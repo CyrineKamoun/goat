@@ -685,7 +685,9 @@ class ThumbnailGeneratorTask:
                 # Parse layer properties
                 properties = row["properties"] or {}
                 if isinstance(properties, str):
-                    properties = json.loads(properties)
+                    properties = json.loads(properties) or {}
+                if not isinstance(properties, dict):
+                    properties = {}
                 properties["visibility"] = True
 
                 # Parse extent to bounds
