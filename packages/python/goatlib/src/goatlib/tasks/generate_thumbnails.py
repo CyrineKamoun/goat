@@ -540,13 +540,23 @@ class ThumbnailGeneratorTask:
         layers = []
         for row in rows:
             # Merge layer properties with layer_project overrides
-            properties = row["layer_properties"] or {}
-            if isinstance(properties, str):
-                properties = json.loads(properties)
+            properties = row["layer_properties"]
+            if properties is None:
+                properties = {}
+            elif isinstance(properties, str):
+                properties = json.loads(properties) or {}
 
-            lp_props = row["layer_project_properties"] or {}
-            if isinstance(lp_props, str):
-                lp_props = json.loads(lp_props)
+            lp_props = row["layer_project_properties"]
+            if lp_props is None:
+                lp_props = {}
+            elif isinstance(lp_props, str):
+                lp_props = json.loads(lp_props) or {}
+
+            # Ensure we have dicts (json.loads can return None for "null")
+            if not isinstance(properties, dict):
+                properties = {}
+            if not isinstance(lp_props, dict):
+                lp_props = {}
 
             # Layer project properties override layer properties
             merged_props = {**properties, **lp_props}
