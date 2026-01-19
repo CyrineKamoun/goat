@@ -81,4 +81,14 @@ TASK_REGISTRY: tuple[TaskDefinition, ...] = (
         schedule=None,  # Called by queue task
         worker_tag="tools",
     ),
+    TaskDefinition(
+        name="generate_thumbnails",
+        display_name="Generate Thumbnails",
+        description="Generate thumbnails for projects and layers that have been updated",
+        module_path="goatlib.tasks.generate_thumbnails",
+        params_class_name="ThumbnailTaskParams",
+        windmill_path="f/goat/tasks/generate_thumbnails",
+        schedule="0 */10 * * * *",  # Every 10 minutes (Windmill uses 6-field cron)
+        worker_tag="print",  # Uses print worker with Playwright
+    ),
 )

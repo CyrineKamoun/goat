@@ -96,7 +96,7 @@ class IProjectCreate(ContentBaseAttributes):
 class IProjectRead(ContentBaseAttributes, DateTimeBase):
     id: UUID = Field(..., description="Project ID")
     layer_order: list[int] | None = Field(None, description="Layer order in project")
-    thumbnail_url: HttpUrl | None = Field(description="Project thumbnail URL")
+    thumbnail_url: str | None = Field(description="Project thumbnail URL")
     active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
     basemap: str | None = Field(None, description="Project basemap")
     shared_with: dict[str, Any] | None = Field(None, description="Shared with")
@@ -110,6 +110,26 @@ class IProjectRead(ContentBaseAttributes, DateTimeBase):
         sa_column=Column(ARRAY(Text), nullable=True),
         description="Layer tags",
     )
+
+    @field_validator("thumbnail_url", mode="before")
+    @classmethod
+    def convert_thumbnail_to_presigned_url(
+        cls: type["IProjectRead"], value: str | None
+    ) -> str | None:
+        """Convert S3 key to presigned URL if needed."""
+        if not value:
+            return settings.DEFAULT_PROJECT_THUMBNAIL
+
+        # If already a full URL, return as-is
+        if value.startswith(("http://", "https://")):
+            return value
+
+        # It's an S3 key, generate presigned URL
+        from core.services.s3 import s3_service
+
+        return s3_service.get_thumbnail_url(
+            value, default_url=settings.DEFAULT_PROJECT_THUMBNAIL
+        )
 
 
 class IProjectBaseUpdate(SQLModel):

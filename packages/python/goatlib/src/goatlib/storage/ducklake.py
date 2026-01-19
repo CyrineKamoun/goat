@@ -326,7 +326,16 @@ class BaseDuckLakeManager:
         if self._extensions_installed:
             return
         for ext in self.REQUIRED_EXTENSIONS:
-            con.execute(f"INSTALL {ext}")
+            try:
+                con.execute(f"INSTALL {ext}")
+            except duckdb.IOException as e:
+                # Extension might already be installed or network unavailable
+                # Try to load it - if it's installed, this will work
+                logger.warning(
+                    "Could not install extension %s (may already be installed): %s",
+                    ext,
+                    e,
+                )
         logger.info("Installed DuckDB extensions: %s", self.REQUIRED_EXTENSIONS)
         self._extensions_installed = True
 

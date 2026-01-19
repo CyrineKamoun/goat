@@ -40,7 +40,13 @@ x-env-print: &env-print
   WORKER_TAGS: print
   JOB_DEFAULT_TIMEOUT: 300
   PYTHONDONTWRITEBYTECODE: "1"
-  WHITELIST_ENVS: "S3_PROVIDER,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION_NAME,PRINT_BASE_URL"
+  WHITELIST_ENVS: "POSTGRES_SERVER,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,S3_PROVIDER,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION_NAME,PRINT_BASE_URL"
+  POSTGRES_SERVER: ${POSTGRES_SERVER}
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  POSTGRES_DB: goat
+  DUCKLAKE_DATA_DIR: /app/data/ducklake
+  DUCKLAKE_CATALOG_SCHEMA: ducklake
   S3_PROVIDER: ${S3_PROVIDER:-hetzner}
   S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
   S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-${S3_ENDPOINT_URL}}
@@ -290,6 +296,7 @@ services:
       PRINT_BASE_URL: ${PRINT_BASE_URL:-http://web:3000}
     volumes:
       - ./packages/python/goatlib/src/goatlib:/venv/lib/python3.11/site-packages/goatlib:ro
+      - ./data/ducklake:/app/data/ducklake:ro
     depends_on:
       - windmill-server
 
@@ -313,6 +320,7 @@ services:
       PRINT_BASE_URL: http://localhost:3000
     volumes:
       - ./packages/python/goatlib/src/goatlib:/venv/lib/python3.11/site-packages/goatlib:ro
+      - ./data/ducklake:/app/data/ducklake:ro
     depends_on:
       - windmill-server
 
