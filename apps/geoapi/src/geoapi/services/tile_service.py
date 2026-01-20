@@ -182,6 +182,56 @@ class TileService:
         # Check if PMTiles exist
         return self._pmtiles_exists(layer_info)
 
+    def can_serve_from_pmtiles(
+        self,
+        layer_info: LayerInfo,
+        cql_filter: Optional[dict] = None,
+        bbox: Optional[list[float]] = None,
+    ) -> bool:
+        """Public method to check if PMTiles can be used for this request.
+
+        This is used by the router to skip expensive metadata lookups.
+
+        Args:
+            layer_info: Layer information
+            cql_filter: Optional CQL filter
+            bbox: Optional additional bbox filter
+
+        Returns:
+            True if PMTiles can serve this request
+        """
+        return self._should_use_pmtiles(layer_info, cql_filter, bbox)
+
+    async def get_tile_from_pmtiles_only(
+        self,
+        layer_info: LayerInfo,
+        z: int,
+        x: int,
+        y: int,
+    ) -> Optional[tuple[bytes, bool, str]]:
+        """Get tile directly from PMTiles without metadata lookup.
+
+        Fast path for tile serving when PMTiles exist and no filters are applied.
+
+        Args:
+            layer_info: Layer information
+            z: Zoom level
+            x: Tile X coordinate
+            y: Tile Y coordinate
+
+        Returns:
+            Tuple of (tile_data, is_gzip, source) or None if PMTiles not available
+        """
+        if not self._pmtiles_exists(layer_info):
+            return None
+
+        result = await self._get_tile_from_pmtiles(layer_info, z, x, y)
+        if result is None:
+            return None
+
+        tile_data, is_gzip = result
+        return (tile_data, is_gzip, "pmtiles")
+
     async def _get_tile_from_pmtiles(
         self, layer_info: LayerInfo, z: int, x: int, y: int
     ) -> Optional[tuple[bytes, bool]]:

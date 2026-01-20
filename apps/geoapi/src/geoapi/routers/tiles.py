@@ -54,7 +54,32 @@ async def get_tile(
     limit: int = Query(default=None, ge=1, le=100000, description="Max features"),
 ) -> Response:
     """Get a vector tile for the specified collection and tile coordinates."""
-    # Get layer metadata for column validation
+    # Fast path: If PMTiles exist and no filters, serve directly without metadata lookup
+    # This avoids expensive PostgreSQL + DuckDB queries for cached tile serving
+    if tile_service.can_serve_from_pmtiles(layer_info, cql_filter, bbox):
+        result = await tile_service.get_tile_from_pmtiles_only(
+            layer_info=layer_info,
+            z=z,
+            x=x,
+            y=y,
+        )
+        if result is not None:
+            tile_data, is_gzip, source = result
+            if not tile_data:
+                return Response(status_code=204)
+            headers = {
+                "Cache-Control": "public, max-age=3600",
+                "X-Tile-Source": source,
+            }
+            if is_gzip:
+                headers["Content-Encoding"] = "gzip"
+            return Response(
+                content=tile_data,
+                media_type="application/vnd.mapbox-vector-tile",
+                headers=headers,
+            )
+
+    # Slow path: Need metadata for dynamic tile generation or validation
     metadata = await layer_service.get_layer_metadata(layer_info)
 
     if not metadata:
