@@ -160,6 +160,85 @@ def create_api_token(base_url: str, token: str, label: str = "goat-api") -> str:
     return api_token
 
 
+def create_folder(
+    base_url: str, token: str, workspace_id: str, folder_name: str
+) -> None:
+    """Create a folder in the workspace."""
+    try:
+        api_request(
+            base_url,
+            f"/w/{workspace_id}/folders/create",
+            method="POST",
+            data={"name": folder_name},
+            token=token,
+        )
+        print(f"  Created folder: {folder_name}")
+    except Exception as e:
+        error_str = str(e).lower()
+        if "already exists" in error_str or "duplicate" in error_str:
+            print(f"  Folder already exists: {folder_name}")
+        else:
+            print(f"  Warning creating folder {folder_name}: {e}")
+
+
+def verify_script_creation(
+    base_url: str, token: str, workspace_id: str, max_retries: int = 10, delay: int = 2
+) -> bool:
+    """Verify that Windmill can create scripts by creating and deleting a test script.
+
+    This ensures Windmill is fully initialized before the sync script runs.
+    """
+    test_path = "f/goat/tools/_init_test"
+    test_content = "def main(): return 'test'"
+
+    print("Verifying Windmill is ready for script creation...")
+
+    for attempt in range(max_retries):
+        try:
+            # Try to create a test script
+            api_request(
+                base_url,
+                f"/w/{workspace_id}/scripts/create",
+                method="POST",
+                data={
+                    "path": test_path,
+                    "content": test_content,
+                    "summary": "Init test",
+                    "description": "Temporary test script",
+                    "language": "python3",
+                },
+                token=token,
+                expect_json=False,
+            )
+
+            # Delete the test script
+            try:
+                api_request(
+                    base_url,
+                    f"/w/{workspace_id}/scripts/delete/p/{test_path}",
+                    method="POST",
+                    token=token,
+                    expect_json=False,
+                )
+            except Exception:
+                pass  # Ignore delete errors
+
+            print("  Windmill is ready for script creation")
+            return True
+
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"  Attempt {attempt + 1}/{max_retries}: Not ready yet ({e})")
+                time.sleep(delay)
+            else:
+                print(
+                    f"ERROR: Windmill not ready for script creation after {max_retries} attempts"
+                )
+                return False
+
+    return False
+
+
 def main() -> int:
     """Initialize Windmill workspace and create API token."""
     # Get configuration from environment
@@ -206,8 +285,19 @@ def main() -> int:
                 base_url, session_token, workspace_id, workspace_id.title()
             )
 
+        # Create required folders for tools
+        # Script path f/goat/tools/buffer means folder "goat" containing folder "tools"
+        # We need to create "goat" first, then "goat/tools"
+        print("Creating folders for tools...")
+        create_folder(base_url, session_token, workspace_id, "goat")
+
         # Create API token
         api_token = create_api_token(base_url, session_token, f"{workspace_id}-api")
+
+        # Verify Windmill is ready for script creation before completing
+        # This prevents the sync script from running too early
+        if not verify_script_creation(base_url, api_token, workspace_id):
+            return 1
 
         # Output the token
         print()
