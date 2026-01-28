@@ -1,6 +1,8 @@
 """Tiles router for OGC Tiles API endpoints."""
 
 import logging
+import time
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Path, Query, Request, Response
@@ -13,6 +15,7 @@ from geoapi.dependencies import (
     TileMatrixSetIdDep,
     normalize_layer_id,
 )
+from geoapi.metrics import tile_metrics
 from geoapi.models import (
     Link,
     StyleJSON,
@@ -56,6 +59,9 @@ async def get_tile(
     limit: int = Query(default=None, ge=1, le=100000, description="Max features"),
 ) -> Response:
     """Get a vector tile for the specified collection and tile coordinates."""
+    request_id = str(uuid.uuid4())[:8]
+    start_time = time.monotonic()
+
     # Ultra-fast path: Try PMTiles by layer_id without ANY database lookup
     # This completely bypasses DuckDB schema lookup for cached tile serving
     try:
@@ -64,6 +70,9 @@ async def get_tile(
         raise HTTPException(
             status_code=400, detail=f"Invalid collection ID: {collection_id}"
         )
+
+    # Start metrics tracking
+    metrics = tile_metrics.start_request(request_id, layer_id, z, x, y)
 
     # Try ultra-fast PMTiles path first (wrapped in try-except to ensure fallback)
     try:
@@ -76,11 +85,24 @@ async def get_tile(
             )
             if result is not None:
                 tile_data, is_gzip, source = result
+                elapsed_ms = (time.monotonic() - start_time) * 1000
                 if not tile_data:
-                    return Response(status_code=204)
+                    tile_metrics.end_request(metrics, tile_size=0, source=source)
+                    return Response(
+                        status_code=204,
+                        headers={
+                            "X-Request-ID": request_id,
+                            "X-Response-Time": f"{elapsed_ms:.1f}ms",
+                        },
+                    )
+                tile_metrics.end_request(
+                    metrics, tile_size=len(tile_data), source=source
+                )
                 headers = {
                     "Cache-Control": "public, max-age=3600",
                     "X-Tile-Source": source,
+                    "X-Request-ID": request_id,
+                    "X-Response-Time": f"{elapsed_ms:.1f}ms",
                 }
                 if is_gzip:
                     headers["Content-Encoding"] = "gzip"
@@ -151,18 +173,31 @@ async def get_tile(
         )
     except TimeoutError:
         # Query exceeded timeout - return 504 Gateway Timeout
+        tile_metrics.end_request(metrics, error="timeout")
         raise HTTPException(
             status_code=504,
             detail=f"Tile query timeout for z={z}, x={x}, y={y}. Try a higher zoom level or smaller area.",
         )
 
     if not result:
-        return Response(status_code=204)
+        elapsed_ms = (time.monotonic() - start_time) * 1000
+        tile_metrics.end_request(metrics, tile_size=0, source="dynamic")
+        return Response(
+            status_code=204,
+            headers={
+                "X-Request-ID": request_id,
+                "X-Response-Time": f"{elapsed_ms:.1f}ms",
+            },
+        )
 
     tile_data, is_gzip, source = result
+    elapsed_ms = (time.monotonic() - start_time) * 1000
+    tile_metrics.end_request(metrics, tile_size=len(tile_data), source=source)
     headers = {
         "Cache-Control": "public, max-age=3600",
         "X-Tile-Source": source,
+        "X-Request-ID": request_id,
+        "X-Response-Time": f"{elapsed_ms:.1f}ms",
     }
     if is_gzip:
         headers["Content-Encoding"] = "gzip"
