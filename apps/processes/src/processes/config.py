@@ -86,6 +86,15 @@ class Settings(BaseSettings):
     # DuckDB memory limit (e.g., "1.5GB", "512MB")
     DUCKDB_MEMORY_LIMIT: str = os.getenv("PROCESSES_DUCKDB_MEMORY_LIMIT", "1.2GB")
 
+    # DuckDB thread limit (number of CPU threads to use)
+    # Default: 2 threads per query to allow concurrent requests
+    DUCKDB_THREADS: int = int(os.getenv("PROCESSES_DUCKDB_THREADS", "2"))
+
+    # Analytics query timeout in seconds (applies to sync analytics queries)
+    ANALYTICS_QUERY_TIMEOUT: int = int(
+        os.getenv("PROCESSES_ANALYTICS_QUERY_TIMEOUT", "60")
+    )
+
     # Traveltime matrices directory for heatmap tools
     TRAVELTIME_MATRICES_DIR: str = os.getenv(
         "TRAVELTIME_MATRICES_DIR", "/app/data/traveltime_matrices"
