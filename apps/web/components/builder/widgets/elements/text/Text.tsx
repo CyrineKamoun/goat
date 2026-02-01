@@ -46,8 +46,13 @@ export const TipTapEditorContent = styled(EditorContent)(() => ({
       marginTop: 0,
     },
     // Hide empty trailing paragraphs (but keep them editable)
-    "& p:last-child:empty, & p:last-child:has(br:only-child)": {
+    "& p:last-child:empty": {
       display: "none",
+    },
+    "@supports selector(p:has(br:only-child))": {
+      "& p:last-child:has(br:only-child)": {
+        display: "none",
+      },
     },
   },
   "& > .ProseMirror-focused": {
