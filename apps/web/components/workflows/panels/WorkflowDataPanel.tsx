@@ -15,6 +15,7 @@ import {
   Box,
   IconButton,
   Skeleton,
+  Stack,
   Tab,
   TablePagination,
   Tabs,
@@ -30,13 +31,19 @@ import { useTranslation } from "react-i18next";
 import type { MapRef } from "react-map-gl/maplibre";
 import { useDispatch, useSelector } from "react-redux";
 
-import { useDatasetCollectionItems } from "@/lib/api/layers";
+import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
+
+import { useDataset, useDatasetCollectionItems } from "@/lib/api/layers";
 import { getExtent } from "@/lib/api/processes";
 import { MAPTILER_KEY } from "@/lib/constants";
 import { DrawProvider } from "@/lib/providers/DrawProvider";
 import type { AppDispatch } from "@/lib/store";
-import { selectRequestMapView } from "@/lib/store/workflow/selectors";
-import { clearMapViewRequest } from "@/lib/store/workflow/slice";
+import { selectRequestMapView, selectRequestTableView } from "@/lib/store/workflow/selectors";
+import {
+  clearMapViewRequest,
+  clearTableViewRequest,
+  setActiveDataPanelView,
+} from "@/lib/store/workflow/slice";
 import { createTheCQLBasedOnExpression } from "@/lib/transformers/filter";
 import { fitBounds } from "@/lib/utils/map/navigate";
 import { globalExtent, wktToGeoJSON } from "@/lib/utils/map/wkt";
@@ -171,80 +178,60 @@ function a11yProps(index: number) {
   };
 }
 
-// Check if node has displayable data
-function getNodeDataInfo(
-  node: WorkflowNode | null,
-  projectLayers: ProjectLayer[]
-): {
+// Get layer ID from node (either dataset layer ID or tool output layer ID)
+function getNodeDataInfo(node: WorkflowNode | null): {
   hasData: boolean;
-  layer: ProjectLayer | null;
-  hasGeometry: boolean;
-  isTable: boolean;
+  layerId: string | null; // UUID of the layer
   nodeFilter: { op: string; expressions: Expression[] } | null;
 } {
   if (!node) {
-    return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
+    return { hasData: false, layerId: null, nodeFilter: null };
   }
 
-  // Dataset node
+  // Dataset node - use layerId directly
   if (node.type === "dataset" && node.data.type === "dataset") {
-    const layerProjectId = node.data.layerProjectId;
-    if (!layerProjectId) {
-      return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
+    const layerId = node.data.layerId;
+    if (!layerId) {
+      return { hasData: false, layerId: null, nodeFilter: null };
     }
-    const layer = projectLayers.find((l) => l.id === layerProjectId);
-    if (!layer) {
-      return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
-    }
-    // Check if it's a table (no geometry)
-    const isTable = layer.type === "table";
     // Get node's workflow filter
     const nodeFilter = node.data.filter as { op: string; expressions: Expression[] } | undefined;
     return {
       hasData: true,
-      layer,
-      hasGeometry: !isTable,
-      isTable,
+      layerId,
       nodeFilter: nodeFilter || null,
     };
   }
 
-  // Tool node with results
+  // Tool node with results - use outputLayerId (UUID)
   if (node.type === "tool" && node.data.type === "tool") {
-    const outputLayerProjectId = node.data.outputLayerProjectId;
-    if (!outputLayerProjectId) {
-      return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
+    const outputLayerId = node.data.outputLayerId;
+    if (!outputLayerId) {
+      return { hasData: false, layerId: null, nodeFilter: null };
     }
-    const layer = projectLayers.find((l) => l.id === outputLayerProjectId);
-    if (!layer) {
-      return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
-    }
-    const isTable = layer.type === "table";
     return {
       hasData: true,
-      layer,
-      hasGeometry: !isTable,
-      isTable,
+      layerId: outputLayerId,
       nodeFilter: null, // Tool nodes don't have workflow filters
     };
   }
 
-  return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
+  return { hasData: false, layerId: null, nodeFilter: null };
 }
 
 interface WorkflowDataPanelProps {
   selectedNode: WorkflowNode | null;
-  projectLayers: ProjectLayer[];
 }
 
-const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, projectLayers }) => {
+const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode }) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
   const dispatch = useDispatch<AppDispatch>();
   const mapRef = useRef<MapRef | null>(null);
 
-  // Redux state for map view request
+  // Redux state for map/table view requests
   const requestMapViewFlag = useSelector(selectRequestMapView);
+  const requestTableViewFlag = useSelector(selectRequestTableView);
 
   // Panel state
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -255,29 +242,41 @@ const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, pro
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ y: number; height: number } | null>(null);
 
-  // Get node data info
-  const {
-    hasData,
-    layer,
-    hasGeometry,
-    isTable: _isTable,
-    nodeFilter,
-  } = useMemo(() => getNodeDataInfo(selectedNode, projectLayers), [selectedNode, projectLayers]);
+  // Get node data info - returns layerId (UUID) for fetching
+  const { hasData, layerId, nodeFilter } = useMemo(() => getNodeDataInfo(selectedNode), [selectedNode]);
+
+  // Fetch layer data by layerId
+  const { dataset: layer } = useDataset(layerId || "");
+
+  // Get the layer UUID
+  const effectiveLayerId = layer?.id || layerId || "";
+
+  // Determine if layer has geometry
+  const isTable = layer?.type === "table";
+  const hasGeometry = layer ? !isTable : false;
 
   // Open map view when requested via Redux (e.g., from spatial filter creation)
   useEffect(() => {
     if (requestMapViewFlag && hasGeometry) {
       setIsCollapsed(false);
       setTabValue(1); // Map tab
+      dispatch(setActiveDataPanelView("map"));
       dispatch(clearMapViewRequest());
     }
   }, [requestMapViewFlag, hasGeometry, dispatch]);
 
+  // Open table view when requested via Redux
+  useEffect(() => {
+    if (requestTableViewFlag && hasData) {
+      setIsCollapsed(false);
+      setTabValue(0); // Table tab
+      dispatch(setActiveDataPanelView("table"));
+      dispatch(clearTableViewRequest());
+    }
+  }, [requestTableViewFlag, hasData, dispatch]);
+
   // Get layer fields for table and filter CQL generation
-  const { layerFields: fields, isLoading: areFieldsLoading } = useLayerFields(
-    layer?.layer_id || "",
-    undefined
-  );
+  const { layerFields: fields, isLoading: areFieldsLoading } = useLayerFields(effectiveLayerId, undefined);
 
   // Build CQL filter from node's workflow filter
   const cqlFilter = useMemo(() => {
@@ -308,17 +307,16 @@ const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, pro
 
   // Reset query params when layer or filter changes
   useEffect(() => {
-    const layerId = layer?.layer_id || null;
     // Only use node's workflow filter, NOT the layer's CQL filter
     // Workflow filter is independent and should not fall back to layer filter
     const filterString = cqlFilterString;
 
     // Skip if nothing changed
-    if (layerId === prevLayerIdRef.current && filterString === prevFilterRef.current) {
+    if (effectiveLayerId === prevLayerIdRef.current && filterString === prevFilterRef.current) {
       return;
     }
 
-    prevLayerIdRef.current = layerId;
+    prevLayerIdRef.current = effectiveLayerId;
     prevFilterRef.current = filterString;
 
     const newParams: GetCollectionItemsQueryParams = {
@@ -329,9 +327,9 @@ const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, pro
       newParams.filter = filterString;
     }
     setDataQueryParams(newParams);
-  }, [layer?.layer_id, cqlFilterString]);
+  }, [effectiveLayerId, cqlFilterString]);
 
-  const { data: tableData } = useDatasetCollectionItems(layer?.layer_id || "", dataQueryParams);
+  const { data: tableData } = useDatasetCollectionItems(effectiveLayerId, dataQueryParams);
 
   // Map state
   const mapBounds = useMemo(() => {
@@ -378,9 +376,9 @@ const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, pro
   // Zoom to appropriate extent when opening map view or when filter/layer changes
   useEffect(() => {
     // Reset zoom tracking when not on map view or no valid data
-    if (!hasGeometry || !layer?.layer_id || tabValue !== 1 || isCollapsed) {
+    if (!hasGeometry || !effectiveLayerId || tabValue !== 1 || isCollapsed) {
       // Reset so we zoom again next time map view opens
-      if (tabValue !== 1 || !layer?.layer_id) {
+      if (tabValue !== 1 || !effectiveLayerId) {
         lastZoomKeyRef.current = null;
       }
       return;
@@ -391,11 +389,10 @@ const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, pro
       return;
     }
 
-    const layerId = layer.layer_id;
     const filterString = cqlFilterString;
 
     // Create a unique key for this zoom target
-    const zoomKey = `${layerId}:${filterString || "none"}`;
+    const zoomKey = `${effectiveLayerId}:${filterString || "none"}`;
 
     // Skip if we already zoomed to this exact target
     if (lastZoomKeyRef.current === zoomKey) {
@@ -407,14 +404,14 @@ const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, pro
 
     // If map is ready, zoom immediately
     if (mapRef.current) {
-      performZoom(layerId, filterString);
+      performZoom(effectiveLayerId, filterString);
       return;
     }
 
     // Map not ready yet - poll for it (faster than waiting for onLoad)
     const checkMapReady = () => {
       if (mapRef.current) {
-        performZoom(layerId, filterString);
+        performZoom(effectiveLayerId, filterString);
         return true;
       }
       return false;
@@ -434,7 +431,7 @@ const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, pro
       return () => clearInterval(intervalId);
     }
   }, [
-    layer?.layer_id,
+    effectiveLayerId,
     hasGeometry,
     tabValue,
     isCollapsed,
@@ -451,6 +448,8 @@ const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, pro
     if (isCollapsed) {
       setIsCollapsed(false);
     }
+    // Track active view in Redux
+    dispatch(setActiveDataPanelView(newValue === 0 ? "table" : "map"));
   };
 
   // Handle pagination
@@ -508,22 +507,35 @@ const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, pro
 
   // Toggle collapse
   const toggleCollapse = useCallback(() => {
-    setIsCollapsed((prev) => !prev);
-  }, []);
+    setIsCollapsed((prev) => {
+      const newCollapsed = !prev;
+      // Track active view in Redux
+      if (newCollapsed) {
+        dispatch(setActiveDataPanelView(null));
+      } else {
+        dispatch(setActiveDataPanelView(tabValue === 0 ? "table" : "map"));
+      }
+      return newCollapsed;
+    });
+  }, [dispatch, tabValue]);
 
   // Layer with visibility and workflow filter for map
-  const layerForMap = useMemo(() => {
+  // Convert Layer to ProjectLayer-like format for MapViewer
+  const layerForMap = useMemo((): ProjectLayer | null => {
     if (!layer || !hasGeometry) return null;
+
     return {
       ...layer,
+      // Add ProjectLayer-specific fields
+      id: 0, // Placeholder - not used for map rendering
+      layer_id: layer.id,
+      folder_id: layer.folder_id,
       properties: {
         ...layer.properties,
         visibility: true,
       },
-      // Apply workflow filter (cqlFilter) if available, otherwise clear any filter
-      // Workflow filter is independent from layer's CQL filter
-      query: cqlFilter ? { ...layer.query, cql: cqlFilter } : { ...layer.query, cql: undefined },
-    };
+      query: cqlFilter ? { cql: cqlFilter } : undefined,
+    } as ProjectLayer;
   }, [layer, hasGeometry, cqlFilter]);
 
   // Don't render if no data available from any node
@@ -531,17 +543,27 @@ const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, pro
     return (
       <PanelContainer height={COLLAPSED_HEIGHT} isCollapsed={true} isDragging={false}>
         <PanelHeader>
-          <Tabs value={false} onChange={() => {}} sx={{ minHeight: 36 }}>
+          <Tabs value={false} onChange={() => {}} sx={{ minHeight: 44 }}>
             <Tab
-              label={t("table_view")}
+              label={
+                <Stack direction="row" alignItems="center" spacing={1.5}>
+                  <Icon iconName={ICON_NAME.TABLE} style={{ fontSize: 14 }} />
+                  <span>{t("table")}</span>
+                </Stack>
+              }
               disabled
-              sx={{ minHeight: 36, py: 0.75, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
+              sx={{ minHeight: 44, py: 0, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
               {...a11yProps(0)}
             />
             <Tab
-              label={t("map_view")}
+              label={
+                <Stack direction="row" alignItems="center" spacing={1.5}>
+                  <Icon iconName={ICON_NAME.MAP} style={{ fontSize: 14 }} />
+                  <span>{t("map")}</span>
+                </Stack>
+              }
               disabled
-              sx={{ minHeight: 36, py: 0.75, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
+              sx={{ minHeight: 44, py: 0, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
               {...a11yProps(1)}
             />
           </Tabs>
@@ -554,18 +576,28 @@ const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, pro
     <PanelContainer height={panelHeight} isCollapsed={isCollapsed} isDragging={isDragging}>
       {/* Header with tabs */}
       <PanelHeader>
-        <Tabs value={tabValue} onChange={handleTabChange} sx={{ minHeight: 36 }}>
+        <Tabs value={tabValue} onChange={handleTabChange} sx={{ minHeight: 44 }}>
           <Tab
-            label={t("table_view")}
+            label={
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Icon iconName={ICON_NAME.TABLE} style={{ fontSize: 14 }} />
+                <span>{t("table")}</span>
+              </Stack>
+            }
             onClick={() => isCollapsed && setIsCollapsed(false)}
-            sx={{ minHeight: 36, py: 0.75, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
+            sx={{ minHeight: 44, py: 0, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
             {...a11yProps(0)}
           />
           <Tab
-            label={t("map_view")}
+            label={
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Icon iconName={ICON_NAME.MAP} style={{ fontSize: 14 }} />
+                <span>{t("map")}</span>
+              </Stack>
+            }
             disabled={!hasGeometry}
             onClick={() => isCollapsed && hasGeometry && setIsCollapsed(false)}
-            sx={{ minHeight: 36, py: 0.75, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
+            sx={{ minHeight: 44, py: 0, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
             {...a11yProps(1)}
           />
         </Tabs>

@@ -85,17 +85,17 @@ Workflows allow users to chain multiple tools (processes) together in a visual D
 
 **Table: `customer.workflow`**
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `id` | UUID | Primary key |
-| `project_id` | UUID | FK to `project.id` (CASCADE delete) |
-| `name` | TEXT | Workflow name |
-| `description` | TEXT | Optional description |
-| `is_default` | BOOLEAN | Default workflow for project |
-| `config` | JSONB | ReactFlow nodes, edges, viewport |
-| `thumbnail_url` | TEXT | Preview image URL |
-| `created_at` | TIMESTAMPTZ | Creation timestamp |
-| `updated_at` | TIMESTAMPTZ | Last update timestamp |
+| Column          | Type        | Description                         |
+| --------------- | ----------- | ----------------------------------- |
+| `id`            | UUID        | Primary key                         |
+| `project_id`    | UUID        | FK to `project.id` (CASCADE delete) |
+| `name`          | TEXT        | Workflow name                       |
+| `description`   | TEXT        | Optional description                |
+| `is_default`    | BOOLEAN     | Default workflow for project        |
+| `config`        | JSONB       | ReactFlow nodes, edges, viewport    |
+| `thumbnail_url` | TEXT        | Preview image URL                   |
+| `created_at`    | TIMESTAMPTZ | Creation timestamp                  |
+| `updated_at`    | TIMESTAMPTZ | Last update timestamp               |
 
 **Pydantic Schemas** (`apps/core/src/core/schemas/workflow.py`):
 
@@ -139,15 +139,14 @@ export const nodeStatusSchema = z.enum([
   "error",
 ]);
 
-// Dataset node - references a project layer
+// Dataset node - references a layer by UUID
 export const datasetNodeDataSchema = z.object({
   type: z.literal("dataset"),
   label: z.string(),
-  layerProjectId: z.number().optional(),  // Project layer ID
-  layerId: z.string().optional(),          // UUID for execution
+  layerId: z.string().uuid().optional(),    // Layer UUID (from project, explorer, or catalog)
   layerName: z.string().optional(),
   geometryType: z.string().optional(),
-  filter: z.record(z.unknown()).optional(), // CQL filter
+  filter: z.record(z.unknown()).optional(), // Workflow filter (independent from layer's CQL)
 });
 
 // Tool node - represents a process
@@ -157,8 +156,7 @@ export const toolNodeDataSchema = z.object({
   label: z.string(),
   config: z.record(z.unknown()),            // Tool parameters (excluding layer inputs)
   status: nodeStatusSchema.optional(),
-  outputLayerId: z.string().optional(),     // Result layer UUID after execution
-  outputLayerProjectId: z.number().optional(),
+  outputLayerId: z.string().uuid().optional(),  // Result layer UUID after execution (temporary, not added to project)
   jobId: z.string().optional(),             // Windmill job ID during execution
   error: z.string().optional(),
 });
@@ -270,16 +268,16 @@ Based on mockups, the workflow editor has three panels:
 
 **Toolbar** (top of canvas):
 
-| Icon | Action | Description |
-|------|--------|-------------|
-| 🗑 | Delete | Delete selected node(s) |
-| 📋 | Duplicate | Duplicate selected node(s) |
-| 🔍 | Filter | Open filter panel for selected dataset node |
-| ⊞ | Auto-layout | Arrange nodes automatically |
-| ☁ | Save | Manual save (auto-save enabled) |
-| ⬇ | Export | Export workflow as JSON |
-| ▶ RUN NODE | Execute | Run only the selected node |
-| ▶▶ RUN TO HERE | Execute | Run from start up to selected node |
+| Icon           | Action      | Description                                 |
+| -------------- | ----------- | ------------------------------------------- |
+| 🗑              | Delete      | Delete selected node(s)                     |
+| 📋              | Duplicate   | Duplicate selected node(s)                  |
+| 🔍              | Filter      | Open filter panel for selected dataset node |
+| ⊞              | Auto-layout | Arrange nodes automatically                 |
+| ☁              | Save        | Manual save (auto-save enabled)             |
+| ⬇              | Export      | Export workflow as JSON                     |
+| ▶ RUN NODE     | Execute     | Run only the selected node                  |
+| ▶▶ RUN TO HERE | Execute     | Run from start up to selected node          |
 
 **Canvas Features:**
 
@@ -513,11 +511,10 @@ async function executeNode(
     // 5. Poll for completion
     const result = await waitForJob(jobId);
     
-    // 6. Update node with result
+    // 6. Update node with result (temporary layer, not added to project)
     updateNodeOutput(node.id, {
       status: "completed",
-      outputLayerId: result.layer_id,
-      outputLayerProjectId: result.layer_project_id,
+      outputLayerId: result.layer_id,  // UUID of temporary result layer
     });
   } catch (error) {
     updateNodeStatus(node.id, "error", error.message);
@@ -541,14 +538,14 @@ async function executeNode(
 
 **Base URL**: `/api/v2/projects/{project_id}/workflow`
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/` | List all workflows for project |
-| GET | `/{workflow_id}` | Get specific workflow |
-| POST | `/` | Create workflow |
-| PUT | `/{workflow_id}` | Update workflow |
-| DELETE | `/{workflow_id}` | Delete workflow |
-| POST | `/{workflow_id}/duplicate` | Duplicate workflow |
+| Method | Endpoint                   | Description                    |
+| ------ | -------------------------- | ------------------------------ |
+| GET    | `/`                        | List all workflows for project |
+| GET    | `/{workflow_id}`           | Get specific workflow          |
+| POST   | `/`                        | Create workflow                |
+| PUT    | `/{workflow_id}`           | Update workflow                |
+| DELETE | `/{workflow_id}`           | Delete workflow                |
+| POST   | `/{workflow_id}/duplicate` | Duplicate workflow             |
 
 ### Frontend API Hooks
 

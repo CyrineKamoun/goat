@@ -71,7 +71,6 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
     nodeType: string;
     toolId?: string;
     layerId?: string;
-    layerProjectId?: number;
     layerName?: string;
     geometryType?: string;
     layerCql?: { op: string; args: unknown[] };
@@ -170,8 +169,7 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
 
       dragDataRef.current = {
         nodeType: "dataset",
-        layerId: layer.layer_id,
-        layerProjectId: layer.id,
+        layerId: layer.layer_id, // Use the actual layer ID (UUID)
         layerName: layer.name,
         geometryType: layer.feature_layer_geometry_type || undefined,
         layerCql: hasValidCql ? (layerCql as { op: string; args: unknown[] }) : undefined,
@@ -224,8 +222,7 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
 
       if (!selectedWorkflowId || !dragDataRef.current || !reactFlowInstance) return;
 
-      const { nodeType, toolId, layerId, layerProjectId, layerName, geometryType, layerCql } =
-        dragDataRef.current;
+      const { nodeType, toolId, layerId, layerName, geometryType, layerCql } = dragDataRef.current;
       dragDataRef.current = null;
 
       // Get canvas position from drop coordinates - use screen coordinates directly
@@ -236,7 +233,7 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
 
       if (nodeType === "dataset") {
         // Check if this is a layer drag (has layerId) or empty dataset drag
-        if (layerId && layerProjectId && layerName) {
+        if (layerId && layerName) {
           // Convert layer's CQL filter to workflow filter format (one-way copy)
           let inheritedFilter: { op: string; expressions: unknown[] } | undefined;
           if (layerCql) {
@@ -262,7 +259,6 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
               data: {
                 type: "dataset",
                 label: layerName,
-                layerProjectId: layerProjectId,
                 layerId: layerId,
                 layerName: layerName,
                 geometryType: geometryType || undefined,
@@ -341,7 +337,7 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
           </Box>
 
           {/* Bottom Data Panel - Table/Map view */}
-          <WorkflowDataPanel selectedNode={selectedNode} projectLayers={projectLayers} />
+          <WorkflowDataPanel selectedNode={selectedNode} />
         </Box>
 
         {/* Right Panel - Tools palette & Node Settings */}
