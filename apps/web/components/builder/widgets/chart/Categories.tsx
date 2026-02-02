@@ -1,8 +1,10 @@
 import { Box, Typography, useTheme } from "@mui/material";
 import LinearProgress from "@mui/material/LinearProgress";
+import chroma from "chroma-js";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useLayerUniqueValues } from "@/lib/api/layers";
 import { useProjectLayerAggregationStats } from "@/lib/api/projects";
 import { formatNumber } from "@/lib/utils/format-number";
 import type { AggregationStatsQueryParams } from "@/lib/validations/project";
@@ -15,8 +17,7 @@ import { useChartWidget } from "@/hooks/map/DashboardBuilderHooks";
 import { StaleDataLoader } from "@/components/builder/widgets/common/StaleDataLoader";
 import { WidgetStatusContainer } from "@/components/builder/widgets/common/WidgetStatusContainer";
 
-const DEFAULT_COLOR = "#0e58ff";
-const DEFAULT_HOVER_COLOR = "#3b82f6";
+const FALLBACK_COLORS = ["#5A1846", "#900C3F", "#C70039", "#E3611C", "#F1920E", "#FFC300"];
 const DEFAULT_SELECTED_COLOR = "#f5b704";
 const OPACITY_MODIFIER = "33";
 
@@ -40,6 +41,38 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
     layerId,
     mainQueryParams as AggregationStatsQueryParams
   );
+
+  // Context label: fetch unique values for the configured field
+  const contextLabelConfig = config?.options?.context_label;
+  const contextLabelQueryParams = useMemo(() => {
+    if (!contextLabelConfig?.field) return undefined;
+    return {
+      size: 1, // Only fetch 1 item - we use 'total' to check if there's exactly 1 unique value
+      page: 1,
+      order: "descendent" as const,
+      ...(queryParams?.query ? { query: queryParams.query } : {}),
+    };
+  }, [contextLabelConfig?.field, queryParams?.query]);
+
+  const { data: contextLabelData } = useLayerUniqueValues(
+    contextLabelConfig?.field ? layerId || "" : "",
+    contextLabelConfig?.field || "",
+    contextLabelQueryParams
+  );
+
+  // Determine the context label value
+  const contextLabelValue = useMemo(() => {
+    if (!contextLabelConfig) return null;
+    if (!contextLabelData) return null;
+
+    // Use total count to determine if there's exactly 1 unique value
+    if (contextLabelData.total === 1 && contextLabelData.items?.length === 1) {
+      // Single unique value - show it
+      return String(contextLabelData.items[0].value);
+    }
+    // Multiple values - show default (or null if not set)
+    return contextLabelConfig.default_value || null;
+  }, [contextLabelConfig, contextLabelData]);
 
   // Fetch selected/filtered data (only in highlight mode)
   const { aggregationStats: selectedStats, isLoading: isSelectedLoading } = useProjectLayerAggregationStats(
@@ -99,24 +132,63 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
   const [activeCategory, setActiveCategory] = useState<string | undefined>();
   const [isHovering, setIsHovering] = useState(false);
 
-  // Colors
-  const baseColor = config?.options?.color || DEFAULT_COLOR;
-  const hoverColor = config?.options?.highlight_color || DEFAULT_HOVER_COLOR;
+  // Build color lookup from color_map if available
+  const colorMapLookup = useMemo(() => {
+    const lookup = new Map<string, string>();
+    config?.options?.color_map?.forEach(([value, color]) => {
+      lookup.set(value, color);
+    });
+    return lookup;
+  }, [config?.options?.color_map]);
+
+  // Generate base colors for each category
+  const baseColors = useMemo(() => {
+    if (displayData.length === 0) return [];
+
+    // If we have a color_map, use it for colors
+    if (colorMapLookup.size > 0) {
+      return displayData.map((item, index) => {
+        const mappedColor = colorMapLookup.get(item.grouped_value);
+        if (mappedColor) return mappedColor;
+        // Fallback for items not in color_map
+        const palette = config?.options?.color_range?.colors || FALLBACK_COLORS;
+        const colors = chroma.scale(palette).mode("lch").colors(displayData.length);
+        return colors[index];
+      });
+    }
+
+    // Default behavior: generate from color_range
+    const palette =
+      orderedData.length > 0 ? config?.options?.color_range?.colors || FALLBACK_COLORS : ["#e0e0e0"];
+
+    return displayData.length === 1
+      ? [palette[0]]
+      : chroma.scale(palette).mode("lch").colors(displayData.length);
+  }, [displayData, orderedData.length, config?.options?.color_range?.colors, colorMapLookup]);
+
+  // Colors for highlight/selected states
   const selectedColor = config?.options?.selected_color || DEFAULT_SELECTED_COLOR;
 
-  const getColor = (category: (typeof displayData)[number], isSelected: boolean) => {
+  const getColor = (category: (typeof displayData)[number], index: number, isSelected: boolean) => {
     const isActive = activeCategory === category.grouped_value;
     const hasData = orderedData.length > 0;
+    const baseColor = baseColors[index % baseColors.length];
 
     if (!hasData) return "#e0e0e0";
 
     // In highlight mode with selections shown
     if (showHighlight && isSelected) {
-      if (isActive) return hoverColor;
+      if (isActive) {
+        // Lighten the base color for hover effect
+        return chroma(selectedColor).brighten(0.5).hex();
+      }
       return selectedColor;
     }
 
-    if (isActive) return hoverColor;
+    if (isActive) {
+      // Lighten the base color for hover effect
+      return chroma(baseColor).brighten(0.5).hex();
+    }
     if (isHovering && !isActive) return `${baseColor}${OPACITY_MODIFIER}`;
     return baseColor;
   };
@@ -149,7 +221,19 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
             flexDirection: "column",
             p: 2,
           }}>
-          {displayData.map((category) => {
+          {contextLabelValue && (
+            <Typography
+              variant="caption"
+              sx={{
+                textAlign: "center",
+                fontWeight: 600,
+                color: "text.secondary",
+                mb: 1,
+              }}>
+              {contextLabelValue}
+            </Typography>
+          )}
+          {displayData.map((category, index) => {
             const totalValue = category.operation_value;
             const selectedValue = showHighlight ? selectedCountMap.get(category.grouped_value) || 0 : 0;
             const percentage = (totalValue / maxValue) * 100;
@@ -197,7 +281,7 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
                         backgroundColor: theme.palette.grey[200],
                         "& .MuiLinearProgress-bar": {
                           borderRadius: 4,
-                          backgroundColor: getColor(category, false),
+                          backgroundColor: getColor(category, index, false),
                         },
                       }}
                     />
@@ -214,7 +298,7 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
                           backgroundColor: "transparent",
                           "& .MuiLinearProgress-bar": {
                             borderRadius: 4,
-                            backgroundColor: getColor(category, true),
+                            backgroundColor: getColor(category, index, true),
                           },
                         }}
                       />
@@ -231,7 +315,7 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
                       backgroundColor: theme.palette.grey[200],
                       "& .MuiLinearProgress-bar": {
                         borderRadius: 4,
-                        backgroundColor: getColor(category, false),
+                        backgroundColor: getColor(category, index, false),
                       },
                     }}
                   />

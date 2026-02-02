@@ -319,6 +319,10 @@ export const WidgetData = ({ sectionLabel, config, onChange }: WidgetConfigProps
                   groupBy: (config.setup as any).group_by_column_name,
                 }}
                 onChange={(value) => {
+                  // Check if group_by changed - if so, reset custom_order and color_map
+                  const currentGroupBy = (config.setup as any).group_by_column_name;
+                  const groupByChanged = hasGroupColumnNameDef && value.groupBy !== currentGroupBy;
+
                   onChange({
                     ...config,
                     setup: {
@@ -326,7 +330,16 @@ export const WidgetData = ({ sectionLabel, config, onChange }: WidgetConfigProps
                       operation_type: value.method,
                       operation_value: value.value,
                       ...(hasGroupColumnNameDef && { group_by_column_name: value.groupBy }),
+                      // Reset custom_order when group_by changes
+                      ...(groupByChanged && { custom_order: undefined }),
                     },
+                    // Reset color_map when group_by changes
+                    ...(groupByChanged && {
+                      options: {
+                        ...((config as any).options || {}),
+                        color_map: undefined,
+                      },
+                    }),
                   } as WidgetConfigSchema);
                 }}
               />
@@ -561,8 +574,16 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
     return hasNestedSchemaPath(schema, "options.color_map");
   }, [schema]);
 
+  const hasColorRangeDef = useMemo(() => {
+    return hasNestedSchemaPath(schema, "options.color_range");
+  }, [schema]);
+
   const hasCustomOrderDef = useMemo(() => {
     return hasNestedSchemaPath(schema, "setup.custom_order");
+  }, [schema]);
+
+  const hasContextLabelDef = useMemo(() => {
+    return hasNestedSchemaPath(schema, "options.context_label");
   }, [schema]);
 
   // Check if we're in highlight mode (for showing selected color option)
@@ -582,6 +603,18 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
   const groupByColumnNameForStyle = useMemo(() => {
     return (config?.setup as any)?.group_by_column_name;
   }, [config?.setup]);
+
+  // Get layer fields for context label field selection
+  const { layerFields: contextLabelFields } = useLayerFields(selectedLayerDatasetIdForStyle || "");
+
+  const contextLabel = useMemo(() => {
+    return (config?.options as any)?.context_label;
+  }, [config?.options]);
+
+  const selectedContextField = useMemo(() => {
+    if (!contextLabel?.field) return undefined;
+    return contextLabelFields.find((f) => f.name === contextLabel.field);
+  }, [contextLabel?.field, contextLabelFields]);
 
   const handleOptionChange = useCallback(
     (key: string, value: any) => {
@@ -613,13 +646,23 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
   const hasStyle = useMemo(() => {
     // Skip for widgets that handle their own style configuration
     if (hasCustomStyleHandling) return false;
-    return hasColorDef || hasHighlightColorDef || hasSelectedColorDef || hasColorMapDef || hasCustomOrderDef;
+    return (
+      hasColorDef ||
+      hasHighlightColorDef ||
+      hasSelectedColorDef ||
+      hasColorMapDef ||
+      hasColorRangeDef ||
+      hasCustomOrderDef ||
+      hasContextLabelDef
+    );
   }, [
     hasColorDef,
     hasHighlightColorDef,
     hasSelectedColorDef,
     hasColorMapDef,
+    hasColorRangeDef,
     hasCustomOrderDef,
+    hasContextLabelDef,
     hasCustomStyleHandling,
   ]);
 
@@ -665,7 +708,7 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
                   />
                 )}
 
-                {/* Category order + colors for pie chart (integrated like layer styling ordinal) */}
+                {/* Category order + colors for charts (integrated like layer styling ordinal) */}
                 {hasColorMapDef &&
                   hasCustomOrderDef &&
                   selectedLayerDatasetIdForStyle &&
@@ -675,6 +718,7 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
                       fieldName={groupByColumnNameForStyle}
                       customOrder={(config?.setup as any)?.custom_order}
                       colorMap={(config?.options as any)?.color_map}
+                      colorRange={(config?.options as any)?.color_range}
                       colorPalette={(config?.options as any)?.color_range?.colors}
                       onChange={(order, colorMap) => {
                         // Update both setup.custom_order and options.color_map atomically
@@ -690,10 +734,25 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
                           },
                         } as WidgetConfigSchema);
                       }}
+                      onPaletteChange={(colorRange, order, colorMap) => {
+                        // Update color_range, custom_order, and color_map atomically
+                        onChange({
+                          ...config,
+                          setup: {
+                            ...((config as any).setup || {}),
+                            custom_order: order.length ? order : undefined,
+                          },
+                          options: {
+                            ...((config as any).options || {}),
+                            color_range: colorRange,
+                            color_map: colorMap.length ? colorMap : undefined,
+                          },
+                        } as WidgetConfigSchema);
+                      }}
                     />
                   )}
 
-                {/* Category order only for charts without color_map (like categories_chart) */}
+                {/* Category order only (no color picking) - for widgets with custom_order but no color_map */}
                 {hasCustomOrderDef &&
                   !hasColorMapDef &&
                   selectedLayerDatasetIdForStyle &&
@@ -707,6 +766,42 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
                       }}
                     />
                   )}
+
+                {/* Context label for pie charts - shows dynamic label based on filtered data */}
+                {hasContextLabelDef && selectedLayerDatasetIdForStyle && (
+                  <>
+                    <LayerFieldSelector
+                      fields={contextLabelFields}
+                      selectedField={selectedContextField}
+                      setSelectedField={(field) => {
+                        handleOptionChange(
+                          "context_label",
+                          field?.name
+                            ? { field: field.name, default_value: contextLabel?.default_value }
+                            : undefined
+                        );
+                      }}
+                      label={t("context_field")}
+                      tooltip={t("context_field_tooltip")}
+                    />
+                    {contextLabel?.field && (
+                      <TextFieldInput
+                        type="text"
+                        label={t("default_label")}
+                        placeholder={t("default_label_placeholder")}
+                        clearable
+                        value={contextLabel?.default_value || ""}
+                        onChange={(value: string) => {
+                          handleOptionChange("context_label", {
+                            field: contextLabel.field,
+                            default_value: value || undefined,
+                          });
+                        }}
+                        tooltip={t("default_label_tooltip")}
+                      />
+                    )}
+                  </>
+                )}
               </Stack>
             }
           />

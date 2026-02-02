@@ -127,19 +127,17 @@ export const filterDataConfigSchema = dataConfigSchema.extend({
       show_histogram: z.boolean().optional().default(true),
       steps: z.number().min(1).max(100).optional().default(50),
       show_slider: z.boolean().optional().default(true),
-      // Color settings
-      color: z.string().optional().default("#0e58ff"),
     })
     .default({}),
   options: dataConfigOptionsBaseSchema
     .extend({
       description: z.string().optional(),
       zoom_to_selection: z.boolean().optional().default(true),
+      // Color settings (for chips, checkbox, range layouts)
+      color: z.string().optional().default("#0e58ff"),
       // Multi-layer attribute filtering
       target_layers: z.array(filterTargetLayerSchema).optional(),
-      // When true, the filter's *available options* are restricted to values present in the currently
-      // cross‑filtered data. This controls applying cross‑filtering to the options list itself, and does
-      // not globally enable/disable cross‑filtering for the widget.
+      // Cross-filter options: when enabled, filter shows only values that exist in currently filtered data
       cross_filter_options: z.boolean().optional().default(true),
     })
     .default({}),
@@ -155,6 +153,14 @@ export const chartsConfigBaseSchema = z.object({
   type: widgetTypes,
   setup: chartConfigSetupBaseSchema.optional().default({}),
   options: chartConfigOptionsBaseSchema.optional().default({}),
+});
+
+// Context label configuration for showing dynamic labels based on filtered data
+export const contextLabelSchema = z.object({
+  // Field to check for unique value (e.g., "city_name")
+  field: z.string(),
+  // Value to show when multiple unique values exist (e.g., "All Cities"). If empty, nothing is shown.
+  default_value: z.string().optional(),
 });
 
 export const histogramChartConfigSchema = chartsConfigBaseSchema.extend({
@@ -197,10 +203,10 @@ export const categoriesChartConfigSchema = chartsConfigBaseSchema.extend({
     .extend({
       format: formatNumberTypes.optional().default("none"),
       sorting: sortTypes.optional().default("asc"),
-      // Base color for bars
-      color: z.string().optional().default("#0e58ff"),
-      // Color when hovering over a bar
-      highlight_color: z.string().optional().default("#3b82f6"),
+      // Color range for generating bar colors (like pie chart)
+      color_range: colorRange.optional().default(DEFAULT_COLOR_RANGE),
+      // Custom color mapping: array of [category_value, hex_color] tuples
+      color_map: z.array(z.tuple([z.string(), z.string()])).optional(),
       // Color for selected/filtered portion (only used in highlight mode)
       selected_color: z.string().optional().default("#f5b704"),
       // How to respond to cross-filter selections: filter data or highlight selected portion
@@ -208,6 +214,8 @@ export const categoriesChartConfigSchema = chartsConfigBaseSchema.extend({
       width: z.number().min(3).max(15).optional().default(5),
       num_categories: z.number().min(1).max(15).optional().default(1),
       show_other_aggregate: z.boolean().optional().default(false),
+      // Dynamic context label based on filtered data
+      context_label: contextLabelSchema.optional(),
     })
     .default({}),
 });
@@ -230,6 +238,8 @@ export const pieChartConfigSchema = chartsConfigBaseSchema.extend({
       // Custom color mapping: array of [category_value, hex_color] tuples
       color_map: z.array(z.tuple([z.string(), z.string()])).optional(),
       sorting: sortTypes.optional().default("desc"),
+      // Dynamic context label based on filtered data
+      context_label: contextLabelSchema.optional(),
     })
     .default({}),
 });

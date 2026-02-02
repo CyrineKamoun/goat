@@ -17,6 +17,7 @@ import {
   ListItemText,
   Menu,
   MenuItem,
+  Paper,
   Skeleton,
   Stack,
   Tooltip,
@@ -28,11 +29,17 @@ import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useLayerUniqueValues } from "@/lib/api/layers";
+import { COLOR_RANGES, DEFAULT_COLOR_RANGE } from "@/lib/constants/color";
+import type { ColorRange } from "@/lib/validations/layer";
 
 import type { SelectorItem } from "@/types/map/common";
 
+import { ArrowPopper } from "@/components/ArrowPoper";
 import WidgetColorPicker from "@/components/builder/widgets/common/WidgetColorPicker";
+import FormLabelHelper from "@/components/common/FormLabelHelper";
 import Selector from "@/components/map/panels/common/Selector";
+import ColorPalette from "@/components/map/panels/style/color/ColorPalette";
+import ColorRangeSelector from "@/components/map/panels/style/color/ColorRangeSelector";
 
 import { MAX_FILTER_VALUES } from "./useFilterValues";
 
@@ -125,10 +132,14 @@ export interface CategoryColorConfigProps {
   customOrder: string[] | undefined;
   /** Color map: array of [category_value, hex_color] tuples */
   colorMap: [string, string][] | undefined;
-  /** Color palette for generating default colors */
+  /** Full color range object for palette selection */
+  colorRange?: ColorRange;
+  /** Color palette for generating default colors (extracted from colorRange.colors) */
   colorPalette?: string[];
   /** Combined callback for updating both order and color_map atomically */
   onChange: (order: string[], colorMap: [string, string][]) => void;
+  /** Callback when palette changes - receives new colorRange and regenerated colorMap */
+  onPaletteChange?: (colorRange: ColorRange, order: string[], colorMap: [string, string][]) => void;
   cqlFilter?: object;
 }
 
@@ -141,11 +152,16 @@ const CategoryColorConfig = ({
   fieldName,
   customOrder,
   colorMap,
+  colorRange,
   colorPalette = DEFAULT_PALETTE,
   onChange,
+  onPaletteChange,
   cqlFilter,
 }: CategoryColorConfigProps) => {
   const { t } = useTranslation("common");
+  const theme = useTheme();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [isClickAwayEnabled, setIsClickAwayEnabled] = useState(true);
 
   const queryParams = useMemo(
     () => ({
@@ -283,6 +299,101 @@ const CategoryColorConfig = ({
     updateBoth(sorted);
   };
 
+  // Calculate the actual category count for palette selection
+  const categoryCount = useMemo(() => {
+    return currentItems.length || allValues.length || 6;
+  }, [currentItems.length, allValues.length]);
+
+  // Generate display colors matching the number of categories
+  // Must be defined before early returns to maintain consistent hook order
+  const displayColors = useMemo(() => {
+    if (categoryCount <= colorPalette.length) {
+      return colorPalette.slice(0, categoryCount);
+    }
+    return chroma.scale(colorPalette).mode("lch").colors(categoryCount);
+  }, [colorPalette, categoryCount]);
+
+  // Create an adjusted color range for the ColorRangeSelector with the correct number of steps
+  // This ensures the palette picker shows palettes with the right number of colors
+  const adjustedColorRange = useMemo((): ColorRange => {
+    const baseRange = colorRange || DEFAULT_COLOR_RANGE;
+
+    // If current palette already has the right number of colors, use it
+    if (baseRange.colors.length === categoryCount) {
+      return baseRange;
+    }
+
+    // Find a palette with the exact number of colors needed
+    // First, look for a palette with the same type/category but correct step count
+    let matchingPalette = COLOR_RANGES.find(
+      (range) =>
+        range.colors.length === categoryCount &&
+        (range.category === baseRange.category || range.type === baseRange.type)
+    );
+
+    // If no matching palette found, find any palette with the correct number of colors
+    if (!matchingPalette) {
+      matchingPalette = COLOR_RANGES.find((range) => range.colors.length === categoryCount);
+    }
+
+    // If still no match (e.g., 11 colors not available), use closest available
+    if (!matchingPalette) {
+      // Find closest step count
+      const availableSteps = [...new Set(COLOR_RANGES.map((r) => r.colors.length))].sort((a, b) => a - b);
+      const closestStep = availableSteps.reduce((prev, curr) =>
+        Math.abs(curr - categoryCount) < Math.abs(prev - categoryCount) ? curr : prev
+      );
+      matchingPalette =
+        COLOR_RANGES.find(
+          (range) =>
+            range.colors.length === closestStep &&
+            (range.category === baseRange.category || range.type === baseRange.type)
+        ) || COLOR_RANGES.find((range) => range.colors.length === closestStep);
+    }
+
+    if (matchingPalette) {
+      return {
+        ...matchingPalette,
+        reversed: baseRange.reversed,
+      };
+    }
+
+    // Fallback: return base range with interpolated colors
+    return {
+      ...baseRange,
+      colors: chroma.scale(baseRange.colors).mode("lch").colors(categoryCount),
+    };
+  }, [colorRange, categoryCount]);
+
+  const handlePaletteSelect = useCallback(
+    (newColorRange: ColorRange) => {
+      // When palette changes, regenerate all colors from the new palette
+      const newPalette = newColorRange.colors;
+      const count = categoryCount;
+      const newColors =
+        count <= newPalette.length
+          ? newPalette.slice(0, count)
+          : chroma.scale(newPalette).mode("lch").colors(count);
+
+      // Update all items with new colors from the palette
+      const newItems = currentItems.map((item, index) => ({
+        ...item,
+        color: newColors[index % newColors.length],
+      }));
+
+      // Build the new order and colorMap
+      const newOrder = newItems.map((item) => item.value);
+      const newColorMap: [string, string][] = newItems.map((item) => [item.value, item.color]);
+
+      // Call the combined callback with all data for atomic update
+      if (onPaletteChange) {
+        onPaletteChange(newColorRange, newOrder, newColorMap);
+      }
+      setPaletteOpen(false);
+    },
+    [currentItems, categoryCount, onPaletteChange]
+  );
+
   if (!layerId || !fieldName) {
     return (
       <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
@@ -311,6 +422,63 @@ const CategoryColorConfig = ({
 
   return (
     <Box>
+      {/* Palette selector */}
+      {onPaletteChange && (
+        <ArrowPopper
+          open={paletteOpen}
+          placement="bottom"
+          arrow={false}
+          isClickAwayEnabled={isClickAwayEnabled}
+          onClose={() => setPaletteOpen(false)}
+          content={
+            <Paper
+              sx={{
+                py: 3,
+                boxShadow: "rgba(0, 0, 0, 0.16) 0px 6px 12px 0px",
+                width: "235px",
+                maxHeight: "500px",
+              }}>
+              <ColorRangeSelector
+                scaleType="ordinal"
+                selectedColorRange={adjustedColorRange}
+                onSelectColorRange={handlePaletteSelect}
+                setIsBusy={(busy) => setIsClickAwayEnabled(!busy)}
+                setIsOpen={setPaletteOpen}
+              />
+            </Paper>
+          }>
+          <Stack spacing={1} sx={{ mb: 2 }}>
+            <FormLabelHelper
+              color={paletteOpen ? theme.palette.primary.main : "inherit"}
+              label={t("palette")}
+            />
+            <Stack
+              onClick={() => setPaletteOpen(!paletteOpen)}
+              direction="row"
+              alignItems="center"
+              sx={{
+                borderRadius: theme.spacing(1.2),
+                border: "1px solid",
+                outline: "2px solid transparent",
+                minHeight: "40px",
+                borderColor: theme.palette.mode === "dark" ? "#464B59" : "#CBCBD1",
+                ...(paletteOpen && {
+                  outline: `2px solid ${theme.palette.primary.main}`,
+                }),
+                cursor: "pointer",
+                p: 2,
+                "&:hover": {
+                  ...(!paletteOpen && {
+                    borderColor: theme.palette.mode === "dark" ? "#5B5F6E" : "#B8B7BF",
+                  }),
+                },
+              }}>
+              <ColorPalette colors={displayColors} />
+            </Stack>
+          </Stack>
+        </ArrowPopper>
+      )}
+
       {/* Header with title and actions */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
         <Typography variant="body2" fontWeight="medium">

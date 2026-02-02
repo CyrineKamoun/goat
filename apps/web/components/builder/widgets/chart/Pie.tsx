@@ -1,8 +1,10 @@
+import { Box, Typography } from "@mui/material";
 import chroma from "chroma-js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Cell, Label, Pie, PieChart, ResponsiveContainer } from "recharts";
 
+import { useLayerUniqueValues } from "@/lib/api/layers";
 import { useProjectLayerAggregationStats } from "@/lib/api/projects";
 import { formatNumber } from "@/lib/utils/format-number";
 import type { AggregationStatsQueryParams } from "@/lib/validations/project";
@@ -30,6 +32,38 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
     layerId,
     queryParams as AggregationStatsQueryParams
   );
+
+  // Context label: fetch unique values for the configured field
+  const contextLabelConfig = config?.options?.context_label;
+  const contextLabelQueryParams = useMemo(() => {
+    if (!contextLabelConfig?.field) return undefined;
+    return {
+      size: 1, // Only fetch 1 item - we use 'total' to check if there's exactly 1 unique value
+      page: 1,
+      order: "descendent" as const,
+      ...(queryParams?.query ? { query: queryParams.query } : {}),
+    };
+  }, [contextLabelConfig?.field, queryParams?.query]);
+
+  const { data: contextLabelData } = useLayerUniqueValues(
+    contextLabelConfig?.field ? layerId || "" : "",
+    contextLabelConfig?.field || "",
+    contextLabelQueryParams
+  );
+
+  // Determine the context label value
+  const contextLabelValue = useMemo(() => {
+    if (!contextLabelConfig) return null;
+    if (!contextLabelData) return null;
+
+    // Use total count to determine if there's exactly 1 unique value
+    if (contextLabelData.total === 1 && contextLabelData.items?.length === 1) {
+      // Single unique value - show it
+      return String(contextLabelData.items[0].value);
+    }
+    // Multiple values - show default (or null if not set)
+    return contextLabelConfig.default_value || null;
+  }, [contextLabelConfig, contextLabelData]);
 
   const originalData = useMemo(() => aggregationStats?.items || [], [aggregationStats]);
 
@@ -170,51 +204,71 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
       />
 
       {config && !isError && aggregationStats && isChartConfigured && (
-        <ResponsiveContainer width="100%" aspect={1.2}>
-          <PieChart onMouseEnter={() => handleChartHover(true)} onMouseLeave={() => handleChartHover(false)}>
-            <Pie
-              activeIndex={activeIndex}
-              activeShape={{
-                fill: baseColors[activeIndex % baseColors.length],
-                strokeWidth: 0,
-              }}
-              data={displayData}
-              dataKey="operation_value"
-              nameKey="grouped_value"
-              cx="50%"
-              cy="50%"
-              innerRadius="65%"
-              cursor="pointer"
-              isAnimationActive={false}
-              paddingAngle={data.length > 0 ? 5 : 0}
-              onMouseEnter={handlePieEnter}>
-              {displayData.map((_, index) => (
-                <Cell key={`cell-${index}`} fill={computedColors[index]} stroke="none" />
-              ))}
+        <Box sx={{ position: "relative", width: "100%" }}>
+          {contextLabelValue && (
+            <Typography
+              variant="caption"
+              sx={{
+                position: "absolute",
+                top: 4,
+                left: 0,
+                right: 0,
+                textAlign: "center",
+                fontWeight: 600,
+                color: "text.secondary",
+                zIndex: 1,
+              }}>
+              {contextLabelValue}
+            </Typography>
+          )}
+          <ResponsiveContainer width="100%" aspect={1.2}>
+            <PieChart
+              onMouseEnter={() => handleChartHover(true)}
+              onMouseLeave={() => handleChartHover(false)}>
+              <Pie
+                activeIndex={activeIndex}
+                activeShape={{
+                  fill: baseColors[activeIndex % baseColors.length],
+                  strokeWidth: 0,
+                }}
+                data={displayData}
+                dataKey="operation_value"
+                nameKey="grouped_value"
+                cx="50%"
+                cy="50%"
+                innerRadius="65%"
+                cursor="pointer"
+                isAnimationActive={false}
+                paddingAngle={data.length > 0 ? 5 : 0}
+                onMouseEnter={handlePieEnter}>
+                {displayData.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={computedColors[index]} stroke="none" />
+                ))}
 
-              <Label
-                value={`${formatNumber(
-                  displayData[activeIndex].operation_value / totalOperationValue,
-                  "percent_1d",
-                  i18n.language
-                )}`}
-                position="centerBottom"
-                fontSize={14}
-                fontWeight="bold"
-                fill={baseColors[activeIndex % baseColors.length]}
-              />
+                <Label
+                  value={`${formatNumber(
+                    displayData[activeIndex].operation_value / totalOperationValue,
+                    "percent_1d",
+                    i18n.language
+                  )}`}
+                  position="centerBottom"
+                  fontSize={14}
+                  fontWeight="bold"
+                  fill={baseColors[activeIndex % baseColors.length]}
+                />
 
-              <Label
-                value={displayData[activeIndex].grouped_value}
-                position="centerTop"
-                fontSize={12}
-                dy={8}
-                fontWeight="bold"
-                fill={baseColors[activeIndex % baseColors.length]}
-              />
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
+                <Label
+                  value={displayData[activeIndex].grouped_value}
+                  position="centerTop"
+                  fontSize={12}
+                  dy={8}
+                  fontWeight="bold"
+                  fill={baseColors[activeIndex % baseColors.length]}
+                />
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+        </Box>
       )}
       <StaleDataLoader isLoading={isLoading} hasData={!!aggregationStats} />
     </>

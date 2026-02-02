@@ -419,7 +419,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
             wrap={rawConfig?.setup.wrap}
             customOrder={rawConfig?.setup.custom_order}
             cqlFilter={crossFilterCql}
-            color={rawConfig?.setup.color}
+            color={rawConfig?.options?.color}
           />
         )}
       {layer &&
@@ -438,7 +438,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
             multiple={rawConfig?.setup.multiple}
             customOrder={rawConfig?.setup.custom_order}
             cqlFilter={crossFilterCql}
-            color={rawConfig?.setup.color}
+            color={rawConfig?.options?.color}
           />
         )}
       {layer &&
@@ -453,7 +453,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
             steps={rawConfig?.setup.steps}
             showSlider={rawConfig?.setup.show_slider}
             cqlFilter={crossFilterCql}
-            color={rawConfig?.setup.color}
+            color={rawConfig?.options?.color}
           />
         )}
     </Box>

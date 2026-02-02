@@ -386,20 +386,6 @@ export const WidgetFilterLayout = ({
                     label={<Typography variant="body2">{t("wrap_chips")}</Typography>}
                   />
                 </Stack>
-                <CategoryOrderConfig
-                  layerId={selectedLayerDatasetId}
-                  fieldName={config.setup?.column_name}
-                  customOrder={config.setup?.custom_order}
-                  onOrderChange={(order) => {
-                    onChange({
-                      ...config,
-                      setup: {
-                        ...config.setup,
-                        custom_order: order,
-                      },
-                    });
-                  }}
-                />
               </>
             )}
             {/* Checkbox specific settings */}
@@ -447,20 +433,6 @@ export const WidgetFilterLayout = ({
                     label={<Typography variant="body2">{t("allow_multiple_selection")}</Typography>}
                   />
                 </Stack>
-                <CategoryOrderConfig
-                  layerId={selectedLayerDatasetId}
-                  fieldName={config.setup?.column_name}
-                  customOrder={config.setup?.custom_order}
-                  onOrderChange={(order) => {
-                    onChange({
-                      ...config,
-                      setup: {
-                        ...config.setup,
-                        custom_order: order,
-                      },
-                    });
-                  }}
-                />
               </>
             )}
             {/* Range specific settings */}
@@ -548,19 +520,39 @@ export const WidgetFilterLayout = ({
           <SectionOptions
             active={true}
             baseOptions={
-              <WidgetColorPicker
-                color={config.setup?.color || "#0e58ff"}
-                onChange={(color) => {
-                  onChange({
-                    ...config,
-                    setup: {
-                      ...config.setup,
-                      color,
-                    },
-                  });
-                }}
-                label={t("color")}
-              />
+              <Stack spacing={2}>
+                <WidgetColorPicker
+                  color={config.options?.color || "#0e58ff"}
+                  onChange={(color) => {
+                    onChange({
+                      ...config,
+                      options: {
+                        ...config.options,
+                        color,
+                      },
+                    });
+                  }}
+                  label={t("color")}
+                />
+                {/* Category order for chips and checkbox */}
+                {(selectedLayout?.value === filterLayoutTypes.Values.chips ||
+                  selectedLayout?.value === filterLayoutTypes.Values.checkbox) && (
+                  <CategoryOrderConfig
+                    layerId={selectedLayerDatasetId}
+                    fieldName={config.setup?.column_name}
+                    customOrder={config.setup?.custom_order}
+                    onOrderChange={(order) => {
+                      onChange({
+                        ...config,
+                        setup: {
+                          ...config.setup,
+                          custom_order: order,
+                        },
+                      });
+                    }}
+                  />
+                )}
+              </Stack>
             }
           />
         </>
