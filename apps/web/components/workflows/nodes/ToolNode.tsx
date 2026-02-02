@@ -39,13 +39,17 @@ const NodeContainer = styled(Box, {
   backgroundColor: theme.palette.background.paper,
   border: `2px solid ${selected ? theme.palette.primary.main : theme.palette.divider}`,
   // Box-shadow for selection indicator (blue glow)
-  boxShadow: selected ? `0 0 0 4px ${theme.palette.primary.main}40, ${theme.shadows[4]}` : theme.shadows[2],
+  boxShadow: selected
+    ? `0 0 0 4px ${theme.palette.primary.main}40, 0 2px 8px rgba(0, 0, 0, 0.1)`
+    : "0 2px 8px rgba(0, 0, 0, 0.08)",
   minWidth: 220,
   maxWidth: 360,
   transition: "all 0.2s ease",
   position: "relative",
   "&:hover": {
-    boxShadow: selected ? `0 0 0 4px ${theme.palette.primary.main}40, ${theme.shadows[4]}` : theme.shadows[4],
+    boxShadow: selected
+      ? `0 0 0 4px ${theme.palette.primary.main}40, 0 2px 8px rgba(0, 0, 0, 0.12)`
+      : "0 2px 8px rgba(0, 0, 0, 0.12)",
   },
 }));
 
@@ -79,8 +83,8 @@ const StyledHandle = styled(Handle, {
 
 const ToolbarContainer = styled(Stack)(({ theme }) => ({
   backgroundColor: theme.palette.background.paper,
-  borderRadius: theme.shape.borderRadius,
-  padding: theme.spacing(0.5),
+  borderRadius: theme.shape.borderRadius * 2,
+  padding: theme.spacing(1),
   gap: theme.spacing(0.5),
   flexDirection: "row",
   alignItems: "center",
@@ -89,23 +93,21 @@ const ToolbarContainer = styled(Stack)(({ theme }) => ({
 }));
 
 const ToolbarButton = styled(IconButton)(({ theme }) => ({
-  padding: theme.spacing(0.5),
+  width: 36,
+  height: 36,
   "&:hover": {
     backgroundColor: theme.palette.action.hover,
-  },
-  "& svg": {
-    fontSize: 18,
   },
 }));
 
 const RunButton = styled(Button)(({ theme }) => ({
-  textTransform: "uppercase",
+  textTransform: "none",
   fontWeight: 600,
-  fontSize: 11,
-  padding: theme.spacing(0.25, 1),
+  fontSize: 12,
+  height: 36,
+  padding: theme.spacing(0.5, 1.5),
   minWidth: "auto",
-  minHeight: "auto",
-  lineHeight: 1.5,
+  borderRadius: theme.shape.borderRadius,
 }));
 
 const ParamRow = styled(Box)({
@@ -428,25 +430,25 @@ const ToolNode: React.FC<ToolNodeProps> = ({ id, data, selected }) => {
       {/* NodeToolbar - automatically shown when selected */}
       <NodeToolbar position={Position.Top} align="end">
         <ToolbarContainer>
-          <Tooltip title={t("run_node")} arrow>
-            <RunButton size="small" startIcon={<PlayIcon sx={{ fontSize: 16 }} />}>
+          <Tooltip title={t("run_node")} placement="top" arrow>
+            <RunButton size="small" variant="text" startIcon={<PlayIcon fontSize="small" />}>
               {t("run_node")}
             </RunButton>
           </Tooltip>
-          <Tooltip title={t("run_to_here")} arrow>
-            <RunButton size="small" startIcon={<RunToHereIcon sx={{ fontSize: 16 }} />}>
+          <Tooltip title={t("run_to_here")} placement="top" arrow>
+            <RunButton size="small" variant="text" startIcon={<RunToHereIcon fontSize="small" />}>
               {t("run_to_here")}
             </RunButton>
           </Tooltip>
           <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-          <Tooltip title={t("duplicate")} arrow>
+          <Tooltip title={t("duplicate")} placement="top" arrow>
             <ToolbarButton onClick={handleDuplicate}>
-              <DuplicateIcon />
+              <DuplicateIcon fontSize="small" />
             </ToolbarButton>
           </Tooltip>
-          <Tooltip title={t("delete")} arrow>
+          <Tooltip title={t("delete")} placement="top" arrow>
             <ToolbarButton onClick={handleDelete}>
-              <DeleteIcon />
+              <DeleteIcon fontSize="small" color="error" />
             </ToolbarButton>
           </Tooltip>
         </ToolbarContainer>

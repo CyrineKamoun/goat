@@ -44,6 +44,8 @@ interface DraggableTreeViewProps<T extends BaseTreeItem> {
   enableSelection?: boolean;
   selectedIds?: string[];
   onSelect?: (ids: string[]) => void;
+  /** Callback for HTML5 external drag start (e.g., to workflow canvas) */
+  onExternalDragStart?: (event: React.DragEvent, item: T) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sx?: any;
 }
@@ -254,6 +256,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
   enableSelection,
   selectedIds,
   onSelect,
+  onExternalDragStart,
 }: {
   item: T;
   allData: T[];
@@ -264,6 +267,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
   enableSelection?: boolean;
   selectedIds: string[];
   onSelect?: (ids: string[]) => void;
+  onExternalDragStart?: (event: React.DragEvent, item: T) => void;
 }) => {
   const children = allData.filter((i) => i.parentId === item.id);
   const isSelected = selectedIds.includes(item.id);
@@ -338,13 +342,22 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
 
   const isVisible = item.isVisible ?? true; // Default to visible if not specified
 
+  // Handle external drag start (for workflow canvas)
+  const handleExternalDragStart = (event: React.DragEvent) => {
+    if (onExternalDragStart && !item.isGroup) {
+      onExternalDragStart(event, item);
+    }
+  };
+
   return (
     <Box sx={{ width: "100%" }}>
       <CustomTreeItemRoot
         ref={!isOverlay ? setNodeRef : null}
         {...(!isOverlay ? listeners : {})}
         {...(!isOverlay ? attributes : {})}
-        style={{ touchAction: "none", paddingBottom: isOverlay ? 0 : undefined }}>
+        style={{ touchAction: "none", paddingBottom: isOverlay ? 0 : undefined }}
+        draggable={!!onExternalDragStart && !item.isGroup}
+        onDragStart={handleExternalDragStart}>
         <CustomTreeItemContent
           onClick={handleRowClick}
           ref={setNodeRef}
@@ -358,6 +371,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
             opacity: isVisible ? 1 : 0.5, // Apply opacity based on visibility
             flexDirection: "column", // Stack main row and caption vertically
             alignItems: "stretch", // Stretch to full width
+            cursor: onExternalDragStart && !item.isGroup ? "grab" : undefined,
           }}>
           {/* Main content row */}
           <Box
@@ -441,6 +455,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
                     selectedIds={selectedIds}
                     onSelect={onSelect}
                     enableSelection={enableSelection}
+                    onExternalDragStart={onExternalDragStart}
                   />
                 ))}
                 {children.length === 0 && (
@@ -502,6 +517,7 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
     selectedIds = [],
     onSelect,
     enableSelection = false,
+    onExternalDragStart,
     sx,
   } = props;
   const [activeId, setActiveId] = React.useState<string | null>(null);
@@ -567,6 +583,7 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
             selectedIds={selectedIds}
             onSelect={onSelect}
             enableSelection={enableSelection}
+            onExternalDragStart={onExternalDragStart}
           />
         ))}
       </Box>

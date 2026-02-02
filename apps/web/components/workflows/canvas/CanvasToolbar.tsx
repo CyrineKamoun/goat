@@ -4,7 +4,7 @@ import {
   Redo as RedoIcon,
   PlayArrow as RunIcon,
   NearMe as SelectIcon,
-  TextFields as TextIcon,
+  StickyNote2 as TextIcon,
   Undo as UndoIcon,
 } from "@mui/icons-material";
 import { Box, Button, IconButton, Tooltip } from "@mui/material";
@@ -30,7 +30,7 @@ const ToolGroup = styled(Box)(({ theme }) => ({
   padding: theme.spacing(0.5),
   backgroundColor: theme.palette.background.paper,
   borderRadius: 28,
-  boxShadow: theme.shadows[4],
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
   border: `1px solid ${theme.palette.divider}`,
 }));
 
@@ -65,7 +65,7 @@ const RunButton = styled(Button)(({ theme }) => ({
   color: theme.palette.primary.contrastText,
   fontWeight: 600,
   textTransform: "none",
-  boxShadow: theme.shadows[4],
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
   "&:hover": {
     backgroundColor: theme.palette.primary.dark,
   },

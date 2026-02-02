@@ -36,3 +36,6 @@ export const selectSelectedNode = (state: RootState) => {
   const { nodes, selectedNodeId } = state.workflow;
   return selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null;
 };
+
+// Select map view request flag
+export const selectRequestMapView = (state: RootState) => state.workflow.requestMapView;

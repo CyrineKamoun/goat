@@ -1,26 +1,33 @@
 "use client";
 
-import { Close as CloseIcon } from "@mui/icons-material";
-import { IconButton, useTheme } from "@mui/material";
+import { Delete as DeleteIcon } from "@mui/icons-material";
+import { IconButton, Stack, Tooltip, useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
-import { BaseEdge, EdgeLabelRenderer, type EdgeProps, getBezierPath } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, type EdgeProps, getBezierPath, useViewport } from "@xyflow/react";
 import React, { memo, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useDispatch } from "react-redux";
 
 import type { AppDispatch } from "@/lib/store";
 import { removeEdges } from "@/lib/store/workflow/slice";
 
-const DeleteButton = styled(IconButton)(({ theme }) => ({
-  width: 20,
-  height: 20,
-  backgroundColor: theme.palette.error.main,
-  color: theme.palette.common.white,
-  padding: 0,
+// Styled to match node toolbar style (same as DatasetNode)
+const ToolbarContainer = styled(Stack)(({ theme }) => ({
+  backgroundColor: theme.palette.background.paper,
+  borderRadius: theme.shape.borderRadius * 2,
+  padding: theme.spacing(1),
+  gap: theme.spacing(0.5),
+  flexDirection: "row",
+  alignItems: "center",
+  boxShadow: theme.shadows[4],
+  border: `1px solid ${theme.palette.divider}`,
+}));
+
+const ToolbarButton = styled(IconButton)(({ theme }) => ({
+  width: 36,
+  height: 36,
   "&:hover": {
-    backgroundColor: theme.palette.error.dark,
-  },
-  "& svg": {
-    fontSize: 14,
+    backgroundColor: theme.palette.action.hover,
   },
 }));
 
@@ -36,8 +43,10 @@ const DeletableEdge: React.FC<EdgeProps> = ({
   markerEnd,
   selected,
 }) => {
+  const { t } = useTranslation("common");
   const dispatch = useDispatch<AppDispatch>();
   const theme = useTheme();
+  const { zoom } = useViewport();
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -61,6 +70,7 @@ const DeletableEdge: React.FC<EdgeProps> = ({
   const handleDelete = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation();
+      event.preventDefault();
       dispatch(removeEdges([id]));
     },
     [dispatch, id]
@@ -72,14 +82,22 @@ const DeletableEdge: React.FC<EdgeProps> = ({
       {selected && (
         <EdgeLabelRenderer>
           <div
+            className="nodrag nopan"
             style={{
               position: "absolute",
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px) scale(${1 / zoom})`,
+              transformOrigin: "center center",
               pointerEvents: "all",
-            }}>
-            <DeleteButton size="small" onClick={handleDelete}>
-              <CloseIcon />
-            </DeleteButton>
+              zIndex: 1000,
+            }}
+            onMouseDown={(e) => e.stopPropagation()}>
+            <ToolbarContainer onClick={handleDelete}>
+              <Tooltip title={t("delete")} placement="top" arrow>
+                <ToolbarButton size="small">
+                  <DeleteIcon fontSize="small" color="error" />
+                </ToolbarButton>
+              </Tooltip>
+            </ToolbarContainer>
           </div>
         </EdgeLabelRenderer>
       )}

@@ -1,13 +1,21 @@
 "use client";
 
-import { AccountTree as WorkflowIcon } from "@mui/icons-material";
-import { Box, Typography, useTheme } from "@mui/material";
+import {
+  CloseFullscreen as CollapseIcon,
+  OpenInFull as ExpandIcon,
+  FitScreen as FitViewIcon,
+  Lock as LockIcon,
+  LockOpen as UnlockIcon,
+  AccountTree as WorkflowIcon,
+  Add as ZoomInIcon,
+  Remove as ZoomOutIcon,
+} from "@mui/icons-material";
+import { Box, IconButton, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import {
   Background,
   BackgroundVariant,
   type Connection,
-  Controls,
   type Edge,
   type EdgeTypes,
   MiniMap,
@@ -16,6 +24,7 @@ import {
   type OnConnect,
   type OnEdgesChange,
   type OnNodesChange,
+  Panel,
   ReactFlow,
   type ReactFlowInstance,
   type Viewport,
@@ -67,28 +76,74 @@ const CanvasContainer = styled(Box)(({ theme }) => ({
   "& .react-flow__attribution": {
     display: "none",
   },
-  // Dark theme styling for ReactFlow controls
-  "& .react-flow__controls": {
-    backgroundColor: theme.palette.background.paper,
-    borderRadius: "4px",
-    border: `1px solid ${theme.palette.divider}`,
+}));
+
+// Collapsible MiniMap container
+const MiniMapContainer = styled(Box, {
+  shouldForwardProp: (prop) => prop !== "isExpanded" && prop !== "isHovered",
+})<{ isExpanded: boolean; isHovered: boolean }>(({ isExpanded }) => ({
+  position: "absolute",
+  bottom: 10,
+  right: 10,
+  zIndex: 5,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-end",
+  "& .react-flow__minimap": {
+    position: "relative !important" as "relative",
+    margin: 0,
+    display: isExpanded ? "block" : "none",
+  },
+}));
+
+const MiniMapToggleButton = styled(IconButton)(({ theme }) => ({
+  width: 36,
+  height: 36,
+  backgroundColor: theme.palette.background.paper,
+  border: `1px solid ${theme.palette.divider}`,
+  borderRadius: theme.shape.borderRadius,
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+  // When used as collapse button (on hover over minimap), no shadow
+  "&.collapse-button": {
     boxShadow: "none",
   },
-  "& .react-flow__controls-button": {
-    backgroundColor: theme.palette.background.paper,
-    borderBottom: `1px solid ${theme.palette.divider}`,
-    "&:hover": {
-      backgroundColor: theme.palette.action.hover,
-    },
-    "& svg": {
-      fill: theme.palette.text.primary,
-    },
+}));
+
+// Custom controls container
+const ControlsContainer = styled(Stack)(({ theme }) => ({
+  backgroundColor: theme.palette.background.paper,
+  borderRadius: theme.shape.borderRadius * 2,
+  border: `1px solid ${theme.palette.divider}`,
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+  overflow: "hidden",
+}));
+
+const ControlButton = styled(IconButton)(({ theme }) => ({
+  width: 36,
+  height: 36,
+  borderRadius: 0,
+  "&:hover": {
+    backgroundColor: theme.palette.action.hover,
   },
-  // Dark theme styling for MiniMap
-  "& .react-flow__minimap": {
-    backgroundColor: theme.palette.background.paper,
-    borderRadius: "4px",
-    border: `1px solid ${theme.palette.divider}`,
+}));
+
+const MiniMapWrapper = styled(Box)(({ theme }) => ({
+  position: "relative",
+  backgroundColor: theme.palette.background.paper,
+  borderRadius: theme.shape.borderRadius,
+  border: `1px solid ${theme.palette.divider}`,
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+  overflow: "hidden",
+  "& .collapse-button": {
+    position: "absolute",
+    top: 4,
+    left: 4,
+    zIndex: 10,
+    opacity: 0,
+    transition: "opacity 0.2s ease",
+  },
+  "&:hover .collapse-button": {
+    opacity: 1,
   },
 }));
 
@@ -129,6 +184,42 @@ const EmptyStateIconWrapper = styled(Box)(({ theme }) => ({
   color: theme.palette.text.secondary,
 }));
 
+// Custom Controls component with MUI buttons and tooltips
+interface CustomControlsProps {
+  isLocked: boolean;
+  onToggleLock: () => void;
+}
+
+const CustomControls: React.FC<CustomControlsProps> = ({ isLocked, onToggleLock }) => {
+  const { t } = useTranslation("common");
+  const { zoomIn, zoomOut, fitView } = useReactFlow();
+
+  return (
+    <ControlsContainer>
+      <Tooltip title={t("zoom_in")} placement="right" arrow>
+        <ControlButton onClick={() => zoomIn()}>
+          <ZoomInIcon fontSize="small" />
+        </ControlButton>
+      </Tooltip>
+      <Tooltip title={t("zoom_out")} placement="right" arrow>
+        <ControlButton onClick={() => zoomOut()}>
+          <ZoomOutIcon fontSize="small" />
+        </ControlButton>
+      </Tooltip>
+      <Tooltip title={t("fit_view")} placement="right" arrow>
+        <ControlButton onClick={() => fitView()}>
+          <FitViewIcon fontSize="small" />
+        </ControlButton>
+      </Tooltip>
+      <Tooltip title={isLocked ? t("unlock") : t("lock")} placement="right" arrow>
+        <ControlButton onClick={onToggleLock}>
+          {isLocked ? <LockIcon fontSize="small" /> : <UnlockIcon fontSize="small" />}
+        </ControlButton>
+      </Tooltip>
+    </ControlsContainer>
+  );
+};
+
 // Custom node types for ReactFlow
 const nodeTypes: NodeTypes = {
   dataset: DatasetNode,
@@ -154,6 +245,13 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onDrop, onDragOver }) =
 
   // Canvas tool state
   const [activeTool, setActiveTool] = useState<"select" | "text">("select");
+
+  // Lock state - prevents node dragging and panning
+  const [isLocked, setIsLocked] = useState(false);
+
+  // MiniMap state
+  const [miniMapExpanded, setMiniMapExpanded] = useState(true);
+  const [miniMapHovered, setMiniMapHovered] = useState(false);
 
   // Drawing state for text annotation
   const [isDrawing, setIsDrawing] = useState(false);
@@ -498,9 +596,11 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onDrop, onDragOver }) =
         onPaneMouseMove={handlePaneMouseMove}
         onMoveEnd={handleMoveEnd}
         isValidConnection={validateConnection}
-        selectionOnDrag={activeTool === "select"}
+        selectionOnDrag={activeTool === "select" && !isLocked}
         panOnDrag={activeTool === "select"}
-        deleteKeyCode={["Backspace", "Delete"]}
+        nodesDraggable={!isLocked}
+        nodesConnectable={!isLocked}
+        deleteKeyCode={isLocked ? [] : ["Backspace", "Delete"]}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         zIndexMode="manual"
@@ -513,12 +613,38 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({ onDrop, onDragOver }) =
         }}
         connectionLineStyle={{ stroke: theme.palette.grey[500], strokeWidth: 2 }}>
         <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-        <Controls />
-        <MiniMap
-          nodeColor={() => theme.palette.grey[500]}
-          maskColor={theme.palette.mode === "dark" ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.8)"}
-        />
+        <Panel position="bottom-left">
+          <CustomControls isLocked={isLocked} onToggleLock={() => setIsLocked(!isLocked)} />
+        </Panel>
       </ReactFlow>
+
+      {/* Collapsible MiniMap */}
+      <MiniMapContainer
+        isExpanded={miniMapExpanded}
+        isHovered={miniMapHovered}
+        onMouseEnter={() => setMiniMapHovered(true)}
+        onMouseLeave={() => setMiniMapHovered(false)}>
+        {miniMapExpanded ? (
+          <MiniMapWrapper>
+            <MiniMapToggleButton
+              className="collapse-button"
+              size="small"
+              onClick={() => setMiniMapExpanded(false)}
+              title={t("collapse")}>
+              <CollapseIcon fontSize="small" />
+            </MiniMapToggleButton>
+            <MiniMap
+              nodeColor={(node) => (node.type === "textAnnotation" ? "transparent" : theme.palette.grey[500])}
+              maskColor={theme.palette.mode === "dark" ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.8)"}
+              style={{ position: "relative", margin: 0 }}
+            />
+          </MiniMapWrapper>
+        ) : (
+          <MiniMapToggleButton onClick={() => setMiniMapExpanded(true)} title={t("expand")}>
+            <ExpandIcon fontSize="small" />
+          </MiniMapToggleButton>
+        )}
+      </MiniMapContainer>
 
       {/* Drawing overlay for text annotation tool */}
       {activeTool === "text" && (

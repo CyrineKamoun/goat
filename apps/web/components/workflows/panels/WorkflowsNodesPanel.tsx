@@ -1,6 +1,7 @@
 "use client";
 
 import { Box, Card, CardHeader, CircularProgress, Grid, Stack, Typography, useTheme } from "@mui/material";
+import { styled } from "@mui/material/styles";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDispatch } from "react-redux";
@@ -17,8 +18,21 @@ import type { ToolCategory } from "@/types/map/ogc-processes";
 import { useCategorizedProcesses } from "@/hooks/map/useOgcProcesses";
 
 import SettingsGroupHeader from "@/components/builder/widgets/common/SettingsGroupHeader";
-import SidePanel, { SidePanelTabPanel, SidePanelTabs } from "@/components/common/SidePanel";
+import {
+  SIDE_PANEL_WIDTH,
+  SidePanelContainer,
+  SidePanelTabPanel,
+  SidePanelTabs,
+} from "@/components/common/SidePanel";
 import WorkflowNodeSettings from "@/components/workflows/panels/WorkflowNodeSettings";
+
+const RightPanelContainer = styled(SidePanelContainer)(({ theme }) => ({
+  width: SIDE_PANEL_WIDTH,
+  height: "100%",
+  borderLeft: `1px solid ${theme.palette.divider}`,
+  display: "flex",
+  flexDirection: "column",
+}));
 
 /**
  * Category display configuration
@@ -296,20 +310,21 @@ const WorkflowsNodesPanel: React.FC<WorkflowsNodesPanelProps> = ({
   };
 
   // If a node is selected, show the node settings panel (like LayerSettingsPanel in Layouts)
+  // Note: textAnnotation nodes don't show settings panel - they have their own floating toolbar
   if (selectedNodeId && config) {
     const selectedNode = config.nodes.find((n) => n.id === selectedNodeId);
-    if (selectedNode) {
+    if (selectedNode && selectedNode.type !== "textAnnotation") {
       return (
-        <SidePanel sx={{ borderLeft: (theme) => `1px solid ${theme.palette.background.paper}` }}>
+        <RightPanelContainer>
           <WorkflowNodeSettings node={selectedNode} projectLayers={projectLayers} onBack={handleBack} />
-        </SidePanel>
+        </RightPanelContainer>
       );
     }
   }
 
   // Default view: Tools and History tabs
   return (
-    <SidePanel sx={{ borderLeft: (theme) => `1px solid ${theme.palette.background.paper}` }}>
+    <RightPanelContainer>
       <SidePanelTabs
         value={activeTab}
         onChange={handleTabChange}
@@ -325,7 +340,7 @@ const WorkflowsNodesPanel: React.FC<WorkflowsNodesPanelProps> = ({
       <SidePanelTabPanel value={activeTab} index={1} id="history">
         <HistoryTabContent workflowId={workflowId} />
       </SidePanelTabPanel>
-    </SidePanel>
+    </RightPanelContainer>
   );
 };
 

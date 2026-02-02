@@ -5,6 +5,7 @@ export { default as WorkflowsLayout } from "./WorkflowsLayout";
 export { default as WorkflowCanvas } from "./canvas/WorkflowCanvas";
 
 // Panel Components
+export { default as WorkflowDataPanel } from "./panels/WorkflowDataPanel";
 export { default as WorkflowsConfigPanel } from "./panels/WorkflowsConfigPanel";
 export { default as WorkflowsNodesPanel } from "./panels/WorkflowsNodesPanel";
 

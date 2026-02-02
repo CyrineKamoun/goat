@@ -1,0 +1,666 @@
+"use client";
+
+/**
+ * Workflow Data Panel
+ *
+ * A collapsible/resizable bottom panel that shows Table or Map view
+ * for the currently selected node's data. Only active when:
+ * - A dataset node with a layer is selected
+ * - A tool node with results is selected
+ *
+ * Map tab is disabled if the data doesn't have geometry.
+ */
+import { KeyboardArrowDown as CollapseIcon, DragHandle as DragHandleIcon } from "@mui/icons-material";
+import {
+  Box,
+  IconButton,
+  Skeleton,
+  Tab,
+  TablePagination,
+  Tabs,
+  Tooltip,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import { styled } from "@mui/material/styles";
+import bbox from "@turf/bbox";
+import "maplibre-gl/dist/maplibre-gl.css";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { MapRef } from "react-map-gl/maplibre";
+import { useDispatch, useSelector } from "react-redux";
+
+import { useDatasetCollectionItems } from "@/lib/api/layers";
+import { getExtent } from "@/lib/api/processes";
+import { MAPTILER_KEY } from "@/lib/constants";
+import { DrawProvider } from "@/lib/providers/DrawProvider";
+import type { AppDispatch } from "@/lib/store";
+import { selectRequestMapView } from "@/lib/store/workflow/selectors";
+import { clearMapViewRequest } from "@/lib/store/workflow/slice";
+import { createTheCQLBasedOnExpression } from "@/lib/transformers/filter";
+import { fitBounds } from "@/lib/utils/map/navigate";
+import { globalExtent, wktToGeoJSON } from "@/lib/utils/map/wkt";
+import type { Expression } from "@/lib/validations/filter";
+import type { GetCollectionItemsQueryParams } from "@/lib/validations/layer";
+import type { ProjectLayer } from "@/lib/validations/project";
+import type { WorkflowNode } from "@/lib/validations/workflow";
+
+import useLayerFields from "@/hooks/map/CommonHooks";
+
+import DatasetTable from "@/components/common/DatasetTable";
+import MapViewer from "@/components/map/MapViewer";
+
+// Panel heights
+const MIN_PANEL_HEIGHT = 200; // Minimum when resizing (not fully collapsed)
+const DEFAULT_PANEL_HEIGHT = 350;
+const MAX_PANEL_HEIGHT = 700;
+const COLLAPSED_HEIGHT = 44;
+
+// Styled components
+const PanelContainer = styled(Box, {
+  shouldForwardProp: (prop) => prop !== "height" && prop !== "isCollapsed" && prop !== "isDragging",
+})<{ height: number; isCollapsed: boolean; isDragging?: boolean }>(
+  ({ theme, height, isCollapsed, isDragging }) => ({
+    position: "relative",
+    width: "100%",
+    height: isCollapsed ? COLLAPSED_HEIGHT : height,
+    minHeight: COLLAPSED_HEIGHT,
+    backgroundColor: theme.palette.background.default,
+    borderTop: `1px solid ${theme.palette.divider}`,
+    display: "flex",
+    flexDirection: "column",
+    // Animate expand/collapse, but not during drag resize
+    transition: isDragging ? "none" : "height 0.2s ease",
+  })
+);
+
+const PanelHeader = styled(Box)(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  padding: theme.spacing(0, 1, 0, 2),
+  minHeight: COLLAPSED_HEIGHT,
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  backgroundColor: theme.palette.background.default,
+  cursor: "default",
+  userSelect: "none",
+  position: "relative",
+}));
+
+const DragHandle = styled(Box)(({ theme }) => ({
+  position: "absolute",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  width: 48,
+  height: 24,
+  cursor: "ns-resize",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: theme.shape.borderRadius,
+  "&:hover": {
+    backgroundColor: theme.palette.action.hover,
+  },
+  "& .drag-icon": {
+    fontSize: 20,
+    color: theme.palette.text.disabled,
+    transition: "color 0.2s",
+  },
+  "&:hover .drag-icon": {
+    color: theme.palette.text.secondary,
+  },
+}));
+
+const PanelContent = styled(Box)(() => ({
+  flex: 1,
+  overflow: "hidden",
+  display: "flex",
+  flexDirection: "column",
+}));
+
+const ContentArea = styled(Box)(() => ({
+  flex: 1,
+  overflow: "auto",
+  position: "relative",
+}));
+
+const EmptyState = styled(Box)(({ theme }) => ({
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  height: "100%",
+  padding: theme.spacing(4),
+  color: theme.palette.text.secondary,
+}));
+
+const MapContainer = styled(Box)(() => ({
+  position: "relative",
+  width: "100%",
+  height: "100%",
+}));
+
+// Tab panels
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <ContentArea
+      role="tabpanel"
+      hidden={value !== index}
+      id={`data-panel-tabpanel-${index}`}
+      aria-labelledby={`data-panel-tab-${index}`}
+      {...other}
+      sx={{ display: value === index ? "flex" : "none", flexDirection: "column" }}>
+      {value === index && children}
+    </ContentArea>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `data-panel-tab-${index}`,
+    "aria-controls": `data-panel-tabpanel-${index}`,
+  };
+}
+
+// Check if node has displayable data
+function getNodeDataInfo(
+  node: WorkflowNode | null,
+  projectLayers: ProjectLayer[]
+): {
+  hasData: boolean;
+  layer: ProjectLayer | null;
+  hasGeometry: boolean;
+  isTable: boolean;
+  nodeFilter: { op: string; expressions: Expression[] } | null;
+} {
+  if (!node) {
+    return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
+  }
+
+  // Dataset node
+  if (node.type === "dataset" && node.data.type === "dataset") {
+    const layerProjectId = node.data.layerProjectId;
+    if (!layerProjectId) {
+      return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
+    }
+    const layer = projectLayers.find((l) => l.id === layerProjectId);
+    if (!layer) {
+      return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
+    }
+    // Check if it's a table (no geometry)
+    const isTable = layer.type === "table";
+    // Get node's workflow filter
+    const nodeFilter = node.data.filter as { op: string; expressions: Expression[] } | undefined;
+    return {
+      hasData: true,
+      layer,
+      hasGeometry: !isTable,
+      isTable,
+      nodeFilter: nodeFilter || null,
+    };
+  }
+
+  // Tool node with results
+  if (node.type === "tool" && node.data.type === "tool") {
+    const outputLayerProjectId = node.data.outputLayerProjectId;
+    if (!outputLayerProjectId) {
+      return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
+    }
+    const layer = projectLayers.find((l) => l.id === outputLayerProjectId);
+    if (!layer) {
+      return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
+    }
+    const isTable = layer.type === "table";
+    return {
+      hasData: true,
+      layer,
+      hasGeometry: !isTable,
+      isTable,
+      nodeFilter: null, // Tool nodes don't have workflow filters
+    };
+  }
+
+  return { hasData: false, layer: null, hasGeometry: false, isTable: false, nodeFilter: null };
+}
+
+interface WorkflowDataPanelProps {
+  selectedNode: WorkflowNode | null;
+  projectLayers: ProjectLayer[];
+}
+
+const WorkflowDataPanel: React.FC<WorkflowDataPanelProps> = ({ selectedNode, projectLayers }) => {
+  const { t } = useTranslation("common");
+  const theme = useTheme();
+  const dispatch = useDispatch<AppDispatch>();
+  const mapRef = useRef<MapRef | null>(null);
+
+  // Redux state for map view request
+  const requestMapViewFlag = useSelector(selectRequestMapView);
+
+  // Panel state
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [panelHeight, setPanelHeight] = useState(DEFAULT_PANEL_HEIGHT);
+  const [tabValue, setTabValue] = useState(0);
+
+  // Dragging state
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef<{ y: number; height: number } | null>(null);
+
+  // Get node data info
+  const {
+    hasData,
+    layer,
+    hasGeometry,
+    isTable: _isTable,
+    nodeFilter,
+  } = useMemo(() => getNodeDataInfo(selectedNode, projectLayers), [selectedNode, projectLayers]);
+
+  // Open map view when requested via Redux (e.g., from spatial filter creation)
+  useEffect(() => {
+    if (requestMapViewFlag && hasGeometry) {
+      setIsCollapsed(false);
+      setTabValue(1); // Map tab
+      dispatch(clearMapViewRequest());
+    }
+  }, [requestMapViewFlag, hasGeometry, dispatch]);
+
+  // Get layer fields for table and filter CQL generation
+  const { layerFields: fields, isLoading: areFieldsLoading } = useLayerFields(
+    layer?.layer_id || "",
+    undefined
+  );
+
+  // Build CQL filter from node's workflow filter
+  const cqlFilter = useMemo(() => {
+    if (!nodeFilter || !nodeFilter.expressions || nodeFilter.expressions.length === 0) {
+      return null;
+    }
+    try {
+      return createTheCQLBasedOnExpression(nodeFilter.expressions, fields, nodeFilter.op as "and" | "or");
+    } catch {
+      return null;
+    }
+  }, [nodeFilter, fields]);
+
+  // Stringify CQL filter for stable comparison
+  const cqlFilterString = useMemo(() => {
+    return cqlFilter ? JSON.stringify(cqlFilter) : null;
+  }, [cqlFilter]);
+
+  // Table data query params
+  const [dataQueryParams, setDataQueryParams] = useState<GetCollectionItemsQueryParams>({
+    limit: 50,
+    offset: 0,
+  });
+
+  // Track previous filter string to avoid unnecessary updates
+  const prevFilterRef = useRef<string | null>(null);
+  const prevLayerIdRef = useRef<string | null>(null);
+
+  // Reset query params when layer or filter changes
+  useEffect(() => {
+    const layerId = layer?.layer_id || null;
+    // Only use node's workflow filter, NOT the layer's CQL filter
+    // Workflow filter is independent and should not fall back to layer filter
+    const filterString = cqlFilterString;
+
+    // Skip if nothing changed
+    if (layerId === prevLayerIdRef.current && filterString === prevFilterRef.current) {
+      return;
+    }
+
+    prevLayerIdRef.current = layerId;
+    prevFilterRef.current = filterString;
+
+    const newParams: GetCollectionItemsQueryParams = {
+      limit: 50,
+      offset: 0,
+    };
+    if (filterString) {
+      newParams.filter = filterString;
+    }
+    setDataQueryParams(newParams);
+  }, [layer?.layer_id, cqlFilterString]);
+
+  const { data: tableData } = useDatasetCollectionItems(layer?.layer_id || "", dataQueryParams);
+
+  // Map state
+  const mapBounds = useMemo(() => {
+    if (!layer || !hasGeometry) return null;
+    const geojson = wktToGeoJSON(layer.extent || globalExtent);
+    return bbox(geojson) as [number, number, number, number];
+  }, [layer, hasGeometry]);
+
+  // Ensure map tab is not selected if no geometry
+  useEffect(() => {
+    if (!hasGeometry && tabValue === 1) {
+      setTabValue(0);
+    }
+  }, [hasGeometry, tabValue]);
+
+  // Track what we've already zoomed to, to avoid repeated zooms
+  const lastZoomKeyRef = useRef<string | null>(null);
+
+  // Helper function to perform the zoom
+  const performZoom = useCallback(
+    (layerId: string, filterString: string | null) => {
+      if (filterString) {
+        getExtent(layerId, filterString)
+          .then((result) => {
+            if (result.bbox && mapRef.current) {
+              fitBounds(mapRef.current, result.bbox, 40, 18, 1000);
+            }
+          })
+          .catch((error) => {
+            console.warn("Failed to fetch filtered extent:", error);
+            // Fall back to layer bounds
+            if (mapBounds && mapRef.current) {
+              mapRef.current.fitBounds(mapBounds, { padding: 40, duration: 1000 });
+            }
+          });
+      } else if (mapBounds && mapRef.current) {
+        // No filter, zoom to full layer extent
+        mapRef.current.fitBounds(mapBounds, { padding: 40, duration: 1000 });
+      }
+    },
+    [mapBounds]
+  );
+
+  // Zoom to appropriate extent when opening map view or when filter/layer changes
+  useEffect(() => {
+    // Reset zoom tracking when not on map view or no valid data
+    if (!hasGeometry || !layer?.layer_id || tabValue !== 1 || isCollapsed) {
+      // Reset so we zoom again next time map view opens
+      if (tabValue !== 1 || !layer?.layer_id) {
+        lastZoomKeyRef.current = null;
+      }
+      return;
+    }
+
+    // Wait for fields to load if there's a filter, so we can generate proper CQL
+    if (nodeFilter && nodeFilter.expressions.length > 0 && areFieldsLoading) {
+      return;
+    }
+
+    const layerId = layer.layer_id;
+    const filterString = cqlFilterString;
+
+    // Create a unique key for this zoom target
+    const zoomKey = `${layerId}:${filterString || "none"}`;
+
+    // Skip if we already zoomed to this exact target
+    if (lastZoomKeyRef.current === zoomKey) {
+      return;
+    }
+
+    // Mark as zoomed
+    lastZoomKeyRef.current = zoomKey;
+
+    // If map is ready, zoom immediately
+    if (mapRef.current) {
+      performZoom(layerId, filterString);
+      return;
+    }
+
+    // Map not ready yet - poll for it (faster than waiting for onLoad)
+    const checkMapReady = () => {
+      if (mapRef.current) {
+        performZoom(layerId, filterString);
+        return true;
+      }
+      return false;
+    };
+
+    // Check immediately, then poll every 50ms until ready (max 1 second)
+    if (!checkMapReady()) {
+      let attempts = 0;
+      const maxAttempts = 20;
+      const intervalId = setInterval(() => {
+        attempts++;
+        if (checkMapReady() || attempts >= maxAttempts) {
+          clearInterval(intervalId);
+        }
+      }, 50);
+
+      return () => clearInterval(intervalId);
+    }
+  }, [
+    layer?.layer_id,
+    hasGeometry,
+    tabValue,
+    isCollapsed,
+    cqlFilterString,
+    nodeFilter,
+    areFieldsLoading,
+    performZoom,
+  ]);
+
+  // Handle tab change - also expand if collapsed
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+    // Auto-expand when clicking on a tab while collapsed
+    if (isCollapsed) {
+      setIsCollapsed(false);
+    }
+  };
+
+  // Handle pagination
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setDataQueryParams((prev) => ({
+      ...prev,
+      offset: newPage * (prev.limit || 50),
+    }));
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setDataQueryParams({
+      limit: parseInt(event.target.value, 10),
+      offset: 0,
+    });
+  };
+
+  // Handle drag resize
+  const handleDragStart = useCallback(
+    (event: React.MouseEvent) => {
+      event.preventDefault();
+      setIsDragging(true);
+      dragStartRef.current = { y: event.clientY, height: panelHeight };
+    },
+    [panelHeight]
+  );
+
+  useEffect(() => {
+    const handleDragMove = (event: MouseEvent) => {
+      if (!isDragging || !dragStartRef.current) return;
+
+      const deltaY = dragStartRef.current.y - event.clientY;
+      const newHeight = Math.min(
+        MAX_PANEL_HEIGHT,
+        Math.max(MIN_PANEL_HEIGHT, dragStartRef.current.height + deltaY)
+      );
+      setPanelHeight(newHeight);
+    };
+
+    const handleDragEnd = () => {
+      setIsDragging(false);
+      dragStartRef.current = null;
+    };
+
+    if (isDragging) {
+      document.addEventListener("mousemove", handleDragMove);
+      document.addEventListener("mouseup", handleDragEnd);
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleDragMove);
+      document.removeEventListener("mouseup", handleDragEnd);
+    };
+  }, [isDragging]);
+
+  // Toggle collapse
+  const toggleCollapse = useCallback(() => {
+    setIsCollapsed((prev) => !prev);
+  }, []);
+
+  // Layer with visibility and workflow filter for map
+  const layerForMap = useMemo(() => {
+    if (!layer || !hasGeometry) return null;
+    return {
+      ...layer,
+      properties: {
+        ...layer.properties,
+        visibility: true,
+      },
+      // Apply workflow filter (cqlFilter) if available, otherwise clear any filter
+      // Workflow filter is independent from layer's CQL filter
+      query: cqlFilter ? { ...layer.query, cql: cqlFilter } : { ...layer.query, cql: undefined },
+    };
+  }, [layer, hasGeometry, cqlFilter]);
+
+  // Don't render if no data available from any node
+  if (!hasData) {
+    return (
+      <PanelContainer height={COLLAPSED_HEIGHT} isCollapsed={true} isDragging={false}>
+        <PanelHeader>
+          <Tabs value={false} onChange={() => {}} sx={{ minHeight: 36 }}>
+            <Tab
+              label={t("table_view")}
+              disabled
+              sx={{ minHeight: 36, py: 0.75, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
+              {...a11yProps(0)}
+            />
+            <Tab
+              label={t("map_view")}
+              disabled
+              sx={{ minHeight: 36, py: 0.75, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
+              {...a11yProps(1)}
+            />
+          </Tabs>
+        </PanelHeader>
+      </PanelContainer>
+    );
+  }
+
+  return (
+    <PanelContainer height={panelHeight} isCollapsed={isCollapsed} isDragging={isDragging}>
+      {/* Header with tabs */}
+      <PanelHeader>
+        <Tabs value={tabValue} onChange={handleTabChange} sx={{ minHeight: 36 }}>
+          <Tab
+            label={t("table_view")}
+            onClick={() => isCollapsed && setIsCollapsed(false)}
+            sx={{ minHeight: 36, py: 0.75, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
+            {...a11yProps(0)}
+          />
+          <Tab
+            label={t("map_view")}
+            disabled={!hasGeometry}
+            onClick={() => isCollapsed && hasGeometry && setIsCollapsed(false)}
+            sx={{ minHeight: 36, py: 0.75, px: 2, fontSize: "0.8125rem", textTransform: "none" }}
+            {...a11yProps(1)}
+          />
+        </Tabs>
+        {/* Centered drag handle - only show when expanded */}
+        {!isCollapsed && (
+          <DragHandle onMouseDown={handleDragStart}>
+            <DragHandleIcon className="drag-icon" />
+          </DragHandle>
+        )}
+        {/* Only show collapse button when expanded */}
+        {!isCollapsed && (
+          <Tooltip title={t("collapse")} placement="top">
+            <IconButton size="small" onClick={toggleCollapse}>
+              <CollapseIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
+      </PanelHeader>
+
+      {/* Content */}
+      {!isCollapsed && (
+        <PanelContent>
+          {/* Table View */}
+          <TabPanel value={tabValue} index={0}>
+            {areFieldsLoading && !tableData && (
+              <Box sx={{ p: 2 }}>
+                <Skeleton variant="rectangular" height={60} />
+                <Skeleton variant="rectangular" height={200} sx={{ mt: 2 }} />
+              </Box>
+            )}
+            {!areFieldsLoading && tableData && fields && (
+              <>
+                <Box sx={{ flex: 1, overflow: "auto" }}>
+                  <DatasetTable areFieldsLoading={areFieldsLoading} displayData={tableData} fields={fields} />
+                </Box>
+                <Box sx={{ borderTop: `1px solid ${theme.palette.divider}` }}>
+                  <TablePagination
+                    rowsPerPageOptions={[10, 25, 50]}
+                    component="div"
+                    count={tableData.numberMatched}
+                    rowsPerPage={dataQueryParams.limit || 50}
+                    page={
+                      dataQueryParams.offset
+                        ? Math.floor(dataQueryParams.offset / (dataQueryParams.limit || 50))
+                        : 0
+                    }
+                    onPageChange={handleChangePage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                  />
+                </Box>
+              </>
+            )}
+            {!areFieldsLoading && !tableData && (
+              <EmptyState>
+                <Typography variant="body2">{t("no_data_available")}</Typography>
+              </EmptyState>
+            )}
+          </TabPanel>
+
+          {/* Map View */}
+          <TabPanel value={tabValue} index={1}>
+            {hasGeometry && layerForMap && mapBounds && (
+              <MapContainer>
+                <DrawProvider>
+                  <MapViewer
+                    mapRef={mapRef}
+                    layers={[layerForMap]}
+                    initialViewState={{
+                      bounds: mapBounds,
+                      fitBoundsOptions: { padding: 20 },
+                    }}
+                    mapStyle={`https://api.maptiler.com/maps/dataviz-light/style.json?key=${MAPTILER_KEY}`}
+                    dragRotate={false}
+                    touchZoomRotate={false}
+                    containerSx={{
+                      position: "relative",
+                      display: "flex",
+                      height: "100%",
+                      width: "100%",
+                      overflow: "hidden",
+                    }}
+                  />
+                </DrawProvider>
+              </MapContainer>
+            )}
+            {!hasGeometry && (
+              <EmptyState>
+                <Typography variant="body2">{t("no_geometry_available")}</Typography>
+              </EmptyState>
+            )}
+          </TabPanel>
+        </PanelContent>
+      )}
+    </PanelContainer>
+  );
+};
+
+export default WorkflowDataPanel;

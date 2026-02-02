@@ -5,7 +5,7 @@
  *
  * Shows configuration for a selected workflow node.
  * For tool nodes, displays the same inputs as GenericTool.
- * For dataset nodes, shows layer information.
+ * For dataset nodes, delegates to DatasetNodeSettings.
  */
 import { Box, CircularProgress, Stack, Typography, useTheme } from "@mui/material";
 import { useParams } from "next/navigation";
@@ -36,6 +36,7 @@ import SectionHeader from "@/components/map/panels/common/SectionHeader";
 import SectionOptions from "@/components/map/panels/common/SectionOptions";
 import ToolsHeader from "@/components/map/panels/common/ToolsHeader";
 import { GenericInput } from "@/components/map/panels/toolbox/generic/inputs";
+import DatasetNodeSettings from "@/components/workflows/panels/DatasetNodeSettings";
 
 // Map section icons from backend to ICON_NAME
 const SECTION_ICON_MAP: Record<string, ICON_NAME> = {
@@ -256,35 +257,7 @@ export default function WorkflowNodeSettings({
 
   // Render dataset node settings
   if (node.type === "dataset" && node.data.type === "dataset") {
-    return (
-      <Container
-        header={<ToolsHeader onBack={onBack} title={node.data.label} />}
-        disablePadding={false}
-        body={
-          <Stack spacing={2}>
-            <Box>
-              <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                {t("layer")}
-              </Typography>
-              <Typography variant="body2" fontWeight="medium">
-                {node.data.label}
-              </Typography>
-            </Box>
-
-            {node.data.layerId && (
-              <Box>
-                <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                  {t("layer_id")}
-                </Typography>
-                <Typography variant="body2" sx={{ fontFamily: "monospace", fontSize: 11 }}>
-                  {node.data.layerId}
-                </Typography>
-              </Box>
-            )}
-          </Stack>
-        }
-      />
-    );
+    return <DatasetNodeSettings node={node} projectLayers={layers} onBack={onBack} />;
   }
 
   // Render tool node settings

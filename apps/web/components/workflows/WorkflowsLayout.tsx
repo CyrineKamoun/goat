@@ -3,6 +3,7 @@
 import { Box, useTheme } from "@mui/material";
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import React, { useCallback, useEffect, useRef } from "react";
+import { MapProvider } from "react-map-gl/maplibre";
 import { useDispatch, useSelector } from "react-redux";
 import { v4 as uuidv4 } from "uuid";
 
@@ -12,6 +13,7 @@ import {
   selectEdges,
   selectIsDirty,
   selectNodes,
+  selectSelectedNode,
   selectSelectedNodeId,
   selectSelectedWorkflow,
   selectSelectedWorkflowId,
@@ -24,15 +26,19 @@ import {
   setWorkflows,
   syncToWorkflowConfig,
 } from "@/lib/store/workflow/slice";
-import type { Project, ProjectLayer } from "@/lib/validations/project";
+import { parseCQLQueryToObject } from "@/lib/transformers/filter";
+import type { Project, ProjectLayer, ProjectLayerGroup } from "@/lib/validations/project";
+import type { WorkflowNode } from "@/lib/validations/workflow";
 
 import WorkflowCanvas from "@/components/workflows/canvas/WorkflowCanvas";
+import WorkflowDataPanel from "@/components/workflows/panels/WorkflowDataPanel";
 import WorkflowsConfigPanel from "@/components/workflows/panels/WorkflowsConfigPanel";
 import WorkflowsNodesPanel from "@/components/workflows/panels/WorkflowsNodesPanel";
 
 export interface WorkflowsLayoutProps {
   project?: Project;
   projectLayers?: ProjectLayer[];
+  projectLayerGroups?: ProjectLayerGroup[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onProjectUpdate?: (key: string, value: any, refresh?: boolean) => void;
 }
@@ -43,6 +49,7 @@ export interface WorkflowsLayoutProps {
 const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
   project,
   projectLayers = [],
+  projectLayerGroups = [],
   onProjectUpdate: _onProjectUpdate,
 }) => {
   const theme = useTheme();
@@ -53,13 +60,22 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
   const selectedWorkflowId = useSelector(selectSelectedWorkflowId);
   const selectedWorkflow = useSelector(selectSelectedWorkflow);
   const selectedNodeId = useSelector(selectSelectedNodeId);
+  const selectedNode = useSelector(selectSelectedNode) as WorkflowNode | null;
   const nodes = useSelector(selectNodes);
   const edges = useSelector(selectEdges);
   const viewport = useSelector(selectViewport);
   const isDirty = useSelector(selectIsDirty);
 
   // Ref to track drag data
-  const dragDataRef = useRef<{ nodeType: string; toolId?: string; layerId?: string } | null>(null);
+  const dragDataRef = useRef<{
+    nodeType: string;
+    toolId?: string;
+    layerId?: string;
+    layerProjectId?: number;
+    layerName?: string;
+    geometryType?: string;
+    layerCql?: { op: string; args: unknown[] };
+  } | null>(null);
 
   // Ref for save timeout
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -145,6 +161,56 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
     []
   );
 
+  // Handle drag start from layer tree (for dropping layers directly onto canvas)
+  const handleLayerDragStart = useCallback(
+    (event: React.DragEvent, layer: ProjectLayer) => {
+      // Extract CQL filter if present
+      const layerCql = layer.query?.cql as { op?: string; args?: unknown[] } | undefined;
+      const hasValidCql = layerCql?.op && layerCql?.args && layerCql.args.length > 0;
+
+      dragDataRef.current = {
+        nodeType: "dataset",
+        layerId: layer.layer_id,
+        layerProjectId: layer.id,
+        layerName: layer.name,
+        geometryType: layer.feature_layer_geometry_type || undefined,
+        layerCql: hasValidCql ? (layerCql as { op: string; args: unknown[] }) : undefined,
+      };
+      event.dataTransfer.setData("application/reactflow", "dataset");
+      event.dataTransfer.effectAllowed = "move";
+
+      // Create a custom drag image that looks like a dataset node
+      const dragImage = document.createElement("div");
+      dragImage.style.cssText = `
+        padding: 12px;
+        border-radius: 4px;
+        background-color: ${theme.palette.background.paper};
+        border: 2px solid ${theme.palette.primary.main};
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        font-family: ${theme.typography.fontFamily};
+        font-size: 14px;
+        font-weight: bold;
+        color: ${theme.palette.text.primary};
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        position: absolute;
+        top: -1000px;
+        left: -1000px;
+        white-space: nowrap;
+      `;
+      dragImage.textContent = layer.name;
+      document.body.appendChild(dragImage);
+      event.dataTransfer.setDragImage(dragImage, 0, 0);
+
+      // Clean up the element after drag starts
+      setTimeout(() => {
+        document.body.removeChild(dragImage);
+      }, 0);
+    },
+    [theme]
+  );
+
   // Handle drag over canvas
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -158,28 +224,67 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
 
       if (!selectedWorkflowId || !dragDataRef.current || !reactFlowInstance) return;
 
-      const { nodeType, toolId } = dragDataRef.current;
+      const { nodeType, toolId, layerId, layerProjectId, layerName, geometryType, layerCql } =
+        dragDataRef.current;
       dragDataRef.current = null;
 
-      // Get canvas position from drop coordinates
-      const reactFlowBounds = event.currentTarget.getBoundingClientRect();
+      // Get canvas position from drop coordinates - use screen coordinates directly
       const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
+        x: event.clientX,
+        y: event.clientY,
       });
 
       if (nodeType === "dataset") {
-        dispatch(
-          addNode({
-            id: `dataset-${uuidv4()}`,
-            type: "dataset",
-            position,
-            data: {
+        // Check if this is a layer drag (has layerId) or empty dataset drag
+        if (layerId && layerProjectId && layerName) {
+          // Convert layer's CQL filter to workflow filter format (one-way copy)
+          let inheritedFilter: { op: string; expressions: unknown[] } | undefined;
+          if (layerCql) {
+            try {
+              const expressions = parseCQLQueryToObject(layerCql);
+              if (expressions.length > 0) {
+                inheritedFilter = {
+                  op: layerCql.op,
+                  expressions,
+                };
+              }
+            } catch {
+              // Ignore parse errors, just don't inherit filter
+            }
+          }
+
+          // Create dataset node pre-populated with layer data and inherited filter
+          dispatch(
+            addNode({
+              id: `dataset-${uuidv4()}`,
               type: "dataset",
-              label: "Dataset",
-            },
-          })
-        );
+              position,
+              data: {
+                type: "dataset",
+                label: layerName,
+                layerProjectId: layerProjectId,
+                layerId: layerId,
+                layerName: layerName,
+                geometryType: geometryType || undefined,
+                filter: inheritedFilter,
+                filterInitialized: true, // Mark as initialized so settings panel doesn't re-copy
+              },
+            })
+          );
+        } else {
+          // Empty dataset node
+          dispatch(
+            addNode({
+              id: `dataset-${uuidv4()}`,
+              type: "dataset",
+              position,
+              data: {
+                type: "dataset",
+                label: "Dataset",
+              },
+            })
+          );
+        }
       } else if (nodeType === "tool" && toolId) {
         dispatch(
           addNode({
@@ -201,43 +306,54 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
   );
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        width: "100%",
-        height: "100%",
-        overflow: "hidden",
-        backgroundColor: theme.palette.background.default,
-      }}>
-      {/* Left Panel - Workflow list */}
-      <WorkflowsConfigPanel
-        project={project}
-        selectedWorkflow={selectedWorkflow ?? null}
-        onSelectWorkflow={handleSelectWorkflow}
-      />
-
-      {/* Center - Canvas */}
+    <MapProvider>
       <Box
         sx={{
-          flex: 1,
           display: "flex",
-          flexDirection: "column",
-          minWidth: 0,
+          width: "100%",
           height: "100%",
           overflow: "hidden",
+          backgroundColor: theme.palette.background.default,
         }}>
-        <WorkflowCanvas onDrop={handleDrop} onDragOver={handleDragOver} />
-      </Box>
+        {/* Left Panel - Workflow list and Layers */}
+        <WorkflowsConfigPanel
+          project={project}
+          projectLayers={projectLayers}
+          projectLayerGroups={projectLayerGroups}
+          selectedWorkflow={selectedWorkflow ?? null}
+          onSelectWorkflow={handleSelectWorkflow}
+          onLayerDragStart={handleLayerDragStart}
+        />
 
-      {/* Right Panel - Tools palette & Node Settings */}
-      <WorkflowsNodesPanel
-        config={selectedWorkflow?.config || null}
-        selectedNodeId={selectedNodeId}
-        projectLayers={projectLayers}
-        workflowId={selectedWorkflow?.id}
-        onDragStart={handleDragStart}
-      />
-    </Box>
+        {/* Center - Canvas and Data Panel */}
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            minWidth: 0,
+            height: "100%",
+            overflow: "hidden",
+          }}>
+          {/* Canvas area */}
+          <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
+            <WorkflowCanvas onDrop={handleDrop} onDragOver={handleDragOver} />
+          </Box>
+
+          {/* Bottom Data Panel - Table/Map view */}
+          <WorkflowDataPanel selectedNode={selectedNode} projectLayers={projectLayers} />
+        </Box>
+
+        {/* Right Panel - Tools palette & Node Settings */}
+        <WorkflowsNodesPanel
+          config={selectedWorkflow?.config || null}
+          selectedNodeId={selectedNodeId}
+          projectLayers={projectLayers}
+          workflowId={selectedWorkflow?.id}
+          onDragStart={handleDragStart}
+        />
+      </Box>
+    </MapProvider>
   );
 };
 

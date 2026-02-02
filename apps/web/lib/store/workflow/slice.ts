@@ -25,6 +25,8 @@ export interface WorkflowState {
   viewport: Viewport;
   // Dirty flag for unsaved changes
   isDirty: boolean;
+  // Flag to request opening map view (e.g., from spatial filter)
+  requestMapView: boolean;
 }
 
 const initialState: WorkflowState = {
@@ -35,6 +37,7 @@ const initialState: WorkflowState = {
   edges: [],
   viewport: { x: 0, y: 0, zoom: 1 },
   isDirty: false,
+  requestMapView: false,
 };
 
 // Helper to convert WorkflowConfig to ReactFlow format
@@ -249,6 +252,16 @@ const workflowSlice = createSlice({
         state.workflows[index] = { ...state.workflows[index], ...changes };
       }
     },
+
+    // Request opening map view (e.g., from spatial filter creation)
+    requestMapView: (state) => {
+      state.requestMapView = true;
+    },
+
+    // Clear map view request (after handling)
+    clearMapViewRequest: (state) => {
+      state.requestMapView = false;
+    },
   },
 });
 
@@ -270,6 +283,8 @@ export const {
   syncToWorkflowConfig,
   markSaved,
   updateWorkflow,
+  requestMapView,
+  clearMapViewRequest,
 } = workflowSlice.actions;
 
 export const workflowReducer = workflowSlice.reducer;

@@ -28,6 +28,7 @@ export const datasetNodeDataSchema = z.object({
   geometryType: z.string().optional(), // "point", "line", "polygon", etc.
   // Filter applied to the layer
   filter: z.record(z.unknown()).optional(), // CQL2-JSON filter
+  filterInitialized: z.boolean().optional(), // True once filter has been initialized (prevents re-inheritance)
 });
 
 export type DatasetNodeData = z.infer<typeof datasetNodeDataSchema>;
@@ -65,7 +66,7 @@ export type ToolNodeData = z.infer<typeof toolNodeDataSchema>;
 export const textAnnotationNodeDataSchema = z.object({
   type: z.literal("textAnnotation"),
   text: z.string().default("<p></p>"), // HTML content from TipTap
-  backgroundColor: z.string().default("#FFF8E1"), // Default warm yellow
+  backgroundColor: z.string().default("#F2CE58"), // Default warm golden/amber
   width: z.number().default(400),
   height: z.number().default(200),
 });
@@ -254,7 +255,7 @@ export const createTextAnnotationNode = (
   width: number = 400,
   height: number = 200,
   text: string = "<h2>Header</h2><p>This is an example paragraph. You can write your text here. You can use <em>italic</em> or <strong>bold</strong> to highlight words.</p>",
-  backgroundColor: string = "#FFF8E1"
+  backgroundColor: string = "#F2CE58"
 ): WorkflowNode => ({
   id,
   type: "textAnnotation",

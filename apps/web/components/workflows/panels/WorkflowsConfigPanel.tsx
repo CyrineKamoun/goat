@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   CircularProgress,
+  Divider,
   IconButton,
   List,
   ListItem,
@@ -21,15 +22,23 @@ import { Trans, useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { createWorkflow, deleteWorkflow, duplicateWorkflow, useWorkflows } from "@/lib/api/workflows";
-import type { Project } from "@/lib/validations/project";
+import {
+  createWorkflow,
+  deleteWorkflow,
+  duplicateWorkflow,
+  updateWorkflow,
+  useWorkflows,
+} from "@/lib/api/workflows";
+import type { Project, ProjectLayer, ProjectLayerGroup } from "@/lib/validations/project";
 import { createEmptyWorkflowConfig } from "@/lib/validations/workflow";
 import type { Workflow } from "@/lib/validations/workflow";
 
 import MoreMenu from "@/components/common/PopperMenu";
 import type { PopperMenuItem } from "@/components/common/PopperMenu";
 import { SIDE_PANEL_WIDTH, SidePanelContainer } from "@/components/common/SidePanel";
+import { AddLayerButton, ProjectLayerTree } from "@/components/map/panels/layer/ProjectLayerTree";
 import ConfirmModal from "@/components/modals/Confirm";
+import WorkflowRenameModal from "@/components/modals/WorkflowRename";
 
 const PanelContainer = styled(SidePanelContainer)(({ theme }) => ({
   width: SIDE_PANEL_WIDTH,
@@ -37,7 +46,7 @@ const PanelContainer = styled(SidePanelContainer)(({ theme }) => ({
   height: "100%",
   maxHeight: "100%",
   boxShadow: "none",
-  borderRight: `1px solid ${theme.palette.background.paper}`,
+  borderRight: `1px solid ${theme.palette.divider}`,
   display: "flex",
   flexDirection: "column",
   overflow: "hidden",
@@ -47,14 +56,21 @@ const PanelContainer = styled(SidePanelContainer)(({ theme }) => ({
 
 interface WorkflowsConfigPanelProps {
   project?: Project;
+  projectLayers?: ProjectLayer[];
+  projectLayerGroups?: ProjectLayerGroup[];
   selectedWorkflow: Workflow | null;
   onSelectWorkflow: (workflow: Workflow | null) => void;
+  /** Callback for when a layer is dragged (for workflow canvas integration) */
+  onLayerDragStart?: (event: React.DragEvent, layer: ProjectLayer) => void;
 }
 
 const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
   project,
+  projectLayers = [],
+  projectLayerGroups = [],
   selectedWorkflow: _selectedWorkflow,
   onSelectWorkflow,
+  onLayerDragStart,
 }) => {
   const { t } = useTranslation("common");
 
@@ -70,6 +86,7 @@ const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
 
   // Modal states
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [actionWorkflowId, setActionWorkflowId] = useState<string | null>(null);
   const [actionWorkflowName, setActionWorkflowName] = useState<string>("");
 
@@ -158,9 +175,40 @@ const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
     }
   }, [project?.id, actionWorkflowId, selectedWorkflowId, mutate, onSelectWorkflow]);
 
+  // Handle rename workflow
+  const handleRenameWorkflow = useCallback(
+    async (newName: string) => {
+      if (!project?.id || !actionWorkflowId) return;
+
+      const workflow = workflows?.find((w) => w.id === actionWorkflowId);
+      if (!workflow) return;
+
+      try {
+        await updateWorkflow(project.id, actionWorkflowId, {
+          name: newName,
+          config: workflow.config,
+        });
+        await mutate();
+      } catch (error) {
+        console.error("Failed to rename workflow:", error);
+      }
+    },
+    [project?.id, actionWorkflowId, workflows, mutate]
+  );
+
   // Context menu items for workflow
   const getWorkflowMenuItems = useCallback(
     (workflow: Workflow): PopperMenuItem[] => [
+      {
+        id: "rename",
+        label: t("rename"),
+        icon: ICON_NAME.EDIT,
+        onClick: () => {
+          setActionWorkflowId(workflow.id);
+          setActionWorkflowName(workflow.name);
+          setRenameModalOpen(true);
+        },
+      },
       {
         id: "duplicate",
         label: t("duplicate"),
@@ -185,7 +233,14 @@ const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
   return (
     <PanelContainer>
       {/* Workflows Section */}
-      <Box sx={{ display: "flex", flexDirection: "column", overflow: "hidden", height: "100%" }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          flex: "0 0 auto",
+          maxHeight: "40%",
+        }}>
         {/* Workflows Header */}
         <Stack
           direction="row"
@@ -269,6 +324,53 @@ const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
         </Box>
       </Box>
 
+      <Divider />
+
+      {/* Layers Section - Read-only view */}
+      <Box sx={{ display: "flex", flexDirection: "column", overflow: "hidden", flex: 1, minHeight: 0 }}>
+        {/* Layers Header */}
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ p: 2, pb: 0, mb: 1, flexShrink: 0 }}>
+          <Typography variant="subtitle1" fontWeight={600}>
+            {t("layers")}
+          </Typography>
+          {project?.id && <AddLayerButton projectId={project.id} />}
+        </Stack>
+
+        {/* Layers Tree - Read-only */}
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            "&::-webkit-scrollbar": {
+              width: "6px",
+            },
+            "&::-webkit-scrollbar-thumb": {
+              background: "#2836484D",
+              borderRadius: "3px",
+              "&:hover": {
+                background: "#28364880",
+              },
+            },
+          }}>
+          {project?.id && (
+            <ProjectLayerTree
+              projectId={project.id}
+              projectLayers={projectLayers}
+              projectLayerGroups={projectLayerGroups}
+              viewMode="view"
+              hideActions
+              isLoading={false}
+              onLayerDragStart={onLayerDragStart}
+            />
+          )}
+        </Box>
+      </Box>
+
       {/* Delete Confirmation Modal */}
       {deleteModalOpen && (
         <ConfirmModal
@@ -291,6 +393,18 @@ const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
           onConfirm={handleDeleteWorkflow}
         />
       )}
+
+      {/* Rename Modal */}
+      <WorkflowRenameModal
+        open={renameModalOpen}
+        workflowName={actionWorkflowName}
+        onClose={() => {
+          setRenameModalOpen(false);
+          setActionWorkflowId(null);
+          setActionWorkflowName("");
+        }}
+        onRename={handleRenameWorkflow}
+      />
     </PanelContainer>
   );
 };

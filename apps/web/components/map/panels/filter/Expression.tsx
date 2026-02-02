@@ -34,6 +34,8 @@ type ExpressionProps = {
   onDelete: (expression: ExpressionType) => void;
   onUpdate: (expression: ExpressionType) => void;
   onDuplicate: (expression: ExpressionType) => void;
+  /** Optional layer ID to use instead of active layer (for workflows) */
+  layerId?: string;
 };
 
 const Expression: React.FC<ExpressionProps> = (props) => {
@@ -61,8 +63,10 @@ const Expression: React.FC<ExpressionProps> = (props) => {
     [t]
   );
 
+  // Use provided layerId prop if available, otherwise fall back to active layer
   const { activeLayer } = useActiveLayer(projectId as string);
-  const { layerFields } = useLayerFields(activeLayer?.layer_id || "");
+  const effectiveLayerId = props.layerId || activeLayer?.layer_id || "";
+  const { layerFields } = useLayerFields(effectiveLayerId);
   const selectedAttribute = useMemo(() => {
     return layerFields.find((field) => field.name === expression.attribute);
   }, [layerFields, expression.attribute]);
@@ -252,7 +256,7 @@ const Expression: React.FC<ExpressionProps> = (props) => {
                           });
                         }
                       }}
-                      layerId={activeLayer?.layer_id || ""}
+                      layerId={effectiveLayerId}
                       fieldName={expression.attribute}
                       label={t("select_value")}
                     />
@@ -284,7 +288,7 @@ const Expression: React.FC<ExpressionProps> = (props) => {
                           });
                         }
                       }}
-                      layerId={activeLayer?.layer_id || ""}
+                      layerId={effectiveLayerId}
                       fieldName={expression.attribute}
                       label={t("select_values")}
                       multiple

@@ -1,7 +1,7 @@
 "use client";
 
 import { Delete as DeleteIcon, ContentCopy as DuplicateIcon } from "@mui/icons-material";
-import { Box, Divider, IconButton, Paper, Portal, Stack, useTheme } from "@mui/material";
+import { Box, Divider, IconButton, Paper, Stack, Tooltip, useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
@@ -10,7 +10,7 @@ import Underline from "@tiptap/extension-underline";
 import type { Editor } from "@tiptap/react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { type NodeProps, NodeResizer } from "@xyflow/react";
+import { type NodeProps, NodeResizer, NodeToolbar, Position, useOnViewportChange } from "@xyflow/react";
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
@@ -81,7 +81,7 @@ const TipTapEditorContent = styled(EditorContent)(({ theme }) => ({
 const NodeContainer = styled(Box, {
   shouldForwardProp: (prop) => prop !== "selected" && prop !== "backgroundColor",
 })<{ selected?: boolean; backgroundColor?: string }>(({ theme, selected, backgroundColor }) => {
-  const baseBgColor = backgroundColor || "#FFF8E1";
+  const baseBgColor = backgroundColor || "#F2CE58";
 
   return {
     padding: theme.spacing(2),
@@ -100,37 +100,22 @@ const NodeContainer = styled(Box, {
   };
 });
 
-const ActionBar = styled(Stack)(({ theme }) => ({
-  position: "absolute",
-  top: -36,
-  right: 0,
-  backgroundColor: theme.palette.background.paper,
-  borderRadius: theme.shape.borderRadius,
-  padding: theme.spacing(0.5),
-  gap: theme.spacing(0.5),
-  flexDirection: "row",
-  boxShadow: theme.shadows[4],
-  border: `1px solid ${theme.palette.divider}`,
-  zIndex: 10,
-}));
-
 const ActionButton = styled(IconButton)(({ theme }) => ({
-  padding: theme.spacing(0.5),
+  width: 36,
+  height: 36,
   "&:hover": {
     backgroundColor: theme.palette.action.hover,
-  },
-  "& svg": {
-    fontSize: 18,
   },
 }));
 
 const ToolbarContainer = styled(Paper)(({ theme }) => ({
   display: "flex",
   alignItems: "center",
-  padding: theme.spacing(2),
+  padding: theme.spacing(1),
   borderRadius: theme.shape.borderRadius * 2,
   boxShadow: theme.shadows[4],
   backgroundColor: theme.palette.background.paper,
+  border: `1px solid ${theme.palette.divider}`,
 }));
 
 const ColorPickerButton = styled(Box, {
@@ -163,7 +148,15 @@ const TextAnnotationNode: React.FC<TextAnnotationNodeProps> = ({ id, data, selec
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0 });
+
+  // Close color picker when viewport changes (pan/zoom)
+  useOnViewportChange({
+    onChange: useCallback(() => {
+      if (colorPickerOpen) {
+        setColorPickerOpen(false);
+      }
+    }, [colorPickerOpen]),
+  });
 
   const editor = useEditor({
     extensions,
@@ -199,21 +192,32 @@ const TextAnnotationNode: React.FC<TextAnnotationNodeProps> = ({ id, data, selec
     }
   }, [editor, data.text, isEditMode]);
 
-  // Show toolbar when node is selected
+  // Show toolbar when node is selected, but don't auto-enable edit mode
+  // Edit mode is entered via double-click
   useEffect(() => {
     if (selected) {
       setToolbarOpen(true);
-      setIsEditMode(true);
-      // Focus editor when selected
-      setTimeout(() => {
-        editor?.commands.focus();
-      }, 50);
     } else {
       setToolbarOpen(false);
       setIsEditMode(false);
       setColorPickerOpen(false); // Close color picker when deselected
     }
-  }, [selected, editor]);
+  }, [selected]);
+
+  // Handle double-click to enter edit mode
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!isEditMode) {
+        setIsEditMode(true);
+        // Focus editor after enabling edit mode
+        setTimeout(() => {
+          editor?.commands.focus();
+        }, 0);
+      }
+    },
+    [isEditMode, editor]
+  );
 
   // Handle editor focus/blur
   useEffect(() => {
@@ -241,31 +245,6 @@ const TextAnnotationNode: React.FC<TextAnnotationNodeProps> = ({ id, data, selec
       editor.off("blur", handleBlur);
     };
   }, [editor, colorPickerOpen, selected]);
-
-  // Update toolbar position
-  useEffect(() => {
-    if (!toolbarOpen || !containerRef.current) return;
-
-    const updatePosition = () => {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (rect) {
-        setToolbarPosition({
-          top: rect.top - 8,
-          left: rect.left + rect.width / 2,
-        });
-      }
-    };
-
-    updatePosition();
-    let animationId: number;
-    const animate = () => {
-      updatePosition();
-      animationId = requestAnimationFrame(animate);
-    };
-    animationId = requestAnimationFrame(animate);
-
-    return () => cancelAnimationFrame(animationId);
-  }, [toolbarOpen]);
 
   const editorState = useEditorState({
     editor,
@@ -337,7 +316,7 @@ const TextAnnotationNode: React.FC<TextAnnotationNodeProps> = ({ id, data, selec
   );
 
   // Get current color as hex for the color picker
-  const currentColorHex = data.backgroundColor || "#FFF8E1";
+  const currentColorHex = data.backgroundColor || "#F2CE58";
 
   return (
     <>
@@ -362,31 +341,27 @@ const TextAnnotationNode: React.FC<TextAnnotationNodeProps> = ({ id, data, selec
 
       <Box
         ref={containerRef}
+        onDoubleClick={handleDoubleClick}
+        className={isEditMode ? "nodrag" : ""}
         sx={{
           width: data.width || 400,
           height: data.height || 200,
           position: "relative",
+          cursor: isEditMode ? "text" : "grab",
+          "&:active": {
+            cursor: isEditMode ? "text" : "grabbing",
+          },
         }}>
-        {/* Action buttons - only when selected */}
-        {selected && (
-          <ActionBar>
-            <ActionButton onClick={handleDuplicate} title={t("duplicate")}>
-              <DuplicateIcon />
-            </ActionButton>
-            <ActionButton onClick={handleDelete} title={t("delete")}>
-              <DeleteIcon />
-            </ActionButton>
-          </ActionBar>
-        )}
-
         <NodeContainer selected={selected} backgroundColor={data.backgroundColor}>
           <TipTapEditorContent
             editor={editor}
+            className={isEditMode ? "nodrag nowheel" : ""}
             sx={{
               overflowY: isEditMode ? "auto" : "hidden",
+              // Prevent text selection and let pointer events pass through when not in edit mode
+              // This allows dragging the node without accidentally selecting text
               userSelect: isEditMode ? "auto" : "none",
               pointerEvents: isEditMode ? "auto" : "none",
-              cursor: isEditMode ? "text" : "default",
               "& .ProseMirror": {
                 userSelect: isEditMode ? "auto" : "none",
                 pointerEvents: isEditMode ? "auto" : "none",
@@ -397,96 +372,108 @@ const TextAnnotationNode: React.FC<TextAnnotationNodeProps> = ({ id, data, selec
       </Box>
 
       {/* Floating toolbar */}
-      {toolbarOpen && (
-        <Portal>
-          <Box
-            className="tiptap-toolbar"
-            onMouseDown={(e) => e.stopPropagation()}
-            onMouseUp={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            onPointerUp={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            sx={{
-              position: "fixed",
-              top: toolbarPosition.top,
-              left: toolbarPosition.left,
-              transform: "translate(-50%, -100%)",
-              zIndex: 1500,
-              pointerEvents: "auto",
-            }}>
-            <ToolbarContainer>
-              {editor && (
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <BlockTypeSelect
-                    editor={editor}
-                    onOpen={() => setActiveDropdown("blockType")}
-                    onClose={() => setActiveDropdown(null)}
-                    forceClose={activeDropdown !== "blockType" && activeDropdown !== null}
+      <NodeToolbar
+        isVisible={toolbarOpen}
+        position={Position.Top}
+        offset={8}
+        className="tiptap-toolbar nodrag nowheel">
+        <Box
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}>
+          <ToolbarContainer>
+            {editor && (
+              <Stack direction="row" spacing={1} alignItems="center">
+                <BlockTypeSelect
+                  editor={editor}
+                  onOpen={() => setActiveDropdown("blockType")}
+                  onClose={() => setActiveDropdown(null)}
+                  forceClose={activeDropdown !== "blockType" && activeDropdown !== null}
+                />
+                <Divider flexItem orientation="vertical" />
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <MenuButton
+                    value="bold"
+                    iconName={ICON_NAME.BOLD}
+                    selected={editorState?.isBold}
+                    onClick={() => editor.chain().focus().toggleBold().run()}
                   />
-                  <Divider flexItem orientation="vertical" />
-                  <Stack direction="row" spacing={0.5} alignItems="center">
-                    <MenuButton
-                      value="bold"
-                      iconName={ICON_NAME.BOLD}
-                      selected={editorState?.isBold}
-                      onClick={() => editor.chain().focus().toggleBold().run()}
-                    />
-                    <MenuButton
-                      value="italic"
-                      iconName={ICON_NAME.ITALIC}
-                      selected={editorState?.isItalic}
-                      onClick={() => editor.chain().focus().toggleItalic().run()}
-                    />
-                    <MenuButton
-                      value="underline"
-                      iconName={ICON_NAME.UNDERLINE}
-                      selected={editorState?.isUnderline}
-                      onClick={() => editor.chain().focus().toggleUnderline().run()}
-                    />
-                  </Stack>
-                  <Divider flexItem orientation="vertical" />
-                  <AlignSelect
-                    editor={editor}
-                    onOpen={() => setActiveDropdown("align")}
-                    onClose={() => setActiveDropdown(null)}
-                    forceClose={activeDropdown !== "align" && activeDropdown !== null}
+                  <MenuButton
+                    value="italic"
+                    iconName={ICON_NAME.ITALIC}
+                    selected={editorState?.isItalic}
+                    onClick={() => editor.chain().focus().toggleItalic().run()}
                   />
-                  <Divider flexItem orientation="vertical" />
-                  {/* Background color picker */}
-                  <ArrowPopper
-                    open={colorPickerOpen}
-                    placement="bottom"
-                    arrow={false}
-                    isClickAwayEnabled={true}
-                    onClose={() => setColorPickerOpen(false)}
-                    content={
-                      <Paper
-                        className="color-picker-popper"
-                        sx={{
-                          py: 3,
-                          boxShadow: "rgba(0, 0, 0, 0.16) 0px 6px 12px 0px",
-                          width: "235px",
-                          maxHeight: "500px",
-                        }}>
-                        <SingleColorSelector
-                          selectedColor={currentColorHex}
-                          onSelectColor={handleColorChange}
-                        />
-                      </Paper>
-                    }>
-                    <ColorPickerButton
-                      buttonColor={currentColorHex}
-                      onClick={() => setColorPickerOpen(!colorPickerOpen)}
-                      title={t("color")}
-                    />
-                  </ArrowPopper>
+                  <MenuButton
+                    value="underline"
+                    iconName={ICON_NAME.UNDERLINE}
+                    selected={editorState?.isUnderline}
+                    onClick={() => editor.chain().focus().toggleUnderline().run()}
+                  />
                 </Stack>
-              )}
-            </ToolbarContainer>
-          </Box>
-        </Portal>
-      )}
+                <Divider flexItem orientation="vertical" />
+                <AlignSelect
+                  editor={editor}
+                  onOpen={() => setActiveDropdown("align")}
+                  onClose={() => setActiveDropdown(null)}
+                  forceClose={activeDropdown !== "align" && activeDropdown !== null}
+                />
+                <Divider flexItem orientation="vertical" />
+                {/* Background color picker */}
+                <ArrowPopper
+                  open={colorPickerOpen}
+                  placement="bottom"
+                  arrow={false}
+                  disablePortal={false}
+                  isClickAwayEnabled={true}
+                  onClose={() => setColorPickerOpen(false)}
+                  content={
+                    <Paper
+                      className="color-picker-popper"
+                      sx={{
+                        py: 3,
+                        boxShadow: "rgba(0, 0, 0, 0.16) 0px 6px 12px 0px",
+                        width: "235px",
+                        maxHeight: "500px",
+                      }}>
+                      <SingleColorSelector
+                        selectedColor={currentColorHex}
+                        onSelectColor={handleColorChange}
+                      />
+                    </Paper>
+                  }>
+                  <ColorPickerButton
+                    buttonColor={currentColorHex}
+                    onClick={() => setColorPickerOpen(!colorPickerOpen)}
+                    title={t("color")}
+                  />
+                </ArrowPopper>
+              </Stack>
+            )}
+          </ToolbarContainer>
+          {/* Separate action buttons group */}
+          <ToolbarContainer>
+            <Tooltip title={t("duplicate")} placement="top" arrow>
+              <ActionButton onClick={handleDuplicate}>
+                <DuplicateIcon fontSize="small" />
+              </ActionButton>
+            </Tooltip>
+            <Tooltip title={t("delete")} placement="top" arrow>
+              <ActionButton onClick={handleDelete}>
+                <DeleteIcon fontSize="small" color="error" />
+              </ActionButton>
+            </Tooltip>
+          </ToolbarContainer>
+        </Box>
+      </NodeToolbar>
     </>
   );
 };

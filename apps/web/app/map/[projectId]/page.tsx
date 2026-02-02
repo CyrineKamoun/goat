@@ -464,6 +464,7 @@ export default function MapPage({ params: { projectId } }) {
                       <WorkflowsLayout
                         project={project}
                         projectLayers={projectLayers}
+                        projectLayerGroups={projectLayerGroups}
                         onProjectUpdate={handleProjectUpdate}
                       />
                     )}
