@@ -30,6 +30,8 @@ import { parseCQLQueryToObject } from "@/lib/transformers/filter";
 import type { Project, ProjectLayer, ProjectLayerGroup } from "@/lib/validations/project";
 import type { WorkflowNode } from "@/lib/validations/workflow";
 
+import { useWorkflowExecution } from "@/hooks/workflows/useWorkflowExecution";
+
 import WorkflowCanvas from "@/components/workflows/canvas/WorkflowCanvas";
 import WorkflowDataPanel from "@/components/workflows/panels/WorkflowDataPanel";
 import WorkflowsConfigPanel from "@/components/workflows/panels/WorkflowsConfigPanel";
@@ -81,6 +83,14 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
 
   // Fetch workflows from API
   const { workflows, mutate: mutateWorkflows } = useWorkflows(project?.id);
+
+  // Workflow execution hook
+  const { isExecuting, canExecute, nodeStatuses, nodeExecutionInfo, tempLayerIds, execute, finalizeNode } =
+    useWorkflowExecution({
+      workflow: selectedWorkflow ?? undefined,
+      projectId: project?.id,
+      folderId: project?.folder_id,
+    });
 
   // Sync workflows from API to Redux
   useEffect(() => {
@@ -333,11 +343,25 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
           }}>
           {/* Canvas area */}
           <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
-            <WorkflowCanvas onDrop={handleDrop} onDragOver={handleDragOver} />
+            <WorkflowCanvas
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              isExecuting={isExecuting}
+              canExecute={canExecute}
+              nodeStatuses={nodeStatuses}
+              nodeExecutionInfo={nodeExecutionInfo}
+              tempLayerIds={tempLayerIds}
+              onRun={execute}
+              onSaveNode={finalizeNode}
+            />
           </Box>
 
           {/* Bottom Data Panel - Table/Map view */}
-          <WorkflowDataPanel selectedNode={selectedNode} />
+          <WorkflowDataPanel
+            selectedNode={selectedNode}
+            tempLayerIds={tempLayerIds}
+            workflowId={selectedWorkflow?.id}
+          />
         </Box>
 
         {/* Right Panel - Tools palette & Node Settings */}

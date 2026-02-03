@@ -8,6 +8,7 @@
  * For dataset nodes, delegates to DatasetNodeSettings.
  */
 import { Box, CircularProgress, Stack, Typography, useTheme } from "@mui/material";
+import { useEdges } from "@xyflow/react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -83,6 +84,9 @@ export default function WorkflowNodeSettings({
   const dispatch = useDispatch<AppDispatch>();
   const { projectId } = useParams();
 
+  // Get edges to detect connected inputs
+  const edges = useEdges();
+
   // For tool nodes, fetch process description
   const processId = node.type === "tool" && node.data.type === "tool" ? node.data.processId : undefined;
   const { process, isLoading: isLoadingProcess } = useProcessDescription(processId);
@@ -96,6 +100,34 @@ export default function WorkflowNodeSettings({
     if (!process) return {};
     return getDefaultValues(process);
   }, [process]);
+
+  // Detect connected layer inputs and create virtual values for them
+  // This ensures depends_on conditions like {input_layer_id: {$ne: None}} are satisfied
+  const connectedLayerValues = useMemo(() => {
+    if (!process?.inputs) return {};
+
+    const virtualValues: Record<string, string> = {};
+
+    // Get incoming edges to this node
+    const incomingEdges = edges.filter((e) => e.target === node.id);
+
+    // Find layer inputs (widgets: layer-selector, starting-points)
+    for (const [name, input] of Object.entries(process.inputs)) {
+      const widget = input.schema?.["x-ui"]?.widget;
+      if (widget === "layer-selector" || widget === "starting-points") {
+        // Check if this input has a connection
+        const isConnected = incomingEdges.some(
+          (e) => e.targetHandle === name || (!e.targetHandle && Object.keys(process.inputs).length === 1)
+        );
+        if (isConnected) {
+          // Set a placeholder value to satisfy depends_on conditions
+          virtualValues[name] = "__connected__";
+        }
+      }
+    }
+
+    return virtualValues;
+  }, [process, edges, node.id]);
 
   // Form state - initialize with node's saved config or defaults
   const [values, setValues] = useState<Record<string, unknown>>(() => {
@@ -156,7 +188,7 @@ export default function WorkflowNodeSettings({
     if (!layers) return {};
 
     const computed: Record<string, boolean> = {};
-    const effectiveValues = { ...defaultValues, ...values };
+    const effectiveValues = { ...defaultValues, ...connectedLayerValues, ...values };
 
     for (const input of allInputs) {
       if (input.inputType === "layer") {
@@ -177,7 +209,7 @@ export default function WorkflowNodeSettings({
       geometryFlags.length > 0 && geometryFlags.every((v) => v === true);
 
     return computed;
-  }, [layers, allInputs, values, defaultValues]);
+  }, [layers, allInputs, values, defaultValues, connectedLayerValues]);
 
   // Update a single input value
   const handleInputChange = useCallback(
@@ -293,7 +325,8 @@ export default function WorkflowNodeSettings({
     }
 
     // Effective values for visibility
-    const effectiveValues = { ...defaultValues, ...values, ...layerGeometryValues };
+    // Include connectedLayerValues so depends_on conditions for connected inputs are satisfied
+    const effectiveValues = { ...defaultValues, ...connectedLayerValues, ...values, ...layerGeometryValues };
 
     // Render sections with inputs (matching GenericTool pattern)
     return (

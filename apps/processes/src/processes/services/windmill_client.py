@@ -457,14 +457,16 @@ class WindmillClient:
             if include_results:
                 # Jobs that need full details:
                 # - layer_export, print_report: need args for filtering and results for download
+                # - workflow_runner: need results for temp_layer_ids
                 # - failed jobs: need result to extract error name/message
                 jobs_needing_details = [
                     j
                     for j in jobs
                     if j.get("script_path", "").endswith(
-                        ("layer_export", "print_report")
+                        ("layer_export", "print_report", "workflow_runner")
                     )
                     or j.get("success") is False  # Failed jobs need error details
+                    or j.get("running") is True  # Running jobs may need flow_status
                 ]
                 if jobs_needing_details:
 
@@ -474,9 +476,24 @@ class WindmillClient:
                             full_job = await self.get_job_with_result(job["id"])
                             # Merge full job details into the list item
                             job["args"] = full_job.get("args")
+                            # Include flow_status for workflow tracking (workflow_as_code_status)
+                            if full_job.get("flow_status"):
+                                job["flow_status"] = full_job.get("flow_status")
                             # Include result for successful jobs (downloads) and failed jobs (errors)
-                            if full_job.get("success") is True or full_job.get("success") is False:
+                            if (
+                                full_job.get("success") is True
+                                or full_job.get("success") is False
+                            ):
                                 job["result"] = full_job.get("result")
+                            # For running workflow_runner jobs, fetch node_status
+                            if job.get("running") is True and job.get(
+                                "script_path", ""
+                            ).endswith("workflow_runner"):
+                                node_status = await self.get_flow_user_state(
+                                    job["id"], "node_status"
+                                )
+                                if node_status:
+                                    job["node_status"] = node_status
                         except Exception as e:
                             logger.warning(
                                 f"Failed to fetch details for job {job['id']}: {e}"
@@ -519,6 +536,36 @@ class WindmillClient:
                 logger.warning(f"Failed to fetch result for job {job_id}: {e}")
 
         return job
+
+    async def get_flow_user_state(self, job_id: str, key: str) -> Any:
+        """Get flow user state for a job at a given key.
+
+        Args:
+            job_id: Windmill job ID
+            key: State key to retrieve
+
+        Returns:
+            State value (usually a dict)
+
+        Raises:
+            WindmillError: If API call fails
+        """
+        client = self._get_client()
+        workspace = settings.WINDMILL_WORKSPACE
+
+        try:
+            response = await self._run_sync(
+                client.client.get,
+                f"{settings.WINDMILL_URL}/api/w/{workspace}/jobs/flow/user_states/{job_id}/{key}",
+                headers={"Authorization": f"Bearer {settings.WINDMILL_TOKEN}"},
+            )
+            if response.status_code == 404:
+                return None
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.warning(f"Failed to get flow user state for {job_id}/{key}: {e}")
+            return None
 
 
 # Global client instance

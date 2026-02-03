@@ -641,6 +641,10 @@ def _windmill_job_to_status_info(job: dict[str, Any], base_url: str) -> StatusIn
         finished=finished,
         inputs=job.get("args"),
         links=links,
+        workflow_as_code_status=job.get("flow_status", {}).get(
+            "workflow_as_code_status"
+        ),
+        node_status=job.get("node_status"),
     )
 
 
