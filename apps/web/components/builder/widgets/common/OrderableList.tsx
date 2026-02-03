@@ -137,19 +137,34 @@ const OrderableList = ({
 }: OrderableListProps) => {
   const { t } = useTranslation("common");
 
+  // Normalize numeric strings for comparison (handles "12" vs "12.0" format differences)
+  const normalizeValue = (v: string): string => {
+    const num = parseFloat(v);
+    return isNaN(num) ? v : String(num);
+  };
+
+  // Build normalized lookup for matching
+  const normalizedAllItems = useMemo(() => {
+    return new Map(allItems.map((v) => [normalizeValue(v), v]));
+  }, [allItems]);
+
   // Currently visible/selected values (respecting custom order)
   // If visibleItems is undefined, show all. If it's an empty array, show none.
   const currentItems = useMemo(() => {
     if (visibleItems === undefined) {
       return allItems;
     }
-    // Only show items that are in visibleItems AND still exist in allItems
-    return visibleItems.filter((v) => allItems.includes(v));
-  }, [visibleItems, allItems]);
+    // Only show items that are in visibleItems AND still exist in allItems (using normalized comparison)
+    // Map back to the actual allItems values to maintain consistent formatting
+    return visibleItems
+      .map((v) => normalizedAllItems.get(normalizeValue(v)))
+      .filter((v): v is string => v !== undefined);
+  }, [visibleItems, allItems, normalizedAllItems]);
 
   // Items that can be added (not currently visible)
   const availableToAdd = useMemo(() => {
-    return allItems.filter((v) => !currentItems.includes(v));
+    const normalizedCurrentItems = new Set(currentItems.map(normalizeValue));
+    return allItems.filter((v) => !normalizedCurrentItems.has(normalizeValue(v)));
   }, [allItems, currentItems]);
 
   // Options for the selector dropdown

@@ -1,7 +1,7 @@
 import { Box, Typography, useTheme } from "@mui/material";
 import LinearProgress from "@mui/material/LinearProgress";
 import chroma from "chroma-js";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useLayerUniqueValues } from "@/lib/api/layers";
@@ -83,6 +83,12 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
   // Data handling
   const originalData = useMemo(() => aggregationStats?.items || [], [aggregationStats]);
 
+  // Normalize numeric strings for comparison (handles "12" vs "12.0" format differences)
+  const normalizeValue = useCallback((v: string): string => {
+    const num = parseFloat(v);
+    return isNaN(num) ? v : String(num);
+  }, []);
+
   // Only show highlight visualization when there's actually filtered data
   const showHighlight = useMemo(() => {
     if (!isHighlightMode || !selectedStats || !aggregationStats) return false;
@@ -109,15 +115,16 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
 
     // Sort by custom order - items in customOrder come first in that order,
     // items not in customOrder are excluded
-    const orderMap = new Map(customOrder.map((val, idx) => [val, idx]));
+    // Use normalized comparison to handle format differences (e.g., "12" vs "12.0")
+    const orderMap = new Map(customOrder.map((val, idx) => [normalizeValue(val), idx]));
     return originalData
-      .filter((item) => orderMap.has(item.grouped_value))
+      .filter((item) => orderMap.has(normalizeValue(item.grouped_value)))
       .sort((a, b) => {
-        const aIdx = orderMap.get(a.grouped_value) ?? Infinity;
-        const bIdx = orderMap.get(b.grouped_value) ?? Infinity;
+        const aIdx = orderMap.get(normalizeValue(a.grouped_value)) ?? Infinity;
+        const bIdx = orderMap.get(normalizeValue(b.grouped_value)) ?? Infinity;
         return aIdx - bIdx;
       });
-  }, [originalData, config?.setup?.custom_order]);
+  }, [originalData, config?.setup?.custom_order, normalizeValue]);
 
   const displayData = useMemo(() => {
     if (orderedData.length > 0) return orderedData;
@@ -132,14 +139,14 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
   const [activeCategory, setActiveCategory] = useState<string | undefined>();
   const [isHovering, setIsHovering] = useState(false);
 
-  // Build color lookup from color_map if available
+  // Build color lookup from color_map if available (normalized for format differences)
   const colorMapLookup = useMemo(() => {
     const lookup = new Map<string, string>();
     config?.options?.color_map?.forEach(([value, color]) => {
-      lookup.set(value, color);
+      lookup.set(normalizeValue(value), color);
     });
     return lookup;
-  }, [config?.options?.color_map]);
+  }, [config?.options?.color_map, normalizeValue]);
 
   // Generate base colors for each category
   const baseColors = useMemo(() => {
@@ -148,7 +155,7 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
     // If we have a color_map, use it for colors
     if (colorMapLookup.size > 0) {
       return displayData.map((item, index) => {
-        const mappedColor = colorMapLookup.get(item.grouped_value);
+        const mappedColor = colorMapLookup.get(normalizeValue(item.grouped_value));
         if (mappedColor) return mappedColor;
         // Fallback for items not in color_map
         const palette = config?.options?.color_range?.colors || FALLBACK_COLORS;
@@ -164,7 +171,7 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
     return displayData.length === 1
       ? [palette[0]]
       : chroma.scale(palette).mode("lch").colors(displayData.length);
-  }, [displayData, orderedData.length, config?.options?.color_range?.colors, colorMapLookup]);
+  }, [displayData, orderedData.length, config?.options?.color_range?.colors, colorMapLookup, normalizeValue]);
 
   // Colors for highlight/selected states
   const selectedColor = config?.options?.selected_color || DEFAULT_SELECTED_COLOR;

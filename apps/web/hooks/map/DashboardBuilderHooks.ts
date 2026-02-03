@@ -75,13 +75,20 @@ export function useChartWidget<TConfig, TQueryParams>(
     return result.success ? result.data : undefined;
   }, [rawConfig, configSchema]);
 
-  // Get the layer_id (UUID) from layer_project_id
-  const layerId = useMemo(() => {
+  // Get the layer from layer_project_id
+  const layer = useMemo(() => {
     const layerProjectId = (config as any)?.setup?.layer_project_id;
     if (!layerProjectId || !layers) return undefined;
-    const layer = layers.find((l) => l.id === layerProjectId);
-    return layer?.layer_id;
+    return layers.find((l) => l.id === layerProjectId);
   }, [config, layers]);
+
+  // Get the layer_id (UUID) from layer
+  const layerId = layer?.layer_id;
+
+  // Get the layer's base filter (set in layer project configuration)
+  const layerBaseFilter = useMemo(() => {
+    return layer?.query?.cql as Record<string, unknown> | undefined;
+  }, [layer?.query?.cql]);
 
   // Get temporary filters for this layer
   const tempFilters = useTemporaryFilters({ layerId: (config as any)?.setup?.layer_project_id });
@@ -96,18 +103,31 @@ export function useChartWidget<TConfig, TQueryParams>(
       const parsed = querySchema.safeParse(base);
       if (!parsed.success) return;
 
+      // Start with layer's base filter if it exists
+      let cqlQuery = layerBaseFilter ? JSON.parse(JSON.stringify(layerBaseFilter)) : undefined;
+
       // Apply cross filters only when enabled and requested
-      let cqlQuery;
       if (applyCrossFilter && (config as any).options?.cross_filter && tempFilters) {
-        cqlQuery = JSON.parse(JSON.stringify(tempFilters));
+        const crossFilter = JSON.parse(JSON.stringify(tempFilters));
+        if (cqlQuery) {
+          // Combine with existing filter using AND
+          cqlQuery = { op: "and", args: [cqlQuery, crossFilter] };
+        } else {
+          cqlQuery = crossFilter;
+        }
       }
 
       if ((config as any).options?.filter_by_viewport && map) {
         const extentRaw = getMapExtentCQL(map);
         if (extentRaw) {
           const extent = JSON.parse(extentRaw);
-          if (cqlQuery && cqlQuery.args) {
-            cqlQuery.args.push(extent);
+          if (cqlQuery) {
+            // Combine with existing filter using AND
+            if (cqlQuery.op === "and" && cqlQuery.args) {
+              cqlQuery.args.push(extent);
+            } else {
+              cqlQuery = { op: "and", args: [cqlQuery, extent] };
+            }
           } else {
             cqlQuery = extent;
           }
@@ -116,7 +136,7 @@ export function useChartWidget<TConfig, TQueryParams>(
 
       return cqlQuery ? { ...parsed.data, query: JSON.stringify(cqlQuery) } : (parsed.data as TQueryParams);
     },
-    [config, map, querySchema, tempFilters]
+    [config, map, querySchema, tempFilters, layerBaseFilter]
   );
 
   const [queryParams, setQueryParams] = useState<TQueryParams | undefined>(() => buildQuery(true));

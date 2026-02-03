@@ -4,6 +4,12 @@ import { useLayerUniqueValues } from "@/lib/api/layers";
 
 export const MAX_FILTER_VALUES = 20;
 
+// Normalize numeric strings for comparison (handles "12" vs "12.0" format differences)
+const normalizeValue = (v: string): string => {
+  const num = parseFloat(v);
+  return isNaN(num) ? v : String(num);
+};
+
 interface UseFilterValuesParams {
   layerId: string;
   fieldName: string;
@@ -34,6 +40,9 @@ export const useFilterValues = ({ layerId, fieldName, customOrder, cqlFilter }: 
   const allValues = useMemo(() => {
     const dataValues = data?.items?.map((item) => item.value) || [];
 
+    // Build normalized lookup for matching (handles "12" vs "12.0" format differences)
+    const normalizedDataValues = new Map(dataValues.map((v) => [normalizeValue(v), v]));
+
     // Apply custom order if provided
     let orderedValues: string[];
     if (customOrder === undefined) {
@@ -44,8 +53,11 @@ export const useFilterValues = ({ layerId, fieldName, customOrder, cqlFilter }: 
       orderedValues = [];
     } else {
       // Custom order set - filter and order by it
-      // Only show values that are in customOrder AND exist in data
-      orderedValues = customOrder.filter((v) => dataValues.includes(v));
+      // Only show values that are in customOrder AND exist in data (using normalized comparison)
+      // Map back to the actual data values to maintain consistent formatting
+      orderedValues = customOrder
+        .map((v) => normalizedDataValues.get(normalizeValue(v)))
+        .filter((v): v is string => v !== undefined);
     }
 
     // Limit to MAX_FILTER_VALUES
