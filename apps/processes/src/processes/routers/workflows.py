@@ -38,6 +38,9 @@ class WorkflowExecuteRequest(BaseModel):
     folder_id: str = Field(..., description="Folder UUID")
     nodes: list[dict[str, Any]] = Field(..., description="Workflow nodes")
     edges: list[dict[str, Any]] = Field(..., description="Workflow edges")
+    variables: list[dict[str, Any]] = Field(
+        default_factory=list, description="Workflow variables"
+    )
 
 
 class WorkflowExecuteResponse(BaseModel):
@@ -107,7 +110,7 @@ async def execute_workflow(
         Job ID and status info
     """
     # Build job inputs
-    job_inputs = {
+    job_inputs: dict[str, Any] = {
         "user_id": str(user_id),
         "project_id": request.project_id,
         "workflow_id": workflow_id,
@@ -115,6 +118,8 @@ async def execute_workflow(
         "nodes": request.nodes,
         "edges": request.edges,
     }
+    if request.variables:
+        job_inputs["variables"] = request.variables
 
     try:
         job_id = await windmill_client.run_script_async(

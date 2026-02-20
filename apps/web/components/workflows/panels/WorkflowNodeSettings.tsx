@@ -40,6 +40,7 @@ import {
   selectActiveDataPanelView,
   selectNodes,
   selectSelectedWorkflowId,
+  selectVariables,
 } from "@/lib/store/workflow/selectors";
 import { requestMapView, requestTableView, updateNode } from "@/lib/store/workflow/slice";
 import {
@@ -60,9 +61,9 @@ import Container from "@/components/map/panels/Container";
 import SectionHeader from "@/components/map/panels/common/SectionHeader";
 import SectionOptions from "@/components/map/panels/common/SectionOptions";
 import ToolsHeader from "@/components/map/panels/common/ToolsHeader";
-import { GenericInput } from "@/components/map/panels/toolbox/generic/inputs";
 import { useWorkflowExecutionContext } from "@/components/workflows/context/WorkflowExecutionContext";
 import SaveDatasetDialog from "@/components/workflows/dialogs/SaveDatasetDialog";
+import VariableAwareInput from "@/components/workflows/inputs/VariableAwareInput";
 import DatasetNodeSettings from "@/components/workflows/panels/DatasetNodeSettings";
 import SqlToolSettings from "@/components/workflows/panels/SqlToolSettings";
 
@@ -120,6 +121,9 @@ export default function WorkflowNodeSettings({
 
   // Get current workflow ID for metadata API
   const workflowId = useSelector(selectSelectedWorkflowId);
+
+  // Get workflow variables for variable-aware inputs
+  const variables = useSelector(selectVariables);
 
   // Fetch workflow metadata (columns from executed nodes)
   const { metadata: workflowMetadata } = useWorkflowMetadata(workflowId ?? undefined);
@@ -910,7 +914,7 @@ export default function WorkflowNodeSettings({
                         baseOptions={
                           <Stack spacing={2}>
                             {baseInputs.map((input) => (
-                              <GenericInput
+                              <VariableAwareInput
                                 key={input.name}
                                 input={input}
                                 value={effectiveValues[input.name]}
@@ -929,6 +933,7 @@ export default function WorkflowNodeSettings({
                                 schemaDefs={process.$defs}
                                 layerDatasetIds={layerDatasetIds}
                                 predictedColumns={predictedColumns}
+                                variables={variables}
                               />
                             ))}
                           </Stack>
@@ -937,7 +942,7 @@ export default function WorkflowNodeSettings({
                           hasAdvancedOptions ? (
                             <Stack spacing={2}>
                               {advancedInputs.map((input) => (
-                                <GenericInput
+                                <VariableAwareInput
                                   key={input.name}
                                   input={input}
                                   value={effectiveValues[input.name]}
@@ -956,6 +961,7 @@ export default function WorkflowNodeSettings({
                                   schemaDefs={process.$defs}
                                   layerDatasetIds={layerDatasetIds}
                                   predictedColumns={predictedColumns}
+                                  variables={variables}
                                 />
                               ))}
                             </Stack>

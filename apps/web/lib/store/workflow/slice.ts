@@ -2,7 +2,13 @@ import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { Edge, Node } from "@xyflow/react";
 
-import type { Workflow, WorkflowConfig, WorkflowEdge, WorkflowNode } from "@/lib/validations/workflow";
+import type {
+  Workflow,
+  WorkflowConfig,
+  WorkflowEdge,
+  WorkflowNode,
+  WorkflowVariable,
+} from "@/lib/validations/workflow";
 
 export interface Viewport {
   x: number;
@@ -23,6 +29,8 @@ export interface WorkflowState {
   edges: Edge[];
   // Viewport (pan/zoom)
   viewport: Viewport;
+  // Workflow-level variables
+  variables: WorkflowVariable[];
   // Dirty flag for unsaved changes
   isDirty: boolean;
   // Flag to request opening map view (e.g., from spatial filter)
@@ -40,6 +48,7 @@ const initialState: WorkflowState = {
   nodes: [],
   edges: [],
   viewport: { x: 0, y: 0, zoom: 1 },
+  variables: [],
   isDirty: false,
   requestMapView: false,
   requestTableView: false,
@@ -134,10 +143,12 @@ const workflowSlice = createSlice({
         state.nodes = nodes;
         state.edges = edges;
         state.viewport = workflow?.config?.viewport ?? { x: 0, y: 0, zoom: 1 };
+        state.variables = workflow?.config?.variables ?? [];
       } else {
         state.nodes = [];
         state.edges = [];
         state.viewport = { x: 0, y: 0, zoom: 1 };
+        state.variables = [];
       }
     },
 
@@ -242,6 +253,7 @@ const workflowSlice = createSlice({
         nodes,
         edges,
         viewport: state.viewport,
+        variables: state.variables,
       };
     },
 
@@ -283,6 +295,41 @@ const workflowSlice = createSlice({
     setActiveDataPanelView: (state, action: PayloadAction<"table" | "map" | null>) => {
       state.activeDataPanelView = action.payload;
     },
+
+    // ==========================================
+    // Workflow variables
+    // ==========================================
+
+    // Set all variables (bulk replace)
+    setVariables: (state, action: PayloadAction<WorkflowVariable[]>) => {
+      state.variables = action.payload;
+      state.isDirty = true;
+    },
+
+    // Add a new variable
+    addVariable: (state, action: PayloadAction<WorkflowVariable>) => {
+      state.variables.push(action.payload);
+      state.isDirty = true;
+    },
+
+    // Update a variable by id
+    updateVariable: (
+      state,
+      action: PayloadAction<{ id: string; changes: Partial<WorkflowVariable> }>
+    ) => {
+      const { id, changes } = action.payload;
+      const index = state.variables.findIndex((v) => v.id === id);
+      if (index !== -1) {
+        state.variables[index] = { ...state.variables[index], ...changes };
+        state.isDirty = true;
+      }
+    },
+
+    // Remove a variable by id
+    removeVariable: (state, action: PayloadAction<string>) => {
+      state.variables = state.variables.filter((v) => v.id !== action.payload);
+      state.isDirty = true;
+    },
   },
 });
 
@@ -309,6 +356,10 @@ export const {
   requestTableView,
   clearTableViewRequest,
   setActiveDataPanelView,
+  setVariables,
+  addVariable,
+  updateVariable,
+  removeVariable,
 } = workflowSlice.actions;
 
 export const workflowReducer = workflowSlice.reducer;

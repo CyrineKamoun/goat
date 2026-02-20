@@ -188,6 +188,22 @@ export interface SqlTable {
   layerId?: string; // Layer UUID for preview
 }
 
+/**
+ * Replace {{@variable_name}} references with type-appropriate SQL placeholders
+ * so that validation/preview queries don't fail on the {{ syntax.
+ */
+function substituteVariablePlaceholders(
+  sqlQuery: string,
+  vars?: { name: string; type: string }[]
+): string {
+  if (!vars || vars.length === 0) return sqlQuery;
+  return sqlQuery.replace(/\{\{@([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g, (_match, name: string) => {
+    const v = vars.find((v) => v.name === name);
+    if (!v) return "NULL";
+    return v.type === "number" ? "0" : "''";
+  });
+}
+
 // Main FormulaBuilder props
 export interface FormulaBuilderProps {
   open: boolean;
@@ -201,6 +217,7 @@ export interface FormulaBuilderProps {
   showGroupBy?: boolean;
   mode?: "expression" | "sql"; // Default: "expression"
   tables?: SqlTable[]; // For SQL mode: available tables with their columns
+  variables?: { name: string; type: string }[]; // Workflow variables for {{@var}} autocomplete
 }
 
 export default function FormulaBuilder({
@@ -215,6 +232,7 @@ export default function FormulaBuilder({
   showGroupBy = true,
   mode = "expression",
   tables,
+  variables,
 }: FormulaBuilderProps) {
   const { t } = useTranslation("common");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -485,7 +503,7 @@ export default function FormulaBuilder({
         }
 
         const result = await validateSql({
-          sql_query: expression,
+          sql_query: substituteVariablePlaceholders(expression, variables),
           table_schemas: tableSchemas,
         });
         setSqlValidation(result);
@@ -547,7 +565,7 @@ export default function FormulaBuilder({
     } finally {
       setIsValidating(false);
     }
-  }, [expression, columnNames, fields, groupByColumn, hasAggregateFunction, t, isSqlMode, tables]);
+  }, [expression, columnNames, fields, groupByColumn, hasAggregateFunction, t, isSqlMode, tables, variables]);
 
   // Preview expression using aggregation-stats endpoint
   const handlePreview = useCallback(async () => {
@@ -599,7 +617,7 @@ export default function FormulaBuilder({
           }
 
           const validation = await validateSql({
-            sql_query: expression,
+            sql_query: substituteVariablePlaceholders(expression, variables),
             table_schemas: tableSchemas,
           });
 
@@ -624,7 +642,7 @@ export default function FormulaBuilder({
         }
 
         const result = await previewSql({
-          sql_query: expression,
+          sql_query: substituteVariablePlaceholders(expression, variables),
           layers: layersMap,
           limit: 10,
         });
@@ -668,18 +686,24 @@ export default function FormulaBuilder({
     }
   }, [expression, collectionId, groupByColumn, isSqlMode, tables]);
 
-  // Debounced validation - re-run when expression or groupByColumn changes
+  // Stable refs so effects only fire on actual value changes, not callback identity
+  const handleValidateRef = useRef(handleValidate);
+  handleValidateRef.current = handleValidate;
+  const handlePreviewRef = useRef(handlePreview);
+  handlePreviewRef.current = handlePreview;
+
+  // Debounced validation - re-run only when expression or groupByColumn changes
   useEffect(() => {
     const timer = setTimeout(() => {
       if (expression.trim()) {
-        handleValidate();
+        handleValidateRef.current();
       } else {
         setValidation(null);
         setSqlValidation(null);
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [expression, groupByColumn, handleValidate]);
+  }, [expression, groupByColumn]);
 
   // Computed validation state (works for both modes)
   const isValid = isSqlMode ? sqlValidation?.valid : validation?.valid;
@@ -691,10 +715,10 @@ export default function FormulaBuilder({
   useEffect(() => {
     if (activeTab === 1 && expression.trim() && isValid !== false) {
       if (isSqlMode || collectionId) {
-        handlePreview();
+        handlePreviewRef.current();
       }
     }
-  }, [activeTab, expression, collectionId, isValid, groupByColumn, handlePreview, isSqlMode]);
+  }, [activeTab, expression, collectionId, isValid, groupByColumn, isSqlMode]);
 
   // Handle apply
   const handleApply = () => {
@@ -767,6 +791,7 @@ export default function FormulaBuilder({
                 placeholder={t("sql_placeholder")}
                 error={isValid === false}
                 editorRef={editorRef}
+                variables={variables}
               />
             ) : (
               <TextField

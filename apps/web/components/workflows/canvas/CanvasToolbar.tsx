@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  DataObject as VariablesIcon,
   Redo as RedoIcon,
   PlayArrow as RunIcon,
   NearMe as SelectIcon,
@@ -110,6 +111,7 @@ interface CanvasToolbarProps {
   onStop?: () => void;
   isRunning?: boolean;
   canRun?: boolean;
+  onVariablesClick?: () => void;
 }
 
 const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
@@ -123,6 +125,7 @@ const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
   onStop,
   isRunning = false,
   canRun = true,
+  onVariablesClick,
 }) => {
   const { t } = useTranslation("common");
 
@@ -161,6 +164,17 @@ const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
             </ToolButton>
           </span>
         </Tooltip>
+
+        {onVariablesClick && (
+          <>
+            <Divider />
+            <Tooltip title={t("workflow_variables")} placement="top">
+              <ToolButton onClick={onVariablesClick}>
+                <VariablesIcon fontSize="small" />
+              </ToolButton>
+            </Tooltip>
+          </>
+        )}
       </ToolGroup>
 
       {/* Run/Stop Button - Separate for emphasis */}

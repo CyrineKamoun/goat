@@ -46,6 +46,7 @@ import {
   selectActiveDataPanelView,
   selectNodes,
   selectSelectedWorkflowId,
+  selectVariables,
 } from "@/lib/store/workflow/selectors";
 import { requestMapView, requestTableView, updateNode } from "@/lib/store/workflow/slice";
 import type { Layer } from "@/lib/validations/layer";
@@ -64,6 +65,8 @@ import FormulaBuilder from "@/components/modals/FormulaBuilder";
 import type { FormulaField, SqlTable } from "@/components/modals/FormulaBuilder";
 import { useWorkflowExecutionContext } from "@/components/workflows/context/WorkflowExecutionContext";
 import SaveDatasetDialog from "@/components/workflows/dialogs/SaveDatasetDialog";
+
+const EMPTY_FIELDS: FormulaField[] = [];
 
 interface AdditionalLayer {
   layerId: string; // layer UUID
@@ -165,6 +168,7 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
   const edges = useEdges();
   const nodes = useSelector((state: RootState) => selectNodes(state));
   const workflowId = useSelector(selectSelectedWorkflowId);
+  const workflowVariables = useSelector(selectVariables);
   const { metadata: workflowMetadata } = useWorkflowMetadata(workflowId ?? undefined);
   const { nodeStatuses, nodeExecutionInfo, tempLayerIds, onSaveNode } = useWorkflowExecutionContext();
   const nodeStatus = nodeStatuses[node.id];
@@ -1027,11 +1031,12 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
         onClose={() => setFormulaBuilderOpen(false)}
         onApply={handleSqlApply}
         initialExpression={sqlQuery}
-        fields={[]}
+        fields={EMPTY_FIELDS}
         mode="sql"
         tables={sqlTables}
         title={t("custom_sql_editor")}
         showGroupBy={false}
+        variables={workflowVariables}
       />
 
       {/* Dataset Explorer Modal */}

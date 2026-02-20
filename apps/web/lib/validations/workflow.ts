@@ -146,6 +146,28 @@ export const workflowEdgeSchema = z.object({
 export type WorkflowEdge = z.infer<typeof workflowEdgeSchema>;
 
 // ============================================================================
+// Workflow Variable
+// ============================================================================
+
+/**
+ * A workflow-level variable that can be referenced in tool parameters
+ * using {{@variable_name}} syntax
+ */
+export const workflowVariableSchema = z.object({
+  id: z.string(),
+  name: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
+  type: z.enum(["string", "number"]),
+  defaultValue: z.union([z.string(), z.number()]).optional(),
+  order: z.number().int().default(0),
+});
+
+export type WorkflowVariable = z.infer<typeof workflowVariableSchema>;
+
+// ============================================================================
 // Workflow Config
 // ============================================================================
 
@@ -162,6 +184,7 @@ export const workflowConfigSchema = z.object({
       zoom: z.number(),
     })
     .default({ x: 0, y: 0, zoom: 1 }),
+  variables: z.array(workflowVariableSchema).default([]),
 });
 
 export type WorkflowConfig = z.infer<typeof workflowConfigSchema>;
@@ -226,6 +249,7 @@ export const createEmptyWorkflowConfig = (): WorkflowConfig => ({
   nodes: [],
   edges: [],
   viewport: { x: 0, y: 0, zoom: 1 },
+  variables: [],
 });
 
 /**

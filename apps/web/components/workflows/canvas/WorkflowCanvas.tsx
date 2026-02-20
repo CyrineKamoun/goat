@@ -62,6 +62,7 @@ import { createTextAnnotationNode } from "@/lib/validations/workflow";
 import { useConnectionValidator, useWorkflowProcessDescriptions } from "@/hooks/map/useConnectionValidation";
 import { useWorkflowHistory } from "@/hooks/workflows/useWorkflowHistory";
 
+import WorkflowVariablesDialog from "../dialogs/WorkflowVariablesDialog";
 import DeletableEdge from "../edges/DeletableEdge";
 import DatasetNode from "../nodes/DatasetNode";
 import ExportNode from "../nodes/ExportNode";
@@ -273,6 +274,9 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   // MiniMap state
   const [miniMapExpanded, setMiniMapExpanded] = useState(true);
   const [miniMapHovered, setMiniMapHovered] = useState(false);
+
+  // Variables dialog state
+  const [variablesDialogOpen, setVariablesDialogOpen] = useState(false);
 
   // Drawing state for text annotation
   const [isDrawing, setIsDrawing] = useState(false);
@@ -734,7 +738,11 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         onStop={onStop}
         isRunning={isExecuting}
         canRun={canExecute && localNodes.length > 0}
+        onVariablesClick={() => setVariablesDialogOpen(true)}
       />
+
+      {/* Variables Dialog */}
+      <WorkflowVariablesDialog open={variablesDialogOpen} onClose={() => setVariablesDialogOpen(false)} />
 
       {/* Empty canvas hint */}
       {localNodes.length === 0 && (

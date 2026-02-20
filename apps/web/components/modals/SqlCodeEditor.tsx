@@ -2,7 +2,8 @@
 
 import type { ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import CodeMirror from "@uiw/react-codemirror";
-import { acceptCompletion } from "@codemirror/autocomplete";
+import type { Completion, CompletionContext, CompletionResult, CompletionSource } from "@codemirror/autocomplete";
+import { acceptCompletion, autocompletion, startCompletion } from "@codemirror/autocomplete";
 import { sql, PostgreSQL } from "@codemirror/lang-sql";
 import { Prec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
@@ -76,6 +77,83 @@ const autoCapitalizeKeywords = EditorView.updateListener.of((update) => {
   }
 });
 
+/**
+ * Force-open completion popup when the user types {{@.
+ * CM6's activateOnTyping only fires for word characters, and @ is not one
+ * in SQL context, so we need this manual trigger.
+ */
+function variableTrigger(variables: VariableInfo[]): ReturnType<typeof EditorView.updateListener.of> {
+  return EditorView.updateListener.of((update) => {
+    if (!update.docChanged || variables.length === 0) return;
+    const pos = update.state.selection.main.head;
+    const line = update.state.doc.lineAt(pos);
+    const textBefore = line.text.slice(0, pos - line.from);
+    if (/\{\{@[a-zA-Z_]?[a-zA-Z0-9_]*$/.test(textBefore)) {
+      setTimeout(() => startCompletion(update.view), 0);
+    }
+  });
+}
+
+interface VariableInfo {
+  name: string;
+  type: string;
+}
+
+/** CodeMirror completion source for {{@variable}} references */
+function variableCompletionSource(variables: VariableInfo[]): CompletionSource {
+  return (context: CompletionContext): CompletionResult | null => {
+    const line = context.state.doc.lineAt(context.pos);
+    const textBefore = line.text.slice(0, context.pos - line.from);
+    const match = textBefore.match(/\{\{@([a-zA-Z_][a-zA-Z0-9_]*)?$/);
+    if (!match) return null;
+
+    const prefix = match[1] || "";
+    const from = context.pos - prefix.length;
+
+    // Check what follows the cursor — closeBrackets may have auto-inserted }}
+    const textAfter = line.text.slice(context.pos - line.from);
+    const closingBraces = textAfter.startsWith("}}") ? 2 : textAfter.startsWith("}") ? 1 : 0;
+
+    return {
+      from,
+      options: variables.map((v) => ({
+        label: v.name,
+        detail: v.type,
+        type: "variable",
+        apply: (view: EditorView, _completion: Completion, from: number, to: number) => {
+          const insert = `${v.name}}}`;
+          view.dispatch({
+            changes: { from, to: to + closingBraces, insert },
+            selection: { anchor: from + insert.length },
+          });
+        },
+      })),
+    };
+  };
+}
+
+/**
+ * Build a combined completion source that checks for {{@ variable patterns first,
+ * then falls back to SQL language completions from language data.
+ */
+function combinedCompletionSource(variables: VariableInfo[]): CompletionSource {
+  const varSource = variableCompletionSource(variables);
+
+  return async (context: CompletionContext): Promise<CompletionResult | null> => {
+    // Check for variable pattern first
+    const varResult = varSource(context);
+    if (varResult) return varResult;
+
+    // Fall back to SQL language completions from language data
+    const sources = context.state.languageDataAt<CompletionSource>("autocomplete", context.pos);
+    for (const source of sources) {
+      const result = await source(context);
+      if (result) return result;
+    }
+    return null;
+  };
+}
+
 interface SqlCodeEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -83,6 +161,7 @@ interface SqlCodeEditorProps {
   placeholder?: string;
   error?: boolean;
   editorRef?: React.MutableRefObject<ReactCodeMirrorRef | undefined>;
+  variables?: VariableInfo[];
 }
 
 export default function SqlCodeEditor({
@@ -92,6 +171,7 @@ export default function SqlCodeEditor({
   placeholder,
   error = false,
   editorRef,
+  variables,
 }: SqlCodeEditorProps) {
   const theme = useTheme();
 
@@ -144,9 +224,35 @@ export default function SqlCodeEditor({
     []
   );
 
+  // When variables exist: single autocompletion extension with override that
+  // handles both {{@ variable completions and SQL completions.
+  // When no variables: no override, let basicSetup autocompletion handle SQL normally.
+  const variableAutocompletion = useMemo(
+    () => {
+      if (!variables || variables.length === 0) return null;
+      return autocompletion({
+        override: [combinedCompletionSource(variables)],
+        activateOnTyping: true,
+      });
+    },
+    [variables]
+  );
+
+  const varTrigger = useMemo(
+    () => (variables && variables.length > 0 ? variableTrigger(variables) : null),
+    [variables]
+  );
+
   const extensions = useMemo(
-    () => [sqlExtension, tabKeymap, autoCapitalizeKeywords, editorTheme],
-    [sqlExtension, tabKeymap, editorTheme]
+    () => [
+      sqlExtension,
+      tabKeymap,
+      autoCapitalizeKeywords,
+      editorTheme,
+      ...(variableAutocompletion ? [variableAutocompletion] : []),
+      ...(varTrigger ? [varTrigger] : []),
+    ],
+    [sqlExtension, tabKeymap, editorTheme, variableAutocompletion, varTrigger]
   );
 
   return (
@@ -163,7 +269,7 @@ export default function SqlCodeEditor({
         highlightActiveLine: false,
         bracketMatching: true,
         closeBrackets: true,
-        autocompletion: true,
+        autocompletion: !variableAutocompletion,
         history: true,
       }}
       minHeight="80px"

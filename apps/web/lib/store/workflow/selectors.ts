@@ -45,3 +45,6 @@ export const selectRequestTableView = (state: RootState) => state.workflow.reque
 
 // Select active data panel view (table, map, or null for collapsed)
 export const selectActiveDataPanelView = (state: RootState) => state.workflow.activeDataPanelView;
+
+// Select workflow variables
+export const selectVariables = (state: RootState) => state.workflow.variables;

@@ -17,6 +17,7 @@ import {
   selectSelectedNodeId,
   selectSelectedWorkflow,
   selectSelectedWorkflowId,
+  selectVariables,
   selectViewport,
 } from "@/lib/store/workflow/selectors";
 import {
@@ -68,6 +69,7 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
   const edges = useSelector(selectEdges);
   const viewport = useSelector(selectViewport);
   const isDirty = useSelector(selectIsDirty);
+  const variables = useSelector(selectVariables);
 
   // Ref to track drag data
   const dragDataRef = useRef<{
@@ -142,6 +144,7 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
             targetHandle: edge.targetHandle || undefined,
           })),
           viewport,
+          variables,
         };
 
         await updateWorkflowApi(project.id, selectedWorkflow.id, { config });
@@ -157,7 +160,7 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [isDirty, selectedWorkflow, project?.id, nodes, edges, viewport, dispatch, mutateWorkflows]);
+  }, [isDirty, selectedWorkflow, project?.id, nodes, edges, viewport, variables, dispatch, mutateWorkflows]);
 
   // Handle workflow selection (from config panel)
   // Only dispatch if the ID actually changes to avoid clearing selectedNodeId

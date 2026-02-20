@@ -20,6 +20,7 @@ export interface WorkflowExecuteRequest {
   folder_id: string;
   nodes: unknown[];
   edges: unknown[];
+  variables?: { name: string; type: string; defaultValue?: string | number }[];
 }
 
 export interface WorkflowExecuteResponse {

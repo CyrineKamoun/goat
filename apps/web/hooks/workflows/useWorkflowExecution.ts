@@ -14,7 +14,7 @@ import {
 } from "@/lib/api/workflows";
 import type { AppDispatch } from "@/lib/store";
 import { setRunningJobIds } from "@/lib/store/jobs/slice";
-import { selectEdges, selectNodes } from "@/lib/store/workflow/selectors";
+import { selectEdges, selectNodes, selectVariables } from "@/lib/store/workflow/selectors";
 
 import { useAppSelector } from "@/hooks/store/ContextHooks";
 
@@ -77,6 +77,7 @@ export function useWorkflowExecution({ workflow, projectId, folderId }: UseWorkf
   // Redux state
   const nodes = useSelector(selectNodes);
   const edges = useSelector(selectEdges);
+  const variables = useSelector(selectVariables);
   const runningJobIds = useAppSelector((state) => state.jobs.runningJobIds);
 
   // Keep ref to runningJobIds to avoid dependency issues
@@ -247,6 +248,13 @@ export function useWorkflowExecution({ workflow, projectId, folderId }: UseWorkf
         folder_id: folderId,
         nodes: nodes,
         edges: edges,
+        ...(variables.length > 0 && {
+          variables: variables.map((v) => ({
+            name: v.name,
+            type: v.type,
+            defaultValue: v.defaultValue,
+          })),
+        }),
       };
 
       // Submit to Windmill
@@ -272,7 +280,7 @@ export function useWorkflowExecution({ workflow, projectId, folderId }: UseWorkf
       toast.dismiss();
       toast.error(`${t("workflow_failed")}: ${message}`);
     }
-  }, [projectId, workflowId, folderId, nodes, edges, dispatch, mutateJobs, t]);
+  }, [projectId, workflowId, folderId, nodes, edges, variables, dispatch, mutateJobs, t]);
 
   /**
    * Finalize a node's temp layer to permanent storage
