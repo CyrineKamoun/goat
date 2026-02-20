@@ -194,6 +194,8 @@ export function getEffectiveSchema(schema: OGCInputSchema): OGCInputSchema {
 export interface DataTypeInfo {
   /** The data type: vector, table, or raster */
   dataType: "vector" | "table" | "raster" | undefined;
+  /** Multiple allowed data types (e.g., ["vector", "table"] for Custom SQL inputs) */
+  dataTypes?: ("vector" | "table" | "raster")[];
   /** For vector data, the allowed geometry types */
   geometryTypes?: string[];
 }
@@ -207,14 +209,24 @@ export function extractInputDataType(input: OGCInputDescription): DataTypeInfo {
     (m) => m.role === "constraint" && m.title === "geometry_types"
   );
 
-  const dataType = dataTypeMeta?.value as "vector" | "table" | "raster" | undefined;
   const geometryTypes = geometryTypesMeta?.value
     ? String(geometryTypesMeta.value)
         .split(",")
         .map((s) => s.trim())
     : undefined;
 
-  return { dataType, geometryTypes };
+  // Parse data_type value — may be comma-separated for inputs accepting multiple types
+  // e.g., "vector,table" for Custom SQL inputs
+  if (dataTypeMeta?.value) {
+    const rawValue = String(dataTypeMeta.value);
+    const parts = rawValue.split(",").map((s) => s.trim()) as ("vector" | "table" | "raster")[];
+    if (parts.length > 1) {
+      return { dataType: parts[0], dataTypes: parts, geometryTypes };
+    }
+    return { dataType: parts[0], geometryTypes };
+  }
+
+  return { dataType: undefined, geometryTypes };
 }
 
 /**
@@ -245,8 +257,9 @@ export function isConnectionValid(outputType: DataTypeInfo, inputType: DataTypeI
     return true;
   }
 
-  // Data types must match
-  if (outputType.dataType !== inputType.dataType) {
+  // Check if the output data type matches any of the input's allowed types
+  const allowedTypes = inputType.dataTypes ?? (inputType.dataType ? [inputType.dataType] : []);
+  if (!outputType.dataType || !allowedTypes.includes(outputType.dataType)) {
     return false;
   }
 

@@ -11,7 +11,7 @@ import { useDispatch } from "react-redux";
 import type { AppDispatch } from "@/lib/store";
 import { removeEdges } from "@/lib/store/workflow/slice";
 
-import { useWorkflowExecutionContext } from "../context/WorkflowExecutionContext";
+import { useNodeExecutionStatus } from "../context/WorkflowExecutionContext";
 
 // Styled to match node toolbar style (same as DatasetNode)
 const ToolbarContainer = styled(Stack)(({ theme }) => ({
@@ -50,7 +50,6 @@ const AnimatedEdgeStyles = () => (
 
 const DeletableEdge: React.FC<EdgeProps> = ({
   id,
-  source,
   target,
   sourceX,
   sourceY,
@@ -67,18 +66,14 @@ const DeletableEdge: React.FC<EdgeProps> = ({
   const theme = useTheme();
   const { zoom } = useViewport();
 
-  // Get execution status from context
-  const { nodeStatuses } = useWorkflowExecutionContext();
-  const sourceStatus = nodeStatuses[source];
-  const targetStatus = nodeStatuses[target];
+  // Get execution status for the target node
+  const { status: targetStatus } = useNodeExecutionStatus(target);
 
   // Determine edge execution state
   // Edge is running if target node is running (data flowing into it)
   const isEdgeRunning = targetStatus === "running";
-  // Edge is completed if target is completed, or if source is completed and target is running
-  // For dataset->tool edges, source won't have status, so just check target
-  const isEdgeCompleted =
-    targetStatus === "completed" || (sourceStatus === "completed" && targetStatus === "completed");
+  // Edge is completed if target node is completed
+  const isEdgeCompleted = targetStatus === "completed";
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,

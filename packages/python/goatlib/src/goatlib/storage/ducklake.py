@@ -231,6 +231,20 @@ class BaseDuckLakeManager:
             self._connection = None
             logger.info("DuckLake connection closed")
 
+    def attach_catalog(
+        self: "BaseDuckLakeManager", con: duckdb.DuckDBPyConnection
+    ) -> None:
+        """Attach DuckLake catalog to an external DuckDB connection.
+
+        Sets up required extensions, S3 config, and attaches the catalog
+        so the connection can query DuckLake tables directly without
+        copying data into memory.
+        """
+        self._install_extensions(con)
+        self._load_extensions(con)
+        self._setup_s3(con)
+        self._attach_ducklake(con)
+
     @contextmanager
     def connection(
         self: "BaseDuckLakeManager",

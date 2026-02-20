@@ -41,6 +41,10 @@ interface FieldStatisticsValue {
   result_name?: string | null;
 }
 
+// Stable empty object references to avoid creating new references on each render
+const EMPTY_LAYER_DATASET_IDS: Record<string, string> = {};
+const EMPTY_PREDICTED_COLUMNS: Record<string, Record<string, string>> = {};
+
 interface FieldStatisticsInputProps {
   input: ProcessedInput;
   value: unknown;
@@ -48,6 +52,10 @@ interface FieldStatisticsInputProps {
   disabled?: boolean;
   /** All current form values - needed to get the related layer's value */
   formValues: Record<string, unknown>;
+  /** Map of layer input names to their dataset IDs (for connected layers in workflows) */
+  layerDatasetIds?: Record<string, string>;
+  /** Map of layer input names to their predicted columns (for connected tool outputs) */
+  predictedColumns?: Record<string, Record<string, string>>;
 }
 
 export default function FieldStatisticsInput({
@@ -56,9 +64,17 @@ export default function FieldStatisticsInput({
   onChange,
   disabled,
   formValues,
+  layerDatasetIds,
+  predictedColumns,
 }: FieldStatisticsInputProps) {
   const { t } = useTranslation("common");
   const { projectId } = useParams();
+
+  // Ensure we have safe objects to access (handles explicit undefined) - use stable references
+  const safeLayerDatasetIds =
+    layerDatasetIds && Object.keys(layerDatasetIds).length > 0 ? layerDatasetIds : EMPTY_LAYER_DATASET_IDS;
+  const safePredictedColumns =
+    predictedColumns && Object.keys(predictedColumns).length > 0 ? predictedColumns : EMPTY_PREDICTED_COLUMNS;
 
   // Parse the current value - backend expects array but we show single selector
   const currentValue = useMemo((): FieldStatisticsValue => {
@@ -116,19 +132,59 @@ export default function FieldStatisticsInput({
 
   // Find the dataset ID for the selected layer
   const datasetId = useMemo(() => {
+    // First check if parent provided it (for connected layers in workflows)
+    if (relatedLayerInputName && safeLayerDatasetIds[relatedLayerInputName]) {
+      return safeLayerDatasetIds[relatedLayerInputName];
+    }
+
+    // Otherwise try to find it from project layers
     if (!selectedLayerId || !projectLayers) return "";
 
     const layer = projectLayers.find(
       (l) => l.id === Number(selectedLayerId) || l.layer_id === selectedLayerId
     );
     return layer?.layer_id || "";
-  }, [selectedLayerId, projectLayers]);
+  }, [selectedLayerId, projectLayers, relatedLayerInputName, safeLayerDatasetIds]);
 
-  // Fetch only numeric fields for the layer (statistics require numeric columns)
+  // Check if we have predicted columns for this layer input (for connected tool outputs)
+  const hasPredictedColumns = useMemo(() => {
+    return relatedLayerInputName && safePredictedColumns[relatedLayerInputName] != null;
+  }, [relatedLayerInputName, safePredictedColumns]);
+
+  // Convert predicted columns to LayerFieldType format (numeric only for statistics)
+  const predictedNumericFields = useMemo((): LayerFieldType[] => {
+    if (!relatedLayerInputName || !safePredictedColumns[relatedLayerInputName]) {
+      return [];
+    }
+    const columns = safePredictedColumns[relatedLayerInputName];
+    return Object.entries(columns)
+      .filter(([name, type]) => {
+        if (["geometry", "geom", "id", "layer_id"].includes(name.toLowerCase())) return false;
+        const upperType = type.toUpperCase();
+        return (
+          upperType.includes("INT") ||
+          upperType.includes("FLOAT") ||
+          upperType.includes("DOUBLE") ||
+          upperType.includes("DECIMAL") ||
+          upperType.includes("NUMERIC")
+        );
+      })
+      .map(([name]) => ({
+        name,
+        type: "number" as const,
+      }));
+  }, [relatedLayerInputName, safePredictedColumns]);
+
+  // Fetch numeric fields for the layer (statistics operations like sum/min/max need numeric fields)
   const { layerFields, isLoading } = useLayerFields(datasetId, "number");
 
-  // Cast to LayerFieldType[] - the hook normalizes types to "string" | "number" | "object"
-  const numericFields = layerFields as LayerFieldType[];
+  // Use predicted numeric fields if available, otherwise use layer fields
+  const numericFields = useMemo((): LayerFieldType[] => {
+    if (hasPredictedColumns && predictedNumericFields.length > 0) {
+      return predictedNumericFields;
+    }
+    return layerFields as LayerFieldType[];
+  }, [hasPredictedColumns, predictedNumericFields, layerFields]);
 
   // Check if the current operation requires a field
   const requiresField = currentValue.operation && currentValue.operation !== "count";

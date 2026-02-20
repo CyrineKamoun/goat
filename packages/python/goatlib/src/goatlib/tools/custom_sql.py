@@ -129,6 +129,7 @@ class CustomSqlToolParams(ToolInputBase):
     )
 
     # Connected workflow inputs (0-3 optional layer-selector handles)
+    # Custom SQL accepts both vector (spatial) and table (non-spatial) data
     input_layer_1_id: str | None = Field(
         None,
         description="First input layer (connected from workflow)",
@@ -137,6 +138,7 @@ class CustomSqlToolParams(ToolInputBase):
             field_order=1,
             widget="layer-selector",
             label_key="input_layer_1",
+            widget_options={"data_types": ["vector", "table"]},
         ),
     )
     input_layer_1_filter: dict[str, Any] | None = Field(
@@ -152,6 +154,7 @@ class CustomSqlToolParams(ToolInputBase):
             field_order=3,
             widget="layer-selector",
             label_key="input_layer_2",
+            widget_options={"data_types": ["vector", "table"]},
         ),
     )
     input_layer_2_filter: dict[str, Any] | None = Field(
@@ -167,6 +170,7 @@ class CustomSqlToolParams(ToolInputBase):
             field_order=5,
             widget="layer-selector",
             label_key="input_layer_3",
+            widget_options={"data_types": ["vector", "table"]},
         ),
     )
     input_layer_3_filter: dict[str, Any] | None = Field(

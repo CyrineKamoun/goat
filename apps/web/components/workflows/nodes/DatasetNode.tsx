@@ -135,9 +135,8 @@ const DatasetNode: React.FC<DatasetNodeProps> = ({ id, data, selected }) => {
   const dispatch = useDispatch<AppDispatch>();
   const nodes = useSelector(selectNodes);
 
-  // Get execution status - dataset nodes are "completed" when any connected tool is running or completed
-  const { nodeStatuses } = useWorkflowExecutionContext();
-  const hasAnyExecution = Object.keys(nodeStatuses).length > 0;
+  // Get execution status - dataset nodes are "completed" when any execution is active
+  const { isExecuting: hasAnyExecution } = useWorkflowExecutionContext();
 
   // Get layer fields for CQL generation
   const { layerFields } = useLayerFields(data.layerId || "", undefined);

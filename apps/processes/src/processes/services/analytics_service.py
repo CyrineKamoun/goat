@@ -633,56 +633,62 @@ class AnalyticsService:
                         "error": f"Failed to load temp layer {alias}: {e}",
                     }
 
-            # Load DuckLake layers
+            # Attach DuckLake catalog in read-only mode (via ducklake_manager)
+            # instead of copying entire datasets into memory
             if ducklake_layers:
-                with ducklake_manager.connection() as lake_con:
-                    for alias, layer_id in ducklake_layers.items():
-                        # Resolve layer to DuckLake table name
-                        try:
-                            norm_id = normalize_layer_id(layer_id)
-                            schema_name = get_schema_for_layer(norm_id)
-                            table_name = _layer_id_to_table_name(norm_id)
-                            full_table = f"lake.{schema_name}.{table_name}"
-                        except Exception as e:
-                            return {
-                                "success": False,
-                                "columns": [],
-                                "rows": [],
-                                "error": f"Layer {alias} ({layer_id}): {e}",
-                            }
+                try:
+                    ducklake_manager.attach_catalog(con)
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "columns": [],
+                        "rows": [],
+                        "error": f"Failed to attach DuckLake catalog: {e}",
+                    }
 
-                        # Read data from DuckLake and register in isolated connection
-                        try:
-                            data = lake_con.execute(
-                                f"SELECT * FROM {full_table}"
-                            ).fetchdf()
-                            con.register(alias, data)
-                        except Exception as e:
-                            return {
-                                "success": False,
-                                "columns": [],
-                                "rows": [],
-                                "error": f"Failed to load layer {alias}: {e}",
-                            }
+                for alias, layer_id in ducklake_layers.items():
+                    # Resolve layer to DuckLake table name
+                    try:
+                        norm_id = normalize_layer_id(layer_id)
+                        schema_name = get_schema_for_layer(norm_id)
+                        table_name = _layer_id_to_table_name(norm_id)
+                        full_table = f"lake.{schema_name}.{table_name}"
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "columns": [],
+                            "rows": [],
+                            "error": f"Layer {alias} ({layer_id}): {e}",
+                        }
+
+                    # Create a view alias pointing to the DuckLake table
+                    try:
+                        con.execute(
+                            f'CREATE VIEW "{alias}" AS '
+                            f"SELECT * FROM {full_table}"
+                        )
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "columns": [],
+                            "rows": [],
+                            "error": f"Failed to load layer {alias}: {e}",
+                        }
+
+            # Get column info first (DESCRIBE doesn't affect data cursor)
+            columns: list[dict[str, str]] = []
+            describe = con.execute(
+                f"DESCRIBE SELECT * FROM ({sql_query}) _preview LIMIT 0"
+            )
+            for row in describe.fetchall():
+                columns.append({"name": row[0], "type": row[1]})
 
             # Execute the query with limit
             limited_sql = (
                 f"SELECT * FROM ({sql_query}) _preview "
                 f"LIMIT {limit}"
             )
-            result = con.execute(limited_sql)
-
-            # Get column info
-            columns: list[dict[str, str]] = []
-            if result.description:
-                describe = con.execute(
-                    f"DESCRIBE SELECT * FROM ({sql_query}) _preview LIMIT 0"
-                )
-                for row in describe.fetchall():
-                    columns.append({"name": row[0], "type": row[1]})
-
-            # Fetch rows
-            rows_data = result.fetchall()
+            rows_data = con.execute(limited_sql).fetchall()
             col_names = [c["name"] for c in columns]
             rows: list[dict[str, Any]] = []
             for row_tuple in rows_data:

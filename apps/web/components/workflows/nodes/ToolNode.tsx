@@ -32,7 +32,7 @@ import type { ToolNodeData } from "@/lib/validations/workflow";
 
 import { useProcessDescription } from "@/hooks/map/useOgcProcesses";
 
-import { useWorkflowExecutionContext } from "../context/WorkflowExecutionContext";
+import { useNodeExecutionStatus } from "../context/WorkflowExecutionContext";
 import {
   AnimatedBorderWrapper,
   BorderAnglePropertyStyles,
@@ -105,20 +105,8 @@ const ToolNode: React.FC<ToolNodeProps> = ({ id, data, selected }) => {
   const nodes = useSelector(selectNodes);
   const edges = useEdges();
 
-  // Get execution status from context
-  const { nodeStatuses, nodeExecutionInfo } = useWorkflowExecutionContext();
-  const nodeStatus = nodeStatuses[id];
-  const executionInfo = nodeExecutionInfo[id];
-
-  // Debug logging for execution status
-  console.log(
-    `[ToolNode ${id}] nodeStatus:`,
-    nodeStatus,
-    "executionInfo:",
-    executionInfo,
-    "durationMs:",
-    executionInfo?.durationMs
-  );
+  // Get execution status for this specific node
+  const { status: nodeStatus, info: executionInfo } = useNodeExecutionStatus(id);
 
   // Fetch process description to determine inputs
   const { process } = useProcessDescription(data.processId);

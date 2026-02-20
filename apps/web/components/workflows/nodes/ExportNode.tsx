@@ -19,7 +19,7 @@ import { selectNodes } from "@/lib/store/workflow/selectors";
 import { addNode, removeNodes } from "@/lib/store/workflow/slice";
 import type { ExportNodeData } from "@/lib/validations/workflow";
 
-import { useWorkflowExecutionContext } from "../context/WorkflowExecutionContext";
+import { useNodeExecutionStatus } from "../context/WorkflowExecutionContext";
 import {
   AnimatedBorderWrapper,
   BorderAnglePropertyStyles,
@@ -49,8 +49,8 @@ const ExportNode: React.FC<ExportNodeProps> = ({ id, data, selected }) => {
   const dispatch = useDispatch<AppDispatch>();
   const nodes = useSelector(selectNodes);
 
-  const { nodeStatuses } = useWorkflowExecutionContext();
-  const nodeStatus = nodeStatuses[id] || data.status;
+  const { status: nodeStatus_ } = useNodeExecutionStatus(id);
+  const nodeStatus = nodeStatus_ || data.status;
 
   // Handle duplicate node
   const handleDuplicate = useCallback(

@@ -638,45 +638,56 @@ export default function WorkflowNodeSettings({
     layers, // Re-fetch when layers become available
   ]);
 
+  // Compute new values with dynamic defaults applied
+  const computeNewValues = useCallback(
+    (prev: Record<string, unknown>, name: string, value: unknown) => {
+      const newValues = { ...prev, [name]: value };
+
+      // Check for dynamic defaults
+      for (const input of allInputs) {
+        const defaultByField = input.uiMeta?.widget_options?.default_by_field as
+          | { field: string; values: Record<string, unknown> }
+          | undefined;
+
+        if (defaultByField && defaultByField.field === name) {
+          const dynamicDefault = defaultByField.values[String(value)];
+          if (dynamicDefault !== undefined) {
+            newValues[input.name] = dynamicDefault;
+          }
+        }
+      }
+
+      return newValues;
+    },
+    [allInputs]
+  );
+
   // Update a single input value
   const handleInputChange = useCallback(
     (name: string, value: unknown) => {
-      setValues((prev) => {
-        const newValues = { ...prev, [name]: value };
+      // Compute new values based on current state
+      const newValues = computeNewValues(values, name, value);
 
-        // Check for dynamic defaults
-        for (const input of allInputs) {
-          const defaultByField = input.uiMeta?.widget_options?.default_by_field as
-            | { field: string; values: Record<string, unknown> }
-            | undefined;
+      // Update local state
+      setValues(newValues);
 
-          if (defaultByField && defaultByField.field === name) {
-            const dynamicDefault = defaultByField.values[String(value)];
-            if (dynamicDefault !== undefined) {
-              newValues[input.name] = dynamicDefault;
-            }
-          }
-        }
-
-        // Save to node data
-        if (node.type === "tool") {
-          dispatch(
-            updateNode({
-              id: node.id,
-              changes: {
-                data: {
-                  ...node.data,
-                  config: newValues,
-                },
+      // Save to Redux (outside setValues updater to avoid updating
+      // other components during this component's render)
+      if (node.type === "tool") {
+        dispatch(
+          updateNode({
+            id: node.id,
+            changes: {
+              data: {
+                ...node.data,
+                config: newValues,
               },
-            })
-          );
-        }
-
-        return newValues;
-      });
+            },
+          })
+        );
+      }
     },
-    [allInputs, dispatch, node]
+    [computeNewValues, values, dispatch, node]
   );
 
   // Update filter for a layer input

@@ -96,6 +96,8 @@ export default function GenericInput({
           onChange={onChange}
           disabled={disabled}
           formValues={safeFormValues}
+          layerDatasetIds={layerDatasetIds}
+          predictedColumns={predictedColumns}
         />
       );
 

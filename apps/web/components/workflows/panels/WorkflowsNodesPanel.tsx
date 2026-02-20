@@ -22,15 +22,16 @@ import {
 import { styled } from "@mui/material/styles";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { type JobStatusType, dismissJob, useJobs } from "@/lib/api/processes";
 import type { AppDispatch } from "@/lib/store";
+import { selectNodes } from "@/lib/store/workflow/selectors";
 import { selectNode } from "@/lib/store/workflow/slice";
 import type { ProjectLayer } from "@/lib/validations/project";
-import type { WorkflowConfig } from "@/lib/validations/workflow";
+import type { WorkflowConfig, WorkflowNode } from "@/lib/validations/workflow";
 
 import type { SelectorItem } from "@/types/map/common";
 import type { ToolCategory } from "@/types/map/ogc-processes";
@@ -574,7 +575,7 @@ interface WorkflowsNodesPanelProps {
 }
 
 const WorkflowsNodesPanel: React.FC<WorkflowsNodesPanelProps> = ({
-  config,
+  config: _config,
   selectedNodeId,
   projectLayers = [],
   workflowId,
@@ -582,6 +583,7 @@ const WorkflowsNodesPanel: React.FC<WorkflowsNodesPanelProps> = ({
 }) => {
   const { t } = useTranslation("common");
   const dispatch = useDispatch<AppDispatch>();
+  const nodes = useSelector(selectNodes);
   const [activeTab, setActiveTab] = useState(0);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -595,12 +597,13 @@ const WorkflowsNodesPanel: React.FC<WorkflowsNodesPanelProps> = ({
 
   // If a node is selected, show the node settings panel (like LayerSettingsPanel in Layouts)
   // Note: textAnnotation nodes don't show settings panel - they have their own floating toolbar
-  if (selectedNodeId && config) {
-    const selectedNode = config.nodes.find((n) => n.id === selectedNodeId);
+  // Use Redux nodes (source of truth) instead of stale workflow config to prevent config resets
+  if (selectedNodeId) {
+    const selectedNode = nodes.find((n) => n.id === selectedNodeId);
     if (selectedNode && selectedNode.type !== "textAnnotation") {
       return (
         <RightPanelContainer>
-          <WorkflowNodeSettings node={selectedNode} projectLayers={projectLayers} onBack={handleBack} />
+          <WorkflowNodeSettings key={selectedNodeId} node={selectedNode as WorkflowNode} projectLayers={projectLayers} onBack={handleBack} />
         </RightPanelContainer>
       );
     }

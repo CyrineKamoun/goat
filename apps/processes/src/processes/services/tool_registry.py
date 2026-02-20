@@ -328,13 +328,19 @@ class ToolRegistry:
         widget_options = x_ui.get("widget_options", {})
 
         # Determine data_type based on widget
-        # layer-selector and starting-points widgets accept vector data
+        # layer-selector and starting-points widgets accept vector data by default
+        # Tools can override with data_types option (e.g., ["vector", "table"])
         if widget in ("layer-selector", "starting-points"):
+            data_types = widget_options.get("data_types")
+            if data_types and isinstance(data_types, list):
+                data_type_value = ",".join(data_types)
+            else:
+                data_type_value = "vector"
             metadata.append(
                 Metadata(
                     title="data_type",
                     role="constraint",
-                    value="vector",
+                    value=data_type_value,
                 )
             )
 
