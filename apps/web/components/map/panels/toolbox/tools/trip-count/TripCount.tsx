@@ -8,7 +8,7 @@ import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { useJobs } from "@/lib/api/processes";
 import { computeTripCount } from "@/lib/api/tools";
-import { accessibilityIndicatorsStaticPayload } from "@/lib/constants/payloads";
+import { OEV_STATION_CONFIG_DEFAULT } from "@/lib/constants/oev-gueteklassen";
 import { setRunningJobIds } from "@/lib/store/jobs/slice";
 import { setMaskLayer } from "@/lib/store/map/slice";
 import { jobTypeEnum } from "@/lib/validations/jobs";
@@ -71,7 +71,7 @@ const TripCount = ({ onBack, onClose }: IndicatorBaseProps) => {
         to_time: ptEndTime,
       },
       reference_area_layer_project_id: referenceLayer?.value,
-      station_config: accessibilityIndicatorsStaticPayload,
+      station_config: OEV_STATION_CONFIG_DEFAULT,
     };
     try {
       setIsBusy(true);

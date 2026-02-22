@@ -16,6 +16,7 @@ import LayerInput from "@/components/map/panels/toolbox/generic/inputs/LayerInpu
 import MultiEnumInput from "@/components/map/panels/toolbox/generic/inputs/MultiEnumInput";
 import NumberInput from "@/components/map/panels/toolbox/generic/inputs/NumberInput";
 import ObjectInput from "@/components/map/panels/toolbox/generic/inputs/ObjectInput";
+import OevStationConfigInput from "@/components/map/panels/toolbox/generic/inputs/OevStationConfigInput";
 import RepeatableObjectInput from "@/components/map/panels/toolbox/generic/inputs/RepeatableObjectInput";
 import ScenarioInput from "@/components/map/panels/toolbox/generic/inputs/ScenarioInput";
 import StartingPointsInput from "@/components/map/panels/toolbox/generic/inputs/StartingPointsInput";
@@ -37,6 +38,8 @@ interface GenericInputProps {
   schemaDefs?: Record<string, OGCInputSchema>;
   /** Layer IDs to exclude from layer selectors (for repeatable objects) */
   excludedLayerIds?: string[];
+  /** Process ID for tool-specific input overrides */
+  processId?: string;
 }
 
 export default function GenericInput({
@@ -49,7 +52,12 @@ export default function GenericInput({
   formValues = {},
   schemaDefs,
   excludedLayerIds,
+  processId,
 }: GenericInputProps) {
+  if (processId === "oev_gueteklassen" && input.name === "station_config") {
+    return <OevStationConfigInput input={input} value={value} onChange={onChange} disabled={disabled} />;
+  }
+
   switch (input.inputType) {
     case "layer":
       return (

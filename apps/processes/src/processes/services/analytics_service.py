@@ -11,6 +11,7 @@ from typing import Any
 from goatlib.analysis.statistics import (
     AreaOperation,
     ClassBreakMethod,
+    HistogramBreakMethod,
     SortOrder,
     StatisticsOperation,
     calculate_aggregation_stats,
@@ -417,6 +418,8 @@ class AnalyticsService:
         collection: str,
         column: str,
         num_bins: int = 10,
+        method: str = "equal_interval",
+        custom_breaks: list[float] | None = None,
         filter_expr: str | None = None,
         order: str = "ascendent",
     ) -> dict[str, Any]:
@@ -426,6 +429,8 @@ class AnalyticsService:
             collection: Layer ID
             column: Numeric column name
             num_bins: Number of histogram bins
+            method: Histogram binning method
+            custom_breaks: Optional custom internal break points
             filter_expr: Optional CQL2 filter
             order: Sort order of bins (ascendent or descendent)
 
@@ -439,12 +444,18 @@ class AnalyticsService:
         if order == "descendent":
             sort_order = SortOrder.descendent
 
+        histogram_method = HistogramBreakMethod.equal_interval
+        if method in HistogramBreakMethod.__members__:
+            histogram_method = HistogramBreakMethod(method)
+
         with ducklake_manager.connection() as con:
             result = calculate_histogram(
                 con,
                 table_name,
                 column=column,
                 num_bins=num_bins,
+                method=histogram_method,
+                custom_breaks=custom_breaks,
                 where_clause=where_clause,
                 params=params if params else None,
                 order=sort_order,

@@ -1,5 +1,5 @@
 import { Stack } from "@mui/material";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { removeTemporaryFilter } from "@/lib/store/map/slice";
 import { hasNestedSchemaPath } from "@/lib/utils/zod";
@@ -26,6 +26,12 @@ interface WidgetConfigurationProps {
 const WidgetConfiguration = ({ onChange, samePanelWidgets }: WidgetConfigurationProps) => {
   const dispatch = useAppDispatch();
   const selectedBuilderItem = useAppSelector((state) => state.map.selectedBuilderItem);
+    const selectedBuilderItemRef = useRef(selectedBuilderItem);
+
+    useEffect(() => {
+      selectedBuilderItemRef.current = selectedBuilderItem;
+    }, [selectedBuilderItem]);
+
   const existingFilter = useAppSelector((state) =>
     state.map.temporaryFilters.find((filter) => filter.id === selectedBuilderItem?.id)
   );
@@ -40,15 +46,24 @@ const WidgetConfiguration = ({ onChange, samePanelWidgets }: WidgetConfiguration
     return null;
   }
 
-  const handleConfigChange = (config: never) => {
-    if (existingFilter) {
-      dispatch(removeTemporaryFilter(existingFilter.id));
-    }
-    onChange({
-      ...selectedBuilderItem,
-      config,
-    });
-  };
+  const handleConfigChange = useCallback(
+    (config: never) => {
+      const latestSelectedBuilderItem = selectedBuilderItemRef.current;
+      if (!latestSelectedBuilderItem || latestSelectedBuilderItem.type !== "widget") {
+        return;
+      }
+
+      if (existingFilter) {
+        dispatch(removeTemporaryFilter(existingFilter.id));
+      }
+
+      onChange({
+        ...latestSelectedBuilderItem,
+        config,
+      });
+    },
+    [dispatch, existingFilter, onChange]
+  );
 
   // Handle full widget update (for tabs widget that needs to update tabWidgets)
   const handleWidgetChange = (updatedWidget: BuilderWidgetSchema) => {

@@ -1,4 +1,4 @@
-import { Box, Typography, useTheme } from "@mui/material";
+import { Box, TextField, Typography, useTheme } from "@mui/material";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -8,13 +8,17 @@ import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { useJobs } from "@/lib/api/processes";
 import { computeOevGueteKlassen } from "@/lib/api/tools";
-import { accessibilityIndicatorsStaticPayload } from "@/lib/constants/payloads";
+import {
+  getOevStationConfigPreset,
+  type OevConfigPresetKey,
+} from "@/lib/constants/oev-gueteklassen";
 import { setRunningJobIds } from "@/lib/store/jobs/slice";
 import { setMaskLayer } from "@/lib/store/map/slice";
 import { jobTypeEnum } from "@/lib/validations/jobs";
 import {
   oevGueteklassenCatchmentType,
   oevGueteklassenSchema,
+  stationConfigSchema,
   toolboxMaskLayerNames,
 } from "@/lib/validations/tools";
 
@@ -32,10 +36,22 @@ import ToolboxActionButtons from "@/components/map/panels/common/ToolboxActionBu
 import ToolsHeader from "@/components/map/panels/common/ToolsHeader";
 import LearnMore from "@/components/map/panels/toolbox/common/LearnMore";
 import PTTimeSelectors from "@/components/map/panels/toolbox/common/PTTimeSelectors";
+import {
+  ensureClassificationCoverage,
+  getCategoryIds,
+  getDistanceKeys,
+  getFrequencyInputValue,
+  getIntervalLabels,
+  parseFrequencyInput,
+  updateCategoryCell,
+  updateClassificationCell,
+  withFrequencies,
+} from "@/components/map/panels/toolbox/tools/oev-gueteklassen/utils";
 
 const OevGueteklassen = ({ onBack, onClose }: IndicatorBaseProps) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
+  const defaultPreset: OevConfigPresetKey = "standard_120";
   const [isBusy, setIsBusy] = useState(false);
   const { mutate } = useJobs({
     read: false,
@@ -46,17 +62,28 @@ const OevGueteklassen = ({ onBack, onClose }: IndicatorBaseProps) => {
   const { filteredLayers } = useLayerByGeomType(["feature"], ["polygon"], projectId as string);
   const [referenceLayer, setReferenceLayer] = useState<SelectorItem | undefined>(undefined);
 
+  const presets: SelectorItem[] = useMemo(
+    () => [
+      { value: "compact_60", label: "Compact (60)", icon: ICON_NAME.CLOCK },
+      { value: "standard_120", label: "Standard (120)", icon: ICON_NAME.CLOCK },
+      { value: "extended_210", label: "Extended (210)", icon: ICON_NAME.CLOCK },
+    ],
+    []
+  );
+  const [selectedPreset, setSelectedPreset] = useState<SelectorItem>(
+    presets.find((preset) => preset.value === defaultPreset) || presets[1]
+  );
+  const [stationConfig, setStationConfig] = useState(
+    getOevStationConfigPreset(defaultPreset)
+  );
+  const [frequencyInput, setFrequencyInput] = useState(getFrequencyInputValue(stationConfig));
+
   const catchmentAreaTypes: SelectorItem[] = useMemo(() => {
     return [
       {
         value: oevGueteklassenCatchmentType.Enum.buffer,
         label: t("buffer"),
         icon: ICON_NAME.BULLSEYE,
-      },
-      {
-        value: oevGueteklassenCatchmentType.Enum.network,
-        label: t("network"),
-        icon: ICON_NAME.STREET_NETWORK,
       },
     ];
   }, [t]);
@@ -77,18 +104,48 @@ const OevGueteklassen = ({ onBack, onClose }: IndicatorBaseProps) => {
     resetPTConfiguration,
   } = usePTTimeSelectorValues();
 
+  const intervalLabels = useMemo(
+    () => getIntervalLabels(stationConfig.time_frequency),
+    [stationConfig.time_frequency]
+  );
+  const categoryIds = useMemo(() => getCategoryIds(stationConfig), [stationConfig]);
+  const distanceKeys = useMemo(() => getDistanceKeys(stationConfig), [stationConfig]);
+  const stationConfigValidation = useMemo(
+    () => stationConfigSchema.safeParse(stationConfig),
+    [stationConfig]
+  );
+  const isStationConfigValid = stationConfigValidation.success;
+
   const isValid = useMemo(() => {
-    if (!referenceLayer || !isPTValid) {
+    if (!referenceLayer || !isPTValid || !isStationConfigValid) {
       return false;
     }
     return true;
-  }, [isPTValid, referenceLayer]);
+  }, [isPTValid, isStationConfigValid, referenceLayer]);
+
+  const handlePresetChange = (item: SelectorItem[] | SelectorItem | undefined) => {
+    const preset = item as SelectorItem;
+    if (!preset?.value) return;
+    const nextPreset = preset.value as OevConfigPresetKey;
+    const config = getOevStationConfigPreset(nextPreset);
+    setSelectedPreset(preset);
+    setStationConfig(config);
+    setFrequencyInput(getFrequencyInputValue(config));
+  };
+
+  const handleFrequencyBlur = () => {
+    const parsed = parseFrequencyInput(frequencyInput);
+    if (!parsed.length) return;
+    const nextConfig = withFrequencies(stationConfig, parsed);
+    setStationConfig(nextConfig);
+    setFrequencyInput(getFrequencyInputValue(nextConfig));
+  };
 
   const handleRun = async () => {
     const payload = {
       catchment_type: catchmentArea?.value,
       reference_area_layer_project_id: referenceLayer?.value,
-      station_config: accessibilityIndicatorsStaticPayload,
+      station_config: stationConfig,
       time_window: {
         weekday: ptDay?.value,
         from_time: ptStartTime,
@@ -117,6 +174,11 @@ const OevGueteklassen = ({ onBack, onClose }: IndicatorBaseProps) => {
   const handleReset = () => {
     setReferenceLayer(undefined);
     setCatchmentArea(catchmentAreaTypes[0]);
+    const preset = presets.find((option) => option.value === defaultPreset) || presets[1];
+    const config = getOevStationConfigPreset(defaultPreset);
+    setSelectedPreset(preset);
+    setStationConfig(config);
+    setFrequencyInput(getFrequencyInputValue(config));
     resetPTConfiguration();
   };
 
@@ -215,6 +277,117 @@ const OevGueteklassen = ({ onBack, onClose }: IndicatorBaseProps) => {
                       label={t("oev_gueteklassen_catchement_area")}
                       tooltip={t("oev_gueteklassen_catchment_area_tooltip")}
                     />
+
+                    <Selector
+                      selectedItems={selectedPreset}
+                      setSelectedItems={handlePresetChange}
+                      items={presets}
+                      label="Preset"
+                      tooltip="Start from a predefined configuration"
+                    />
+
+                    <TextField
+                      size="small"
+                      value={frequencyInput}
+                      onChange={(event) => {
+                        setFrequencyInput(event.target.value);
+                      }}
+                      onBlur={handleFrequencyBlur}
+                      label="Frequency thresholds (minutes)"
+                      placeholder="5, 10, 20, 40, 60, 120"
+                    />
+
+                    <Typography variant="body2" fontWeight={600} sx={{ mt: 1 }}>
+                      Station Category Matrix
+                    </Typography>
+                    <Box sx={{ overflowX: "auto", border: `1px solid ${theme.palette.divider}` }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: "left", padding: 8 }}>Interval</th>
+                            <th style={{ textAlign: "left", padding: 8 }}>A</th>
+                            <th style={{ textAlign: "left", padding: 8 }}>B</th>
+                            <th style={{ textAlign: "left", padding: 8 }}>C</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stationConfig.categories.map((row, rowIndex) => (
+                            <tr key={`row-${rowIndex}`}>
+                              <td style={{ padding: 8 }}>{intervalLabels[rowIndex] || `#${rowIndex + 1}`}</td>
+                              {(["A", "B", "C"] as const).map((group) => (
+                                <td key={`${rowIndex}-${group}`} style={{ padding: 8 }}>
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    value={row[group] ?? ""}
+                                    inputProps={{ min: 1 }}
+                                    onChange={(event) => {
+                                      const value = Number(event.target.value);
+                                      if (!Number.isFinite(value) || value <= 0) return;
+                                      setStationConfig((current) =>
+                                        updateCategoryCell(current, rowIndex, group, value)
+                                      );
+                                    }}
+                                    sx={{ width: 88 }}
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </Box>
+
+                    <Typography variant="body2" fontWeight={600} sx={{ mt: 1 }}>
+                      Distance to Class Matrix
+                    </Typography>
+                    <Box sx={{ overflowX: "auto", border: `1px solid ${theme.palette.divider}` }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead>
+                          <tr>
+                            <th style={{ textAlign: "left", padding: 8 }}>Category</th>
+                            {distanceKeys.map((distance) => (
+                              <th key={`distance-${distance}`} style={{ textAlign: "left", padding: 8 }}>
+                                {distance} m
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {categoryIds.map((categoryId) => (
+                            <tr key={`category-${categoryId}`}>
+                              <td style={{ padding: 8 }}>{categoryId}</td>
+                              {distanceKeys.map((distance) => (
+                                <td key={`${categoryId}-${distance}`} style={{ padding: 8 }}>
+                                  <TextField
+                                    size="small"
+                                    type="number"
+                                    value={stationConfig.classification[categoryId]?.[distance] ?? ""}
+                                    inputProps={{ min: 1, max: 6 }}
+                                    onChange={(event) => {
+                                      const value = Number(event.target.value);
+                                      if (!Number.isFinite(value) || value < 1 || value > 6) return;
+                                      setStationConfig((current) =>
+                                        ensureClassificationCoverage(
+                                          updateClassificationCell(current, categoryId, distance, String(value))
+                                        )
+                                      );
+                                    }}
+                                    sx={{ width: 88 }}
+                                  />
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </Box>
+
+                    {!isStationConfigValid ? (
+                      <Typography color="error" variant="caption">
+                        {stationConfigValidation.error.issues[0]?.message}
+                      </Typography>
+                    ) : null}
                   </>
                 }
               />
