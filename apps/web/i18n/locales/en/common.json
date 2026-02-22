@@ -1589,7 +1589,8 @@
   "title_text": "Title text",
   "to": "To",
   "toolbar": "Toolbar",
-  "tools": "Toolbox",
+  "tools": "Tools",
+  "toolbox": "Toolbox",
   "transfer_ownership": "Transfer Ownership",
   "travel_time_distance": "Travel distance",
   "travel_time_limit": "Travel time limit",
@@ -1764,5 +1765,10 @@
   "export_no_connection": "Connect a tool's output to this export node",
   "dataset_exported_successfully": "Dataset exported successfully",
   "options": "Options",
-  "yes": "Yes"
+  "yes": "Yes",
+  "no_workflows_available": "No workflows available in this project",
+  "workflow_no_variables": "This workflow has no configurable variables",
+  "workflow_stop": "Stop",
+  "workflow_progress": "Progress",
+  "workflow_node_count": "{{completed}}/{{total}} steps"
 }

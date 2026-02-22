@@ -125,6 +125,69 @@ def substitute_variables_in_config(
     return resolved
 
 
+def coerce_inputs_from_schema(
+    process_id: str,
+    inputs: dict[str, Any],
+) -> dict[str, Any]:
+    """Coerce input values to match the tool's Pydantic schema types.
+
+    When workflow variables resolve a single value for a field that expects
+    a list (e.g. ``distances: List[float]`` receives ``100`` instead of
+    ``[100]``), wrap the scalar in a list.
+    """
+    from goatlib.tools.registry import get_tool
+
+    tool_def = get_tool(process_id)
+    if not tool_def:
+        return inputs
+
+    try:
+        params_class = tool_def.get_params_class()
+        schema = params_class.model_json_schema()
+    except Exception:
+        return inputs
+
+    properties = schema.get("properties", {})
+    defs = schema.get("$defs", {})
+
+    for key, value in inputs.items():
+        if key not in properties or isinstance(value, (list, type(None))):
+            continue
+
+        prop = properties[key]
+        if _schema_expects_array(prop, defs):
+            inputs[key] = [value]
+
+    return inputs
+
+
+def _schema_expects_array(
+    prop: dict[str, Any],
+    defs: dict[str, Any],
+) -> bool:
+    """Check if a JSON schema property expects an array type."""
+    # Direct {"type": "array"}
+    if prop.get("type") == "array":
+        return True
+
+    # anyOf / oneOf (e.g. Optional[List[float]] → [{"type": "array", ...}, {"type": "null"}])
+    for variant_key in ("anyOf", "oneOf"):
+        variants = prop.get(variant_key)
+        if variants:
+            for variant in variants:
+                if variant.get("type") == "array":
+                    return True
+                # Follow $ref
+                ref = variant.get("$ref")
+                if ref and ref.startswith("#/$defs/"):
+                    ref_name = ref.split("/")[-1]
+                    ref_schema = defs.get(ref_name, {})
+                    if ref_schema.get("type") == "array":
+                        return True
+
+    return False
+
+
 def topological_sort(nodes: list[dict], edges: list[dict]) -> list[dict]:
     """Sort nodes in execution order (dependencies first).
 
@@ -212,6 +275,11 @@ def build_tool_inputs(
         }
         if var_map:
             inputs = substitute_variables_in_config(inputs, var_map)
+
+    # Coerce scalar values to lists where the tool schema expects arrays
+    process_id = node_data.get("processId")
+    if process_id:
+        inputs = coerce_inputs_from_schema(process_id, inputs)
 
     # Process incoming edges to get layer inputs
     for edge in edges:

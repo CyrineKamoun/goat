@@ -1578,6 +1578,7 @@
   "to": "Bis",
   "toolbar": "Werkzeugleiste",
   "tools": "Werkzeuge",
+  "toolbox": "Werkzeugkasten",
   "triggered_by": "Ausgelöst von",
   "transfer_ownership": "Rechte übertragen",
   "travel_time_distance": "Reiseentfernung",
@@ -1751,5 +1752,10 @@
   "export_no_connection": "Verbinden Sie die Ausgabe eines Tools mit diesem Export-Knoten",
   "dataset_exported_successfully": "Dataset erfolgreich exportiert",
   "options": "Optionen",
-  "yes": "Ja"
+  "yes": "Ja",
+  "no_workflows_available": "Keine Workflows in diesem Projekt verfügbar",
+  "workflow_no_variables": "Dieser Workflow hat keine konfigurierbaren Variablen",
+  "workflow_stop": "Stopp",
+  "workflow_progress": "Fortschritt",
+  "workflow_node_count": "{{completed}}/{{total}} Schritte"
 }
