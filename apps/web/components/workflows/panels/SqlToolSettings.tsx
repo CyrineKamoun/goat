@@ -281,7 +281,14 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
       const sourceData = sourceNode?.data as Record<string, unknown> | undefined;
 
       let layerUuid: string | undefined;
-      let layerName = (sourceData?.label as string) || `Input ${idx}`;
+      // Use result_layer_name for tool nodes, fall back to translated processId or label
+      let layerName = `Input ${idx}`;
+      if (sourceData?.type === "tool") {
+        const toolConfig = sourceData.config as Record<string, unknown> | undefined;
+        layerName = (toolConfig?.result_layer_name as string) || t(sourceData.processId as string, { defaultValue: sourceData.label as string }) || layerName;
+      } else if (sourceData?.label) {
+        layerName = sourceData.label as string;
+      }
 
       if (sourceData?.type === "dataset" && sourceData.layerId) {
         const layerIdValue = sourceData.layerId as string;
@@ -328,22 +335,28 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
   const [predictedColumns, setPredictedColumns] = useState<Record<string, Record<string, string>>>({});
   const predictionFetchedRef = useRef<string>("");
 
-  // Stable key for connected inputs to avoid redundant fetches
+  // Stable key for connected inputs to avoid redundant fetches.
+  // Includes source node config so predictions re-trigger when upstream SQL changes.
   const connectedInputsKey = useMemo(() => {
     return connectedInputs
-      .map((ci) => `${ci.sourceNodeId || ""}:${ci.sourceNode?.data?.type || ""}`)
+      .map((ci) => {
+        const base = `${ci.sourceNodeId || ""}:${ci.sourceNode?.data?.type || ""}`;
+        // For tool source nodes, include config hash so we re-predict when upstream changes
+        if (ci.sourceNode?.data?.type === "tool") {
+          const config = (ci.sourceNode.data as Record<string, unknown>).config as Record<string, unknown> | undefined;
+          const sqlQuery = config?.sql_query as string | undefined;
+          return `${base}:${sqlQuery || ""}`;
+        }
+        return base;
+      })
       .join("|");
   }, [connectedInputs]);
-
-  // Stable boolean: true once project layers are loaded (avoids array ref instability)
-  const projectLayersReady = !!(projectLayers && projectLayers.length > 0);
 
   // Predict output schema for connected tool source nodes.
   // Uses recursive graph traversal: walks backward through edges until
   // reaching dataset nodes, predicting each tool's output along the way.
   useEffect(() => {
     if (!workflowId || connectedInputs.length === 0) return;
-    if (!projectLayersReady) return;
 
     const fetchKey = `${workflowId}:${connectedInputsKey}`;
     if (fetchKey === predictionFetchedRef.current) return;
@@ -444,7 +457,7 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
 
     fetchPredictions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflowId, connectedInputsKey, projectLayersReady]);
+  }, [workflowId, connectedInputsKey]);
 
   // Get fields for a connected input — prefer metadata, then predicted, then queryables
   const getInputFields = useCallback(

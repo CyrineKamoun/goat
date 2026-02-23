@@ -221,6 +221,30 @@ class CustomSqlToolRunner(BaseToolRunner[CustomSqlToolParams]):
     default_output_name = "Custom SQL"
 
     @classmethod
+    def _resolve_input_alias(cls: type["CustomSqlToolRunner"], input_key: str, index: int) -> str:
+        """Map an input schema key to the table alias used in SQL queries.
+
+        Handles both correct keys (input_layer_1_id) and fallback keys
+        (input, input_layer_id) that may occur when edge handles aren't
+        fully resolved yet.
+        """
+        # Exact mapping for known keys
+        alias_mapping = {
+            "input_layer_1_id": "input_1",
+            "input_layer_2_id": "input_2",
+            "input_layer_3_id": "input_3",
+        }
+        if input_key in alias_mapping:
+            return alias_mapping[input_key]
+
+        # Fallback: if the key is already a valid alias, use it directly
+        if input_key.startswith("input_") and input_key[-1].isdigit():
+            return input_key
+
+        # Last resort: derive alias from position (0-based index → input_1, etc.)
+        return f"input_{index + 1}"
+
+    @classmethod
     def predict_output_schema(
         cls,
         input_schemas: dict[str, dict[str, str]],
@@ -236,6 +260,11 @@ class CustomSqlToolRunner(BaseToolRunner[CustomSqlToolParams]):
             # No SQL yet, return empty schema
             return {}
 
+        # Substitute workflow variable templates ({{@var_name}}) with a
+        # neutral placeholder so DuckDB can parse the SQL. We only care
+        # about column names/types, not actual values, so 1 is safe.
+        sql_query = re.sub(r"\{\{@\w+\}\}", "1", sql_query)
+
         try:
             validate_sql_query(sql_query)
         except ValueError:
@@ -243,25 +272,33 @@ class CustomSqlToolRunner(BaseToolRunner[CustomSqlToolParams]):
 
         con = duckdb.connect()
         try:
-            con.execute("INSTALL spatial; LOAD spatial;")
+            # Spatial extension is optional — needed only for geometry columns
+            try:
+                con.execute("INSTALL spatial; LOAD spatial;")
+            except Exception:
+                logger.debug("Spatial extension not available for schema prediction")
 
-            # Map input schema keys to table aliases
-            alias_mapping = {
-                "input_layer_1_id": "input_1",
-                "input_layer_2_id": "input_2",
-                "input_layer_3_id": "input_3",
-            }
+            has_spatial = False
+            try:
+                con.execute("SELECT ST_Point(0, 0)")
+                has_spatial = True
+            except Exception:
+                pass
 
             # Create mock tables from input schemas
-            for input_key, columns in input_schemas.items():
-                alias = alias_mapping.get(input_key, input_key)
+            for idx, (input_key, columns) in enumerate(input_schemas.items()):
+                alias = cls._resolve_input_alias(input_key, idx)
 
                 col_defs = []
                 if columns:
                     for col_name, col_type in columns.items():
                         # Normalize geometry columns
                         if "GEOMETRY" in col_type.upper():
-                            col_defs.append(f'"{col_name}" GEOMETRY')
+                            if has_spatial:
+                                col_defs.append(f'"{col_name}" GEOMETRY')
+                            else:
+                                # Fall back to BLOB when spatial is unavailable
+                                col_defs.append(f'"{col_name}" BLOB')
                         else:
                             col_defs.append(f'"{col_name}" {col_type}')
 
