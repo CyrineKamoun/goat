@@ -18,6 +18,7 @@ import type { ReportLayoutConfig } from "@/lib/validations/reportLayout";
 import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 import { useBasemap } from "@/hooks/map/MapHooks";
 import { useAtlasFeatures } from "@/hooks/reports/useAtlasFeatures";
+import { useProjectLayerGroups } from "@/lib/api/projects";
 
 import { ElementContentRenderer } from "@/components/reports/elements/renderers/ElementRenderers";
 
@@ -53,12 +54,47 @@ export default function PrintPage() {
 
   const { reportLayout, isLoading, isError } = useReportLayout(projectId, layoutId);
   const { project, isLoading: isProjectLoading } = useProject(projectId);
-  const { layers: projectLayers, isLoading: isLayersLoading } = useFilteredProjectLayers(
+  const { layers: allProjectLayers, isLoading: isLayersLoading } = useFilteredProjectLayers(
     projectId,
     ["table"],
     []
   );
+  const { layerGroups: projectLayerGroups } = useProjectLayerGroups(projectId);
   const { activeBasemap } = useBasemap(project);
+
+  // Filter out layers that belong to invisible groups (same logic as editor)
+  const projectLayers = useMemo(() => {
+    if (!allProjectLayers || !projectLayerGroups) {
+      return allProjectLayers || [];
+    }
+
+    const invisibleGroupIds = new Set<number>();
+
+    const findInvisibleGroups = (groups: typeof projectLayerGroups) => {
+      groups.forEach((group) => {
+        const groupVisibility = group.properties?.visibility ?? true;
+        if (!groupVisibility) {
+          invisibleGroupIds.add(group.id);
+        }
+        if (group.parent_id && invisibleGroupIds.has(group.parent_id)) {
+          invisibleGroupIds.add(group.id);
+        }
+      });
+    };
+
+    let previousSize = -1;
+    while (invisibleGroupIds.size !== previousSize) {
+      previousSize = invisibleGroupIds.size;
+      findInvisibleGroups(projectLayerGroups);
+    }
+
+    return allProjectLayers.filter((layer) => {
+      if (!layer.layer_project_group_id) {
+        return true;
+      }
+      return !invisibleGroupIds.has(layer.layer_project_group_id);
+    });
+  }, [allProjectLayers, projectLayerGroups]);
   const [isReady, setIsReady] = useState(false);
 
   // Atlas support - fetch features and generate pages
