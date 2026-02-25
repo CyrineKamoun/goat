@@ -75,6 +75,7 @@ class HeatmapGravityToolParams(
             field_order=1,
             widget="layer-selector",
             label_key="opportunity_layer_1",
+            hidden=True,
         ),
     )
     opportunity_layer_1_filter: dict[str, Any] | None = Field(
@@ -90,6 +91,7 @@ class HeatmapGravityToolParams(
             field_order=3,
             widget="layer-selector",
             label_key="opportunity_layer_2",
+            hidden=True,
         ),
     )
     opportunity_layer_2_filter: dict[str, Any] | None = Field(
@@ -105,6 +107,7 @@ class HeatmapGravityToolParams(
             field_order=5,
             widget="layer-selector",
             label_key="opportunity_layer_3",
+            hidden=True,
         ),
     )
     opportunity_layer_3_filter: dict[str, Any] | None = Field(
