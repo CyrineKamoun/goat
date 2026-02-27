@@ -636,7 +636,7 @@ class ClusteringZones(AnalysisTool):
             ),
             compactness_per_zone AS (
                 SELECT individual_id, cluster_id,
-                    case when SQRT(dist_sq) - {max_distance}/2>0 then MAX(POWER((SQRT(dist_sq) - {max_distance}/2) / ({max_distance}/2), 2)) ELSE 0 END AS max_zone_length
+                    case when SQRT(dist_sq) - {max_distance}/2>0 then MAX(POWER((SQRT(dist_sq) - {max_distance}/2) / ({max_distance}/2), 2)) ELSE NULL END AS max_zone_length
                 FROM feature_centroid_dist
                 GROUP BY individual_id, cluster_id,dist_sq
             ),
