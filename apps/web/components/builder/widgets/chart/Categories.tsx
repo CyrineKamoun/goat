@@ -9,6 +9,7 @@ import { formatNumber } from "@/lib/utils/format-number";
 import { normalizeValue } from "@/lib/utils/normalize-value";
 import type { AggregationStatsQueryParams } from "@/lib/validations/project";
 import { aggregationStatsQueryParams } from "@/lib/validations/project";
+import type { ColorRange } from "@/lib/validations/layer";
 import type { CategoriesChartSchema } from "@/lib/validations/widget";
 import { categoriesChartConfigSchema } from "@/lib/validations/widget";
 
@@ -222,7 +223,7 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
           const mappedColor = colorMapLookup.get(normalizeValue(item.grouped_value));
           if (mappedColor) return mappedColor;
 
-          const palette = config?.options?.color_range?.colors || FALLBACK_COLORS;
+          const palette = (config?.options?.color_range as ColorRange | undefined)?.colors || FALLBACK_COLORS;
           const colors =
             displayData.length === 1
               ? [palette[0]]
@@ -231,13 +232,13 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
         });
       }
 
-      const fallbackPalette = config?.options?.color_range?.colors || FALLBACK_COLORS;
+      const fallbackPalette = (config?.options?.color_range as ColorRange | undefined)?.colors || FALLBACK_COLORS;
       return displayData.length === 1
         ? [fallbackPalette[0]]
         : chroma.scale(fallbackPalette).mode("lch").colors(displayData.length);
     }
 
-    const palette = config?.options?.color_range?.colors || FALLBACK_COLORS;
+    const palette = (config?.options?.color_range as ColorRange | undefined)?.colors || FALLBACK_COLORS;
     if (orderedData.length === 0) {
       return ["#e0e0e0"];
     }
@@ -274,7 +275,7 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
     config?.options?.style_attribute_source,
     config?.options?.color,
     config?.options?.value_color_scale,
-    config?.options?.color_range?.colors,
+    (config?.options?.color_range as ColorRange | undefined)?.colors,
     colorMapLookup,
     orderedData,
   ]);

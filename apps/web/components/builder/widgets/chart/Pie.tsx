@@ -9,6 +9,7 @@ import { formatNumber } from "@/lib/utils/format-number";
 import { normalizeValue } from "@/lib/utils/normalize-value";
 import type { AggregationStatsQueryParams } from "@/lib/validations/project";
 import { aggregationStatsQueryParams } from "@/lib/validations/project";
+import type { ColorRange } from "@/lib/validations/layer";
 import type { PieChartSchema } from "@/lib/validations/widget";
 import { pieChartConfigSchema, pieLayoutTypes } from "@/lib/validations/widget";
 
@@ -163,19 +164,19 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
         const mappedColor = colorMapLookup.get(normalizeValue(item.grouped_value));
         if (mappedColor) return mappedColor;
         // Fallback for items not in color_map
-        const palette = config?.options?.color_range?.colors || FALLBACK_COLORS;
+        const palette = (config?.options?.color_range as ColorRange | undefined)?.colors || FALLBACK_COLORS;
         const colors = chroma.scale(palette).mode("lch").colors(displayData.length);
         return colors[index];
       });
     }
 
     // Default behavior: generate from color_range
-    const palette = data.length > 0 ? config?.options?.color_range?.colors || FALLBACK_COLORS : ["#e0e0e0"];
+    const palette = data.length > 0 ? (config?.options?.color_range as ColorRange | undefined)?.colors || FALLBACK_COLORS : ["#e0e0e0"];
 
     return displayData.length === 1
       ? [palette[0]]
       : chroma.scale(palette).mode("lch").colors(displayData.length);
-  }, [displayData, data.length, config?.options?.color_range?.colors, colorMapLookup]);
+  }, [displayData, data.length, (config?.options?.color_range as ColorRange | undefined)?.colors, colorMapLookup]);
 
   const computedColors = useMemo(() => {
     return displayData.map((item, index) => {
