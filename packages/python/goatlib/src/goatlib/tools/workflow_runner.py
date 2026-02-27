@@ -125,6 +125,132 @@ def substitute_variables_in_config(
     return resolved
 
 
+def coerce_inputs_from_schema(
+    process_id: str,
+    inputs: dict[str, Any],
+) -> dict[str, Any]:
+    """Coerce input values to match the tool's Pydantic schema types.
+
+    When workflow variables resolve a single value for a field that expects
+    a list (e.g. ``distances: List[float]`` receives ``100`` instead of
+    ``[100]``), wrap the scalar in a list.
+    """
+    from goatlib.tools.registry import get_tool
+
+    tool_def = get_tool(process_id)
+    if not tool_def:
+        return inputs
+
+    try:
+        params_class = tool_def.get_params_class()
+        schema = params_class.model_json_schema()
+    except Exception:
+        return inputs
+
+    properties = schema.get("properties", {})
+    defs = schema.get("$defs", {})
+
+    for key, value in inputs.items():
+        if key not in properties or isinstance(value, (list, type(None))):
+            continue
+
+        prop = properties[key]
+        if _schema_expects_array(prop, defs):
+            inputs[key] = [value]
+
+    return inputs
+
+
+def _schema_expects_array(
+    prop: dict[str, Any],
+    defs: dict[str, Any],
+) -> bool:
+    """Check if a JSON schema property expects an array type."""
+    # Direct {"type": "array"}
+    if prop.get("type") == "array":
+        return True
+
+    # anyOf / oneOf (e.g. Optional[List[float]] → [{"type": "array", ...}, {"type": "null"}])
+    for variant_key in ("anyOf", "oneOf"):
+        variants = prop.get(variant_key)
+        if variants:
+            for variant in variants:
+                if variant.get("type") == "array":
+                    return True
+                # Follow $ref
+                ref = variant.get("$ref")
+                if ref and ref.startswith("#/$defs/"):
+                    ref_name = ref.split("/")[-1]
+                    ref_schema = defs.get(ref_name, {})
+                    if ref_schema.get("type") == "array":
+                        return True
+
+    return False
+
+
+def _field_expects_layer_object(
+    process_id: str | None,
+    field_name: str,
+) -> bool:
+    """Check if a tool field expects an object with a ``layer_id`` property.
+
+    Some tools (e.g. catchment_area) have complex input types like
+    ``StartingPointsLayer`` that expect ``{"layer_id": "..."}`` rather than
+    a plain layer_id string. When building workflow inputs from edges we need
+    to wrap the layer_id accordingly.
+    """
+    if not process_id:
+        return False
+    # Simple heuristic: fields ending with _id are plain string layer refs
+    if field_name.endswith("_id"):
+        return False
+
+    from goatlib.tools.registry import get_tool
+
+    tool_def = get_tool(process_id)
+    if not tool_def:
+        return False
+
+    try:
+        params_class = tool_def.get_params_class()
+        schema = params_class.model_json_schema()
+    except Exception:
+        return False
+
+    properties = schema.get("properties", {})
+    defs = schema.get("$defs", {})
+    prop = properties.get(field_name)
+    if not prop:
+        return False
+
+    # Check if any variant is an object type with a "layer_id" required field
+    def _has_layer_id(obj_schema: dict) -> bool:  # noqa: ANN401
+        if obj_schema.get("type") != "object":
+            return False
+        return "layer_id" in obj_schema.get("properties", {})
+
+    # Direct object
+    if _has_layer_id(prop):
+        return True
+
+    # anyOf / oneOf with $ref to object defs
+    for variant_key in ("anyOf", "oneOf"):
+        variants = prop.get(variant_key)
+        if not variants:
+            continue
+        for variant in variants:
+            if _has_layer_id(variant):
+                return True
+            ref = variant.get("$ref")
+            if ref and ref.startswith("#/$defs/"):
+                ref_name = ref.split("/")[-1]
+                ref_schema = defs.get(ref_name, {})
+                if _has_layer_id(ref_schema):
+                    return True
+
+    return False
+
+
 def topological_sort(nodes: list[dict], edges: list[dict]) -> list[dict]:
     """Sort nodes in execution order (dependencies first).
 
@@ -213,6 +339,11 @@ def build_tool_inputs(
         if var_map:
             inputs = substitute_variables_in_config(inputs, var_map)
 
+    # Coerce scalar values to lists where the tool schema expects arrays
+    process_id = node_data.get("processId")
+    if process_id:
+        inputs = coerce_inputs_from_schema(process_id, inputs)
+
     # Process incoming edges to get layer inputs
     for edge in edges:
         if edge["target"] != node["id"]:
@@ -231,14 +362,22 @@ def build_tool_inputs(
         # Get layer_id from source
         layer_id = get_input_layer_id(source_node, results)
         if layer_id:
-            inputs[target_handle] = layer_id
-
-            # For dataset nodes, also include filter if present
+            # Get optional filter from dataset nodes
             source_type = source_node.get("data", {}).get("type")
+            filter_config = None
             if source_type == "dataset":
-                filter_config = source_node.get("data", {}).get("filter")
+                filter_config = source_node.get("data", {}).get("filter") or None
+
+            # Check if the target field expects an object with a layer_id
+            # property (e.g. StartingPointsLayer) rather than a plain string
+            if _field_expects_layer_object(process_id, target_handle):
+                layer_obj: dict[str, Any] = {"layer_id": layer_id}
                 if filter_config:
-                    # Convert handle name: input_layer_id -> input_layer_filter
+                    layer_obj["layer_filter"] = filter_config
+                inputs[target_handle] = layer_obj
+            else:
+                inputs[target_handle] = layer_id
+                if filter_config:
                     filter_key = target_handle.replace("_id", "_filter")
                     inputs[filter_key] = filter_config
 
@@ -259,6 +398,45 @@ def build_tool_inputs(
                 new_filter = new_key.replace("_id", "_filter")
                 if old_filter in inputs:
                     inputs[new_filter] = inputs.pop(old_filter)
+
+    # For heatmap gravity/closest_average: build opportunities list from
+    # numbered opportunity_layer_N_id inputs and per-opportunity config keys.
+    if process_id in ("heatmap_gravity", "heatmap_closest_average"):
+        opp_keys = sorted(
+            k
+            for k in list(inputs)
+            if k.startswith("opportunity_layer_") and k.endswith("_id")
+        )
+        if opp_keys:
+            opportunities: list[dict[str, Any]] = []
+            for key in opp_keys:
+                layer_id = inputs.pop(key)
+                if not layer_id:
+                    continue
+                # Pop the corresponding filter
+                filter_key = key.replace("_id", "_filter")
+                layer_filter = inputs.pop(filter_key, None)
+
+                # Extract the number (e.g. "1" from "opportunity_layer_1_id")
+                opp_num = key.split("_")[2]
+                # Collect per-opportunity config (opportunity_1_max_cost, etc.)
+                prefix = f"opportunity_{opp_num}_"
+                opp_config: dict[str, Any] = {}
+                for cfg_key in list(inputs):
+                    if cfg_key.startswith(prefix):
+                        param_name = cfg_key[len(prefix):]
+                        opp_config[param_name] = inputs.pop(cfg_key)
+
+                opportunity: dict[str, Any] = {
+                    "input_path": layer_id,
+                    **opp_config,
+                }
+                if layer_filter:
+                    opportunity["input_layer_filter"] = layer_filter
+                opportunities.append(opportunity)
+
+            if opportunities:
+                inputs["opportunities"] = opportunities
 
     # Add workflow context
     inputs["user_id"] = params.user_id
@@ -546,6 +724,11 @@ def main(
                     "layer_name": dataset_name,
                     "delete_temp": False,  # Keep temp files for frontend preview
                 }
+
+                # Pass style properties from the source tool's result
+                source_properties = source_result.get("properties")
+                if source_properties:
+                    finalize_inputs["properties"] = source_properties
 
                 job_id, result = run_tool_node(
                     export_node_id, "finalize_layer", finalize_inputs

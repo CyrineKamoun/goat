@@ -5,7 +5,7 @@ import { useSWRConfig } from "swr";
 
 import { JOBS_API_BASE_URL, executeProcessAsync } from "@/lib/api/processes";
 
-export type ExportFormat = "pdf" | "png";
+export type ExportFormat = "pdf" | "png" | "jpeg";
 
 export interface ExportOptions {
   projectId: string;

@@ -1,5 +1,6 @@
 import logging
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -23,16 +24,16 @@ ClusterType_LABELS: dict[str, str] = {
 }
 
 
-class WeightMethod(StrEnum):
+class SizeMethod(StrEnum):
     """Method used to determine balance weight per point."""
 
     count = "count"
     field = "field"
 
 
-WeightMethod_LABELS: dict[str, str] = {
-    "count": "weight_method.count",
-    "field": "weight_method.field",
+SizeMethod_LABELS: dict[str, str] = {
+    "count": "size_method.count",
+    "field": "size_method.field",
 }
 
 
@@ -56,42 +57,43 @@ class ClusteringParams(BaseModel):
             widget="layer-selector",
         ),
     )
-    nb_cluster: int = Field(
-        10,
-        description="Number of clusters " "It should be an integer ",
-        json_schema_extra=ui_field(
-            section="input",
-            field_order=2,
-            widget="number-input",
-            visible_when={"input_path": {"$ne": None}},
-        ),
-    )
 
-    weight_method: WeightMethod = Field(
-        default=WeightMethod.count,
+    nb_cluster: int = Field(
+          10,
+          description="Number of clusters " "It should be an integer ",
+          json_schema_extra=ui_field(
+              section="configuration",
+              field_order=2,
+              widget="number-input",
+          ),
+      )
+    size_method: SizeMethod = Field(
+        default=SizeMethod.count,
         description="Method to determine balance weight: count (each point = 1) or field (use a numeric column).",
         json_schema_extra=ui_field(
             section="configuration",
             field_order=2,
-            label_key="weight_method",
-            enum_labels=WeightMethod_LABELS,
+            label_key="size_method",
+            enum_labels=SizeMethod_LABELS,
             visible_when={"cluster_type": "equal_size"},
         ),
     )
 
-    weight_field: str | None = Field(
+  
+
+    size_field: str | None = Field(
         default=None,
-        description="Numeric field to use as balance weight when weight_method is 'field'.",
+        description="Numeric field to use as balance weight when size_method is 'field'.",
         json_schema_extra=ui_field(
             section="configuration",
             field_order=3,
-            label_key="weight_field",
+            label_key="size_field",
             widget="field-selector",
             widget_options={"source_layer": "input_path", "field_types": ["number"]},
             visible_when={
                 "$and": [
                     {"cluster_type": "equal_size"},
-                    {"weight_method": "field"},
+                    {"size_method": "field"},
                 ]
             },
         ),
@@ -129,12 +131,40 @@ class ClusteringParams(BaseModel):
         ),
     )
 
+    compactness_weight: Literal[0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5] = Field(
+        default=0.01,
+        description="Weight for the compactness fitness criterion.",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=7,
+            label_key="compactness_weight",
+            visible_when={
+                "$and": [
+                    {"cluster_type": "equal_size"},
+                    {"use_compactness": True},
+                ]
+            },
+            advanced=True,
+        ),
+    )
+
     output_path: str = Field(
         ...,
-        description="Output GeoParquet path.",
+        description="Cluster at the feature level",
         json_schema_extra=ui_field(
             section="configuration",
             field_order=99,
-            hidden=True,  # Internal field
+            hidden=True,  
         ),
     )
+    
+    output_summary_path: str = Field(
+        ...,
+        description="Cluster Summary",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=99,
+            hidden=True,  
+        ),
+    )
+    

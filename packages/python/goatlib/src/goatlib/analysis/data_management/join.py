@@ -342,6 +342,12 @@ class JoinTool(AnalysisTool):
         """Execute join with statistical aggregation of multiple matches."""
         con = self.con
 
+        # Get a column from the join table to use for counting.
+        # COUNT(join_col) returns 0 for unmatched LEFT JOIN rows (NULL values),
+        # unlike COUNT(*) which returns 1 for the phantom target row.
+        join_fields = self._get_raw_field_names(join_table)
+        join_count_col = f"join_data.{join_fields[0]}"
+
         # Build aggregation expressions
         agg_expressions = []
         has_count = False
@@ -350,8 +356,8 @@ class JoinTool(AnalysisTool):
             operation = field_stat.operation
             result_col = field_stat.get_result_column_name()
             if operation.value == "count":
-                # Count doesn't need a field
-                agg_expressions.append(f"COUNT(*) as {result_col}")
+                # Count actual join matches using a specific join column
+                agg_expressions.append(f"COUNT({join_count_col}) as {result_col}")
                 has_count = True
             else:
                 field_name = field_stat.field
@@ -361,7 +367,7 @@ class JoinTool(AnalysisTool):
 
         # Always include a match count if not already specified
         if not has_count:
-            agg_expressions.insert(0, "COUNT(*) as match_count")
+            agg_expressions.insert(0, f"COUNT({join_count_col}) as match_count")
 
         agg_clause = ", ".join(agg_expressions)
 
@@ -403,10 +409,16 @@ class JoinTool(AnalysisTool):
                     count_col = field_stat.get_result_column_name()
                     break
 
+        # Use a specific join column for counting.
+        # COUNT(join_col) returns 0 for unmatched LEFT JOIN rows,
+        # unlike COUNT(*) which returns 1 for the phantom target row.
+        join_fields = self._get_raw_field_names(join_table)
+        join_count_col = f"join_data.{join_fields[0]}"
+
         query = f"""
         CREATE OR REPLACE TEMP TABLE count_joins AS
         SELECT {', '.join([f'target.{f}' for f in self._get_raw_field_names(target_table)])},
-               COUNT(join_data.*) as {count_col}
+               COUNT({join_count_col}) as {count_col}
         FROM {target_table} target
         {join_type_sql} {join_table} join_data
         ON {join_condition}

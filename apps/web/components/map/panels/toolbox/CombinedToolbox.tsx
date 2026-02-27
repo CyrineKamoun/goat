@@ -1,8 +1,9 @@
 /**
  * Combined Toolbox Component
  *
- * Displays all tools from OGC API Processes, organized by category.
- * All tools use the generic form renderer based on their JSON schema.
+ * Displays tools and workflows in a tabbed interface.
+ * Tools tab: All tools from OGC API Processes, organized by category.
+ * Workflows tab: Project workflows that can be run with runtime variables.
  */
 import {
   Box,
@@ -11,6 +12,8 @@ import {
   ListItemButton,
   ListItemSecondaryAction,
   ListItemText,
+  Tab,
+  Tabs,
   Typography,
   useTheme,
 } from "@mui/material";
@@ -34,6 +37,8 @@ import { useAppDispatch } from "@/hooks/store/ContextHooks";
 
 import AccordionWrapper from "@/components/common/AccordionWrapper";
 import Container from "@/components/map/panels/Container";
+import WorkflowList from "@/components/map/panels/toolbox/WorkflowList";
+import WorkflowRunner from "@/components/map/panels/toolbox/WorkflowRunner";
 import GenericTool from "@/components/map/panels/toolbox/generic/GenericTool";
 
 /**
@@ -111,7 +116,9 @@ export default function CombinedToolbox() {
   const theme = useTheme();
   const dispatch = useAppDispatch();
 
+  const [activeTab, setActiveTab] = useState(0);
   const [selectedToolId, setSelectedToolId] = useState<string | undefined>(undefined);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | undefined>(undefined);
 
   // Fetch all processes from OGC API
   const { processes: ogcProcesses, isLoading, error } = useCategorizedProcesses();
@@ -154,7 +161,7 @@ export default function CombinedToolbox() {
     setSelectedToolId(toolId);
   };
 
-  const handleBack = () => {
+  const handleToolBack = () => {
     setSelectedToolId(undefined);
     dispatch(setMaskLayer(undefined));
     dispatch(setToolboxStartingPoints(undefined));
@@ -162,21 +169,37 @@ export default function CombinedToolbox() {
     dispatch(setMapCursor(undefined));
   };
 
+  const handleWorkflowBack = () => {
+    setSelectedWorkflowId(undefined);
+  };
+
   const handleClose = () => {
     setSelectedToolId(undefined);
+    setSelectedWorkflowId(undefined);
     dispatch(setActiveRightPanel(undefined));
   };
 
-  // Render selected tool
+  // Render selected tool (full panel takeover)
   if (selectedToolId) {
-    return <GenericTool processId={selectedToolId} onBack={handleBack} onClose={handleClose} />;
+    return <GenericTool processId={selectedToolId} onBack={handleToolBack} onClose={handleClose} />;
   }
 
-  // Loading state
-  if (isLoading) {
+  // Render selected workflow (full panel takeover)
+  if (selectedWorkflowId) {
+    return (
+      <WorkflowRunner
+        workflowId={selectedWorkflowId}
+        onBack={handleWorkflowBack}
+        onClose={handleClose}
+      />
+    );
+  }
+
+  // Loading state (tools tab only)
+  if (isLoading && activeTab === 0) {
     return (
       <Container
-        title={t("tools")}
+        title={t("toolbox")}
         disablePadding={true}
         close={handleClose}
         body={
@@ -188,57 +211,89 @@ export default function CombinedToolbox() {
     );
   }
 
-  // Main toolbox view
+  // Main toolbox view with tabs
   return (
     <Container
-      title={t("tools")}
       disablePadding={true}
       close={handleClose}
+      header={
+        <Typography variant="body1" fontWeight="bold">
+          {t("toolbox")}
+        </Typography>
+      }
       body={
         <>
-          {error && (
-            <Typography color="warning.main" variant="caption" sx={{ p: 1, display: "block" }}>
-              {t("some_tools_unavailable")}
-            </Typography>
+          <Box sx={{ borderBottom: 1, borderColor: "divider", mt: -2 }}>
+            <Tabs
+              value={activeTab}
+              onChange={(_e, newValue) => setActiveTab(newValue)}
+              variant="fullWidth"
+              sx={{
+                minHeight: 36,
+                "& .MuiTab-root": {
+                  minHeight: 36,
+                  textTransform: "none",
+                  fontSize: "0.8125rem",
+                },
+              }}>
+              <Tab label={t("tools")} />
+              <Tab label={t("workflows")} />
+            </Tabs>
+          </Box>
+
+          {/* Tools Tab */}
+          {activeTab === 0 && (
+            <>
+              {error && (
+                <Typography color="warning.main" variant="caption" sx={{ p: 1, display: "block" }}>
+                  {t("some_tools_unavailable")}
+                </Typography>
+              )}
+
+              {sortedCategories.map(([category, tools]) => {
+                const config = CATEGORY_CONFIG[category as ToolCategory];
+
+                return (
+                  <AccordionWrapper
+                    key={category}
+                    boxShadow="none"
+                    backgroundColor="transparent"
+                    header={
+                      <Typography
+                        variant="body2"
+                        fontWeight="bold"
+                        sx={{
+                          flexShrink: 0,
+                          display: "flex",
+                          gap: theme.spacing(2),
+                          alignItems: "center",
+                        }}>
+                        <Icon
+                          iconName={config?.icon ?? ICON_NAME.CIRCLEINFO}
+                          sx={{ fontSize: "16px" }}
+                          htmlColor="inherit"
+                        />
+                        {t(config?.name ?? category)}
+                      </Typography>
+                    }
+                    body={<ToolList tools={tools} onSelectTool={handleSelectTool} />}
+                  />
+                );
+              })}
+
+              {sortedCategories.length === 0 && (
+                <Box sx={{ p: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {t("no_tools_available")}
+                  </Typography>
+                </Box>
+              )}
+            </>
           )}
 
-          {sortedCategories.map(([category, tools]) => {
-            const config = CATEGORY_CONFIG[category as ToolCategory];
-
-            return (
-              <AccordionWrapper
-                key={category}
-                boxShadow="none"
-                backgroundColor="transparent"
-                header={
-                  <Typography
-                    variant="body2"
-                    fontWeight="bold"
-                    sx={{
-                      flexShrink: 0,
-                      display: "flex",
-                      gap: theme.spacing(2),
-                      alignItems: "center",
-                    }}>
-                    <Icon
-                      iconName={config?.icon ?? ICON_NAME.CIRCLEINFO}
-                      sx={{ fontSize: "16px" }}
-                      htmlColor="inherit"
-                    />
-                    {t(config?.name ?? category)}
-                  </Typography>
-                }
-                body={<ToolList tools={tools} onSelectTool={handleSelectTool} />}
-              />
-            );
-          })}
-
-          {sortedCategories.length === 0 && (
-            <Box sx={{ p: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                {t("no_tools_available")}
-              </Typography>
-            </Box>
+          {/* Workflows Tab */}
+          {activeTab === 1 && (
+            <WorkflowList onSelectWorkflow={(id) => setSelectedWorkflowId(id)} />
           )}
         </>
       }

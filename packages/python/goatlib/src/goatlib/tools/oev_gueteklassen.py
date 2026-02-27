@@ -14,6 +14,7 @@ from pydantic import Field
 from goatlib.analysis.accessibility import (
     STATION_CONFIG_DEFAULT,
     OevGueteklasseParams,
+    OevGueteklasseStationConfig,
     OevGueteklasseTool,
     PTTimeWindow,
 )
@@ -189,6 +190,11 @@ class OevGueteklassenToolParams(ScenarioSelectorMixin, ToolInputBase):
         description="Output path for quality classes layer.",
         json_schema_extra=ui_field(section="configuration", hidden=True),
     )
+    station_config: OevGueteklasseStationConfig | None = Field(
+        default=None,
+        description="Optional custom station configuration for ÖV-Güteklassen.",
+        json_schema_extra=ui_field(section="configuration", hidden=True),
+    )
 
 
 class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
@@ -226,9 +232,19 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
         params: OevGueteklassenToolParams,
         metadata: DatasetMetadata,
         table_info: dict[str, Any] | None = None,
+        parquet_path: Path | str | None = None,
     ) -> dict[str, Any] | None:
-        """Return ÖV-Güteklassen style with ordinal color scale for A-F classes."""
-        return get_oev_gueteklassen_style()
+        """Return ÖV-Güteklassen style with class count from active configuration."""
+        station_config = params.station_config or STATION_CONFIG_DEFAULT
+
+        class_values = [
+            int(pt_class)
+            for distances in station_config.classification.values()
+            for pt_class in distances.values()
+        ]
+        class_count = max(class_values) if class_values else 1
+
+        return get_oev_gueteklassen_style(class_count=class_count)
 
     def process(
         self: Self, params: OevGueteklassenToolParams, temp_dir: Path
@@ -270,7 +286,7 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
             stop_times_path=stop_times_path,
             time_window=time_window,
             output_path=str(output_path),
-            station_config=STATION_CONFIG_DEFAULT,
+            station_config=params.station_config or STATION_CONFIG_DEFAULT,
             stations_output_path=str(stations_output_path),
         )
 
@@ -300,6 +316,9 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
 
         from goatlib.tools.schemas import ToolOutputBase
 
+        # Check if we're in temp mode (for workflow preview)
+        temp_mode = getattr(params, "temp_mode", False)
+
         # Main polygon layer - use result_layer_name, then output_name, then default
         output_layer_id = str(uuid_module.uuid4())
         output_name = (
@@ -312,7 +331,8 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
 
         logger.info(
             f"Starting tool: {self.__class__.__name__} "
-            f"(user={params.user_id}, output={output_layer_id})"
+            f"(user={params.user_id}, output={output_layer_id}, "
+            f"temp_mode={temp_mode})"
         )
 
         # Initialize db_service
@@ -329,6 +349,23 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
                 f"Analysis complete: {metadata.feature_count or 0} features "
                 f"at {output_parquet}"
             )
+
+            # Compute style from params (static, no data dependency)
+            custom_properties = self.get_layer_properties(
+                params, metadata, parquet_path=output_parquet
+            )
+
+            # Temp mode: write primary (polygon) output only, skip stations and DB records
+            if temp_mode:
+                result = self._write_temp_result(
+                    params=params,
+                    output_parquet=output_parquet,
+                    output_name=output_name,
+                    output_layer_id=output_layer_id,
+                    properties=custom_properties,
+                )
+                asyncio.get_event_loop().run_until_complete(self._close_db_service())
+                return result
 
             # Step 2: Ingest polygon layer to DuckLake
             table_info = self._ingest_to_ducklake(
@@ -385,6 +422,7 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
                     output_name=output_name,
                     metadata=metadata,
                     table_info=table_info,
+                    custom_properties=custom_properties,
                 )
             )
 

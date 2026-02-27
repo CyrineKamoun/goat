@@ -37,7 +37,7 @@ interface RepeatableObjectInputProps {
 /**
  * Process object schema properties into ProcessedInput array
  */
-function processObjectProperties(
+export function processObjectProperties(
   objectSchema: OGCInputSchema,
   schemaDefs?: Record<string, OGCInputSchema>
 ): ProcessedInput[] {
@@ -127,7 +127,7 @@ function processObjectProperties(
 /**
  * Get default values for a new object item
  */
-function getObjectDefaults(
+export function getObjectDefaults(
   objectSchema: OGCInputSchema,
   schemaDefs?: Record<string, OGCInputSchema>
 ): Record<string, unknown> {
@@ -337,7 +337,9 @@ export default function RepeatableObjectInput({
     <Stack spacing={2}>
       {items.map((item, index) => {
         const itemValues = item as Record<string, unknown>;
-        const visibleInputs = getVisibleInputs(itemInputs, itemValues);
+        // Merge parent form values with item values so visible_when conditions
+        const mergedValues = { ..._formValues, ...itemValues };
+        const visibleInputs = getVisibleInputs(itemInputs, mergedValues);
 
         // Calculate excluded layer IDs for this item's layer inputs
         // (exclude layers selected in OTHER items, not this item's current selection)
