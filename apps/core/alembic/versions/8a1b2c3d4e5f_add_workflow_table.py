@@ -42,7 +42,7 @@ def upgrade():
         sa.Column("project_id", sa.UUID(), nullable=False),
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("is_default", sa.Boolean(), nullable=False),
+        sa.Column("is_default", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("config", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("thumbnail_url", sa.Text(), nullable=True),
         sa.ForeignKeyConstraint(

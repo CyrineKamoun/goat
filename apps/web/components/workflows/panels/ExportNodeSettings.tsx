@@ -22,7 +22,7 @@ import {
   useTheme,
 } from "@mui/material";
 import { useEdges, useNodes } from "@xyflow/react";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDispatch } from "react-redux";
 
@@ -59,6 +59,13 @@ export default function ExportNodeSettings({ node, onBack }: ExportNodeSettingsP
   const [datasetName, setDatasetName] = useState(data.datasetName || "");
   const [addToProject, setAddToProject] = useState(data.addToProject);
   const [overwritePrevious, setOverwritePrevious] = useState(data.overwritePrevious);
+
+  // Reset local state when a different node is selected
+  useEffect(() => {
+    setDatasetName(data.datasetName || "");
+    setAddToProject(data.addToProject);
+    setOverwritePrevious(data.overwritePrevious);
+  }, [node.id, data.datasetName, data.addToProject, data.overwritePrevious]);
 
   // Find the upstream tool node connected to this export node
   const upstreamInfo = useMemo(() => {

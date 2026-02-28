@@ -140,7 +140,11 @@ interface LayerLegendItemProps {
 
 const LayerLegendItem: React.FC<LayerLegendItemProps> = ({ layer, showLayerName = true }) => {
   const props = layer.properties as Record<string, unknown>;
-  const geomType = layer.type === "feature" ? (layer.feature_layer_geometry_type || "polygon") : "polygon";
+  const geomType = layer.type === "feature"
+    ? (layer.feature_layer_geometry_type || "polygon")
+    : layer.type === "raster"
+      ? "raster"
+      : "polygon";
 
   // Same check as ProjectLayerTree line 756
   const hasComplexLegend = !!(props.color_field || props.stroke_color_field || props.marker_field);

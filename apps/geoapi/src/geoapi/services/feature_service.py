@@ -334,12 +334,6 @@ class FeatureService:
             con = duckdb.connect(":memory:")
             con.execute("INSTALL spatial; LOAD spatial;")
 
-            # Get total count
-            count_result = con.execute(
-                f"SELECT COUNT(*) FROM read_parquet('{parquet_path}')"
-            ).fetchone()
-            total_count = count_result[0] if count_result else 0
-
             # Detect geometry column
             cols = con.execute(
                 f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}')"
@@ -364,13 +358,19 @@ class FeatureService:
 
             select_clause = ", ".join(select_cols) if select_cols else "*"
 
-            # Build query
+            # Build WHERE clause (applies to both count and data queries)
             where_clause = "1=1"
             if bbox and geom_col and len(bbox) == 4:
                 where_clause = (
                     f'ST_Intersects("{geom_col}", '
                     f"ST_MakeEnvelope({bbox[0]}, {bbox[1]}, {bbox[2]}, {bbox[3]}))"
                 )
+
+            # Get total count with the same filter
+            count_result = con.execute(
+                f"SELECT COUNT(*) FROM read_parquet('{parquet_path}') WHERE {where_clause}"
+            ).fetchone()
+            total_count = count_result[0] if count_result else 0
 
             query = f"""
                 SELECT {select_clause}
@@ -379,8 +379,9 @@ class FeatureService:
                 LIMIT {limit} OFFSET {offset}
             """
 
-            results = con.execute(query).fetchall()
-            description = con.execute(query).description
+            cursor = con.execute(query)
+            description = cursor.description
+            results = cursor.fetchall()
 
             col_names_result = [desc[0] for desc in description]
             features = []

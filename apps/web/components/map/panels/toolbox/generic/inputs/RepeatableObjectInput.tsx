@@ -5,7 +5,7 @@
  * Used for array fields with complex object items (e.g., opportunities in heatmap tools).
  */
 import { Box, Button, Divider, IconButton, Stack, Typography, useTheme } from "@mui/material";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { v4 as uuidv4 } from "uuid";
 
@@ -217,15 +217,11 @@ export default function RepeatableObjectInput({
     }));
   }, [value]);
 
-  // Track if we've initialized to prevent infinite loops
-  const hasInitialized = useRef(false);
-
   // Enforce minItems: pad with defaults if current value has fewer items than required
   useEffect(() => {
     if (!itemSchema || minItems <= 0) return;
     const currentLength = value?.length ?? 0;
     if (currentLength < minItems) {
-      hasInitialized.current = true;
       const defaults = getObjectDefaults(itemSchema, schemaDefs);
       const padded = [...(value || [])];
       for (let i = currentLength; i < minItems; i++) {
@@ -233,8 +229,9 @@ export default function RepeatableObjectInput({
       }
       onChange(padded);
     }
+    // onChange excluded: callback identity shouldn't trigger padding
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [minItems, itemSchema]); // Re-run when minItems or schema changes
+  }, [value, minItems, itemSchema, schemaDefs]);
 
   // Add new item
   const handleAdd = useCallback(() => {

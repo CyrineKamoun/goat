@@ -505,6 +505,20 @@ class AnalyticsService:
                 col_defs = []
                 if columns:
                     for col_name, col_type in columns.items():
+                        # Validate column name to prevent SQL injection
+                        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_ ]*$", col_name):
+                            return {
+                                "valid": False,
+                                "errors": [f"Invalid column name: {col_name}"],
+                                "columns": {},
+                            }
+                        # Validate type string to prevent SQL injection
+                        if not re.match(r"^[a-zA-Z0-9_ ()\[\],]+$", col_type):
+                            return {
+                                "valid": False,
+                                "errors": [f"Invalid column type: {col_type}"],
+                                "columns": {},
+                            }
                         if "GEOMETRY" in col_type.upper():
                             col_defs.append(f'"{col_name}" GEOMETRY')
                         else:
