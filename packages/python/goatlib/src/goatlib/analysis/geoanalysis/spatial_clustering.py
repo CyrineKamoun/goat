@@ -147,10 +147,9 @@ class ClusteringZones(AnalysisTool):
             self.con.execute(""" CREATE OR REPLACE TEMP TABLE ga_seeds ( individual_id INTEGER, cluster_id INTEGER,seed_id INTEGER) """)
 
             self._init_population(k)
-            batch_size = max(5, self.population_size // 4)
-            for batch_start in range(0, self.population_size, batch_size):
-                batch_ids = list(range(batch_start, min(batch_start + batch_size, self.population_size)))
-                self._create_individuals_from_seeds_batch(batch_ids, k, n_features, n_weighted_features, use_compactness)
+            self._create_individuals_from_seeds_batch(
+                list(range(self.population_size)), k, n_features, n_weighted_features, use_compactness
+            )
             logger.info("Created initial population of %d individuals", self.population_size)
 
             # Genetic algorithm evolution 
@@ -772,10 +771,9 @@ class ClusteringZones(AnalysisTool):
 
         
         logger.info("Creating %d new individuals via zone growing...", len(new_individual_ids))
-        batch_size = max(5, len(new_individual_ids) // 4)
-        for batch_start in range(0, len(new_individual_ids), batch_size):
-            batch_ids = new_individual_ids[batch_start:batch_start + batch_size]
-            self._create_individuals_from_seeds_batch(batch_ids, k, n_features,n_weighted_features, use_compactness)
+        self._create_individuals_from_seeds_batch(
+            new_individual_ids, k, n_features, n_weighted_features, use_compactness
+        )
         updated_next_id = next_individual_id + len(new_individual_ids)
         return new_individual_ids, elite_ids, updated_next_id
 
@@ -812,7 +810,6 @@ class ClusteringZones(AnalysisTool):
         self.con.execute(f"""
             CREATE OR REPLACE TEMP TABLE batch_zone_grow AS
             WITH seed_assignments AS (
-                -- Deduplicate: if same feature is seed for multiple clusters, pick one
                 SELECT individual_id, seed_id AS feature_id, 
                        MIN(cluster_id) AS cluster_id
                 FROM ga_seeds
@@ -848,9 +845,22 @@ class ClusteringZones(AnalysisTool):
             GROUP BY individual_id, cluster_id
         """)
 
+        # Pre-create reusable temp tables to avoid repeated CREATE/DROP in the hot loop
+        if use_compactness:
+            self.con.execute("""
+                CREATE OR REPLACE TEMP TABLE zone_centroids_grow (
+                    individual_id INTEGER, cluster_id INTEGER, cx DOUBLE, cy DOUBLE
+                )
+            """)
+        self.con.execute("""
+            CREATE OR REPLACE TEMP TABLE _new_zone_weights (
+                individual_id INTEGER, cluster_id INTEGER, add_weight DOUBLE
+            )
+        """)
+
         target_size = n_weighted_features // k
         features_per_zone_per_iter = max(3, min(10, target_size // 10))
-        max_iterations = max(30, (n_features // (k * features_per_zone_per_iter)) + 20)
+        max_iterations = max(40, (n_features // (k * features_per_zone_per_iter)) + 30)
         if target_size <= 30:
             features_per_zone_per_iter = 1
         # Slow growth rate when zones approach target size to avoid overshooting
@@ -859,13 +869,12 @@ class ClusteringZones(AnalysisTool):
 
         # Batch zone growing  
         for iteration in range(max_iterations):
-            # Conditionally create centroids table only when needed for compactness
+            # Conditionally refresh centroids table only when needed for compactness
             if use_compactness:
+                self.con.execute("TRUNCATE zone_centroids_grow")
                 self.con.execute("""
-                    CREATE OR REPLACE TEMP TABLE zone_centroids_grow AS
-                    SELECT individual_id, cluster_id,
-                           AVG(x) AS cx,
-                           AVG(y) AS cy
+                    INSERT INTO zone_centroids_grow
+                    SELECT individual_id, cluster_id, AVG(x) AS cx, AVG(y) AS cy
                     FROM batch_zone_grow
                     WHERE cluster_id >= 0
                     GROUP BY individual_id, cluster_id
@@ -934,38 +943,27 @@ class ClusteringZones(AnalysisTool):
                   AND bzg.feature_id = ba.feature_id
             """)
 
-            # Incrementally update zone sizes - 
+            # Materialize new weights once, then reuse for both UPDATE and INSERT
+            self.con.execute("TRUNCATE _new_zone_weights")
             self.con.execute("""
-                WITH new_weights AS (
-                    SELECT 
-                        ba.individual_id,
-                        ba.cluster_id,
-                        SUM(bzg.weight) AS add_weight
-                    FROM batch_assignments ba
-                    JOIN batch_zone_grow bzg ON bzg.individual_id = ba.individual_id
-                                              AND bzg.feature_id = ba.feature_id
-                    GROUP BY ba.individual_id, ba.cluster_id
-                )
+                INSERT INTO _new_zone_weights
+                SELECT ba.individual_id, ba.cluster_id, SUM(bzg.weight)
+                FROM batch_assignments ba
+                JOIN batch_zone_grow bzg ON bzg.individual_id = ba.individual_id
+                                          AND bzg.feature_id = ba.feature_id
+                GROUP BY ba.individual_id, ba.cluster_id
+            """)
+            self.con.execute("""
                 UPDATE zone_sizes 
                 SET size = zone_sizes.size + nw.add_weight
-                FROM new_weights nw
+                FROM _new_zone_weights nw
                 WHERE zone_sizes.individual_id = nw.individual_id 
                   AND zone_sizes.cluster_id = nw.cluster_id
             """)
             self.con.execute("""
-                WITH new_weights AS (
-                    SELECT 
-                        ba.individual_id,
-                        ba.cluster_id,
-                        SUM(bzg.weight) AS add_weight
-                    FROM batch_assignments ba
-                    JOIN batch_zone_grow bzg ON bzg.individual_id = ba.individual_id
-                                              AND bzg.feature_id = ba.feature_id
-                    GROUP BY ba.individual_id, ba.cluster_id
-                )
                 INSERT INTO zone_sizes (individual_id, cluster_id, size)
                 SELECT nw.individual_id, nw.cluster_id, nw.add_weight
-                FROM new_weights nw
+                FROM _new_zone_weights nw
                 WHERE NOT EXISTS (
                     SELECT 1 FROM zone_sizes zs 
                     WHERE zs.individual_id = nw.individual_id 
@@ -1019,49 +1017,42 @@ class ClusteringZones(AnalysisTool):
               AND bzg.feature_id = bz.feature_id
               AND bz.rn = 1
         """)
-        # boundary mutations: swap some boundary features to smaller neighboring zones
+        # Refresh zone sizes after unassigned feature assignment
+        self.con.execute("""
+            CREATE OR REPLACE TEMP TABLE zone_sizes AS
+            SELECT individual_id, cluster_id, SUM(weight) AS size
+            FROM batch_zone_grow
+            WHERE cluster_id >= 0
+            GROUP BY individual_id, cluster_id
+        """)
+        # Boundary correction: swap boundary features to smaller neighboring zones.
         self.con.execute(f"""
-            WITH zone_sizes_final AS (
-                SELECT individual_id, cluster_id, SUM(weight) AS size
-                FROM batch_zone_grow
-                GROUP BY individual_id, cluster_id
-            ),
-            boundary_features AS (
-                SELECT DISTINCT
-                    bzg.individual_id, bzg.feature_id, bzg.cluster_id AS current_cluster,
-                    zs.size AS current_zone_size
-                FROM batch_zone_grow bzg
-                JOIN neighbors n ON bzg.feature_id = n.from_id
-                JOIN batch_zone_grow nbr ON bzg.individual_id = nbr.individual_id 
-                                          AND n.to_id = nbr.feature_id
-                JOIN zone_sizes_final zs ON bzg.individual_id = zs.individual_id 
-                                          AND bzg.cluster_id = zs.cluster_id
-                WHERE nbr.cluster_id != bzg.cluster_id
-            ),
-            swap_candidates AS (
-                SELECT 
-                    bp.individual_id, bp.feature_id, bp.current_cluster,
+            WITH swap_candidates AS (
+                SELECT
+                    bzg.individual_id,
+                    bzg.feature_id,
                     nbr.cluster_id AS target_cluster,
-                    bp.current_zone_size,
-                    zs_target.size AS target_zone_size,
                     ROW_NUMBER() OVER (
-                        PARTITION BY bp.individual_id, bp.feature_id 
+                        PARTITION BY bzg.individual_id, bzg.feature_id
                         ORDER BY zs_target.size
                     ) AS rn
-                FROM boundary_features bp
-                JOIN neighbors n ON bp.feature_id = n.from_id
-                JOIN batch_zone_grow nbr ON bp.individual_id = nbr.individual_id 
+                FROM batch_zone_grow bzg
+                JOIN neighbors n ON bzg.feature_id = n.from_id
+                JOIN batch_zone_grow nbr ON bzg.individual_id = nbr.individual_id
                                           AND n.to_id = nbr.feature_id
-                JOIN zone_sizes_final zs_target ON nbr.individual_id = zs_target.individual_id 
-                                                 AND nbr.cluster_id = zs_target.cluster_id
-                WHERE nbr.cluster_id != bp.current_cluster
-                  AND zs_target.size < bp.current_zone_size * 0.9
+                JOIN zone_sizes zs_curr ON bzg.individual_id = zs_curr.individual_id
+                                         AND bzg.cluster_id = zs_curr.cluster_id
+                JOIN zone_sizes zs_target ON nbr.individual_id = zs_target.individual_id
+                                           AND nbr.cluster_id = zs_target.cluster_id
+                WHERE bzg.cluster_id >= 0
+                  AND nbr.cluster_id != bzg.cluster_id
+                  AND zs_target.size < zs_curr.size * 0.9
                   AND random() < 0.3
             )
             UPDATE batch_zone_grow bzg
             SET cluster_id = sc.target_cluster
             FROM swap_candidates sc
-            WHERE bzg.individual_id = sc.individual_id 
+            WHERE bzg.individual_id = sc.individual_id
               AND bzg.feature_id = sc.feature_id
               AND sc.rn = 1
         """)
@@ -1075,3 +1066,4 @@ class ClusteringZones(AnalysisTool):
         self.con.execute("DROP TABLE IF EXISTS batch_assignments")
         self.con.execute("DROP TABLE IF EXISTS zone_sizes")
         self.con.execute("DROP TABLE IF EXISTS zone_centroids_grow")
+        self.con.execute("DROP TABLE IF EXISTS _new_zone_weights")
