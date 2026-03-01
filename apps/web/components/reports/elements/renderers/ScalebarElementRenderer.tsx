@@ -490,8 +490,9 @@ const ScalebarElementRenderer: React.FC<ScalebarElementRendererProps> = ({
     const latitude = viewState.latitude ?? 48;
 
     // Calculate meters per pixel at this zoom level and latitude
-    // Formula: 156543.03392 * cos(lat) / (2 ^ zoom)
-    const metersPerPixel = (156543.03392 * Math.cos((latitude * Math.PI) / 180)) / Math.pow(2, zoomLevel);
+    // Formula: earth_circumference * cos(lat) / (tileSize * 2^zoom)
+    // MapLibre uses 512px tiles, so constant = 40075016.686 / 512 = 78271.51696
+    const metersPerPixel = (78271.51696 * Math.cos((latitude * Math.PI) / 180)) / Math.pow(2, zoomLevel);
 
     return metersPerPixel;
   }, [mapElementId, mapElements]);
