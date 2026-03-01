@@ -378,8 +378,7 @@ class ClusteringZones(AnalysisTool):
             WHERE dist_rank <= {n_candidates}
         """)
 
-        # Step 2: Pick best per sector (closest in each angular sector),
-        # then fill remaining slots by pure proximity
+        # Step 2: Pick best per sector (closest in each angular sector),then fill remaining slots by pure proximity
         self.con.execute(f"""
             CREATE OR REPLACE TEMP TABLE neighbors AS
             WITH sector_best AS (
@@ -609,9 +608,8 @@ class ClusteringZones(AnalysisTool):
             SELECT * FROM alien_individuals
         """)
 
-        # Deduplicate seeds: if 2+ clusters share the same seed_id within an individual,
-        # keep the lowest cluster_id and re-assign others to random unused features.
-        self.con.execute(f"""
+        # Deduplicate seeds: if 2+ clusters share the same seed_id within an individual, keep the lowest cluster_id and re-assign others to random unused features.
+        self.con.execute("""
             WITH duplicates AS (
                 SELECT individual_id, cluster_id, seed_id,
                        ROW_NUMBER() OVER (PARTITION BY individual_id, seed_id ORDER BY cluster_id) AS dup_rank
@@ -824,8 +822,7 @@ class ClusteringZones(AnalysisTool):
             SELECT individual_id, cluster_id, seed_id FROM generation_offspring_seeds
         """)
 
-        # Deduplicate seeds: if crossover/mutation assigned the same feature to 2+ clusters,
-        # keep one and re-assign the others to random unused features.
+        # Deduplicate seeds: if crossover/mutation assigned the same feature to 2+ clusters, keep one and re-assign the others to random unused features.
         self.con.execute("""
             WITH duplicates AS (
                 SELECT individual_id, cluster_id, seed_id,
@@ -1076,7 +1073,7 @@ class ClusteringZones(AnalysisTool):
             ).fetchone()[0]
             if unassigned_count == 0:
                 break
-        # Handle remaining unassigned features via neighbor graph (5 neighbors) then fall back to only for features whose neighbors are all unassigned.
+        # Handle remaining unassigned features via neighbor graph then fall back to only for features whose neighbors are all unassigned.
         self.con.execute("""
             WITH unassigned AS (
                 SELECT individual_id, feature_id
@@ -1147,7 +1144,7 @@ class ClusteringZones(AnalysisTool):
             WHERE cluster_id >= 0
             GROUP BY individual_id, cluster_id
         """)
-       # Boundary correction: swap boundary features to smaller neighboring zones.
+        # Boundary correction: swap boundary features to smaller neighboring zones.
         self.con.execute("""
             WITH boundary_pairs AS (
                 SELECT DISTINCT
