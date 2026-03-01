@@ -23,6 +23,11 @@ import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 
 import LayerFieldSelector from "@/components/map/common/LayerFieldSelector";
 
+// Stable empty object references to avoid creating new references on each render
+const EMPTY_LAYER_DATASET_IDS: Record<string, string> = {};
+const EMPTY_PREDICTED_COLUMNS: Record<string, Record<string, string>> = {};
+const EMPTY_FIELDS: LayerFieldType[] = [];
+
 interface FieldInputProps {
   input: ProcessedInput;
   value: unknown;
@@ -32,6 +37,8 @@ interface FieldInputProps {
   formValues: Record<string, unknown>;
   /** Map of layer input names to their dataset IDs (computed by parent) */
   layerDatasetIds?: Record<string, string>;
+  /** Map of layer input names to their predicted columns (for connected tool outputs) */
+  predictedColumns?: Record<string, Record<string, string>>;
 }
 
 /**
@@ -57,16 +64,51 @@ function inferRelatedLayerInput(fieldInputName: string): string | null {
   return null;
 }
 
+/**
+ * Map DuckDB column types to LayerFieldType types
+ */
+function mapDuckDBTypeToFieldType(duckdbType: string): string {
+  const upperType = duckdbType.toUpperCase();
+
+  if (upperType.includes("INT") || upperType.includes("BIGINT")) {
+    return "number";
+  }
+  if (upperType.includes("FLOAT") || upperType.includes("DOUBLE") || upperType.includes("DECIMAL")) {
+    return "number";
+  }
+  if (upperType.includes("VARCHAR") || upperType.includes("TEXT") || upperType.includes("STRING")) {
+    return "string";
+  }
+  if (upperType.includes("BOOL")) {
+    return "boolean";
+  }
+  if (upperType.includes("DATE") || upperType.includes("TIME") || upperType.includes("TIMESTAMP")) {
+    return "string"; // Dates are typically shown as strings in selectors
+  }
+  if (upperType.includes("GEOMETRY")) {
+    return "geometry";
+  }
+
+  return "string"; // Default fallback
+}
+
 export default function FieldInput({
   input,
   value,
   onChange,
   disabled,
   formValues,
-  layerDatasetIds = {},
+  layerDatasetIds,
+  predictedColumns,
 }: FieldInputProps) {
   const { t } = useTranslation("common");
   const { projectId } = useParams();
+
+  // Ensure we have safe objects to access (handles explicit undefined) - use stable references
+  const safeLayerDatasetIds =
+    layerDatasetIds && Object.keys(layerDatasetIds).length > 0 ? layerDatasetIds : EMPTY_LAYER_DATASET_IDS;
+  const safePredictedColumns =
+    predictedColumns && Object.keys(predictedColumns).length > 0 ? predictedColumns : EMPTY_PREDICTED_COLUMNS;
 
   // Determine which layer this field relates to
   const relatedLayerInputName = useMemo(() => {
@@ -101,8 +143,8 @@ export default function FieldInput({
   // Find the dataset ID for the selected layer
   const datasetId = useMemo(() => {
     // First check if parent provided it
-    if (relatedLayerInputName && layerDatasetIds[relatedLayerInputName]) {
-      return layerDatasetIds[relatedLayerInputName];
+    if (relatedLayerInputName && safeLayerDatasetIds[relatedLayerInputName]) {
+      return safeLayerDatasetIds[relatedLayerInputName];
     }
 
     // Otherwise try to find it from project layers
@@ -116,10 +158,35 @@ export default function FieldInput({
     );
     // layer_id IS the dataset_id in the project layer schema
     return layer?.layer_id || "";
-  }, [selectedLayerId, projectLayers, relatedLayerInputName, layerDatasetIds]);
+  }, [selectedLayerId, projectLayers, relatedLayerInputName, safeLayerDatasetIds]);
 
-  // Fetch fields for the layer
-  const { layerFields, isLoading } = useLayerFields(datasetId);
+  // Check if we have predicted columns for this layer input (for connected tool outputs)
+  const hasPredictedColumns = useMemo(() => {
+    return relatedLayerInputName && safePredictedColumns[relatedLayerInputName] != null;
+  }, [relatedLayerInputName, safePredictedColumns]);
+
+  // Fetch fields for the layer (skip when predicted columns are available)
+  const { layerFields, isLoading } = useLayerFields(hasPredictedColumns ? "" : datasetId);
+
+  // Convert predicted columns to LayerFieldType format
+  const predictedFields = useMemo((): LayerFieldType[] => {
+    if (!relatedLayerInputName || !safePredictedColumns[relatedLayerInputName]) {
+      return EMPTY_FIELDS;
+    }
+    const columns = safePredictedColumns[relatedLayerInputName];
+    return Object.entries(columns).map(([name, type]) => ({
+      name,
+      type: mapDuckDBTypeToFieldType(type),
+    }));
+  }, [relatedLayerInputName, safePredictedColumns]);
+
+  // Use predicted fields if available, otherwise use layer fields
+  const availableFields = useMemo(() => {
+    if (hasPredictedColumns && predictedFields.length > 0) {
+      return predictedFields;
+    }
+    return layerFields.length > 0 ? layerFields : EMPTY_FIELDS;
+  }, [hasPredictedColumns, predictedFields, layerFields]);
 
   // Get field type filter from widget_options (supports both 'field_types' and 'types')
   const fieldTypeFilter = useMemo(() => {
@@ -138,10 +205,10 @@ export default function FieldInput({
   // Filter fields by type if specified
   const filteredFields = useMemo(() => {
     if (!fieldTypeFilter || fieldTypeFilter.length === 0) {
-      return layerFields;
+      return availableFields;
     }
-    return layerFields.filter((field) => fieldTypeFilter.includes(field.type));
-  }, [layerFields, fieldTypeFilter]);
+    return availableFields.filter((field) => fieldTypeFilter.includes(field.type));
+  }, [availableFields, fieldTypeFilter]);
 
   // Convert value to LayerFieldType format (single select)
   const selectedField = useMemo((): LayerFieldType | undefined => {
@@ -206,6 +273,28 @@ export default function FieldInput({
     );
   }
 
+  // Show loading state while fields are being fetched
+  if (isLoading) {
+    return (
+      <Box>
+        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+          {label}: {t("loading")}...
+        </Typography>
+      </Box>
+    );
+  }
+
+  // Show message if no fields available (prevents MUI empty state loop)
+  if (filteredFields.length === 0) {
+    return (
+      <Box>
+        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: "italic" }}>
+          {label}: {t("no_fields_found")}
+        </Typography>
+      </Box>
+    );
+  }
+
   // Render multi-select or single-select based on config
   if (isMultiSelect) {
     return (
@@ -217,7 +306,7 @@ export default function FieldInput({
         fields={filteredFields}
         label={input.title || input.name}
         tooltip={input.description}
-        disabled={disabled || isLoading}
+        disabled={disabled}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         multiple={true as any}
       />
@@ -231,7 +320,7 @@ export default function FieldInput({
       fields={filteredFields}
       label={input.title || input.name}
       tooltip={input.description}
-      disabled={disabled || isLoading}
+      disabled={disabled}
     />
   );
 }

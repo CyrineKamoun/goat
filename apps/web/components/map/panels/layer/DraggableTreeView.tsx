@@ -44,6 +44,8 @@ interface DraggableTreeViewProps<T extends BaseTreeItem> {
   enableSelection?: boolean;
   selectedIds?: string[];
   onSelect?: (ids: string[]) => void;
+  /** Callback for HTML5 external drag start (e.g., to workflow canvas) */
+  onExternalDragStart?: (event: React.DragEvent, item: T) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sx?: any;
 }
@@ -244,7 +246,7 @@ const EmptyGroupPlaceholder = ({
 // 4. RECURSIVE ITEM COMPONENT
 // ----------------------------------------------------------------------
 
-const RecursiveTreeItem = <T extends BaseTreeItem>({
+const RecursiveTreeItemInner = <T extends BaseTreeItem>({
   item,
   allData,
   level,
@@ -254,6 +256,7 @@ const RecursiveTreeItem = <T extends BaseTreeItem>({
   enableSelection,
   selectedIds,
   onSelect,
+  onExternalDragStart,
 }: {
   item: T;
   allData: T[];
@@ -264,6 +267,7 @@ const RecursiveTreeItem = <T extends BaseTreeItem>({
   enableSelection?: boolean;
   selectedIds: string[];
   onSelect?: (ids: string[]) => void;
+  onExternalDragStart?: (event: React.DragEvent, item: T) => void;
 }) => {
   const children = allData.filter((i) => i.parentId === item.id);
   const isSelected = selectedIds.includes(item.id);
@@ -338,13 +342,22 @@ const RecursiveTreeItem = <T extends BaseTreeItem>({
 
   const isVisible = item.isVisible ?? true; // Default to visible if not specified
 
+  // Handle external drag start (for workflow canvas)
+  const handleExternalDragStart = (event: React.DragEvent) => {
+    if (onExternalDragStart && !item.isGroup) {
+      onExternalDragStart(event, item);
+    }
+  };
+
   return (
     <Box sx={{ width: "100%" }}>
       <CustomTreeItemRoot
         ref={!isOverlay ? setNodeRef : null}
         {...(!isOverlay ? listeners : {})}
         {...(!isOverlay ? attributes : {})}
-        style={{ touchAction: "none", paddingBottom: isOverlay ? 0 : undefined }}>
+        style={{ touchAction: "none", paddingBottom: isOverlay ? 0 : undefined }}
+        draggable={!!onExternalDragStart && !item.isGroup}
+        onDragStart={handleExternalDragStart}>
         <CustomTreeItemContent
           onClick={handleRowClick}
           ref={setNodeRef}
@@ -358,6 +371,7 @@ const RecursiveTreeItem = <T extends BaseTreeItem>({
             opacity: isVisible ? 1 : 0.5, // Apply opacity based on visibility
             flexDirection: "column", // Stack main row and caption vertically
             alignItems: "stretch", // Stretch to full width
+            cursor: onExternalDragStart && !item.isGroup ? "grab" : undefined,
           }}>
           {/* Main content row */}
           <Box
@@ -431,7 +445,7 @@ const RecursiveTreeItem = <T extends BaseTreeItem>({
             {item.isGroup && (
               <>
                 {children.map((child) => (
-                  <RecursiveTreeItem
+                  <MemoizedRecursiveTreeItem
                     key={child.id}
                     item={child}
                     allData={allData}
@@ -441,6 +455,7 @@ const RecursiveTreeItem = <T extends BaseTreeItem>({
                     selectedIds={selectedIds}
                     onSelect={onSelect}
                     enableSelection={enableSelection}
+                    onExternalDragStart={onExternalDragStart}
                   />
                 ))}
                 {children.length === 0 && (
@@ -468,6 +483,32 @@ const RecursiveTreeItem = <T extends BaseTreeItem>({
   );
 };
 
+// Memoized version to prevent unnecessary re-renders
+// Only re-render if the item's own properties change, not when siblings change
+const MemoizedRecursiveTreeItem = React.memo(RecursiveTreeItemInner, (prevProps, nextProps) => {
+  // Check if the item itself changed
+  if (prevProps.item !== nextProps.item) return false;
+  // Check if level changed
+  if (prevProps.level !== nextProps.level) return false;
+  // Check if selection state changed for this item
+  const prevSelected = prevProps.selectedIds.includes(prevProps.item.id);
+  const nextSelected = nextProps.selectedIds.includes(nextProps.item.id);
+  if (prevSelected !== nextSelected) return false;
+  // Check if enableSelection changed
+  if (prevProps.enableSelection !== nextProps.enableSelection) return false;
+  // Check if this item's children changed (for groups)
+  if (prevProps.item.isGroup) {
+    const prevChildren = prevProps.allData.filter((i) => i.parentId === prevProps.item.id);
+    const nextChildren = nextProps.allData.filter((i) => i.parentId === nextProps.item.id);
+    if (prevChildren.length !== nextChildren.length) return false;
+    for (let i = 0; i < prevChildren.length; i++) {
+      if (prevChildren[i] !== nextChildren[i]) return false;
+    }
+  }
+  // Props are equal, don't re-render
+  return true;
+}) as typeof RecursiveTreeItemInner;
+
 export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeViewProps<T>) {
   const {
     items,
@@ -476,6 +517,7 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
     selectedIds = [],
     onSelect,
     enableSelection = false,
+    onExternalDragStart,
     sx,
   } = props;
   const [activeId, setActiveId] = React.useState<string | null>(null);
@@ -531,7 +573,7 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
       onDragEnd={handleDragEnd}>
       <Box sx={{ flexGrow: 1, ...sx }} className={activeId ? "dnd-drag-active" : ""}>
         {rootItems.map((item) => (
-          <RecursiveTreeItem
+          <MemoizedRecursiveTreeItem
             key={item.id}
             item={item}
             allData={items}
@@ -541,12 +583,13 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
             selectedIds={selectedIds}
             onSelect={onSelect}
             enableSelection={enableSelection}
+            onExternalDragStart={onExternalDragStart}
           />
         ))}
       </Box>
       <DragOverlay dropAnimation={null}>
         {activeItem ? (
-          <RecursiveTreeItem
+          <RecursiveTreeItemInner
             item={{ ...activeItem, collapsed: true }}
             allData={[]}
             level={0}

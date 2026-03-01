@@ -19,6 +19,9 @@ import type { SelectorItem } from "@/types/map/common";
 
 import FormLabelHelper from "@/components/common/FormLabelHelper";
 
+// Stable empty array reference to prevent re-renders
+const EMPTY_ARRAY: never[] = [];
+
 type SelectorProps = {
   selectedItems: SelectorItem[] | SelectorItem | undefined;
   setSelectedItems: (items: SelectorItem[] | SelectorItem | undefined) => void;
@@ -69,9 +72,24 @@ const Selector = (props: SelectorProps) => {
     if (!multiple && !Array.isArray(selectedItems)) {
       return selectedItems ? selectedItems.value : "";
     } else {
-      return selectedItems && Array.isArray(selectedItems) ? selectedItems?.map((item) => item.value) : [];
+      return selectedItems && Array.isArray(selectedItems) && selectedItems.length > 0
+        ? selectedItems.map((item) => item.value)
+        : EMPTY_ARRAY;
     }
   }, [multiple, selectedItems]);
+
+  // Return early if no items to prevent MUI empty state loop
+  if (!items || items.length === 0) {
+    return label ? (
+      <FormControl size="small" fullWidth>
+        <FormLabelHelper
+          label={label}
+          color={theme.palette.text.secondary}
+          tooltip={tooltip}
+        />
+      </FormControl>
+    ) : null;
+  }
 
   return (
     <FormControl size="small" fullWidth>
@@ -108,8 +126,8 @@ const Selector = (props: SelectorProps) => {
         disabled={disabled}
         error={!!errorMessage}
         multiple={multiple}
-        defaultValue={multiple ? [] : ("" as unknown)} //todo: fix this
-        value={selectedValue || (multiple ? [] : "")}
+        defaultValue={multiple ? EMPTY_ARRAY : ("" as unknown)} //todo: fix this
+        value={selectedValue || (multiple ? EMPTY_ARRAY : "")}
         onChange={(e) => {
           if (multiple) {
             const value = e.target.value as string[] | number[];

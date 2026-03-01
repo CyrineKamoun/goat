@@ -65,9 +65,9 @@ class PrintReportParams(ToolInputBase):
             "x-ui": {"section": "input", "field_order": 2, "hidden": True}
         },
     )
-    format: Literal["pdf", "png"] = Field(
+    format: Literal["pdf", "png", "jpeg"] = Field(
         default="pdf",
-        description="Output format (pdf or png)",
+        description="Output format (pdf, png or jpeg)",
         json_schema_extra={
             "x-ui": {
                 "section": "output",
@@ -77,6 +77,7 @@ class PrintReportParams(ToolInputBase):
                     "options": [
                         {"value": "pdf", "label": "PDF"},
                         {"value": "png", "label": "PNG"},
+                        {"value": "jpeg", "label": "JPEG"},
                     ]
                 },
             }
@@ -208,7 +209,7 @@ class PrintReportRunner(SimpleToolRunner):
     async def _render_page(
         self: Self,
         url: str,
-        output_format: Literal["pdf", "png"],
+        output_format: Literal["pdf", "png", "jpeg"],
         access_token: str | None = None,
         dpi: int = 300,
         paper_width_mm: float = 210.0,
@@ -334,20 +335,25 @@ class PrintReportRunner(SimpleToolRunner):
                 )
                 return pdf_bytes
             else:
-                # Capture the print paper area as PNG
+                # Capture the print paper area as PNG or JPEG
+                screenshot_type = "jpeg" if output_format == "jpeg" else "png"
+                screenshot_kwargs = {"type": screenshot_type}
+                if screenshot_type == "jpeg":
+                    screenshot_kwargs["quality"] = 95
+
                 # Use locator for more reliable element selection
                 paper_locator = page.locator("#print-paper")
                 if await paper_locator.count() > 0:
                     # Wait for the element to be visible
                     await paper_locator.wait_for(state="visible", timeout=5000)
-                    png_bytes = await paper_locator.screenshot(type="png")
+                    img_bytes = await paper_locator.screenshot(**screenshot_kwargs)
                 else:
                     # Fallback to full page
                     logger.warning(
                         "Print paper element not found, using full page screenshot"
                     )
-                    png_bytes = await page.screenshot(type="png", full_page=False)
-                return png_bytes
+                    img_bytes = await page.screenshot(**screenshot_kwargs, full_page=False)
+                return img_bytes
 
         finally:
             await context.close()
@@ -439,20 +445,23 @@ class PrintReportRunner(SimpleToolRunner):
                 file_name = f"{file_base}.pdf"
                 content_type = "application/pdf"
 
-            else:  # PNG
+            else:  # PNG or JPEG
+                ext = params.format  # "png" or "jpeg"
+                mime = f"image/{ext}"
+
                 if len(rendered_pages) > 1:
-                    # Create ZIP of PNGs
+                    # Create ZIP of images
                     zip_buffer = io.BytesIO()
                     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                        for idx, png_bytes in enumerate(rendered_pages):
-                            zf.writestr(f"page_{idx + 1:03d}.png", png_bytes)
+                        for idx, img_bytes in enumerate(rendered_pages):
+                            zf.writestr(f"page_{idx + 1:03d}.{ext}", img_bytes)
                     output_bytes = zip_buffer.getvalue()
                     file_name = f"{file_base}.zip"
                     content_type = "application/zip"
                 else:
                     output_bytes = rendered_pages[0]
-                    file_name = f"{file_base}.png"
-                    content_type = "image/png"
+                    file_name = f"{file_base}.{ext}"
+                    content_type = mime
 
             # Upload to S3
             s3_service = S3Service()

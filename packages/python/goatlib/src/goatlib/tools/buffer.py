@@ -92,11 +92,41 @@ class BufferToolRunner(BaseToolRunner[BufferToolParams]):
     output_geometry_type = "polygon"
     default_output_name = get_default_layer_name("buffer", "en")
 
+    @classmethod
+    def predict_output_schema(
+        cls,
+        input_schemas: dict[str, dict[str, str]],
+        params: dict[str, Any],
+    ) -> dict[str, str]:
+        """Predict buffer output schema.
+
+        Buffer outputs:
+        - All input columns (unless polygon_union is enabled)
+        - buffer_distance column (always added)
+        - geometry as Polygon
+        """
+        polygon_union = params.get("polygon_union", False)
+
+        if polygon_union:
+            # Union mode: only buffer_distance and geometry
+            return {
+                "buffer_distance": "INTEGER",
+                "geometry": "GEOMETRY",
+            }
+
+        # Normal mode: all input columns plus buffer_distance
+        primary_input = input_schemas.get("input_layer_id", {})
+        columns = dict(primary_input)
+        col_name = cls.unique_column_name(columns, "buffer_distance")
+        columns[col_name] = "INTEGER"
+        return columns
+
     def get_layer_properties(
         self: Self,
         params: BufferToolParams,
         metadata: DatasetMetadata,
         table_info: dict[str, Any] | None = None,
+        parquet_path: Path | str | None = None,
     ) -> dict[str, Any] | None:
         """Return style for buffer with ordinal scale based on buffer_distance values.
 

@@ -59,6 +59,34 @@ class ToolDefinition:
         module = importlib.import_module(self.module_path)
         return getattr(module, self.params_class_name)
 
+    def get_runner_class(self: Self) -> type | None:
+        """Dynamically import and return the tool runner class.
+
+        Returns the class ending with 'ToolRunner' from the module.
+        """
+        import importlib
+
+        module = importlib.import_module(self.module_path)
+        # Find the ToolRunner class in the module
+        for name in dir(module):
+            if name.endswith("ToolRunner") and not name.startswith("Base"):
+                cls = getattr(module, name)
+                # Verify it's actually a class
+                if isinstance(cls, type):
+                    return cls
+        return None
+
+    def get_output_geometry_type(self: Self) -> str | None:
+        """Get the output geometry type from the tool runner.
+
+        Returns:
+            Geometry type string (e.g., "polygon", "point", "line") or None
+        """
+        runner_class = self.get_runner_class()
+        if runner_class and hasattr(runner_class, "output_geometry_type"):
+            return runner_class.output_geometry_type
+        return None
+
 
 # Central registry of all GOAT tools
 TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
@@ -239,6 +267,28 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
             "pelias",
         ),
     ),
+    ToolDefinition(
+        name="spatial_clustering",
+        display_name="Zone Clustering",
+        description="Create spatially contiguous clusters with balanced feature counts using genetic algorithm",
+        module_path="goatlib.tools.spatial_clustering",
+        params_class_name="ClusteringZonesToolParams",
+        windmill_path="f/goat/tools/spatial_clustering",
+        category="geoanalysis",
+        docs_path="/toolbox/geoanalysis/spatial_clustering",
+        keywords=(
+            "geoanalysis",
+            "clustering",
+            "balanced",
+            "zones",
+            "genetic",
+            "algorithm",
+            "spatial",
+            "contiguity",
+            "equal",
+            "size",
+        ),
+    ),
     # Accessibility indicators
     ToolDefinition(
         name="catchment_area",
@@ -313,6 +363,46 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         ),
         docs_path="/toolbox/accessibility_indicators/connectivity",
     ),
+     ToolDefinition(
+         name="heatmap_2sfca",
+         display_name="Heatmap 2SFCA",
+         description="Two-Step Floating Catchment Area accessibility analysis",
+         module_path="goatlib.tools.heatmap_2sfca",
+         params_class_name="Heatmap2SFCAToolParams",
+         windmill_path="f/goat/tools/heatmap_2sfca",
+         category="accessibility_indicators",
+         keywords=(
+             "accessibility",
+             "heatmap",
+             "2sfca",
+             "floating catchment",
+             "supply",
+             "demand",
+             "capacity",
+             "travel time",
+         ),
+         docs_path="/toolbox/accessibility_indicators/2sfca",
+     ),
+     ToolDefinition(
+         name="huff_model",
+         display_name="Huff Model",
+         description="Huff model accessibility for market area and service probability estimation",
+         module_path="goatlib.tools.huff_model",
+         params_class_name="HuffModelToolParams",
+         windmill_path="f/goat/tools/huff_model",
+         category="accessibility_indicators",
+         keywords=(
+             "accessibility",
+             "huff model",
+             "market area",
+             "probability",
+             "gravity model",
+             "attractiveness",
+             "consumer choice",
+             "travel time",
+         ),
+         docs_path="/toolbox/accessibility_indicators/huff_model",
+     ),
     ToolDefinition(
         name="oev_gueteklassen",
         display_name="ÖV-Güteklassen",
@@ -416,6 +506,18 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         keywords=("print", "report", "pdf", "png", "export"),
         toolbox_hidden=True,
         worker_tag="print",
+    ),
+    ToolDefinition(
+        name="custom_sql",
+        display_name="Custom SQL",
+        description="Execute custom SQL query against workflow layers",
+        module_path="goatlib.tools.custom_sql",
+        params_class_name="CustomSqlToolParams",
+        windmill_path="f/goat/tools/custom_sql",
+        category="data_management",
+        keywords=("sql", "query", "custom", "transform"),
+        toolbox_hidden=True,
+        worker_tag="tools",
     ),
 )
 

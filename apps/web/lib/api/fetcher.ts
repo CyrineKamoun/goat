@@ -1,16 +1,34 @@
 import { getSession } from "next-auth/react";
 
 /**
+ * Cached access token to avoid hitting /api/auth/session on every API request.
+ * getSession() makes a network call each time, so with ~70+ SWR hooks this
+ * would otherwise generate dozens of session requests per second.
+ *
+ * Cache expiry is tied to the JWT exp claim with a 10s buffer, so the token
+ * is always refreshed before it actually expires.
+ */
+let cachedToken: string | null = null;
+let cacheExpiry = 0;
+const REFRESH_BUFFER_MS = 10_000; // refresh 10s before token expires
+const NULL_CACHE_MS = 30_000; // cache null results for 30s
+let pendingSessionPromise: Promise<string | null> | null = null;
+
+/** Extract exp from a JWT without verifying signature */
+function getTokenExpiry(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Get access token from session or localStorage (for print mode)
  * Print mode uses localStorage to pass token from Playwright
  */
 const getAccessToken = async (): Promise<string | null> => {
-  // First try NextAuth session (normal user flow)
-  const session = await getSession();
-  if (session?.access_token) {
-    return session.access_token;
-  }
-
   // Fallback to localStorage for print mode (Playwright injects token here)
   if (typeof window !== "undefined") {
     const printToken = localStorage.getItem("print_access_token");
@@ -19,7 +37,38 @@ const getAccessToken = async (): Promise<string | null> => {
     }
   }
 
-  return null;
+  // Return cached result if still valid (caches both token and null)
+  if (Date.now() < cacheExpiry) {
+    return cachedToken;
+  }
+
+  // Deduplicate concurrent getSession() calls
+  if (pendingSessionPromise) {
+    return pendingSessionPromise;
+  }
+
+  pendingSessionPromise = getSession()
+    .then((session) => {
+      cachedToken = session?.access_token ?? null;
+      if (cachedToken) {
+        const exp = getTokenExpiry(cachedToken);
+        cacheExpiry = exp ? exp - REFRESH_BUFFER_MS : Date.now() + NULL_CACHE_MS;
+      } else {
+        cacheExpiry = Date.now() + NULL_CACHE_MS;
+      }
+      return cachedToken;
+    })
+    .finally(() => {
+      pendingSessionPromise = null;
+    });
+
+  return pendingSessionPromise;
+};
+
+/** Clear the cached token (call on sign-out) */
+export const clearTokenCache = () => {
+  cachedToken = null;
+  cacheExpiry = 0;
 };
 
 export const fetcher = async (params) => {

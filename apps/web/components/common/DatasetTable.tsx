@@ -2,8 +2,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { Box, Collapse, IconButton, Skeleton } from "@mui/material";
 import { Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";
-import { useMemo, useState } from "react";
-import { v4 } from "uuid";
+import React, { useMemo, useState } from "react";
 
 import type { DatasetCollectionItems } from "@/lib/validations/layer";
 
@@ -50,7 +49,14 @@ const Row = ({ row, fields }) => {
                 {objectFields.map((field) => {
                   const rawValue = row.properties[field.name];
                   // Handle both string (JSON) and object values
-                  const jsonData = typeof rawValue === "string" ? JSON.parse(rawValue) : rawValue;
+                  let jsonData = rawValue;
+                  if (typeof rawValue === "string") {
+                    try {
+                      jsonData = JSON.parse(rawValue);
+                    } catch {
+                      // Not valid JSON, keep as-is
+                    }
+                  }
                   const isJsonDataArrayOfObjects =
                     Array.isArray(jsonData) &&
                     jsonData.length > 0 &&
@@ -58,7 +64,7 @@ const Row = ({ row, fields }) => {
                     !Array.isArray(jsonData[0]);
 
                   return (
-                    <>
+                    <React.Fragment key={field.name}>
                       <Stack direction="column" spacing={1} sx={{ py: 1, pl: 4 }}>
                         <Typography variant="body2" fontWeight="bold">
                           {field.name}
@@ -89,7 +95,7 @@ const Row = ({ row, fields }) => {
                         // This could be rendering it as a string or handling other data structures in the future.
                         <Typography>{JSON.stringify(jsonData, null, 2)}</Typography>
                       )}
-                    </>
+                    </React.Fragment>
                   );
                 })}
               </Box>
@@ -145,7 +151,7 @@ const DatasetTable: React.FC<DatasetTableProps> = ({ areFieldsLoading, displayDa
               </TableRow>
             )}
             {displayData.features?.length &&
-              displayData.features.map((row) => <Row key={row.id || v4()} row={row} fields={fields} />)}
+              displayData.features.map((row, index) => <Row key={index} row={row} fields={fields} />)}
           </TableBody>
         </Table>
       )}

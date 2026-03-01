@@ -537,8 +537,17 @@ const PublicProjectLayout = ({
               {builderConfig?.settings.measure && <MeasureResultsPanel {...measureTool} />}
               {/* Layer Settings Panel */}
               {activeRightComponent && (
-                <FloatingPanel width={400} minHeight="auto" maxHeight="50vh" fillHeight>
-                  <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+                <FloatingPanel
+                  width={activeRight === MapSidebarItemID.STYLE ? 320 : 400}
+                  minHeight="auto"
+                  maxHeight="50vh"
+                  fillHeight={activeRight !== MapSidebarItemID.STYLE}>
+                  <Box
+                    sx={{
+                      height: activeRight === MapSidebarItemID.STYLE ? "auto" : "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}>
                     <ViewContainer
                       title={activeRightComponent.title}
                       disablePadding={true}

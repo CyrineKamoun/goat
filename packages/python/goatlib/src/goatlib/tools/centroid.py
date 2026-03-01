@@ -5,7 +5,7 @@ Computes the centroid of each feature in the input layer.
 
 import logging
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 from pydantic import ConfigDict, Field
 
@@ -81,6 +81,24 @@ class CentroidToolRunner(BaseToolRunner[CentroidToolParams]):
     tool_class = CentroidTool
     output_geometry_type = "Point"
     default_output_name = get_default_layer_name("centroid", "en")
+
+    @classmethod
+    def predict_output_schema(
+        cls,
+        input_schemas: dict[str, dict[str, str]],
+        params: dict[str, Any],
+    ) -> dict[str, str]:
+        """Predict centroid output schema.
+
+        Centroid preserves all columns from the input layer.
+        Geometry is converted to Point.
+        """
+        primary_input = input_schemas.get("input_layer_id", {})
+        columns = dict(primary_input)
+        # Geometry becomes Point
+        if "geometry" in columns:
+            columns["geometry"] = "GEOMETRY"
+        return columns
 
     def process(
         self: Self, params: CentroidToolParams, temp_dir: Path

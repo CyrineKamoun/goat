@@ -70,5 +70,6 @@
   "mypy-type-checker.preferDaemon": false,
   "python-envs.pythonProjects": [],
   // Disable automatic venv activation in terminals (breaks frontend dev server)
-  "python.terminal.activateEnvironment": false
+  "python.terminal.activateEnvironment": false,
+  "terminal.integrated.sendKeybindingsToShell": true
 }

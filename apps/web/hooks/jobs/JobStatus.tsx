@@ -61,15 +61,27 @@ export function useJobStatus(onSuccess?: () => void, onFailed?: () => void) {
           // Don't show success toast for:
           // - delete jobs: already handled optimistically
           // - layer_export/print_report: handled in JobsPopper with auto-download
+          // - workflow_runner: handled by useWorkflowExecution
+          // - finalize_layer: show custom message
           const isDeleteJob =
             job.processID === "layer_delete" || job.processID.toLowerCase().includes("delete");
           const isDownloadJob = job.processID === "layer_export" || job.processID === "print_report";
-          if (!isDeleteJob && !isDownloadJob) {
+          const isWorkflowJob = job.processID === "workflow_runner";
+          const isFinalizeJob = job.processID === "finalize_layer";
+          if (isFinalizeJob) {
+            toast.success(t("layer_saved_successfully"));
+          } else if (!isDeleteJob && !isDownloadJob && !isWorkflowJob) {
             toast.success(`"${type}" - ${t("job_success")}`);
           }
         } else {
           onFailedRef.current?.();
-          toast.error(`"${type}" - ${t("job_failed")}`);
+          // Show custom error message for finalize_layer
+          const isFinalizeJob = job.processID === "finalize_layer";
+          if (isFinalizeJob) {
+            toast.error(t("layer_save_failed"));
+          } else {
+            toast.error(`"${type}" - ${t("job_failed")}`);
+          }
         }
       }
     });

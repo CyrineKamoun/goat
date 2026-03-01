@@ -158,6 +158,7 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
     () => [
       { label: "PDF", value: "pdf" },
       { label: "PNG", value: "png" },
+      { label: "JPEG", value: "jpeg" },
     ],
     []
   );

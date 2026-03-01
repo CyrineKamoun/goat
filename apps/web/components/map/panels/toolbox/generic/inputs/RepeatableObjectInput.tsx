@@ -5,7 +5,7 @@
  * Used for array fields with complex object items (e.g., opportunities in heatmap tools).
  */
 import { Box, Button, Divider, IconButton, Stack, Typography, useTheme } from "@mui/material";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { v4 as uuidv4 } from "uuid";
 
@@ -28,12 +28,16 @@ interface RepeatableObjectInputProps {
   schemaDefs?: Record<string, OGCInputSchema>;
   /** All form values for conditional visibility */
   formValues?: Record<string, unknown>;
+  /** Map of layer input names to their dataset IDs (for connected layers in workflows) */
+  layerDatasetIds?: Record<string, string>;
+  /** Map of layer input names to their predicted columns (for connected tool outputs) */
+  predictedColumns?: Record<string, Record<string, string>>;
 }
 
 /**
  * Process object schema properties into ProcessedInput array
  */
-function processObjectProperties(
+export function processObjectProperties(
   objectSchema: OGCInputSchema,
   schemaDefs?: Record<string, OGCInputSchema>
 ): ProcessedInput[] {
@@ -123,7 +127,7 @@ function processObjectProperties(
 /**
  * Get default values for a new object item
  */
-function getObjectDefaults(
+export function getObjectDefaults(
   objectSchema: OGCInputSchema,
   schemaDefs?: Record<string, OGCInputSchema>
 ): Record<string, unknown> {
@@ -156,7 +160,9 @@ export default function RepeatableObjectInput({
   onNestedFiltersChange,
   disabled,
   schemaDefs,
-  formValues: _formValues,
+  formValues: _formValues = {},
+  layerDatasetIds,
+  predictedColumns,
 }: RepeatableObjectInputProps) {
   const { t } = useTranslation("common");
   const theme = useTheme();
@@ -204,33 +210,28 @@ export default function RepeatableObjectInput({
   // Current items (ensure at least minItems)
   const items = useMemo(() => {
     const currentItems = value || [];
-    if (currentItems.length < minItems && itemSchema) {
-      const defaults = getObjectDefaults(itemSchema, schemaDefs);
-      const newItems = [...currentItems];
-      while (newItems.length < minItems) {
-        newItems.push({ ...defaults, _id: uuidv4() });
-      }
-      return newItems;
-    }
     // Ensure all items have _id for stable keys
     return currentItems.map((item) => ({
       ...item,
       _id: (item as Record<string, unknown>)._id || uuidv4(),
     }));
-  }, [value, minItems, itemSchema, schemaDefs]);
+  }, [value]);
 
-  // Initialize if empty
-  useMemo(() => {
-    if ((!value || value.length === 0) && minItems > 0 && itemSchema) {
+  // Enforce minItems: pad with defaults if current value has fewer items than required
+  useEffect(() => {
+    if (!itemSchema || minItems <= 0) return;
+    const currentLength = value?.length ?? 0;
+    if (currentLength < minItems) {
       const defaults = getObjectDefaults(itemSchema, schemaDefs);
-      const initialItems: Record<string, unknown>[] = [];
-      for (let i = 0; i < minItems; i++) {
-        initialItems.push({ ...defaults, _id: uuidv4() });
+      const padded = [...(value || [])];
+      for (let i = currentLength; i < minItems; i++) {
+        padded.push({ ...defaults, _id: uuidv4() });
       }
-      // Defer onChange to avoid render cycle
-      setTimeout(() => onChange(initialItems), 0);
+      onChange(padded);
     }
-  }, [value, minItems, itemSchema, schemaDefs, onChange]);
+    // onChange excluded: callback identity shouldn't trigger padding
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, minItems, itemSchema, schemaDefs]);
 
   // Add new item
   const handleAdd = useCallback(() => {
@@ -333,7 +334,9 @@ export default function RepeatableObjectInput({
     <Stack spacing={2}>
       {items.map((item, index) => {
         const itemValues = item as Record<string, unknown>;
-        const visibleInputs = getVisibleInputs(itemInputs, itemValues);
+        // Merge parent form values with item values so visible_when conditions
+        const mergedValues = { ..._formValues, ...itemValues };
+        const visibleInputs = getVisibleInputs(itemInputs, mergedValues);
 
         // Calculate excluded layer IDs for this item's layer inputs
         // (exclude layers selected in OTHER items, not this item's current selection)
@@ -380,6 +383,8 @@ export default function RepeatableObjectInput({
                   formValues={{ ..._formValues, ...itemValues }}
                   schemaDefs={schemaDefs}
                   excludedLayerIds={getExcludedLayerIds(inputDef.name)}
+                  layerDatasetIds={layerDatasetIds}
+                  predictedColumns={predictedColumns}
                 />
               ))}
             </Stack>

@@ -208,11 +208,31 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
     # Store stations output path for secondary layer creation
     _stations_parquet: Path | None = None
 
+    @classmethod
+    def predict_output_schema(
+        cls,
+        input_schemas: dict[str, dict[str, str]],
+        params: dict[str, Any],
+    ) -> dict[str, str]:
+        """Predict ÖV-Güteklassen output schema.
+
+        ÖV-Güteklassen outputs:
+        - gueteklasse: quality class (A-F or None)
+        - station_group_id: unique identifier for station catchment group
+        - geometry: Polygon representing the catchment area
+        """
+        return {
+            "gueteklasse": "VARCHAR",
+            "station_group_id": "INTEGER",
+            "geometry": "GEOMETRY",
+        }
+
     def get_layer_properties(
         self: Self,
         params: OevGueteklassenToolParams,
         metadata: DatasetMetadata,
         table_info: dict[str, Any] | None = None,
+        parquet_path: Path | str | None = None,
     ) -> dict[str, Any] | None:
         """Return ÖV-Güteklassen style with class count from active configuration."""
         station_config = params.station_config or STATION_CONFIG_DEFAULT
@@ -296,6 +316,9 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
 
         from goatlib.tools.schemas import ToolOutputBase
 
+        # Check if we're in temp mode (for workflow preview)
+        temp_mode = getattr(params, "temp_mode", False)
+
         # Main polygon layer - use result_layer_name, then output_name, then default
         output_layer_id = str(uuid_module.uuid4())
         output_name = (
@@ -308,7 +331,8 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
 
         logger.info(
             f"Starting tool: {self.__class__.__name__} "
-            f"(user={params.user_id}, output={output_layer_id})"
+            f"(user={params.user_id}, output={output_layer_id}, "
+            f"temp_mode={temp_mode})"
         )
 
         # Initialize db_service
@@ -325,6 +349,23 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
                 f"Analysis complete: {metadata.feature_count or 0} features "
                 f"at {output_parquet}"
             )
+
+            # Compute style from params (static, no data dependency)
+            custom_properties = self.get_layer_properties(
+                params, metadata, parquet_path=output_parquet
+            )
+
+            # Temp mode: write primary (polygon) output only, skip stations and DB records
+            if temp_mode:
+                result = self._write_temp_result(
+                    params=params,
+                    output_parquet=output_parquet,
+                    output_name=output_name,
+                    output_layer_id=output_layer_id,
+                    properties=custom_properties,
+                )
+                asyncio.get_event_loop().run_until_complete(self._close_db_service())
+                return result
 
             # Step 2: Ingest polygon layer to DuckLake
             table_info = self._ingest_to_ducklake(
@@ -381,6 +422,7 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
                     output_name=output_name,
                     metadata=metadata,
                     table_info=table_info,
+                    custom_properties=custom_properties,
                 )
             )
 

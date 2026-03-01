@@ -5,7 +5,7 @@ Computes the geometric intersection of features from input and overlay layers.
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Self
+from typing import Any, List, Optional, Self
 
 from pydantic import ConfigDict, Field
 
@@ -113,6 +113,41 @@ class IntersectionToolRunner(BaseToolRunner[IntersectionToolParams]):
     tool_class = IntersectionTool
     output_geometry_type = None  # Depends on input
     default_output_name = get_default_layer_name("intersection", "en")
+
+    @classmethod
+    def predict_output_schema(
+        cls,
+        input_schemas: dict[str, dict[str, str]],
+        params: dict[str, Any],
+    ) -> dict[str, str]:
+        """Predict intersection output schema.
+
+        Intersection combines columns from both input and overlay layers.
+        input_fields/overlay_fields params can limit which fields are included.
+        """
+        input_layer = input_schemas.get("input_layer_id", {})
+        overlay_layer = input_schemas.get("overlay_layer_id", {})
+
+        columns = {}
+
+        # Get input fields (or all if not specified)
+        input_fields = params.get("input_fields")
+        for col, dtype in input_layer.items():
+            if input_fields is None or col in input_fields or col == "geometry":
+                columns[col] = dtype
+
+        # Get overlay fields (or all if not specified), prefixed to avoid conflicts
+        overlay_fields = params.get("overlay_fields")
+        overlay_prefix = params.get("overlay_fields_prefix", "overlay_")
+        for col, dtype in overlay_layer.items():
+            if col == "geometry":
+                continue  # Skip overlay geometry
+            if overlay_fields is None or col in overlay_fields:
+                base = f"{overlay_prefix}{col}" if col in columns else col
+                out_col = cls.unique_column_name(columns, base)
+                columns[out_col] = dtype
+
+        return columns
 
     def process(
         self: Self, params: IntersectionToolParams, temp_dir: Path

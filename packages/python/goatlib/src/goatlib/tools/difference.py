@@ -5,7 +5,7 @@ Computes the geometric difference of features from input and overlay layers.
 
 import logging
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 from pydantic import ConfigDict, Field
 
@@ -95,6 +95,20 @@ class DifferenceToolRunner(BaseToolRunner[DifferenceToolParams]):
     tool_class = DifferenceTool
     output_geometry_type = None  # Depends on input
     default_output_name = get_default_layer_name("difference", "en")
+
+    @classmethod
+    def predict_output_schema(
+        cls,
+        input_schemas: dict[str, dict[str, str]],
+        params: dict[str, Any],
+    ) -> dict[str, str]:
+        """Predict difference output schema.
+
+        Difference preserves all columns from the input layer.
+        Geometry type is preserved from input.
+        """
+        primary_input = input_schemas.get("input_layer_id", {})
+        return dict(primary_input)
 
     def process(
         self: Self, params: DifferenceToolParams, temp_dir: Path

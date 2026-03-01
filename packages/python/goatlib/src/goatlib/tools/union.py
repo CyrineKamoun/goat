@@ -113,6 +113,33 @@ class UnionToolRunner(BaseToolRunner[UnionToolParams]):
     output_geometry_type = None  # Depends on input
     default_output_name = get_default_layer_name("union", "en")
 
+    @classmethod
+    def predict_output_schema(
+        cls,
+        input_schemas: dict[str, dict[str, str]],
+        params: dict[str, Any],
+    ) -> dict[str, str]:
+        """Predict union output schema.
+
+        Union combines columns from both input and overlay layers.
+        If no overlay, performs self-union (just input columns).
+        """
+        input_layer = input_schemas.get("input_layer_id", {})
+        overlay_layer = input_schemas.get("overlay_layer_id", {})
+
+        columns = dict(input_layer)
+
+        # Add overlay columns with prefix if overlay exists
+        overlay_prefix = params.get("overlay_fields_prefix", "overlay_")
+        for col, dtype in overlay_layer.items():
+            if col == "geometry":
+                continue  # Skip overlay geometry
+            base = f"{overlay_prefix}{col}" if col in columns else col
+            out_col = cls.unique_column_name(columns, base)
+            columns[out_col] = dtype
+
+        return columns
+
     def process(
         self: Self, params: UnionToolParams, temp_dir: Path
     ) -> tuple[Path, DatasetMetadata]:

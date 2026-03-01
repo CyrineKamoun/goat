@@ -8,19 +8,22 @@
  *
  * The related layer is determined by widget_options.source_layer.
  */
-import { Box, FormControl, InputLabel, MenuItem, Select, TextField, Typography } from "@mui/material";
+import { Box, Stack, TextField, Typography } from "@mui/material";
 import { useParams } from "next/navigation";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { LayerFieldType } from "@/lib/validations/layer";
 
+import type { SelectorItem } from "@/types/map/common";
 import type { ProcessedInput } from "@/types/map/ogc-processes";
 
 import useLayerFields from "@/hooks/map/CommonHooks";
 import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 
+import FormLabelHelper from "@/components/common/FormLabelHelper";
 import LayerFieldSelector from "@/components/map/common/LayerFieldSelector";
+import Selector from "@/components/map/panels/common/Selector";
 
 // Define the statistic operations supported by the backend
 const STATISTIC_OPERATIONS = [
@@ -38,6 +41,10 @@ interface FieldStatisticsValue {
   result_name?: string | null;
 }
 
+// Stable empty object references to avoid creating new references on each render
+const EMPTY_LAYER_DATASET_IDS: Record<string, string> = {};
+const EMPTY_PREDICTED_COLUMNS: Record<string, Record<string, string>> = {};
+
 interface FieldStatisticsInputProps {
   input: ProcessedInput;
   value: unknown;
@@ -45,6 +52,10 @@ interface FieldStatisticsInputProps {
   disabled?: boolean;
   /** All current form values - needed to get the related layer's value */
   formValues: Record<string, unknown>;
+  /** Map of layer input names to their dataset IDs (for connected layers in workflows) */
+  layerDatasetIds?: Record<string, string>;
+  /** Map of layer input names to their predicted columns (for connected tool outputs) */
+  predictedColumns?: Record<string, Record<string, string>>;
 }
 
 export default function FieldStatisticsInput({
@@ -53,9 +64,17 @@ export default function FieldStatisticsInput({
   onChange,
   disabled,
   formValues,
+  layerDatasetIds,
+  predictedColumns,
 }: FieldStatisticsInputProps) {
   const { t } = useTranslation("common");
   const { projectId } = useParams();
+
+  // Ensure we have safe objects to access (handles explicit undefined) - use stable references
+  const safeLayerDatasetIds =
+    layerDatasetIds && Object.keys(layerDatasetIds).length > 0 ? layerDatasetIds : EMPTY_LAYER_DATASET_IDS;
+  const safePredictedColumns =
+    predictedColumns && Object.keys(predictedColumns).length > 0 ? predictedColumns : EMPTY_PREDICTED_COLUMNS;
 
   // Parse the current value - backend expects array but we show single selector
   const currentValue = useMemo((): FieldStatisticsValue => {
@@ -113,19 +132,59 @@ export default function FieldStatisticsInput({
 
   // Find the dataset ID for the selected layer
   const datasetId = useMemo(() => {
+    // First check if parent provided it (for connected layers in workflows)
+    if (relatedLayerInputName && safeLayerDatasetIds[relatedLayerInputName]) {
+      return safeLayerDatasetIds[relatedLayerInputName];
+    }
+
+    // Otherwise try to find it from project layers
     if (!selectedLayerId || !projectLayers) return "";
 
     const layer = projectLayers.find(
       (l) => l.id === Number(selectedLayerId) || l.layer_id === selectedLayerId
     );
     return layer?.layer_id || "";
-  }, [selectedLayerId, projectLayers]);
+  }, [selectedLayerId, projectLayers, relatedLayerInputName, safeLayerDatasetIds]);
 
-  // Fetch only numeric fields for the layer (statistics require numeric columns)
-  const { layerFields, isLoading } = useLayerFields(datasetId, "number");
+  // Check if we have predicted columns for this layer input (for connected tool outputs)
+  const hasPredictedColumns = useMemo(() => {
+    return relatedLayerInputName && safePredictedColumns[relatedLayerInputName] != null;
+  }, [relatedLayerInputName, safePredictedColumns]);
 
-  // Cast to LayerFieldType[] - the hook normalizes types to "string" | "number" | "object"
-  const numericFields = layerFields as LayerFieldType[];
+  // Convert predicted columns to LayerFieldType format (numeric only for statistics)
+  const predictedNumericFields = useMemo((): LayerFieldType[] => {
+    if (!relatedLayerInputName || !safePredictedColumns[relatedLayerInputName]) {
+      return [];
+    }
+    const columns = safePredictedColumns[relatedLayerInputName];
+    return Object.entries(columns)
+      .filter(([name, type]) => {
+        if (["geometry", "geom", "id", "layer_id"].includes(name.toLowerCase())) return false;
+        const upperType = type.toUpperCase();
+        return (
+          upperType.includes("INT") ||
+          upperType.includes("FLOAT") ||
+          upperType.includes("DOUBLE") ||
+          upperType.includes("DECIMAL") ||
+          upperType.includes("NUMERIC")
+        );
+      })
+      .map(([name]) => ({
+        name,
+        type: "number" as const,
+      }));
+  }, [relatedLayerInputName, safePredictedColumns]);
+
+  // Fetch numeric fields for the layer (skip when predicted columns are available)
+  const { layerFields, isLoading } = useLayerFields(hasPredictedColumns ? "" : datasetId, "number");
+
+  // Use predicted numeric fields if available, otherwise use layer fields
+  const numericFields = useMemo((): LayerFieldType[] => {
+    if (hasPredictedColumns && predictedNumericFields.length > 0) {
+      return predictedNumericFields;
+    }
+    return layerFields as LayerFieldType[];
+  }, [hasPredictedColumns, predictedNumericFields, layerFields]);
 
   // Check if the current operation requires a field
   const requiresField = currentValue.operation && currentValue.operation !== "count";
@@ -136,12 +195,26 @@ export default function FieldStatisticsInput({
     return numericFields.find((f) => f.name === currentValue.field);
   }, [currentValue.field, numericFields, requiresField]);
 
-  const handleOperationChange = (operation: string) => {
+  // Convert operations to SelectorItems for the Selector component
+  const operationItems: SelectorItem[] = useMemo(() => {
+    return STATISTIC_OPERATIONS.map((op) => ({
+      value: op.value,
+      label: t(op.labelKey),
+    }));
+  }, [t]);
+
+  // Find selected operation item
+  const selectedOperationItem = useMemo(() => {
+    if (!currentValue.operation) return undefined;
+    return operationItems.find((item) => item.value === currentValue.operation);
+  }, [currentValue.operation, operationItems]);
+
+  const handleOperationChange = (item: SelectorItem | SelectorItem[] | undefined) => {
+    if (Array.isArray(item)) return;
+    const operation = (item?.value as string) || "";
     if (operation === "count") {
-      // Count operation doesn't need a field
       emitChange({ operation, field: null, result_name: currentValue.result_name });
     } else {
-      // Preserve field if it was already selected, otherwise set to null
       emitChange({ operation, field: currentValue.field || null, result_name: currentValue.result_name });
     }
   };
@@ -154,11 +227,11 @@ export default function FieldStatisticsInput({
     });
   };
 
-  const handleResultNameChange = (resultName: string) => {
+  const handleResultNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     emitChange({
       operation: currentValue.operation,
       field: currentValue.field,
-      result_name: resultName || null,
+      result_name: event.target.value || null,
     });
   };
 
@@ -185,22 +258,16 @@ export default function FieldStatisticsInput({
   }
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-      {/* Operation Selector */}
-      <FormControl size="small" fullWidth disabled={disabled}>
-        <InputLabel id={`${input.name}-operation-label`}>{t("select_operation")}</InputLabel>
-        <Select
-          labelId={`${input.name}-operation-label`}
-          value={currentValue.operation}
-          onChange={(e) => handleOperationChange(e.target.value)}
-          label={t("select_operation")}>
-          {STATISTIC_OPERATIONS.map((op) => (
-            <MenuItem key={op.value} value={op.value}>
-              {t(op.labelKey)}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+    <Stack spacing={2}>
+      {/* Operation Selector - uses Selector component like EnumInput */}
+      <Selector
+        selectedItems={selectedOperationItem}
+        setSelectedItems={handleOperationChange}
+        items={operationItems}
+        label={t("select_operation")}
+        placeholder={t("select_option")}
+        disabled={disabled}
+      />
 
       {/* Field Selector (hidden for count operation) */}
       {requiresField && (
@@ -214,19 +281,20 @@ export default function FieldStatisticsInput({
         />
       )}
 
-      {/* Result Column Name (optional) - only show when operation is selected */}
+      {/* Result Column Name (optional) - uses FormLabelHelper like StringInput */}
       {currentValue.operation && (
-        <TextField
-          size="small"
-          fullWidth
-          label={t("result_column_name")}
-          placeholder={resultNamePlaceholder}
-          value={currentValue.result_name || ""}
-          onChange={(e) => handleResultNameChange(e.target.value)}
-          disabled={disabled}
-          helperText={t("result_column_name_helper")}
-        />
+        <Stack>
+          <FormLabelHelper label={t("result_column_name")} color="inherit" tooltip={t("result_column_name_helper")} />
+          <TextField
+            size="small"
+            fullWidth
+            placeholder={resultNamePlaceholder}
+            value={currentValue.result_name || ""}
+            onChange={handleResultNameChange}
+            disabled={disabled}
+          />
+        </Stack>
       )}
-    </Box>
+    </Stack>
   );
 }

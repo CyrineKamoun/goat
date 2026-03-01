@@ -199,11 +199,69 @@ class AggregatePointsToolRunner(BaseToolRunner[AggregatePointsToolParams]):
     output_geometry_type = "polygon"
     default_output_name = get_default_layer_name("aggregate_points", "en")
 
+    @classmethod
+    def predict_output_schema(
+        cls,
+        input_schemas: dict[str, dict[str, str]],
+        params: dict[str, Any],
+    ) -> dict[str, str]:
+        """Predict aggregate points output schema.
+
+        Aggregate outputs:
+        - h3_index (if area_type is h3) or area layer columns
+        - group_by_field columns (if specified)
+        - count column (always present)
+        - Statistics columns (operation_field for each statistic)
+        - geometry column
+        """
+        columns = {}
+
+        # Add h3_index for H3 aggregation
+        area_type = params.get("area_type", "polygon")
+        if area_type == "h3":
+            columns["h3_index"] = "VARCHAR"
+        else:
+            # For polygon aggregation, area layer columns are preserved
+            area_layer = input_schemas.get("area_layer_id", {})
+            for col, dtype in area_layer.items():
+                if col != "geometry":
+                    columns[col] = dtype
+
+        # Add group_by_field columns
+        group_by_fields = params.get("group_by_field") or []
+        source_layer = input_schemas.get("source_layer_id", {})
+        for field in group_by_fields:
+            if field in source_layer:
+                columns[field] = source_layer[field]
+
+        # Add count column (always present)
+        count_col = cls.unique_column_name(columns, "count")
+        columns[count_col] = "BIGINT"
+
+        # Add statistics columns
+        column_statistics = params.get("column_statistics") or []
+        for stat in column_statistics:
+            operation = stat.get("operation", "count")
+            field = stat.get("field")
+            result_name = stat.get("result_name")
+            if operation == "count":
+                continue  # count already added
+            elif field:
+                base_name = result_name if result_name else f"{field}_{operation}"
+                col_name = cls.unique_column_name(columns, base_name)
+                columns[col_name] = "DOUBLE"
+
+        # Add geometry
+        columns["geometry"] = "GEOMETRY"
+
+        return columns
+
     def get_layer_properties(
         self: Self,
         params: AggregatePointsToolParams,
         metadata: DatasetMetadata,
         table_info: dict[str, Any] | None = None,
+        parquet_path: Path | str | None = None,
     ) -> dict[str, Any] | None:
         """Return style for aggregated output with quantile breaks."""
         # Determine the value field based on the statistics operation
@@ -221,12 +279,14 @@ class AggregatePointsToolRunner(BaseToolRunner[AggregatePointsToolParams]):
 
         # Compute quantile breaks from the DuckLake table
         color_scale_breaks = None
-        if table_info and table_info.get("table_name"):
+        table_name = table_info["table_name"] if table_info else None
+        if table_name or parquet_path:
             color_scale_breaks = self.compute_quantile_breaks(
-                table_name=table_info["table_name"],
+                table_name=table_name,
                 column_name=color_field,
                 num_breaks=6,
                 strip_zeros=True,
+                parquet_path=parquet_path,
             )
             if color_scale_breaks:
                 logger.info(

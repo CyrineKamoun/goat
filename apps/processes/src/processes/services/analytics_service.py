@@ -6,8 +6,10 @@ These are synchronous operations that return immediate results.
 
 import json
 import logging
+import re
 from typing import Any
 
+import duckdb
 from goatlib.analysis.statistics import (
     AreaOperation,
     ClassBreakMethod,
@@ -23,6 +25,7 @@ from goatlib.analysis.statistics import (
     calculate_unique_values,
 )
 from goatlib.storage import build_cql_filter
+from goatlib.tools.custom_sql import validate_sql_query
 
 from processes.dependencies import (
     _layer_id_to_table_name,
@@ -462,6 +465,289 @@ class AnalyticsService:
             )
 
         return result.model_dump()
+
+    def validate_sql(
+        self,
+        sql_query: str,
+        table_schemas: dict[str, dict[str, str]] | None = None,
+    ) -> dict[str, Any]:
+        """Validate a SQL SELECT statement against provided table schemas.
+
+        Args:
+            sql_query: The SQL SELECT statement to validate
+            table_schemas: Table schemas: {alias: {column_name: duckdb_type}}
+
+        Returns:
+            Dict with valid, errors, columns
+        """
+        # Step 1: Basic SQL security validation
+        try:
+            validate_sql_query(sql_query)
+        except ValueError as e:
+            return {"valid": False, "errors": [str(e)], "columns": {}}
+
+        # Step 2: Schema validation — create mock tables and execute with LIMIT 0
+        if not table_schemas:
+            return {"valid": True, "errors": [], "columns": {}}
+
+        con = duckdb.connect()
+        try:
+            con.execute("LOAD spatial;")
+
+            for alias, columns in table_schemas.items():
+                if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", alias):
+                    return {
+                        "valid": False,
+                        "errors": [f"Invalid table alias: {alias}"],
+                        "columns": {},
+                    }
+
+                col_defs = []
+                if columns:
+                    for col_name, col_type in columns.items():
+                        # Validate column name to prevent SQL injection
+                        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_ ]*$", col_name):
+                            return {
+                                "valid": False,
+                                "errors": [f"Invalid column name: {col_name}"],
+                                "columns": {},
+                            }
+                        # Validate type string to prevent SQL injection
+                        if not re.match(r"^[a-zA-Z0-9_ ()\[\],]+$", col_type):
+                            return {
+                                "valid": False,
+                                "errors": [f"Invalid column type: {col_type}"],
+                                "columns": {},
+                            }
+                        if "GEOMETRY" in col_type.upper():
+                            col_defs.append(f'"{col_name}" GEOMETRY')
+                        else:
+                            col_defs.append(f'"{col_name}" {col_type}')
+
+                if not col_defs:
+                    # Schema not yet available — create table with placeholder
+                    col_defs = ['"_placeholder" INTEGER']
+
+                create_sql = f'CREATE TABLE "{alias}" ({", ".join(col_defs)})'
+                con.execute(create_sql)
+
+            # Execute with LIMIT 0 to validate and get output schema
+            limited_sql = f"SELECT * FROM ({sql_query}) _v LIMIT 0"
+            con.execute(limited_sql)
+
+            # Get output column types via DESCRIBE
+            describe_result = con.execute(
+                f"DESCRIBE SELECT * FROM ({sql_query}) _v LIMIT 0"
+            )
+            output_columns: dict[str, str] = {}
+            for row in describe_result.fetchall():
+                output_columns[row[0]] = row[1]
+
+            return {"valid": True, "errors": [], "columns": output_columns}
+
+        except duckdb.Error as e:
+            return {"valid": False, "errors": [str(e)], "columns": {}}
+        except Exception as e:
+            logger.warning("SQL validation error: %s", e)
+            return {"valid": False, "errors": [str(e)], "columns": {}}
+        finally:
+            con.close()
+
+    def _find_temp_parquet(self, temp_uuid: str) -> str | None:
+        """Find a temp parquet file by its UUID.
+
+        Searches DATA_DIR/temporary/ for t_{uuid}.parquet files.
+
+        Args:
+            temp_uuid: The temp file UUID (hex, no dashes)
+
+        Returns:
+            Path to parquet file as string, or None if not found
+        """
+        import os
+        from pathlib import Path
+
+        temp_root = Path(os.getenv("DATA_DIR", "/app/data")) / "temporary"
+        if not temp_root.exists():
+            return None
+
+        clean_uuid = temp_uuid.replace("-", "")
+        matches = list(temp_root.glob(f"**/t_{clean_uuid}.parquet"))
+        if matches:
+            return str(matches[0])
+        return None
+
+    def preview_sql(
+        self,
+        sql_query: str,
+        layers: dict[str, str],
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        """Preview a SQL query against actual layer data.
+
+        Loads each referenced layer from DuckLake (or temp parquet) as a named
+        view in an in-memory DuckDB connection, then executes the query with a LIMIT.
+
+        Layer IDs can be:
+        - Regular UUID: resolved from DuckLake
+        - "temp:<uuid>": read from temp parquet file in DATA_DIR/temporary/
+
+        Args:
+            sql_query: The SQL SELECT statement to preview
+            layers: Layer mapping {alias: layer_id}
+            limit: Max rows to return
+
+        Returns:
+            Dict with success, columns, rows, error
+        """
+        # Validate SQL first
+        try:
+            validate_sql_query(sql_query)
+        except ValueError as e:
+            return {"success": False, "columns": [], "rows": [], "error": str(e)}
+
+        if not layers:
+            return {
+                "success": False,
+                "columns": [],
+                "rows": [],
+                "error": "No layers provided for preview",
+            }
+
+        con = duckdb.connect()
+        try:
+            con.execute("LOAD spatial;")
+
+            # Separate temp layers from DuckLake layers
+            temp_layers: dict[str, str] = {}
+            ducklake_layers: dict[str, str] = {}
+            for alias, layer_id in layers.items():
+                if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", alias):
+                    return {
+                        "success": False,
+                        "columns": [],
+                        "rows": [],
+                        "error": f"Invalid table alias: {alias}",
+                    }
+                if layer_id.startswith("temp:"):
+                    temp_layers[alias] = layer_id[5:]  # strip "temp:" prefix
+                else:
+                    ducklake_layers[alias] = layer_id
+
+            # Load temp layers from parquet files
+            for alias, temp_uuid in temp_layers.items():
+                parquet_path = self._find_temp_parquet(temp_uuid)
+                if not parquet_path:
+                    return {
+                        "success": False,
+                        "columns": [],
+                        "rows": [],
+                        "error": f"Temp layer {alias} not found (may have been cleaned up). "
+                        f"Re-run the workflow to regenerate.",
+                    }
+                try:
+                    con.execute(
+                        f'CREATE VIEW "{alias}" AS '
+                        f"SELECT * FROM read_parquet('{parquet_path}')"
+                    )
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "columns": [],
+                        "rows": [],
+                        "error": f"Failed to load temp layer {alias}: {e}",
+                    }
+
+            # Attach DuckLake catalog in read-only mode (via ducklake_manager)
+            # instead of copying entire datasets into memory
+            if ducklake_layers:
+                try:
+                    ducklake_manager.attach_catalog(con)
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "columns": [],
+                        "rows": [],
+                        "error": f"Failed to attach DuckLake catalog: {e}",
+                    }
+
+                for alias, layer_id in ducklake_layers.items():
+                    # Resolve layer to DuckLake table name
+                    try:
+                        norm_id = normalize_layer_id(layer_id)
+                        schema_name = get_schema_for_layer(norm_id)
+                        table_name = _layer_id_to_table_name(norm_id)
+                        full_table = f"lake.{schema_name}.{table_name}"
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "columns": [],
+                            "rows": [],
+                            "error": f"Layer {alias} ({layer_id}): {e}",
+                        }
+
+                    # Create a view alias pointing to the DuckLake table
+                    try:
+                        con.execute(
+                            f'CREATE VIEW "{alias}" AS '
+                            f"SELECT * FROM {full_table}"
+                        )
+                    except Exception as e:
+                        return {
+                            "success": False,
+                            "columns": [],
+                            "rows": [],
+                            "error": f"Failed to load layer {alias}: {e}",
+                        }
+
+            # Get column info first (DESCRIBE doesn't affect data cursor)
+            columns: list[dict[str, str]] = []
+            describe = con.execute(
+                f"DESCRIBE SELECT * FROM ({sql_query}) _preview LIMIT 0"
+            )
+            for row in describe.fetchall():
+                columns.append({"name": row[0], "type": row[1]})
+
+            # Execute the query with limit
+            limited_sql = (
+                f"SELECT * FROM ({sql_query}) _preview "
+                f"LIMIT {limit}"
+            )
+            rows_data = con.execute(limited_sql).fetchall()
+            col_names = [c["name"] for c in columns]
+            rows: list[dict[str, Any]] = []
+            for row_tuple in rows_data:
+                values: dict[str, Any] = {}
+                for i, val in enumerate(row_tuple):
+                    col_name = col_names[i] if i < len(col_names) else f"col_{i}"
+                    if hasattr(val, "wkt"):
+                        values[col_name] = val.wkt
+                    elif val is None:
+                        values[col_name] = None
+                    else:
+                        try:
+                            values[col_name] = (
+                                val
+                                if isinstance(val, (str, int, float, bool))
+                                else str(val)
+                            )
+                        except Exception:
+                            values[col_name] = str(val)
+                rows.append({"values": values})
+
+            return {
+                "success": True,
+                "columns": columns,
+                "rows": rows,
+            }
+
+        except duckdb.Error as e:
+            return {"success": False, "columns": [], "rows": [], "error": str(e)}
+        except Exception as e:
+            logger.exception("Error previewing SQL")
+            return {"success": False, "columns": [], "rows": [], "error": str(e)}
+        finally:
+            con.close()
 
 
 # Singleton instance

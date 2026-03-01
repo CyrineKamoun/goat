@@ -227,11 +227,38 @@ class GeocodingToolRunner(BaseToolRunner[GeocodingToolParams]):
     output_geometry_type = "Point"
     default_output_name = get_default_layer_name("geocoding", "en")
 
+    @classmethod
+    def predict_output_schema(
+        cls,
+        input_schemas: dict[str, dict[str, str]],
+        params: dict[str, Any],
+    ) -> dict[str, str]:
+        """Predict geocoding output schema.
+
+        Geocoding outputs:
+        - All input columns (preserves original data)
+        - geocode_status: SUCCESS, PARTIAL, NO_MATCH, etc.
+        - geocode_confidence: confidence score 0-1
+        - geocode_label: formatted address from geocoder
+        - geometry: Point geometry from geocoding result
+        """
+        input_layer = input_schemas.get("input_layer_id", {})
+        columns = dict(input_layer)
+
+        # Add geocoding result columns
+        columns["geocode_status"] = "VARCHAR"
+        columns["geocode_confidence"] = "DOUBLE"
+        columns["geocode_label"] = "VARCHAR"
+        columns["geometry"] = "GEOMETRY"
+
+        return columns
+
     def get_layer_properties(
         self: Self,
         params: GeocodingToolParams,
         metadata: DatasetMetadata,
         table_info: dict[str, Any] | None = None,
+        parquet_path: Path | str | None = None,
     ) -> dict[str, Any] | None:
         """Return style for geocoded output - simple point markers."""
         # Import here to avoid circular imports

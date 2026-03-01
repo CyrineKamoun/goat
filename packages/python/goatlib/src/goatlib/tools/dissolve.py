@@ -128,11 +128,58 @@ class DissolveToolRunner(BaseToolRunner[DissolveToolParams]):
     output_geometry_type = None  # Dynamic based on input geometry
     default_output_name = get_default_layer_name("dissolve", "en")
 
+    @classmethod
+    def predict_output_schema(
+        cls,
+        input_schemas: dict[str, dict[str, str]],
+        params: dict[str, Any],
+    ) -> dict[str, str]:
+        """Predict dissolve output schema.
+
+        Dissolve outputs:
+        - dissolve_fields (group by columns)
+        - Statistics columns (operation_field for each statistic)
+        - count column (always added)
+        - geometry column (merged polygons)
+        """
+        input_layer = input_schemas.get("input_layer_id", {})
+        columns = {}
+
+        # Add dissolve_fields (group by columns)
+        dissolve_fields = params.get("dissolve_fields") or []
+        for field in dissolve_fields:
+            if field in input_layer:
+                columns[field] = input_layer[field]
+
+        # Add count column (always present)
+        count_col = cls.unique_column_name(columns, "count")
+        columns[count_col] = "BIGINT"
+
+        # Add statistics columns
+        field_statistics = params.get("field_statistics") or []
+        for stat in field_statistics:
+            operation = stat.get("operation", "count")
+            field = stat.get("field")
+            result_name = stat.get("result_name")
+            if operation == "count":
+                # count is already added above
+                continue
+            elif field:
+                base_name = result_name if result_name else f"{field}_{operation}"
+                col_name = cls.unique_column_name(columns, base_name)
+                columns[col_name] = "DOUBLE"
+
+        # Add geometry
+        columns["geometry"] = "GEOMETRY"
+
+        return columns
+
     def get_layer_properties(
         self: Self,
         params: DissolveToolParams,
         metadata: DatasetMetadata,
         table_info: dict[str, Any] | None = None,
+        parquet_path: Path | str | None = None,
     ) -> dict[str, Any] | None:
         """Return style for dissolved output.
 
@@ -155,12 +202,14 @@ class DissolveToolRunner(BaseToolRunner[DissolveToolParams]):
         # Use Teal for dissolve - represents aggregated data
         # If no statistics, this will still return a valid style with default color
         color_scale_breaks = None
-        if color_field and table_info and table_info.get("table_name"):
+        table_name = table_info["table_name"] if table_info else None
+        if color_field and (table_name or parquet_path):
             color_scale_breaks = self.compute_quantile_breaks(
-                table_name=table_info["table_name"],
+                table_name=table_name,
                 column_name=color_field,
                 num_breaks=6,
                 strip_zeros=True,
+                parquet_path=parquet_path,
             )
             if color_scale_breaks:
                 logger.info(

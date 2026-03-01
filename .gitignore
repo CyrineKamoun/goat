@@ -1,3 +1,6 @@
+# MCP config (contains tokens)
+.mcp.json
+
 # Logs
 logs
 *.log
@@ -31,6 +34,7 @@ build
 # misc
 .DS_Store
 *.pem
+compose.override.yaml
 
 # local env files
 .env

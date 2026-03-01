@@ -26,7 +26,7 @@ export const useLayerSettingsMoreMenu = () => {
   function getLayerMoreMenuOptions(
     layerType: ProjectLayer["type"],
     viewChart?: boolean,
-    inCatalog?: ProjectLayer["in_catalog"],
+    _inCatalog?: ProjectLayer["in_catalog"],
     readOnly?: boolean
   ): PopperMenuItem[] {
     if (readOnly) {
@@ -49,15 +49,11 @@ export const useLayerSettingsMoreMenu = () => {
               },
             ]
           : []),
-        ...(layerType !== "feature" || !inCatalog
-          ? [
-              {
-                id: ContentActions.DOWNLOAD,
-                label: t("download"),
-                icon: ICON_NAME.DOWNLOAD,
-              },
-            ]
-          : []),
+        {
+          id: ContentActions.DOWNLOAD,
+          label: t("download"),
+          icon: ICON_NAME.DOWNLOAD,
+        },
         {
           id: ContentActions.INFO,
           label: t("data_source_info"),
@@ -108,15 +104,11 @@ export const useLayerSettingsMoreMenu = () => {
           label: t("rename"),
           icon: ICON_NAME.EDIT,
         },
-        ...(inCatalog
-          ? []
-          : [
-              {
-                id: ContentActions.DOWNLOAD,
-                label: t("download"),
-                icon: ICON_NAME.DOWNLOAD,
-              },
-            ]),
+        {
+          id: ContentActions.DOWNLOAD,
+          label: t("download"),
+          icon: ICON_NAME.DOWNLOAD,
+        },
         {
           id: ContentActions.DELETE,
           label: t("delete"),

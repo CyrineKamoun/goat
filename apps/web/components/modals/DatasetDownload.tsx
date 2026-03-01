@@ -56,6 +56,11 @@ const DatasetDownloadModal: React.FC<DownloadDatasetDialogProps> = ({
   const layerType = (dataset as { layer_type?: string }).layer_type || dataset.type;
   const isSpatialLayer = layerType === "feature" || layerType === "raster";
 
+  // Catalog layers can only be downloaded by their owner
+  const inCatalog = (dataset as { in_catalog?: boolean }).in_catalog;
+  const layerOwnerId = (dataset as { user_id?: string }).user_id;
+  const isCatalogNotOwned = inCatalog && layerOwnerId && userProfile?.id && layerOwnerId !== userProfile.id;
+
   const [dataDownloadType, setDataDownloadType] = useState<FeatureDataExchangeType>(
     isSpatialLayer ? featureDataExchangeType.Enum.gpkg : tableDataExchangeType.Enum.csv
   );
@@ -116,53 +121,59 @@ const DatasetDownloadModal: React.FC<DownloadDatasetDialogProps> = ({
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{`${t("download")} "${dataset.name}"`}</DialogTitle>
       <DialogContent>
-        <Stack spacing={2} sx={{ py: 2 }}>
-          <Box>
-            <Typography variant="caption">{t(`download_type`)}</Typography>
-            <Select
-              fullWidth
-              disabled={isBusy}
-              sx={{
-                my: 2,
-              }}
-              id="download-simple-select"
-              value={dataDownloadType}
-              onChange={(e) => setDataDownloadType(e.target.value as FeatureDataExchangeType)}>
-              {isSpatialLayer &&
-                featureDataExchangeType.options.map((type: string) => (
-                  <MenuItem key={type} value={type}>
-                    {t(`${type}`)}
-                  </MenuItem>
-                ))}
-              {!isSpatialLayer &&
-                tableDataExchangeType.options.map((type: string) => (
-                  <MenuItem key={type} value={type}>
-                    {t(`${type}`)}
-                  </MenuItem>
-                ))}
-            </Select>
-          </Box>
-          {isSpatialLayer && (
+        {isCatalogNotOwned ? (
+          <Typography variant="body2" sx={{ py: 2 }}>
+            {t("catalog_download_not_allowed")}
+          </Typography>
+        ) : (
+          <Stack spacing={2} sx={{ py: 2 }}>
             <Box>
-              <Typography variant="caption">{t(`download_crs`)}</Typography>
+              <Typography variant="caption">{t(`download_type`)}</Typography>
               <Select
                 fullWidth
                 disabled={isBusy}
                 sx={{
                   my: 2,
                 }}
-                id="download-crs-select"
-                value={dataCrs}
-                onChange={(e) => setDataCrs(e.target.value as string)}>
-                {featureDataExchangeCRS.options.map((type: string) => (
-                  <MenuItem key={type} value={type}>
-                    {t(`${type}`)}
-                  </MenuItem>
-                ))}
+                id="download-simple-select"
+                value={dataDownloadType}
+                onChange={(e) => setDataDownloadType(e.target.value as FeatureDataExchangeType)}>
+                {isSpatialLayer &&
+                  featureDataExchangeType.options.map((type: string) => (
+                    <MenuItem key={type} value={type}>
+                      {t(`${type}`)}
+                    </MenuItem>
+                  ))}
+                {!isSpatialLayer &&
+                  tableDataExchangeType.options.map((type: string) => (
+                    <MenuItem key={type} value={type}>
+                      {t(`${type}`)}
+                    </MenuItem>
+                  ))}
               </Select>
             </Box>
-          )}
-        </Stack>
+            {isSpatialLayer && (
+              <Box>
+                <Typography variant="caption">{t(`download_crs`)}</Typography>
+                <Select
+                  fullWidth
+                  disabled={isBusy}
+                  sx={{
+                    my: 2,
+                  }}
+                  id="download-crs-select"
+                  value={dataCrs}
+                  onChange={(e) => setDataCrs(e.target.value as string)}>
+                  {featureDataExchangeCRS.options.map((type: string) => (
+                    <MenuItem key={type} value={type}>
+                      {t(`${type}`)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Box>
+            )}
+          </Stack>
+        )}
       </DialogContent>
       <DialogActions
         disableSpacing
@@ -171,14 +182,16 @@ const DatasetDownloadModal: React.FC<DownloadDatasetDialogProps> = ({
         }}>
         <Button onClick={onClose} variant="text" disabled={isBusy}>
           <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
+            {t(isCatalogNotOwned ? "close" : "cancel")}
           </Typography>
         </Button>
-        <LoadingButton loading={isBusy} onClick={handleDownload} disabled={disabled}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("download")}
-          </Typography>
-        </LoadingButton>
+        {!isCatalogNotOwned && (
+          <LoadingButton loading={isBusy} onClick={handleDownload} disabled={disabled}>
+            <Typography variant="body2" fontWeight="bold" color="inherit">
+              {t("download")}
+            </Typography>
+          </LoadingButton>
+        )}
       </DialogActions>
     </Dialog>
   );

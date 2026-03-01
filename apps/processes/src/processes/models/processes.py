@@ -170,6 +170,7 @@ class OutputDescription(BaseModel):
     title: str
     description: str | None = None
     schema_: dict[str, Any] = Field(alias="schema")
+    metadata: list[Metadata] = Field(default_factory=list)
 
     model_config = {"populate_by_name": True}
 
@@ -236,6 +237,11 @@ class StatusInfo(BaseModel):
     # Extended fields (not OGC standard)
     inputs: dict[str, Any] | None = None  # Job inputs for filtering
     result: dict[str, Any] | None = None  # Job result/output
+    # Workflow execution status (from Windmill workflow-as-code)
+    workflow_as_code_status: dict[str, Any] | None = None
+    # Node status for workflow jobs (from flow_user_state)
+    # Can be either string (legacy) or object with status/started_at/duration_ms
+    node_status: dict[str, Any] | None = None
 
 
 class JobList(BaseModel):

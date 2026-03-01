@@ -9,6 +9,9 @@
     "opportunities": {
       "label": "Gelegenheiten"
     },
+    "demand": {
+      "label": "Nachfrage"
+    },
     "scenario": {
       "label": "Szenario"
     },
@@ -50,6 +53,9 @@
     },
     "geocoding": {
       "label": "Geokodierung"
+    },
+    "algorithm_settings": {
+      "label": "Algorithmus-Einstellungen"
     },
     "matrix": {
       "label": "Matrix-Daten"
@@ -175,6 +181,10 @@
       "label": "Potenzialfeld",
       "description": "Feldname mit den Zielpotenzialwerten"
     },
+    "capacity_field": {
+      "label": "Kapazitätsfeld",
+      "description": "Feldname mit den Zielkapazitätswerten"
+    },
     "potential_constant": {
       "label": "Konstantes Potenzial",
       "description": "Verwenden Sie einen konstanten Wert für alle Ziele"
@@ -189,7 +199,35 @@
     },
     "reference_area_path": {
       "label": "Referenzgebiet",
-      "description": "Layer, der das Referenzgebiet für die Konnektivitätsanalyse definiert"
+      "description": "Layer, der das Referenzgebiet definiert, in dem die Analyse durchgeführt wird"
+    },
+    "demand_field": {
+      "label": "Nachfragefeld",
+      "description": "Feld mit den Nachfragewerten"
+    },
+    "demand_path": {
+      "label": "Nachfrage-Layer",
+      "description": "Layer mit den Nachfragepunkten"
+    },
+    "opportunity_path": {
+      "label": "Gelegenheiten-Layer",
+      "description": "Layer mit den Gelegenheitsstandorten"
+    },
+    "attractivity": {
+      "label": "Attraktivitätsfeld",
+      "description": "Feld des Gelegenheiten-Layers mit Attraktivitätswerten"
+    },
+    "attractiveness_param": {
+      "label": "Attraktivitätsparameter",
+      "description": "Exponent für die Attraktivität in der Huff-Modell-Gravitationsfunktion"
+    },
+    "distance_decay": {
+      "label": "Entfernungsabnahme",
+      "description": "Exponent für die Entfernungsabnahme in der Huff-Modell-Gravitationsfunktion"
+    },
+    "two_sfca_type": {
+      "label": "2SFCA-Typ",
+      "description": "Art der Two-Step Floating Catchment Area-Methode"
     },
     "weekday": {
       "label": "Tag",
@@ -226,6 +264,46 @@
     "dissolve": {
       "label": "Zusammenführen",
       "description": "Überlappende Objekte zu einer Geometrie zusammenführen"
+    },
+    "nb_cluster": {
+      "label": "Anzahl Cluster",
+      "description": "Anzahl der zu erstellenden Zonen"
+    },
+    "cluster_type": {
+      "label": "ClusterTyp",
+      "description": "Methode zur Erstellung der Zonen"
+    },
+    "size_method": {
+      "label": "Größenmethode",
+      "description": "Wählen Sie, wie die Zonen ausgeglichen werden: nach Punktanzahl oder nach einem numerischen Feldwert"
+    },
+    "size_field": {
+      "label": "Größenfeld",
+      "description": "Numerisches Feld für die Zonenbalancierung"
+    },
+    "use_compactness": {
+      "label": "Eingeschränkter Zonenumgriff",
+      "description": "Aktivieren um eine maximale Entfernung zwischen Punkten in derselben Zone festzulegen"
+    },
+    "max_distance_threshold": {
+      "label": "Max. Entfernung",
+      "description": "Maximale Entfernung für Kompaktheitsmessung (automatisch erkannt falls nicht angegeben)"
+    },
+    "population_size": {
+      "label": "Populationsgröße",
+      "description": "Anzahl Individuen in genetischem Algorithmus (höher = bessere Qualität, langsamer)"
+    },
+    "max_generations": {
+      "label": "Max. Generationen",
+      "description": "Maximale Anzahl Generationen (höher = bessere Konvergenz, langsamer)"
+    },
+    "mutation_rate": {
+      "label": "Mutationsrate",
+      "description": "Wahrscheinlichkeit für Mutation im genetischen Algorithmus"
+    },
+    "h3_resolution": {
+      "label": "H3-Gitter-Auflösung",
+      "description": "Detailgrad des hexagonalen Gitters (höher = detaillierter, langsamer)"
     },
     "num_triangles": {
       "label": "Kurvenglättung",
@@ -400,8 +478,12 @@
       "description": "Berechnung des Einzugsgebiets nach Zeit oder Entfernung"
     },
     "max_distance": {
-      "label": "Reiseentfernung",
-      "description": "Definieren Sie die maximale Reiseentfernung in Metern"
+      "label": "Maximale Entfernung",
+      "description": "Definieren Sie die maximale Entfernung in Metern"
+    },
+    "compactness_weight": {
+      "label": "Kompaktheitsgewicht",
+      "description": "Wie stark ausgedehnte Zonen bestraft werden. Das Gleichverteilungsgewicht ist fest auf 1 gesetzt."
     },
     "source_layer_id": {
       "label": "Eingabe-Punkt-Layer",
@@ -578,6 +660,10 @@
     "result_layer_name": {
       "label": "Name der Ergebnislayer",
       "description": "Benutzerdefinierter Name für die Ergebnis-Layer"
+    },
+    "summary_layer_name": {
+      "label": "Name der Zusammenfassungsebene",
+      "description": "Benutzerdefinierter Name für die Cluster-Zusammenfassungsebene"
     },
     "starting_points_layer_name": {
       "label": "Name des Startpunkte-Layer",
@@ -757,6 +843,14 @@
       "title": "Heatmap Konnektivität",
       "description": "Die Vernetzung der Verkehrswege wird ausgedrückt durch die Berechnung von Einzugsbereichen für jede Rasterzelle, wobei die erreichbare Fläche der Einzugsbereiche die Konnektivität ausdrückt."
     },
+    "heatmap_2sfca": {
+      "title": "Heatmap 2SFCA",
+      "description": "Die 2SFCA-Methode (Two-Step Floating Catchment Area) misst die Erreichbarkeit mehrerer Einrichtungen, indem zunächst für jeden Standort ein Kapazitäts-Nachfrage-Verhältnis berechnet und anschließend die erreichbaren Verhältnisse je Rasterzelle aufsummiert werden."
+    },
+    "huff_model": {
+      "title": "Huff-Modell",
+      "description": "Das Huff-Modell prognostiziert die Wahrscheinlichkeit, dass Verbraucher in einem Referenzgebiet bestimmte Standorte besuchen, basierend auf der Attraktivität der Standorte und der Entfernung zu diesen Standorten, einschließlich der Konkurrenz zwischen den Gelegenheiten."
+    },
     "oev_gueteklassen": {
       "title": "ÖV-Güteklassen",
       "description": "ÖV-Güteklassen zeigen die Attraktivität des öffentlichen Verkehrs in einem bestimmten Gebiet an."
@@ -806,6 +900,10 @@
       "title": "Geokodierung",
       "description": "Wandelt Adressen in geografische Koordinaten um. Unterstützt sowohl vollständige Adresszeichenfolgen als auch strukturierte Adresskomponenten."
     },
+    "spatial_clustering": {
+      "title": "Räumliches Clustering",
+      "description": "Erstellt clustrierte Zonen aus Punktobjekten. Wählen Sie die Clustermethode: schnell mit K-Means oder langsamer mit ausgewogenen Zonen."
+    },
     "join": {
       "title": "Objekte verbinden",
       "description": "Überträgt Attribute zwischen Layern basierend auf räumlichen und Attributbeziehungen. Optional können statistische Daten für die verbundenen Objekte berechnet werden."
@@ -847,12 +945,29 @@
     "heatmap_gravity": "Heatmap Gravity",
     "heatmap_connectivity": "Heatmap Connectivity",
     "heatmap_closest_average": "Heatmap Durchschnitt Reisezeit",
+    "heatmap_2sfca": "Heatmap 2SFCA",
+    "huff_model": "Huff-Modell",
     "oev_gueteklassen": "ÖV-Güteklassen",
     "oev_gueteklassen_stations": "ÖV Stationen",
     "trip_count": "Anzahl Abfahrten Haltepunkte",
     "origin_destination_lines": "QZ Linien",
     "origin_destination_points": "QZ Punkte",
     "join": "Objekte verbinden",
-    "geocoding": "Geokodierung"
+    "geocoding": "Geokodierung",
+    "clustered_features": "Clusterzuordnung",
+    "cluster_summary": "Cluster-Zusammenfassung"
+  },
+  "two_sfca_type": {
+    "twosfca": "2SFCA",
+    "e2sfca": "Erweiterte 2SFCA",
+    "m2sfca": "Modifizierte 2SFCA"
+  },
+  "size_method": {
+    "count": "Anzahl",
+    "field": "Feldwert"
+  },
+  "cluster_type": {
+    "kmean": "K-Means",
+    "equal_size": "Ausgewogene Zonen"
   }
 }

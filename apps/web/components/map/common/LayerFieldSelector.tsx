@@ -58,26 +58,34 @@ export const FieldTypeTag = styled("div")<{ fieldType: string }>(({ fieldType })
   lineHeight: "20px",
 }));
 
+// Empty array constant to avoid creating new references
+const EMPTY_FIELDS: LayerFieldType[] = [];
+
 const LayerFieldSelector = (props: SelectorProps) => {
   const theme = useTheme();
   const [searchText, setSearchText] = useState("");
   const { selectedField, fields, setSelectedField } = props;
   const [focused, setFocused] = useState(false);
+
+  // Ensure fields is always an array (defensive check) - use stable reference
+  const safeFields = fields && fields.length > 0 ? fields : EMPTY_FIELDS;
+
   const displayedfields = useMemo(() => {
-    const filtered = fields.filter((field) => {
+    if (safeFields.length === 0) return EMPTY_FIELDS;
+    const filtered = safeFields.filter((field) => {
       return containsText(field.name, searchText);
     });
     return filtered;
-  }, [fields, searchText]);
+  }, [safeFields, searchText]);
 
   const { t } = useTranslation("common");
   const selectedValue = useMemo(() => {
     if (!props.multiple && !Array.isArray(selectedField)) {
       return selectedField ? JSON.stringify(selectedField) : "";
     } else {
-      return selectedField && Array.isArray(selectedField)
-        ? selectedField?.map((field) => JSON.stringify(field))
-        : [];
+      return selectedField && Array.isArray(selectedField) && selectedField.length > 0
+        ? selectedField.map((field) => JSON.stringify(field))
+        : EMPTY_FIELDS;
     }
   }, [props.multiple, selectedField]);
 
@@ -112,16 +120,24 @@ const LayerFieldSelector = (props: SelectorProps) => {
         sx={{ pr: 1 }}
         displayEmpty
         value={selectedValue as unknown}
-        defaultValue={props.multiple ? [] : ""}
+        defaultValue={props.multiple ? EMPTY_FIELDS : ""}
         onChange={(e) => {
-          if (!props.multiple) {
-            const field = JSON.parse(e.target.value as string) as LayerFieldType;
-            setSelectedField(field as LayerFieldType);
-          } else if (props.multiple) {
-            const fields = e.target.value as string[];
-            const selectedFields = fields.map((field) => JSON.parse(field) as LayerFieldType);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setSelectedField(selectedFields as any);
+          try {
+            if (!props.multiple) {
+              const value = e.target.value as string;
+              if (!value) return;
+              const field = JSON.parse(value) as LayerFieldType;
+              setSelectedField(field as LayerFieldType);
+            } else if (props.multiple) {
+              const fields = e.target.value as string[];
+              const selectedFields = fields
+                .filter((f) => f) // Filter out empty strings
+                .map((field) => JSON.parse(field) as LayerFieldType);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              setSelectedField(selectedFields as any);
+            }
+          } catch (error) {
+            console.error("Failed to parse field selection:", error);
           }
         }}
         onClose={() => {
@@ -140,9 +156,13 @@ const LayerFieldSelector = (props: SelectorProps) => {
         onBlur={() => setFocused(false)}
         startAdornment={
           <>
-            {selectedField && FieldTypeColors[selectedField.type] && (
-              <FieldTypeTag fieldType={selectedField.type}>{selectedField.type}</FieldTypeTag>
-            )}
+            {/* Only show field type tag for single select mode */}
+            {!props.multiple &&
+              selectedField &&
+              !Array.isArray(selectedField) &&
+              FieldTypeColors[selectedField.type] && (
+                <FieldTypeTag fieldType={selectedField.type}>{selectedField.type}</FieldTypeTag>
+              )}
           </>
         }
         endAdornment={

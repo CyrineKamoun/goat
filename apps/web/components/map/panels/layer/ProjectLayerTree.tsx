@@ -73,7 +73,7 @@ interface ProjectTreeItem extends BaseTreeItem {
 
 // 1. HELPER COMPONENTS
 
-const AddLayerButton = ({
+export const AddLayerButton = ({
   projectId,
   variant = "outlined",
   startIcon = true,
@@ -292,6 +292,8 @@ const castNodeToProjectLayer = (node: ProjectLayerTreeNode): ProjectLayer => {
     id: node.id,
     name: node.name,
     properties: node.properties || {},
+    // Map geometry_type from tree node to feature_layer_geometry_type expected by ProjectLayer
+    feature_layer_geometry_type: node.geometry_type as "point" | "line" | "polygon" | undefined,
   } as unknown as ProjectLayer;
 };
 
@@ -315,8 +317,11 @@ interface ProjectLayerTreeProps {
   onUpdateGroup?: (groupData: { name?: string; groupId?: number }) => Promise<void>;
   onDeleteGroup?: (groupData: { groupId?: number }) => Promise<void>;
   onLayerDuplicate?: (layerId: string) => Promise<void>;
+  /** Callback when a layer starts being dragged (for workflow canvas integration) */
+  onLayerDragStart?: (event: React.DragEvent, layer: ProjectLayer) => void;
   isLoading?: boolean;
   viewMode?: "edit" | "view";
+  hideActions?: boolean;
 }
 
 export const ProjectLayerTree = ({
@@ -328,14 +333,17 @@ export const ProjectLayerTree = ({
   onUpdateGroup,
   onDeleteGroup,
   onLayerDuplicate,
+  onLayerDragStart,
   isLoading,
   viewMode = "edit",
+  hideActions = false,
 }: ProjectLayerTreeProps) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
   const { map } = useMap();
   const dispatch = useAppDispatch();
-  const currentZoom = useAppSelector((state) => state.map.currentZoom);
+  // Only subscribe to currentZoom in view mode to avoid re-renders during map interaction in edit mode
+  const currentZoom = useAppSelector((state) => (viewMode === "view" ? state.map.currentZoom : undefined));
 
   const [items, setItems] = useState<ProjectTreeItem[]>([]);
   const [groupModal, setGroupModal] = useState<{
@@ -634,8 +642,8 @@ export const ProjectLayerTree = ({
           </Tooltip>
         )}
 
-        {/* Visibility - Don't show for table layers */}
-        {node.layer_type !== "table" && (
+        {/* Visibility - Don't show for table layers or when hideActions is true */}
+        {!hideActions && node.layer_type !== "table" && (
           <Tooltip title={nodeVisibility ? t("hide") : t("show")} placement="top">
             <IconButton size="small" onClick={(e) => handleVisibilityToggle(node, e)} sx={{ px: 0.5 }}>
               <Icon
@@ -646,8 +654,8 @@ export const ProjectLayerTree = ({
           </Tooltip>
         )}
 
-        {/* More Menu - Show if we have menu options */}
-        {menuOptions.length > 0 && (
+        {/* More Menu - Show if we have menu options and hideActions is false */}
+        {!hideActions && menuOptions.length > 0 && (
           <MoreMenu
             menuItems={menuOptions}
             disablePortal={false}
@@ -960,6 +968,17 @@ export const ProjectLayerTree = ({
           enableSelection={isEditMode}
           selectedIds={treeSelectedIds}
           onSelect={handleNodeClick}
+          onExternalDragStart={
+            onLayerDragStart
+              ? (event, item) => {
+                  // Only allow dragging layers, not groups
+                  if (item.data.type === "layer") {
+                    const layer = castNodeToProjectLayer(item.data);
+                    onLayerDragStart(event, layer);
+                  }
+                }
+              : undefined
+          }
           sx={{ width: "100%" }}
         />
       </Box>

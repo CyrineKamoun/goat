@@ -133,6 +133,11 @@ export default function EnumInput({ input, value, onChange, disabled, formValues
   const label = input.uiMeta?.label || input.title;
   const description = input.uiMeta?.description || input.description;
 
+  // Don't render if no items available (prevents MUI empty state loop)
+  if (enumItems.length === 0) {
+    return null;
+  }
+
   return (
     <Selector
       selectedItems={selectedItem}

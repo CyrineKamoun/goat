@@ -5,7 +5,7 @@ Clips features from an input layer using overlay layer geometry.
 
 import logging
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
 from pydantic import ConfigDict, Field
 
@@ -95,6 +95,20 @@ class ClipToolRunner(BaseToolRunner[ClipToolParams]):
     tool_class = ClipTool
     output_geometry_type = None  # Preserves input geometry type
     default_output_name = get_default_layer_name("clip", "en")
+
+    @classmethod
+    def predict_output_schema(
+        cls,
+        input_schemas: dict[str, dict[str, str]],
+        params: dict[str, Any],
+    ) -> dict[str, str]:
+        """Predict clip output schema.
+
+        Clip preserves all columns from the input layer.
+        Geometry type is preserved from input.
+        """
+        primary_input = input_schemas.get("input_layer_id", {})
+        return dict(primary_input)
 
     def process(
         self: Self, params: ClipToolParams, temp_dir: Path

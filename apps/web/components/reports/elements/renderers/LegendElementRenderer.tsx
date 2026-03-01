@@ -3,6 +3,8 @@
 import { Box, Stack, Typography } from "@mui/material";
 import React, { useMemo } from "react";
 
+import { rgbToHex } from "@/lib/utils/helpers";
+import type { RGBColor } from "@/types/map/color";
 import type { ProjectLayer } from "@/lib/validations/project";
 import type { ReportElement } from "@/lib/validations/reportLayout";
 
@@ -36,72 +38,10 @@ interface LegendElementRendererProps {
 }
 
 /**
- * Get simple layer color for layers without attribute-based styling
- */
-const getLayerSimpleColor = (layer: ProjectLayer): string | undefined => {
-  const props = layer.properties as Record<string, unknown>;
-
-  // For raster layers, they use their own style system
-  if (layer.type === "raster") {
-    return undefined;
-  }
-
-  // Check for fill color
-  if (props.color) {
-    if (Array.isArray(props.color)) {
-      return `rgb(${(props.color as number[]).join(",")})`;
-    }
-    return props.color as string;
-  }
-
-  // Check for stroke color
-  if (props.stroke_color) {
-    if (Array.isArray(props.stroke_color)) {
-      return `rgb(${(props.stroke_color as number[]).join(",")})`;
-    }
-    return props.stroke_color as string;
-  }
-
-  return "#666666"; // Default color
-};
-
-/**
- * Check if layer has attribute-based legend (needs expanded legend panel)
- */
-const hasExpandedLegend = (layer: ProjectLayer): boolean => {
-  const props = layer.properties as Record<string, unknown>;
-
-  // Check for raster with style
-  if (props.style) {
-    return true;
-  }
-
-  // Check for color mapping
-  if (props.color_field || props.stroke_color_field || props.marker_field) {
-    return true;
-  }
-
-  return false;
-};
-
-/**
- * Get geometry type for a layer
- */
-const getGeometryType = (layer: ProjectLayer): string => {
-  if (layer.type === "feature") {
-    return layer.feature_layer_geometry_type || "polygon";
-  }
-  if (layer.type === "raster") {
-    return "raster";
-  }
-  return "polygon";
-};
-
-/**
  * Legend Element Renderer for print reports
  *
  * Displays layer legends in a configurable multi-column layout.
- * Reuses the LayerLegendPanel component for consistent legend rendering.
+ * Uses the same legend logic as ProjectLayerTree for consistent rendering.
  */
 const LegendElementRenderer: React.FC<LegendElementRendererProps> = ({
   element,
@@ -189,7 +129,9 @@ const LegendElementRenderer: React.FC<LegendElementRendererProps> = ({
 };
 
 /**
- * Individual layer legend item
+ * Individual layer legend item.
+ * Mirrors the logic from ProjectLayerTree for deciding between
+ * simple icon vs expanded LayerLegendPanel.
  */
 interface LayerLegendItemProps {
   layer: ProjectLayer;
@@ -197,18 +139,63 @@ interface LayerLegendItemProps {
 }
 
 const LayerLegendItem: React.FC<LayerLegendItemProps> = ({ layer, showLayerName = true }) => {
-  const geometryType = getGeometryType(layer);
-  const hasExpanded = hasExpandedLegend(layer);
-  const simpleColor = getLayerSimpleColor(layer);
+  const props = layer.properties as Record<string, unknown>;
+  const geomType = layer.type === "feature"
+    ? (layer.feature_layer_geometry_type || "polygon")
+    : layer.type === "raster"
+      ? "raster"
+      : "polygon";
+
+  // Same check as ProjectLayerTree line 756
+  const hasComplexLegend = !!(props.color_field || props.stroke_color_field || props.marker_field);
+
+  // Raster legend check
+  const rasterStyle = props.style as { style_type?: string; categories?: unknown[]; color_map?: unknown[] } | undefined;
+  const hasRasterLegend =
+    layer.type === "raster" &&
+    rasterStyle &&
+    ((rasterStyle.style_type === "categories" && Array.isArray(rasterStyle.categories) && rasterStyle.categories.length > 0) ||
+      (rasterStyle.style_type === "color_range" && Array.isArray(rasterStyle.color_map) && rasterStyle.color_map.length > 0));
+
+  // Simple icon props (same logic as ProjectLayerTree lines 813-842)
+  const baseColor: string = props.color
+    ? Array.isArray(props.color) && (props.color as number[]).length >= 3
+      ? rgbToHex(props.color as RGBColor)
+      : Array.isArray(props.color)
+        ? `rgb(${(props.color as number[]).join(",")})`
+        : String(props.color)
+    : "#ccc";
+  const strokeColor: string | undefined = props.stroke_color
+    ? Array.isArray(props.stroke_color) && (props.stroke_color as number[]).length >= 3
+      ? rgbToHex(props.stroke_color as RGBColor)
+      : Array.isArray(props.stroke_color)
+        ? `rgb(${(props.stroke_color as number[]).join(",")})`
+        : String(props.stroke_color)
+    : undefined;
 
   return (
     <Box sx={{ minWidth: 0 }}>
-      {/* Layer name with simple icon for non-expanded legends */}
+      {/* Layer name with simple icon for non-complex legends */}
       {showLayerName && (
         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
-          {!hasExpanded && (
+          {!hasComplexLegend && !hasRasterLegend && (
             <Box sx={{ flexShrink: 0 }}>
-              <LayerIcon type={geometryType} color={simpleColor} />
+              <LayerIcon
+                type={geomType}
+                color={baseColor}
+                strokeColor={strokeColor}
+                filled={props.filled !== false}
+                iconUrl={
+                  !props.marker_field && props.custom_marker && (props.marker as Record<string, unknown>)?.url
+                    ? ((props.marker as Record<string, unknown>).url as string)
+                    : undefined
+                }
+                iconSource={
+                  !props.marker_field && props.custom_marker && (props.marker as Record<string, unknown>)?.source
+                    ? ((props.marker as Record<string, unknown>).source as "custom" | "library")
+                    : "library"
+                }
+              />
             </Box>
           )}
           <Typography
@@ -224,15 +211,37 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({ layer, showLayerName 
         </Stack>
       )}
 
-      {/* Expanded legend for attribute-based styling */}
-      {hasExpanded && (
-        <Box sx={{ pl: showLayerName ? 0 : 0 }}>
-          <LayerLegendPanel
-            properties={layer.properties as Record<string, unknown>}
-            geometryType={geometryType}
-          />
-        </Box>
+      {/* Legend caption */}
+      {!!(props.legend && (props.legend as Record<string, unknown>).caption) && (
+        <Typography variant="caption" fontWeight="bold" sx={{ display: "block", mb: 0.5 }}>
+          {String((props.legend as Record<string, unknown>).caption)}
+        </Typography>
       )}
+
+      {/* Complex feature legend - attribute-based styling */}
+      {hasComplexLegend && layer.type === "feature" && (
+        <LayerLegendPanel
+          properties={props}
+          geometryType={geomType}
+        />
+      )}
+
+      {/* Raster legend */}
+      {hasRasterLegend && (
+        <LayerLegendPanel
+          properties={props}
+          geometryType="raster"
+        />
+      )}
+
+      {/* Raster legend URLs */}
+      {layer.type === "raster" &&
+        layer.other_properties?.legend_urls &&
+        (layer.other_properties.legend_urls as string[]).map((url: string) => (
+          <Stack key={url} spacing={1} sx={{ mt: 0.5 }} direction="column">
+            <img src={url} alt="" style={{ width: "100%" }} />
+          </Stack>
+        ))}
     </Box>
   );
 };

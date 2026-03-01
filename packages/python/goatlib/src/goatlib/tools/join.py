@@ -221,6 +221,30 @@ class JoinToolParams(ScenarioSelectorMixin, ToolInputBase, BaseModel):
         ),
     )
 
+    @field_validator("attribute_relationships", mode="before")
+    @classmethod
+    def filter_incomplete_attribute_relationships(
+        cls, value: List[dict] | None
+    ) -> List[dict] | None:
+        """Filter out incomplete attribute relationship items (missing target_field or join_field).
+
+        The frontend may send items with only _id when the user adds a new item but
+        hasn't filled in the fields yet.
+        """
+        if value is None:
+            return None
+        if not isinstance(value, list):
+            return value
+        # Filter to only include items that have both required fields
+        filtered = [
+            item
+            for item in value
+            if isinstance(item, dict)
+            and item.get("target_field")
+            and item.get("join_field")
+        ]
+        return filtered if filtered else None
+
     # ===== Join Operation Settings =====
     join_type: JoinType = Field(
         JoinType.inner,  # Default to inner join
@@ -345,6 +369,62 @@ class JoinToolRunner(BaseToolRunner[JoinToolParams]):
     tool_class = JoinTool
     output_geometry_type = None  # Same as target layer
     default_output_name = get_default_layer_name("join", "en")
+
+    @classmethod
+    def predict_output_schema(
+        cls,
+        input_schemas: dict[str, dict[str, str]],
+        params: dict[str, Any],
+    ) -> dict[str, str]:
+        """Predict join output schema.
+
+        Join outputs:
+        - All columns from target layer
+        - Columns from join layer (may be prefixed to avoid conflicts)
+        - Statistics columns if calculate_statistics is enabled
+        - join_count column for one-to-one joins
+        """
+        target_layer = input_schemas.get("target_layer_id", {})
+        join_layer = input_schemas.get("join_layer_id", {})
+
+        columns = dict(target_layer)
+
+        # Add join layer columns (excluding geometry)
+        for col, dtype in join_layer.items():
+            if col == "geometry":
+                continue
+            out_col = cls.unique_column_name(columns, col)
+            columns[out_col] = dtype
+
+        # Add join_count for one-to-one joins
+        join_operation = params.get("join_operation", "one_to_one")
+        if join_operation == "one_to_one":
+            col_name = cls.unique_column_name(columns, "join_count")
+            columns[col_name] = "BIGINT"
+
+        # Add statistics columns if enabled
+        calculate_statistics = params.get("calculate_statistics", False)
+        field_statistics = (
+            params.get("field_statistics") or params.get("column_statistics") or []
+        )
+        if calculate_statistics and field_statistics:
+            for stat in field_statistics:
+                operation = stat.get("operation", "count")
+                field = stat.get("field")
+                result_name = stat.get("result_name")
+                # Use custom result_name if provided, otherwise generate default
+                if result_name:
+                    base_name = result_name
+                elif operation == "count":
+                    base_name = "count"
+                elif field:
+                    base_name = f"{field}_{operation}"
+                else:
+                    continue
+                col_name = cls.unique_column_name(columns, base_name)
+                columns[col_name] = "BIGINT" if operation == "count" else "DOUBLE"
+
+        return columns
 
     def process(
         self: Self, params: JoinToolParams, temp_dir: Path

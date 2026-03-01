@@ -30,17 +30,30 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import dynamic from "next/dynamic";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import type { ReactCodeMirrorRef } from "@uiw/react-codemirror";
+
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import type { ExpressionPreviewResult, FunctionDoc, ValidateExpressionResponse } from "@/lib/api/expressions";
+const SqlCodeEditor = dynamic(() => import("./SqlCodeEditor"), { ssr: false });
+
+import type {
+  ExpressionPreviewResult,
+  FunctionDoc,
+  PreviewSqlResponse,
+  ValidateExpressionResponse,
+  ValidateSqlResponse,
+} from "@/lib/api/expressions";
 import {
   FUNCTION_CATEGORIES,
   previewExpressionAsAggregation,
+  previewSql,
   useExpressionFunctions,
   validateExpression,
+  validateSql,
 } from "@/lib/api/expressions";
 
 // Operators definition for the formula builder
@@ -167,6 +180,30 @@ function getFieldTypeIcon(type: string): ICON_NAME {
   return ICON_NAME.DATABASE;
 }
 
+// SQL table definition for SQL mode
+export interface SqlTable {
+  alias: string; // e.g., "input_1", "buildings"
+  fields: FormulaField[]; // Columns in this table
+  layerName?: string; // Human-readable display name
+  layerId?: string; // Layer UUID for preview
+}
+
+/**
+ * Replace {{@variable_name}} references with type-appropriate SQL placeholders
+ * so that validation/preview queries don't fail on the {{ syntax.
+ */
+function substituteVariablePlaceholders(
+  sqlQuery: string,
+  vars?: { name: string; type: string }[]
+): string {
+  if (!vars || vars.length === 0) return sqlQuery;
+  return sqlQuery.replace(/\{\{@([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g, (_match, name: string) => {
+    const v = vars.find((v) => v.name === name);
+    if (!v) return "NULL";
+    return v.type === "number" ? "0" : "''";
+  });
+}
+
 // Main FormulaBuilder props
 export interface FormulaBuilderProps {
   open: boolean;
@@ -178,6 +215,9 @@ export interface FormulaBuilderProps {
   collectionId?: string; // For preview functionality
   title?: string;
   showGroupBy?: boolean;
+  mode?: "expression" | "sql"; // Default: "expression"
+  tables?: SqlTable[]; // For SQL mode: available tables with their columns
+  variables?: { name: string; type: string }[]; // Workflow variables for {{@var}} autocomplete
 }
 
 export default function FormulaBuilder({
@@ -190,17 +230,24 @@ export default function FormulaBuilder({
   collectionId,
   title,
   showGroupBy = true,
+  mode = "expression",
+  tables,
+  variables,
 }: FormulaBuilderProps) {
   const { t } = useTranslation("common");
   const inputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<ReactCodeMirrorRef>();
+  const isSqlMode = mode === "sql";
 
   // State
   const [expression, setExpression] = useState(initialExpression);
   const [functionSearch, setFunctionSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("fields");
+  const [selectedCategory, setSelectedCategory] = useState<string>(isSqlMode ? "tables" : "fields");
   const [selectedFunction, setSelectedFunction] = useState<FunctionDoc | null>(null);
   const [validation, setValidation] = useState<ValidateExpressionResponse | null>(null);
+  const [sqlValidation, setSqlValidation] = useState<ValidateSqlResponse | null>(null);
   const [preview, setPreview] = useState<ExpressionPreviewResult | null>(null);
+  const [sqlPreview, setSqlPreview] = useState<PreviewSqlResponse | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -208,6 +255,7 @@ export default function FormulaBuilder({
   const [groupByColumn, setGroupByColumn] = useState<string>("");
   const [hoveredOperator, setHoveredOperator] = useState<(typeof OPERATORS)[number] | null>(null);
   const [hoveredField, setHoveredField] = useState<FormulaField | null>(null);
+  const [expandedTable, setExpandedTable] = useState<string | null>(tables?.[0]?.alias ?? null);
 
   // Fetch functions only when dialog is open
   const {
@@ -221,17 +269,37 @@ export default function FormulaBuilder({
     return fields.filter((f) => !f.type.toLowerCase().includes("geom"));
   }, [fields]);
 
-  // Reset state when dialog opens
+  // CodeMirror schema for SQL autocomplete
+  const cmSchema = useMemo(() => {
+    if (!tables) return {};
+    const schema: Record<string, string[]> = {};
+    for (const table of tables) {
+      schema[table.alias] = table.fields.map((f) => f.name);
+    }
+    return schema;
+  }, [tables]);
+
+  // Track dialog open/close transitions
+  const prevOpenRef = useRef(false);
+
+  // Reset state only when dialog transitions from closed to open
+  // (not on every tables/props change while dialog is already open)
   useEffect(() => {
-    if (open) {
+    if (open && !prevOpenRef.current) {
       setExpression(initialExpression);
       setValidation(null);
+      setSqlValidation(null);
       setPreview(null);
+      setSqlPreview(null);
       setSelectedFunction(null);
       setActiveTab(0);
       setGroupByColumn(initialGroupByColumn);
+      setSelectedCategory(isSqlMode ? "tables" : "fields");
+      setExpandedTable(tables?.[0]?.alias ?? null);
+      setCursorPosition(initialExpression.length);
     }
-  }, [open, initialExpression, initialGroupByColumn]);
+    prevOpenRef.current = open;
+  }, [open, initialExpression, initialGroupByColumn, isSqlMode, tables]);
 
   // Filter functions by search (across all categories) and also filter fields
   const filteredFunctionsByCategory = useMemo(() => {
@@ -270,19 +338,38 @@ export default function FormulaBuilder({
     if (!allFunctions) return [];
 
     switch (selectedCategory) {
+      case "tables":
+        // SQL mode: return tables as groups (handled separately in render)
+        return [];
       case "fields":
         return filteredFields.map((f) => ({ type: "field" as const, data: f }));
       case "operators":
         return OPERATORS.map((op) => ({ type: "operator" as const, data: op }));
-      default:
+      default: {
         // Function categories
         const funcs = filteredFunctionsByCategory[selectedCategory] || [];
         return funcs.map((f) => ({ type: "function" as const, data: f }));
+      }
     }
   }, [selectedCategory, filteredFields, filteredFunctionsByCategory, allFunctions]);
 
   // Category list for sidebar
   const categories = useMemo(() => {
+    if (isSqlMode) {
+      const cats = [
+        { key: "tables", label: t("tables"), count: tables?.length || 0 },
+        { key: "operators", label: t("operators"), count: OPERATORS.length },
+      ];
+      // Add function categories
+      Object.entries(FUNCTION_CATEGORIES).forEach(([key, { labelKey }]) => {
+        const count = allFunctions?.[key]?.length || 0;
+        if (count > 0) {
+          cats.push({ key, label: t(labelKey), count });
+        }
+      });
+      return cats;
+    }
+
     const cats = [
       { key: "fields", label: t("fields"), count: fields.length },
       { key: "operators", label: t("operators"), count: OPERATORS.length },
@@ -295,19 +382,32 @@ export default function FormulaBuilder({
       }
     });
     return cats;
-  }, [fields.length, allFunctions, t]);
+  }, [fields.length, allFunctions, t, isSqlMode, tables]);
 
   // Insert text at cursor position
   const insertAtCursor = useCallback(
     (text: string) => {
+      // SQL mode: use CodeMirror's dispatch API
+      if (isSqlMode && editorRef.current?.view) {
+        const view = editorRef.current.view;
+        const { from } = view.state.selection.main;
+        view.dispatch(
+          view.state.update({
+            changes: { from, insert: text },
+            selection: { anchor: from + text.length },
+          })
+        );
+        view.focus();
+        return;
+      }
+
+      // Expression mode: existing logic
       const before = expression.slice(0, cursorPosition);
       const after = expression.slice(cursorPosition);
       const newExpression = before + text + after;
       setExpression(newExpression);
-      // Move cursor to end of inserted text
       const newPosition = cursorPosition + text.length;
       setCursorPosition(newPosition);
-      // Focus and set selection
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus();
@@ -315,7 +415,7 @@ export default function FormulaBuilder({
         }
       }, 0);
     },
-    [expression, cursorPosition]
+    [expression, cursorPosition, isSqlMode]
   );
 
   // Insert field reference
@@ -382,6 +482,40 @@ export default function FormulaBuilder({
   const handleValidate = useCallback(async () => {
     if (!expression.trim()) {
       setValidation(null);
+      setSqlValidation(null);
+      return;
+    }
+
+    // SQL mode validation
+    if (isSqlMode) {
+      setIsValidating(true);
+      try {
+        // Build table schemas from tables prop
+        const tableSchemas: Record<string, Record<string, string>> = {};
+        if (tables) {
+          for (const table of tables) {
+            const colTypes: Record<string, string> = {};
+            for (const field of table.fields) {
+              colTypes[field.name] = field.type;
+            }
+            tableSchemas[table.alias] = colTypes;
+          }
+        }
+
+        const result = await validateSql({
+          sql_query: substituteVariablePlaceholders(expression, variables),
+          table_schemas: tableSchemas,
+        });
+        setSqlValidation(result);
+      } catch (error) {
+        setSqlValidation({
+          valid: false,
+          errors: [String(error)],
+          columns: {},
+        });
+      } finally {
+        setIsValidating(false);
+      }
       return;
     }
 
@@ -431,11 +565,103 @@ export default function FormulaBuilder({
     } finally {
       setIsValidating(false);
     }
-  }, [expression, columnNames, fields, groupByColumn, hasAggregateFunction, t]);
+  }, [expression, columnNames, fields, groupByColumn, hasAggregateFunction, t, isSqlMode, tables, variables]);
 
   // Preview expression using aggregation-stats endpoint
   const handlePreview = useCallback(async () => {
-    if (!expression.trim() || !collectionId) {
+    if (!expression.trim()) {
+      setPreview(null);
+      setSqlPreview(null);
+      return;
+    }
+
+    // SQL mode preview
+    if (isSqlMode) {
+      if (!tables || tables.length === 0) {
+        setSqlPreview(null);
+        return;
+      }
+
+      setIsPreviewing(true);
+      try {
+        // Build layers map from tables
+        const layersMap: Record<string, string> = {};
+        for (const table of tables) {
+          if (table.layerId) {
+            layersMap[table.alias] = table.layerId;
+          }
+        }
+
+        if (Object.keys(layersMap).length === 0) {
+          // No real layer data available — fall back to schema-based preview.
+          // Build table_schemas from table fields and use validateSql to predict output columns.
+          const tableSchemas: Record<string, Record<string, string>> = {};
+          for (const table of tables) {
+            if (table.fields.length > 0) {
+              const colMap: Record<string, string> = {};
+              for (const f of table.fields) {
+                colMap[f.name] = f.type;
+              }
+              tableSchemas[table.alias] = colMap;
+            }
+          }
+
+          if (Object.keys(tableSchemas).length === 0) {
+            setSqlPreview({
+              success: false,
+              columns: [],
+              rows: [],
+              error: "No input schemas available. Connect dataset nodes first.",
+            });
+            return;
+          }
+
+          const validation = await validateSql({
+            sql_query: substituteVariablePlaceholders(expression, variables),
+            table_schemas: tableSchemas,
+          });
+
+          if (validation.valid) {
+            setSqlPreview({
+              success: true,
+              columns: Object.entries(validation.columns).map(([name, type]) => ({
+                name,
+                type,
+              })),
+              rows: [],
+            });
+          } else {
+            setSqlPreview({
+              success: false,
+              columns: [],
+              rows: [],
+              error: validation.errors.join("; "),
+            });
+          }
+          return;
+        }
+
+        const result = await previewSql({
+          sql_query: substituteVariablePlaceholders(expression, variables),
+          layers: layersMap,
+          limit: 10,
+        });
+        setSqlPreview(result);
+      } catch (error) {
+        setSqlPreview({
+          success: false,
+          columns: [],
+          rows: [],
+          error: String(error),
+        });
+      } finally {
+        setIsPreviewing(false);
+      }
+      return;
+    }
+
+    // Expression mode
+    if (!collectionId) {
       setPreview(null);
       return;
     }
@@ -458,30 +684,45 @@ export default function FormulaBuilder({
     } finally {
       setIsPreviewing(false);
     }
-  }, [expression, collectionId, groupByColumn]);
+  }, [expression, collectionId, groupByColumn, isSqlMode, tables]);
 
-  // Debounced validation - re-run when expression or groupByColumn changes
+  // Stable refs so effects only fire on actual value changes, not callback identity
+  const handleValidateRef = useRef(handleValidate);
+  handleValidateRef.current = handleValidate;
+  const handlePreviewRef = useRef(handlePreview);
+  handlePreviewRef.current = handlePreview;
+
+  // Debounced validation - re-run only when expression or groupByColumn changes
   useEffect(() => {
     const timer = setTimeout(() => {
       if (expression.trim()) {
-        handleValidate();
+        handleValidateRef.current();
       } else {
         setValidation(null);
+        setSqlValidation(null);
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [expression, groupByColumn, handleValidate]);
+  }, [expression, groupByColumn]);
+
+  // Computed validation state (works for both modes)
+  const isValid = isSqlMode ? sqlValidation?.valid : validation?.valid;
+  const validationErrors = isSqlMode
+    ? sqlValidation?.errors?.map((e) => ({ message: e, code: "SQL_ERROR" })) || []
+    : validation?.errors || [];
 
   // Auto-preview when switching to Preview tab or when groupByColumn changes
   useEffect(() => {
-    if (activeTab === 1 && expression.trim() && collectionId && validation?.valid !== false) {
-      handlePreview();
+    if (activeTab === 1 && expression.trim() && isValid !== false) {
+      if (isSqlMode || collectionId) {
+        handlePreviewRef.current();
+      }
     }
-  }, [activeTab, expression, collectionId, validation?.valid, groupByColumn, handlePreview]);
+  }, [activeTab, expression, collectionId, isValid, groupByColumn, isSqlMode]);
 
   // Handle apply
   const handleApply = () => {
-    if (validation?.valid || !validation) {
+    if (isValid || isValid === undefined) {
       onApply(expression, groupByColumn || undefined);
       onClose();
     }
@@ -503,17 +744,21 @@ export default function FormulaBuilder({
     if (!expression.trim()) {
       return null;
     }
-    if (validation?.valid) {
+    if (isValid) {
       return (
-        <Tooltip title={t("expression_valid")}>
-          <Icon iconName={ICON_NAME.CIRCLECHECK} fontSize="small" htmlColor="#4caf50" />
+        <Tooltip title={isSqlMode ? t("sql_valid") : t("expression_valid")}>
+          <span style={{ display: "flex" }}>
+            <Icon iconName={ICON_NAME.CIRCLECHECK} fontSize="small" htmlColor="#4caf50" />
+          </span>
         </Tooltip>
       );
     }
-    if (validation?.valid === false) {
+    if (isValid === false) {
       return (
-        <Tooltip title={validation.errors[0]?.message || t("expression_invalid")}>
-          <Icon iconName={ICON_NAME.XCLOSE} fontSize="small" htmlColor="#f44336" />
+        <Tooltip title={validationErrors[0]?.message || t("expression_invalid")}>
+          <span style={{ display: "flex" }}>
+            <Icon iconName={ICON_NAME.XCLOSE} fontSize="small" htmlColor="#f44336" />
+          </span>
         </Tooltip>
       );
     }
@@ -532,40 +777,42 @@ export default function FormulaBuilder({
           minHeight: 600,
         },
       }}>
-      <DialogTitle sx={{ pb: 1 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Icon iconName={ICON_NAME.CODE} />
-            <Typography variant="h6">{title || t("formula_builder")}</Typography>
-          </Stack>
-          <IconButton onClick={onClose} size="small">
-            <Icon iconName={ICON_NAME.CLOSE} fontSize="small" />
-          </IconButton>
-        </Stack>
-      </DialogTitle>
+      <DialogTitle>{title || t("formula_builder")}</DialogTitle>
 
       <DialogContent dividers sx={{ p: 2, pb: 2, overflow: "hidden" }}>
         <Stack spacing={2}>
-          {/* Expression Input with inline validation */}
+          {/* Expression/SQL Input with inline validation */}
           <Box sx={{ position: "relative" }}>
-            <TextField
-              inputRef={inputRef}
-              fullWidth
-              multiline
-              rows={3}
-              value={expression}
-              onChange={(e) => setExpression(e.target.value)}
-              onSelect={handleInputSelect}
-              onClick={handleInputSelect}
-              placeholder={t("enter_expression_placeholder")}
-              sx={{
-                "& .MuiInputBase-input": {
-                  fontFamily: "monospace",
-                  fontSize: "0.875rem",
-                },
-              }}
-              error={validation?.valid === false}
-            />
+            {isSqlMode ? (
+              <SqlCodeEditor
+                value={expression}
+                onChange={setExpression}
+                schema={cmSchema}
+                placeholder={t("sql_placeholder")}
+                error={isValid === false}
+                editorRef={editorRef}
+                variables={variables}
+              />
+            ) : (
+              <TextField
+                inputRef={inputRef}
+                fullWidth
+                multiline
+                rows={3}
+                value={expression}
+                onChange={(e) => setExpression(e.target.value)}
+                onSelect={handleInputSelect}
+                onClick={handleInputSelect}
+                placeholder={t("enter_expression_placeholder")}
+                sx={{
+                  "& .MuiInputBase-input": {
+                    fontFamily: "monospace",
+                    fontSize: "0.875rem",
+                  },
+                }}
+                error={isValid === false}
+              />
+            )}
             {/* Validation indicator in top-right corner */}
             <Box
               sx={{
@@ -574,26 +821,20 @@ export default function FormulaBuilder({
                 right: 8,
                 display: "flex",
                 alignItems: "center",
+                zIndex: 5,
               }}>
               <ValidationIndicator />
             </Box>
           </Box>
 
-          {/* Error message below editor (only when there's an error) */}
-          {validation?.valid === false && !isValidating && (
-            <Alert severity="error" sx={{ py: 0.5 }}>
-              {validation.errors.map((err, i) => (
-                <Box key={i}>
-                  <Typography variant="caption">{err.message}</Typography>
-                  {err.suggestion && (
-                    <Typography variant="caption" color="primary" sx={{ display: "block" }}>
-                      {err.suggestion}
-                    </Typography>
-                  )}
-                </Box>
-              ))}
-            </Alert>
-          )}
+          {/* Validation error line (fixed height to avoid layout shift, full details on hover) */}
+          <Box sx={{ minHeight: 20, display: "flex", alignItems: "center" }}>
+            {isValid === false && !isValidating && validationErrors.length > 0 && (
+              <Typography variant="caption" color="error.main" noWrap sx={{ maxWidth: "100%" }}>
+                {validationErrors[0]?.message}
+              </Typography>
+            )}
+          </Box>
 
           {/* Tabs: Build / Preview */}
           <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
@@ -689,6 +930,90 @@ export default function FormulaBuilder({
                           {t("error_loading_functions")}
                         </Typography>
                       </Box>
+                    ) : selectedCategory === "tables" && isSqlMode && tables ? (
+                      /* SQL mode: show tables as expandable groups */
+                      <List dense disablePadding>
+                        {tables.map((table) => {
+                          const isExpanded = expandedTable === table.alias;
+                          const filteredTableFields = functionSearch
+                            ? table.fields.filter((f) =>
+                                f.name.toLowerCase().includes(functionSearch.toLowerCase())
+                              )
+                            : table.fields;
+
+                          return (
+                            <React.Fragment key={table.alias}>
+                              <ListItem disablePadding>
+                                <ListItemButton
+                                  onClick={() => setExpandedTable(isExpanded ? null : table.alias)}
+                                  sx={{
+                                    py: 0.75,
+                                    px: 1.5,
+                                    bgcolor: isExpanded ? "action.selected" : "transparent",
+                                  }}
+                                  dense>
+                                  <ListItemIcon sx={{ minWidth: 24 }}>
+                                    <Icon
+                                      iconName={ICON_NAME.TABLE}
+                                      sx={{ fontSize: "1rem" }}
+                                      color="primary"
+                                    />
+                                  </ListItemIcon>
+                                  <ListItemText
+                                    primary={
+                                      <Typography variant="body2" fontWeight="bold" fontFamily="monospace" fontSize="0.8rem">
+                                        {table.alias}
+                                      </Typography>
+                                    }
+                                    secondary={table.layerName ? (
+                                      <Typography variant="caption" color="text.secondary" noWrap>
+                                        {table.layerName}
+                                      </Typography>
+                                    ) : undefined}
+                                  />
+                                  <Typography variant="caption" color="text.secondary">
+                                    {table.fields.length}
+                                  </Typography>
+                                </ListItemButton>
+                              </ListItem>
+                              {isExpanded && filteredTableFields.map((field) => (
+                                <ListItem key={`${table.alias}.${field.name}`} disablePadding>
+                                  <ListItemButton
+                                    onClick={() => insertField(`${table.alias}.${field.name}`)}
+                                    onMouseEnter={() => setHoveredField(field)}
+                                    onMouseLeave={() => setHoveredField(null)}
+                                    sx={{ py: 0.25, pl: 4, pr: 1.5 }}
+                                    dense>
+                                    <ListItemIcon sx={{ minWidth: 24 }}>
+                                      <Icon
+                                        iconName={getFieldTypeIcon(field.type)}
+                                        sx={{ fontSize: "0.875rem" }}
+                                        color="action"
+                                      />
+                                    </ListItemIcon>
+                                    <ListItemText
+                                      primary={
+                                        <Typography variant="body2" fontFamily="monospace" fontSize="0.75rem">
+                                          {field.name}
+                                        </Typography>
+                                      }
+                                    />
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        fontSize: "0.65rem",
+                                        color: "text.disabled",
+                                        fontFamily: "monospace",
+                                      }}>
+                                      {field.type}
+                                    </Typography>
+                                  </ListItemButton>
+                                </ListItem>
+                              ))}
+                            </React.Fragment>
+                          );
+                        })}
+                      </List>
                     ) : categoryItems.length === 0 ? (
                       <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
                         {t("no_items_found")}
@@ -968,8 +1293,8 @@ export default function FormulaBuilder({
                 </Paper>
               </Stack>
 
-              {/* Group By Panel - single select */}
-              {showGroupBy && (
+              {/* Group By Panel - single select (hidden in SQL mode) */}
+              {showGroupBy && !isSqlMode && (
                 <Paper variant="outlined" sx={{ p: 1.5 }}>
                   <Stack direction="row" spacing={2} alignItems="center">
                     <Stack
@@ -1044,7 +1369,89 @@ export default function FormulaBuilder({
                 </Box>
               )}
 
-              {!isPreviewing && preview && (
+              {/* SQL mode preview - tabular results */}
+              {!isPreviewing && isSqlMode && sqlPreview && (
+                <>
+                  {sqlPreview.success && sqlPreview.columns.length > 0 ? (
+                    <Stack spacing={2}>
+                      {sqlPreview.total_count !== null && sqlPreview.total_count !== undefined && (
+                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
+                          {t("total_rows")}: {sqlPreview.total_count}
+                        </Typography>
+                      )}
+                      <Paper variant="outlined" sx={{ overflow: "auto", maxHeight: 300 }}>
+                        <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem", fontFamily: "monospace" }}>
+                          <Box component="thead">
+                            <Box component="tr" sx={{ bgcolor: "action.hover" }}>
+                              {sqlPreview.columns.map((col) => (
+                                <Box
+                                  component="th"
+                                  key={col.name}
+                                  sx={{
+                                    px: 1.5,
+                                    py: 0.75,
+                                    textAlign: "left",
+                                    borderBottom: 1,
+                                    borderColor: "divider",
+                                    fontWeight: "bold",
+                                    whiteSpace: "nowrap",
+                                  }}>
+                                  {col.name}
+                                  <Typography
+                                    component="span"
+                                    variant="caption"
+                                    sx={{ display: "block", color: "text.secondary", fontSize: "0.65rem" }}>
+                                    {col.type}
+                                  </Typography>
+                                </Box>
+                              ))}
+                            </Box>
+                          </Box>
+                          <Box component="tbody">
+                            {sqlPreview.rows.map((row, rowIdx) => (
+                              <Box
+                                component="tr"
+                                key={rowIdx}
+                                sx={{ bgcolor: rowIdx % 2 === 0 ? "transparent" : "action.hover" }}>
+                                {sqlPreview.columns.map((col) => (
+                                  <Box
+                                    component="td"
+                                    key={col.name}
+                                    sx={{
+                                      px: 1.5,
+                                      py: 0.5,
+                                      borderBottom: 1,
+                                      borderColor: "divider",
+                                      maxWidth: 200,
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}>
+                                    {row.values[col.name] !== null && row.values[col.name] !== undefined
+                                      ? String(row.values[col.name])
+                                      : <Typography component="span" variant="caption" color="text.disabled">NULL</Typography>
+                                    }
+                                  </Box>
+                                ))}
+                              </Box>
+                            ))}
+                          </Box>
+                        </Box>
+                      </Paper>
+                      <Typography variant="caption" color="text.secondary">
+                        {t("showing_rows", { count: sqlPreview.rows.length })}
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Alert severity="error">
+                      <Typography variant="body2">{sqlPreview.error || t("no_results")}</Typography>
+                    </Alert>
+                  )}
+                </>
+              )}
+
+              {/* Expression mode preview */}
+              {!isPreviewing && !isSqlMode && preview && (
                 <>
                   {!preview.error ? (
                     <Stack spacing={2}>
@@ -1163,18 +1570,21 @@ export default function FormulaBuilder({
       </DialogContent>
 
       <DialogActions
+        disableSpacing
         sx={{
-          px: 3,
-          py: 2,
+          mt: 2,
+          pb: 2,
         }}>
-        <Stack direction="row" spacing={2}>
-          <Button onClick={onClose} color="inherit" variant="outlined">
+        <Button onClick={onClose} variant="text">
+          <Typography variant="body2" fontWeight="bold">
             {t("cancel")}
-          </Button>
-          <Button onClick={handleApply} variant="contained" disabled={validation?.valid === false}>
+          </Typography>
+        </Button>
+        <Button onClick={handleApply} variant="text" color="primary" disabled={isValid === false}>
+          <Typography variant="body2" fontWeight="bold" color="inherit">
             {t("apply")}
-          </Button>
-        </Stack>
+          </Typography>
+        </Button>
       </DialogActions>
     </Dialog>
   );
