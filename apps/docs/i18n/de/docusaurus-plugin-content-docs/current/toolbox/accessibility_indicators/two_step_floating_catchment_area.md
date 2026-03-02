@@ -32,8 +32,8 @@ Sie können den **Routing-Modus**, **Ziele-Layer** (mit Kapazitätsfeld), **Beda
 
 - Der **2SFCA-Typ** steuert, wie die Distanzgewichtung angewendet wird:
   - **Standard 2SFCA** verwendet binäre Einzugsgebiete (drinnen oder draußen) – alle Standorte innerhalb des Reisezeitlimits werden gleich gewichtet, unabhängig von ihrer tatsächlichen Entfernung zu den Einrichtungen. Dies liefert klare, einfache Angebot-Nachfrage-Verhältnisse.
-  - **Enhanced 2SFCA (E2SFCA)** gewichtet mittels einer Impedanzfunktion in beiden Berechnungsschritten, wodurch ein realistischer Distanzabfall entsteht, bei dem näher gelegene Einrichtungen stärker zur Erreichbarkeit beitragen als entfernte.
-  - **Modified 2SFCA (M2SFCA)** verwendet quadrierte Impedanzgewichte im zweiten Schritt, was eine noch stärkere Bevorzugung von Nähe erzeugt. Diese Variante betont stark nahegelegene Einrichtungen, berücksichtigt aber immer noch entfernte Optionen, was ideal ist, wenn Reisekomfort entscheidend ist.
+  - **Enhanced 2SFCA (E2SFCA)** gewichtet mittels einer Widerstandsfunktion in beiden Berechnungsschritten, wodurch ein realistischer Distanzabfall entsteht, bei dem näher gelegene Einrichtungen stärker zur Erreichbarkeit beitragen als entfernte.
+  - **Modified 2SFCA (M2SFCA)** verwendet quadrierte Widerstandsgewichte im zweiten Schritt, was eine noch stärkere Bevorzugung von Nähe erzeugt. Diese Variante betont stark nahegelegene Einrichtungen, berücksichtigt aber immer noch entfernte Optionen, was ideal ist, wenn Reisekomfort entscheidend ist.
 
 **Wesentlicher Unterschied:** Im Gegensatz zur *Gravitationsbasierten Heatmap*, die die allgemeine Erreichbarkeit von Zielen misst, modelliert die *2SFCA Heatmap* explizit das **Gleichgewicht von Angebot und Nachfrage** – und zeigt, wo die Kapazität im Verhältnis zur bedürftigen Bevölkerung ausreichend oder unzureichend ist.
 
@@ -137,17 +137,17 @@ Dies ist die einfachste Variante und eignet sich gut, wenn Sie ein direktes Ange
 
 <TabItem value="e2sfca" label="Enhanced 2SFCA (E2SFCA)" className="tabItemBox">
 
-Die Enhanced 2SFCA-Methode fügt eine **Reisewiderstandsgewichtung** unter Verwendung einer Impedanzfunktion hinzu. In beiden Schritten werden Interaktionen danach gewichtet, wie weit Einrichtung und Bevölkerung voneinander entfernt sind – nähere Standorte erhalten ein höheres Gewicht. Dies führt zu realistischeren Ergebnissen und spiegelt wider, dass Menschen eher nahegelegene Einrichtungen nutzen.
+Die Enhanced 2SFCA-Methode fügt eine **Reisewiderstandsgewichtung** unter Verwendung einer Widerstandsfunktion hinzu. In beiden Schritten werden Interaktionen danach gewichtet, wie weit Einrichtung und Bevölkerung voneinander entfernt sind – nähere Standorte erhalten ein höheres Gewicht. Dies führt zu realistischeren Ergebnissen und spiegelt wider, dass Menschen eher nahegelegene Einrichtungen nutzen.
 
-Erfordert die Auswahl einer **Impedanzfunktion** und eines **Sensitivitätswertes**.
+Erfordert die Auswahl einer **Widerstandsfunktion** und eines **Sensitivitätswertes**.
 
 </TabItem>
 
 <TabItem value="m2sfca" label="Modified 2SFCA (M2SFCA)" className="tabItemBox">
 
-Die Modified 2SFCA-Methode wendet **quadrierte Impedanzgewichte** an, was einen noch stärkeren Distanzabfalleffekt erzeugt. Während Enhanced 2SFCA die Nähe mit einem relativen Gewichtungsansatz berücksichtigt, bezieht Modified 2SFCA durch Quadrieren der Impedanzgewichte auch die absolute Distanzwirkung mit ein.
+Die Modified 2SFCA-Methode wendet **quadrierte Widerstandsgewichte** an, was einen noch stärkeren Distanzabfalleffekt erzeugt. Während Enhanced 2SFCA die Nähe mit einem relativen Gewichtungsansatz berücksichtigt, bezieht Modified 2SFCA durch Quadrieren der Widerstandsgewichte auch die absolute Distanzwirkung mit ein.
 
-Erfordert die Auswahl einer **Impedanzfunktion** und eines **Sensitivitätswertes**.
+Erfordert die Auswahl einer **Widerstandsfunktion** und eines **Sensitivitätswertes**.
 
 </TabItem>
 
@@ -155,14 +155,14 @@ Erfordert die Auswahl einer **Impedanzfunktion** und eines **Sensitivitätswerte
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Wenn Sie <b>E2SFCA</b> oder <b>M2SFCA</b> verwenden, wählen Sie die <code>Impedanzfunktion</code> für die Distanzgewichtung.</div>
+  <div class="content">Wenn Sie <b>E2SFCA</b> oder <b>M2SFCA</b> verwenden, wählen Sie die <code>Widerstandsfunktion</code> für die Distanzgewichtung.</div>
 </div>
 
 <Tabs>
 
 <TabItem value="gaussian" label="Gauß" default className="tabItemBox">
 
-Berechnet Distanzgewichte unter Verwendung einer Gaußschen (glockenförmigen) Kurve. Die Erreichbarkeit nimmt für kurze Reisezeiten langsam ab und fällt jenseits eines bestimmten Schwellenwerts schnell ab. Dies ist die am häufigsten verwendete Impedanzfunktion. Details siehe [Technische Details](#calculation).
+Berechnet Distanzgewichte unter Verwendung einer Gaußschen (glockenförmigen) Kurve. Die Erreichbarkeit nimmt für kurze Reisezeiten langsam ab und fällt jenseits eines bestimmten Schwellenwerts schnell ab. Dies ist die am häufigsten verwendete Widerstandsfunktion. Details siehe [Technische Details](#calculation).
 
 </TabItem>
 
@@ -223,7 +223,7 @@ Benötigen Sie Hilfe bei der Auswahl einer geeigneten Reisezeitgrenze für versc
 
 <div class="step">
   <div class="step-number">11</div>
-  <div class="content">Wenn Sie <b>E2SFCA</b> oder <b>M2SFCA</b> verwenden, geben Sie einen <code>Sensitivitätswert</code> an, um zu steuern, wie schnell die Impedanzfunktion mit der Entfernung abfällt.</div>
+  <div class="content">Wenn Sie <b>E2SFCA</b> oder <b>M2SFCA</b> verwenden, geben Sie einen <code>Sensitivitätswert</code> an, um zu steuern, wie schnell die Widerstandsfunktion mit der Entfernung abfällt.</div>
 </div>
 
 <div class="step">
@@ -300,7 +300,7 @@ Wobei:
 - *D<sub>k</sub>* = Nachfrage (Bevölkerung) am Standort *k*
 - *d<sub>kj</sub>* = Reisezeit vom Standort *k* zur Einrichtung *j*
 - *d<sub>0</sub>* = Reisezeitlimit (maximales Einzugsgebiet)
-- *f(d<sub>kj</sub>)* = Impedanzfunktion (Distanzgewicht)
+- *f(d<sub>kj</sub>)* = Widerstandsfunktion (Distanzgewicht)
 
 #### Schritt 2 — Kumulative Erreichbarkeit
 
@@ -315,11 +315,11 @@ Für jede Rasterzelle *i* werden die Kapazitäts-Nachfrage-Verhältnisse aller e
 Wobei:
 - *A<sub>i</sub>* = Erreichbarkeit am Standort *i*
 - *R<sub>j</sub>* = Kapazitäts-Nachfrage-Verhältnis der Einrichtung *j* (aus Schritt 1)
-- *f(d<sub>ij</sub>)* = Gewicht der Impedanzfunktion
+- *f(d<sub>ij</sub>)* = Gewicht der Widerstandsfunktion
 
 ### Vergleich der Varianten
 
-Die verschiedenen Berechnungsmethoden verändern, wie Distanz wahrgenommen und gemessen wird, wie in den Beispielen unten dargestellt. Jedes Szenario zeigt eine Einrichtung mit **100 Kapazitätseinheiten** (angezeigt durch die zentrale Standortmarkierung), die Rasterzellen mit jeweils **50 Nachfrageeinheiten** versorgt. Wir nehmen eine **maximale Reisezeit von 5 Minuten** an, wobei kleine Pfeile **1 Minute Reisezeit** und große Pfeile **2 Minuten Reisezeit** darstellen. Für die Enhanced- und Modified-Varianten wird eine **lineare Impedanzfunktion** ($f(d) = 1 - d/5$) verwendet.
+Die verschiedenen Berechnungsmethoden verändern, wie Distanz wahrgenommen und gemessen wird, wie in den Beispielen unten dargestellt. Jedes Szenario zeigt eine Einrichtung mit **100 Kapazitätseinheiten** (angezeigt durch die zentrale Standortmarkierung), die Rasterzellen mit jeweils **50 Nachfrageeinheiten** versorgt. Wir nehmen eine **maximale Reisezeit von 5 Minuten** an, wobei kleine Pfeile **1 Minute Reisezeit** und große Pfeile **2 Minuten Reisezeit** darstellen. Für die Enhanced- und Modified-Varianten wird eine **lineare Widerstandsfunktion** ($f(d) = 1 - d/5$) verwendet.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
 <img src={require('/img/toolbox/accessibility_indicators/heatmaps/two_step_floating_catchment_area/2sfca_variants_comparaison.png').default} alt="Vergleich von 2SFCA-Varianten, der Effekte der Distanzgewichtung zeigt" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
@@ -329,12 +329,12 @@ Die verschiedenen Berechnungsmethoden verändern, wie Distanz wahrgenommen und g
 
 - Die **Enhanced 2SFCA** führt eine **Reisewiderstandsgewichtung** ein, die eine Differenzierung der Erreichbarkeit basierend auf der Distanz erzeugt, mit einer **höheren Erreichbarkeit** (Wert von 1,1) für nähere Zellen. Zellen, die gleich weit von Einrichtungen entfernt sind, erhalten jedoch unabhängig von der absoluten Distanz dieselbe Erreichbarkeit (z. B. erhalten zwei Zellen, die beide 1 Minute entfernt sind, oder beide 2 Minuten entfernt sind, alle **1**).
 
-- Die **Modified 2SFCA** wendet in Schritt 2 **quadrierte Impedanzgewichte** an, was stärkere Distanzstrafen mit Werten wie **0,9** und **0,5** erzeugt (verglichen mit 1,1 und 0,9 bei E2SFCA für ähnliche Positionen). Sie berücksichtigt im Gegensatz zu E2SFCA die absolute Distanz – zum Beispiel erhalten zwei Zellen, die beide 2 Minuten entfernt sind, eine geringere Erreichbarkeit (**0,6**) als zwei Zellen, die beide 1 Minute entfernt sind (**0,8**).
+- Die **Modified 2SFCA** wendet in Schritt 2 **quadrierte Widerstandsgewichte** an, was stärkere Distanzstrafen mit Werten wie **0,9** und **0,5** erzeugt (verglichen mit 1,1 und 0,9 bei E2SFCA für ähnliche Positionen). Sie berücksichtigt im Gegensatz zu E2SFCA die absolute Distanz – zum Beispiel erhalten zwei Zellen, die beide 2 Minuten entfernt sind, eine geringere Erreichbarkeit (**0,6**) als zwei Zellen, die beide 1 Minute entfernt sind (**0,8**).
 
 **Die Wahl der geeigneten Variante** hängt von Ihren spezifischen Analysezielen ab und davon, wie empfindlich Ihre Zielbevölkerung auf Reisedistanzen reagiert.
 
 
-**GOAT verwendet die folgenden Impedanzfunktionen für die Enhanced und Modified 2SFCA-Varianten:**
+**GOAT verwendet die folgenden Widerstandsfunktionen für die Enhanced und Modified 2SFCA-Varianten:**
 
 
 *Modified Gaussian, (Kwan,1998):*

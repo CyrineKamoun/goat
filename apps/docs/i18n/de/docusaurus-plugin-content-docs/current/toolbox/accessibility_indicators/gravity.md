@@ -22,7 +22,7 @@ Sie können das **Verkehrsmittel**, den **Ziel-Layer**, das **Reisezeitlimit** s
 
 - Der **Ziel-Layer enthält punktbasierte Ziel-Daten** (wie POIs, Haltestellen, Schulen, Einrichtungen oder benutzerdefinierte Punkte). Sie können mehrere Ziel-Layer auswählen, die zu einer einzigen Heatmap kombiniert werden.
 
-- Die **Sensitivität steuert, wie schnell die Erreichbarkeit mit zunehmender Reisezeit abnimmt**, während das **Destinationspotenzial es ermöglicht, Zielen mit höherer Kapazität oder Qualität mehr Gewicht zu geben** (z. B. ein größerer Supermarkt oder eine Haltestelle mit mehr Abfahrten). Zusammen mit der gewählten **Impedanzfunktion definieren diese Einstellungen, wie die Erreichbarkeit berechnet wird**.
+- Die **Sensitivität steuert, wie schnell die Erreichbarkeit mit zunehmender Reisezeit abnimmt**, während das **Destinationspotenzial es ermöglicht, Zielen mit höherer Kapazität oder Qualität mehr Gewicht zu geben** (z. B. ein größerer Supermarkt oder eine Haltestelle mit mehr Abfahrten). Zusammen mit der gewählten **Widerstandsfunktion definieren diese Einstellungen, wie die Erreichbarkeit berechnet wird**.
 
 - Mit dem **Destinationspotenzial können bestimmte Ziele priorisiert werden**. Zum Beispiel kann ein größerer, aber weiter entfernter Supermarkt höher bewertet werden als ein kleinerer in der Nähe. So können qualitative Informationen – wie Größe, Frequenz oder Servicelevel – in die Berechnung einfließen, was zu einer realistischeren Heatmap führt.
 
@@ -113,7 +113,7 @@ Wenn Sie Analysen außerhalb dieses Geofence durchführen möchten, [kontaktiere
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Wählen Sie die <code>Impedanzfunktion</code> für die Heatmap aus.</div>
+  <div class="content">Wählen Sie die <code>Widerstandsfunktion</code> für die Heatmap aus.</div>
 </div>
 
 <Tabs>
@@ -246,11 +246,11 @@ Einfach gesagt, die Erreichbarkeit (**A**) einer Zelle (**i**) hängt ab von:
 - der **Anzahl oder Bedeutung der Ziele** (**O**) in der Nähe und  
 - der **Reisezeit** (**tᵢⱼ**) zu diesen Zielen.
 
-Die Funktion **f(tᵢⱼ)** reduziert den Einfluss weiter entfernter Ziele – dies ist die **Impedanzfunktion**. In GOAT können Sie zwischen verschiedenen Impedanztypen wählen: `Gauß`, `Linear`, `Exponential` oder `Potenz`.
+Die Funktion **f(tᵢⱼ)** reduziert den Einfluss weiter entfernter Ziele – dies ist die **Widerstandsfunktion**. In GOAT können Sie zwischen verschiedenen Widerstandstypen wählen: `Gauß`, `Linear`, `Exponential` oder `Potenz`.
 
 und einstellen, wie stark die Entfernung die Erreichbarkeit beeinflusst, mit dem **Sensitivitätsparameter (β)**. Falls ein **Destinationspotenzial** enthalten ist, erhöht dies zusätzlich das Gewicht von Zielen mit höherer Kapazität oder Qualität (z. B. größere Geschäfte oder häufige Haltestellen).
 
-#### GOAT verwendet folgende Formeln für die Impedanzfunktionen:
+#### GOAT verwendet folgende Formeln für die Widerstandsfunktionen:
 
 *Modifizierte Gaußfunktion, (Kwan,1998):*
 
@@ -305,7 +305,7 @@ Mit der von Ihnen gewählten *Sensitivität* ermöglicht die Gaußfunktion, dies
 </MathJax.Provider>
 </div>  
 
-Reisezeiten werden in Minuten gemessen. Für ein maximales Reisezeitlimit von 30 Minuten werden Ziele, die weiter entfernt sind, als nicht erreichbar betrachtet und gehen nicht in die Berechnung ein. Der *Sensitivitätsparameter* bestimmt, wie sich die Erreichbarkeit mit zunehmender Reisezeit verändert. Da der *Sensitivitätsparameter* entscheidend für die Messung der Erreichbarkeit ist, können Sie diesen in GOAT einstellen. Das Diagramm zeigt, wie die Bereitschaft zu Fuß zu gehen mit zunehmender Reisezeit je nach gewählter Impedanzfunktion und Sensitivitätswert (β) abnimmt.
+Reisezeiten werden in Minuten gemessen. Für ein maximales Reisezeitlimit von 30 Minuten werden Ziele, die weiter entfernt sind, als nicht erreichbar betrachtet und gehen nicht in die Berechnung ein. Der *Sensitivitätsparameter* bestimmt, wie sich die Erreichbarkeit mit zunehmender Reisezeit verändert. Da der *Sensitivitätsparameter* entscheidend für die Messung der Erreichbarkeit ist, können Sie diesen in GOAT einstellen. Das Diagramm zeigt, wie die Bereitschaft zu Fuß zu gehen mit zunehmender Reisezeit je nach gewählter Widerstandsfunktion und Sensitivitätswert (β) abnimmt.
 
 import ImpedanceFunction from '@site/src/components/ImpedanceFunction';
 

@@ -142,7 +142,7 @@
       "description": "Wählen Sie die ÖV-Modi für die Analyse"
     },
     "impedance": {
-      "label": "Impedanzfunktion",
+      "label": "Widerstandsfunktion",
       "description": "Distanzabbau-Funktion für die Gravitationsberechnung"
     },
     "max_sensitivity": {

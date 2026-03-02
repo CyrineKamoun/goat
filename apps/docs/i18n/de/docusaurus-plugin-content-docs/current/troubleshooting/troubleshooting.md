@@ -45,7 +45,7 @@ Wenn Sie eine Analyse in einem Projekt ausführen, wird die Aufgabe in der Softw
 
 ## Erreichbarkeitsindikatoren
 ### Heatmap - Durchschnitt Reisezeit
-* Die Sensitivität einer Gaußschen Impedanzfunktion darf 1.000.000 nicht überschreiten.
+* Die Sensitivität einer Gaußschen Widerstandsfunktion darf 1.000.000 nicht überschreiten.
 <div style={{ display: "flex", alignItems: "center" }}>
   <img 
     src={require('/img/icons/arrow-right.png').default} 
