@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     FEATURE_TIMEOUT: int = int(os.getenv("GEOAPI_FEATURE_TIMEOUT", "30"))
     # DuckDB query timeout - queries exceeding this will be interrupted
     QUERY_TIMEOUT: int = int(os.getenv("GEOAPI_QUERY_TIMEOUT", "10"))
+    # Download/export timeout - longer since exports can be large
+    DOWNLOAD_TIMEOUT: int = int(os.getenv("GEOAPI_DOWNLOAD_TIMEOUT", "120"))
 
     # Redis settings for distributed tile caching
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")

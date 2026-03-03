@@ -22,6 +22,7 @@ from geoapi.ducklake import ducklake_manager
 from geoapi.ducklake_pool import ducklake_pool
 from geoapi.models import HealthCheck
 from geoapi.routers import (
+    download_router,
     expressions_router,
     features_router,
     metadata_router,
@@ -47,6 +48,8 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 
         if "/tiles/" in path:
             timeout = settings.TILE_TIMEOUT
+        elif "/download" in path:
+            timeout = settings.DOWNLOAD_TIMEOUT
         elif "/items" in path or "/features" in path:
             timeout = settings.FEATURE_TIMEOUT
         else:
@@ -139,6 +142,7 @@ app.include_router(metadata_router)
 app.include_router(features_router)
 app.include_router(tiles_router)
 app.include_router(expressions_router)
+app.include_router(download_router)
 
 
 @app.get(

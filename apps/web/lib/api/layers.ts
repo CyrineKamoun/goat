@@ -405,6 +405,40 @@ export const startDatasetExport = async (
   return executeProcessAsync("layer_export", inputs);
 };
 
+/**
+ * Download a public layer directly from GeoAPI (no auth required).
+ * Fetches the file as a blob and triggers a browser download.
+ */
+export const downloadLayerDirect = async (
+  layerId: string,
+  format: string,
+  fileName: string,
+  crs?: string
+): Promise<void> => {
+  const params = new URLSearchParams({ format });
+  if (crs) {
+    params.set("crs", crs);
+  }
+
+  const url = `${COLLECTIONS_API_BASE_URL}/${layerId}/download?${params.toString()}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: "Download failed" }));
+    throw new Error(error.detail || `Download failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const downloadUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = `${fileName}.zip`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(downloadUrl);
+};
+
 export const useClassBreak = (layerId: string, operation: string, column: string, breaks: number) => {
   const { data, isLoading, error } = useSWR<LayerClassBreaks>(
     layerId && operation && column && breaks

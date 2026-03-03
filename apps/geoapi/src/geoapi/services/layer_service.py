@@ -414,6 +414,36 @@ class LayerService:
         else:
             return "string"
 
+    async def is_layer_in_public_project(self, layer_id: UUID) -> bool:
+        """Check if a layer belongs to any published (public) project.
+
+        Queries the project_public table's config JSONB to find
+        if any public project includes this layer_id in its layers array.
+
+        Args:
+            layer_id: Layer UUID
+
+        Returns:
+            True if the layer is in at least one public project
+        """
+        if not self._pool:
+            raise RuntimeError("LayerService not initialized")
+
+        row = await self._execute_with_retry(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM customer.project_public pp
+                WHERE EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(pp.config->'layers') AS layer
+                    WHERE layer->>'layer_id' = $1
+                )
+            ) AS is_public
+            """,
+            str(layer_id),
+            fetch_one=True,
+        )
+        return bool(row and row["is_public"])
+
     async def list_layers(
         self,
         user_id: Optional[str] = None,
