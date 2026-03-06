@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
+import type { TypographyStyle } from "@/lib/constants/typography";
 import type { ReportElement } from "@/lib/validations/reportLayout";
 
 import type { SelectorItem } from "@/types/map/common";
@@ -14,6 +15,7 @@ import FormLabelHelper from "@/components/common/FormLabelHelper";
 import SectionHeader from "@/components/map/panels/common/SectionHeader";
 import SectionOptions from "@/components/map/panels/common/SectionOptions";
 import Selector from "@/components/map/panels/common/Selector";
+import TypographyStyleControl from "@/components/reports/elements/config/TypographyStyleControl";
 
 /**
  * Scalebar style options
@@ -77,6 +79,8 @@ export interface ScalebarElementConfig {
   segmentsLeft?: number;
   /** Number of segments on the right (main divisions) */
   segmentsRight?: number;
+  /** Typography style for labels */
+  typography?: TypographyStyle;
 }
 
 interface ScalebarElementConfigProps {
@@ -103,6 +107,7 @@ const ScalebarElementConfig: React.FC<ScalebarElementConfigProps> = ({
   // Section collapsed states
   const [dataCollapsed, setDataCollapsed] = useState(false);
   const [optionsCollapsed, setOptionsCollapsed] = useState(false);
+  const [typographyCollapsed, setTypographyCollapsed] = useState(false);
 
   // Extract current config
   const config = (element.config || {}) as ScalebarElementConfig;
@@ -261,6 +266,11 @@ const ScalebarElementConfig: React.FC<ScalebarElementConfigProps> = ({
     updateConfig({ segmentsRight: item.value as number });
   };
 
+  // Handle typography change
+  const handleTypographyChange = (typoStyle: TypographyStyle) => {
+    updateConfig({ typography: typoStyle });
+  };
+
   return (
     <Stack spacing={2}>
       {/* Data Section */}
@@ -390,6 +400,27 @@ const ScalebarElementConfig: React.FC<ScalebarElementConfigProps> = ({
               />
             )}
           </Stack>
+        }
+      />
+
+      {/* Typography Section */}
+      <SectionHeader
+        label={t("typography")}
+        icon={ICON_NAME.TEXT}
+        active={true}
+        alwaysActive
+        collapsed={typographyCollapsed}
+        setCollapsed={setTypographyCollapsed}
+        disableAdvanceOptions
+      />
+      <SectionOptions
+        active={true}
+        collapsed={typographyCollapsed}
+        baseOptions={
+          <TypographyStyleControl
+            value={config.typography ?? {}}
+            onChange={handleTypographyChange}
+          />
         }
       />
     </Stack>

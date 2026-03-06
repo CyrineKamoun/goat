@@ -1,36 +1,128 @@
 "use client";
 
-import { Stack, TextField, Typography } from "@mui/material";
-import React, { useMemo, useState } from "react";
+import SyncIcon from "@mui/icons-material/Sync";
+import { Button, Checkbox, FormControlLabel, Stack, TextField, Typography, useTheme } from "@mui/material";
+import React, { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
+import type { ProjectLayer } from "@/lib/validations/project";
 import type { ReportElement } from "@/lib/validations/reportLayout";
 
 import type { SelectorItem } from "@/types/map/common";
+
+import FormLabelHelper from "@/components/common/FormLabelHelper";
 import SectionHeader from "@/components/map/panels/common/SectionHeader";
 import SectionOptions from "@/components/map/panels/common/SectionOptions";
+import SelectorFreeSolo from "@/components/map/panels/common/SelectorFreeSolo";
 import Selector from "@/components/map/panels/common/Selector";
+
+// =============================================================================
+// Zoom <-> Scale conversion utilities
+// =============================================================================
+
+// MapLibre uses 512px tiles. Earth circumference / tile size = 78271.51696
+const METERS_PER_PIXEL_AT_ZOOM0 = 78271.51696;
+
+// Standard screen DPI assumption for scale calculation
+const SCREEN_DPI = 96;
+const METERS_PER_INCH = 0.0254;
+const METERS_PER_PIXEL_SCREEN = METERS_PER_INCH / SCREEN_DPI;
+
+/**
+ * Convert zoom level + latitude to scale denominator (e.g. 5000 for 1:5,000)
+ */
+function zoomToScale(zoom: number, latitude: number): number {
+  const metersPerPixelMap =
+    (METERS_PER_PIXEL_AT_ZOOM0 * Math.cos((latitude * Math.PI) / 180)) / Math.pow(2, zoom);
+  return Math.round(metersPerPixelMap / METERS_PER_PIXEL_SCREEN);
+}
+
+/**
+ * Convert scale denominator + latitude to zoom level
+ */
+function scaleToZoom(scale: number, latitude: number): number {
+  const metersPerPixelMap = scale * METERS_PER_PIXEL_SCREEN;
+  const zoom = Math.log2(
+    (METERS_PER_PIXEL_AT_ZOOM0 * Math.cos((latitude * Math.PI) / 180)) / metersPerPixelMap
+  );
+  return Math.round(zoom * 100) / 100; // 2 decimal places
+}
+
+/**
+ * Format scale denominator for display: 5000 -> "1:5,000"
+ */
+function formatScale(scale: number): string {
+  return `1:${scale.toLocaleString()}`;
+}
+
+/**
+ * Parse scale string to denominator: "1:5,000" -> 5000, "5000" -> 5000
+ */
+function parseScale(input: string): number | null {
+  // Remove "1:" prefix, spaces, and thousand separators
+  const cleaned = input.replace(/^1\s*:\s*/, "").replace(/[,.\s]/g, "");
+  const num = parseInt(cleaned, 10);
+  return isNaN(num) || num <= 0 ? null : num;
+}
+
+// Predefined scales commonly used in cartography/GIS
+const PREDEFINED_SCALES = [
+  500, 1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2500000, 5000000,
+];
+
+// =============================================================================
 
 interface MapElementConfigProps {
   element: ReportElement;
+  projectLayers?: ProjectLayer[];
   onChange: (updates: Partial<ReportElement>) => void;
+  onSyncLayers?: () => void;
 }
 
 type AtlasMode = "best_fit" | "fixed_scale";
 
-const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, onChange }) => {
+const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, projectLayers = [], onChange, onSyncLayers }) => {
   const { t } = useTranslation("common");
+  const theme = useTheme();
 
   // Section collapsed states
   const [mainPropertiesCollapsed, setMainPropertiesCollapsed] = useState(false);
+  const [layersCollapsed, setLayersCollapsed] = useState(false);
   const [atlasCollapsed, setAtlasCollapsed] = useState(false);
 
   // Get current settings from element config
   const viewState = element.config?.viewState || {};
   const currentZoom = viewState.zoom ?? 10;
+  const currentLatitude = viewState.latitude ?? 48;
   const currentRotation = viewState.bearing ?? 0;
+  // If the user explicitly picked a scale, we stored it here so we can display it exactly
+  const storedScale = viewState.scale_denominator as number | undefined;
+
+  // Display scale: use stored exact value if available, otherwise derive from zoom
+  const displayScale = storedScale ?? zoomToScale(currentZoom, currentLatitude);
+
+  // Predefined scale options for the free-solo selector
+  const scaleOptions: SelectorItem[] = useMemo(
+    () =>
+      PREDEFINED_SCALES.map((s) => ({
+        label: formatScale(s),
+        value: s,
+      })),
+    []
+  );
+
+  // Find the closest matching predefined scale, or create a custom item
+  const selectedScaleItem: SelectorItem = useMemo(() => {
+    const match = scaleOptions.find((opt) => opt.value === displayScale);
+    if (match) return match;
+    return { label: formatScale(displayScale), value: displayScale };
+  }, [scaleOptions, displayScale]);
+
+  // Layer lock settings
+  const lockLayers = element.config?.lock_layers ?? false;
+  const lockStyles = element.config?.lock_styles ?? false;
 
   // Atlas control settings
   const atlasEnabled = element.config?.atlas?.enabled ?? false;
@@ -51,19 +143,31 @@ const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, onChange }
     [modeItems, atlasMode]
   );
 
-  // Main Properties handlers
-  const handleZoomChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(event.target.value);
-    if (!isNaN(value) && value >= 0 && value <= 22) {
+  // Update viewState helper
+  const updateViewState = useCallback(
+    (updates: Record<string, unknown>) => {
       onChange({
         config: {
           ...element.config,
           viewState: {
             ...element.config?.viewState,
-            zoom: value,
+            ...updates,
           },
         },
       });
+    },
+    [element.config, onChange]
+  );
+
+  // Handle scale selection (from dropdown or typed)
+  const handleScaleChange = (item: SelectorItem | undefined) => {
+    if (!item) return;
+    const scaleValue =
+      typeof item.value === "number" ? item.value : parseScale(String(item.value));
+    if (scaleValue) {
+      const newZoom = scaleToZoom(scaleValue, currentLatitude);
+      // Store both the zoom and the exact scale denominator so display matches exactly
+      updateViewState({ zoom: newZoom, scale_denominator: scaleValue });
     }
   };
 
@@ -72,16 +176,57 @@ const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, onChange }
     if (!isNaN(value)) {
       const normalized = ((value % 360) + 360) % 360;
       const bearing = normalized > 180 ? normalized - 360 : normalized;
-      onChange({
-        config: {
-          ...element.config,
-          viewState: {
-            ...element.config?.viewState,
-            bearing,
-          },
-        },
-      });
+      updateViewState({ bearing });
     }
+  };
+
+  // Layer lock handlers
+  const captureLayerSnapshot = (layers: boolean, styles: boolean) => {
+    const visibleLayers = projectLayers.filter((layer) => {
+      const props = layer.properties as Record<string, unknown>;
+      return props.visibility !== false;
+    });
+
+    const updates: Record<string, unknown> = {
+      ...element.config,
+      lock_layers: layers,
+      lock_styles: styles,
+    };
+
+    if (layers) {
+      updates.locked_layer_ids = visibleLayers.map((l) => l.id);
+      if (styles) {
+        const stylesMap: Record<number, Record<string, unknown>> = {};
+        visibleLayers.forEach((l) => {
+          stylesMap[l.id] = JSON.parse(JSON.stringify(l.properties));
+        });
+        updates.locked_layer_styles = stylesMap;
+      } else {
+        updates.locked_layer_styles = undefined;
+      }
+    } else {
+      updates.locked_layer_ids = undefined;
+      updates.locked_layer_styles = undefined;
+    }
+
+    onChange({ config: updates });
+  };
+
+  const handleLockLayersChange = (_event: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    if (checked) {
+      captureLayerSnapshot(true, lockStyles);
+    } else {
+      captureLayerSnapshot(false, false);
+    }
+  };
+
+  const handleLockStylesChange = (_event: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    captureLayerSnapshot(lockLayers, checked);
+  };
+
+  const handleSyncLayers = () => {
+    captureLayerSnapshot(lockLayers, lockStyles);
+    onSyncLayers?.();
   };
 
   // Atlas handlers
@@ -127,6 +272,9 @@ const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, onChange }
     }
   };
 
+  // Count locked layers for display
+  const lockedLayerCount = (element.config?.locked_layer_ids as number[] | undefined)?.length ?? 0;
+
   return (
     <Stack spacing={2}>
       {/* Main Properties Section */}
@@ -144,31 +292,95 @@ const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, onChange }
         collapsed={mainPropertiesCollapsed}
         baseOptions={
           <Stack spacing={3}>
-            {/* Zoom */}
-            <TextField
-              label={t("zoom")}
-              type="number"
-              size="small"
-              value={currentZoom}
-              onChange={handleZoomChange}
-              inputProps={{ min: 0, max: 22, step: 0.5 }}
+            {/* Scale */}
+            <SelectorFreeSolo
+              label={t("scale")}
+              options={scaleOptions}
+              selectedItem={selectedScaleItem}
+              onSelect={handleScaleChange}
+              placeholder="1:10,000"
             />
 
             {/* Rotation */}
-            <TextField
-              label={t("map_rotation")}
-              type="number"
-              size="small"
-              value={currentRotation}
-              onChange={handleRotationChange}
-              InputProps={{
-                endAdornment: (
-                  <Typography variant="body2" color="text.secondary">
-                    °
-                  </Typography>
-                ),
-              }}
+            <Stack spacing={0.5}>
+              <FormLabelHelper label={t("map_rotation")} color={theme.palette.text.secondary} />
+              <TextField
+                type="number"
+                size="small"
+                value={currentRotation}
+                onChange={handleRotationChange}
+                InputProps={{
+                  endAdornment: (
+                    <Typography variant="body2" color="text.secondary">
+                      °
+                    </Typography>
+                  ),
+                }}
+              />
+            </Stack>
+          </Stack>
+        }
+      />
+
+      {/* Layers Section */}
+      <SectionHeader
+        label={t("layers")}
+        icon={ICON_NAME.LAYERS}
+        active={true}
+        alwaysActive
+        collapsed={layersCollapsed}
+        setCollapsed={setLayersCollapsed}
+        disableAdvanceOptions
+      />
+      <SectionOptions
+        active={true}
+        collapsed={layersCollapsed}
+        baseOptions={
+          <Stack spacing={1}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={lockLayers}
+                  onChange={handleLockLayersChange}
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  {t("lock_layers")}
+                </Typography>
+              }
             />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={lockStyles}
+                  onChange={handleLockStylesChange}
+                  disabled={!lockLayers}
+                />
+              }
+              label={
+                <Typography variant="body2" color={!lockLayers ? "text.disabled" : "text.primary"}>
+                  {t("lock_styles")}
+                </Typography>
+              }
+            />
+            {lockLayers && (
+              <Stack spacing={1} sx={{ mt: 1 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {t("locked_layers_count", { count: lockedLayerCount })}
+                </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<SyncIcon />}
+                  onClick={handleSyncLayers}
+                  sx={{ textTransform: "none" }}>
+                  {t("sync_layers")}
+                </Button>
+              </Stack>
+            )}
           </Stack>
         }
       />
@@ -196,21 +408,23 @@ const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, onChange }
             />
 
             {atlasMode === "best_fit" && (
-              <TextField
-                label={t("margin_percent")}
-                type="number"
-                size="small"
-                value={marginPercent}
-                onChange={handleMarginChange}
-                inputProps={{ min: 0, max: 100 }}
-                InputProps={{
-                  endAdornment: (
-                    <Typography variant="body2" color="text.secondary">
-                      %
-                    </Typography>
-                  ),
-                }}
-              />
+              <Stack spacing={0.5}>
+                <FormLabelHelper label={t("margin_percent")} color={theme.palette.text.secondary} />
+                <TextField
+                  type="number"
+                  size="small"
+                  value={marginPercent}
+                  onChange={handleMarginChange}
+                  inputProps={{ min: 0, max: 100 }}
+                  InputProps={{
+                    endAdornment: (
+                      <Typography variant="body2" color="text.secondary">
+                        %
+                      </Typography>
+                    ),
+                  }}
+                />
+              </Stack>
             )}
 
             {atlasMode === "fixed_scale" && (

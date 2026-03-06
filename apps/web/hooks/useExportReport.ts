@@ -22,6 +22,8 @@ export interface ExportOptions {
   paperWidthMm?: number;
   /** Paper height in millimeters */
   paperHeightMm?: number;
+  /** File name template for atlas image exports */
+  fileNameTemplate?: string;
 }
 
 export interface UseExportReportResult {
@@ -55,6 +57,7 @@ export function useExportReport(): UseExportReportResult {
         dpi = 300,
         paperWidthMm,
         paperHeightMm,
+        fileNameTemplate,
       } = options;
 
       setIsBusy(true);
@@ -89,6 +92,11 @@ export function useExportReport(): UseExportReportResult {
         }
         if (paperHeightMm !== undefined) {
           inputs.paper_height_mm = paperHeightMm;
+        }
+
+        // Pass file name template for atlas image exports
+        if (fileNameTemplate) {
+          inputs.file_name_template = fileNameTemplate;
         }
 
         // Pass refresh token for long-running atlas jobs where access token may expire

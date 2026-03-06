@@ -298,6 +298,7 @@ export const ElementContentRenderer: React.FC<ElementContentRendererProps> = ({
           mapElements={mapElements}
           viewOnly={viewOnly}
           zoom={zoom}
+          onElementUpdate={onElementUpdate}
         />
       </Box>
     );

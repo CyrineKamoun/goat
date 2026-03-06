@@ -12,9 +12,15 @@ interface LayerLegendPanelProps {
   geometryType: string; // "point", "line", "polygon"
   /** Optional sx overrides for legend item label text */
   itemTypographySx?: Record<string, unknown>;
+  /** Whether text labels are inline-editable */
+  editable?: boolean;
+  /** Text overrides keyed by "item_{index}" */
+  textOverrides?: Record<string, string>;
+  /** Save callback for text overrides */
+  onTextSave?: (key: string, text: string) => void;
 }
 
-export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx }: LayerLegendPanelProps) => {
+export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, editable, textOverrides, onTextSave }: LayerLegendPanelProps) => {
   const { t } = useTranslation("common");
 
   // Check if this is a raster layer with styling
@@ -23,7 +29,7 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx }:
 
   // 1. Raster Layer Legends
   if (rasterStyle) {
-    return <RasterLayerLegend style={rasterStyle} itemTypographySx={itemTypographySx} />;
+    return <RasterLayerLegend style={rasterStyle} itemTypographySx={itemTypographySx} editable={editable} textOverrides={textOverrides} onTextSave={onTextSave} />;
   }
 
   // 2. Feature Layer Legends
@@ -32,15 +38,46 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx }:
   const strokeMap = getLegendColorMap(properties, "stroke_color");
   const markerMap = getLegendMarkerMap(properties);
 
+  // Track a running index for editable keys
+  let rowIndex = 0;
+
   // 2. Helper to render a single legend row
-  const renderRow = (label: string, iconNode: React.ReactNode) => (
-    <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 0.5 }}>
-      <Box sx={{ width: 20, display: "flex", justifyContent: "center" }}>{iconNode}</Box>
-      <Typography variant="caption" sx={{ lineHeight: 1.2, ...itemTypographySx }}>
-        {label}
-      </Typography>
-    </Stack>
-  );
+  const renderRow = (label: string, iconNode: React.ReactNode) => {
+    const idx = rowIndex++;
+    const overrideKey = `item_${idx}`;
+    const displayLabel = editable && textOverrides?.[overrideKey] != null ? textOverrides[overrideKey] : label;
+
+    const handleBlur = (e: React.FocusEvent<HTMLSpanElement>) => {
+      const newText = e.currentTarget.textContent ?? "";
+      if (newText !== displayLabel) {
+        onTextSave?.(overrideKey, newText);
+      }
+    };
+
+    return (
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 0.5 }}>
+        <Box sx={{ width: 20, display: "flex", justifyContent: "center" }}>{iconNode}</Box>
+        <Typography
+          variant="caption"
+          className={editable ? "legend-editable-text" : undefined}
+          sx={{
+            lineHeight: 1.2,
+            ...itemTypographySx,
+            ...(editable && {
+              cursor: "text",
+              outline: "none",
+              "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" },
+              "&:focus": { backgroundColor: "rgba(0,0,0,0.08)" },
+            }),
+          }}
+          contentEditable={editable}
+          suppressContentEditableWarning
+          onBlur={editable ? handleBlur : undefined}>
+          {displayLabel}
+        </Typography>
+      </Stack>
+    );
+  };
 
   // --- RENDER LOGIC ---
   // Priority: Check if markers and colors represent the same attribute
@@ -246,29 +283,62 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx }:
 interface RasterLayerLegendProps {
   style: RasterLayerProperties["style"];
   itemTypographySx?: Record<string, unknown>;
+  editable?: boolean;
+  textOverrides?: Record<string, string>;
+  onTextSave?: (key: string, text: string) => void;
 }
 
-const RasterLayerLegend = ({ style, itemTypographySx }: RasterLayerLegendProps) => {
+const RasterLayerLegend = ({ style, itemTypographySx, editable, textOverrides, onTextSave }: RasterLayerLegendProps) => {
   if (!style) return null;
 
+  let rowIndex = 0;
+
   // Helper to render a single legend row
-  const renderRow = (label: string, color: string) => (
-    <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 0.5 }}>
-      <Box
-        sx={{
-          width: 20,
-          height: 12,
-          backgroundColor: color,
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 0.5,
-        }}
-      />
-      <Typography variant="caption" sx={{ lineHeight: 1.2, ...itemTypographySx }}>
-        {label}
-      </Typography>
-    </Stack>
-  );
+  const renderRow = (label: string, color: string) => {
+    const idx = rowIndex++;
+    const overrideKey = `item_${idx}`;
+    const displayLabel = editable && textOverrides?.[overrideKey] != null ? textOverrides[overrideKey] : label;
+
+    const handleBlur = (e: React.FocusEvent<HTMLSpanElement>) => {
+      const newText = e.currentTarget.textContent ?? "";
+      if (newText !== displayLabel) {
+        onTextSave?.(overrideKey, newText);
+      }
+    };
+
+    return (
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 0.5 }}>
+        <Box
+          sx={{
+            width: 20,
+            height: 12,
+            backgroundColor: color,
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 0.5,
+          }}
+        />
+        <Typography
+          variant="caption"
+          className={editable ? "legend-editable-text" : undefined}
+          sx={{
+            lineHeight: 1.2,
+            ...itemTypographySx,
+            ...(editable && {
+              cursor: "text",
+              outline: "none",
+              "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" },
+              "&:focus": { backgroundColor: "rgba(0,0,0,0.08)" },
+            }),
+          }}
+          contentEditable={editable}
+          suppressContentEditableWarning
+          onBlur={editable ? handleBlur : undefined}>
+          {displayLabel}
+        </Typography>
+      </Stack>
+    );
+  };
 
   // 1. Categories Style
   if (style.style_type === "categories") {
@@ -285,13 +355,24 @@ const RasterLayerLegend = ({ style, itemTypographySx }: RasterLayerLegendProps) 
 
   // 2. Color Range Style
   if (style.style_type === "color_range" && style.color_map.length > 0) {
-    const minLabel =
+    const minLabelRaw =
       style.min_label || style.min_value?.toString() || style.color_map[0]?.[0]?.toString() || "Min";
-    const maxLabel =
+    const maxLabelRaw =
       style.max_label ||
       style.max_value?.toString() ||
       style.color_map[style.color_map.length - 1]?.[0]?.toString() ||
       "Max";
+    const minLabel = editable && textOverrides?.["item_min"] != null ? textOverrides["item_min"] : minLabelRaw;
+    const maxLabel = editable && textOverrides?.["item_max"] != null ? textOverrides["item_max"] : maxLabelRaw;
+
+    const editableSx = editable
+      ? {
+          cursor: "text" as const,
+          outline: "none",
+          "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" },
+          "&:focus": { backgroundColor: "rgba(0,0,0,0.08)" },
+        }
+      : {};
 
     return (
       <Box sx={{ pb: 1, pr: 2, pt: 3 }}>
@@ -305,10 +386,28 @@ const RasterLayerLegend = ({ style, itemTypographySx }: RasterLayerLegendProps) 
           }}
         />
         <Stack direction="row" justifyContent="space-between">
-          <Typography variant="caption" sx={{ color: "text.secondary", ...itemTypographySx }}>
+          <Typography
+            variant="caption"
+            className={editable ? "legend-editable-text" : undefined}
+            sx={{ color: "text.secondary", ...itemTypographySx, ...editableSx }}
+            contentEditable={editable}
+            suppressContentEditableWarning
+            onBlur={editable ? (e) => {
+              const t = e.currentTarget.textContent ?? "";
+              if (t !== minLabel) onTextSave?.("item_min", t);
+            } : undefined}>
             {minLabel}
           </Typography>
-          <Typography variant="caption" sx={{ color: "text.secondary", ...itemTypographySx }}>
+          <Typography
+            variant="caption"
+            className={editable ? "legend-editable-text" : undefined}
+            sx={{ color: "text.secondary", ...itemTypographySx, ...editableSx }}
+            contentEditable={editable}
+            suppressContentEditableWarning
+            onBlur={editable ? (e) => {
+              const t = e.currentTarget.textContent ?? "";
+              if (t !== maxLabel) onTextSave?.("item_max", t);
+            } : undefined}>
             {maxLabel}
           </Typography>
         </Stack>

@@ -25,6 +25,7 @@ interface ElementConfigurationProps {
   onChange: (updates: Partial<ReportElement>) => void;
   onDelete: () => void;
   onBack: () => void;
+  onSyncMapLayers?: (elementId: string) => void;
 }
 
 // Check if element type has configuration (like builder's widgetTypesWithoutConfig)
@@ -92,10 +93,11 @@ const elementHasConfig = (type: string, config?: ReportElement["config"]): boole
 const ElementConfiguration: React.FC<ElementConfigurationProps> = ({
   element,
   allElements,
-  projectLayers: _projectLayers,
+  projectLayers,
   onChange,
   onDelete: _onDelete,
   onBack,
+  onSyncMapLayers,
 }) => {
   const { t } = useTranslation("common");
 
@@ -117,7 +119,12 @@ const ElementConfiguration: React.FC<ElementConfigurationProps> = ({
           <Stack spacing={2} sx={{ p: 2 }}>
             {/* Element-specific configuration */}
             {element.type === "map" ? (
-              <MapElementConfig element={element} onChange={onChange} />
+              <MapElementConfig
+                element={element}
+                projectLayers={projectLayers}
+                onChange={onChange}
+                onSyncLayers={() => onSyncMapLayers?.(element.id)}
+              />
             ) : element.type === "legend" ? (
               <LegendElementConfig element={element} mapElements={mapElements} onChange={onChange} />
             ) : element.type === "north_arrow" ? (

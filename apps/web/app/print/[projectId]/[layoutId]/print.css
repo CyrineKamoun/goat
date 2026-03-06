@@ -31,7 +31,8 @@
   margin-bottom: 0 !important;
 }
 
-/* Remove padding from widget elements in print */
-#print-paper .MuiBox-root > .MuiBox-root {
+/* Remove padding from widget elements (text/image) in print */
+#print-paper [data-element-type="text"] .ProseMirror,
+#print-paper [data-element-type="image"] .MuiBox-root {
   padding: 0 !important;
 }

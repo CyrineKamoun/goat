@@ -265,6 +265,8 @@ export default function PrintPage() {
         data-atlas-enabled={isAtlasEnabled}
         data-atlas-total-pages={atlasTotalPages}
         data-atlas-current-page={atlasPageIndex}
+        data-atlas-feature-properties={currentAtlasPage?.feature?.properties ? JSON.stringify(currentAtlasPage.feature.properties) : undefined}
+        data-atlas-page-label={currentAtlasPage?.label || undefined}
         style={{ display: "none" }}
       />
     </Box>
@@ -344,6 +346,7 @@ const ReportElements: React.FC<ReportElementsProps> = ({
         return (
           <Box
             key={element.id}
+            data-element-type={element.type}
             sx={{
               position: "absolute",
               // Convert mm positions to pixels at SCREEN_DPI (96)

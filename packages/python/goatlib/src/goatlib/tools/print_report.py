@@ -18,9 +18,12 @@ Usage:
 
 import asyncio
 import io
+import json
 import logging
 import os
+import re
 import zipfile
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, Self
 
@@ -133,6 +136,15 @@ class PrintReportParams(ToolInputBase):
         description="Paper height in millimeters",
         json_schema_extra={"x-ui": {"hidden": True}},
     )
+    file_name_template: str | None = Field(
+        default=None,
+        description=(
+            "Template for output filenames (atlas image exports). "
+            "Placeholders: {{@layout_name}}, {{@page_number}}, {{@total_pages}}, {{@feature.ATTR}}. "
+            "Use '/' for folder structure in ZIP."
+        ),
+        json_schema_extra={"x-ui": {"hidden": True}},
+    )
     access_token: str | None = Field(
         default=None,
         description="Access token for API authentication (passed by GeoAPI)",
@@ -158,6 +170,129 @@ class PrintReportOutput(BaseModel):
     page_count: int = Field(default=1, description="Number of pages/images generated")
     # Windmill job labels - returned at runtime for job tracking
     wm_labels: list[str] = Field(default_factory=list)
+
+
+@dataclass
+class RenderedPage:
+    """Result from rendering a single page."""
+
+    data: bytes
+    page_index: int | None = None
+    feature_properties: dict[str, str] = field(default_factory=dict)
+    page_label: str = ""
+
+
+def _sanitize_path_segment(value: str, allow_slash: bool = False) -> str:
+    """Sanitize a string for safe use in filenames/paths.
+
+    - Replaces invalid characters with underscores
+    - Collapses consecutive underscores
+    - Strips leading/trailing whitespace, dots, and underscores
+    - Truncates to max_length
+    """
+    allowed = "-_ /" if allow_slash else "-_ "
+    result = "".join(c if c.isalnum() or c in allowed else "_" for c in value)
+    result = re.sub(r"_+", "_", result)  # collapse consecutive underscores
+    result = result.strip().strip(".").strip("_")
+    result = result.replace(" ", "_")
+    return result
+
+
+# Maximum filename length (without extension). Leaves room for extension + dedup suffix.
+_MAX_FILENAME_LENGTH = 200
+
+
+def _sanitize_filename(name: str) -> str:
+    """Sanitize a fully resolved filename (may contain / for folder structure).
+
+    Sanitizes each path segment individually, truncates long names,
+    and provides a fallback for empty results.
+    """
+    # Split on / to preserve folder structure
+    parts = name.split("/")
+    sanitized_parts: list[str] = []
+    for part in parts:
+        clean = _sanitize_path_segment(part)
+        if clean:
+            # Truncate individual segments
+            if len(clean) > _MAX_FILENAME_LENGTH:
+                clean = clean[:_MAX_FILENAME_LENGTH].rstrip("_")
+            sanitized_parts.append(clean)
+
+    result = "/".join(sanitized_parts)
+    if not result:
+        result = "page"
+    return result
+
+
+def _resolve_file_name_template(
+    template: str,
+    page_number: int,
+    total_pages: int,
+    layout_name: str,
+    feature_properties: dict[str, str],
+) -> str:
+    """Resolve a filename template with placeholders.
+
+    Placeholders:
+      {{@page_number}}      -> 1-based page number
+      {{@total_pages}}       -> total page count
+      {{@layout_name}}       -> sanitized layout name
+      {{@feature.ATTR_NAME}} -> feature attribute value
+
+    The final result is sanitized for safe filesystem use.
+    """
+    result = template
+    result = result.replace("{{@page_number}}", str(page_number))
+    result = result.replace("{{@total_pages}}", str(total_pages))
+    result = result.replace(
+        "{{@layout_name}}", _sanitize_path_segment(layout_name)
+    )
+
+    # Resolve feature attribute placeholders
+    def replace_feature_attr(match: re.Match) -> str:  # type: ignore[type-arg]
+        attr_name = match.group(1)
+        value = feature_properties.get(attr_name, "")
+        # Allow / in feature values for folder structure
+        return _sanitize_path_segment(str(value), allow_slash=True)
+
+    result = re.sub(r"\{\{@feature\.([^}]+)\}\}", replace_feature_attr, result)
+
+    # Final sanitization of the complete resolved name
+    return _sanitize_filename(result)
+
+
+def _deduplicate_filenames(filenames: list[str]) -> list[str]:
+    """Append _2, _3, etc. to duplicate filenames.
+
+    Only adds a suffix when there are actual conflicts.
+    First occurrence keeps its original name.
+    """
+    counts: dict[str, int] = {}
+    result: list[str] = []
+
+    for name in filenames:
+        if name in counts:
+            counts[name] += 1
+            # Split at last dot to insert suffix before extension
+            if "/" in name:
+                # Preserve folder path
+                folder, basename = name.rsplit("/", 1)
+                if "." in basename:
+                    base, ext = basename.rsplit(".", 1)
+                    result.append(f"{folder}/{base}_{counts[name]}.{ext}")
+                else:
+                    result.append(f"{folder}/{basename}_{counts[name]}")
+            elif "." in name:
+                base, ext = name.rsplit(".", 1)
+                result.append(f"{base}_{counts[name]}.{ext}")
+            else:
+                result.append(f"{name}_{counts[name]}")
+        else:
+            counts[name] = 1
+            result.append(name)
+
+    return result
 
 
 class PrintReportRunner(SimpleToolRunner):
@@ -272,7 +407,8 @@ class PrintReportRunner(SimpleToolRunner):
         dpi: int = 300,
         paper_width_mm: float = 210.0,
         paper_height_mm: float = 297.0,
-    ) -> bytes:
+        page_index: int | None = None,
+    ) -> RenderedPage:
         """Render a single page to PDF or PNG.
 
         The device_scale_factor is calculated to achieve the target DPI:
@@ -369,11 +505,28 @@ class PrintReportRunner(SimpleToolRunner):
             # Small buffer for any final CSS/layout calculations
             await asyncio.sleep(0.5)
 
-            # Get page dimensions from metadata element
+            # Get page dimensions and atlas metadata
             metadata = await page.query_selector("#print-metadata")
+            feature_properties: dict[str, str] = {}
+            page_label = ""
             if metadata:
                 width_mm = await metadata.get_attribute("data-width-mm") or "210"
                 height_mm = await metadata.get_attribute("data-height-mm") or "297"
+                # Extract atlas feature properties for filename templates
+                props_json = await metadata.get_attribute(
+                    "data-atlas-feature-properties"
+                )
+                if props_json:
+                    try:
+                        raw = json.loads(props_json)
+                        feature_properties = {
+                            k: str(v) for k, v in raw.items() if v is not None
+                        }
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                page_label = (
+                    await metadata.get_attribute("data-atlas-page-label") or ""
+                )
             else:
                 width_mm = "210"
                 height_mm = "297"
@@ -391,7 +544,12 @@ class PrintReportRunner(SimpleToolRunner):
                         "left": "0mm",
                     },
                 )
-                return pdf_bytes
+                return RenderedPage(
+                    data=pdf_bytes,
+                    page_index=page_index,
+                    feature_properties=feature_properties,
+                    page_label=page_label,
+                )
             else:
                 # Capture the print paper area as PNG or JPEG
                 screenshot_type = "jpeg" if output_format == "jpeg" else "png"
@@ -410,8 +568,15 @@ class PrintReportRunner(SimpleToolRunner):
                     logger.warning(
                         "Print paper element not found, using full page screenshot"
                     )
-                    img_bytes = await page.screenshot(**screenshot_kwargs, full_page=False)
-                return img_bytes
+                    img_bytes = await page.screenshot(
+                        **screenshot_kwargs, full_page=False
+                    )
+                return RenderedPage(
+                    data=img_bytes,
+                    page_index=page_index,
+                    feature_properties=feature_properties,
+                    page_label=page_label,
+                )
 
         finally:
             await context.close()
@@ -476,7 +641,7 @@ class PrintReportRunner(SimpleToolRunner):
             )
 
             # Render pages in batches
-            rendered_pages: list[bytes] = []
+            rendered_pages: list[RenderedPage] = []
 
             for i in range(0, len(page_indices), ATLAS_BATCH_SIZE):
                 batch = page_indices[i : i + ATLAS_BATCH_SIZE]
@@ -497,6 +662,7 @@ class PrintReportRunner(SimpleToolRunner):
                             params.dpi,
                             params.paper_width_mm,
                             params.paper_height_mm,
+                            page_idx,
                         )
                     )
 
@@ -506,28 +672,27 @@ class PrintReportRunner(SimpleToolRunner):
 
             # Generate output file
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            layout_name = params.layout_name or f"report_{params.layout_id}"
 
             # Create filename base from layout name or ID
-            if params.layout_name:
-                # Sanitize layout name for use in filename
-                safe_name = (
-                    "".join(
-                        c if c.isalnum() or c in "-_ " else "_"
-                        for c in params.layout_name
-                    )
-                    .strip()
-                    .replace(" ", "_")
+            safe_name = (
+                "".join(
+                    c if c.isalnum() or c in "-_ " else "_"
+                    for c in layout_name
                 )
-                file_base = f"{safe_name}_{timestamp}"
-            else:
-                file_base = f"report_{params.layout_id}_{timestamp}"
+                .strip()
+                .replace(" ", "_")
+            )
+            file_base = f"{safe_name}_{timestamp}"
 
             if params.format == "pdf":
                 if len(rendered_pages) > 1:
                     # Merge PDFs
-                    output_bytes = await self._merge_pdfs(rendered_pages)
+                    output_bytes = await self._merge_pdfs(
+                        [rp.data for rp in rendered_pages]
+                    )
                 else:
-                    output_bytes = rendered_pages[0]
+                    output_bytes = rendered_pages[0].data
 
                 file_name = f"{file_base}.pdf"
                 content_type = "application/pdf"
@@ -537,17 +702,54 @@ class PrintReportRunner(SimpleToolRunner):
                 mime = f"image/{ext}"
 
                 if len(rendered_pages) > 1:
+                    # Resolve filenames from template (or default)
+                    template = (
+                        params.file_name_template
+                        or "{{@layout_name}}_{{@page_number}}"
+                    )
+                    total_pages = len(rendered_pages)
+                    raw_names: list[str] = []
+                    for idx, rp in enumerate(rendered_pages):
+                        page_num = idx + 1
+                        resolved = _resolve_file_name_template(
+                            template,
+                            page_number=page_num,
+                            total_pages=total_pages,
+                            layout_name=layout_name,
+                            feature_properties=rp.feature_properties,
+                        )
+                        raw_names.append(f"{resolved}.{ext}")
+
+                    # Deduplicate filenames (appends _2, _3 etc. on conflicts)
+                    final_names = _deduplicate_filenames(raw_names)
+
                     # Create ZIP of images
                     zip_buffer = io.BytesIO()
-                    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                        for idx, img_bytes in enumerate(rendered_pages):
-                            zf.writestr(f"page_{idx + 1:03d}.{ext}", img_bytes)
+                    with zipfile.ZipFile(
+                        zip_buffer, "w", zipfile.ZIP_DEFLATED
+                    ) as zf:
+                        for rp, name in zip(rendered_pages, final_names):
+                            zf.writestr(name, rp.data)
                     output_bytes = zip_buffer.getvalue()
                     file_name = f"{file_base}.zip"
                     content_type = "application/zip"
                 else:
-                    output_bytes = rendered_pages[0]
-                    file_name = f"{file_base}.{ext}"
+                    # Single image - use template if provided
+                    if params.file_name_template:
+                        rp = rendered_pages[0]
+                        resolved = _resolve_file_name_template(
+                            params.file_name_template,
+                            page_number=1,
+                            total_pages=1,
+                            layout_name=layout_name,
+                            feature_properties=rp.feature_properties,
+                        )
+                        # Strip folder structure for single files (no ZIP)
+                        resolved = resolved.rsplit("/", 1)[-1] if "/" in resolved else resolved
+                        file_name = f"{resolved}.{ext}"
+                    else:
+                        file_name = f"{file_base}.{ext}"
+                    output_bytes = rendered_pages[0].data
                     content_type = mime
 
             # Upload to S3

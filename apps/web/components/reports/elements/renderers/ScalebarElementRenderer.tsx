@@ -3,6 +3,8 @@
 import { Box, Typography } from "@mui/material";
 import React, { useMemo } from "react";
 
+import type { TypographyStyle } from "@/lib/constants/typography";
+import { DEFAULT_FONT_FAMILY } from "@/lib/constants/typography";
 import type { ReportElement } from "@/lib/validations/reportLayout";
 
 import {
@@ -10,6 +12,19 @@ import {
   type ScalebarUnit,
   getUnitAbbreviation,
 } from "@/components/reports/elements/config/ScalebarElementConfig";
+
+/**
+ * Convert TypographyStyle to MUI sx props
+ */
+function typographyToSx(style?: TypographyStyle): Record<string, unknown> {
+  if (!style) return { fontFamily: DEFAULT_FONT_FAMILY };
+  const sx: Record<string, unknown> = {};
+  sx.fontFamily = style.fontFamily || DEFAULT_FONT_FAMILY;
+  if (style.fontSize) sx.fontSize = style.fontSize;
+  if (style.fontColor) sx.color = style.fontColor;
+  if (style.fontWeight) sx.fontWeight = style.fontWeight;
+  return sx;
+}
 
 interface ScalebarElementRendererProps {
   element: ReportElement;
@@ -75,18 +90,26 @@ const calculateScaleBarParams = (
   const totalMeters = mapScale * targetWidthPx;
   const totalUnits = metersToUnit(totalMeters, unit);
 
-  // Get a nice round total value
-  const niceTotal = getNiceNumber(totalUnits);
-
-  // Calculate segment value
   const totalSegments = Math.max(1, segmentsRight);
-  const segmentValue = niceTotal / totalSegments;
+
+  // Get a nice round segment value so labels are always clean numbers
+  const targetSegmentValue = totalUnits / totalSegments;
+  const segmentValue = getNiceNumber(targetSegmentValue);
+  const niceTotal = segmentValue * totalSegments;
 
   return {
     totalValue: niceTotal,
     segmentValue,
     totalSegments,
   };
+};
+
+/**
+ * Format a label value to avoid floating point artifacts (e.g. 5.000000001 -> "5")
+ */
+const formatLabelValue = (value: number): string => {
+  // Use toPrecision to strip floating point noise, then remove trailing zeros
+  return parseFloat(value.toPrecision(10)).toString();
 };
 
 /**
@@ -99,7 +122,8 @@ const SingleBoxScalebar: React.FC<{
   labelUnit: string;
   labelMultiplier: number;
   height: number;
-}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height }) => {
+  labelSx?: Record<string, unknown>;
+}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height, labelSx }) => {
   const allSegments = segmentsLeft + totalSegments;
 
   return (
@@ -113,8 +137,8 @@ const SingleBoxScalebar: React.FC<{
             <Typography
               key={i}
               variant="caption"
-              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center" }}>
-              {value}
+              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center", ...labelSx }}>
+              {formatLabelValue(value)}
               {isLast && labelUnit ? ` ${labelUnit}` : ""}
             </Typography>
           );
@@ -146,7 +170,8 @@ const DoubleBoxScalebar: React.FC<{
   labelUnit: string;
   labelMultiplier: number;
   height: number;
-}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height }) => {
+  labelSx?: Record<string, unknown>;
+}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height, labelSx }) => {
   const allSegments = segmentsLeft + totalSegments;
   const halfHeight = height / 2;
 
@@ -161,8 +186,8 @@ const DoubleBoxScalebar: React.FC<{
             <Typography
               key={i}
               variant="caption"
-              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center" }}>
-              {value}
+              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center", ...labelSx }}>
+              {formatLabelValue(value)}
               {isLast && labelUnit ? ` ${labelUnit}` : ""}
             </Typography>
           );
@@ -209,8 +234,9 @@ const LineTicksScalebar: React.FC<{
   labelUnit: string;
   labelMultiplier: number;
   height: number;
+  labelSx?: Record<string, unknown>;
   tickPosition: "middle" | "down" | "up";
-}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height, tickPosition }) => {
+}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height, labelSx, tickPosition }) => {
   const allSegments = segmentsLeft + totalSegments;
 
   return (
@@ -224,8 +250,8 @@ const LineTicksScalebar: React.FC<{
             <Typography
               key={i}
               variant="caption"
-              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center" }}>
-              {value}
+              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center", ...labelSx }}>
+              {formatLabelValue(value)}
               {isLast && labelUnit ? ` ${labelUnit}` : ""}
             </Typography>
           );
@@ -275,7 +301,8 @@ const SteppedLineScalebar: React.FC<{
   labelUnit: string;
   labelMultiplier: number;
   height: number;
-}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height }) => {
+  labelSx?: Record<string, unknown>;
+}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height, labelSx }) => {
   const allSegments = segmentsLeft + totalSegments;
 
   return (
@@ -289,8 +316,8 @@ const SteppedLineScalebar: React.FC<{
             <Typography
               key={i}
               variant="caption"
-              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center" }}>
-              {value}
+              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center", ...labelSx }}>
+              {formatLabelValue(value)}
               {isLast && labelUnit ? ` ${labelUnit}` : ""}
             </Typography>
           );
@@ -367,7 +394,8 @@ const HollowScalebar: React.FC<{
   labelUnit: string;
   labelMultiplier: number;
   height: number;
-}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height }) => {
+  labelSx?: Record<string, unknown>;
+}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height, labelSx }) => {
   const allSegments = segmentsLeft + totalSegments;
 
   return (
@@ -381,8 +409,8 @@ const HollowScalebar: React.FC<{
             <Typography
               key={i}
               variant="caption"
-              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center" }}>
-              {value}
+              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center", ...labelSx }}>
+              {formatLabelValue(value)}
               {isLast && labelUnit ? ` ${labelUnit}` : ""}
             </Typography>
           );
@@ -414,16 +442,9 @@ const HollowScalebar: React.FC<{
  * Render Numeric style scalebar (just text showing scale ratio)
  */
 const NumericScalebar: React.FC<{
-  mapScale: number;
-}> = ({ mapScale }) => {
-  // Calculate scale ratio (1:X)
-  // mapScale is meters per pixel, we need to convert to a ratio
-  // Assuming screen DPI of 96, 1 inch = 25.4mm = ~2.54cm
-  const inchesPerPixel = 1 / 96;
-  const metersPerInch = mapScale * 96;
-  // Convert to same units (meters to meters for 1:X ratio)
-  const scaleRatio = Math.round(metersPerInch / (inchesPerPixel * 0.0254));
-
+  scaleDenominator: number;
+  labelSx?: Record<string, unknown>;
+}> = ({ scaleDenominator, labelSx }) => {
   // Format nicely
   const formatScale = (ratio: number): string => {
     if (ratio >= 1000000) {
@@ -444,8 +465,8 @@ const NumericScalebar: React.FC<{
         alignItems: "center",
         justifyContent: "center",
       }}>
-      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-        {formatScale(scaleRatio)}
+      <Typography variant="body2" sx={{ fontWeight: 500, ...labelSx }}>
+        {formatScale(scaleDenominator)}
       </Typography>
     </Box>
   );
@@ -473,16 +494,28 @@ const ScalebarElementRenderer: React.FC<ScalebarElementRendererProps> = ({
   const segmentsLeft = config.segmentsLeft ?? 0;
   const segmentsRight = config.segmentsRight ?? 2;
 
+  // Standard screen DPI assumption for scale calculation
+  const SCREEN_DPI = 96;
+  const METERS_PER_PIXEL_SCREEN = 0.0254 / SCREEN_DPI;
+
   // Get connected map's scale
-  const mapScale = useMemo(() => {
+  const { mapScale, scaleDenominator } = useMemo(() => {
     if (!mapElementId || !mapElements.length) {
       // Default scale (roughly city level)
-      return 100; // meters per pixel
+      const defaultMpp = 100;
+      return {
+        mapScale: defaultMpp,
+        scaleDenominator: Math.round(defaultMpp / METERS_PER_PIXEL_SCREEN),
+      };
     }
 
     const connectedMap = mapElements.find((el) => el.id === mapElementId);
     if (!connectedMap?.config?.viewState) {
-      return 100;
+      const defaultMpp = 100;
+      return {
+        mapScale: defaultMpp,
+        scaleDenominator: Math.round(defaultMpp / METERS_PER_PIXEL_SCREEN),
+      };
     }
 
     const viewState = connectedMap.config.viewState;
@@ -494,7 +527,14 @@ const ScalebarElementRenderer: React.FC<ScalebarElementRendererProps> = ({
     // MapLibre uses 512px tiles, so constant = 40075016.686 / 512 = 78271.51696
     const metersPerPixel = (78271.51696 * Math.cos((latitude * Math.PI) / 180)) / Math.pow(2, zoomLevel);
 
-    return metersPerPixel;
+    // Use stored scale_denominator if available (exact user-picked value), otherwise derive
+    const storedScale = viewState.scale_denominator as number | undefined;
+    const derivedScale = Math.round(metersPerPixel / METERS_PER_PIXEL_SCREEN);
+
+    return {
+      mapScale: metersPerPixel,
+      scaleDenominator: storedScale ?? derivedScale,
+    };
   }, [mapElementId, mapElements]);
 
   // Calculate scale bar values
@@ -502,6 +542,8 @@ const ScalebarElementRenderer: React.FC<ScalebarElementRendererProps> = ({
     () => calculateScaleBarParams(mapScale, unit, segmentsRight, segmentsLeft),
     [mapScale, unit, segmentsRight, segmentsLeft]
   );
+
+  const labelSx = useMemo(() => typographyToSx(config.typography), [config.typography]);
 
   const renderScalebar = () => {
     const commonProps = {
@@ -511,6 +553,7 @@ const ScalebarElementRenderer: React.FC<ScalebarElementRendererProps> = ({
       labelUnit,
       labelMultiplier,
       height,
+      labelSx,
     };
 
     switch (style) {
@@ -529,7 +572,7 @@ const ScalebarElementRenderer: React.FC<ScalebarElementRendererProps> = ({
       case "hollow":
         return <HollowScalebar {...commonProps} />;
       case "numeric":
-        return <NumericScalebar mapScale={mapScale} />;
+        return <NumericScalebar scaleDenominator={scaleDenominator} labelSx={labelSx} />;
       default:
         return <SingleBoxScalebar {...commonProps} />;
     }

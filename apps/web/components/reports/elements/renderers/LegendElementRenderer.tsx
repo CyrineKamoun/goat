@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Stack, Typography } from "@mui/material";
-import React, { useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { TypographyStyle } from "@/lib/constants/typography";
@@ -28,6 +28,26 @@ function typographyToSx(style?: TypographyStyle): Record<string, unknown> {
 }
 
 /**
+ * Extract overrides with a given prefix, stripping the prefix from keys.
+ * e.g. prefix="legenditem_5_" extracts "legenditem_5_item_0" -> "item_0"
+ */
+function extractPrefixedOverrides(
+  overrides: Record<string, string> | undefined,
+  prefix: string
+): Record<string, string> | undefined {
+  if (!overrides) return undefined;
+  const result: Record<string, string> = {};
+  let found = false;
+  for (const [key, val] of Object.entries(overrides)) {
+    if (key.startsWith(prefix)) {
+      result[key.slice(prefix.length)] = val;
+      found = true;
+    }
+  }
+  return found ? result : undefined;
+}
+
+/**
  * Legend typography configuration (per text role)
  */
 interface LegendTypographyConfig {
@@ -47,6 +67,8 @@ export interface LegendElementConfig {
   };
   /** Map element ID to bind to (null = show all layers) */
   mapElementId?: string | null;
+  /** Auto-update legend from connected map (default true) */
+  auto_update?: boolean;
   /** Layout options */
   layout?: {
     columns?: number;
@@ -54,7 +76,49 @@ export interface LegendElementConfig {
   };
   /** Typography settings for different text roles */
   typography?: LegendTypographyConfig;
+  /** Text overrides when auto_update is off (keyed by "title" or "layer_{id}" or "caption_{id}") */
+  textOverrides?: Record<string, string>;
 }
+
+/**
+ * Inline-editable text component. When editable=true, renders a contentEditable span.
+ * On blur, calls onSave with the new text content.
+ */
+const EditableText: React.FC<{
+  text: string;
+  editable: boolean;
+  onSave: (text: string) => void;
+  sx?: Record<string, unknown>;
+  variant?: "caption" | "subtitle2" | "body2";
+  children?: React.ReactNode;
+}> = ({ text, editable, onSave, sx, variant = "caption", children }) => {
+  const handleBlur = (e: React.FocusEvent<HTMLSpanElement>) => {
+    const newText = e.currentTarget.textContent ?? "";
+    if (newText !== text) {
+      onSave(newText);
+    }
+  };
+
+  return (
+    <Typography
+      variant={variant}
+      className={editable ? "legend-editable-text" : undefined}
+      sx={{
+        ...sx,
+        ...(editable && {
+          cursor: "text",
+          outline: "none",
+          "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" },
+          "&:focus": { backgroundColor: "rgba(0,0,0,0.08)" },
+        }),
+      }}
+      contentEditable={editable}
+      suppressContentEditableWarning
+      onBlur={editable ? handleBlur : undefined}>
+      {children ?? text}
+    </Typography>
+  );
+};
 
 interface LegendElementRendererProps {
   element: ReportElement;
@@ -63,6 +127,8 @@ interface LegendElementRendererProps {
   viewOnly?: boolean;
   /** Zoom level to scale content */
   zoom?: number;
+  /** Callback for updating element config (needed for inline text editing) */
+  onElementUpdate?: (elementId: string, config: Record<string, unknown>) => void;
 }
 
 /**
@@ -77,6 +143,7 @@ const LegendElementRenderer: React.FC<LegendElementRendererProps> = ({
   mapElements = [],
   viewOnly: _viewOnly = true,
   zoom = 1,
+  onElementUpdate,
 }) => {
   const { t } = useTranslation("common");
   // Extract legend config
@@ -84,27 +151,99 @@ const LegendElementRenderer: React.FC<LegendElementRendererProps> = ({
   const titleText = config?.title?.text ?? t("legend");
   const layoutConfig = config?.layout ?? { columns: 1, showLayerNames: true };
   const typography = config?.typography;
+  const textOverrides = config?.textOverrides;
 
-  // Filter layers based on map element binding
-  const filteredLayers = useMemo(() => {
-    // If bound to a specific map element, filter layers
-    if (config?.mapElementId && mapElements.length > 0) {
-      const mapElement = mapElements.find((m) => m.id === config.mapElementId);
-      if (mapElement?.map_config?.layers) {
-        const mapLayerIds = mapElement.map_config.layers;
-        return projectLayers.filter((l) => mapLayerIds.includes(l.id));
+  // Auto-update: default true. When false, legend freezes at its current content.
+  const autoUpdate = config?.auto_update !== false;
+
+  // Whether inline editing is allowed (only when auto_update is off)
+  const isEditable = !autoUpdate;
+
+  // Save a text override
+  const saveTextOverride = useCallback(
+    (key: string, text: string) => {
+      if (!onElementUpdate) return;
+      const currentOverrides = config?.textOverrides ?? {};
+      onElementUpdate(element.id, {
+        ...element.config,
+        textOverrides: {
+          ...currentOverrides,
+          [key]: text,
+        },
+      } as Record<string, unknown>);
+    },
+    [onElementUpdate, element.id, element.config, config?.textOverrides]
+  );
+
+  // Resolve layers dynamically based on map element binding and lock state
+  const resolvedLayers = useMemo(() => {
+    // Find connected map element (if any)
+    const connectedMap = config?.mapElementId && mapElements.length > 0
+      ? mapElements.find((m) => m.id === config.mapElementId)
+      : null;
+
+    // Determine which layer IDs to show
+    let layerIds: number[] | null = null;
+    let styleOverrides: Record<string, Record<string, unknown>> | null = null;
+
+    if (connectedMap) {
+      const mapConfig = connectedMap.config as Record<string, unknown> | undefined;
+      const mapLockLayers = mapConfig?.lock_layers === true;
+      const mapLockStyles = mapConfig?.lock_styles === true;
+      const mapLockedIds = mapConfig?.locked_layer_ids as number[] | undefined;
+      const mapLockedStyles = mapConfig?.locked_layer_styles as Record<string, Record<string, unknown>> | undefined;
+
+      if (mapLockLayers && mapLockedIds) {
+        // Map has locked layers - use those IDs
+        layerIds = mapLockedIds;
+        if (mapLockStyles && mapLockedStyles) {
+          // Map also has locked styles - use frozen properties
+          styleOverrides = mapLockedStyles;
+        }
+      } else if (connectedMap.map_config?.layers) {
+        // Fallback to map_config.layers if available
+        layerIds = connectedMap.map_config.layers;
       }
     }
 
-    // Show all visible layers
-    return projectLayers.filter((layer) => {
-      const props = layer.properties as Record<string, unknown>;
-      // Only show layers that are visible and have legend enabled
-      const isVisible = props.visibility !== false;
-      const legendShow = (props.legend as { show?: boolean })?.show !== false;
-      return isVisible && legendShow;
-    });
+    // Filter project layers
+    let result: ProjectLayer[];
+    if (layerIds) {
+      result = projectLayers.filter((l) => layerIds!.includes(l.id));
+    } else {
+      // Show all visible layers with legend enabled
+      result = projectLayers.filter((layer) => {
+        const props = layer.properties as Record<string, unknown>;
+        const isVisible = props.visibility !== false;
+        const legendShow = (props.legend as { show?: boolean })?.show !== false;
+        return isVisible && legendShow;
+      });
+    }
+
+    // Apply style overrides if the connected map has locked styles
+    if (styleOverrides) {
+      result = result.map((layer) => {
+        const frozenProps = styleOverrides![String(layer.id)];
+        if (frozenProps) {
+          return { ...layer, properties: frozenProps };
+        }
+        return layer;
+      });
+    }
+
+    return result;
   }, [projectLayers, mapElements, config?.mapElementId]);
+
+  // Freeze mechanism: when auto_update is off, keep showing the last resolved layers
+  const frozenLayersRef = useRef<ProjectLayer[]>(resolvedLayers);
+  useEffect(() => {
+    if (autoUpdate) {
+      // Auto-update is on: always keep frozen ref in sync
+      frozenLayersRef.current = resolvedLayers;
+    }
+  }, [autoUpdate, resolvedLayers]);
+
+  const filteredLayers = autoUpdate ? resolvedLayers : frozenLayersRef.current;
 
   // Limit columns to number of layers (no empty columns)
   const columns = Math.min(layoutConfig.columns || 1, filteredLayers.length || 1);
@@ -122,15 +261,17 @@ const LegendElementRenderer: React.FC<LegendElementRendererProps> = ({
       }}>
       {/* Title - only show if text is not empty */}
       {titleText && (
-        <Typography
+        <EditableText
+          text={isEditable && textOverrides?.title ? textOverrides.title : titleText}
+          editable={isEditable}
+          onSave={(text) => saveTextOverride("title", text)}
           variant="subtitle2"
           sx={{
             fontWeight: "bold",
             mb: 1,
             ...typographyToSx(typography?.title),
-          }}>
-          {titleText}
-        </Typography>
+          }}
+        />
       )}
 
       {/* Legend content */}
@@ -152,6 +293,9 @@ const LegendElementRenderer: React.FC<LegendElementRendererProps> = ({
               layer={layer}
               showLayerName={layoutConfig.showLayerNames !== false}
               typography={typography}
+              editable={isEditable}
+              textOverrides={textOverrides}
+              onTextSave={saveTextOverride}
             />
           ))}
         </Box>
@@ -169,9 +313,19 @@ interface LayerLegendItemProps {
   layer: ProjectLayer;
   showLayerName?: boolean;
   typography?: LegendTypographyConfig;
+  editable?: boolean;
+  textOverrides?: Record<string, string>;
+  onTextSave?: (key: string, text: string) => void;
 }
 
-const LayerLegendItem: React.FC<LayerLegendItemProps> = ({ layer, showLayerName = true, typography }) => {
+const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
+  layer,
+  showLayerName = true,
+  typography,
+  editable = false,
+  textOverrides,
+  onTextSave,
+}) => {
   const props = layer.properties as Record<string, unknown>;
   const geomType = layer.type === "feature"
     ? (layer.feature_layer_geometry_type || "polygon")
@@ -231,28 +385,33 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({ layer, showLayerName 
               />
             </Box>
           )}
-          <Typography
+          <EditableText
+            text={editable && textOverrides?.[`layer_${layer.id}`] ? textOverrides[`layer_${layer.id}`] : layer.name}
+            editable={editable}
+            onSave={(text) => onTextSave?.(`layer_${layer.id}`, text)}
             variant="caption"
             sx={{
               fontWeight: 500,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              wordBreak: "break-word",
               ...typographyToSx(typography?.layerName),
-            }}>
-            {layer.name}
-          </Typography>
+            }}
+          />
         </Stack>
       )}
 
       {/* Legend caption */}
       {!!(props.legend && (props.legend as Record<string, unknown>).caption) && (
-        <Typography
+        <EditableText
+          text={
+            editable && textOverrides?.[`caption_${layer.id}`]
+              ? textOverrides[`caption_${layer.id}`]
+              : String((props.legend as Record<string, unknown>).caption)
+          }
+          editable={editable}
+          onSave={(text) => onTextSave?.(`caption_${layer.id}`, text)}
           variant="caption"
-          fontWeight="bold"
-          sx={{ display: "block", mb: 0.5, ...typographyToSx(typography?.caption) }}>
-          {String((props.legend as Record<string, unknown>).caption)}
-        </Typography>
+          sx={{ display: "block", mb: 0.5, fontWeight: "bold", ...typographyToSx(typography?.caption) }}
+        />
       )}
 
       {/* Complex feature legend - attribute-based styling */}
@@ -261,6 +420,9 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({ layer, showLayerName 
           properties={props}
           geometryType={geomType}
           itemTypographySx={typographyToSx(typography?.legendItem)}
+          editable={editable}
+          textOverrides={editable ? extractPrefixedOverrides(textOverrides, `legenditem_${layer.id}_`) : undefined}
+          onTextSave={editable ? (key, text) => onTextSave?.(`legenditem_${layer.id}_${key}`, text) : undefined}
         />
       )}
 
@@ -270,6 +432,9 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({ layer, showLayerName 
           properties={props}
           geometryType="raster"
           itemTypographySx={typographyToSx(typography?.legendItem)}
+          editable={editable}
+          textOverrides={editable ? extractPrefixedOverrides(textOverrides, `legenditem_${layer.id}_`) : undefined}
+          onTextSave={editable ? (key, text) => onTextSave?.(`legenditem_${layer.id}_${key}`, text) : undefined}
         />
       )}
 

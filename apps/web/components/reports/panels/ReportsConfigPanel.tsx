@@ -16,6 +16,7 @@ import {
   ListItemText,
   Stack,
   Switch,
+  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -119,6 +120,8 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
   const [atlasPageName, setAtlasPageName] = useState<string>("");
   const [atlasSortBy, setAtlasSortBy] = useState<string>("");
   const [atlasSortOrder, setAtlasSortOrder] = useState<"asc" | "desc">("asc");
+  const [atlasFileNameTemplate, setAtlasFileNameTemplate] = useState<string>("");
+  const [customTemplateInput, setCustomTemplateInput] = useState<string>("");
 
   // Modal states
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -203,8 +206,15 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
     [t]
   );
 
-  // Update local state and notify parent when selected report changes
+  // Track previous report ID to avoid re-notifying parent on SWR cache updates
+  const prevSelectedReportIdRef = useRef<string | null>(null);
+
+  // Notify parent and load settings only when the selected report ID changes
   useEffect(() => {
+    // Skip if the ID hasn't actually changed (e.g. SWR cache mutation)
+    if (selectedReportId === prevSelectedReportIdRef.current) return;
+    prevSelectedReportIdRef.current = selectedReportId;
+
     if (selectedReportId && reportLayouts) {
       const report = reportLayouts.find((r) => r.id === selectedReportId);
       if (report) {
@@ -235,6 +245,11 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
         } else {
           setAtlasPageName("");
         }
+        // File name template - detect if saved value matches a preset or is custom
+        const savedTemplate = atlas?.file_name_template ?? "";
+        setAtlasFileNameTemplate(savedTemplate);
+        // customTemplateInput will be set after fileNameTemplateItems recalculates
+        setCustomTemplateInput(savedTemplate);
       }
     } else {
       onSelectReport(null);
@@ -362,23 +377,26 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
             ...updates,
           },
         };
+        const updatedReport = { ...selectedReport, config: updatedConfig };
         await updateReportLayout(project.id, selectedReport.id, {
           config: updatedConfig,
         });
         // Optimistic cache update to avoid re-fetch replacing parent's local state
         mutate(
           reportLayouts?.map((r) =>
-            r.id === selectedReport.id ? { ...r, config: updatedConfig } : r
+            r.id === selectedReport.id ? updatedReport : r
           ),
           { revalidate: false }
         );
+        // Notify parent so selectedReport stays in sync
+        onSelectReport(updatedReport);
       } catch (error) {
         console.error("Failed to update report layout:", error);
       } finally {
         setIsSaving(false);
       }
     },
-    [project?.id, selectedReport, reportLayouts, mutate]
+    [project?.id, selectedReport, reportLayouts, mutate, onSelectReport]
   );
 
   const handlePageSizeChange = (newSize: PageConfig["size"]) => {
@@ -416,23 +434,26 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
             ...updates,
           },
         };
+        const updatedReport = { ...selectedReport, config: updatedConfig };
         await updateReportLayout(project.id, selectedReport.id, {
           config: updatedConfig,
         });
         // Optimistic cache update to avoid re-fetch replacing parent's local state
         mutate(
           reportLayouts?.map((r) =>
-            r.id === selectedReport.id ? { ...r, config: updatedConfig } : r
+            r.id === selectedReport.id ? updatedReport : r
           ),
           { revalidate: false }
         );
+        // Notify parent so selectedReport stays in sync
+        onSelectReport(updatedReport);
       } catch (error) {
         console.error("Failed to update atlas settings:", error);
       } finally {
         setIsSaving(false);
       }
     },
-    [project?.id, selectedReport, reportLayouts, mutate]
+    [project?.id, selectedReport, reportLayouts, mutate, onSelectReport]
   );
 
   const handleAtlasEnabledChange = (enabled: boolean) => {
@@ -488,6 +509,79 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
     });
   };
 
+  // Predefined file name template options
+  const CUSTOM_TEMPLATE_VALUE = "__custom__";
+  const fileNameTemplateItems: SelectorItem[] = useMemo(() => {
+    const items: SelectorItem[] = [
+      { label: `${t("layout_name")} + ${t("page_number")}`, value: "{{@layout_name}}_{{@page_number}}" },
+      { label: t("page_number_only"), value: "{{@page_number}}" },
+      { label: t("page_x_of_y"), value: "{{@page_number}}_of_{{@total_pages}}" },
+    ];
+    if (atlasPageName) {
+      items.push(
+        { label: `${t("layout_name")} + ${t("page_name")}`, value: `{{@layout_name}}_{{@feature.${atlasPageName}}}` },
+        { label: t("page_name_only"), value: `{{@feature.${atlasPageName}}}` },
+      );
+    }
+    items.push({ label: t("custom"), value: CUSTOM_TEMPLATE_VALUE });
+    return items;
+  }, [t, atlasPageName]);
+
+  // Determine if current template is a preset or custom
+  const isCustomTemplate = useMemo(() => {
+    if (!atlasFileNameTemplate) return false;
+    if (atlasFileNameTemplate === CUSTOM_TEMPLATE_VALUE) return true;
+    return !fileNameTemplateItems.some(
+      (item) => item.value !== CUSTOM_TEMPLATE_VALUE && item.value === atlasFileNameTemplate
+    );
+  }, [atlasFileNameTemplate, fileNameTemplateItems]);
+
+  const selectedFileNameTemplateItem = useMemo(() => {
+    if (!atlasFileNameTemplate) return fileNameTemplateItems[0]; // default
+    if (isCustomTemplate) return fileNameTemplateItems.find((item) => item.value === CUSTOM_TEMPLATE_VALUE);
+    return fileNameTemplateItems.find((item) => item.value === atlasFileNameTemplate);
+  }, [atlasFileNameTemplate, fileNameTemplateItems, isCustomTemplate]);
+
+  // Validate template placeholders (only relevant for custom input)
+  const templateValidationError = useMemo(() => {
+    if (!isCustomTemplate || !customTemplateInput) return "";
+    // Find all {{...}} placeholders
+    const placeholders = customTemplateInput.match(/\{\{[^}]*\}\}/g);
+    if (!placeholders) return "";
+    const validPatterns = [
+      /^\{\{@page_number\}\}$/,
+      /^\{\{@total_pages\}\}$/,
+      /^\{\{@layout_name\}\}$/,
+      /^\{\{@feature\.[^}]+\}\}$/,
+    ];
+    for (const ph of placeholders) {
+      if (!validPatterns.some((p) => p.test(ph))) {
+        return t("invalid_placeholder", { placeholder: ph });
+      }
+    }
+    return "";
+  }, [customTemplateInput, isCustomTemplate, t]);
+
+  const handleFileNameTemplateSelect = (item: SelectorItem | SelectorItem[] | undefined) => {
+    if (!item || Array.isArray(item)) return;
+    if (item.value === CUSTOM_TEMPLATE_VALUE) {
+      // Switch to custom mode with empty input
+      setCustomTemplateInput("");
+      setAtlasFileNameTemplate(CUSTOM_TEMPLATE_VALUE);
+    } else {
+      const value = item.value as string;
+      setAtlasFileNameTemplate(value);
+      setCustomTemplateInput("");
+      handleAtlasSettingChange({ file_name_template: value || undefined });
+    }
+  };
+
+  const handleCustomTemplateBlur = () => {
+    // Only persist on blur to avoid focus loss
+    if (customTemplateInput && !templateValidationError) {
+      handleAtlasSettingChange({ file_name_template: customTemplateInput || undefined });
+    }
+  };
 
   // Menu items for layout actions
   const getLayoutMenuItems = useCallback(
@@ -533,6 +627,20 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
       projectLayers,
     });
 
+  // Example preview for the active template
+  const templatePreview = useMemo(() => {
+    const template = isCustomTemplate ? customTemplateInput : atlasFileNameTemplate;
+    if (!template || template === CUSTOM_TEMPLATE_VALUE) return "";
+    const layoutName = selectedReport?.name || "Layout";
+    const sampleAttr = atlasPageName ? "Berlin" : "";
+    const example = template
+      .replace(/\{\{@layout_name\}\}/g, layoutName.replace(/\s+/g, "_"))
+      .replace(/\{\{@page_number\}\}/g, "1")
+      .replace(/\{\{@total_pages\}\}/g, String(atlasTotalPages || 10))
+      .replace(/\{\{@feature\.[^}]+\}\}/g, sampleAttr || "value");
+    return example ? `${example}.${exportFormat}` : "";
+  }, [atlasFileNameTemplate, customTemplateInput, isCustomTemplate, exportFormat, selectedReport?.name, atlasTotalPages, atlasPageName, CUSTOM_TEMPLATE_VALUE]);
+
   const handlePrintReport = useCallback(async () => {
     if (!project?.id || !selectedReport) return;
 
@@ -553,6 +661,7 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
         dpi,
         paperWidthMm,
         paperHeightMm,
+        fileNameTemplate: selectedReport.config.atlas?.file_name_template || undefined,
       });
     } catch (error) {
       console.error("Failed to print report:", error);
@@ -860,6 +969,38 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                           items={sortOrderItems}
                           disabled={!selectedReport || isSaving}
                         />
+
+                        {/* Output File Name Template - only for image formats */}
+                        {exportFormat !== "pdf" && (
+                          <Stack spacing={1.5}>
+                            <Selector
+                              label={t("atlas_file_name_template")}
+                              tooltip={t("atlas_file_name_template_help")}
+                              selectedItems={selectedFileNameTemplateItem}
+                              setSelectedItems={handleFileNameTemplateSelect}
+                              items={fileNameTemplateItems}
+                              disabled={!selectedReport || isSaving}
+                            />
+                            {isCustomTemplate && (
+                              <TextField
+                                size="small"
+                                value={customTemplateInput}
+                                onChange={(e) => setCustomTemplateInput(e.target.value)}
+                                onBlur={handleCustomTemplateBlur}
+                                placeholder="{{@layout_name}}_{{@page_number}}"
+                                disabled={!selectedReport || isSaving}
+                                error={!!templateValidationError}
+                                helperText={templateValidationError}
+                                fullWidth
+                              />
+                            )}
+                            {templatePreview && (
+                              <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                                {t("example")}: {templatePreview}
+                              </Typography>
+                            )}
+                          </Stack>
+                        )}
 
                       </>
                     )}

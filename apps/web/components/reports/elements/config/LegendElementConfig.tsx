@@ -1,7 +1,7 @@
 "use client";
 
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { Collapse, Stack, TextField, Typography, useTheme } from "@mui/material";
+import { Checkbox, Collapse, FormControlLabel, Stack, TextField, Typography, useTheme } from "@mui/material";
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -38,6 +38,8 @@ interface LegendElementConfig {
   };
   /** Map element ID to bind to (null = show all layers) */
   mapElementId?: string | null;
+  /** Auto-update legend from connected map (default true) */
+  auto_update?: boolean;
   /** Layout options */
   layout?: {
     columns?: number;
@@ -45,6 +47,8 @@ interface LegendElementConfig {
   };
   /** Typography settings for different text roles */
   typography?: LegendTypographyConfig;
+  /** Text overrides when auto_update is off */
+  textOverrides?: Record<string, string>;
 }
 
 interface LegendElementConfigProps {
@@ -83,6 +87,7 @@ const LegendElementConfig: React.FC<LegendElementConfigProps> = ({ element, mapE
   const titleText = config.title?.text ?? t("legend");
   const layoutConfig = config.layout ?? { columns: 1, showBackground: true };
   const mapElementId = config.mapElementId ?? "";
+  const autoUpdate = config.auto_update !== false; // Default true
 
   // Create map selector items
   const mapSelectorItems: SelectorItem[] = useMemo(() => {
@@ -137,6 +142,16 @@ const LegendElementConfig: React.FC<LegendElementConfigProps> = ({ element, mapE
   const handleMapChange = (item: SelectorItem | SelectorItem[] | undefined) => {
     if (!item || Array.isArray(item)) return;
     updateConfig({ mapElementId: item.value ? String(item.value) : null });
+  };
+
+  // Handle auto-update toggle
+  const handleAutoUpdateChange = (_event: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {
+    if (checked) {
+      // Clear text overrides when re-enabling auto-update
+      updateConfig({ auto_update: true, textOverrides: undefined });
+    } else {
+      updateConfig({ auto_update: false });
+    }
   };
 
   // Handle columns selection
@@ -211,6 +226,21 @@ const LegendElementConfig: React.FC<LegendElementConfigProps> = ({ element, mapE
               items={mapSelectorItems}
               label={t("connected_map")}
               tooltip={t("legend_map_connection_help")}
+            />
+            {/* Auto Update */}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={autoUpdate}
+                  onChange={handleAutoUpdateChange}
+                />
+              }
+              label={
+                <Typography variant="body2">
+                  {t("auto_update")}
+                </Typography>
+              }
             />
           </Stack>
         }

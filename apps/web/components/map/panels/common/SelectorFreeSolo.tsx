@@ -29,7 +29,7 @@ const SelectorFreeSolo = (props: SelectorFreeSoloProps) => {
         <FormLabelHelper
           label={props.label}
           color={
-            props.disabled ? theme.palette.secondary.main : focused ? theme.palette.primary.main : "inherit"
+            props.disabled ? theme.palette.secondary.main : focused ? theme.palette.primary.main : theme.palette.text.secondary
           }
           tooltip={props.tooltip}
         />

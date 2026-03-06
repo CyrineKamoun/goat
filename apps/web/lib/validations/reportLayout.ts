@@ -234,6 +234,17 @@ export const atlasConfigSchema = z
     coverage: atlasCoverageSchema.optional(),
     /** Page labeling configuration */
     page_label: atlasPageLabelSchema,
+    /**
+     * Output filename template for atlas exports (PNG/JPEG).
+     * Supports placeholders:
+     * - {{@page_number}}: Current page number (1-based)
+     * - {{@total_pages}}: Total number of pages
+     * - {{@layout_name}}: Layout name
+     * - {{@feature.ATTR_NAME}}: Feature attribute value
+     * Use "/" to create folder structure inside the ZIP.
+     * Duplicates get auto-suffixed (_2, _3, etc.)
+     */
+    file_name_template: z.string().optional(),
   })
   .optional();
 

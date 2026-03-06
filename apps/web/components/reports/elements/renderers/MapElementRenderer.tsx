@@ -77,13 +77,40 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
   // Use live basemap URL from props, fallback to default
   const mapStyleUrl = basemapUrl || DEFAULT_BASEMAP_URL;
 
-  // Filter to only include visible layers (synced with main map visibility)
+  // Layer lock settings from config
+  const lockLayers = element.config?.lock_layers === true;
+  const lockStyles = element.config?.lock_styles === true;
+  const lockedLayerIds = element.config?.locked_layer_ids as number[] | undefined;
+  const lockedLayerStyles = element.config?.locked_layer_styles as Record<string, Record<string, unknown>> | undefined;
+
+  // Filter and transform layers based on lock state
   const visibleLayers = useMemo(() => {
-    return layers.filter((layer) => {
-      const props = layer.properties as Record<string, unknown>;
-      return props.visibility !== false;
-    });
-  }, [layers]);
+    let filtered: ProjectLayer[];
+
+    if (lockLayers && lockedLayerIds) {
+      // Locked: only show the locked layer IDs (regardless of current visibility)
+      filtered = layers.filter((layer) => lockedLayerIds.includes(layer.id));
+    } else {
+      // Normal: filter by visibility
+      filtered = layers.filter((layer) => {
+        const props = layer.properties as Record<string, unknown>;
+        return props.visibility !== false;
+      });
+    }
+
+    // If styles are also locked, overlay frozen properties onto matching layers
+    if (lockLayers && lockStyles && lockedLayerStyles) {
+      filtered = filtered.map((layer) => {
+        const frozenProps = lockedLayerStyles[String(layer.id)];
+        if (frozenProps) {
+          return { ...layer, properties: frozenProps };
+        }
+        return layer;
+      });
+    }
+
+    return filtered;
+  }, [layers, lockLayers, lockStyles, lockedLayerIds, lockedLayerStyles]);
 
   // Use controlled viewState to prevent map from changing when container resizes (page zoom)
   const [viewState, setViewState] = useState({
