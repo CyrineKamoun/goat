@@ -28,6 +28,7 @@ import type { ReportElement, ReportElementType, ReportLayout } from "@/lib/valid
 import SettingsGroupHeader from "@/components/builder/widgets/common/SettingsGroupHeader";
 import SidePanel, { SidePanelTabPanel, SidePanelTabs } from "@/components/common/SidePanel";
 import JobProgressItem from "@/components/jobs/JobProgressItem";
+import { useBasemap } from "@/hooks/map/MapHooks";
 import { reportElementIconMap } from "@/components/reports/elements/ReportElementIconMap";
 import ElementConfiguration from "@/components/reports/elements/config/ElementConfiguration";
 
@@ -351,6 +352,8 @@ const ReportsElementsPanel: React.FC<ReportsElementsPanelProps> = ({
   onElementDelete,
 }) => {
   const { t } = useTranslation("common");
+  const { activeBasemap } = useBasemap(project);
+  const basemapUrl = activeBasemap?.url;
   const [activeTab, setActiveTab] = useState(0);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -399,6 +402,7 @@ const ReportsElementsPanel: React.FC<ReportsElementsPanelProps> = ({
           element={selectedElement}
           allElements={selectedReport?.config?.elements}
           projectLayers={projectLayers}
+          basemapUrl={basemapUrl}
           onChange={handleElementUpdate}
           onDelete={handleElementDelete}
           onBack={handleBack}

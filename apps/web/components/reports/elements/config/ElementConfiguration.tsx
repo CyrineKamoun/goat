@@ -22,6 +22,7 @@ interface ElementConfigurationProps {
   element: ReportElement;
   allElements?: ReportElement[];
   projectLayers?: ProjectLayer[];
+  basemapUrl?: string;
   onChange: (updates: Partial<ReportElement>) => void;
   onDelete: () => void;
   onBack: () => void;
@@ -94,6 +95,7 @@ const ElementConfiguration: React.FC<ElementConfigurationProps> = ({
   element,
   allElements,
   projectLayers,
+  basemapUrl,
   onChange,
   onDelete: _onDelete,
   onBack,
@@ -122,6 +124,7 @@ const ElementConfiguration: React.FC<ElementConfigurationProps> = ({
               <MapElementConfig
                 element={element}
                 projectLayers={projectLayers}
+                basemapUrl={basemapUrl}
                 onChange={onChange}
                 onSyncLayers={() => onSyncMapLayers?.(element.id)}
               />

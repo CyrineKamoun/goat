@@ -71,5 +71,9 @@
   "python-envs.pythonProjects": [],
   // Disable automatic venv activation in terminals (breaks frontend dev server)
   "python.terminal.activateEnvironment": false,
-  "terminal.integrated.sendKeybindingsToShell": true
+  "terminal.integrated.sendKeybindingsToShell": true,
+  // Copilot commit message generation uses our commit convention instructions
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    { "file": ".github/instructions/commit-messages.instructions.md" }
+  ]
 }

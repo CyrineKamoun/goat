@@ -77,13 +77,14 @@ const PREDEFINED_SCALES = [
 interface MapElementConfigProps {
   element: ReportElement;
   projectLayers?: ProjectLayer[];
+  basemapUrl?: string;
   onChange: (updates: Partial<ReportElement>) => void;
   onSyncLayers?: () => void;
 }
 
 type AtlasMode = "best_fit" | "fixed_scale";
 
-const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, projectLayers = [], onChange, onSyncLayers }) => {
+const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, projectLayers = [], basemapUrl, onChange, onSyncLayers }) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
 
@@ -195,6 +196,7 @@ const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, projectLay
 
     if (layers) {
       updates.locked_layer_ids = visibleLayers.map((l) => l.id);
+      updates.locked_basemap_url = basemapUrl;
       if (styles) {
         const stylesMap: Record<number, Record<string, unknown>> = {};
         visibleLayers.forEach((l) => {
@@ -207,6 +209,7 @@ const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, projectLay
     } else {
       updates.locked_layer_ids = undefined;
       updates.locked_layer_styles = undefined;
+      updates.locked_basemap_url = undefined;
     }
 
     onChange({ config: updates });

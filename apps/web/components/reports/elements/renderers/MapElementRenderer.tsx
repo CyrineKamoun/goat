@@ -74,22 +74,29 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
   // Create a stable key for detecting config changes
   const configKey = JSON.stringify(configViewState);
 
-  // Use live basemap URL from props, fallback to default
-  const mapStyleUrl = basemapUrl || DEFAULT_BASEMAP_URL;
-
   // Layer lock settings from config
   const lockLayers = element.config?.lock_layers === true;
   const lockStyles = element.config?.lock_styles === true;
   const lockedLayerIds = element.config?.locked_layer_ids as number[] | undefined;
   const lockedLayerStyles = element.config?.locked_layer_styles as Record<string, Record<string, unknown>> | undefined;
+  const lockedBasemapUrl = element.config?.locked_basemap_url as string | undefined;
+
+  // Use locked basemap when layers are locked, otherwise live from props
+  const mapStyleUrl = (lockLayers && lockedBasemapUrl) ? lockedBasemapUrl : (basemapUrl || DEFAULT_BASEMAP_URL);
 
   // Filter and transform layers based on lock state
   const visibleLayers = useMemo(() => {
     let filtered: ProjectLayer[];
 
     if (lockLayers && lockedLayerIds) {
-      // Locked: only show the locked layer IDs (regardless of current visibility)
-      filtered = layers.filter((layer) => lockedLayerIds.includes(layer.id));
+      // Locked: only show the locked layer IDs with forced visibility
+      // (layer visibility from the project should NOT affect locked maps)
+      filtered = layers
+        .filter((layer) => lockedLayerIds.includes(layer.id))
+        .map((layer) => ({
+          ...layer,
+          properties: { ...layer.properties, visibility: true },
+        }));
     } else {
       // Normal: filter by visibility
       filtered = layers.filter((layer) => {
