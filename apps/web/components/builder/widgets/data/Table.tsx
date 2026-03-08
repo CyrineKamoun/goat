@@ -1,4 +1,7 @@
-import { Box, TextField, Typography } from "@mui/material";
+import EditIcon from "@mui/icons-material/Edit";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
+import { Box, Button, IconButton, Popover, Stack, TextField, Typography } from "@mui/material";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -11,11 +14,13 @@ import type { DatasetCollectionItems, GetCollectionItemsQueryParams } from "@/li
 import type { AggregationStatsQueryParams, ProjectLayer } from "@/lib/validations/project";
 import { aggregationStatsQueryParams } from "@/lib/validations/project";
 import { tableDataConfigSchema, tableModeTypes, tableQueryModeTypes, type TableDataSchema } from "@/lib/validations/widget";
+import type { FormatNumberTypes } from "@/lib/validations/widget";
 
 import useLayerFields from "@/hooks/map/CommonHooks";
 import { useChartWidget } from "@/hooks/map/DashboardBuilderHooks";
 
 import WidgetRecordsTable from "@/components/builder/widgets/data/WidgetRecordsTable";
+import { NumberFormatSelector } from "@/components/builder/widgets/common/WidgetCommonConfigs";
 import { WidgetStatusContainer } from "@/components/builder/widgets/common/WidgetStatusContainer";
 
 interface TableDataWidgetProps {
@@ -34,6 +39,7 @@ type GroupedMetricConfig = {
 
 type GroupedRow = {
   grouped_value: string;
+  grouped_secondary_value?: string;
   metrics: number[];
 };
 
@@ -53,6 +59,13 @@ export const TableDataWidget = ({
   const mode = config?.setup?.mode ?? tableModeTypes.Values.records;
   const isGroupedMode = mode === tableModeTypes.Values.grouped;
   const stickyHeaderEnabled = (config?.options?.sticky_header ?? true) === true;
+
+  const secondaryGroupByColumn = config?.setup?.group_by_secondary_column_name;
+  const hasSecondaryGroup = isGroupedMode && !!secondaryGroupByColumn;
+  const groupedDisplayMode = config?.setup?.grouped_display_mode ?? "flat";
+  const isCollapsibleMode = hasSecondaryGroup && groupedDisplayMode === "collapsible";
+  const collapseInitial = config?.setup?.grouped_collapse_initial ?? "collapsed";
+  const showSubtotals = config?.setup?.grouped_show_subtotals !== false;
 
   const [recordsPage, setRecordsPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(rowsShownSetting);
@@ -79,8 +92,12 @@ export const TableDataWidget = ({
   const [isSqlOverflowing, setIsSqlOverflowing] = useState(false);
   const [areWidthsHydrated, setAreWidthsHydrated] = useState(false);
   const [isResizingColumns, setIsResizingColumns] = useState(false);
-  const [editingHeaderKey, setEditingHeaderKey] = useState<string | null>(null);
-  const [editingHeaderValue, setEditingHeaderValue] = useState("");
+  const [columnEditAnchorEl, setColumnEditAnchorEl] = useState<HTMLElement | null>(null);
+  const [columnEditHeaderKey, setColumnEditHeaderKey] = useState<string | null>(null);
+  const [columnEditLabel, setColumnEditLabel] = useState("");
+  const [columnEditFormat, setColumnEditFormat] = useState<FormatNumberTypes | undefined>(undefined);
+  const [columnEditIsNumeric, setColumnEditIsNumeric] = useState(false);
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
 
   const recordsScrollRef = useRef<HTMLDivElement | null>(null);
   const groupedScrollRef = useRef<HTMLDivElement | null>(null);
@@ -93,21 +110,22 @@ export const TableDataWidget = ({
     startWidth: number;
   } | null>(null);
 
-  const twoLineClampSx = {
-    display: "-webkit-box",
-    WebkitLineClamp: 2,
-    WebkitBoxOrient: "vertical" as const,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "normal",
-    wordBreak: "break-word",
-    lineHeight: 1.25,
-    maxHeight: "2.5em",
-  };
+  const twoLineClampSx = useMemo(
+    () => ({
+      display: "-webkit-box",
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: "vertical" as const,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "normal",
+      wordBreak: "break-word",
+      lineHeight: 1.25,
+      maxHeight: "2.5em",
+    }),
+    []
+  );
 
   const persistentScrollbarSx = {
-    scrollbarWidth: "auto" as const,
-    scrollbarColor: "rgba(110, 110, 110, 0.5) transparent",
     "&::-webkit-scrollbar": {
       width: 10,
       height: 10,
@@ -139,7 +157,9 @@ export const TableDataWidget = ({
     return projectLayers.find((layer) => layer.id === config?.setup?.layer_project_id);
   }, [projectLayers, config?.setup?.layer_project_id]);
 
-  const recordsLayerId = selectedLayer?.layer_id;
+  // Prefer explicit selected layer from props, but fall back to hook-resolved layer id.
+  // This avoids SQL mode becoming "not configured" when projectLayers is temporarily stale.
+  const recordsLayerId = selectedLayer?.layer_id || layerId;
 
   const tableMetrics = useMemo(() => {
     if (!isGroupedMode || isSqlMode) return [] as GroupedMetricConfig[];
@@ -196,6 +216,10 @@ export const TableDataWidget = ({
   }, [layerFields, config?.setup?.visible_columns]);
 
   const isRecordsColumnsConfigured = visibleFields.length > 0;
+
+  const recordNumericFieldNames = useMemo(() => {
+    return new Set(visibleFields.filter((f) => f.type === "number").map((f) => f.name));
+  }, [visibleFields]);
 
   const recordsQueryParams = useMemo(() => {
     if (!recordsLayerId || isGroupedMode || isSqlMode || !isRecordsColumnsConfigured) return undefined;
@@ -267,7 +291,7 @@ export const TableDataWidget = ({
       };
     });
     setRecordsHasMore(recordsData.features.length >= rowsPerPage);
-  }, [isGroupedMode, isSqlMode, recordsData, recordsPage]);
+  }, [isGroupedMode, isSqlMode, recordsData, recordsPage, rowsPerPage]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -304,6 +328,10 @@ export const TableDataWidget = ({
               filter,
             };
 
+            if (secondaryGroupByColumn) {
+              inputs.group_by_secondary_column = secondaryGroupByColumn;
+            }
+
             if (!metric.operation_value) {
               delete inputs.operation_column;
             }
@@ -320,26 +348,61 @@ export const TableDataWidget = ({
             }
 
             const result = await response.json();
-            return (result.items || []) as Array<{ grouped_value: string; operation_value: number }>;
+            return (result.items || []) as Array<{
+              grouped_value: string;
+              grouped_secondary_value?: string;
+              operation_value: number;
+            }>;
           })
         );
 
         if (isCancelled) return;
 
-        const groupedMap = new Map<string, number[]>();
+        if (secondaryGroupByColumn) {
+          // Two-level grouping: build composite key from primary + secondary
+          const groupedMap = new Map<string, number[]>();
+          const secondaryMap = new Map<string, string>();
 
-        responses.forEach((items, metricIndex) => {
-          items.forEach((item) => {
-            const groupedValue = String(item.grouped_value ?? "-");
-            if (!groupedMap.has(groupedValue)) {
-              groupedMap.set(groupedValue, new Array(tableMetrics.length).fill(0));
-            }
-            const values = groupedMap.get(groupedValue)!;
-            values[metricIndex] = item.operation_value ?? 0;
+          responses.forEach((items, metricIndex) => {
+            items.forEach((item) => {
+              const primary = String(item.grouped_value ?? "-");
+              const secondary = String(item.grouped_secondary_value ?? "-");
+              const compositeKey = `${primary}\x00${secondary}`;
+              if (!groupedMap.has(compositeKey)) {
+                groupedMap.set(compositeKey, new Array(tableMetrics.length).fill(0));
+                secondaryMap.set(compositeKey, secondary);
+              }
+              const values = groupedMap.get(compositeKey)!;
+              values[metricIndex] = item.operation_value ?? 0;
+            });
           });
-        });
 
-        setGroupedRows(Array.from(groupedMap.entries()).map(([grouped_value, metrics]) => ({ grouped_value, metrics })));
+          setGroupedRows(
+            Array.from(groupedMap.entries()).map(([compositeKey, metrics]) => {
+              const primary = compositeKey.split("\x00")[0];
+              return {
+                grouped_value: primary,
+                grouped_secondary_value: secondaryMap.get(compositeKey),
+                metrics,
+              };
+            })
+          );
+        } else {
+          const groupedMap = new Map<string, number[]>();
+
+          responses.forEach((items, metricIndex) => {
+            items.forEach((item) => {
+              const groupedValue = String(item.grouped_value ?? "-");
+              if (!groupedMap.has(groupedValue)) {
+                groupedMap.set(groupedValue, new Array(tableMetrics.length).fill(0));
+              }
+              const values = groupedMap.get(groupedValue)!;
+              values[metricIndex] = item.operation_value ?? 0;
+            });
+          });
+
+          setGroupedRows(Array.from(groupedMap.entries()).map(([grouped_value, metrics]) => ({ grouped_value, metrics })));
+        }
       } catch (error) {
         if (!isCancelled) {
           setGroupedRows([]);
@@ -364,6 +427,7 @@ export const TableDataWidget = ({
     isSqlMode,
     layerId,
     queryParams,
+    secondaryGroupByColumn,
     tableMetrics,
   ]);
 
@@ -417,7 +481,7 @@ export const TableDataWidget = ({
 
         if (isCancelled) return;
 
-        setSqlColumns((previous) => (sqlPage === 0 ? result.columns || [] : previous));
+        setSqlColumns((previous) => (sqlPage === 0 || previous.length === 0 ? result.columns || [] : previous));
 
         const incomingRows = (result.rows || []).map((row) => row.values || {});
         setSqlRows((previous) => (sqlPage === 0 ? incomingRows : [...previous, ...incomingRows]));
@@ -521,7 +585,10 @@ export const TableDataWidget = ({
   const sortedGroupedRows = useMemo(() => {
     const items = groupedRows;
     const sortByRaw = config?.options?.sort_by;
-    const sortBy = sortByRaw === "grouped_value" ? "grouped_value" : sortByRaw || "metric_0";
+    const sortBy =
+      sortByRaw === "grouped_value" || sortByRaw === "grouped_secondary_value"
+        ? sortByRaw
+        : sortByRaw || "metric_0";
     const sorting = config?.options?.sorting ?? "desc";
 
     return [...items].sort((left, right) => {
@@ -532,6 +599,15 @@ export const TableDataWidget = ({
             numeric: true,
             sensitivity: "base",
           }) * direction
+        );
+      }
+      if (sortBy === "grouped_secondary_value") {
+        return (
+          String(left.grouped_secondary_value ?? "-").localeCompare(
+            String(right.grouped_secondary_value ?? "-"),
+            i18n.language,
+            { numeric: true, sensitivity: "base" }
+          ) * direction
         );
       }
       const metricIndex = Number(sortBy.replace("metric_", ""));
@@ -545,6 +621,18 @@ export const TableDataWidget = ({
     // Grouped rows are already fully fetched; render the full list to keep both table views consistent.
     setGroupedVisibleCount(sortedGroupedRows.length);
   }, [sortedGroupedRows.length]);
+
+  const toggleParent = useCallback((parentValue: string) => {
+    setExpandedParents((prev) => {
+      const next = new Set(prev);
+      if (next.has(parentValue)) {
+        next.delete(parentValue);
+      } else {
+        next.add(parentValue);
+      }
+      return next;
+    });
+  }, []);
 
   const totalGroupedMetrics = useMemo(() => {
     if (!config?.options?.show_totals) return [] as Array<number | null>;
@@ -569,6 +657,74 @@ export const TableDataWidget = ({
       })
       .map((column) => column.name);
   }, [sqlColumns]);
+
+  const columnFormats = useMemo(() => {
+    return config?.options?.column_formats || {};
+  }, [config?.options?.column_formats]);
+
+  const getColumnFormat = useCallback(
+    (columnKey: string): FormatNumberTypes => {
+      return columnFormats[columnKey] || config?.options?.format || "none";
+    },
+    [columnFormats, config?.options?.format]
+  );
+
+  // Detect SQL group columns for collapsible mode.
+  // Priority: explicitly configured group columns -> non-numeric columns -> first two SQL columns.
+  const sqlGroupColumns = useMemo(() => {
+    const configuredPrimary = config?.setup?.group_by_column_name;
+    const configuredSecondary = config?.setup?.group_by_secondary_column_name;
+    const hasConfiguredPair =
+      !!configuredPrimary &&
+      !!configuredSecondary &&
+      sqlColumns.some((column) => column.name === configuredPrimary) &&
+      sqlColumns.some((column) => column.name === configuredSecondary);
+
+    if (hasConfiguredPair) {
+      return [configuredPrimary, configuredSecondary] as string[];
+    }
+
+    const nonNumericColumns = sqlColumns
+      .filter((column) => !sqlNumericColumnNames.includes(column.name))
+      .map((column) => column.name);
+
+    if (nonNumericColumns.length >= 2) {
+      return nonNumericColumns;
+    }
+
+    return sqlColumns.slice(0, 2).map((column) => column.name);
+  }, [
+    config?.setup?.group_by_column_name,
+    config?.setup?.group_by_secondary_column_name,
+    sqlColumns,
+    sqlNumericColumnNames,
+  ]);
+
+  const sqlGroupPrimaryColumn = sqlGroupColumns[0] as string | undefined;
+  const sqlGroupSecondaryColumn = sqlGroupColumns.length >= 2 ? sqlGroupColumns[1] : undefined;
+  const hasSqlMultipleGroups = !!sqlGroupPrimaryColumn && !!sqlGroupSecondaryColumn;
+  const isSqlCollapsibleMode = isSqlMode && hasSqlMultipleGroups && groupedDisplayMode === "collapsible";
+
+  // Reset expanded parents when data or collapsible settings change
+  useEffect(() => {
+    if (!isCollapsibleMode && !isSqlCollapsibleMode) {
+      setExpandedParents(new Set());
+      return;
+    }
+    if (collapseInitial === "expanded") {
+      if (isCollapsibleMode) {
+        const allParents = new Set(sortedGroupedRows.map((row) => row.grouped_value));
+        setExpandedParents(allParents);
+      } else if (isSqlCollapsibleMode && sqlGroupPrimaryColumn) {
+        const allParents = new Set(
+          sqlRows.map((row) => String(row[sqlGroupPrimaryColumn] ?? "-"))
+        );
+        setExpandedParents(allParents);
+      }
+    } else {
+      setExpandedParents(new Set());
+    }
+  }, [collapseInitial, isCollapsibleMode, isSqlCollapsibleMode, sortedGroupedRows, sqlRows, sqlGroupPrimaryColumn]);
 
   const sqlColumnLabelMap = useMemo(() => {
     return config?.setup?.sql_column_labels || {};
@@ -627,6 +783,18 @@ export const TableDataWidget = ({
           label: config?.setup?.group_by_label || config?.setup?.group_by_column_name || t("group", { defaultValue: "Group" }),
           align: "left" as const,
         },
+        ...(!isCollapsibleMode && hasSecondaryGroup
+          ? [
+              {
+                key: "grouped_secondary_value",
+                label:
+                  config?.setup?.group_by_secondary_label ||
+                  config?.setup?.group_by_secondary_column_name ||
+                  t("secondary_group", { defaultValue: "Secondary group" }),
+                align: "left" as const,
+              },
+            ]
+          : []),
         ...groupedMetricLabels.map((label, index) => ({
           key: `metric_${index}`,
           label,
@@ -643,18 +811,86 @@ export const TableDataWidget = ({
 
       return [...ordered, ...missing];
     },
-    [config?.setup?.group_by_column_name, config?.setup?.group_by_label, config?.setup?.grouped_column_order, groupedMetricLabels, t]
+    [config?.setup?.group_by_column_name, config?.setup?.group_by_label, config?.setup?.group_by_secondary_column_name, config?.setup?.group_by_secondary_label, config?.setup?.grouped_column_order, groupedMetricLabels, hasSecondaryGroup, isCollapsibleMode, t]
   );
 
   const groupedTableRows = useMemo(() => {
-    return visibleGroupedRows.map((item) => {
-      const row: Record<string, unknown> = { grouped_value: item.grouped_value ?? "-" };
-      item.metrics.forEach((value, metricIndex) => {
-        row[`metric_${metricIndex}`] = value;
+    if (!isCollapsibleMode) {
+      // Flat mode: one row per combination
+      return visibleGroupedRows.map((item) => {
+        const row: Record<string, unknown> = {
+          grouped_value: item.grouped_value ?? "-",
+          ...(hasSecondaryGroup && { grouped_secondary_value: item.grouped_secondary_value ?? "-" }),
+        };
+        item.metrics.forEach((value, metricIndex) => {
+          row[`metric_${metricIndex}`] = value;
+        });
+        return row;
       });
-      return row;
+    }
+
+    // Collapsible mode: build parent/child rows
+    const parentOrder: string[] = [];
+    const childrenByParent = new Map<string, GroupedRow[]>();
+
+    visibleGroupedRows.forEach((item) => {
+      const parent = item.grouped_value ?? "-";
+      if (!childrenByParent.has(parent)) {
+        parentOrder.push(parent);
+        childrenByParent.set(parent, []);
+      }
+      childrenByParent.get(parent)!.push(item);
     });
-  }, [visibleGroupedRows]);
+
+    const rows: Array<Record<string, unknown>> = [];
+
+    parentOrder.forEach((parent) => {
+      const children = childrenByParent.get(parent) || [];
+      const isExpanded = expandedParents.has(parent);
+
+      // Parent row: compute subtotals across all children
+      const parentRow: Record<string, unknown> = {
+        grouped_value: parent,
+        _isParent: true,
+        _isExpanded: isExpanded,
+        _childCount: children.length,
+      };
+
+      if (showSubtotals) {
+        const metricCount = children[0]?.metrics?.length || 0;
+        for (let i = 0; i < metricCount; i++) {
+          parentRow[`metric_${i}`] = children.reduce((sum, child) => sum + (child.metrics[i] ?? 0), 0);
+        }
+      }
+
+      rows.push(parentRow);
+
+      if (isExpanded) {
+        // Sub-header row showing the secondary column name
+        const subHeaderRow: Record<string, unknown> = {
+          grouped_value: config?.setup?.group_by_secondary_label || config?.setup?.group_by_secondary_column_name || t("secondary_group", { defaultValue: "Secondary group" }),
+          _isSubHeader: true,
+        };
+        groupedMetricLabels.forEach((label, metricIndex) => {
+          subHeaderRow[`metric_${metricIndex}`] = label;
+        });
+        rows.push(subHeaderRow);
+
+        children.forEach((child) => {
+          const childRow: Record<string, unknown> = {
+            grouped_value: child.grouped_secondary_value ?? "-",
+            _isChild: true,
+          };
+          child.metrics.forEach((value, metricIndex) => {
+            childRow[`metric_${metricIndex}`] = value;
+          });
+          rows.push(childRow);
+        });
+      }
+    });
+
+    return rows;
+  }, [config?.setup?.group_by_secondary_column_name, config?.setup?.group_by_secondary_label, expandedParents, groupedMetricLabels, hasSecondaryGroup, isCollapsibleMode, showSubtotals, t, visibleGroupedRows]);
 
   const groupedTotalsRow = useMemo(() => {
     if (!totalGroupedMetrics.some((value) => value !== null)) return undefined;
@@ -665,18 +901,72 @@ export const TableDataWidget = ({
     return row;
   }, [t, totalGroupedMetrics]);
 
-  const formatGroupedCell = useCallback(
+  const formatRecordCell = useCallback(
     (columnKey: string, value: unknown) => {
+      if (value === null || value === undefined) return "";
+      if (recordNumericFieldNames.has(columnKey) && (typeof value === "number" || typeof value === "string")) {
+        const parsed = typeof value === "number" ? value : Number(value);
+        if (Number.isFinite(parsed)) {
+          return formatNumber(parsed, getColumnFormat(columnKey), i18n.language);
+        }
+      }
+      if (typeof value === "object") return JSON.stringify(value);
+      return String(value);
+    },
+    [getColumnFormat, i18n.language, recordNumericFieldNames]
+  );
+
+  const formatGroupedCell = useCallback(
+    (columnKey: string, value: unknown, row?: Record<string, unknown>) => {
       if (columnKey === "grouped_value") {
+        if (isCollapsibleMode && row?._isParent) {
+          const isExpanded = row._isExpanded as boolean;
+          const childCount = row._childCount as number;
+          const ArrowIcon = isExpanded ? KeyboardArrowDownIcon : KeyboardArrowRightIcon;
+          return (
+            <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+              <ArrowIcon sx={{ fontSize: 18, color: "text.secondary", flexShrink: 0 }} />
+              <Box component="span" sx={{ fontWeight: 600 }}>{String(value ?? "-")}</Box>
+              <Box component="span" sx={{ color: "text.disabled", fontSize: "0.75rem", ml: 0.25 }}>
+                ({childCount})
+              </Box>
+            </Box>
+          );
+        }
+        if (isCollapsibleMode && row?._isSubHeader) {
+          return (
+            <Box component="span" sx={{ pl: 3.5, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+              {String(value ?? "-")}
+            </Box>
+          );
+        }
+        if (isCollapsibleMode && row?._isChild) {
+          return (
+            <Box component="span" sx={{ pl: 3.5 }}>
+              {String(value ?? "-")}
+            </Box>
+          );
+        }
+        return String(value ?? "-");
+      }
+      if (columnKey === "grouped_secondary_value") {
         return String(value ?? "-");
       }
       if (columnKey.startsWith("metric_")) {
+        if (isCollapsibleMode && row?._isSubHeader) {
+          return (
+            <Box component="span" sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+              {String(value ?? "")}
+            </Box>
+          );
+        }
+        if (isCollapsibleMode && row?._isParent && !showSubtotals) return "";
         if (value === null || value === undefined) return "-";
-        return formatNumber(value as number, config?.options?.format, i18n.language);
+        return formatNumber(value as number, getColumnFormat(columnKey), i18n.language);
       }
       return String(value ?? "-");
     },
-    [config?.options?.format, i18n.language]
+    [getColumnFormat, i18n.language, isCollapsibleMode, showSubtotals]
   );
 
   const sqlTableColumns = useMemo(
@@ -775,12 +1065,136 @@ export const TableDataWidget = ({
       if (sqlNumericColumnNames.includes(columnKey) && (typeof value === "number" || typeof value === "string")) {
         const parsed = typeof value === "number" ? value : Number(value);
         if (Number.isFinite(parsed)) {
-          return formatNumber(parsed, config?.options?.format, i18n.language);
+          return formatNumber(parsed, getColumnFormat(columnKey), i18n.language);
         }
       }
       return String(value);
     },
-    [config?.options?.format, i18n.language, sqlNumericColumnNames]
+    [getColumnFormat, i18n.language, sqlNumericColumnNames]
+  );
+
+  // SQL collapsible mode: columns, rows, cell formatter
+  const sqlCollapsibleColumns = useMemo(() => {
+    if (!isSqlCollapsibleMode) return sqlTableColumns;
+    // In collapsible mode, hide the secondary group column from headers
+    return sqlTableColumns.filter((col) => col.key !== sqlGroupSecondaryColumn);
+  }, [isSqlCollapsibleMode, sqlGroupSecondaryColumn, sqlTableColumns]);
+
+  const sqlCollapsibleRows = useMemo(() => {
+    if (!isSqlCollapsibleMode || !sqlGroupPrimaryColumn || !sqlGroupSecondaryColumn) return sqlRows;
+
+    const parentOrder: string[] = [];
+    const childrenByParent = new Map<string, Array<Record<string, unknown>>>();
+
+    sqlRows.forEach((row) => {
+      const parent = String(row[sqlGroupPrimaryColumn] ?? "-");
+      if (!childrenByParent.has(parent)) {
+        parentOrder.push(parent);
+        childrenByParent.set(parent, []);
+      }
+      childrenByParent.get(parent)!.push(row);
+    });
+
+    const rows: Array<Record<string, unknown>> = [];
+
+    parentOrder.forEach((parent) => {
+      const children = childrenByParent.get(parent) || [];
+      const isExpanded = expandedParents.has(parent);
+
+      // Parent row with subtotals
+      const parentRow: Record<string, unknown> = {
+        [sqlGroupPrimaryColumn]: parent,
+        _isParent: true,
+        _isExpanded: isExpanded,
+        _childCount: children.length,
+      };
+
+      if (showSubtotals) {
+        sqlNumericColumnNames.forEach((numCol) => {
+          if (numCol === sqlGroupPrimaryColumn || numCol === sqlGroupSecondaryColumn) return;
+          parentRow[numCol] = children.reduce((sum, child) => {
+            const val = typeof child[numCol] === "number" ? child[numCol] as number : Number(child[numCol]);
+            return sum + (Number.isFinite(val) ? val : 0);
+          }, 0);
+        });
+      }
+
+      rows.push(parentRow);
+
+      if (isExpanded) {
+        // Sub-header row showing secondary column name + metric column names
+        const subHeaderRow: Record<string, unknown> = {
+          [sqlGroupPrimaryColumn]: sqlTableColumns.find((c) => c.key === sqlGroupSecondaryColumn)?.label || sqlGroupSecondaryColumn,
+          _isSubHeader: true,
+        };
+        sqlTableColumns.forEach((col) => {
+          if (col.key !== sqlGroupPrimaryColumn && col.key !== sqlGroupSecondaryColumn) {
+            subHeaderRow[col.key] = col.label;
+          }
+        });
+        rows.push(subHeaderRow);
+
+        children.forEach((child) => {
+          const childRow: Record<string, unknown> = {
+            ...child,
+            // Override primary column with secondary value for tree display
+            [sqlGroupPrimaryColumn]: child[sqlGroupSecondaryColumn] ?? "-",
+            _isChild: true,
+          };
+          rows.push(childRow);
+        });
+      }
+    });
+
+    return rows;
+  }, [expandedParents, isSqlCollapsibleMode, showSubtotals, sqlGroupPrimaryColumn, sqlGroupSecondaryColumn, sqlNumericColumnNames, sqlRows, sqlTableColumns]);
+
+  const formatSqlCellCollapsible = useCallback(
+    (columnKey: string, value: unknown, row?: Record<string, unknown>) => {
+      if (columnKey === sqlGroupPrimaryColumn) {
+        if (row?._isParent) {
+          const isExpanded = row._isExpanded as boolean;
+          const childCount = row._childCount as number;
+          const ArrowIcon = isExpanded ? KeyboardArrowDownIcon : KeyboardArrowRightIcon;
+          return (
+            <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+              <ArrowIcon sx={{ fontSize: 18, color: "text.secondary", flexShrink: 0 }} />
+              <Box component="span" sx={{ fontWeight: 600 }}>{String(value ?? "-")}</Box>
+              <Box component="span" sx={{ color: "text.disabled", fontSize: "0.75rem", ml: 0.25 }}>
+                ({childCount})
+              </Box>
+            </Box>
+          );
+        }
+        if (row?._isSubHeader) {
+          return (
+            <Box component="span" sx={{ pl: 3.5, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+              {String(value ?? "-")}
+            </Box>
+          );
+        }
+        if (row?._isChild) {
+          return (
+            <Box component="span" sx={{ pl: 3.5 }}>
+              {String(value ?? "-")}
+            </Box>
+          );
+        }
+      }
+      // Sub-header for non-primary columns
+      if (row?._isSubHeader) {
+        return (
+          <Box component="span" sx={{ fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+            {String(value ?? "")}
+          </Box>
+        );
+      }
+      // Numeric columns: hide subtotals for parent if showSubtotals is off
+      if (sqlNumericColumnNames.includes(columnKey) && row?._isParent && !showSubtotals) return "";
+      // Fall through to standard SQL formatting
+      return formatSqlCell(columnKey, value);
+    },
+    [formatSqlCell, showSubtotals, sqlGroupPrimaryColumn, sqlNumericColumnNames]
   );
 
   const hasMoreSqlRows = sqlHasMore;
@@ -907,6 +1321,7 @@ export const TableDataWidget = ({
   useEffect(() => {
     if (!isSqlMode || isGroupedMode) return;
     if (!hasMoreSqlRows || isSqlLoading || isSqlNextPagePending) return;
+    if (sqlColumns.length === 0) return;
     const target = sqlScrollRef.current;
     if (!target) return;
 
@@ -924,6 +1339,7 @@ export const TableDataWidget = ({
     isSqlMode,
     isSqlNextPagePending,
     rowsPerPage,
+    sqlColumns.length,
     sqlPage,
     sqlRows.length,
   ]);
@@ -956,6 +1372,7 @@ export const TableDataWidget = ({
   useEffect(() => {
     if (!isSqlMode || isGroupedMode) return;
     if (!hasMoreSqlRows || isSqlLoading || isSqlNextPagePending) return;
+    if (sqlColumns.length === 0) return;
     const target = sqlScrollRef.current;
     if (!target) return;
 
@@ -970,6 +1387,7 @@ export const TableDataWidget = ({
     isSqlLoading,
     isSqlMode,
     isSqlNextPagePending,
+    sqlColumns.length,
   ]);
 
   const handleSqlWheel = useCallback(
@@ -1077,30 +1495,45 @@ export const TableDataWidget = ({
     return config?.setup?.record_column_labels || {};
   }, [config?.setup?.record_column_labels]);
 
-  const beginHeaderRename = useCallback(
-    (headerKey: string, currentLabel: string) => {
+  const beginColumnEdit = useCallback(
+    (anchorEl: HTMLElement, headerKey: string, currentLabel: string, isNumeric: boolean) => {
       if (viewOnly || !onConfigChange) return;
-      setEditingHeaderKey(headerKey);
-      setEditingHeaderValue(currentLabel);
+      setColumnEditAnchorEl(anchorEl);
+      setColumnEditHeaderKey(headerKey);
+      setColumnEditLabel(currentLabel);
+      setColumnEditIsNumeric(isNumeric);
+      // Resolve the actual column key for format lookup
+      let formatKey = headerKey;
+      if (headerKey.startsWith("record:")) formatKey = headerKey.slice(7);
+      else if (headerKey.startsWith("sql:")) formatKey = headerKey.slice(4);
+      setColumnEditFormat(columnFormats[formatKey] || undefined);
     },
-    [onConfigChange, viewOnly]
+    [columnFormats, onConfigChange, viewOnly]
   );
 
-  const applyHeaderRename = useCallback(() => {
-    if (!editingHeaderKey || !onConfigChange) {
-      setEditingHeaderKey(null);
+  const closeColumnEdit = useCallback(() => {
+    setColumnEditAnchorEl(null);
+    setColumnEditHeaderKey(null);
+  }, []);
+
+  const applyColumnEdit = useCallback(() => {
+    if (!columnEditHeaderKey || !onConfigChange) {
+      closeColumnEdit();
       return;
     }
 
-    const nextLabel = editingHeaderValue.trim();
+    const nextLabel = columnEditLabel.trim();
     const nextSetup = {
       ...(config?.setup || {}),
     } as TableDataSchema["setup"];
 
-    if (editingHeaderKey === "grouped_value") {
+    // Apply label rename
+    if (columnEditHeaderKey === "grouped_value") {
       nextSetup.group_by_label = nextLabel || undefined;
-    } else if (editingHeaderKey.startsWith("record:")) {
-      const sourceColumnName = editingHeaderKey.slice(7);
+    } else if (columnEditHeaderKey === "grouped_secondary_value") {
+      nextSetup.group_by_secondary_label = nextLabel || undefined;
+    } else if (columnEditHeaderKey.startsWith("record:")) {
+      const sourceColumnName = columnEditHeaderKey.slice(7);
       const recordLabels = { ...(nextSetup.record_column_labels || {}) };
       if (nextLabel) {
         recordLabels[sourceColumnName] = nextLabel;
@@ -1108,10 +1541,10 @@ export const TableDataWidget = ({
         delete recordLabels[sourceColumnName];
       }
       nextSetup.record_column_labels = Object.keys(recordLabels).length ? recordLabels : undefined;
-    } else if (editingHeaderKey === "metric_0") {
+    } else if (columnEditHeaderKey === "metric_0") {
       nextSetup.primary_metric_label = nextLabel || undefined;
-    } else if (editingHeaderKey.startsWith("metric_")) {
-      const metricNumber = Number(editingHeaderKey.replace("metric_", ""));
+    } else if (columnEditHeaderKey.startsWith("metric_")) {
+      const metricNumber = Number(columnEditHeaderKey.replace("metric_", ""));
       const additionalMetricIndex = metricNumber - 1;
       const additionalMetrics = [...(nextSetup.additional_metrics || [])];
       if (additionalMetricIndex >= 0 && additionalMetricIndex < additionalMetrics.length) {
@@ -1121,8 +1554,8 @@ export const TableDataWidget = ({
         };
         nextSetup.additional_metrics = additionalMetrics;
       }
-    } else if (editingHeaderKey.startsWith("sql:")) {
-      const sourceColumnName = editingHeaderKey.slice(4);
+    } else if (columnEditHeaderKey.startsWith("sql:")) {
+      const sourceColumnName = columnEditHeaderKey.slice(4);
       const sqlLabels = { ...(nextSetup.sql_column_labels || {}) };
       if (nextLabel) {
         sqlLabels[sourceColumnName] = nextLabel;
@@ -1132,58 +1565,73 @@ export const TableDataWidget = ({
       nextSetup.sql_column_labels = Object.keys(sqlLabels).length ? sqlLabels : undefined;
     }
 
+    // Apply per-column format
+    let formatKey = columnEditHeaderKey;
+    if (formatKey.startsWith("record:")) formatKey = formatKey.slice(7);
+    else if (formatKey.startsWith("sql:")) formatKey = formatKey.slice(4);
+    const nextColumnFormats: Record<string, FormatNumberTypes> = {
+      ...(config?.options?.column_formats || {}),
+    };
+    if (columnEditFormat) {
+      nextColumnFormats[formatKey] = columnEditFormat;
+    } else {
+      delete nextColumnFormats[formatKey];
+    }
+
     onConfigChange({
       type: "table",
       ...config,
       setup: nextSetup,
+      options: {
+        ...(config?.options || {}),
+        column_formats: Object.keys(nextColumnFormats).length ? nextColumnFormats : undefined,
+      },
     } as TableDataSchema);
-    setEditingHeaderKey(null);
-  }, [config, editingHeaderKey, editingHeaderValue, onConfigChange]);
+    closeColumnEdit();
+  }, [closeColumnEdit, columnEditFormat, columnEditHeaderKey, columnEditLabel, config, onConfigChange]);
 
   const renderHeaderLabel = useCallback(
-    (headerKey: string, label: string, align: "left" | "right" = "left") => {
-      if (editingHeaderKey === headerKey) {
-        return (
-          <TextField
-            autoFocus
-            size="small"
-            value={editingHeaderValue}
-            onChange={(event) => setEditingHeaderValue(event.target.value)}
-            onBlur={applyHeaderRename}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                applyHeaderRename();
-              }
-              if (event.key === "Escape") {
-                event.preventDefault();
-                setEditingHeaderKey(null);
-              }
-            }}
-            sx={{
-              minWidth: 100,
-              "& .MuiInputBase-input": { fontSize: "0.75rem", py: 0.5 },
-            }}
-          />
-        );
-      }
-
+    (headerKey: string, label: string, align: "left" | "right" = "left", isNumeric = false) => {
+      const canEdit = !viewOnly && !!onConfigChange;
       return (
-        <Typography
-          variant="body2"
-          fontWeight="bold"
-          align={align}
-          onDoubleClick={() => beginHeaderRename(headerKey, label)}
+        <Box
           sx={{
-            ...twoLineClampSx,
-            cursor: viewOnly || !onConfigChange ? "default" : "text",
-            pr: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: align === "right" ? "flex-end" : "flex-start",
+            gap: 0.25,
+            "&:hover .column-edit-btn": canEdit ? { opacity: 1 } : {},
           }}>
-          {label}
-        </Typography>
+          <Typography
+            variant="body2"
+            fontWeight="bold"
+            align={align}
+            sx={{
+              ...twoLineClampSx,
+              pr: canEdit ? 0 : 1,
+              flex: 1,
+              minWidth: 0,
+            }}>
+            {label}
+          </Typography>
+          {canEdit && (
+            <IconButton
+              className="column-edit-btn"
+              size="small"
+              onClick={(event) => beginColumnEdit(event.currentTarget, headerKey, label, isNumeric)}
+              sx={{
+                opacity: 0,
+                transition: "opacity 0.15s",
+                p: 0.25,
+                flexShrink: 0,
+              }}>
+              <EditIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+            </IconButton>
+          )}
+        </Box>
       );
     },
-    [applyHeaderRename, beginHeaderRename, editingHeaderKey, editingHeaderValue, onConfigChange, twoLineClampSx, viewOnly]
+    [beginColumnEdit, onConfigChange, twoLineClampSx, viewOnly]
   );
 
   return (
@@ -1223,7 +1671,8 @@ export const TableDataWidget = ({
               stickyHeaderEnabled={stickyHeaderEnabled}
               headerLabelMap={recordColumnLabelMap}
               getColumnWidth={recordsColWidth}
-              renderHeaderLabel={(fieldName, label) => renderHeaderLabel(`record:${fieldName}`, label)}
+              formatCellValueForColumn={formatRecordCell}
+              renderHeaderLabel={(fieldName, label) => renderHeaderLabel(`record:${fieldName}`, label, "left", recordNumericFieldNames.has(fieldName))}
               onReorderColumns={(fromColumnKey, toColumnKey) => {
                 handleReorderColumn("records", fromColumnKey, toColumnKey);
               }}
@@ -1271,7 +1720,7 @@ export const TableDataWidget = ({
                 </Typography>
               }
               getColumnWidth={groupedColWidth}
-              renderHeaderLabel={(columnKey, label, align) => renderHeaderLabel(columnKey, label, align || "left")}
+              renderHeaderLabel={(columnKey, label, align) => renderHeaderLabel(columnKey, label, align || "left", columnKey.startsWith("metric_"))}
               onReorderColumns={(fromColumnKey, toColumnKey) => {
                 handleReorderColumn("grouped", fromColumnKey, toColumnKey);
               }}
@@ -1280,6 +1729,27 @@ export const TableDataWidget = ({
                   ? undefined
                   : (event, columnKey) => startColumnResize(event, "grouped", columnKey)
               }
+              {...(isCollapsibleMode && {
+                onRowClick: (row) => {
+                  if (row._isParent) {
+                    toggleParent(String(row.grouped_value));
+                  }
+                },
+                getRowSx: (row) => {
+                  if (row._isSubHeader) {
+                    return {
+                      backgroundColor: "action.hover",
+                    };
+                  }
+                  if (row._isParent) {
+                    return {
+                      backgroundColor: "action.hover",
+                      "&:hover": { backgroundColor: "action.selected" },
+                    };
+                  }
+                  return undefined;
+                },
+              })}
             />
           </Box>
           {(hasMoreGroupedRows || isGroupedOverflowing) && (
@@ -1309,16 +1779,16 @@ export const TableDataWidget = ({
               areFieldsLoading={false}
               fields={[]}
               stickyHeaderEnabled={stickyHeaderEnabled}
-              tableColumns={sqlTableColumns}
-              tableRows={sqlRows}
-              formatCellValueForColumn={formatSqlCell}
+              tableColumns={isSqlCollapsibleMode ? sqlCollapsibleColumns : sqlTableColumns}
+              tableRows={isSqlCollapsibleMode ? sqlCollapsibleRows : sqlRows}
+              formatCellValueForColumn={isSqlCollapsibleMode ? formatSqlCellCollapsible : formatSqlCell}
               emptyMessage={
                 <Typography variant="body2" color="text.secondary">
                   {t("no_data_for_current_filters", { defaultValue: "No data for current filters." })}
                 </Typography>
               }
               getColumnWidth={sqlColWidth}
-              renderHeaderLabel={(columnKey, label, align) => renderHeaderLabel(`sql:${columnKey}`, label, align || "left")}
+              renderHeaderLabel={(columnKey, label, align) => renderHeaderLabel(`sql:${columnKey}`, label, align || "left", sqlNumericColumnNames.includes(columnKey))}
               onReorderColumns={(fromColumnKey, toColumnKey) => {
                 handleReorderColumn("sql", fromColumnKey, toColumnKey);
               }}
@@ -1327,9 +1797,30 @@ export const TableDataWidget = ({
                   ? undefined
                   : (event, columnKey) => startColumnResize(event, "sql", columnKey)
               }
+              {...(isSqlCollapsibleMode && {
+                onRowClick: (row) => {
+                  if (row._isParent && sqlGroupPrimaryColumn) {
+                    toggleParent(String(row[sqlGroupPrimaryColumn]));
+                  }
+                },
+                getRowSx: (row) => {
+                  if (row._isSubHeader) {
+                    return {
+                      backgroundColor: "action.hover",
+                    };
+                  }
+                  if (row._isParent) {
+                    return {
+                      backgroundColor: "action.hover",
+                      "&:hover": { backgroundColor: "action.selected" },
+                    };
+                  }
+                  return undefined;
+                },
+              })}
             />
           </Box>
-          {sqlTotalsRow && sqlTableColumns.length > 0 && (
+          {sqlTotalsRow && !isSqlCollapsibleMode && sqlTableColumns.length > 0 && (
             <Box sx={{ overflowX: "auto" }}>
               <Box component="table" sx={{ tableLayout: "fixed", width: "100%", borderCollapse: "collapse" }}>
                 <Box component="tbody">
@@ -1368,6 +1859,62 @@ export const TableDataWidget = ({
           )}
         </Box>
       )}
+
+      {/* Column edit popover */}
+      <Popover
+        open={Boolean(columnEditAnchorEl)}
+        anchorEl={columnEditAnchorEl}
+        onClose={closeColumnEdit}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}>
+        <Stack spacing={1.5} sx={{ p: 1.5, width: 280 }}>
+          <Stack spacing={0.5}>
+            <Typography variant="caption" color="text.secondary">
+              {t("column_name", { defaultValue: "Column name" })}
+            </Typography>
+            <TextField
+              size="small"
+              value={columnEditLabel}
+              onChange={(event) => setColumnEditLabel(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  applyColumnEdit();
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  closeColumnEdit();
+                }
+              }}
+              autoFocus
+              fullWidth
+            />
+          </Stack>
+          {columnEditIsNumeric && (
+            <NumberFormatSelector
+              numberFormat={columnEditFormat}
+              onNumberFormatChange={(format) => setColumnEditFormat(format)}
+            />
+          )}
+          <Stack direction="row" spacing={1} justifyContent="flex-end">
+            <Button size="small" onClick={closeColumnEdit} variant="text" sx={{ borderRadius: 0 }}>
+              <Typography variant="body2" fontWeight="bold">
+                {t("cancel")}
+              </Typography>
+            </Button>
+            <Button
+              size="small"
+              variant="text"
+              color="primary"
+              onClick={applyColumnEdit}
+              sx={{ borderRadius: 0 }}>
+              <Typography variant="body2" fontWeight="bold" color="inherit">
+                {t("apply", { defaultValue: "Apply" })}
+              </Typography>
+            </Button>
+          </Stack>
+        </Stack>
+      </Popover>
     </>
   );
 };

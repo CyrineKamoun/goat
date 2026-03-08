@@ -354,6 +354,7 @@ class AnalyticsService:
         operation: str = "count",
         operation_column: str | None = None,
         group_by_column: str | None = None,
+        group_by_secondary_column: str | None = None,
         filter_expr: str | None = None,
         order: str = "descendent",
         limit: int = 100,
@@ -366,6 +367,7 @@ class AnalyticsService:
             operation_column: Column to perform the operation on. For 'expression', this
                 contains the raw SQL expression.
             group_by_column: Optional column to group results by
+            group_by_secondary_column: Optional secondary column for two-level grouping
             filter_expr: Optional CQL2 filter
             order: Sort order (ascendent or descendent)
             limit: Maximum number of grouped values to return
@@ -408,6 +410,7 @@ class AnalyticsService:
                 operation=stats_op,
                 operation_column=operation_column,
                 group_by_column=group_by_column,
+                group_by_secondary_column=group_by_secondary_column,
                 where_clause=where_clause,
                 params=params if params else None,
                 order=sort_order,

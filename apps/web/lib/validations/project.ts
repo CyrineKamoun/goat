@@ -46,6 +46,7 @@ export const builderPanelConfigSchema = z.object({
     .object({
       style: z.enum(["default", "rounded", "floated"]).optional().default("default"),
       collapsible: z.boolean().optional().default(false),
+      collapsed_default: z.boolean().optional().default(false),
     })
     .optional()
     .default({}),

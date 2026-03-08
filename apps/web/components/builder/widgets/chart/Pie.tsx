@@ -161,6 +161,10 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
     return safeValue.length > maxLength ? `${safeValue.slice(0, maxLength - 1)}…` : safeValue;
   }, []);
 
+  const configuredPalette = useMemo(() => {
+    return (config?.options?.color_range as ColorRange | undefined)?.colors;
+  }, [config?.options?.color_range]);
+
   const baseColors = useMemo(() => {
     if (displayData.length === 0) return [];
 
@@ -170,19 +174,19 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
         const mappedColor = colorMapLookup.get(normalizeValue(item.grouped_value));
         if (mappedColor) return mappedColor;
         // Fallback for items not in color_map
-        const palette = (config?.options?.color_range as ColorRange | undefined)?.colors || FALLBACK_COLORS;
+        const palette = configuredPalette || FALLBACK_COLORS;
         const colors = chroma.scale(palette).mode("lch").colors(displayData.length);
         return colors[index];
       });
     }
 
     // Default behavior: generate from color_range
-    const palette = data.length > 0 ? (config?.options?.color_range as ColorRange | undefined)?.colors || FALLBACK_COLORS : ["#e0e0e0"];
+    const palette = data.length > 0 ? configuredPalette || FALLBACK_COLORS : ["#e0e0e0"];
 
     return displayData.length === 1
       ? [palette[0]]
       : chroma.scale(palette).mode("lch").colors(displayData.length);
-  }, [displayData, data.length, (config?.options?.color_range as ColorRange | undefined)?.colors, colorMapLookup]);
+  }, [displayData, data.length, configuredPalette, colorMapLookup]);
 
   const computedColors = useMemo(() => {
     return displayData.map((item, index) => {
@@ -235,7 +239,7 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
           y={y}
           textAnchor={textAnchor}
           dominantBaseline="central"
-          fontSize={10}
+          fontSize={12}
           fontWeight={500}
           fill={theme.palette.text.primary}>
           {formatNumber(percent || 0, "percent_1d", i18n.language)}
@@ -346,24 +350,66 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
                 {isCenterActiveLayout && (
                   <>
                     <Label
-                      value={`${formatNumber(
-                        displayData[activeIndex].operation_value / totalOperationValue,
-                        "percent_1d",
-                        i18n.language
-                      )}`}
-                      position="centerBottom"
-                      fontSize={13}
-                      fontWeight="bold"
-                      fill={baseColors[activeIndex % baseColors.length]}
-                    />
-
-                    <Label
-                      value={getDisplayLabel(displayData[activeIndex].grouped_value)}
-                      position="centerTop"
-                      fontSize={11}
-                      dy={8}
-                      fontWeight="bold"
-                      fill={baseColors[activeIndex % baseColors.length]}
+                      content={(props: Record<string, unknown>) => {
+                        const vb = props.viewBox as { cx?: number; cy?: number } | undefined;
+                        const cx = vb?.cx ?? 0;
+                        const cy = vb?.cy ?? 0;
+                        const activeColor = baseColors[activeIndex % baseColors.length];
+                        const percentText = formatNumber(
+                          displayData[activeIndex].operation_value / totalOperationValue,
+                          "percent_1d",
+                          i18n.language
+                        );
+                        const label = getDisplayLabel(displayData[activeIndex].grouped_value);
+                        const maxChars = 12;
+                        const words = label.split(/\s+/);
+                        const lines: string[] = [];
+                        let currentLine = "";
+                        for (const word of words) {
+                          if (!currentLine) {
+                            currentLine = word;
+                          } else if ((currentLine + " " + word).length <= maxChars) {
+                            currentLine += " " + word;
+                          } else {
+                            lines.push(currentLine);
+                            currentLine = word;
+                          }
+                        }
+                        if (currentLine) lines.push(currentLine);
+                        const labelLineHeight = 14;
+                        const percentSize = 16;
+                        const gap = 4;
+                        const totalLabelHeight = lines.length * labelLineHeight;
+                        const totalHeight = percentSize + gap + totalLabelHeight;
+                        const startY = cy - totalHeight / 2 + percentSize / 2;
+                        return (
+                          <g>
+                            <text
+                              x={cx}
+                              y={startY}
+                              textAnchor="middle"
+                              fontSize={percentSize}
+                              fontWeight="bold"
+                              fill={activeColor}>
+                              {percentText}
+                            </text>
+                            <text
+                              x={cx}
+                              y={startY + percentSize / 2 + gap}
+                              textAnchor="middle"
+                              dominantBaseline="hanging"
+                              fontSize={11}
+                              fontWeight="bold"
+                              fill={activeColor}>
+                              {lines.map((line, i) => (
+                                <tspan key={i} x={cx} dy={i === 0 ? 0 : labelLineHeight}>
+                                  {line}
+                                </tspan>
+                              ))}
+                            </text>
+                          </g>
+                        );
+                      }}
                     />
                   </>
                 )}

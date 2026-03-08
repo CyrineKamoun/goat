@@ -1,4 +1,4 @@
-import { IconButton } from "@mui/material";
+import { IconButton, useTheme } from "@mui/material";
 import React, { useMemo } from "react";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
@@ -16,6 +16,7 @@ const ExpandCollapseButton: React.FC<ExpandCollapseButtonProps> = ({
   onClick,
   isVisible,
 }) => {
+  const theme = useTheme();
   const iconName = useMemo<ICON_NAME>(() => {
     switch (position) {
       case "left":
@@ -30,10 +31,10 @@ const ExpandCollapseButton: React.FC<ExpandCollapseButtonProps> = ({
   }, [position, expanded]);
 
   const styles = {
-    left: { right: 4, top: "50%", transform: "translateY(-50%)" },
-    right: { left: 4, top: "50%", transform: "translateY(-50%)" },
-    top: { bottom: 4, left: "50%", transform: "translateX(-50%)" },
-    bottom: { top: 4, left: "50%", transform: "translateX(-50%)" },
+    left: { right: 2, top: "50%", transform: "translateY(-50%)" },
+    right: { left: 2, top: "50%", transform: "translateY(-50%)" },
+    top: { bottom: 2, left: "50%", transform: "translateX(-50%)" },
+    bottom: { top: 2, left: "50%", transform: "translateX(-50%)" },
   };
 
   return (
@@ -45,6 +46,16 @@ const ExpandCollapseButton: React.FC<ExpandCollapseButtonProps> = ({
         transition: "opacity 0.3s, transform 0.3s",
         opacity: isVisible ? 1 : 0,
         zIndex: 10,
+        width: 24,
+        height: 24,
+        minWidth: 24,
+        padding: 0,
+        backgroundColor: theme.palette.background.paper,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+        border: `1px solid ${theme.palette.divider}`,
+        "&:hover": {
+          backgroundColor: theme.palette.action.hover,
+        },
       }}
       onClick={(event) => {
         event.stopPropagation();
@@ -53,7 +64,7 @@ const ExpandCollapseButton: React.FC<ExpandCollapseButtonProps> = ({
       <Icon
         iconName={iconName}
         style={{
-          fontSize: 17,
+          fontSize: 14,
         }}
         htmlColor="inherit"
       />

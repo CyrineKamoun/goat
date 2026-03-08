@@ -306,6 +306,7 @@ export const Container: React.FC<ContainerProps> = ({
               width: "100%",
               height: "100%",
               display: "flex",
+              position: "relative",
               alignSelf: "stretch",
               ...(panel.orientation === "horizontal" && {
                 flexDirection: "row",
@@ -440,14 +441,13 @@ export const Container: React.FC<ContainerProps> = ({
                 </Box>
               ))
             )}
-            {viewOnly &&
-              panel.config?.options?.collapsible &&
+            {panel.config?.options?.collapsible &&
               (panel.config?.options?.style === "default" || panel.config?.options?.style === "rounded") && (
                 <ExpandCollapseButton
                   position={panel.position}
                   expanded={!isCollapsed}
                   onClick={handleToggleCollapse}
-                  isVisible={isHovered || isCollapsed}
+                  isVisible={viewOnly || isHovered || isCollapsed}
                 />
               )}
           </Box>

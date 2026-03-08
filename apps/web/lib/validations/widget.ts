@@ -142,6 +142,7 @@ export const numbersDataConfigSchema = dataConfigSchema.extend({
 
 export const tableModeTypes = z.enum(["records", "grouped"]);
 export const tableQueryModeTypes = z.enum(["builder", "sql"]);
+export const tableGroupedDisplayModes = z.enum(["flat", "collapsible"]);
 
 const tableMetricSchema = z.object({
   operation_type: statisticOperationEnum,
@@ -162,7 +163,12 @@ export const tableDataConfigSchema = dataConfigSchema.extend({
       operation_type: statisticOperationEnum.optional(),
       operation_value: z.string().optional(),
       group_by_column_name: z.string().optional(),
+      group_by_secondary_column_name: z.string().optional(),
       group_by_label: z.string().optional(),
+      group_by_secondary_label: z.string().optional(),
+      grouped_display_mode: tableGroupedDisplayModes.optional().default("flat"),
+      grouped_collapse_initial: z.enum(["expanded", "collapsed"]).optional().default("collapsed"),
+      grouped_show_subtotals: z.boolean().optional().default(true),
       primary_metric_label: z.string().optional(),
       record_column_labels: z.record(z.string()).optional(),
       sql_column_labels: z.record(z.string()).optional(),
@@ -180,6 +186,7 @@ export const tableDataConfigSchema = dataConfigSchema.extend({
       sticky_header: z.boolean().optional().default(true),
       show_totals: z.boolean().optional().default(true),
       format: formatNumberTypes.optional().default("none"),
+      column_formats: z.record(formatNumberTypes).optional(),
       description: z.string().optional(),
     })
     .default({}),

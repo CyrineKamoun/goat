@@ -12,6 +12,7 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import {
   WidgetData,
   WidgetInfo,
+  WidgetLayout,
   WidgetOptions,
   WidgetSetup,
   WidgetStyle,
@@ -95,6 +96,7 @@ const WidgetConfiguration = ({ onChange, samePanelWidgets }: WidgetConfiguration
     <Stack direction="column" spacing={2} justifyContent="space-between">
       <WidgetInfo config={widgetConfig} onChange={handleConfigChange} />
       {hasDataConfig && <WidgetData config={widgetConfig} onChange={handleConfigChange} />}
+      <WidgetLayout config={widgetConfig} onChange={handleConfigChange} />
       <WidgetSetup config={widgetConfig} onChange={handleConfigChange} />
       <WidgetStyle config={widgetConfig} onChange={handleConfigChange} />
       <WidgetOptions config={widgetConfig} onChange={handleConfigChange} />

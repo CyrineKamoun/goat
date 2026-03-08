@@ -152,6 +152,7 @@ def _execute_analytics_sync(process_id: str, inputs: dict[str, Any]) -> dict[str
                 operation=inputs.get("operation", "count"),
                 operation_column=inputs.get("operation_column"),
                 group_by_column=inputs.get("group_by_column"),
+                group_by_secondary_column=inputs.get("group_by_secondary_column"),
                 filter_expr=inputs.get("filter"),
                 order=inputs.get("order", "descendent"),
                 limit=inputs.get("limit", 100),

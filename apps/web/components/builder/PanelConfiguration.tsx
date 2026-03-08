@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
+import { setCollapsedPanels } from "@/lib/store/map/slice";
 import type { BuilderPanelSchema } from "@/lib/validations/project";
 
 import type { SelectorItem } from "@/types/map/common";
@@ -13,6 +14,8 @@ import SectionHeader from "@/components/map/panels/common/SectionHeader";
 import SectionOptions from "@/components/map/panels/common/SectionOptions";
 import Selector from "@/components/map/panels/common/Selector";
 import SliderInput from "@/components/map/panels/common/SliderInput";
+
+import { useAppDispatch } from "@/hooks/store/ContextHooks";
 
 interface PanelContainerProps {
   panel: BuilderPanelSchema;
@@ -37,6 +40,7 @@ const ConfigSection = ({
 
 const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) => {
   const { t } = useTranslation("common");
+  const dispatch = useAppDispatch();
 
   // Style configuration
   const panelStyle = useMemo(
@@ -80,6 +84,7 @@ const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) 
   const [shadow, setShadow] = useState(panel.config?.appearance?.shadow ?? 0);
   const [spacing, setSpacing] = useState(panel.config?.position?.spacing ?? 0);
   const [collapsible, setCollapsible] = useState(panel.config?.options?.collapsible ?? false);
+  const [collapsedDefault, setCollapsedDefault] = useState(panel.config?.options?.collapsed_default ?? false);
 
   useEffect(() => {
     setOpacity(panel.config?.appearance?.opacity ?? 1);
@@ -87,6 +92,7 @@ const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) 
     setShadow(panel.config?.appearance?.shadow ?? 0);
     setSpacing(panel.config?.position?.spacing ?? 0);
     setCollapsible(panel.config?.options?.collapsible ?? false);
+    setCollapsedDefault(panel.config?.options?.collapsed_default ?? false);
   }, [panel]);
 
   // Handlers
@@ -106,12 +112,23 @@ const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) 
       ),
     };
 
-    // Special logic: if changing style to floated, reset collapsible
+    // Special logic: if changing style to floated, reset collapsible and collapsed_default
     if (path === "options.style" && value === "floated") {
       setCollapsible(false);
+      setCollapsedDefault(false);
       newConfig.options = {
         ...newConfig.options,
         collapsible: false,
+        collapsed_default: false,
+      };
+    }
+
+    // If disabling collapsible, also reset collapsed_default
+    if (path === "options.collapsible" && value === false) {
+      setCollapsedDefault(false);
+      newConfig.options = {
+        ...newConfig.options,
+        collapsed_default: false,
       };
     }
 
@@ -139,28 +156,31 @@ const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) 
   );
 
   const renderCheckbox = (label: string, checked: boolean, configPath: string, disabled: boolean = false) => (
-    <Stack>
-      <FormControlLabel
-        control={
-          <Checkbox
-            size="small"
-            color="primary"
-            checked={checked}
-            disabled={disabled}
-            onChange={(e) => {
-              const newValue = e.target.checked;
-              switch (configPath.split(".")[1]) {
-                case "collapsible":
-                  setCollapsible(newValue);
-                  break;
-              }
-              updateConfig(configPath, newValue);
-            }}
-          />
-        }
-        label={<Typography variant="body2">{label}</Typography>}
-      />
-    </Stack>
+    <FormControlLabel
+      sx={{ ml: 0 }}
+      control={
+        <Checkbox
+          size="small"
+          color="primary"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => {
+            const newValue = e.target.checked;
+            switch (configPath.split(".")[1]) {
+              case "collapsible":
+                setCollapsible(newValue);
+                break;
+              case "collapsed_default":
+                setCollapsedDefault(newValue);
+                dispatch(setCollapsedPanels({ [panel.id]: newValue }));
+                break;
+            }
+            updateConfig(configPath, newValue);
+          }}
+        />
+      }
+      label={<Typography variant="body2">{label}</Typography>}
+    />
   );
 
   const renderSlider = (
@@ -208,12 +228,20 @@ const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) 
       <Stack direction="column" spacing={3}>
         <ConfigSection title={t("options")} icon={ICON_NAME.SLIDERS}>
           {renderSelector(panelStyle, panelStyleOptions, t("select_panel_style"), "options.style")}
-          {renderCheckbox(
-            t("collapsible_panel"),
-            collapsible,
-            "options.collapsible",
-            panelStyle.value === "floated"
-          )}
+          <Stack spacing={1}>
+            {renderCheckbox(
+              t("collapsible_panel"),
+              collapsible,
+              "options.collapsible",
+              panelStyle.value === "floated"
+            )}
+            {collapsible && renderCheckbox(
+              t("collapsed_by_default"),
+              collapsedDefault,
+              "options.collapsed_default",
+              false
+            )}
+          </Stack>
         </ConfigSection>
 
         <ConfigSection title={t("appearance")} icon={ICON_NAME.PANEL_APPERANCE}>

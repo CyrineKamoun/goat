@@ -1,5 +1,5 @@
 import { Box } from "@mui/material";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { v4 } from "uuid";
 
@@ -8,6 +8,7 @@ import { setSelectedLayers } from "@/lib/store/layer/slice";
 import {
   removeTemporaryFilter,
   setActiveRightPanel,
+  setCollapsedPanels,
   setGeocoderResult,
   setSelectedBuilderItem,
 } from "@/lib/store/map/slice";
@@ -78,6 +79,23 @@ const PublicProjectLayout = ({
   const panels = useMemo(() => builderConfig?.interface ?? [], [builderConfig]);
   const PANEL_SIZE = 300;
   const COLLAPSED_SIZE = 40; // Should match the collapsedSize in Container component
+
+  // Initialize collapsed state from panel config once per project load.
+  const initializedProjectIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const projectId = project?.id || null;
+    if (!projectId || initializedProjectIdRef.current === projectId || panels.length === 0) return;
+
+    initializedProjectIdRef.current = projectId;
+    const defaults: Record<string, boolean> = {};
+    panels.forEach((panel) => {
+      defaults[panel.id] = Boolean(
+        panel.config?.options?.collapsible && panel.config?.options?.collapsed_default
+      );
+    });
+
+    dispatch(setCollapsedPanels(defaults));
+  }, [dispatch, panels, project?.id]);
   const activeRight = useAppSelector((state) => state.map.activeRightPanel);
 
   // Layer settings logic (public version)

@@ -178,6 +178,10 @@ class AggregationStatsInput(BaseModel):
     group_by_column: str | None = Field(
         default=None, description="Column to group results by"
     )
+    group_by_secondary_column: str | None = Field(
+        default=None,
+        description="Optional secondary column for two-level grouping",
+    )
     filter: str | None = Field(default=None, description="CQL2 filter expression")
     order: SortOrder = Field(
         default=SortOrder.descendent, description="Sort order by operation value"
@@ -195,6 +199,10 @@ class AggregationStatsItem(BaseModel):
 
     grouped_value: str | None = Field(
         None, description="The grouped value (null if no grouping)"
+    )
+    grouped_secondary_value: str | None = Field(
+        None,
+        description="The secondary grouped value (null if no secondary grouping)",
     )
     operation_value: float = Field(
         ..., description="Result of the statistical operation"

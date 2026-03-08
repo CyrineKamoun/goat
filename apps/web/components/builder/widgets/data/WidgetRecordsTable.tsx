@@ -30,7 +30,22 @@ const formatCellValue = (value: unknown): string => {
   return String(value);
 };
 
-const Row = ({ row, fields }) => {
+type RecordFeatureRow = {
+  id?: string | number;
+  properties: Record<string, unknown>;
+};
+
+const isArrayOfRecords = (value: unknown): value is Array<Record<string, unknown>> => {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    typeof value[0] === "object" &&
+    value[0] !== null &&
+    !Array.isArray(value[0])
+  );
+};
+
+const Row = ({ row, fields, formatCellValueForColumn }: { row: RecordFeatureRow; fields: Array<{ name: string; type: string }>; formatCellValueForColumn?: (columnKey: string, value: unknown) => React.ReactNode }) => {
   const [open, setOpen] = useState(false);
 
   const primitiveFields = useMemo(() => fields.filter((field) => field.type !== "object"), [fields]);
@@ -50,7 +65,9 @@ const Row = ({ row, fields }) => {
         {primitiveFields.map((field, fieldIndex) => (
           <TableCell key={fieldIndex}>
             <Typography variant="body2" sx={TWO_LINE_CLAMP_SX}>
-              {formatCellValue(row.properties[field.name])}
+              {formatCellValueForColumn
+                ? formatCellValueForColumn(field.name, row.properties[field.name])
+                : formatCellValue(row.properties[field.name])}
             </Typography>
           </TableCell>
         ))}
@@ -63,7 +80,7 @@ const Row = ({ row, fields }) => {
               <Box sx={{ margin: 2 }}>
                 {objectFields.map((field) => {
                   const rawValue = row.properties[field.name];
-                  let jsonData = rawValue;
+                  let jsonData: unknown = rawValue;
                   if (typeof rawValue === "string") {
                     try {
                       jsonData = JSON.parse(rawValue);
@@ -71,11 +88,7 @@ const Row = ({ row, fields }) => {
                       // Not valid JSON, keep as-is
                     }
                   }
-                  const isJsonDataArrayOfObjects =
-                    Array.isArray(jsonData) &&
-                    jsonData.length > 0 &&
-                    typeof jsonData[0] === "object" &&
-                    !Array.isArray(jsonData[0]);
+                  const jsonDataRows = isArrayOfRecords(jsonData) ? jsonData : undefined;
 
                   return (
                     <React.Fragment key={field.name}>
@@ -84,17 +97,17 @@ const Row = ({ row, fields }) => {
                           {field.name}
                         </Typography>
                       </Stack>
-                      {isJsonDataArrayOfObjects ? (
+                      {jsonDataRows ? (
                         <Table size="small" aria-label="purchases" key={field.name}>
                           <TableHead>
                             <TableRow>
-                              {Object.keys(jsonData[0]).map((key) => (
+                              {Object.keys(jsonDataRows[0]).map((key) => (
                                 <TableCell key={key}>{key}</TableCell>
                               ))}
                             </TableRow>
                           </TableHead>
                           <TableBody>
-                            {jsonData.map((item, rowIndex) => (
+                            {jsonDataRows.map((item, rowIndex) => (
                               <TableRow key={rowIndex}>
                                 {Object.values(item).map((value: string, cellIndex) => (
                                   <TableCell key={cellIndex}>{formatCellValue(value)}</TableCell>
@@ -131,8 +144,10 @@ interface WidgetRecordsTableProps {
   tableRows?: Array<Record<string, unknown>>;
   totalsRow?: Record<string, unknown>;
   emptyMessage?: React.ReactNode;
-  formatCellValueForColumn?: (columnKey: string, value: unknown) => React.ReactNode;
+  formatCellValueForColumn?: (columnKey: string, value: unknown, row?: Record<string, unknown>) => React.ReactNode;
   onReorderColumns?: (fromColumnKey: string, toColumnKey: string) => void;
+  onRowClick?: (row: Record<string, unknown>, rowIndex: number) => void;
+  getRowSx?: (row: Record<string, unknown>) => Record<string, unknown> | undefined;
 }
 
 const WidgetRecordsTable: React.FC<WidgetRecordsTableProps> = ({
@@ -150,6 +165,8 @@ const WidgetRecordsTable: React.FC<WidgetRecordsTableProps> = ({
   emptyMessage,
   formatCellValueForColumn,
   onReorderColumns,
+  onRowClick,
+  getRowSx,
 }) => {
   const primitiveFields = useMemo(() => fields.filter((field) => field.type !== "object"), [fields]);
   const isGenericMode = Array.isArray(tableColumns) && Array.isArray(tableRows);
@@ -296,12 +313,18 @@ const WidgetRecordsTable: React.FC<WidgetRecordsTableProps> = ({
               </TableRow>
             )}
             {tableRows.map((row, rowIndex) => (
-              <TableRow key={`generic-row-${rowIndex}`}>
+              <TableRow
+                key={`generic-row-${rowIndex}`}
+                onClick={onRowClick ? () => onRowClick(row, rowIndex) : undefined}
+                sx={{
+                  ...(onRowClick && row._isParent ? { cursor: "pointer" } : {}),
+                  ...(getRowSx?.(row) || {}),
+                }}>
                 {tableColumns.map((column) => (
                   <TableCell key={`${column.key}-${rowIndex}`} align={column.align || "left"} sx={{ width: getColumnWidth?.(column.key) }}>
                     <Typography variant="body2" sx={TWO_LINE_CLAMP_SX}>
                       {formatCellValueForColumn
-                        ? formatCellValueForColumn(column.key, row[column.key])
+                        ? formatCellValueForColumn(column.key, row[column.key], row)
                         : formatCellValue(row[column.key]) || "-"}
                     </Typography>
                   </TableCell>
@@ -449,7 +472,7 @@ const WidgetRecordsTable: React.FC<WidgetRecordsTableProps> = ({
               </TableRow>
             )}
             {displayData.features?.length &&
-              displayData.features.map((row, index) => <Row key={index} row={row} fields={fields} />)}
+              displayData.features.map((row, index) => <Row key={index} row={row} fields={fields} formatCellValueForColumn={formatCellValueForColumn} />)}
           </TableBody>
         </Table>
       )}
