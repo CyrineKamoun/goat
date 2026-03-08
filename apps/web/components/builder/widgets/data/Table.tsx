@@ -1599,7 +1599,7 @@ export const TableDataWidget = ({
             display: "flex",
             alignItems: "center",
             justifyContent: align === "right" ? "flex-end" : "flex-start",
-            gap: 0.25,
+            gap: 0,
             "&:hover .column-edit-btn": canEdit ? { opacity: 1 } : {},
           }}>
           <Typography
@@ -1622,7 +1622,8 @@ export const TableDataWidget = ({
               sx={{
                 opacity: 0,
                 transition: "opacity 0.15s",
-                p: 0.25,
+                p: 0,
+                ml: -0.25,
                 flexShrink: 0,
               }}>
               <EditIcon sx={{ fontSize: 14, color: "text.secondary" }} />

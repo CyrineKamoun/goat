@@ -116,6 +116,7 @@ const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) 
     if (path === "options.style" && value === "floated") {
       setCollapsible(false);
       setCollapsedDefault(false);
+      dispatch(setCollapsedPanels({ [panel.id]: false }));
       newConfig.options = {
         ...newConfig.options,
         collapsible: false,
@@ -126,6 +127,7 @@ const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) 
     // If disabling collapsible, also reset collapsed_default
     if (path === "options.collapsible" && value === false) {
       setCollapsedDefault(false);
+      dispatch(setCollapsedPanels({ [panel.id]: false }));
       newConfig.options = {
         ...newConfig.options,
         collapsed_default: false,

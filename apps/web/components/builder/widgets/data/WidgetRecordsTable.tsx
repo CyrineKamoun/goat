@@ -97,7 +97,7 @@ const Row = ({ row, fields, formatCellValueForColumn }: { row: RecordFeatureRow;
                           {field.name}
                         </Typography>
                       </Stack>
-                      {isJsonDataArrayOfObjects ? (
+                      {jsonDataRows ? (
                         <Table
                           size="small"
                           aria-label={field?.name ? `${field.name} object field values` : "expanded object field values"}
@@ -268,7 +268,7 @@ const WidgetRecordsTable: React.FC<WidgetRecordsTableProps> = ({
                     cursor: onReorderColumns ? "grab" : undefined,
                     ...getHeaderCellDropSx(column.key),
                   }}>
-                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 1.5 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 0 }}>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       {renderHeaderLabel ? (
                         renderHeaderLabel(column.key, column.label, column.align || "left")
@@ -429,7 +429,7 @@ const WidgetRecordsTable: React.FC<WidgetRecordsTableProps> = ({
                         alignItems: "center",
                         justifyContent: "space-between",
                         py: 1,
-                        pr: 1.5,
+                        pr: 0,
                       }}>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         {renderHeaderLabel ? (

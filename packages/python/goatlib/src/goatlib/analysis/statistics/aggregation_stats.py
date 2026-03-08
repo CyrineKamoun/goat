@@ -1,6 +1,7 @@
 """Aggregation statistics calculation."""
 
 import logging
+import re
 from typing import Any
 
 import duckdb
@@ -13,6 +14,12 @@ from goatlib.analysis.schemas.statistics import (
 )
 
 logger = logging.getLogger(__name__)
+
+_SAFE_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _is_safe_identifier(value: str) -> bool:
+    return bool(_SAFE_IDENTIFIER_RE.fullmatch(value))
 
 
 def calculate_aggregation_stats(
@@ -51,6 +58,31 @@ def calculate_aggregation_stats(
             f"operation_column is required for operation '{operation.value}'"
         )
 
+    table_columns = {
+        str(row[0]) for row in con.execute(f"DESCRIBE {table_name}").fetchall() if row
+    }
+
+    for identifier_name, identifier_value in (
+        ("group_by_column", group_by_column),
+        ("group_by_secondary_column", group_by_secondary_column),
+    ):
+        if identifier_value is None:
+            continue
+        if not _is_safe_identifier(identifier_value):
+            raise ValueError(f"Invalid SQL identifier for {identifier_name}: {identifier_value!r}")
+        if identifier_value not in table_columns:
+            raise ValueError(f"Unknown column for {identifier_name}: {identifier_value}")
+
+    if (
+        operation != StatisticsOperation.expression
+        and operation_column
+        and _is_safe_identifier(operation_column)
+        and operation_column not in table_columns
+    ):
+        raise ValueError(f"Unknown operation_column: {operation_column}")
+    if operation != StatisticsOperation.expression and operation_column and not _is_safe_identifier(operation_column):
+        raise ValueError(f"Invalid SQL identifier for operation_column: {operation_column!r}")
+
     # Build the aggregation expression
     if operation == StatisticsOperation.count:
         if operation_column:
@@ -68,7 +100,7 @@ def calculate_aggregation_stats(
     elif operation == StatisticsOperation.expression:
         # For expression operation, operation_column contains the raw SQL expression
         # Note: The expression should be validated before calling this function
-        agg_expr = operation_column
+        agg_expr = str(operation_column)
     else:
         raise ValueError(f"Unsupported operation: {operation}")
 
@@ -96,7 +128,7 @@ def calculate_aggregation_stats(
                     SELECT DISTINCT {group_col}, {sec_col}
                     FROM {table_name}
                     WHERE {where_clause}
-                )
+                ) AS t
             """
 
             data_query = f"""
@@ -184,6 +216,7 @@ def calculate_aggregation_stats(
         items = [
             AggregationStatsItem(
                 grouped_value=row[0],
+                grouped_secondary_value=None,
                 operation_value=float(row[1]) if row[1] is not None else 0.0,
             )
             for row in data_result
