@@ -1,0 +1,4 @@
+[submodule "packages/python/nigiri"]
+	path = packages/python/nigiri
+	url = https://github.com/plan4better/nigiri.git
+	branch = pynigiri

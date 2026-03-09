@@ -68,7 +68,6 @@ storybook-static
 cache
 
 # Submodules
-.gitmodules
 apps/accounts
 
 apps/core/data/*

@@ -46,6 +46,7 @@ members = [
     "apps/core",
     "apps/processes",
     "packages/python/goatlib",
+    "packages/python/nigiri/python",
 ]
 
 [tool.mypy]
