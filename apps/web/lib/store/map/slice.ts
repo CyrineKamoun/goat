@@ -91,6 +91,9 @@ export interface MapState {
   measurements: Measurement[];
   isMeasuring: boolean;
   selectedMeasurementId: string | undefined;
+  isDataPanelOpen: boolean;
+  dataPanelLayerId: number | null;
+  dataPanelHeight: number;
 }
 
 const initialState = {
@@ -118,6 +121,9 @@ const initialState = {
   measurements: [] as Measurement[],
   isMeasuring: false,
   selectedMeasurementId: undefined,
+  isDataPanelOpen: false,
+  dataPanelLayerId: null,
+  dataPanelHeight: 0,
 } as MapState;
 
 const mapSlice = createSlice({
@@ -197,6 +203,12 @@ const mapSlice = createSlice({
       if (action.payload === "data") {
         state.selectedBuilderItem = undefined;
       }
+      // Clean up data panel when leaving data mode
+      if (action.payload !== "data") {
+        state.isDataPanelOpen = false;
+        state.dataPanelHeight = 0;
+        state.dataPanelLayerId = null;
+      }
     },
     setUserLocation: (state, action: PayloadAction<MapState["userLocation"]>) => {
       state.userLocation = action.payload;
@@ -260,6 +272,19 @@ const mapSlice = createSlice({
     setSelectedMeasurementId: (state, action: PayloadAction<string | undefined>) => {
       state.selectedMeasurementId = action.payload;
     },
+    setIsDataPanelOpen: (state, action: PayloadAction<boolean>) => {
+      state.isDataPanelOpen = action.payload;
+      if (!action.payload) {
+        state.dataPanelHeight = 0;
+        state.dataPanelLayerId = null;
+      }
+    },
+    setDataPanelLayerId: (state, action: PayloadAction<number | null>) => {
+      state.dataPanelLayerId = action.payload;
+    },
+    setDataPanelHeight: (state, action: PayloadAction<number>) => {
+      state.dataPanelHeight = action.payload;
+    },
   },
 });
 
@@ -294,6 +319,9 @@ export const {
   clearMeasurements,
   setIsMeasuring,
   setSelectedMeasurementId,
+  setIsDataPanelOpen,
+  setDataPanelLayerId,
+  setDataPanelHeight,
 } = mapSlice.actions;
 
 export const mapReducer = mapSlice.reducer;

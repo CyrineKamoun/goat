@@ -458,3 +458,149 @@ export const useClassBreak = (layerId: string, operation: string, column: string
   );
   return { data, isLoading, error };
 };
+
+// --- Feature Write API Functions ---
+
+export const createFeature = async (
+  layerId: string,
+  feature: { geometry?: Record<string, unknown> | null; properties: Record<string, unknown> }
+) => {
+  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/items`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "Feature",
+      geometry: feature.geometry || null,
+      properties: feature.properties,
+    }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to create feature");
+  }
+  return response.json();
+};
+
+export const createFeaturesBulk = async (
+  layerId: string,
+  features: Array<{ geometry?: Record<string, unknown> | null; properties: Record<string, unknown> }>
+) => {
+  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/items`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "FeatureCollection",
+      features: features.map((f) => ({
+        type: "Feature",
+        geometry: f.geometry || null,
+        properties: f.properties,
+      })),
+    }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to create features");
+  }
+  return response.json();
+};
+
+export const updateFeatureProperties = async (
+  layerId: string,
+  featureId: string,
+  properties: Record<string, unknown>
+) => {
+  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/items/${featureId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ properties }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to update feature");
+  }
+  return response.json();
+};
+
+export const replaceFeature = async (
+  layerId: string,
+  featureId: string,
+  feature: { geometry?: Record<string, unknown> | null; properties: Record<string, unknown> }
+) => {
+  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/items/${featureId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      type: "Feature",
+      geometry: feature.geometry || null,
+      properties: feature.properties,
+    }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to replace feature");
+  }
+  return response.json();
+};
+
+export const deleteFeature = async (layerId: string, featureId: string) => {
+  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/items/${featureId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to delete feature");
+  }
+  return response.json();
+};
+
+export const deleteFeaturesBulk = async (layerId: string, featureIds: string[]) => {
+  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/items/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: featureIds }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to delete features");
+  }
+  return response.json();
+};
+
+// --- Column Management API Functions ---
+
+export const addColumn = async (layerId: string, name: string, type: string, defaultValue?: unknown) => {
+  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/columns`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, type, default_value: defaultValue }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to add column");
+  }
+  return response.json();
+};
+
+export const renameColumn = async (layerId: string, columnName: string, newName: string) => {
+  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/columns/${columnName}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ new_name: newName }),
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to rename column");
+  }
+  return response.json();
+};
+
+export const deleteColumn = async (layerId: string, columnName: string) => {
+  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/columns/${columnName}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to delete column");
+  }
+  return response.json();
+};

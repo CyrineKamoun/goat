@@ -73,6 +73,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
 
   const { translatedBaseMaps, activeBasemap } = useBasemap(project);
   const activeRight = useAppSelector((state) => state.map.activeRightPanel);
+  // Panel height is read via CSS variable --data-panel-height for real-time updates
   const { isAppFeatureEnabled } = useAuthZ();
 
   // 1. Redux Global Selection
@@ -247,7 +248,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
         sx={{
           position: "absolute",
           top: toolbarHeight + 10,
-          height: `calc(100% - ${toolbarHeight + 20}px)`,
+          height: `calc(100% - ${toolbarHeight + 20}px - var(--data-panel-height, 0px))`,
           left: 10,
           zIndex: (theme) => theme.zIndex.drawer + 1,
           pointerEvents: "none",
@@ -306,7 +307,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
         sx={{
           position: "absolute",
           top: toolbarHeight + 10,
-          height: `calc(100% - ${toolbarHeight + 10}px)`,
+          height: `calc(100% - ${toolbarHeight + 10}px - var(--data-panel-height, 0px))`,
           right: 10,
           zIndex: (theme) => theme.zIndex.drawer + 1,
           pointerEvents: "none",

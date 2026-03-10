@@ -1,0 +1,199 @@
+import { Box, alpha, useTheme } from "@mui/material";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+
+import { setDataPanelHeight, setIsDataPanelOpen } from "@/lib/store/map/slice";
+import type { ProjectLayer } from "@/lib/validations/project";
+
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
+
+import DatasetDownloadModal from "@/components/modals/DatasetDownload";
+import EditableDataTable from "@/components/map/panels/EditableDataTable";
+
+const MIN_PANEL_HEIGHT = 150;
+const DEFAULT_PANEL_HEIGHT = 350;
+const MAX_PANEL_HEIGHT_RATIO = 0.8; // Max 80% of container
+const RESIZE_HANDLE_HEIGHT = 4;
+
+/** CSS custom property name used to communicate panel height to sibling layout components */
+export const DATA_PANEL_HEIGHT_VAR = "--data-panel-height";
+
+interface DataPanelProps {
+  projectLayers: ProjectLayer[];
+}
+
+const DataPanel: React.FC<DataPanelProps> = ({ projectLayers }) => {
+  const theme = useTheme();
+  const dispatch = useAppDispatch();
+  const [isDragging, setIsDragging] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const dragStartRef = useRef<{ y: number; height: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const heightRef = useRef(DEFAULT_PANEL_HEIGHT);
+
+  const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+  const isDataPanelOpen = useAppSelector((state) => state.map.isDataPanelOpen);
+  const dataPanelLayerId = useAppSelector((state) => state.map.dataPanelLayerId);
+  const mapMode = useAppSelector((state) => state.map.mapMode);
+
+  // Find the data panel's project layer (independent of layer tree selection)
+  const activeProjectLayer = dataPanelLayerId
+    ? projectLayers.find((l) => l.id === dataPanelLayerId)
+    : undefined;
+
+  // Single source of truth: set the CSS variable on :root.
+  // Both the panel itself and sibling layout components read from this variable.
+  const syncHeight = useCallback((height: number) => {
+    heightRef.current = height;
+    document.documentElement.style.setProperty(DATA_PANEL_HEIGHT_VAR, `${height}px`);
+  }, []);
+
+  // Document-level drag handlers — only touch the CSS variable, no React state
+  const handleDragMove = useCallback(
+    (event: MouseEvent) => {
+      if (!dragStartRef.current) return;
+      const parentHeight = containerRef.current?.parentElement?.clientHeight ?? 800;
+      const maxHeight = parentHeight * MAX_PANEL_HEIGHT_RATIO;
+      const deltaY = dragStartRef.current.y - event.clientY;
+      const newHeight = Math.min(maxHeight, Math.max(MIN_PANEL_HEIGHT, dragStartRef.current.height + deltaY));
+      syncHeight(newHeight);
+    },
+    [syncHeight]
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+    dragStartRef.current = null;
+    dispatch(setDataPanelHeight(heightRef.current));
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (isDragging) {
+      document.body.style.userSelect = "none";
+      document.body.style.cursor = "ns-resize";
+      window.addEventListener("mousemove", handleDragMove);
+      window.addEventListener("mouseup", handleDragEnd);
+      return () => {
+        document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+        window.removeEventListener("mousemove", handleDragMove);
+        window.removeEventListener("mouseup", handleDragEnd);
+      };
+    }
+  }, [isDragging, handleDragMove, handleDragEnd]);
+
+  // Sync CSS var when panel visibility changes
+  const isVisible = mapMode === "data" && isDataPanelOpen && !!activeProjectLayer;
+  useEffect(() => {
+    if (isVisible) {
+      syncHeight(heightRef.current);
+      dispatch(setDataPanelHeight(heightRef.current));
+    } else {
+      document.documentElement.style.setProperty(DATA_PANEL_HEIGHT_VAR, "0px");
+    }
+  }, [isVisible, syncHeight, dispatch]);
+
+  // Also clean up on unmount
+  useEffect(() => {
+    return () => {
+      document.documentElement.style.setProperty(DATA_PANEL_HEIGHT_VAR, "0px");
+    };
+  }, []);
+
+  // Only render in data mode when panel is open with an active layer
+  if (mapMode !== "data" || !isDataPanelOpen || !activeProjectLayer) {
+    return null;
+  }
+
+  const handleDragStart = (event: React.MouseEvent) => {
+    if (isExpanded) return; // No drag resize when expanded
+    event.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = { y: event.clientY, height: heightRef.current };
+  };
+
+  const handleClose = () => {
+    setIsExpanded(false);
+    dispatch(setIsDataPanelOpen(false));
+    // Reset CSS var to 0 but keep heightRef at the stored height so reopening works
+    document.documentElement.style.setProperty(DATA_PANEL_HEIGHT_VAR, "0px");
+  };
+
+  const handleToggleExpand = () => {
+    if (isExpanded) {
+      // Collapse back to previous height — restore CSS var so overlays adjust
+      setIsExpanded(false);
+      syncHeight(heightRef.current);
+    } else {
+      // Expand to fill container — keep CSS var at current height so overlays stay in place
+      setIsExpanded(true);
+    }
+  };
+
+  return (
+    <Box
+      ref={containerRef}
+      sx={{
+        position: isExpanded ? "fixed" : "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        ...(isExpanded ? { top: 0 } : {}),
+        height: isExpanded ? "100vh" : `var(${DATA_PANEL_HEIGHT_VAR}, ${DEFAULT_PANEL_HEIGHT}px)`,
+        display: "flex",
+        flexDirection: "column",
+        zIndex: isExpanded ? 1300 : 10,
+        transition: isDragging ? "none" : "height 0.15s ease-out",
+        pointerEvents: "auto",
+      }}>
+      {/* Resize handle — full width top edge (hidden when expanded) */}
+      {!isExpanded && (
+        <Box
+          onMouseDown={handleDragStart}
+          sx={{
+            height: RESIZE_HANDLE_HEIGHT,
+            cursor: "ns-resize",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            backgroundColor: isDragging ? theme.palette.primary.main : "transparent",
+            transition: isDragging ? "none" : "background-color 0.15s ease",
+            "&:hover": {
+              backgroundColor: isDragging ? theme.palette.primary.main : theme.palette.action.hover,
+            },
+          }}
+        />
+      )}
+
+      {/* Table content — includes its own toolbar/header */}
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          backgroundColor: isExpanded ? theme.palette.background.paper : alpha(theme.palette.background.paper, 0.9),
+          backdropFilter: isExpanded ? "none" : "blur(10px)",
+          transition: "background-color 0.15s ease-out",
+        }}>
+        <EditableDataTable
+          layerId={activeProjectLayer.layer_id}
+          projectLayer={activeProjectLayer}
+          layerName={activeProjectLayer.name}
+          isExpanded={isExpanded}
+          onToggleExpand={handleToggleExpand}
+          onClose={handleClose}
+          onDownload={() => setIsDownloadOpen(true)}
+        />
+        <DatasetDownloadModal
+          open={isDownloadOpen}
+          onClose={() => setIsDownloadOpen(false)}
+          dataset={activeProjectLayer}
+        />
+      </Box>
+    </Box>
+  );
+};
+
+export default DataPanel;

@@ -28,7 +28,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 // Redux
 import { useProject, useProjectScenarioFeatures } from "@/lib/api/projects";
 import { setSelectedLayers } from "@/lib/store/layer/slice";
-import { setActiveRightPanel } from "@/lib/store/map/slice";
+import { setActiveRightPanel, setDataPanelLayerId, setIsDataPanelOpen } from "@/lib/store/map/slice";
 import { rgbToHex } from "@/lib/utils/helpers";
 import { zoomToLayer, zoomToProjectLayer } from "@/lib/utils/map/navigate";
 // API & Store
@@ -498,6 +498,11 @@ export const ProjectLayerTree = ({
       .filter((id) => id !== undefined);
     dispatch(setSelectedLayers(realIds));
 
+    // Always sync data panel layer — if the panel is closed, this is a no-op
+    if (realIds.length === 1) {
+      dispatch(setDataPanelLayerId(realIds[0]));
+    }
+
     if (isEditMode && realIds.length > 0) {
       // Get the first selected layer to determine default panel
       const firstSelectedItem = items.find((i) => {
@@ -685,12 +690,21 @@ export const ProjectLayerTree = ({
               // Handle layer-specific actions
               if (node.type === "layer") {
                 const target = castNodeToProjectLayer(node);
+                dispatch(setSelectedLayers([target.id]));
+                dispatch(setDataPanelLayerId(target.id));
                 if (menuItem.id === MapLayerActions.PROPERTIES) {
                   handleProperties(target);
                 } else if (menuItem.id === MapLayerActions.STYLE) {
                   handleStyle(target);
                 } else if (menuItem.id === MapLayerActions.DUPLICATE) {
                   handleDuplicate(target);
+                } else if (menuItem.id === ContentActions.TABLE) {
+                  if (isEditMode) {
+                    dispatch(setDataPanelLayerId(target.id));
+                    dispatch(setIsDataPanelOpen(true));
+                  } else {
+                    openMoreMenu(menuItem, target);
+                  }
                 } else {
                   openMoreMenu(menuItem, target);
                 }

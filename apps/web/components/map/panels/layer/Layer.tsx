@@ -651,6 +651,7 @@ const LayerPanel = ({ projectId }: PanelProps) => {
                               </Tooltip>
                             }
                             onSelect={async (menuItem: PopperMenuItem) => {
+                              dispatch(setActiveLayer(layer.id));
                               if (menuItem.id === MapLayerActions.PROPERTIES) {
                                 openPropertiesPanel(layer);
                               } else if (menuItem.id === MapLayerActions.DUPLICATE) {
@@ -659,6 +660,8 @@ const LayerPanel = ({ projectId }: PanelProps) => {
                                 if (map) {
                                   await zoomToProjectLayer(map, layer);
                                 }
+                              } else if (menuItem.id === ContentActions.TABLE) {
+                                openMoreMenu(menuItem, layer);
                               } else {
                                 openMoreMenu(menuItem, layer);
                               }
