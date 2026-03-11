@@ -287,6 +287,7 @@ interface ReportElementRendererProps {
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdate: (id: string, updates: Partial<ReportElement>) => void;
+  onInteractionEnd?: () => void;
 }
 
 const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
@@ -306,6 +307,7 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
   onSelect,
   onDelete,
   onUpdate,
+  onInteractionEnd,
 }) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
@@ -453,11 +455,13 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
           y: Math.max(0, newYMm),
         },
       });
+      onInteractionEnd?.();
     },
     [
       element.id,
       element.position,
       onUpdate,
+      onInteractionEnd,
       zoom,
       width,
       height,
@@ -606,8 +610,9 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
           height: newHeightMm,
         },
       });
+      onInteractionEnd?.();
     },
-    [element.id, element.position, onUpdate, zoom, snapPoints, onSnapGuidesChange, isSnappingEnabled]
+    [element.id, element.position, onUpdate, onInteractionEnd, zoom, snapPoints, onSnapGuidesChange, isSnappingEnabled]
   );
 
   // Custom resize handle styles
@@ -795,6 +800,9 @@ const ReportsCanvas: React.FC<ReportsCanvasProps> = ({
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
 
+  // Track recent drag/resize to prevent click-deselect after interaction
+  const lastInteractionRef = useRef<number>(0);
+
   // State for snap guides (shown during drag)
   const [activeSnapGuides, setActiveSnapGuides] = useState<SnapGuide[]>([]);
 
@@ -936,6 +944,8 @@ const ReportsCanvas: React.FC<ReportsCanvasProps> = ({
   };
 
   const handleCanvasClick = () => {
+    // Skip deselect if a drag/resize just ended (prevents losing selection when mouseup lands on paper)
+    if (Date.now() - lastInteractionRef.current < 200) return;
     // Deselect element when clicking on empty canvas area
     onElementSelect?.(null);
   };
@@ -1212,6 +1222,7 @@ const ReportsCanvas: React.FC<ReportsCanvasProps> = ({
                         onSelect={(id) => onElementSelect?.(id)}
                         onDelete={(id) => onElementDelete?.(id)}
                         onUpdate={(id, updates) => onElementUpdate?.(id, updates)}
+                        onInteractionEnd={() => { lastInteractionRef.current = Date.now(); }}
                       />
                     ))}
                   </ThemeProvider>
