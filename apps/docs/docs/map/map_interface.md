@@ -49,8 +49,7 @@ The tools are located on the right side of the Layers Panel:
 - <img src={require('/img/icons/compass.png').default} alt="Scenarios" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Scenarios</code>: <strong>Access to Scenarios</strong>. Read more in <a href="/category/scenarios">Scenarios</a>.
 
 -  <img src={require('/img/icons/ruler-horizontal.png').default} alt="Measurements" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Measurements</code>: Users can <strong>measure distances and areas</strong>, such as routes, lines and polygons.
-Read more in <a href="/category/measurements">Measurements</a>.
-
+  
 #### Editing and Tools Panel
 
 When selecting a layer from the Layers Panel, the Editing Panel appears on the right side of the map interface. This panel provides access to various options:
