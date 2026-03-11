@@ -24,6 +24,13 @@ type BlogPost = {
 
 const blogPostsEnglish: BlogPost[] = [
   {
+    title: 'GOAT 2.4.0 "Toggenburg" is here',
+    date: "March 9, 2026",
+    thumbnail:
+      "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/69a80eca7103ae1f77222324_workflows_cover.webp",
+    url: "https://www.plan4better.de/en/post/goat-2-4-0-toggenburg-is-here",
+  },
+  {
     title: 'GOAT 2.3.0 "Tarn" is here',
     date: "January 13, 2026",
     thumbnail:
@@ -47,6 +54,13 @@ const blogPostsEnglish: BlogPost[] = [
 ];
 
 const blogPostsGerman: BlogPost[] = [
+  {
+    title: 'GOAT 2.4.0 „Toggenburg" ist da',
+    date: "9. März 2026",
+    thumbnail:
+      "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/69a80eca7103ae1f77222324_workflows_cover.webp",
+    url: "https://www.plan4better.de/de/post/goat-2-4-0-toggenburg-is-here",
+  },
   {
     title: 'GOAT 2.3.0 „Tarn" ist da',
     date: "13. Januar 2026",
