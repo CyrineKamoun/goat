@@ -391,6 +391,8 @@
   "done": "Fertig",
   "catalog_download_not_allowed": "Daten aus dem Katalog können nicht direkt heruntergeladen werden. Nur Datensätze, die Ihnen gehören, können heruntergeladen werden.",
   "download": "Herunterladen",
+  "crs_global": "Global",
+  "crs_recommended": "Empfohlen für Ihre Daten",
   "download_crs": "Koordinatenreferenzsystem",
   "download_started": "Download gestartet",
   "download_type": "Download-Typ",

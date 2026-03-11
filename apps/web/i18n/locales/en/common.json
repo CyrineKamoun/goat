@@ -389,6 +389,8 @@
   "dpi": "DPI",
   "drag_elements_to_canvas": "Drag elements to canvas",
   "drop_element_here": "Drop element here",
+  "crs_global": "Global",
+  "crs_recommended": "Recommended for your data",
   "download_crs": "Coordinate Reference System (CRS)",
   "download_started": "Download started",
   "download_type": "Download Type",
