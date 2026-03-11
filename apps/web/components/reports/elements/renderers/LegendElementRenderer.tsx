@@ -3,7 +3,7 @@
 import { Box, Stack, Typography } from "@mui/material";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import type { TypographyStyle } from "@/lib/constants/typography";
-import { DEFAULT_FONT_FAMILY } from "@/lib/constants/typography";
+import { DEFAULT_FONT_FAMILY, LEGEND_TYPOGRAPHY_DEFAULTS } from "@/lib/constants/typography";
 import { rgbToHex } from "@/lib/utils/helpers";
 import type { RGBColor } from "@/types/map/color";
 import type { ProjectLayer } from "@/lib/validations/project";
@@ -15,13 +15,13 @@ import { LayerLegendPanel } from "@/components/map/panels/layer/legend/LayerLege
 /**
  * Convert TypographyStyle to MUI sx props
  */
-function typographyToSx(style?: TypographyStyle): Record<string, unknown> {
-  if (!style) return { fontFamily: DEFAULT_FONT_FAMILY };
+function typographyToSx(style?: TypographyStyle, role?: string): Record<string, unknown> {
+  const defaults = role ? LEGEND_TYPOGRAPHY_DEFAULTS[role] : undefined;
   const sx: Record<string, unknown> = {};
-  sx.fontFamily = style.fontFamily || DEFAULT_FONT_FAMILY;
-  if (style.fontSize) sx.fontSize = style.fontSize;
-  if (style.fontColor) sx.color = style.fontColor;
-  if (style.fontWeight) sx.fontWeight = style.fontWeight;
+  sx.fontFamily = style?.fontFamily || defaults?.fontFamily || DEFAULT_FONT_FAMILY;
+  sx.fontSize = style?.fontSize || defaults?.fontSize;
+  sx.fontWeight = style?.fontWeight || defaults?.fontWeight;
+  if (style?.fontColor) sx.color = style.fontColor;
   return sx;
 }
 
@@ -265,9 +265,8 @@ const LegendElementRenderer: React.FC<LegendElementRendererProps> = ({
           onSave={(text) => saveTextOverride("title", text)}
           variant="subtitle2"
           sx={{
-            fontWeight: "bold",
             mb: 1,
-            ...typographyToSx(typography?.title),
+            ...typographyToSx(typography?.title, "title"),
           }}
         />
       )}
@@ -389,9 +388,8 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
             onSave={(text) => onTextSave?.(`layer_${layer.id}`, text)}
             variant="caption"
             sx={{
-              fontWeight: 500,
               wordBreak: "break-word",
-              ...typographyToSx(typography?.layerName),
+              ...typographyToSx(typography?.layerName, "layerName"),
             }}
           />
         </Stack>
@@ -408,7 +406,7 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
           editable={editable}
           onSave={(text) => onTextSave?.(`caption_${layer.id}`, text)}
           variant="caption"
-          sx={{ display: "block", mb: 0.5, fontWeight: "bold", ...typographyToSx(typography?.caption) }}
+          sx={{ display: "block", mb: 0.5, ...typographyToSx(typography?.caption, "caption") }}
         />
       )}
 
@@ -417,8 +415,8 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
         <LayerLegendPanel
           properties={props}
           geometryType={geomType}
-          itemTypographySx={typographyToSx(typography?.legendItem)}
-          headingTypographySx={typographyToSx(typography?.heading)}
+          itemTypographySx={typographyToSx(typography?.legendItem, "legendItem")}
+          headingTypographySx={typographyToSx(typography?.heading, "heading")}
           editable={editable}
           textOverrides={editable ? extractPrefixedOverrides(textOverrides, `legenditem_${layer.id}_`) : undefined}
           onTextSave={editable ? (key, text) => onTextSave?.(`legenditem_${layer.id}_${key}`, text) : undefined}
@@ -430,7 +428,7 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
         <LayerLegendPanel
           properties={props}
           geometryType="raster"
-          itemTypographySx={typographyToSx(typography?.legendItem)}
+          itemTypographySx={typographyToSx(typography?.legendItem, "legendItem")}
           editable={editable}
           textOverrides={editable ? extractPrefixedOverrides(textOverrides, `legenditem_${layer.id}_`) : undefined}
           onTextSave={editable ? (key, text) => onTextSave?.(`legenditem_${layer.id}_${key}`, text) : undefined}

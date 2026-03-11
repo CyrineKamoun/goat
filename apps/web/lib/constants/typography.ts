@@ -37,6 +37,18 @@ export const DEFAULT_FONT_SIZE = "12pt";
 export const DEFAULT_FONT_FAMILY = "Arial, sans-serif";
 
 /**
+ * Default typography per legend text role.
+ * These define the actual rendered defaults so the config panel stays in sync.
+ */
+export const LEGEND_TYPOGRAPHY_DEFAULTS: Record<string, TypographyStyle> = {
+  title: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "10pt", fontWeight: "bold" },
+  layerName: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "9pt", fontWeight: "bold" },
+  legendItem: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "9pt", fontWeight: "normal" },
+  caption: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "9pt", fontWeight: "bold" },
+  heading: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "9pt", fontWeight: "normal" },
+};
+
+/**
  * Parse a CSS font-size string like "12pt" or "4mm" into value + unit.
  */
 export function parseFontSize(value: string | null | undefined): { size: number; unit: string } {
