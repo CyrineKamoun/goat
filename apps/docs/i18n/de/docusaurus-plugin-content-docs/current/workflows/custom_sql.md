@@ -86,19 +86,6 @@ Das Benutzerdefinierte SQL-Werkzeug unterstützt Standard-SQL-Funktionen plus r�
   <div class="content"><strong>Abfrage validieren</strong>: Klicken Sie auf die Schaltfläche <code>Validieren</code>, um zu prüfen, ob Ihre Abfrage erfolgreich ausgeführt wird.</div>
 </div>
 
-<div class="step">
-  <div class="step-number">3</div>
-  <div class="content"><strong>Ergebnisse vorschauen</strong>: Verwenden Sie die Schaltfläche <code>Vorschau</code>, um die ersten Zeilen der Ergebnisse zu sehen.</div>
-</div>
-
-### Konfigurationsoptionen
-
-**Abfrage-Timeout**: Setzen Sie eine maximale Ausführungszeit für Ihre Abfrage (Standard: 30 Sekunden)
-
-**Ergebnis-Limit**: Begrenzen Sie die Anzahl der zurückgegebenen Zeilen (nützlich zum Testen großer Abfragen)
-
-**Spaltentypen**: Konfigurieren Sie Datentypen für die Ausgabespalten bei Bedarf
-
 ## Beispiele
 
 ### Grundlegende Filterung und Auswahl
