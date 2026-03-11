@@ -84,6 +84,9 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
   // Use locked basemap when layers are locked, otherwise live from props
   const mapStyleUrl = (lockLayers && lockedBasemapUrl) ? lockedBasemapUrl : (basemapUrl || DEFAULT_BASEMAP_URL);
 
+  // Check if this map element is controlled by atlas
+  const isAtlasControlled = element.config?.atlas?.enabled === true;
+
   // Filter and transform layers based on lock state
   const visibleLayers = useMemo(() => {
     let filtered: ProjectLayer[];
@@ -116,8 +119,34 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
       });
     }
 
+    // Atlas coverage layer handling: hide or filter to current feature
+    if (atlasPage && isAtlasControlled && atlasPage.coverageLayerProjectId) {
+      const covLayerId = atlasPage.coverageLayerProjectId;
+
+      if (atlasPage.hiddenCoverageLayer) {
+        // Hide the coverage layer entirely
+        filtered = filtered.filter((layer) => layer.id !== covLayerId);
+      } else if (atlasPage.filterToCurrentFeature && atlasPage.feature) {
+        // Filter coverage layer to only show the current feature
+        const currentFeatureId = atlasPage.feature.id;
+        filtered = filtered.map((layer) => {
+          if (layer.id !== covLayerId) return layer;
+          return {
+            ...layer,
+            query: {
+              ...layer.query,
+              cql: {
+                op: "=",
+                args: [{ property: "id" }, currentFeatureId],
+              },
+            },
+          };
+        });
+      }
+    }
+
     return filtered;
-  }, [layers, lockLayers, lockStyles, lockedLayerIds, lockedLayerStyles]);
+  }, [layers, lockLayers, lockStyles, lockedLayerIds, lockedLayerStyles, atlasPage, isAtlasControlled]);
 
   // Use controlled viewState to prevent map from changing when container resizes (page zoom)
   const [viewState, setViewState] = useState({
@@ -127,9 +156,6 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
     bearing: configViewState?.bearing ?? DEFAULT_VIEW_STATE.bearing,
     pitch: configViewState?.pitch ?? DEFAULT_VIEW_STATE.pitch,
   });
-
-  // Check if this map element is controlled by atlas
-  const isAtlasControlled = element.config?.atlas?.enabled === true;
 
   // Update viewState when element config changes (e.g., from config panel or after reload)
   // This syncs bearing (rotation) and zoom set via the config panel

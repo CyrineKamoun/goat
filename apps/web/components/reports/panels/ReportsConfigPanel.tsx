@@ -5,6 +5,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Divider,
   FormControlLabel,
@@ -122,6 +123,8 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
   const [atlasSortOrder, setAtlasSortOrder] = useState<"asc" | "desc">("asc");
   const [atlasFileNameTemplate, setAtlasFileNameTemplate] = useState<string>("");
   const [customTemplateInput, setCustomTemplateInput] = useState<string>("");
+  const [atlasFilterToCurrentFeature, setAtlasFilterToCurrentFeature] = useState(false);
+  const [atlasHiddenCoverageLayer, setAtlasHiddenCoverageLayer] = useState(false);
 
   // Modal states
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -233,10 +236,14 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
           setAtlasLayerId(atlas.coverage.layer_project_id);
           setAtlasSortBy(atlas.coverage.sort_by ?? "");
           setAtlasSortOrder(atlas.coverage.sort_order ?? "asc");
+          setAtlasFilterToCurrentFeature(atlas.coverage.filter_to_current_feature ?? false);
+          setAtlasHiddenCoverageLayer(atlas.coverage.hidden_coverage_layer ?? false);
         } else {
           setAtlasLayerId(null);
           setAtlasSortBy("");
           setAtlasSortOrder("asc");
+          setAtlasFilterToCurrentFeature(false);
+          setAtlasHiddenCoverageLayer(false);
         }
         // Page label
         const pageLabel = atlas?.page_label;
@@ -468,6 +475,8 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
     // Reset dependent fields
     setAtlasSortBy("");
     setAtlasPageName("");
+    setAtlasFilterToCurrentFeature(false);
+    setAtlasHiddenCoverageLayer(false);
     if (layerId) {
       const coverage: AtlasFeatureCoverage = {
         type: "feature",
@@ -487,6 +496,8 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
       layer_project_id: atlasLayerId,
       sort_by: sortBy || undefined,
       sort_order: atlasSortOrder,
+      filter_to_current_feature: atlasFilterToCurrentFeature,
+      hidden_coverage_layer: atlasHiddenCoverageLayer,
     };
     handleAtlasSettingChange({ coverage });
   };
@@ -499,6 +510,36 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
       layer_project_id: atlasLayerId,
       sort_by: atlasSortBy || undefined,
       sort_order: order,
+      filter_to_current_feature: atlasFilterToCurrentFeature,
+      hidden_coverage_layer: atlasHiddenCoverageLayer,
+    };
+    handleAtlasSettingChange({ coverage });
+  };
+
+  const handleAtlasFilterToCurrentFeatureChange = (checked: boolean) => {
+    setAtlasFilterToCurrentFeature(checked);
+    if (!atlasLayerId) return;
+    const coverage: AtlasFeatureCoverage = {
+      type: "feature",
+      layer_project_id: atlasLayerId,
+      sort_by: atlasSortBy || undefined,
+      sort_order: atlasSortOrder,
+      filter_to_current_feature: checked,
+      hidden_coverage_layer: atlasHiddenCoverageLayer,
+    };
+    handleAtlasSettingChange({ coverage });
+  };
+
+  const handleAtlasHiddenCoverageLayerChange = (checked: boolean) => {
+    setAtlasHiddenCoverageLayer(checked);
+    if (!atlasLayerId) return;
+    const coverage: AtlasFeatureCoverage = {
+      type: "feature",
+      layer_project_id: atlasLayerId,
+      sort_by: atlasSortBy || undefined,
+      sort_order: atlasSortOrder,
+      filter_to_current_feature: atlasFilterToCurrentFeature,
+      hidden_coverage_layer: checked,
     };
     handleAtlasSettingChange({ coverage });
   };
@@ -974,6 +1015,32 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                           }}
                           items={sortOrderItems}
                           disabled={!selectedReport || isSaving}
+                        />
+
+                        {/* Coverage layer rendering options */}
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={atlasFilterToCurrentFeature}
+                              onChange={(e) => handleAtlasFilterToCurrentFeatureChange(e.target.checked)}
+                              disabled={!selectedReport || isSaving || atlasHiddenCoverageLayer}
+                            />
+                          }
+                          label={<Typography variant="body2">{t("atlas_filter_to_current_feature")}</Typography>}
+                          sx={{ ml: 0 }}
+                        />
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={atlasHiddenCoverageLayer}
+                              onChange={(e) => handleAtlasHiddenCoverageLayerChange(e.target.checked)}
+                              disabled={!selectedReport || isSaving}
+                            />
+                          }
+                          label={<Typography variant="body2">{t("atlas_hidden_coverage_layer")}</Typography>}
+                          sx={{ ml: 0 }}
                         />
 
                         {/* Output File Name Template - only for image formats */}

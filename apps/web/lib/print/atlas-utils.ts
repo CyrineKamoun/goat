@@ -44,6 +44,13 @@ export interface AtlasPage {
   bounds: [number, number, number, number];
   /** Computed center [lng, lat] */
   center: [number, number];
+
+  /** Coverage layer project ID (for filtering/hiding) */
+  coverageLayerProjectId?: number;
+  /** Only render the current feature on the coverage layer */
+  filterToCurrentFeature?: boolean;
+  /** Hide the coverage layer entirely from the map */
+  hiddenCoverageLayer?: boolean;
 }
 
 /**
@@ -228,6 +235,9 @@ export function generateFeaturePages(
       },
       bounds: featureBounds,
       center,
+      coverageLayerProjectId: coverage.layer_project_id,
+      filterToCurrentFeature: coverage.filter_to_current_feature ?? false,
+      hiddenCoverageLayer: coverage.hidden_coverage_layer ?? false,
     });
   });
 

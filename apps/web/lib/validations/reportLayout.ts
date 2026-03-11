@@ -194,6 +194,10 @@ export const atlasFeatureCoverageSchema = z.object({
   sort_by: z.string().optional(),
   /** Sort order */
   sort_order: z.enum(["asc", "desc"]).default("asc"),
+  /** Only render the current feature on the coverage layer (filter others out) */
+  filter_to_current_feature: z.boolean().optional(),
+  /** Hide the coverage layer entirely from the map */
+  hidden_coverage_layer: z.boolean().optional(),
 });
 
 /**

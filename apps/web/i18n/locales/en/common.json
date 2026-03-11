@@ -79,6 +79,8 @@
   "atlas_file_name_template": "Output file name",
   "atlas_file_name_template_help": "Template for output filenames (PNG/JPEG). Placeholders: {{@layout_name}}, {{@page_number}}, {{@total_pages}}, {{@feature.ATTR}}. Use \"/\" to create folders in the ZIP.",
   "atlas_filter_hint": "To filter features, apply a CQL filter on the coverage layer source.",
+  "atlas_filter_to_current_feature": "Only render current feature on coverage layer",
+  "atlas_hidden_coverage_layer": "Hidden coverage layer",
   "custom_template": "Custom template",
   "invalid_placeholder": "Invalid placeholder: {{placeholder}}",
   "layout_name": "Layout name",

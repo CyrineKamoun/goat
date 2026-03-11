@@ -80,6 +80,8 @@
   "atlas_file_name_template": "Ausgabe-Dateiname",
   "atlas_file_name_template_help": "Vorlage für Ausgabedateinamen (PNG/JPEG). Platzhalter: {{@layout_name}}, {{@page_number}}, {{@total_pages}}, {{@feature.ATTR}}. Verwenden Sie \"/\" um Ordner im ZIP zu erstellen.",
   "atlas_filter_hint": "Um Features zu filtern, wenden Sie einen CQL-Filter auf die Abdeckungs-Layer-Quelle an.",
+  "atlas_filter_to_current_feature": "Nur aktuelles Feature auf Abdeckungs-Layer rendern",
+  "atlas_hidden_coverage_layer": "Abdeckungs-Layer ausblenden",
   "custom_template": "Benutzerdefinierte Vorlage",
   "invalid_placeholder": "Ungültiger Platzhalter: {{placeholder}}",
   "layout_name": "Layout-Name",
