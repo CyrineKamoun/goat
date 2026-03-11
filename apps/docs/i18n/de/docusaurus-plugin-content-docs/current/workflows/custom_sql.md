@@ -4,11 +4,11 @@
 Dies ist eine erweiterte Funktion, die für Benutzer mit SQL-Kenntnissen gedacht ist. Falsche Abfragen können dazu führen, dass Workflows fehlschlagen oder unerwartete Ergebnisse liefern. Wenn Sie Hilfe beim Schreiben von SQL-Abfragen benötigen, können Sie KI-Assistenten verwenden, um Code zu generieren und zu erklären.
 :::
 
-Das **Benutzerdefinierte SQL**-Werkzeug ermöglicht es Ihnen, benutzerdefinierte SQL-Abfragen für Datenanalysen direkt innerhalb Ihrer [Workflows](../further_reading/glossary.md#workflows) zu schreiben. Diese mächtige Funktion ermöglicht erweiterte Datenverarbeitung, die über GOATs eingebaute Werkzeuge hinausgeht.
+Das **Benutzerdefinierte SQL**-Werkzeug ermöglicht es Ihnen, benutzerdefinierte SQL-Abfragen für Datenanalysen direkt innerhalb Ihrer Workflows zu schreiben. Diese mächtige Funktion ermöglicht erweiterte Datenverarbeitung, die über GOATs eingebaute Werkzeuge hinausgeht.
 
 ## Übersicht
 
-Das Benutzerdefinierte SQL-Werkzeug verbindet sich mit GOATs [DuckDB](../further_reading/glossary.md#duckdb) Backend und gibt Ihnen direkten Zugriff auf die Abfrage Ihrer Datensätze mit SQL-Syntax. Sie können:
+Das Benutzerdefinierte SQL-Werkzeug verbindet sich mit GOATs DuckDB Backend und gibt Ihnen direkten Zugriff auf die Abfrage Ihrer Datensätze mit SQL-Syntax. Sie können:
 
 - Komplexe analytische Abfragen ausführen
 - Mehrere Datensätze verknüpfen
@@ -27,7 +27,7 @@ Das Benutzerdefinierte SQL-Werkzeug verbindet sich mit GOATs [DuckDB](../further
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Verbinden Sie Eingabe-[Datensatz-Knoten](../further_reading/glossary.md#datensatz-knoten) oder andere Werkzeuge, um Datenquellen für Ihre Abfrage bereitzustellen.</div>
+  <div class="content">Verbinden Sie Eingabe-Datensatz-Knoten oder andere Werkzeuge, um Datenquellen für Ihre Abfrage bereitzustellen.</div>
 </div>
 
 <div class="step">
@@ -156,10 +156,10 @@ Häufige Probleme und Lösungen:
 
 ## Ausgabe und Integration
 
-Das Benutzerdefinierte SQL-Werkzeug erstellt eine neue [temporäre Ebene](../further_reading/glossary.md#temporäre-ebene), die Ihre Abfrageergebnisse enthält. Sie können:
+Das Benutzerdefinierte SQL-Werkzeug erstellt eine neue temporäre Ebene, die Ihre Abfrageergebnisse enthält. Sie können:
 
 - Die Ausgabe mit anderen Workflow-Werkzeugen für weitere Analysen verbinden
-- Einen [Export-Knoten](../further_reading/glossary.md#export-knoten) hinzufügen, um Ergebnisse als permanenten Datensatz zu speichern
+- Einen Export-Knoten hinzufügen, um Ergebnisse als permanenten Datensatz zu speichern
 - Die Ergebnisse in Visualisierungen und Styling verwenden
 
 :::info Variablen-Unterstützung
