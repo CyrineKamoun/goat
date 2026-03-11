@@ -91,6 +91,7 @@ export interface MapState {
   measurements: Measurement[];
   isMeasuring: boolean;
   selectedMeasurementId: string | undefined;
+  reportCanvasZoom: number;
 }
 
 const initialState = {
@@ -118,6 +119,7 @@ const initialState = {
   measurements: [] as Measurement[],
   isMeasuring: false,
   selectedMeasurementId: undefined,
+  reportCanvasZoom: 1,
 } as MapState;
 
 const mapSlice = createSlice({
@@ -260,6 +262,9 @@ const mapSlice = createSlice({
     setSelectedMeasurementId: (state, action: PayloadAction<string | undefined>) => {
       state.selectedMeasurementId = action.payload;
     },
+    setReportCanvasZoom: (state, action: PayloadAction<number>) => {
+      state.reportCanvasZoom = action.payload;
+    },
   },
 });
 
@@ -294,6 +299,7 @@ export const {
   clearMeasurements,
   setIsMeasuring,
   setSelectedMeasurementId,
+  setReportCanvasZoom,
 } = mapSlice.actions;
 
 export const mapReducer = mapSlice.reducer;

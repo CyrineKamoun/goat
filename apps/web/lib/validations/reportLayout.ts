@@ -16,6 +16,8 @@ export const pageConfigSchema = z.object({
   height: z.number().optional(),
   snapToGuides: z.boolean().default(false), // Enable/disable snapping to guides
   showRulers: z.boolean().default(false), // Show rulers on canvas
+  dpi: z.number().optional(),
+  export_format: z.enum(["pdf", "png", "jpeg"]).optional(),
 });
 
 // Layout grid configuration

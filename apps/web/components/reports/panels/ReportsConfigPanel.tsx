@@ -224,6 +224,8 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
         setOrientation(report.config.page.orientation);
         setSnapToGuides(report.config.page.snapToGuides ?? false);
         setShowRulers(report.config.page.showRulers ?? false);
+        setDpi(report.config.page.dpi ?? 300);
+        setExportFormat(report.config.page.export_format ?? "pdf");
         // Atlas settings loading
         const atlas = report.config.atlas;
         setAtlasEnabled(atlas?.enabled ?? false);
@@ -839,7 +841,9 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                       selectedItems={dpiItems.find((item) => item.value === dpi)}
                       setSelectedItems={(item: SelectorItem | SelectorItem[] | undefined) => {
                         if (item && !Array.isArray(item)) {
-                          setDpi(item.value as number);
+                          const newDpi = item.value as number;
+                          setDpi(newDpi);
+                          handleSettingChange({ dpi: newDpi });
                         }
                       }}
                       items={dpiItems}
@@ -852,7 +856,9 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                       selectedItems={exportFormatItems.find((item) => item.value === exportFormat)}
                       setSelectedItems={(item: SelectorItem | SelectorItem[] | undefined) => {
                         if (item && !Array.isArray(item)) {
-                          setExportFormat(item.value as string);
+                          const newFormat = item.value as string;
+                          setExportFormat(newFormat);
+                          handleSettingChange({ export_format: newFormat as "pdf" | "png" | "jpeg" });
                         }
                       }}
                       items={exportFormatItems}

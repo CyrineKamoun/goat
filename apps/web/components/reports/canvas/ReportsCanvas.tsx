@@ -22,6 +22,9 @@ import { PAGE_SIZES, mmToPx, pxToMm } from "@/lib/print/units";
 import type { Project, ProjectLayer } from "@/lib/validations/project";
 import type { ReportElement, ReportLayoutConfig } from "@/lib/validations/reportLayout";
 
+import { setReportCanvasZoom } from "@/lib/store/map/slice";
+
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import { useBasemap } from "@/hooks/map/MapHooks";
 import { useAtlasFeatures } from "@/hooks/reports/useAtlasFeatures";
 
@@ -779,7 +782,14 @@ const ReportsCanvas: React.FC<ReportsCanvasProps> = ({
   onElementDelete,
 }) => {
   const { t } = useTranslation("common");
-  const [zoom, setZoom] = useState(0.6);
+  const dispatch = useAppDispatch();
+  const zoom = useAppSelector((state) => state.map.reportCanvasZoom);
+  const setZoom = useCallback(
+    (val: number | ((prev: number) => number)) => {
+      dispatch(setReportCanvasZoom(typeof val === "function" ? val(zoom) : val));
+    },
+    [dispatch, zoom]
+  );
   const [atlasPageIndex, setAtlasPageIndex] = useState(0);
   const paperRef = useRef<HTMLDivElement>(null);
   const canvasWrapperRef = useRef<HTMLDivElement>(null);
