@@ -89,6 +89,7 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
   projectLayers = [],
   onProjectUpdate: _onProjectUpdate,
 }) => {
+  const { t } = useTranslation("common");
   // Shared state for the selected report layout
   const [selectedReport, setSelectedReport] = useState<ReportLayout | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
@@ -219,7 +220,13 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
                         pitch: initialView?.pitch ?? 0,
                       },
                     }
-                  : elementType === "north_arrow" || elementType === "legend" || elementType === "scalebar"
+                  : elementType === "legend"
+                    ? {
+                        title: { text: t("legend") },
+                        mapElementId:
+                          prev.config.elements?.find((el) => el.type === "map")?.id ?? null,
+                      }
+                  : elementType === "north_arrow" || elementType === "scalebar"
                     ? {
                         mapElementId:
                           prev.config.elements?.find((el) => el.type === "map")?.id ?? null,
