@@ -53,6 +53,7 @@ interface LegendTypographyConfig {
   layerName?: TypographyStyle;
   legendItem?: TypographyStyle;
   caption?: TypographyStyle;
+  heading?: TypographyStyle;
 }
 
 /**
@@ -417,6 +418,7 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
           properties={props}
           geometryType={geomType}
           itemTypographySx={typographyToSx(typography?.legendItem)}
+          headingTypographySx={typographyToSx(typography?.heading)}
           editable={editable}
           textOverrides={editable ? extractPrefixedOverrides(textOverrides, `legenditem_${layer.id}_`) : undefined}
           onTextSave={editable ? (key, text) => onTextSave?.(`legenditem_${layer.id}_${key}`, text) : undefined}

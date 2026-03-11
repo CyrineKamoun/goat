@@ -26,6 +26,7 @@ export interface LegendTypographyConfig {
   layerName?: TypographyStyle;
   legendItem?: TypographyStyle;
   caption?: TypographyStyle;
+  heading?: TypographyStyle;
 }
 
 /**
@@ -81,6 +82,7 @@ const LegendElementConfig: React.FC<LegendElementConfigProps> = ({ element, mapE
   const [layerNameTypoOpen, setLayerNameTypoOpen] = useState(false);
   const [legendItemTypoOpen, setLegendItemTypoOpen] = useState(false);
   const [captionTypoOpen, setCaptionTypoOpen] = useState(false);
+  const [headingTypoOpen, setHeadingTypoOpen] = useState(false);
 
   // Extract current config
   const config = (element.config || {}) as LegendElementConfig;
@@ -328,6 +330,17 @@ const LegendElementConfig: React.FC<LegendElementConfigProps> = ({ element, mapE
               <TypographyStyleControl
                 value={typographyConfig.caption ?? {}}
                 onChange={(style) => handleTypographyChange("caption", style)}
+              />
+            </TypographySubGroup>
+
+            {/* Heading Typography (field name labels) */}
+            <TypographySubGroup
+              label={t("heading_typography")}
+              open={headingTypoOpen}
+              onToggle={() => setHeadingTypoOpen(!headingTypoOpen)}>
+              <TypographyStyleControl
+                value={typographyConfig.heading ?? {}}
+                onChange={(style) => handleTypographyChange("heading", style)}
               />
             </TypographySubGroup>
           </Stack>
