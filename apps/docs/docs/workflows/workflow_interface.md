@@ -6,7 +6,7 @@ sidebar_position: 1
 
 **Workflows** in GOAT provide a powerful visual automation system for creating sophisticated spatial analysis pipelines. Instead of running individual tools sequentially, you can connect multiple analysis steps together using a drag-and-drop canvas, creating an automated data processing that eliminates repetitive manual work.
 
-The workflows can be reused across different datasets and scenarios. Each workflow consists of different types of [nodes](../further_reading/glossary.md#node) connected by [edges](../further_reading/glossary.md#edge), enabling you to:
+The workflows can be reused across different datasets and scenarios. Each workflow consists of different types of nodes connected by edges, enabling you to:
 
 - **Automate complex analytical pipelines**: Chain multiple tools together where the output of one analysis automatically feeds into the next
 - **Create multi-source data workflows**: Build sophisticated analysis processes that integrate multiple datasets and processing steps
@@ -141,7 +141,7 @@ Begin with simple 2-3 node workflows to understand the interface, then gradually
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content"><strong>Create New Workflow</strong>: Click <code>+ Add Workflow</code> in the left panel to create a new [workflow](../further_reading/glossary.md#workflow).</div>
+  <div class="content"><strong>Create New Workflow</strong>: Click <code>+ Add Workflow</code> in the left panel to create a new workflow.</div>
 </div>
 
 <div class="step">
