@@ -107,6 +107,7 @@ const DatasetUploadModal: React.FC<DatasetUploadDialogProps> = ({ open, onClose,
       const isFeatureLayer =
         file.name.endsWith(".gpkg") ||
         file.name.endsWith(".geojson") ||
+        file.name.endsWith(".zip") ||
         file.name.endsWith(".shp") ||
         file.name.endsWith(".kml") ||
         file.name.endsWith(".parquet");
