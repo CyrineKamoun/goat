@@ -41,11 +41,11 @@ export const DEFAULT_FONT_FAMILY = "Arial, sans-serif";
  * These define the actual rendered defaults so the config panel stays in sync.
  */
 export const LEGEND_TYPOGRAPHY_DEFAULTS: Record<string, TypographyStyle> = {
-  title: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "10pt", fontWeight: "bold" },
+  title: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "11pt", fontWeight: "bold" },
   layerName: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "9pt", fontWeight: "bold" },
-  legendItem: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "9pt", fontWeight: "normal" },
-  caption: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "9pt", fontWeight: "bold" },
-  heading: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "9pt", fontWeight: "normal" },
+  legendItem: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "8pt", fontWeight: "normal" },
+  caption: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "8pt", fontWeight: "normal" },
+  heading: { fontFamily: DEFAULT_FONT_FAMILY, fontSize: "8pt", fontWeight: "normal", fontColor: "#666666" },
 };
 
 /**
