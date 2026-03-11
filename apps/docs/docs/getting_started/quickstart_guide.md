@@ -34,7 +34,7 @@ You've landed in the map view of your new project. Now it's time to add some dat
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Click on <code>+ Add Layer</code> on the bottom left of the left panel. </div>
+  <div class="content">Click on <code>+ Add Layer</code> on the left panel. </div>
 </div>
 
 <div class="step">
@@ -106,15 +106,11 @@ You've landed in the map view of your new project. Now it's time to add some dat
 </TabItem>
 </Tabs>
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/getting_started/add_data.png').default} alt="Workspace at GOAT" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
-</div>
-
 ## Explore the analysis tools
 Depending on the layers you have added, you can run different analysis from the toolbox.
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content"> Click on the <code>Toolbox</code> button on the right panel.</div>
+  <div class="content"> Locate and click on the <code>Toolbox</code> button, which appears as a tools icon on the right side of the left panel.</div>
 </div>
 
 <div class="step">
@@ -122,17 +118,12 @@ Depending on the layers you have added, you can run different analysis from the 
   <div class="content"> Select the analysis tool you want to use. You can choose between our <b> Accessibility indicators</b>, <b>Data management</b>, <b>Geoanalysis</b>, or <b>Geoprocessing</b> tools, and complete the settings.</div>
 </div>
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/getting_started/toolbox.png').default} alt="Workspace at GOAT" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
-</div>
-
-
 ## Style your map
 Once you have added the layers to your map and computed the analysis, you can customize their appearance to enhance visualization.
 
 <div class="step">
   <div class="step-number">9</div>
-  <div class="content">Click on <code>Layer design <img src={require('/img/icons/styling.png').default} alt="Styling Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/></code>, open the <code> Style</code> menu, select the color you want or if you want to style by attribute, click on <code>options <img src={require('/img/icons/styling.png').default} alt="Options Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/></code>, and set the field you want on the <code>Color based on </code> menu.</div>
+  <div class="content">Click on any layer from your project, and the editing layer panel will appear on the right with the <code>Style</code> tab selected. Go to the <code>Style</code> section and select the color you want. If you want to style by attribute, click on <code>options <img src={require('/img/icons/styling.png').default} alt="Options Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/></code> and set the field you want in the <code>Color based on</code> menu.</div>
 </div>
 
 <div class="step">
@@ -143,10 +134,6 @@ Once you have added the layers to your map and computed the analysis, you can cu
 <div class="step">
   <div class="step-number">11</div>
   <div class="content">Then you can turn on the <code>Labels</code> if you want, edit your <code>Popups</code> and <code>Legend</code>.</div>
-</div>
-
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/getting_started/layer_design.png').default} alt="Workspace at GOAT" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div>
 
 ## Ready to share your work
@@ -165,9 +152,4 @@ Now that you have created your first project in GOAT, it's time to share it with
 <div class="step">
   <div class="step-number">14</div>
   <div class="content">Now you can click on <code>Copy URL</code> and <b> share the direct link </b> so others can open the map in their browser. Or click on <code>Copy iframe Code</code> and <b> embed the map </b> in websites or tools that support HTML and iframes.</div>
-</div>
-
-
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/getting_started/share.gif').default} alt="Workspace at GOAT" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
 </div>

@@ -54,7 +54,7 @@ You can easily check the data types of your layer attributes:
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/data/view-data-layer.png').default} alt="More Options" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/data/view_data.png').default} alt="More Options" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
   <p style={{ textAlign: 'center', fontStyle: 'italic', marginTop: '8px', color: '#666' }}>Accessing the View Data option</p>
 </div>
 

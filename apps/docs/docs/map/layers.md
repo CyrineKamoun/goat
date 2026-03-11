@@ -17,6 +17,12 @@ import TabItem from '@theme/TabItem';
 
 ## How to manage your Layers
 
+The Layers Panel is your central hub for organizing and controlling all the data in your GOAT project. Here you can **add new datasets, arrange layer order for optimal visualization, group related layers together, and control visibility**.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/map/layers/add_layer.webp').default} alt="Add layers in GOAT" style={{ maxHeight: "flex", maxWidth: "flex", objectFit: "cover"}}/>
+</div>
+
 ### Add Layers
 
 You can add layers from [different sources](../data/dataset_types) to your map. You can either:
@@ -24,23 +30,17 @@ You can add layers from [different sources](../data/dataset_types) to your map. 
 - Upload new **datasets from your local device** (GeoPackage, GeoJSON, Shapefile, KML, CSV, or XLSX). 
 - Add external layers by inserting the **url of the external source** (WMS, WMTS, or MVT).
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/map/layers/add_layer.png').default} alt="Add layers in GOAT" style={{ maxHeight: "flex", maxWidth: "flex", objectFit: "cover"}}/>
-</div>
+
 
 <p></p>
+
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Navigate to the <code>Layers</code> menu via the <strong>left sidebar</strong>.</div>
+  <div class="content">On the left panel, click on <code>+ Add Layer</code> to <strong>open the layer options</strong>. </div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Click on <code>+ Add Layer</code> to <strong>open the layer options</strong>. </div>
-</div>
-
-<div class="step">
-  <div class="step-number">3</div>
   <div class="content">Select if you like to integrate a dataset using the: <code>Data Explorer</code>, <code>Dataset Upload</code>, <code>Dataset External</code> or <code>Dataset Catalog</code> to <strong>choose your data source</strong>.</div>
 </div>
 
@@ -49,12 +49,12 @@ You can add layers from [different sources](../data/dataset_types) to your map. 
 
 
 <div class="step">
-  <div class="step-number">4</div>
+  <div class="step-number">3</div>
   <div class="content">Select the file you want to <strong>import</strong>.</div>
 </div>
 
 <div class="step">
-  <div class="step-number">5</div>
+  <div class="step-number">4</div>
   <div class="content">Click on <code>+ Add Layer</code> to <strong>add the selected file</strong>.</div>
 </div>
 
@@ -64,17 +64,17 @@ You can add layers from [different sources](../data/dataset_types) to your map. 
 
 
 <div class="step">
-  <div class="step-number">4</div>
+  <div class="step-number">3</div>
   <div class="content">Select the file you want to <strong>import</strong>.</div>
 </div>
 
 <div class="step">
-  <div class="step-number">5</div>
+  <div class="step-number">4</div>
   <div class="content">Define the name of the dataset and <strong>add a description</strong>, if you like.</div>
 </div>
 
 <div class="step">
-  <div class="step-number">6</div>
+  <div class="step-number">5</div>
   <div class="content">Check the information and click on <code>Upload</code> to <strong>upload the dataset</strong>.</div>
 </div>
 
@@ -83,17 +83,17 @@ You can add layers from [different sources](../data/dataset_types) to your map. 
   <TabItem value="Catalog Explorer" label="Catalog Explorer" className="tabItemBox">
 
 <div class="step">
-  <div class="step-number">4</div>
+  <div class="step-number">3</div>
   <div class="content">Browse <code>GOAT Dataset Catalog</code> to <strong>explore available datasets</strong>.</div>
 </div>
 
 <div class="step">
-  <div class="step-number">5</div>
+  <div class="step-number">4</div>
   <div class="content">Select the Dataset you want to <strong>import</strong>.</div>
 </div>
 
 <div class="step">
-  <div class="step-number">6</div>
+  <div class="step-number">5</div>
   <div class="content">Click on <code>+ Add Layer</code> to <strong>add the selected dataset</strong>.</div>
 </div>
 
@@ -102,7 +102,7 @@ You can add layers from [different sources](../data/dataset_types) to your map. 
   <TabItem value="Dataset External" label="Dataset External" default className="tabItemBox">
   
 <div class="step">
-  <div class="step-number">4</div>
+  <div class="step-number">3</div>
   <div class="content">Insert your <code>external URL</code> and <strong>follow the steps</strong> depending on the type of dataset you would like to add.</div>
 </div>
 
@@ -139,31 +139,48 @@ You can manage all your datasets on the [Datasets page](../workspace/datasets).
 
 :::
 
-### Organize Layers
-
-Once you have added a dataset to the map, **it will be visible in the Layer List**. From there you can organize the different layers.
-
-#### Layer Order
+### Order Layers
 
 When visualizing several data sets at once, the layer order is crucial for creating clear, readable maps. Therefore, **the layer order can be changed interactively**.
 
-Hover over the <strong>left border</strong> of the layer in the layer list until an arrow symbol appears, then <strong>drag and drop to move</strong> the layer to your desired position.
+<strong> Click on the layer</strong> you want to move, then <strong>drag and drop</strong> the layer to your desired position.
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/layers/layer_order.gif').default} alt="Layer Order" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
-</div> 
-
-#### Show / Hide Layers
+### Show / Hide Layers
 
 Click the <img src={require('/img/icons/eye.png').default} alt="Add layers in GOAT" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> icon next to the layer name to  <strong>temporarily hide</strong> a layer from the map view. Clicking the eye again will <strong>make the layer visible</strong> again.
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/layers/hide_layers.gif').default} alt="Hide Layer" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
-</div> 
+### Group Layers
 
-#### Options
+Click the <img src={require('/img/icons/layer.png').default} alt="Group layers" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code> Group Layers</code> button on top of the Layers Panel to **create layer groups** that help organize related datasets together. 
 
-By clicking on <code>more options</code> <img src={require('/img/icons/3dots.png').default} alt="Options" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> icon you have further options to <strong>manage and organize</strong> the selected layer.
+<div class="step">
+  <div class="step-number">1</div>
+  <div class="content">Click the <code>Group Layers</code> button <img src={require('/img/icons/layer.png').default} alt="Group layers" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> at the top of the Layers Panel.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">2</div>
+  <div class="content">Enter a <strong>name for your layer group</strong> in the dialog that appears.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Click <code>Create</code> to <strong>create the new layer group</strong>.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content"><strong>Drag and drop layers</strong> from the main layers list into your newly created group to organize them.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Use the <strong>expand/collapse arrow</strong> next to the group name to show or hide the group contents.</div>
+</div>
+
+### Layer Options
+
+By clicking on <img src={require('/img/icons/3dots.png').default} alt="Options" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>more options</code> icon next to each layer you have further options to <strong>manage and organize</strong> the selected layer.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
 <img src={require('/img/map/layers/layer_options.png').default} alt="Layer Options" style={{ maxHeight: "250px", maxWidth: "250px", objectFit: "cover", alignItems: 'center'}}/>

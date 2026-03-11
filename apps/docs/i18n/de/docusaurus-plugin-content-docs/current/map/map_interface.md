@@ -34,11 +34,8 @@ sidebar_position: 1
 - <code>Benutzerprofil</code>: <strong>Zugriff auf Kontoeinstellungen</strong> und abmelden.
 
 
-### Navigationsleiste
-Die Navigationsleiste auf der linken Seite der Kartenoberfläche bietet Zugriff auf Layer und Legende.
-
-- <img src={require('/img/icons/layer.png').default} alt="Layer" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Layer</code>: <strong>Hinzufügen und verwalten</strong> Ihrer Assets in Form von Layern innerhalb Ihres GOAT-Projekts.
-- <img src={require('/img/icons/list.png').default} alt="Legende" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Legende</code>: <strong>Visualisieren Sie die Legende</strong> der Layer.
+### Layer Panel
+Das Layer Panel auf der linken Seite der Kartenoberfläche bietet Zugang zu allen Projektlayern. Von hier aus können Benutzer ihre Daten verwalten, indem sie neue Layer mit <code>+ Layer hinzufügen</code> hinzufügen und sie mit <img src={require('/img/icons/layer.png').default} alt="Layer gruppieren" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/><code>Layer gruppieren</code> organisieren, um logische Sammlungen verwandter Datensätze zu erstellen.
 
 
 ### Räumliche Operationen Leiste

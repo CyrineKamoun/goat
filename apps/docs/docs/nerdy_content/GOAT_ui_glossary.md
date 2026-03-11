@@ -30,6 +30,7 @@ This comprehensive glossary provides English to German translations for all the 
 | **Properties** | **Eigenschaften** | Layer information and settings |
 | **Filter** | **Filter** | Data filtering tools |
 | **Toolbox** | **Werkzeuge** | Spatial analysis tools |
+| **Workflows** | **Workflows** | Visual analysis workflow editor |
 | **Scenarios** | **Szenarien** | Scenario planning tools |
 
 ## Spatial Analysis Tools
@@ -124,6 +125,64 @@ This comprehensive glossary provides English to German translations for all the 
 | GTFS Data | GTFS-Daten | General Transit Feed Specification |
 | Quality Classes | Güteklassen | Service quality assessment levels |
 | Station Coverage | Stationsabdeckung | Public transport station reach |
+
+## Workflows Interface
+
+| English | German | Description |
+|---------|--------|-------------|
+| **Workflows** | **Workflows** | Visual analysis workflow system |
+| Workflow | Workflow | Collection of connected analysis steps |
+| Workflow Canvas | Workflow-Leinwand | Visual editing area for workflows |
+| Workflow Editor | Workflow-Editor | Visual workflow design interface |
+| Node | Knoten | Individual workflow element (dataset, tool, export) |
+| Edge | Verbindung | Connection between workflow nodes |
+| **Dataset Node** | **Datensatz-Knoten** | Input data source in workflow |
+| **Tool Node** | **Werkzeug-Knoten** | Analysis process in workflow |
+| **Export Node** | **Export-Knoten** | Output/save step in workflow |
+| **Text Annotation Node** | **Text-Anmerkungs-Knoten** | Documentation note on canvas |
+| Canvas | Leinwand | Visual workspace for building workflows |
+| Viewport | Ansichtsbereich | Canvas view position and zoom |
+| Handle | Anschluss | Connection point on nodes |
+| Source Handle | Quell-Anschluss | Output connection point |
+| Target Handle | Ziel-Anschluss | Input connection point |
+| **Execution** | **Ausführung** | Running workflow processes |
+| Run Node | Knoten ausführen | Execute single workflow step |
+| Run to Here | Bis hier ausführen | Execute workflow up to selected node |
+| Run Workflow | Workflow ausführen | Execute entire workflow |
+| Node Status | Knoten-Status | Current state of workflow node |
+| Idle | Bereit | Node ready to run |
+| Pending | Wartend | Node queued for execution |
+| Running | Läuft | Node currently executing |
+| Completed | Abgeschlossen | Node finished successfully |
+| Error | Fehler | Node execution failed |
+| **Variables** | **Variablen** | Workflow-level parameters |
+| Variable Name | Variablenname | Parameter identifier |
+| Default Value | Standardwert | Initial parameter value |
+| Variable Type | Variablentyp | Data type (string, number) |
+| **Canvas Controls** | **Leinwand-Steuerung** | Workflow editor tools |
+| Auto-layout | Automatisches Layout | Arrange nodes automatically |
+| Zoom Controls | Zoom-Steuerung | Canvas zoom in/out |
+| Minimap | Minimap | Canvas overview navigator |
+| Background Grid | Hintergrund-Raster | Canvas alignment grid |
+| **Workflow Management** | **Workflow-Verwaltung** | Workflow organization |
+| Add Workflow | Workflow hinzufügen | Create new workflow |
+| Duplicate Workflow | Workflow duplizieren | Copy existing workflow |
+| Rename Workflow | Workflow umbenennen | Change workflow name |
+| Delete Workflow | Workflow löschen | Remove workflow |
+| Default Workflow | Standard-Workflow | Primary workflow for project |
+| Workflow Description | Workflow-Beschreibung | Workflow documentation |
+| Workflow Thumbnail | Workflow-Vorschau | Preview image |
+| **Data Processing** | **Datenverarbeitung** | Workflow data handling |
+| Temporary Layer | Temporäre Ebene | Intermediate workflow result |
+| Output Layer | Ausgabe-Ebene | Final workflow result |
+| Layer Reference | Ebenen-Referenz | Link to project layer |
+| Filter | Filter | Data filtering within workflow |
+| Filter Expression | Filter-Ausdruck | Data filtering condition |
+| Geometry Type | Geometrietyp | Spatial data type (point, line, polygon) |
+| **Connection Validation** | **Verbindungsvalidierung** | Workflow connection rules |
+| Compatible Types | Kompatible Typen | Matching geometry types for connections |
+| Invalid Connection | Ungültige Verbindung | Incompatible node connection |
+| Connection Error | Verbindungsfehler | Failed node linkage |
 
 ## Layouts & Print
 

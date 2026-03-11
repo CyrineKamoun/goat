@@ -113,7 +113,7 @@ Sie sind in der Kartenansicht Ihres neuen Projekts gelandet. Jetzt ist es Zeit, 
 Je nach den Layern, die Sie hinzugefügt haben, können Sie verschiedene Analysen aus der Werkzeugkiste ausführen.
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content"> Klicken Sie auf die <code>Werkzeuge</code>-Schaltfläche im rechten Panel.</div>
+  <div class="content"> Suchen Sie die <code>Werkzeuge</code>-Schaltfläche, die als Werkzeug-Symbol auf der rechten Seite des linken Panels angezeigt wird, und klicken Sie darauf. Dadurch wird das Analysewerkzeuge-Panel geöffnet, in dem Sie je nach den Datenlayern Ihres Projekts auf verschiedene analytische Funktionen zugreifen können.</div>
 </div>
 
 <div class="step">
