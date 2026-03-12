@@ -162,6 +162,7 @@ async def get_tile(
             limit=limit,
             columns=columns,
             geometry_column=geometry_column,
+            geometry_type=metadata.geometry_type,
         )
     except TimeoutError:
         # Query exceeded timeout - return 504 Gateway Timeout

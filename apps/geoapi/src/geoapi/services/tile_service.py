@@ -1017,6 +1017,7 @@ class TileService:
         limit: Optional[int] = None,
         columns: Optional[list[dict]] = None,
         geometry_column: str = "geometry",
+        geometry_type: Optional[str] = None,
     ) -> Optional[tuple[bytes, bool, str]]:
         """Generate MVT tile for a layer.
 
@@ -1031,6 +1032,7 @@ class TileService:
             limit: Maximum features
             columns: List of column dicts with 'name' and 'type' keys
             geometry_column: Name of the geometry column
+            geometry_type: Geometry type (e.g., "polygon") for anchor generation
 
         Returns:
             Tuple of (MVT tile bytes, is_gzip_compressed, source) or None if empty
@@ -1053,6 +1055,7 @@ class TileService:
                     limit=limit,
                     columns=columns,
                     geometry_column=geometry_column,
+                    geometry_type=geometry_type,
                 ),
             )
             if tile_data is None:
@@ -1084,6 +1087,7 @@ class TileService:
                     limit=limit,
                     columns=columns,
                     geometry_column=geometry_column,
+                    geometry_type=geometry_type,
                 ),
             )
             if tile_data is None:
@@ -1117,8 +1121,13 @@ class TileService:
         limit: Optional[int] = None,
         columns: Optional[list[dict]] = None,
         geometry_column: str = "geometry",
+        geometry_type: Optional[str] = None,
     ) -> Optional[bytes]:
         """Generate MVT tile dynamically using DuckDB.
+
+        For polygon layers, generates two MVT layers in the same tile:
+        - 'default': the polygon geometry
+        - 'default_anchor': point features from ST_PointOnSurface for label placement
 
         Args:
             layer_info: Layer information from URL
@@ -1129,6 +1138,7 @@ class TileService:
             limit: Maximum features
             columns: List of column dicts
             geometry_column: Name of the geometry column
+            geometry_type: Geometry type (e.g., "polygon") for anchor generation
 
         Returns:
             MVT tile bytes or None if empty
@@ -1350,6 +1360,9 @@ class TileService:
                 FROM candidates, bounds
             """
 
+        # Determine if we need to generate label anchor points for polygon layers
+        is_polygon_layer = geometry_type and "polygon" in geometry_type.lower()
+
         try:
             # Use pool's execute_with_retry for automatic connection handling
             # Apply query timeout to prevent blocking other requests
@@ -1361,15 +1374,99 @@ class TileService:
                 timeout=settings.QUERY_TIMEOUT,
             )
 
-            if result and result[0]:
-                return bytes(result[0])
-            return None
+            if not result or not result[0]:
+                return None
+
+            tile_data = bytes(result[0])
+
+            # For polygon layers, generate and append a label anchor layer
+            # using ST_PointOnSurface for optimal label placement
+            if is_polygon_layer:
+                anchor_data = self._generate_anchor_layer(
+                    query=query,
+                    struct_pack_args=struct_pack_args,
+                    geom_col=geom_col,
+                    params=params,
+                )
+                if anchor_data:
+                    # MVT is protobuf — multiple layers can be concatenated
+                    tile_data = tile_data + anchor_data
+
+            return tile_data
         except TimeoutError:
             logger.warning("Tile query timeout: z=%d, x=%d, y=%d", z, x, y)
             raise
         except Exception as e:
             logger.error("Tile generation error: %s", e)
             raise
+
+    def _generate_anchor_layer(
+        self,
+        query: str,
+        struct_pack_args: str,
+        geom_col: str,
+        params: list | None = None,
+    ) -> Optional[bytes]:
+        """Generate a label anchor MVT layer for polygon features.
+
+        Creates point features using ST_PointOnSurface for optimal label
+        placement inside polygons. The result is a separate MVT layer named
+        'default_anchor' that can be concatenated with the main tile.
+
+        Args:
+            query: The original tile query (reused for the candidates CTE)
+            struct_pack_args: Original struct_pack arguments
+            geom_col: Geometry column name
+            params: Query parameters
+
+        Returns:
+            MVT bytes for the anchor layer, or None if empty
+        """
+        # Build anchor struct_pack by wrapping the transformed geometry with
+        # ST_PointOnSurface. The original geometry field looks like:
+        #   geometry := ST_AsMVTGeom(ST_Transform(...), ST_Extent(bounds.bbox3857))
+        # We need:
+        #   geometry := ST_AsMVTGeom(
+        #     ST_PointOnSurface(ST_Transform(...)),
+        #     ST_Extent(bounds.bbox3857)
+        #   )
+        original_geom_expr = (
+            f'ST_AsMVTGeom(ST_Transform(candidates."{geom_col}"'
+        )
+        anchor_geom_expr = (
+            f'ST_AsMVTGeom(ST_PointOnSurface(ST_Transform(candidates."{geom_col}"'
+        )
+        # The closing parens: original has ...always_xy := true), ST_Extent(bounds.bbox3857))
+        # We need an extra ) to close ST_PointOnSurface before the comma
+        original_close = "always_xy := true), ST_Extent"
+        anchor_close = "always_xy := true)), ST_Extent"
+
+        anchor_struct = struct_pack_args.replace(
+            original_geom_expr, anchor_geom_expr
+        ).replace(
+            original_close, anchor_close
+        )
+        anchor_query = query.replace(
+            f"struct_pack({struct_pack_args})",
+            f"struct_pack({anchor_struct})",
+        ).replace(
+            "'default'",
+            "'default_anchor'",
+        )
+
+        try:
+            result = ducklake_pool.execute_with_retry(
+                anchor_query,
+                params=params if params else None,
+                max_retries=1,
+                fetch_all=False,
+                timeout=settings.QUERY_TIMEOUT,
+            )
+            if result and result[0]:
+                return bytes(result[0])
+        except Exception as e:
+            logger.warning("Anchor layer generation failed: %s", e)
+        return None
 
 
 # Singleton instance

@@ -250,7 +250,9 @@ const Layers = (props: LayersProps) => {
                         id={
                           layer.properties?.["custom_marker"] ? layer.id.toString() : `text-label-${layer.id}`
                         }
-                        source-layer="default"
+                        source-layer={
+                          layer.feature_layer_geometry_type === "polygon" ? "default_anchor" : "default"
+                        }
                         minzoom={layer.properties.min_zoom || 0}
                         maxzoom={layer.properties.max_zoom || 24}
                         {...labelStyleSpec}

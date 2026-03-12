@@ -329,35 +329,6 @@ class SimpleToolRunner:
         )
         root_logger.addHandler(handler)
 
-    @staticmethod
-    def _libpq_to_postgres_uri(libpq_str: str) -> str:
-        """Convert libpq connection string to postgresql:// URI.
-
-        Args:
-            libpq_str: libpq format string like "host=db port=5432 dbname=goat user=rds password=xxx"
-
-        Returns:
-            postgresql:// URI like "postgresql://rds:xxx@db:5432/goat"
-        """
-        # Parse libpq key=value pairs
-        params: dict[str, str] = {}
-        for part in libpq_str.split():
-            if "=" in part:
-                key, value = part.split("=", 1)
-                params[key] = value
-
-        host = params.get("host", "localhost")
-        port = params.get("port", "5432")
-        dbname = params.get("dbname", "")
-        user = params.get("user", "")
-        password = params.get("password", "")
-
-        if password:
-            return f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
-        elif user:
-            return f"postgresql://{user}@{host}:{port}/{dbname}"
-        else:
-            return f"postgresql://{host}:{port}/{dbname}"
 
     def init_from_env(self: Self) -> None:
         """Initialize settings from environment variables."""
@@ -395,18 +366,6 @@ class SimpleToolRunner:
                 OVERRIDE_DATA_PATH true
             )
         """)
-
-        # Also attach postgres directly for querying DuckLake metadata
-        # This allows us to read snapshot_id from ducklake_table for PMTiles sync
-        try:
-            # Convert libpq connection string to postgres:// URI
-            pg_uri = self._libpq_to_postgres_uri(self.settings.ducklake_postgres_uri)
-            con.execute(f"""
-                ATTACH '{pg_uri}' AS pg (TYPE postgres, SCHEMA {self.settings.ducklake_catalog_schema})
-            """)
-        except Exception as e:
-            # Non-fatal - PMTiles sync tracking will just not have snapshot_id
-            logger.debug(f"Could not attach postgres for metadata queries: {e}")
 
         # Configure DuckLake parquet options for optimal spatial performance:
         # - ZSTD compression: better compression ratio than Snappy
@@ -1655,7 +1614,7 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
     ) -> int | None:
         """Get the DuckLake snapshot_id for a table.
 
-        Queries the DuckLake metadata catalog in PostgreSQL to get the
+        Queries the DuckLake internal metadata catalog to get the
         begin_snapshot for a table. This snapshot_id is used to track
         whether PMTiles files are in sync with the source data.
 
@@ -1666,16 +1625,11 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
         Returns:
             Snapshot ID if found, None otherwise
         """
-        if self.settings is None:
-            return None
-
         try:
-            # Query the DuckLake metadata catalog directly via PostgreSQL
-            # We need to attach postgres to access the metadata schema
             result = self.duckdb_con.execute(f"""
                 SELECT t.begin_snapshot
-                FROM pg.{self.settings.ducklake_catalog_schema}.ducklake_table t
-                JOIN pg.{self.settings.ducklake_catalog_schema}.ducklake_schema s
+                FROM __ducklake_metadata_lake.ducklake.ducklake_table t
+                JOIN __ducklake_metadata_lake.ducklake.ducklake_schema s
                     ON t.schema_id = s.schema_id
                 WHERE s.schema_name = '{schema_name}'
                 AND t.table_name = '{table_name}'
