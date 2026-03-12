@@ -65,6 +65,10 @@ class PMTilesSyncParams(BaseModel):
         default=True,
         description="Show tippecanoe progress during tile generation",
     )
+    geometry_type_filter: str | None = Field(
+        default=None,
+        description="Only process layers matching this geometry type (e.g. 'polygon', 'point', 'line')",
+    )
 
 
 __all__ = ["PMTilesSyncParams", "PMTilesSyncTask", "main"]
@@ -368,6 +372,39 @@ class PMTilesSyncTask:
 
         return layers
 
+    def _detect_geometry_type(
+        self: Self,
+        layer: LayerInfo,
+    ) -> str:
+        """Detect actual geometry type by sampling layer data.
+
+        Args:
+            layer: Layer info with table name and geometry column
+
+        Returns:
+            Geometry type string: "polygon", "line", "point", or "unknown"
+        """
+        manager = self._get_manager()
+        try:
+            with manager.connection() as con:
+                result = con.execute(f"""
+                    SELECT DISTINCT ST_GeometryType(ST_GeomFromWKB({layer.geometry_column}))
+                    FROM {layer.full_table_name}
+                    LIMIT 10
+                """).fetchall()
+                types = {row[0].upper() for row in result if row[0]}
+                if any("POLYGON" in t for t in types):
+                    return "polygon"
+                elif any("LINE" in t for t in types):
+                    return "line"
+                elif any("POINT" in t for t in types):
+                    return "point"
+        except Exception as e:
+            logger.warning(
+                f"Could not detect geometry type for {layer.full_table_name}: {e}"
+            )
+        return "unknown"
+
     def _process_layer(
         self: Self,
         layer: LayerInfo,
@@ -466,6 +503,25 @@ class PMTilesSyncTask:
             if not layers:
                 logger.info("No layers to process")
                 return stats.to_dict()
+
+            # Filter by geometry type if requested
+            if params.geometry_type_filter:
+                filter_type = params.geometry_type_filter.lower()
+                filtered = []
+                for layer in layers:
+                    geom_type = self._detect_geometry_type(layer)
+                    if geom_type == filter_type:
+                        filtered.append(layer)
+                    else:
+                        logger.info(
+                            f"  Skipping {layer.full_table_name} "
+                            f"(geometry={geom_type}, filter={filter_type})"
+                        )
+                logger.info(
+                    f"Filtered to {len(filtered)}/{len(layers)} "
+                    f"{filter_type} layers"
+                )
+                layers = filtered
 
             # Categorize layers
             generator = self._get_generator()
