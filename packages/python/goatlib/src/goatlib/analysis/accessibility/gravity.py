@@ -249,22 +249,27 @@ class HeatmapGravityTool(HeatmapToolBase):
         # --- Handle potential_expression first ---
         if opp.potential_expression:
             expr = opp.potential_expression.lower().strip()
-
-            if expr in ("$area", "area"):
+            if expr in ("$area", "area", "$perimeter", "perimeter"):
                 if "polygon" not in geom_type_lower:
                     raise ValueError(
                         f"Invalid potential_expression='{expr}' for geometry type '{geom_type}'. "
-                        "Area is only valid for Polygon or MultiPolygon geometries."
+                        "Area/Perimeter is only valid for Polygon or MultiPolygon geometries."
                     )
-                return f"ST_Area_Spheroid({wgs84_geom_sql})"
 
-            if expr in ("$perimeter", "perimeter"):
-                if "polygon" not in geom_type_lower:
-                    raise ValueError(
-                        f"Invalid potential_expression='{expr}' for geometry type '{geom_type}'. "
-                        "Perimeter is only valid for Polygon or MultiPolygon geometries."
-                    )
-                return f"ST_Perimeter_Spheroid({wgs84_geom_sql})"
+                # Dynamic UTM zone for metric results (m² / m)
+                wgs84_proj = "'+proj=longlat +datum=WGS84 +no_defs'"
+                utm_zone_expr = (
+                    f"('EPSG:' || CAST(("
+                    f"CASE WHEN ST_Y(ST_Centroid({wgs84_geom_sql})) >= 0 THEN 32600 ELSE 32700 END "
+                    f"+ CAST(FLOOR((ST_X(ST_Centroid({wgs84_geom_sql})) + 180) / 6) + 1 AS INT)"
+                    f") AS VARCHAR))"
+                )
+                utm_geom = f"ST_Transform({wgs84_geom_sql}, {wgs84_proj}, {utm_zone_expr})"
+
+                if expr in ("$area", "area"):
+                    return f"ST_Area({utm_geom})"
+                if expr in ("$perimeter", "perimeter"):
+                    return f"ST_Perimeter({utm_geom})"
 
             # Custom user expression (use as-is)
             return expr
