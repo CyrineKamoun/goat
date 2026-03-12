@@ -7,11 +7,11 @@
       "request": "launch",
       "module": "fastapi",
       "args": [
-          "dev",
-          "src/core/main.py",
-          "--reload",
-          "--port",
-          "8000"
+        "dev",
+        "src/core/main.py",
+        "--reload",
+        "--port",
+        "8000"
       ],
       "consoleName": "Core Debug Console",
       "cwd": "${workspaceFolder}/apps/core",
@@ -31,11 +31,11 @@
       "request": "launch",
       "module": "fastapi",
       "args": [
-          "dev",
-          "src/geoapi/main.py",
-          "--reload",
-          "--port",
-          "8100"
+        "dev",
+        "src/geoapi/main.py",
+        "--reload",
+        "--port",
+        "8100"
       ],
       "consoleName": "GeoAPI Debug Console",
       "cwd": "${workspaceFolder}/apps/geoapi",
@@ -55,11 +55,11 @@
       "request": "launch",
       "module": "fastapi",
       "args": [
-          "dev",
-          "src/processes/main.py",
-          "--reload",
-          "--port",
-          "8300"
+        "dev",
+        "src/processes/main.py",
+        "--reload",
+        "--port",
+        "8300"
       ],
       "consoleName": "Processes Debug Console",
       "cwd": "${workspaceFolder}/apps/processes",
@@ -79,11 +79,11 @@
       "request": "launch",
       "module": "fastapi",
       "args": [
-          "dev",
-          "src/accounts/main.py",
-          "--reload",
-          "--port",
-          "8100"
+        "dev",
+        "src/accounts/main.py",
+        "--reload",
+        "--port",
+        "8100"
       ],
       "consoleName": "Accounts Debug Console",
       "cwd": "${workspaceFolder}/apps/accounts",
@@ -97,20 +97,19 @@
         "order": 3
       }
     },
-
     {
       "name": "Routing Debug",
       "type": "debugpy",
       "request": "launch",
       "module": "fastapi",
       "args": [
-          "dev",
-          "src/routing/main.py",
-          "--reload",
-          "--host",
-          "0.0.0.0",
-          "--port",
-          "8200"
+        "dev",
+        "src/routing/main.py",
+        "--reload",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8200"
       ],
       "consoleName": "Routing Debug Console",
       "cwd": "${workspaceFolder}/apps/routing",
@@ -226,8 +225,7 @@
         "GeoAPI Debug",
         "Processes Debug",
         "Core Debug",
-        "Web Debug",
-        "Docs Debug"
+        "Web Debug"
       ],
       "presentation": {
         "hidden": false,
