@@ -137,6 +137,11 @@ class DuckDBCQLEvaluator(Evaluator):
             # Use the actual geometry column name
             return self._quote_identifier(self.geometry_column)
 
+        # When filtering on "id" but the table has no id column, use rowid
+        # (GeoAPI uses DuckDB's rowid as fallback feature ID)
+        if name.lower() == "id" and "id" not in self.field_names:
+            return "rowid"
+
         # Validate column name
         if name.lower() not in self.field_names:
             raise ValueError(f"Unknown field: {name}. Valid fields: {self.field_names}")

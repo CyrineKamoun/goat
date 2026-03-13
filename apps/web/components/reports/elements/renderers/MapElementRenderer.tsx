@@ -129,16 +129,22 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
       } else if (atlasPage.filterToCurrentFeature && atlasPage.feature) {
         // Filter coverage layer to only show the current feature
         const currentFeatureId = atlasPage.feature.id;
+        const idFilter = {
+          op: "=",
+          args: [{ property: "id" }, currentFeatureId],
+        };
         filtered = filtered.map((layer) => {
           if (layer.id !== covLayerId) return layer;
+          const existingCql = layer.query?.cql;
+          // Combine with existing CQL filter if present
+          const combinedCql = existingCql
+            ? { op: "and", args: [existingCql, idFilter] }
+            : idFilter;
           return {
             ...layer,
             query: {
               ...layer.query,
-              cql: {
-                op: "=",
-                args: [{ property: "id" }, currentFeatureId],
-              },
+              cql: combinedCql,
             },
           };
         });
@@ -195,21 +201,28 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
     const containerWidth = container?.clientWidth ?? 400;
     const containerHeight = container?.clientHeight ?? 300;
     const minDim = Math.min(containerWidth, containerHeight);
-    const paddingPx = Math.round((marginPercent / 100) * minDim);
+    // Clamp padding so it doesn't exceed what fitBounds can handle
+    // (padding on both sides must leave at least 1px for the map)
+    const maxPadding = Math.floor(Math.min(containerWidth, containerHeight) / 2) - 1;
+    const paddingPx = Math.min(Math.round((marginPercent / 100) * minDim), Math.max(0, maxPadding));
 
     // Fit the map to the atlas page bounds with margin-based padding
-    mapRef.current.fitBounds(
-      [
-        [west, south],
-        [east, north],
-      ],
-      {
-        padding: paddingPx,
-        duration: 0, // No animation for print preview
-        maxZoom: 18, // Prevent excessive zoom for small features
-        bearing: configBearing, // Preserve rotation from config
-      }
-    );
+    try {
+      mapRef.current.fitBounds(
+        [
+          [west, south],
+          [east, north],
+        ],
+        {
+          padding: paddingPx,
+          duration: 0, // No animation for print preview
+          maxZoom: 18, // Prevent excessive zoom for small features
+          bearing: configBearing, // Preserve rotation from config
+        }
+      );
+    } catch {
+      // fitBounds can throw if the canvas is too small for the given padding
+    }
   }, [atlasPage, isAtlasControlled, mapLoaded, configViewState?.bearing, element.config?.atlas?.margin_percent]);
 
   // Handle double-click to enter navigation mode
