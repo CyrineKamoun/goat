@@ -414,6 +414,7 @@ class CatchmentAreaWindmillParams(ToolInputBase):
                     "catchment_area_starting_points", "de"
                 ),
             },
+            visible_when={"starting_points": {"$hasKey": "latitude"}},  # Only show for map clicks (not layer)
         ),
     )
 

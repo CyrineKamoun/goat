@@ -691,6 +691,14 @@ export function evaluateCondition(
             if (expected && !exists) return false;
             if (!expected && exists) return false;
             break;
+          case "$hasKey":
+            if (
+              typeof value !== "object" ||
+              value === null ||
+              !(expected as string in (value as Record<string, unknown>))
+            )
+              return false;
+            break;
           default:
             // Unknown operator, skip
             break;
