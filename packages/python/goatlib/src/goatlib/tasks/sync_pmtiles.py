@@ -388,7 +388,7 @@ class PMTilesSyncTask:
         try:
             with manager.connection() as con:
                 result = con.execute(f"""
-                    SELECT DISTINCT ST_GeometryType(ST_GeomFromWKB({layer.geometry_column}))
+                    SELECT DISTINCT ST_GeometryType({layer.geometry_column})
                     FROM {layer.full_table_name}
                     LIMIT 10
                 """).fetchall()
