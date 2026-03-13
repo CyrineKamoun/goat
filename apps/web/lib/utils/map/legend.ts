@@ -57,13 +57,17 @@ export function getLegendColorMap(
     if (["ordinal"].includes(properties[`${type}_scale`] as string)) {
       // Ordinal (Categories)
       ((properties[`${type}_range`] as Record<string, unknown>)?.color_map as unknown[])?.forEach(
-        (value: unknown) => {
+        (value: unknown, index: number) => {
           if (Array.isArray(value) && value.length === 2) {
             const color = value[1] as string;
+            const values = value[0] as string[] | null;
+            // Look up label by category value first, fall back to color key for backward compat
+            const valueKey = values ? values.join(",") : String(index);
+            const label = colorLegends?.[valueKey] || colorLegends?.[color];
             colorMap.push({
-              value: value[0],
+              value: values,
               color,
-              ...(colorLegends?.[color] ? { label: colorLegends[color] } : {}),
+              ...(label ? { label } : {}),
             });
           }
         }
@@ -103,6 +107,8 @@ export function getLegendColorMap(
         Array.isArray((classBreaksValues as Record<string, unknown>).breaks) &&
         colors
       ) {
+        // Track running row index for index-based legend label lookup
+        let rowIdx = 0;
         ((classBreaksValues as Record<string, unknown>).breaks as number[]).forEach(
           (value: number, index: number) => {
             if (index === 0) {
@@ -114,8 +120,9 @@ export function getLegendColorMap(
                 color0,
                 true,
                 false,
-                colorLegends?.[color0]
+                colorLegends?.[String(rowIdx)] || colorLegends?.[color0]
               );
+              rowIdx++;
               const color1 = getColor(colors, index + 1);
               createRangeAndColor(
                 colorMap,
@@ -124,8 +131,9 @@ export function getLegendColorMap(
                 color1,
                 false,
                 false,
-                colorLegends?.[color1]
+                colorLegends?.[String(rowIdx)] || colorLegends?.[color1]
               );
+              rowIdx++;
             } else if (
               index ===
               ((classBreaksValues as Record<string, unknown>).breaks as number[]).length - 1
@@ -138,8 +146,9 @@ export function getLegendColorMap(
                 color,
                 false,
                 true,
-                colorLegends?.[color]
+                colorLegends?.[String(rowIdx)] || colorLegends?.[color]
               );
+              rowIdx++;
             } else {
               const color = getColor(colors, index + 1);
               createRangeAndColor(
@@ -149,8 +158,9 @@ export function getLegendColorMap(
                 color,
                 false,
                 false,
-                colorLegends?.[color]
+                colorLegends?.[String(rowIdx)] || colorLegends?.[color]
               );
+              rowIdx++;
             }
           }
         );

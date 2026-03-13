@@ -69,6 +69,10 @@ class PMTilesSyncParams(BaseModel):
         default=None,
         description="Only process layers matching this geometry type (e.g. 'polygon', 'point', 'line')",
     )
+    anchor_only: bool = Field(
+        default=False,
+        description="Only generate anchor PMTiles for polygon layers (skip main tile regeneration)",
+    )
 
 
 __all__ = ["PMTilesSyncParams", "PMTilesSyncTask", "main"]
@@ -407,7 +411,17 @@ class PMTilesSyncTask:
 
     @staticmethod
     def _has_anchor_layer(pmtiles_path: "Path") -> bool:
-        """Check if a PMTiles file already contains a default_anchor layer."""
+        """Check if a layer already has anchor label points.
+
+        Checks for a separate anchor PMTiles file (new two-file approach)
+        or a default_anchor layer in the main file (legacy merged approach).
+        """
+        # New approach: separate anchor PMTiles file
+        anchor_path = pmtiles_path.with_name(pmtiles_path.stem + "_anchor.pmtiles")
+        if anchor_path.exists():
+            return True
+
+        # Legacy: check for default_anchor layer inside merged PMTiles
         try:
             from pmtiles.reader import MmapSource
             from pmtiles.reader import Reader as PMTilesReader
@@ -415,7 +429,7 @@ class PMTilesSyncTask:
             with open(pmtiles_path, "rb") as f:
                 reader = PMTilesReader(MmapSource(f))
                 meta = reader.metadata()
-                layers = [l["id"] for l in meta.get("vector_layers", [])]
+                layers = [layer["id"] for layer in meta.get("vector_layers", [])]
                 return "default_anchor" in layers
         except Exception:
             return False
@@ -427,12 +441,58 @@ class PMTilesSyncTask:
         dry_run: bool = False,
         show_progress: bool = True,
         skip_existing_anchors: bool = False,
+        anchor_only: bool = False,
     ) -> SyncResult:
         """Process a single layer - generate PMTiles if needed."""
         generator = self._get_generator()
 
         try:
             pmtiles_path = generator.get_pmtiles_path(layer.user_id, layer.layer_id)
+
+            # Anchor-only mode: generate only anchor PMTiles for polygon layers
+            if anchor_only:
+                if not pmtiles_path.exists():
+                    return SyncResult(
+                        layer_id=layer.layer_id,
+                        status="skipped",
+                        message="No main PMTiles file, skipping anchor generation",
+                    )
+                if self._has_anchor_layer(pmtiles_path):
+                    return SyncResult(
+                        layer_id=layer.layer_id,
+                        status="skipped",
+                        message="Already has anchor layer",
+                    )
+                if dry_run:
+                    return SyncResult(
+                        layer_id=layer.layer_id,
+                        status="would_create",
+                        message="Would generate anchor PMTiles",
+                    )
+                manager = self._get_manager()
+                with manager.connection() as con:
+                    output = generator.generate_anchor_from_table(
+                        duckdb_con=con,
+                        table_name=layer.full_table_name,
+                        user_id=layer.user_id,
+                        layer_id=layer.layer_id,
+                        geometry_column=layer.geometry_column,
+                        snapshot_id=layer.snapshot_id,
+                        show_progress=show_progress,
+                    )
+                if output:
+                    size_mb = output.stat().st_size / 1024 / 1024
+                    return SyncResult(
+                        layer_id=layer.layer_id,
+                        status="generated",
+                        message=f"Generated anchor {size_mb:.1f} MB",
+                    )
+                else:
+                    return SyncResult(
+                        layer_id=layer.layer_id,
+                        status="skipped",
+                        message="Not a polygon layer",
+                    )
 
             # Skip if already has anchor layer (for resumable polygon migration)
             if skip_existing_anchors and pmtiles_path.exists():
@@ -529,9 +589,13 @@ class PMTilesSyncTask:
                 logger.info("No layers to process")
                 return stats.to_dict()
 
-            # Filter by geometry type if requested
-            if params.geometry_type_filter:
-                filter_type = params.geometry_type_filter.lower()
+            # Filter by geometry type if requested (anchor_only implies polygon)
+            geom_filter = params.geometry_type_filter
+            if params.anchor_only and not geom_filter:
+                geom_filter = "polygon"
+
+            if geom_filter:
+                filter_type = geom_filter.lower()
                 filtered = []
                 for layer in layers:
                     geom_type = self._detect_geometry_type(layer)
@@ -547,6 +611,38 @@ class PMTilesSyncTask:
                     f"{filter_type} layers"
                 )
                 layers = filtered
+
+            # Anchor-only mode: process all polygon layers, skip categorization
+            if params.anchor_only:
+                to_process = layers
+                logger.info(
+                    f"Anchor-only mode: processing {len(to_process)} polygon layers..."
+                )
+                for i, layer in enumerate(to_process, 1):
+                    logger.info(f"Processing {i}/{len(to_process)}: {layer.layer_id}")
+                    result = self._process_layer(
+                        layer,
+                        dry_run=params.dry_run,
+                        show_progress=params.show_progress,
+                        anchor_only=True,
+                    )
+                    if result.status == "generated":
+                        stats.generated += 1
+                    elif result.status == "error":
+                        stats.errors += 1
+                    elif result.status in ("skipped", "would_create"):
+                        stats.skipped += 1
+                    logger.info(f"  [{result.status}] {result.message}")
+
+                logger.info("\n--- Summary ---")
+                logger.info(f"  Total polygon layers: {len(to_process)}")
+                if stats.generated > 0:
+                    logger.info(f"  Generated anchors: {stats.generated}")
+                if stats.skipped > 0:
+                    logger.info(f"  Skipped: {stats.skipped}")
+                if stats.errors > 0:
+                    logger.info(f"  Errors: {stats.errors}")
+                return stats.to_dict()
 
             # Categorize layers
             generator = self._get_generator()
@@ -720,6 +816,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--small-first", action="store_true", help="Process smaller layers first"
     )
+    parser.add_argument(
+        "--anchor-only",
+        action="store_true",
+        help="Only generate anchor PMTiles for polygon layers (skip main tiles)",
+    )
 
     args = parser.parse_args()
 
@@ -730,6 +831,7 @@ if __name__ == "__main__":
         missing_only=args.missing_only,
         dry_run=args.dry_run,
         small_first=args.small_first,
+        anchor_only=args.anchor_only,
     )
 
     result = main(params)

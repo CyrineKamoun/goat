@@ -172,13 +172,17 @@ const CustomColorScale = (props: CustomColorScaleProps) => {
   const getValueMaps = React.useCallback(() => {
     const colorLegends = colorSet.selectedColor.color_legends as ColorLegends | undefined;
     const valueMaps =
-      colorSet.selectedColor.color_map?.map((colorMapEntry) => {
+      colorSet.selectedColor.color_map?.map((colorMapEntry, index) => {
         const color = colorMapEntry[1] as string;
+        const values = colorMapEntry[0] as string[] | null;
+        // Look up label by category value first, fall back to color key for backward compat
+        const valueKey = values ? values.join(",") : String(index);
+        const label = colorLegends?.[valueKey] || colorLegends?.[color] || "";
         return {
           id: v4(),
-          value: colorMapEntry[0],
+          value: values,
           color,
-          label: colorLegends?.[color] || "",
+          label,
         };
       }) || [];
 
@@ -337,10 +341,12 @@ const CustomColorScale = (props: CustomColorScaleProps) => {
   function onApply() {
     const colorMaps = [] as ColorMap;
     const colorLegends: ColorLegends = {};
-    valueMaps.forEach((item) => {
+    valueMaps.forEach((item, index) => {
       colorMaps.push([item.value, item.color]);
       if (item.label) {
-        colorLegends[item.color] = item.label;
+        // Key by category value (unique per entry) instead of color hex (can collide)
+        const key = item.value ? item.value.join(",") : String(index);
+        colorLegends[key] = item.label;
       }
     });
     props.onApply && props.onApply(colorMaps, Object.keys(colorLegends).length > 0 ? colorLegends : undefined);

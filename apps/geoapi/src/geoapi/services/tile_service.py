@@ -595,6 +595,11 @@ class TileService:
 
         tile_data, is_gzip = result
 
+        # Step 3: For polygon layers, also read from anchor PMTiles and concatenate
+        tile_data, is_gzip = await self._concat_anchor_tile(
+            pmtiles_path, z, x, y, tile_data, is_gzip
+        )
+
         # Cache in Redis for other pods
         if tile_data:
             cache_tile(layer_id, z, x, y, tile_data, is_gzip)
@@ -898,11 +903,62 @@ class TileService:
 
             if overzoomed:
                 # tippecanoe-overzoom outputs gzip-compressed tiles
-                return overzoomed, True
+                result = overzoomed, True
+            else:
+                result = b"", False
 
-            return b"", False
+        # Concatenate anchor tile for polygon layers (separate anchor PMTiles)
+        tile_data, is_gzip = result
+        tile_data, is_gzip = await self._concat_anchor_tile(
+            pmtiles_path, z, x, y, tile_data, is_gzip
+        )
+        return tile_data, is_gzip
 
-        return result
+    async def _concat_anchor_tile(
+        self,
+        pmtiles_path: Path,
+        z: int,
+        x: int,
+        y: int,
+        tile_data: bytes,
+        is_gzip: bool,
+    ) -> tuple[bytes, bool]:
+        """Concatenate anchor tile data for polygon layers.
+
+        Checks if a separate anchor PMTiles file exists (containing label
+        anchor points from --convert-polygons-to-label-points). If so, reads
+        the anchor tile and concatenates the raw MVT bytes with the main tile.
+
+        Args:
+            pmtiles_path: Path to the main PMTiles file
+            z, x, y: Tile coordinates
+            tile_data: Main tile MVT data (possibly gzipped)
+            is_gzip: Whether tile_data is gzip compressed
+
+        Returns:
+            Tuple of (concatenated_tile_data, is_gzip)
+        """
+        if not tile_data:
+            return tile_data, is_gzip
+
+        # Derive anchor path: t_{layer_id}.pmtiles -> t_{layer_id}_anchor.pmtiles
+        anchor_path = pmtiles_path.with_name(pmtiles_path.stem + "_anchor.pmtiles")
+        if not anchor_path.exists():
+            return tile_data, is_gzip
+
+        # Read anchor tile (has its own variable-depth pyramid + overzoom)
+        anchor_result = await self._get_tile_from_pmtiles_path(anchor_path, z, x, y)
+        if not anchor_result or not anchor_result[0]:
+            return tile_data, is_gzip
+
+        anchor_data, anchor_is_gzip = anchor_result
+
+        # Decompress both if needed — MVT concatenation requires raw protobuf
+        main_bytes = gzip.decompress(tile_data) if is_gzip else tile_data
+        anchor_bytes = gzip.decompress(anchor_data) if anchor_is_gzip else anchor_data
+
+        # MVT is protobuf — multiple layers can be concatenated at the byte level
+        return main_bytes + anchor_bytes, False
 
     async def _overzoom_tile(
         self,
@@ -1430,9 +1486,7 @@ class TileService:
         #     ST_PointOnSurface(ST_Transform(...)),
         #     ST_Extent(bounds.bbox3857)
         #   )
-        original_geom_expr = (
-            f'ST_AsMVTGeom(ST_Transform(candidates."{geom_col}"'
-        )
+        original_geom_expr = f'ST_AsMVTGeom(ST_Transform(candidates."{geom_col}"'
         anchor_geom_expr = (
             f'ST_AsMVTGeom(ST_PointOnSurface(ST_Transform(candidates."{geom_col}"'
         )
@@ -1443,9 +1497,7 @@ class TileService:
 
         anchor_struct = struct_pack_args.replace(
             original_geom_expr, anchor_geom_expr
-        ).replace(
-            original_close, anchor_close
-        )
+        ).replace(original_close, anchor_close)
         anchor_query = query.replace(
             f"struct_pack({struct_pack_args})",
             f"struct_pack({anchor_struct})",
