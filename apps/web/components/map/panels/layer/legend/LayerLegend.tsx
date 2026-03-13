@@ -38,6 +38,10 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, h
   // Editable heading helper
   const renderHeading = (defaultText: string, overrideKey: string) => {
     const displayText = editable && textOverrides?.[overrideKey] != null ? textOverrides[overrideKey] : defaultText;
+    // Hide heading entirely when user has cleared the text
+    if (editable && textOverrides?.[overrideKey] != null && !displayText.trim()) {
+      return null;
+    }
     const handleBlur = (e: React.FocusEvent<HTMLSpanElement>) => {
       const newText = e.currentTarget.textContent ?? "";
       if (newText !== displayText) {

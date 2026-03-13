@@ -5,12 +5,10 @@ import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import type { TypographyStyle } from "@/lib/constants/typography";
 import { DEFAULT_FONT_FAMILY, LEGEND_TYPOGRAPHY_DEFAULTS } from "@/lib/constants/typography";
 import { rgbToHex } from "@/lib/utils/helpers";
-import { getLegendColorMap } from "@/lib/utils/map/legend";
 import type { RGBColor } from "@/types/map/color";
 import type { ProjectLayer } from "@/lib/validations/project";
 import type { ReportElement } from "@/lib/validations/reportLayout";
 
-import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import { LayerIcon } from "@/components/map/panels/layer/legend/LayerIcon";
 import { LayerLegendPanel } from "@/components/map/panels/layer/legend/LayerLegend";
 
@@ -317,31 +315,6 @@ interface LayerLegendItemProps {
   onTextSave?: (key: string, text: string) => void;
 }
 
-/**
- * Small gradient swatch icon for complex (classified) layers.
- * Shows a horizontal gradient of the layer's classification colors.
- */
-const GradientSwatch: React.FC<{ colors: string[] }> = ({ colors }) => {
-  if (colors.length === 0) return null;
-  const bg = colors.length === 1
-    ? colors[0]
-    : `linear-gradient(to right, ${colors.join(", ")})`;
-  return (
-    <svg height="20" width="20" style={{ display: "block", flexShrink: 0 }}>
-      <defs>
-        <linearGradient id={`grad-${colors.join("-").replace(/[^a-zA-Z0-9]/g, "")}`} x1="0" x2="1" y1="0" y2="0">
-          {colors.map((c, i) => (
-            <stop key={i} offset={`${(i / Math.max(colors.length - 1, 1)) * 100}%`} stopColor={c} />
-          ))}
-        </linearGradient>
-      </defs>
-      <rect
-        x="4" y="4" width="12" height="12" rx="2"
-        fill={colors.length === 1 ? bg : `url(#grad-${colors.join("-").replace(/[^a-zA-Z0-9]/g, "")})`}
-      />
-    </svg>
-  );
-};
 
 const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
   layer,
@@ -369,15 +342,6 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
     ((rasterStyle.style_type === "categories" && Array.isArray(rasterStyle.categories) && rasterStyle.categories.length > 0) ||
       (rasterStyle.style_type === "color_range" && Array.isArray(rasterStyle.color_map) && rasterStyle.color_map.length > 0));
 
-  // Collect gradient colors for complex layers
-  const gradientColors = useMemo(() => {
-    if (!hasComplexLegend) return [];
-    const colorMap = getLegendColorMap(props, "color");
-    const strokeMap = getLegendColorMap(props, "stroke_color");
-    const colors = (colorMap.length > 1 ? colorMap : strokeMap).map((item) => item.color).filter(Boolean);
-    return colors;
-  }, [hasComplexLegend, props]);
-
   // Simple icon props (same logic as ProjectLayerTree lines 813-842)
   const baseColor: string = props.color
     ? Array.isArray(props.color) && (props.color as number[]).length >= 3
@@ -399,18 +363,13 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
       {/* Layer name with icon */}
       {showLayerName && (() => {
         const isComplex = hasComplexLegend || hasRasterLegend;
-        const hasColors = gradientColors.length > 0;
-        const showMarkerIcon = isComplex && !hasColors && !!props.marker_field && !!props.custom_marker;
-        const showGeometryIcon = !isComplex || (isComplex && !hasColors && !showMarkerIcon);
-        const showGradient = isComplex && hasColors;
+        const layerNameKey = `layer_${layer.id}`;
+        const layerNameCleared = editable && textOverrides?.[layerNameKey] != null && !textOverrides[layerNameKey].trim();
+        // Hide the layer name row entirely when user has cleared the text
+        if (layerNameCleared) return null;
         return (
         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
-          {showMarkerIcon && (
-            <Box sx={{ flexShrink: 0, width: 20, height: 20, display: "flex", justifyContent: "center", alignItems: "center" }}>
-              <Icon iconName={ICON_NAME.LOCATION_MARKER} style={{ fontSize: "14px", color: "#999" }} />
-            </Box>
-          )}
-          {showGeometryIcon && (
+          {!isComplex && (
             <Box sx={{ flexShrink: 0 }}>
               <LayerIcon
                 type={geomType}
@@ -429,9 +388,6 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
                 }
               />
             </Box>
-          )}
-          {showGradient && (
-            <GradientSwatch colors={gradientColors} />
           )}
           <EditableText
             text={editable && textOverrides?.[`layer_${layer.id}`] ? textOverrides[`layer_${layer.id}`] : layer.name}
