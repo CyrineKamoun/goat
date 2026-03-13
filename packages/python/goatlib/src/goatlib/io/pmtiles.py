@@ -561,10 +561,13 @@ class PMTilesGenerator:
         if label_anchor:
             # Label anchor settings: one point per polygon, no clustering.
             # tippecanoe's --convert-polygons-to-label-points already handles
-            # optimal placement. We just need to keep all features at all zooms.
+            # optimal placement. Use higher tile size limit to avoid "tile too big"
+            # errors on dense polygon layers, and allow dropping at low zooms.
             cmd.extend(
                 [
-                    "-r1",  # Keep at least 1 feature per tile
+                    "-r1",  # Minimal drop rate (keep as much as possible)
+                    "-M",
+                    "2000000",  # 2MB tile size limit (default 500KB too small for dense layers)
                     "--extend-zooms-if-still-dropping",
                 ]
             )
