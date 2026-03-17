@@ -15,6 +15,7 @@ Endpoints:
 
 import asyncio
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
@@ -55,6 +56,15 @@ from processes.services.windmill_client import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Pattern to strip usernames from Windmill cancellation messages
+_CANCEL_USER_RE = re.compile(r"cancelled by \S+")
+
+
+def _sanitize_error_msg(msg: str) -> str:
+    """Remove usernames from Windmill cancellation error messages."""
+    return _CANCEL_USER_RE.sub("cancelled", msg)
+
 
 router = APIRouter(tags=["Processes"])
 
@@ -683,6 +693,8 @@ def _windmill_job_to_status_info(job: dict[str, Any], base_url: str) -> StatusIn
         # Fallback to generic message if no structured error (avoid exposing raw logs)
         if not message:
             message = "Unknown error"
+        else:
+            message = _sanitize_error_msg(message)
 
     return StatusInfo(
         processID=process_id if process_id else None,

@@ -19,6 +19,15 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+# Pattern to strip usernames from Windmill cancellation messages
+# e.g. "cancelled by majkshkurti (reason: User requested dismissal)" -> "cancelled (reason: User requested dismissal)"
+_CANCEL_USER_RE = re.compile(r"cancelled by \S+")
+
+
+def _sanitize_error_msg(msg: str) -> str:
+    """Remove usernames from Windmill cancellation error messages."""
+    return _CANCEL_USER_RE.sub("cancelled", msg)
+
 
 class WorkflowNode(BaseModel):
     """A node in the workflow graph."""
@@ -897,6 +906,6 @@ def main(
         else:
             error_msg = str(error_info)
         node_id = first_error.get("node_id", "unknown")
-        raise RuntimeError(f"Node {node_id} failed: {error_msg}")
+        raise RuntimeError(f"Node {node_id} failed: {_sanitize_error_msg(error_msg)}")
 
     return result
