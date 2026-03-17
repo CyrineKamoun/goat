@@ -186,16 +186,16 @@ const CustomColorScale = (props: CustomColorScaleProps) => {
         };
       }) || [];
 
-    const sortedValues = valueMaps.map((item) => item.value?.[0]).sort((a, b) => Number(a) - Number(b));
-    const sortedColorMaps = valueMaps.map((item, index) => {
-      return {
-        ...item,
-        value: [sortedValues?.[index]?.toString() || "0"],
-        id: v4(),
-      };
-    });
-    return sortedColorMaps;
-  }, [colorSet.selectedColor.color_map, colorSet.selectedColor.color_legends]);
+    // Only sort for custom_breaks (numeric ranges must be ordered);
+    // ordinal preserves the user's custom order from color_map
+    if (props.selectedColorScaleMethod === "custom_breaks") {
+      const sorted = [...valueMaps].sort(
+        (a, b) => Number(a.value?.[0] ?? 0) - Number(b.value?.[0] ?? 0)
+      );
+      return sorted.map((item) => ({ ...item, id: v4() }));
+    }
+    return valueMaps;
+  }, [colorSet.selectedColor.color_map, colorSet.selectedColor.color_legends, props.selectedColorScaleMethod]);
 
   const [valueMaps, setValueMaps] = React.useState<ColorMapItem[]>(getValueMaps());
 
@@ -353,15 +353,10 @@ const CustomColorScale = (props: CustomColorScaleProps) => {
   }
 
   function sortandSetValueMapsValues(valueMaps: ColorMapItem[]) {
-    const sortedValues = valueMaps.map((item) => item.value?.[0]).sort((a, b) => Number(a) - Number(b));
-    const sortedColorMaps = valueMaps.map((item, index) => {
-      return {
-        ...item,
-        value: [sortedValues?.[index]?.toString() || "0"],
-        id: v4(),
-      };
-    });
-    setValueMaps(sortedColorMaps);
+    const sorted = [...valueMaps].sort(
+      (a, b) => Number(a.value?.[0] ?? 0) - Number(b.value?.[0] ?? 0)
+    );
+    setValueMaps(sorted.map((item) => ({ ...item, id: v4() })));
   }
 
   return (
