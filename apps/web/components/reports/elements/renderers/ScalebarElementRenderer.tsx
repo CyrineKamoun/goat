@@ -5,6 +5,7 @@ import React, { useMemo } from "react";
 
 import type { TypographyStyle } from "@/lib/constants/typography";
 import { DEFAULT_FONT_FAMILY } from "@/lib/constants/typography";
+import { mmToPx, SCREEN_DPI } from "@/lib/print/units";
 import type { ReportElement } from "@/lib/validations/reportLayout";
 
 import {
@@ -62,202 +63,274 @@ const metersToUnit = (meters: number, unit: ScalebarUnit): number => {
 };
 
 /**
- * Get nice round numbers for scale bars
+ * Get the largest nice round number that fits within the given value.
+ * Rounds DOWN to 1, 2, or 5 × 10^n so the bar never exceeds the available width.
  */
 const getNiceNumber = (value: number): number => {
+  if (value <= 0) return 1;
   const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
   const normalized = value / magnitude;
 
-  if (normalized <= 1) return magnitude;
-  if (normalized <= 2) return 2 * magnitude;
-  if (normalized <= 5) return 5 * magnitude;
+  // Round DOWN: pick the largest nice number <= value
+  if (normalized < 2) return magnitude;
+  if (normalized < 5) return 2 * magnitude;
+  if (normalized < 10) return 5 * magnitude;
   return 10 * magnitude;
 };
 
 /**
- * Calculate scale bar parameters based on map scale
+ * Calculate scale bar parameters using "Fit Segment Width" mode (QGIS-style).
+ *
+ * The scalebar's total distance is rounded to a nice number, and the bar width
+ * adjusts (shrinks) so its pixel length exactly represents that distance.
+ * Changing segment count only subdivides the same total — labels stay consistent.
+ *
+ * Left segments are subdivisions of one right-side segment (finer detail),
+ * placed to the left of the zero mark.
  */
 const calculateScaleBarParams = (
-  mapScale: number,
+  metersPerPixel: number,
+  maxWidthPx: number,
   unit: ScalebarUnit,
   segmentsRight: number,
-  _segmentsLeft: number
+  segmentsLeft: number
 ) => {
-  // mapScale is meters per pixel at the map center
-  // For a typical scalebar width of ~150px, we want readable values
+  const effectiveSegmentsRight = Math.max(1, segmentsRight);
 
-  const targetWidthPx = 150;
-  const totalMeters = mapScale * targetWidthPx;
-  const totalUnits = metersToUnit(totalMeters, unit);
+  // Total distance the max width represents
+  const rawTotalMeters = metersPerPixel * maxWidthPx;
+  const rawTotalUnits = metersToUnit(rawTotalMeters, unit);
 
-  const totalSegments = Math.max(1, segmentsRight);
+  // Round the TOTAL to a nice number (not per-segment)
+  const niceTotalUnits = getNiceNumber(rawTotalUnits);
 
-  // Get a nice round segment value so labels are always clean numbers
-  const targetSegmentValue = totalUnits / totalSegments;
-  const segmentValue = getNiceNumber(targetSegmentValue);
-  const niceTotal = segmentValue * totalSegments;
+  // Width ratio: how much of the max width the bar actually occupies
+  // getNiceNumber can round up (e.g. 3.5 → 5), so clamp to 1
+  const widthRatio = Math.min(niceTotalUnits / rawTotalUnits, 1);
+
+  // Right segment value: total divided evenly
+  const segmentValueRight = niceTotalUnits / effectiveSegmentsRight;
+
+  // Left segments subdivide one right segment
+  const effectiveSegmentsLeft = Math.max(0, segmentsLeft);
+  const segmentValueLeft = effectiveSegmentsLeft > 0
+    ? segmentValueRight / effectiveSegmentsLeft
+    : 0;
 
   return {
-    totalValue: niceTotal,
-    segmentValue,
-    totalSegments,
+    niceTotalUnits,
+    segmentValueRight,
+    segmentValueLeft,
+    segmentsRight: effectiveSegmentsRight,
+    segmentsLeft: effectiveSegmentsLeft,
+    widthRatio,
   };
+};
+
+/**
+ * Build segment data: relative widths and label values.
+ *
+ * Left segments subdivide the FIRST right segment into finer detail.
+ * All labels are positive, reading left to right: 0 → subdivisions → full segments → total.
+ *
+ * Example with segmentsRight=2, segmentsLeft=4, segmentValueRight=5:
+ *   Segments: [1.25][1.25][1.25][1.25][    5    ]
+ *   Labels:   0   1.25  2.5  3.75  5         10
+ *
+ * Returns:
+ * - segments: array of { relativeWidth } for rendering bars
+ * - labels: array of { value, isLast } for rendering labels at segment boundaries
+ */
+const buildSegmentData = (
+  segmentsLeft: number,
+  segmentsRight: number,
+  segmentValueRight: number,
+  segmentValueLeft: number,
+  labelMultiplier: number,
+) => {
+  const segments: { relativeWidth: number }[] = [];
+  const labels: { value: number; isLast: boolean }[] = [];
+
+  if (segmentsLeft > 0) {
+    // First right segment is subdivided into segmentsLeft sub-segments
+    for (let i = 0; i < segmentsLeft; i++) {
+      segments.push({ relativeWidth: 1 / segmentsLeft });
+      labels.push({
+        value: i * segmentValueLeft * labelMultiplier,
+        isLast: false,
+      });
+    }
+    // Remaining right segments (starting from the 2nd one)
+    for (let i = 1; i < segmentsRight; i++) {
+      segments.push({ relativeWidth: 1 });
+      labels.push({
+        value: i * segmentValueRight * labelMultiplier,
+        isLast: false,
+      });
+    }
+  } else {
+    // No left subdivisions — all segments are uniform
+    for (let i = 0; i < segmentsRight; i++) {
+      segments.push({ relativeWidth: 1 });
+      labels.push({
+        value: i * segmentValueRight * labelMultiplier,
+        isLast: false,
+      });
+    }
+  }
+
+  // Final label (end of last right segment)
+  labels.push({
+    value: segmentsRight * segmentValueRight * labelMultiplier,
+    isLast: true,
+  });
+
+  return { segments, labels };
 };
 
 /**
  * Format a label value to avoid floating point artifacts (e.g. 5.000000001 -> "5")
  */
 const formatLabelValue = (value: number): string => {
-  // Use toPrecision to strip floating point noise, then remove trailing zeros
   return parseFloat(value.toPrecision(10)).toString();
 };
+
+// Common props interface for all bar-style scalebar components
+interface ScalebarStyleProps {
+  segments: { relativeWidth: number }[];
+  labels: { value: number; isLast: boolean }[];
+  labelUnit: string;
+  height: number;
+  labelSx?: Record<string, unknown>;
+}
+
+/**
+ * Render labels row (shared by all bar styles)
+ */
+const ScalebarLabels: React.FC<{
+  segments: { relativeWidth: number }[];
+  labels: { value: number; isLast: boolean }[];
+  labelUnit: string;
+  labelSx?: Record<string, unknown>;
+}> = ({ segments, labels, labelUnit, labelSx }) => {
+  // Position labels at segment boundaries using the same flex proportions
+  // We create a flex row where each "gap" between labels matches the segment width
+  const totalRelativeWidth = segments.reduce((sum, s) => sum + s.relativeWidth, 0);
+
+  return (
+    <Box sx={{ position: "relative", width: "100%", height: "1.2em" }}>
+      {labels.map((label, i) => {
+        // Calculate the percentage position of this label
+        let position = 0;
+        for (let j = 0; j < i; j++) {
+          position += segments[j].relativeWidth;
+        }
+        const pct = (position / totalRelativeWidth) * 100;
+        const isFirst = i === 0;
+
+        // First label: left-aligned at 0. Last label: right-aligned at end.
+        // Middle labels: centered on their position.
+        const positionSx = label.isLast
+          ? { right: 0 }
+          : isFirst
+            ? { left: 0 }
+            : { left: `${pct}%`, transform: "translateX(-50%)" };
+
+        return (
+          <Typography
+            key={i}
+            variant="caption"
+            sx={{
+              position: "absolute",
+              fontSize: "0.65rem",
+              whiteSpace: "nowrap",
+              ...positionSx,
+              ...labelSx,
+            }}>
+            {formatLabelValue(label.value)}
+            {label.isLast && labelUnit ? ` ${labelUnit}` : ""}
+          </Typography>
+        );
+      })}
+    </Box>
+  );
+};
+
+/**
+ * Render segments bar row (shared by box styles)
+ */
+const SegmentsBar: React.FC<{
+  segments: { relativeWidth: number }[];
+  height: number;
+  invertColors?: boolean;
+  border?: boolean;
+}> = ({ segments, height, invertColors = false, border = true }) => (
+  <Box
+    sx={{
+      display: "flex",
+      height: `${height}px`,
+      ...(border ? { border: "1px solid #000" } : {}),
+    }}>
+    {segments.map((seg, i) => (
+      <Box
+        key={i}
+        sx={{
+          flex: seg.relativeWidth,
+          backgroundColor: invertColors
+            ? (i % 2 === 0 ? "#fff" : "#000")
+            : (i % 2 === 0 ? "#000" : "#fff"),
+        }}
+      />
+    ))}
+  </Box>
+);
 
 /**
  * Render Single Box style scalebar
  */
-const SingleBoxScalebar: React.FC<{
-  totalSegments: number;
-  segmentsLeft: number;
-  segmentValue: number;
-  labelUnit: string;
-  labelMultiplier: number;
-  height: number;
-  labelSx?: Record<string, unknown>;
-}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height, labelSx }) => {
-  const allSegments = segmentsLeft + totalSegments;
-
-  return (
-    <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5 }}>
-      {/* Labels */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-        {Array.from({ length: allSegments + 1 }, (_, i) => {
-          const value = (i - segmentsLeft) * segmentValue * labelMultiplier;
-          const isLast = i === allSegments;
-          return (
-            <Typography
-              key={i}
-              variant="caption"
-              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center", ...labelSx }}>
-              {formatLabelValue(value)}
-              {isLast && labelUnit ? ` ${labelUnit}` : ""}
-            </Typography>
-          );
-        })}
-      </Box>
-      {/* Bar */}
-      <Box sx={{ display: "flex", height: `${height}px`, border: "1px solid #000" }}>
-        {Array.from({ length: allSegments }, (_, i) => (
-          <Box
-            key={i}
-            sx={{
-              flex: 1,
-              backgroundColor: i % 2 === 0 ? "#000" : "#fff",
-            }}
-          />
-        ))}
-      </Box>
-    </Box>
-  );
-};
+const SingleBoxScalebar: React.FC<ScalebarStyleProps> = ({
+  segments, labels, labelUnit, height, labelSx,
+}) => (
+  <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5 }}>
+    <ScalebarLabels segments={segments} labels={labels} labelUnit={labelUnit} labelSx={labelSx} />
+    <SegmentsBar segments={segments} height={height} />
+  </Box>
+);
 
 /**
  * Render Double Box style scalebar
  */
-const DoubleBoxScalebar: React.FC<{
-  totalSegments: number;
-  segmentsLeft: number;
-  segmentValue: number;
-  labelUnit: string;
-  labelMultiplier: number;
-  height: number;
-  labelSx?: Record<string, unknown>;
-}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height, labelSx }) => {
-  const allSegments = segmentsLeft + totalSegments;
-  const halfHeight = height / 2;
-
-  return (
-    <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5 }}>
-      {/* Labels */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-        {Array.from({ length: allSegments + 1 }, (_, i) => {
-          const value = (i - segmentsLeft) * segmentValue * labelMultiplier;
-          const isLast = i === allSegments;
-          return (
-            <Typography
-              key={i}
-              variant="caption"
-              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center", ...labelSx }}>
-              {formatLabelValue(value)}
-              {isLast && labelUnit ? ` ${labelUnit}` : ""}
-            </Typography>
-          );
-        })}
-      </Box>
-      {/* Double Bar */}
-      <Box sx={{ display: "flex", flexDirection: "column", border: "1px solid #000" }}>
-        {/* Top row */}
-        <Box sx={{ display: "flex", height: `${halfHeight}px` }}>
-          {Array.from({ length: allSegments }, (_, i) => (
-            <Box
-              key={i}
-              sx={{
-                flex: 1,
-                backgroundColor: i % 2 === 0 ? "#000" : "#fff",
-              }}
-            />
-          ))}
-        </Box>
-        {/* Bottom row (inverted) */}
-        <Box sx={{ display: "flex", height: `${halfHeight}px` }}>
-          {Array.from({ length: allSegments }, (_, i) => (
-            <Box
-              key={i}
-              sx={{
-                flex: 1,
-                backgroundColor: i % 2 === 0 ? "#fff" : "#000",
-              }}
-            />
-          ))}
-        </Box>
-      </Box>
+const DoubleBoxScalebar: React.FC<ScalebarStyleProps> = ({
+  segments, labels, labelUnit, height, labelSx,
+}) => (
+  <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5 }}>
+    <ScalebarLabels segments={segments} labels={labels} labelUnit={labelUnit} labelSx={labelSx} />
+    <Box sx={{ display: "flex", flexDirection: "column", border: "1px solid #000" }}>
+      <SegmentsBar segments={segments} height={height / 2} border={false} />
+      <SegmentsBar segments={segments} height={height / 2} border={false} invertColors />
     </Box>
-  );
-};
+  </Box>
+);
 
 /**
  * Render Line Ticks style scalebar
  */
-const LineTicksScalebar: React.FC<{
-  totalSegments: number;
-  segmentsLeft: number;
-  segmentValue: number;
-  labelUnit: string;
-  labelMultiplier: number;
-  height: number;
-  labelSx?: Record<string, unknown>;
-  tickPosition: "middle" | "down" | "up";
-}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height, labelSx, tickPosition }) => {
-  const allSegments = segmentsLeft + totalSegments;
+const LineTicksScalebar: React.FC<ScalebarStyleProps & { tickPosition: "middle" | "down" | "up" }> = ({
+  segments, labels, labelUnit, height, labelSx, tickPosition,
+}) => {
+  const totalRelativeWidth = segments.reduce((sum, s) => sum + s.relativeWidth, 0);
+
+  // Calculate tick positions (at each segment boundary)
+  const tickPositions: number[] = [];
+  let cumulative = 0;
+  for (let i = 0; i <= segments.length; i++) {
+    tickPositions.push((cumulative / totalRelativeWidth) * 100);
+    if (i < segments.length) cumulative += segments[i].relativeWidth;
+  }
 
   return (
     <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5 }}>
-      {/* Labels */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-        {Array.from({ length: allSegments + 1 }, (_, i) => {
-          const value = (i - segmentsLeft) * segmentValue * labelMultiplier;
-          const isLast = i === allSegments;
-          return (
-            <Typography
-              key={i}
-              variant="caption"
-              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center", ...labelSx }}>
-              {formatLabelValue(value)}
-              {isLast && labelUnit ? ` ${labelUnit}` : ""}
-            </Typography>
-          );
-        })}
-      </Box>
-      {/* Line with ticks */}
+      <ScalebarLabels segments={segments} labels={labels} labelUnit={labelUnit} labelSx={labelSx} />
       <Box sx={{ position: "relative", height: `${height}px`, width: "100%" }}>
         {/* Horizontal line */}
         <Box
@@ -271,14 +344,13 @@ const LineTicksScalebar: React.FC<{
           }}
         />
         {/* Ticks */}
-        {Array.from({ length: allSegments + 1 }, (_, i) => (
+        {tickPositions.map((pct, i) => (
           <Box
             key={i}
             sx={{
               position: "absolute",
-              left: `${(i / allSegments) * 100}%`,
-              top: tickPosition === "up" ? 0 : tickPosition === "down" ? 0 : 0,
-              bottom: tickPosition === "up" ? 0 : tickPosition === "down" ? 0 : 0,
+              left: `${pct}%`,
+              top: 0,
               width: "1px",
               height: "100%",
               backgroundColor: "#000",
@@ -294,39 +366,27 @@ const LineTicksScalebar: React.FC<{
 /**
  * Render Stepped Line style scalebar
  */
-const SteppedLineScalebar: React.FC<{
-  totalSegments: number;
-  segmentsLeft: number;
-  segmentValue: number;
-  labelUnit: string;
-  labelMultiplier: number;
-  height: number;
-  labelSx?: Record<string, unknown>;
-}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height, labelSx }) => {
-  const allSegments = segmentsLeft + totalSegments;
+const SteppedLineScalebar: React.FC<ScalebarStyleProps> = ({
+  segments, labels, labelUnit, height, labelSx,
+}) => {
+  const totalRelativeWidth = segments.reduce((sum, s) => sum + s.relativeWidth, 0);
+
+  // Calculate segment positions and widths as percentages
+  const segmentLayout: { leftPct: number; widthPct: number }[] = [];
+  let cumulative = 0;
+  for (const seg of segments) {
+    segmentLayout.push({
+      leftPct: (cumulative / totalRelativeWidth) * 100,
+      widthPct: (seg.relativeWidth / totalRelativeWidth) * 100,
+    });
+    cumulative += seg.relativeWidth;
+  }
 
   return (
     <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5 }}>
-      {/* Labels */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-        {Array.from({ length: allSegments + 1 }, (_, i) => {
-          const value = (i - segmentsLeft) * segmentValue * labelMultiplier;
-          const isLast = i === allSegments;
-          return (
-            <Typography
-              key={i}
-              variant="caption"
-              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center", ...labelSx }}>
-              {formatLabelValue(value)}
-              {isLast && labelUnit ? ` ${labelUnit}` : ""}
-            </Typography>
-          );
-        })}
-      </Box>
-      {/* Stepped line */}
+      <ScalebarLabels segments={segments} labels={labels} labelUnit={labelUnit} labelSx={labelSx} />
       <Box sx={{ position: "relative", height: `${height}px`, width: "100%" }}>
-        {Array.from({ length: allSegments }, (_, i) => {
-          const segmentWidth = 100 / allSegments;
+        {segmentLayout.map((layout, i) => {
           const isEven = i % 2 === 0;
           return (
             <React.Fragment key={i}>
@@ -334,8 +394,8 @@ const SteppedLineScalebar: React.FC<{
               <Box
                 sx={{
                   position: "absolute",
-                  left: `${i * segmentWidth}%`,
-                  width: `${segmentWidth}%`,
+                  left: `${layout.leftPct}%`,
+                  width: `${layout.widthPct}%`,
                   top: isEven ? 0 : `${height - 1}px`,
                   height: "1px",
                   backgroundColor: "#000",
@@ -346,7 +406,7 @@ const SteppedLineScalebar: React.FC<{
                 <Box
                   sx={{
                     position: "absolute",
-                    left: `${i * segmentWidth}%`,
+                    left: `${layout.leftPct}%`,
                     top: 0,
                     width: "1px",
                     height: `${height}px`,
@@ -387,56 +447,30 @@ const SteppedLineScalebar: React.FC<{
 /**
  * Render Hollow style scalebar
  */
-const HollowScalebar: React.FC<{
-  totalSegments: number;
-  segmentsLeft: number;
-  segmentValue: number;
-  labelUnit: string;
-  labelMultiplier: number;
-  height: number;
-  labelSx?: Record<string, unknown>;
-}> = ({ totalSegments, segmentsLeft, segmentValue, labelUnit, labelMultiplier, height, labelSx }) => {
-  const allSegments = segmentsLeft + totalSegments;
-
-  return (
-    <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5 }}>
-      {/* Labels */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-        {Array.from({ length: allSegments + 1 }, (_, i) => {
-          const value = (i - segmentsLeft) * segmentValue * labelMultiplier;
-          const isLast = i === allSegments;
-          return (
-            <Typography
-              key={i}
-              variant="caption"
-              sx={{ fontSize: "0.65rem", minWidth: isLast ? "auto" : 0, textAlign: "center", ...labelSx }}>
-              {formatLabelValue(value)}
-              {isLast && labelUnit ? ` ${labelUnit}` : ""}
-            </Typography>
-          );
-        })}
-      </Box>
-      {/* Hollow bar */}
-      <Box
-        sx={{
-          display: "flex",
-          height: `${height}px`,
-          border: "1px solid #000",
-          backgroundColor: "#fff",
-        }}>
-        {Array.from({ length: allSegments }, (_, i) => (
-          <Box
-            key={i}
-            sx={{
-              flex: 1,
-              borderRight: i < allSegments - 1 ? "1px solid #000" : "none",
-            }}
-          />
-        ))}
-      </Box>
+const HollowScalebar: React.FC<ScalebarStyleProps> = ({
+  segments, labels, labelUnit, height, labelSx,
+}) => (
+  <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5 }}>
+    <ScalebarLabels segments={segments} labels={labels} labelUnit={labelUnit} labelSx={labelSx} />
+    <Box
+      sx={{
+        display: "flex",
+        height: `${height}px`,
+        border: "1px solid #000",
+        backgroundColor: "#fff",
+      }}>
+      {segments.map((seg, i) => (
+        <Box
+          key={i}
+          sx={{
+            flex: seg.relativeWidth,
+            borderRight: i < segments.length - 1 ? "1px solid #000" : "none",
+          }}
+        />
+      ))}
     </Box>
-  );
-};
+  </Box>
+);
 
 /**
  * Render Numeric style scalebar (just text showing scale ratio)
@@ -445,7 +479,6 @@ const NumericScalebar: React.FC<{
   scaleDenominator: number;
   labelSx?: Record<string, unknown>;
 }> = ({ scaleDenominator, labelSx }) => {
-  // Format nicely
   const formatScale = (ratio: number): string => {
     if (ratio >= 1000000) {
       return `1:${(ratio / 1000000).toFixed(1)}M`;
@@ -475,8 +508,9 @@ const NumericScalebar: React.FC<{
 /**
  * Scalebar Element Renderer for print reports
  *
- * Renders a scalebar that reflects the connected map's scale.
- * Supports multiple styles: Single Box, Double Box, Line Ticks, Stepped Line, Hollow, Numeric
+ * Uses QGIS-style "Fit Segment Width" mode: the total distance is rounded
+ * to a nice number, and the bar width adjusts so its pixel length exactly
+ * represents that distance. Left segments are subdivisions of one right segment.
  */
 const ScalebarElementRenderer: React.FC<ScalebarElementRendererProps> = ({
   element,
@@ -494,14 +528,14 @@ const ScalebarElementRenderer: React.FC<ScalebarElementRendererProps> = ({
   const segmentsLeft = config.segmentsLeft ?? 0;
   const segmentsRight = config.segmentsRight ?? 2;
 
-  // Standard screen DPI assumption for scale calculation
-  const SCREEN_DPI = 96;
   const METERS_PER_PIXEL_SCREEN = 0.0254 / SCREEN_DPI;
+
+  // Max width of the scalebar element in CSS pixels (from element dimensions in mm)
+  const maxWidthPx = mmToPx(element.position.width, SCREEN_DPI);
 
   // Get connected map's scale
   const { mapScale, scaleDenominator } = useMemo(() => {
     if (!mapElementId || !mapElements.length) {
-      // Default scale (roughly city level)
       const defaultMpp = 100;
       return {
         mapScale: defaultMpp,
@@ -523,11 +557,9 @@ const ScalebarElementRenderer: React.FC<ScalebarElementRendererProps> = ({
     const latitude = viewState.latitude ?? 48;
 
     // Calculate meters per pixel at this zoom level and latitude
-    // Formula: earth_circumference * cos(lat) / (tileSize * 2^zoom)
     // MapLibre uses 512px tiles, so constant = 40075016.686 / 512 = 78271.51696
     const metersPerPixel = (78271.51696 * Math.cos((latitude * Math.PI) / 180)) / Math.pow(2, zoomLevel);
 
-    // Use stored scale_denominator if available (exact user-picked value), otherwise derive
     const storedScale = viewState.scale_denominator as number | undefined;
     const derivedScale = Math.round(metersPerPixel / METERS_PER_PIXEL_SCREEN);
 
@@ -535,23 +567,33 @@ const ScalebarElementRenderer: React.FC<ScalebarElementRendererProps> = ({
       mapScale: metersPerPixel,
       scaleDenominator: storedScale ?? derivedScale,
     };
-  }, [mapElementId, mapElements]);
+  }, [mapElementId, mapElements, METERS_PER_PIXEL_SCREEN]);
 
-  // Calculate scale bar values
+  // Calculate scale bar values (fit segment width mode)
   const scaleParams = useMemo(
-    () => calculateScaleBarParams(mapScale, unit, segmentsRight, segmentsLeft),
-    [mapScale, unit, segmentsRight, segmentsLeft]
+    () => calculateScaleBarParams(mapScale, maxWidthPx, unit, segmentsRight, segmentsLeft),
+    [mapScale, maxWidthPx, unit, segmentsRight, segmentsLeft]
+  );
+
+  // Build segment layout data
+  const { segments, labels } = useMemo(
+    () => buildSegmentData(
+      scaleParams.segmentsLeft,
+      scaleParams.segmentsRight,
+      scaleParams.segmentValueRight,
+      scaleParams.segmentValueLeft,
+      labelMultiplier,
+    ),
+    [scaleParams, labelMultiplier]
   );
 
   const labelSx = useMemo(() => typographyToSx(config.typography), [config.typography]);
 
   const renderScalebar = () => {
-    const commonProps = {
-      totalSegments: scaleParams.totalSegments,
-      segmentsLeft,
-      segmentValue: scaleParams.segmentValue,
+    const commonProps: ScalebarStyleProps = {
+      segments,
+      labels,
       labelUnit,
-      labelMultiplier,
       height,
       labelSx,
     };
@@ -585,13 +627,13 @@ const ScalebarElementRenderer: React.FC<ScalebarElementRendererProps> = ({
         height: `${100 / zoom}%`,
         display: "flex",
         alignItems: "center",
-        justifyContent: "center",
+        justifyContent: "flex-start",
         p: 1,
         boxSizing: "border-box",
         transform: `scale(${zoom})`,
         transformOrigin: "top left",
       }}>
-      <Box sx={{ width: "100%", maxWidth: "200px" }}>{renderScalebar()}</Box>
+      <Box sx={{ width: `${scaleParams.widthRatio * 100}%` }}>{renderScalebar()}</Box>
     </Box>
   );
 };

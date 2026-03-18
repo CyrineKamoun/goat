@@ -667,7 +667,7 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
       onDragStop={handleDragStop}
       onResize={handleResize}
       onResizeStop={handleResizeStop}
-      enableResizing={isSelected && !isMapNavigating && element.type !== "scalebar"}
+      enableResizing={isSelected && !isMapNavigating}
       disableDragging={!isSelected || isMapNavigating}
       cancel=".ProseMirror, .tiptap-toolbar, .MuiMenu-root, .MuiPopover-root, .legend-editable-text"
       bounds="parent"

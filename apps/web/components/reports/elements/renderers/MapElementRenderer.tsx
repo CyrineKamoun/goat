@@ -185,45 +185,92 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configKey, atlasPage, isAtlasControlled]);
 
-  // Atlas mode: fit map to atlas page bounds when atlas page changes
-  // Only applies if this map element has atlas control enabled
+  // Atlas mode: update map view when atlas page changes
+  // "best_fit" mode: fitBounds to feature with margin padding
+  // "fixed_scale" mode: center on feature, keep zoom from config
+  const atlasMode = (element.config?.atlas?.mode as string) ?? "best_fit";
+
   useEffect(() => {
     if (!atlasPage || !isAtlasControlled || !mapLoaded || !mapRef.current) return;
 
     const [west, south, east, north] = atlasPage.bounds;
-
-    // Get bearing from config to preserve rotation during fitBounds
     const configBearing = configViewState?.bearing ?? DEFAULT_VIEW_STATE.bearing;
+    const configPitch = configViewState?.pitch ?? DEFAULT_VIEW_STATE.pitch;
+    const map = mapRef.current;
 
-    // Compute padding from margin_percent (percentage of map container size)
-    const marginPercent = (element.config?.atlas?.margin_percent as number) ?? 10;
-    const container = mapRef.current.getContainer();
-    const containerWidth = container?.clientWidth ?? 400;
-    const containerHeight = container?.clientHeight ?? 300;
-    const minDim = Math.min(containerWidth, containerHeight);
-    // Clamp padding so it doesn't exceed what fitBounds can handle
-    // (padding on both sides must leave at least 1px for the map)
-    const maxPadding = Math.floor(Math.min(containerWidth, containerHeight) / 2) - 1;
-    const paddingPx = Math.min(Math.round((marginPercent / 100) * minDim), Math.max(0, maxPadding));
-
-    // Fit the map to the atlas page bounds with margin-based padding
     try {
-      mapRef.current.fitBounds(
-        [
-          [west, south],
-          [east, north],
-        ],
-        {
-          padding: paddingPx,
-          duration: 0, // No animation for print preview
-          maxZoom: 18, // Prevent excessive zoom for small features
-          bearing: configBearing, // Preserve rotation from config
+      if (atlasMode === "fixed_scale") {
+        // Fixed scale: center on feature bounds, keep the configured zoom
+        const centerLat = (south + north) / 2;
+        const centerLng = (west + east) / 2;
+        const configZoom = configViewState?.zoom ?? DEFAULT_VIEW_STATE.zoom;
+
+        // Update local React state directly (controlled mode — jumpTo may not
+        // trigger onMove reliably in react-map-gl)
+        const newViewState = {
+          latitude: centerLat,
+          longitude: centerLng,
+          zoom: configZoom,
+          bearing: configBearing,
+          pitch: configPitch,
+        };
+        setViewState(newViewState);
+
+        // Also write to config so scalebar reads correct lat/lng
+        if (onElementUpdate) {
+          onElementUpdate(element.id, {
+            ...element.config,
+            viewState: newViewState,
+          });
         }
-      );
+      } else {
+        // Best fit: fitBounds to feature with margin padding
+        const marginPercent = (element.config?.atlas?.margin_percent as number) ?? 10;
+        const container = map.getContainer();
+        const containerWidth = container?.clientWidth ?? 400;
+        const containerHeight = container?.clientHeight ?? 300;
+        const minDim = Math.min(containerWidth, containerHeight);
+        const maxPadding = Math.floor(Math.min(containerWidth, containerHeight) / 2) - 1;
+        const paddingPx = Math.min(Math.round((marginPercent / 100) * minDim), Math.max(0, maxPadding));
+
+        map.fitBounds(
+          [
+            [west, south],
+            [east, north],
+          ],
+          {
+            padding: paddingPx,
+            duration: 0,
+            maxZoom: 18,
+            bearing: configBearing,
+          }
+        );
+
+        // Write the actual computed viewState back after fitBounds settles
+        map.once("idle", () => {
+          const center = map.getCenter();
+          const actualZoom = map.getZoom();
+          const newViewState = {
+            latitude: center.lat,
+            longitude: center.lng,
+            zoom: actualZoom,
+            bearing: configBearing,
+            pitch: configPitch,
+          };
+          setViewState(newViewState);
+          if (onElementUpdate) {
+            onElementUpdate(element.id, {
+              ...element.config,
+              viewState: newViewState,
+            });
+          }
+        });
+      }
     } catch {
-      // fitBounds can throw if the canvas is too small for the given padding
+      // fitBounds/jumpTo can throw if the canvas is too small
     }
-  }, [atlasPage, isAtlasControlled, mapLoaded, configViewState?.bearing, element.config?.atlas?.margin_percent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atlasPage, isAtlasControlled, atlasMode, mapLoaded, configViewState?.bearing, element.config?.atlas?.margin_percent]);
 
   // Handle double-click to enter navigation mode
   const handleDoubleClick = useCallback(
