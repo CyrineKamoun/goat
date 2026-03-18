@@ -89,7 +89,7 @@ export function useAtlasFeatures({
     const layerCqlFilter = coverageLayer.query?.cql;
 
     return {
-      limit: 10000, // Fetch all features for atlas
+      limit: 200, // Max pages allowed for atlas
       offset: 0,
       ...(layerCqlFilter ? { filter: JSON.stringify(layerCqlFilter) } : {}),
     };
