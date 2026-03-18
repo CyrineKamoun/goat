@@ -89,7 +89,7 @@ export function useAtlasFeatures({
     const layerCqlFilter = coverageLayer.query?.cql;
 
     return {
-      limit: 200, // Max pages allowed for atlas
+      limit: ATLAS_MAX_PAGES,
       offset: 0,
       ...(layerCqlFilter ? { filter: JSON.stringify(layerCqlFilter) } : {}),
     };
@@ -147,7 +147,7 @@ export function useAtlasFeatures({
     totalPages: atlasResult?.totalPages ?? 0,
     coverageLayer,
     features,
-    wasTruncated: features.length > ATLAS_MAX_PAGES,
-    totalFeatureCount: features.length,
+    wasTruncated: (data?.numberMatched ?? 0) > ATLAS_MAX_PAGES,
+    totalFeatureCount: data?.numberMatched ?? 0,
   };
 }
