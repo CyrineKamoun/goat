@@ -96,6 +96,9 @@
     "join_options": {
       "label": "Join Options"
     },
+    "merge_options": {
+      "label": "Merge Options"
+    },
     "result": {
       "label": "Results"
     }
@@ -899,6 +902,10 @@
     "dissolve": {
       "title": "Dissolve",
       "description": "Aggregates features that have the same values for specified attributes. Optionally computes statistics for numeric fields."
+    },
+    "merge": {
+      "title": "Merge",
+      "description": "Parameters for merge tool. By default, fields with the same name are mapped together, while fields unique to inputs are retained in the output."
     }
   },
   "routing_modes": {
@@ -925,6 +932,7 @@
     "dissolve": "Dissolve",
     "intersection": "Intersection",
     "union": "Union",
+    "merge": "Merge",
     "aggregate_points": "Aggregate Points",
     "aggregate_polygon": "Aggregate Polygons",
     "aggregate_polygons": "Aggregate Polygons",

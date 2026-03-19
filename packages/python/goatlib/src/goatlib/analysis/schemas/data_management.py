@@ -5,8 +5,9 @@ join operations between datasets.
 """
 
 from enum import StrEnum
-from typing import List, Literal, Optional, Self
+from typing import Any, List, Literal, Optional, Self
 
+from goatlib.analysis.schemas.ui import ui_field
 from pydantic import BaseModel, Field, model_validator
 
 from goatlib.analysis.schemas.base import FieldStatistic
@@ -254,13 +255,37 @@ class JoinParams(BaseModel):
         return self
 
 
-class MergeParams(BaseModel):
-    """Parameters for merging multiple vector layers."""
+class MergeInputLayer(BaseModel):
+    """Single merge input layer definition."""
 
-    input_paths: List[str] = Field(
+    input_path: str = Field(
+        ...,
+        description="Layer UUID/path to merge",
+        json_schema_extra=ui_field(
+            section="input",
+            field_order=1,
+            widget="layer-selector",
+        ),
+    )
+    input_layer_filter: dict[str, Any] | None = Field(
+        None,
+        description="Optional CQL2-JSON filter for this input layer",
+        json_schema_extra=ui_field(section="input", field_order=2, hidden=True),
+    )
+
+
+class MergeParams(BaseModel):
+    """Parameters for merging multiple layers/tables.
+
+    By default, fields with the same name are mapped together into one output
+    column, while fields unique to an input are retained and filled with NULL
+    for rows from other inputs.
+    """
+
+    input_paths: List[MergeInputLayer] = Field(
         ...,
         min_length=2,
-        description="List of paths to vector layers to merge. Must be at least 2 layers.",
+        description="List of input layer/table paths to merge. Must be at least 2 inputs.",
     )
 
     output_path: Optional[str] = Field(

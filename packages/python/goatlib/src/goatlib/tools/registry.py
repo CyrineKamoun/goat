@@ -194,6 +194,17 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         ),
     ),
     ToolDefinition(
+        name="merge",
+        display_name="Merge",
+        description="Combines multiple vector layers into one output layer",
+        module_path="goatlib.tools.merge",
+        params_class_name="MergeToolParams",
+        windmill_path="f/goat/tools/merge",
+        category="data_management",
+        docs_path="/toolbox/data_management/merge",
+        keywords=("data_management", "merge", "combine", "append", "layers"),
+    ),
+    ToolDefinition(
         name="origin_destination",
         display_name="Origin-Destination",
         description="Create origin-destination lines and points from geometry and OD matrix",

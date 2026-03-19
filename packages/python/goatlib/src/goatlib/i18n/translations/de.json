@@ -93,6 +93,9 @@
     "join_options": {
       "label": "Verbindungsoptionen"
     },
+    "merge_options": {
+      "label": "Merge-Optionen"
+    },
     "dissolve_settings": {
       "label": "Auflösungseinstellungen"
     },
@@ -919,6 +922,10 @@
     "dissolve": {
       "title": "Zusammenführen",
       "description": "Fasst Objekte mit gleichen Attributwerten zusammen. Optional können Statistiken für numerische Felder berechnet werden."
+    },
+    "merge": {
+      "title": "Merge",
+      "description": "Parameter für das Merge-Werkzeug. Standardmäßig werden Felder mit gleichem Namen zusammengeführt, während eingabespezifische Felder im Ergebnis erhalten bleiben."
     }
   },
   "routing_modes": {
@@ -945,6 +952,7 @@
     "dissolve": "Zusammenführen",
     "intersection": "Überschneiden",
     "union": "Vereinigen",
+    "merge": "Zusammenführen",
     "aggregate_points": "Punkte aggregieren",
     "aggregate_polygon": "Polygone aggregieren",
     "aggregate_polygons": "Polygone aggregieren",

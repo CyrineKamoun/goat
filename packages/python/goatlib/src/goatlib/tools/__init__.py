@@ -54,6 +54,7 @@ from goatlib.tools.layer_delete_multi import (
 )
 from goatlib.tools.layer_export import LayerExportParams, LayerExportRunner
 from goatlib.tools.layer_import import LayerImportParams, LayerImportRunner
+from goatlib.tools.merge import MergeToolParams, MergeToolRunner
 from goatlib.tools.origin_destination import (
     OriginDestinationToolParams,
     OriginDestinationToolRunner,
@@ -107,6 +108,8 @@ __all__ = [
     "OriginDestinationToolRunner",
     "LayerImportParams",
     "LayerImportRunner",
+    "MergeToolParams",
+    "MergeToolRunner",
     "LayerDeleteParams",
     "LayerDeleteRunner",
     "LayerDeleteMultiParams",

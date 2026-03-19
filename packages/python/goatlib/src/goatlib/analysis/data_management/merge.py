@@ -12,28 +12,29 @@ logger = logging.getLogger(__name__)
 
 class MergeTool(AnalysisTool):
     """
-    MergeTool: Combines multiple vector layers into a single layer using DuckDB Spatial.
+    MergeTool: Combines multiple datasets into a single output using DuckDB.
 
     Features:
-    - Merges 2+ layers of compatible geometry types
-    - Automatic CRS harmonization (reproject all to target CRS)
-    - Simple field handling (duplicate field names get suffixed with layer index)
+    - Merges 2+ inputs with compatible data model (all spatial or all tabular)
+    - Automatic CRS harmonization for spatial inputs
+    - Field mapping by name (same-name fields are merged into one column)
     - Optional source tracking field (layer_source: 0, 1, 2, etc.)
-    - Geometry type validation and promotion
+    - Geometry type validation and promotion for spatial inputs
     - Efficient DuckDB-based processing
     """
 
     def _run_implementation(
         self: Self, params: MergeParams
     ) -> List[Tuple[Path, DatasetMetadata]]:
-        """Perform merge operation on multiple vector datasets."""
+        """Perform merge operation on multiple datasets."""
 
         if len(params.input_paths) < 2:
             raise ValueError("At least 2 input layers required for merge operation.")
 
         # --- Import all inputs and collect metadata
         layer_info = []
-        for i, input_path in enumerate(params.input_paths):
+        for i, input_layer in enumerate(params.input_paths):
+            input_path = input_layer.input_path
             # Use unique table name for each input to avoid conflicts
             unique_table_name = f"v_input_{i}"
             meta, table_name = self.import_input(
@@ -51,38 +52,51 @@ class MergeTool(AnalysisTool):
                 }
             )
 
-            if not meta.geometry_column:
-                raise ValueError(
-                    f"Could not detect geometry column for layer {i}: {input_path}"
-                )
+        has_geometry_flags = [bool(info["geom_col"]) for info in layer_info]
+        has_geometry = all(has_geometry_flags)
 
-        # --- Validate geometry compatibility
-        if params.validate_geometry_types:
+        # Keep merge behavior predictable: either all layers are spatial or all are tables.
+        if any(has_geometry_flags) and not has_geometry:
+            raise ValueError(
+                "Cannot merge mixed spatial and non-spatial inputs. "
+                "Use either all layers with geometry or all tabular inputs."
+            )
+
+        # --- Validate geometry compatibility for spatial merges
+        if has_geometry and params.validate_geometry_types:
             self._validate_geometry_types(layer_info)
 
-        # --- Determine target CRS
-        target_crs = params.output_crs or (
-            layer_info[0]["crs"].to_string() if layer_info[0]["crs"] else "EPSG:4326"
-        )
-        logger.info(f"Target CRS for merge: {target_crs}")
+        # --- Determine target CRS for spatial merges
+        target_crs: str | None = None
+        if has_geometry:
+            target_crs = params.output_crs or (
+                layer_info[0]["crs"].to_string()
+                if layer_info[0]["crs"]
+                else "EPSG:4326"
+            )
+            logger.info("Target CRS for merge: %s", target_crs)
 
         # --- Determine output path
         if not params.output_path:
             params.output_path = str(
-                Path(params.input_paths[0]).parent
-                / f"{Path(params.input_paths[0]).stem}_merged.parquet"
+                Path(params.input_paths[0].input_path).parent
+                / f"{Path(params.input_paths[0].input_path).stem}_merged.parquet"
             )
         output_path = Path(params.output_path)
 
         # --- Execute merge
         output_geom_type = self._execute_merge(
-            params, layer_info, target_crs, output_path
+            params,
+            layer_info,
+            target_crs=target_crs,
+            output_path=output_path,
+            has_geometry=has_geometry,
         )
 
         metadata = DatasetMetadata(
             path=str(output_path),
-            source_type="vector",
-            format="geoparquet",
+            source_type="vector" if has_geometry else "tabular",
+            format="geoparquet" if has_geometry else "parquet",
             crs=target_crs,
             geometry_type=output_geom_type,
         )
@@ -145,15 +159,17 @@ class MergeTool(AnalysisTool):
         self,
         params: MergeParams,
         layer_info: List[Dict],
-        target_crs: str,
+        target_crs: str | None,
         output_path: Path,
-    ) -> str:
+        has_geometry: bool,
+    ) -> str | None:
         """Execute the merge operation in DuckDB."""
         con = self.con
 
         # --- Step 1: Collect all columns from all layers and track which layer has which
         layer_columns: Dict[int, List[str]] = {}  # layer_idx -> list of columns
-        all_columns: Dict[str, List[int]] = {}  # column_name -> list of layer indices
+        all_columns: List[str] = []  # ordered output columns (excluding geometry)
+        all_columns_seen: set[str] = set()
 
         for info in layer_info:
             layer_idx = info["index"]
@@ -161,45 +177,31 @@ class MergeTool(AnalysisTool):
             geom_col = info["geom_col"]
 
             # Get column list from this layer (exclude geometry and bbox columns)
+            excluded = {"bbox"}
+            if has_geometry and geom_col:
+                excluded.add(geom_col)
+
             cols_query = f"PRAGMA table_info({table_name})"
             columns = [
                 row[1]
                 for row in con.execute(cols_query).fetchall()
-                if row[1] not in (geom_col, "bbox")
+                if row[1] not in excluded
             ]
 
             layer_columns[layer_idx] = columns
 
             for col in columns:
-                if col not in all_columns:
-                    all_columns[col] = []
-                all_columns[col].append(layer_idx)
+                if col not in all_columns_seen:
+                    all_columns_seen.add(col)
+                    all_columns.append(col)
 
-        # --- Step 2: Resolve field conflicts (rename duplicates)
-        # Fields appearing in multiple layers: field → field, field_1, field_2, etc.
-        final_columns: List[str] = []  # Ordered list of all output columns
-        column_mapping: Dict[int, Dict[str, str]] = {
-            i: {} for i in range(len(layer_info))
-        }
-
-        for col, layer_indices in all_columns.items():
-            if len(layer_indices) == 1:
-                # Unique column - keep original name
-                final_columns.append(col)
-                column_mapping[layer_indices[0]][col] = col
-            else:
-                # Conflicting column - rename with suffix
-                for i, layer_idx in enumerate(layer_indices):
-                    if i == 0:
-                        new_name = col  # First occurrence keeps original
-                    else:
-                        new_name = f"{col}_{i}"
-                    final_columns.append(new_name)
-                    column_mapping[layer_idx][col] = new_name
+        # --- Step 2: Build output columns (same-name columns are mapped together)
+        final_columns: List[str] = list(all_columns)
 
         if params.add_source_field:
             final_columns.append("layer_source")
-        final_columns.append("geometry")
+        if has_geometry:
+            final_columns.append("geometry")
 
         logger.info(f"Output schema will have {len(final_columns)} columns")
 
@@ -211,6 +213,7 @@ class MergeTool(AnalysisTool):
             table_name = info["table"]
             geom_col = info["geom_col"]
             source_crs = info["crs"].to_string() if info["crs"] else None
+            input_columns = set(layer_columns[layer_idx])
 
             # Build SELECT parts for this layer
             select_parts = []
@@ -222,15 +225,8 @@ class MergeTool(AnalysisTool):
                 if final_col == "geometry":
                     continue  # Handle separately
 
-                # Find original column name for this final column in this layer
-                original_col = None
-                for orig, mapped in column_mapping[layer_idx].items():
-                    if mapped == final_col:
-                        original_col = orig
-                        break
-
-                if original_col:
-                    select_parts.append(f'"{original_col}" AS "{final_col}"')
+                if final_col in input_columns:
+                    select_parts.append(f'"{final_col}" AS "{final_col}"')
                 else:
                     select_parts.append(f'NULL AS "{final_col}"')
 
@@ -239,14 +235,15 @@ class MergeTool(AnalysisTool):
                 select_parts.append(f"{layer_idx} AS layer_source")
 
             # Add geometry with optional transform and promotion
-            geom_transform = (
-                f"ST_Transform({geom_col}, '{source_crs}', '{target_crs}')"
-                if source_crs and source_crs != target_crs
-                else geom_col
-            )
-            if params.promote_to_multi:
-                geom_transform = f"ST_Multi({geom_transform})"
-            select_parts.append(f"{geom_transform} AS geometry")
+            if has_geometry:
+                geom_transform = (
+                    f"ST_Transform({geom_col}, '{source_crs}', '{target_crs}')"
+                    if source_crs and target_crs and source_crs != target_crs
+                    else geom_col
+                )
+                if params.promote_to_multi:
+                    geom_transform = f"ST_Multi({geom_transform})"
+                select_parts.append(f"{geom_transform} AS geometry")
 
             select_query = f"SELECT {', '.join(select_parts)} FROM {table_name}"
             normalized_selects.append(select_query)
@@ -273,8 +270,14 @@ class MergeTool(AnalysisTool):
         )
 
         # Determine output geometry type
-        output_geom_type = layer_info[0]["geometry_type"]
-        if params.promote_to_multi and not output_geom_type.startswith("Multi"):
-            output_geom_type = f"Multi{output_geom_type}"
+        output_geom_type = None
+        if has_geometry:
+            output_geom_type = layer_info[0]["geometry_type"]
+            if (
+                output_geom_type
+                and params.promote_to_multi
+                and not output_geom_type.startswith("Multi")
+            ):
+                output_geom_type = f"Multi{output_geom_type}"
 
         return output_geom_type
