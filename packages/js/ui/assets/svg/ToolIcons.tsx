@@ -217,6 +217,23 @@ export const JoinIcon = (props: SvgIconProps) => (
   </SvgIcon>
 );
 
+export const MergeIcon = (props: SvgIconProps) => (
+  <SvgIcon viewBox="0 0 44 44" {...props}>
+    {/* Input layer A (light tone, upper-left) */}
+    <rect x="4" y="5" width="14" height="10" rx="1.5" fill="var(--icon-color-3, #BDBDBD)"/>
+    {/* Input layer B (medium tone, upper-right) */}
+    <rect x="26" y="5" width="14" height="10" rx="1.5" fill="var(--icon-color-2, #999999)"/>
+    {/* Left converging stem */}
+    <path d="M8 16 L14 16 L22 26 L19 26 Z" fill="var(--icon-color-3, #BDBDBD)"/>
+    {/* Right converging stem */}
+    <path d="M30 16 L36 16 L25 26 L22 26 Z" fill="var(--icon-color-3, #BDBDBD)"/>
+    {/* Arrowhead pointing down to merged output */}
+    <path d="M17 27 L27 27 L22 31.5 Z" fill="var(--icon-color-3, #BDBDBD)"/>
+    {/* Merged output (primary tone) */}
+    <rect x="4" y="32" width="36" height="8" rx="1.5" fill="var(--icon-color-1, #666666)"/>
+  </SvgIcon>
+);
+
 export const OevGueteklassenIcon = (props: SvgIconProps) => (
   <SvgIcon viewBox="0 0 44 44" {...props}>
     <path d="M29.2223 12.5808L34.6676 13.9421C35.0791 14.045 35.4473 14.2761 35.7189 14.602L38.672 18.1457C39.1807 18.7562 39.2798 19.6098 38.9245 20.3205L34.4782 29.213C34.1748 29.8198 33.5845 30.2314 32.9103 30.3063L25.837 31.0922C25.6629 31.1116 25.4921 31.1537 25.3289 31.2176L10.3226 37.091C9.13086 37.5575 7.81369 36.8001 7.61736 35.5354L5.10302 19.3394C5.03617 18.9088 5.1118 18.4681 5.31841 18.0844L10.6603 8.16387C10.9057 7.70797 11.3185 7.36504 11.8116 7.20723L20.5226 4.41972C21.3123 4.16703 22.176 4.42776 22.6939 5.07518L28.1457 11.8899C28.4193 12.2319 28.7975 12.4746 29.2223 12.5808Z" fill="var(--icon-color-2, #999999)"/>
@@ -358,6 +375,7 @@ export enum TOOL_ICON_NAME {
   HUFF_MODEL = "huff_model",
   INTERSECTION = "intersection",
   JOIN = "join",
+  MERGE = "merge",
   OEV_GUETEKLASSEN = "oev_gueteklassen",
   ORIGIN_DESTINATION = "origin_destination",
   TRAVEL_COST_MATRIX = "travel_cost_matrix",
@@ -391,6 +409,7 @@ export const toolIconMap: Record<TOOL_ICON_NAME, React.FC<SvgIconProps>> = {
   [TOOL_ICON_NAME.HUFF_MODEL]: HuffModelIcon,
   [TOOL_ICON_NAME.INTERSECTION]: IntersectionIcon,
   [TOOL_ICON_NAME.JOIN]: JoinIcon,
+  [TOOL_ICON_NAME.MERGE]: MergeIcon,
   [TOOL_ICON_NAME.OEV_GUETEKLASSEN]: OevGueteklassenIcon,
   [TOOL_ICON_NAME.ORIGIN_DESTINATION]: OriginDestinationIcon,
   [TOOL_ICON_NAME.TRAVEL_COST_MATRIX]: TravelCostMatrixIcon,

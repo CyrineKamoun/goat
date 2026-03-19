@@ -135,7 +135,7 @@ class AggregatePointsToolParams(
             field_order=1,
             label_key="select_statistics_configuration",
             widget="field-statistics-selector",
-            widget_options={"source_layer": "source_layer_id"},
+            widget_options={"source_layer": "source_layer_id", "multi": True},
         ),
     )
 
@@ -272,9 +272,9 @@ class AggregatePointsToolRunner(BaseToolRunner[AggregatePointsToolParams]):
         if stat_op.value == "count":
             color_field = "count"
         else:
-            # For sum/mean/min/max, the output column is named after the operation
+            # Match runner output: `{field}_{op}` (e.g. ``population_sum``).
             color_field = (
-                f"{stat_op.value}_{stat_field}" if stat_field else stat_op.value
+                f"{stat_field}_{stat_op.value}" if stat_field else stat_op.value
             )
 
         # Compute quantile breaks from the DuckLake table

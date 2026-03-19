@@ -93,6 +93,9 @@
     "join_options": {
       "label": "Verbindungsoptionen"
     },
+    "merge_options": {
+      "label": "Merge-Optionen"
+    },
     "dissolve_settings": {
       "label": "Auflösungseinstellungen"
     },
@@ -1017,6 +1020,10 @@
     "travel_cost_matrix": {
       "title": "Reisezeitmatrix",
       "description": "Berechnet Reisezeiten und Entfernungen zwischen Start- und Zielpunkt-Layern."
+    },
+    "merge": {
+      "title": "Merge",
+      "description": "Parameter für das Merge-Werkzeug. Standardmäßig werden Felder mit gleichem Namen zusammengeführt, während eingabespezifische Felder im Ergebnis erhalten bleiben."
     }
   },
   "groups": {
@@ -1050,6 +1057,7 @@
     "dissolve": "Zusammenführen",
     "intersection": "Überschneiden",
     "union": "Vereinigen",
+    "merge": "Zusammenführen",
     "aggregate_points": "Punkte aggregieren",
     "aggregate_polygon": "Polygone aggregieren",
     "aggregate_polygons": "Polygone aggregieren",

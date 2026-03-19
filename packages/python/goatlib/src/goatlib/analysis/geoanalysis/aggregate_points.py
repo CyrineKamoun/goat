@@ -160,17 +160,12 @@ class AggregatePointsTool(AnalysisTool):
             "area",
         )
 
-        # Get statistics SQL and result column name
-        # Use first statistic from the list
-        stats = params.column_statistics[0]
-        stats_sql = self.get_statistics_sql(
-            f"s.{stats.field}" if stats.field else "",
-            stats.operation.value,
+        agg_specs = self._build_agg_specs(params, source_prefix="s.")
+        total_select = ", ".join(f"{sql} AS {col}" for col, sql in agg_specs)
+        coalesced_total_select = ", ".join(
+            f"COALESCE(t.{col}, 0) AS {col}" for col, _ in agg_specs
         )
-        # Use the helper method for consistent column naming
-        result_col = stats.get_result_column_name()
 
-        # Get all columns from area layer except geometry and bbox
         area_columns = self.con.execute(f"""
             SELECT column_name
             FROM information_schema.columns
@@ -179,8 +174,8 @@ class AggregatePointsTool(AnalysisTool):
             AND column_name != 'bbox'
         """).fetchall()
         area_col_names = [col[0] for col in area_columns]
+        area_select_with_prefix = ", ".join([f'a."{col}"' for col in area_col_names])
 
-        # Create a table with row IDs from area layer for joining
         self.con.execute(f"""
             CREATE OR REPLACE TEMP TABLE area_with_id AS
             SELECT
@@ -190,90 +185,78 @@ class AggregatePointsTool(AnalysisTool):
         """)
 
         if params.group_by_field:
-            # Build group by columns expression
             group_cols = ", ".join([f"s.{col}" for col in params.group_by_field])
             group_col_concat = " || '_' || ".join(
                 [f"CAST(s.{col} AS VARCHAR)" for col in params.group_by_field]
             )
 
-            # First compute stats grouped by area and group_by_field
             self.con.execute(f"""
                 CREATE OR REPLACE TEMP TABLE grouped_stats AS
                 SELECT
                     a.area_id,
                     {group_col_concat} AS group_name,
-                    {stats_sql} AS stats
+                    {total_select}
                 FROM area_with_id a
                 JOIN {source_view} s
                 ON ST_Intersects(a.{area_geom}, s.{source_geom})
                 GROUP BY a.area_id, {group_cols}
             """)
 
-            # Aggregate into JSON object per area
-            self.con.execute("""
+            grouped_json_select = ", ".join(
+                f"JSON_GROUP_OBJECT(group_name, {col}) AS {col}_grouped"
+                for col, _ in agg_specs
+            )
+            self.con.execute(f"""
                 CREATE OR REPLACE TEMP TABLE grouped_json AS
-                SELECT
-                    area_id,
-                    JSON_GROUP_OBJECT(group_name, stats) AS grouped_stats
+                SELECT area_id, {grouped_json_select}
                 FROM grouped_stats
                 GROUP BY area_id
             """)
 
-            # Compute total stats per area
             self.con.execute(f"""
                 CREATE OR REPLACE TEMP TABLE total_stats AS
-                SELECT
-                    a.area_id,
-                    {stats_sql} AS total_stats
+                SELECT a.area_id, {total_select}
                 FROM area_with_id a
                 JOIN {source_view} s
                 ON ST_Intersects(a.{area_geom}, s.{source_geom})
                 GROUP BY a.area_id
             """)
 
-            # Join everything together - quote column names for special characters
-            area_select_with_prefix = ", ".join(
-                [f'a."{col}"' for col in area_col_names]
+            grouped_proj = ", ".join(
+                f"g.{col}_grouped AS {col}_grouped" for col, _ in agg_specs
             )
             self.con.execute(f"""
                 CREATE OR REPLACE TABLE aggregation_result AS
                 SELECT
                     a.{area_geom} AS geometry,
                     {area_select_with_prefix},
-                    COALESCE(t.total_stats, 0) AS {result_col},
-                    g.grouped_stats AS {result_col}_grouped
+                    {coalesced_total_select},
+                    {grouped_proj}
                 FROM area_with_id a
                 LEFT JOIN total_stats t ON a.area_id = t.area_id
                 LEFT JOIN grouped_json g ON a.area_id = g.area_id
             """)
         else:
-            # Simple aggregation without grouping
             self.con.execute(f"""
                 CREATE OR REPLACE TEMP TABLE total_stats AS
-                SELECT
-                    a.area_id,
-                    {stats_sql} AS total_stats
+                SELECT a.area_id, {total_select}
                 FROM area_with_id a
                 JOIN {source_view} s
                 ON ST_Intersects(a.{area_geom}, s.{source_geom})
                 GROUP BY a.area_id
             """)
 
-            # Quote column names for special characters
-            area_select_with_prefix = ", ".join(
-                [f'a."{col}"' for col in area_col_names]
-            )
             self.con.execute(f"""
                 CREATE OR REPLACE TABLE aggregation_result AS
                 SELECT
                     a.{area_geom} AS geometry,
                     {area_select_with_prefix},
-                    COALESCE(t.total_stats, 0) AS {result_col}
+                    {coalesced_total_select}
                 FROM area_with_id a
                 LEFT JOIN total_stats t ON a.area_id = t.area_id
             """)
 
-        logger.info("Polygon aggregation completed")
+        logger.info("Polygon aggregation completed with %d output stat columns", len(agg_specs))
 
     def _aggregate_to_h3(
         self: Self,
@@ -290,108 +273,98 @@ class AggregatePointsTool(AnalysisTool):
         """
         h3_resolution = params.h3_resolution
 
-        # Get statistics SQL and result column name
-        # Use first statistic from the list
-        stats = params.column_statistics[0]
-        stats_sql = self.get_statistics_sql(
-            stats.field if stats.field else "",
-            stats.operation.value,
+        # H3 mode references source columns unqualified (no table alias).
+        agg_specs = self._build_agg_specs(params, source_prefix="")
+        total_select = ", ".join(f"{sql} AS {col}" for col, sql in agg_specs)
+        h3_cell_expr = (
+            f"h3_latlng_to_cell("
+            f"ST_Y(ST_Centroid({source_geom})), "
+            f"ST_X(ST_Centroid({source_geom})), "
+            f"{h3_resolution})"
         )
-        # Use the helper method for consistent column naming
-        result_col = stats.get_result_column_name()
 
         if params.group_by_field:
-            # Build group by columns expression
             group_cols = ", ".join(params.group_by_field)
             group_col_concat = " || '_' || ".join(
                 [f"CAST({col} AS VARCHAR)" for col in params.group_by_field]
             )
 
-            # First compute stats grouped by H3 cell and group_by_field
             self.con.execute(f"""
                 CREATE OR REPLACE TEMP TABLE grouped_stats AS
                 SELECT
-                    h3_latlng_to_cell(
-                        ST_Y(ST_Centroid({source_geom})),
-                        ST_X(ST_Centroid({source_geom})),
-                        {h3_resolution}
-                    ) AS h3_index,
+                    {h3_cell_expr} AS h3_index,
                     {group_col_concat} AS group_name,
-                    {stats_sql} AS stats
+                    {total_select}
                 FROM {source_view}
-                GROUP BY h3_latlng_to_cell(
-                    ST_Y(ST_Centroid({source_geom})),
-                    ST_X(ST_Centroid({source_geom})),
-                    {h3_resolution}
-                ), {group_cols}
+                GROUP BY {h3_cell_expr}, {group_cols}
             """)
 
-            # Aggregate into JSON object per H3 cell
-            self.con.execute("""
+            grouped_json_select = ", ".join(
+                f"JSON_GROUP_OBJECT(group_name, {col}) AS {col}_grouped"
+                for col, _ in agg_specs
+            )
+            self.con.execute(f"""
                 CREATE OR REPLACE TEMP TABLE grouped_json AS
-                SELECT
-                    h3_index,
-                    JSON_GROUP_OBJECT(group_name, stats) AS grouped_stats
+                SELECT h3_index, {grouped_json_select}
                 FROM grouped_stats
                 GROUP BY h3_index
             """)
 
-            # Compute total stats per H3 cell
             self.con.execute(f"""
                 CREATE OR REPLACE TEMP TABLE total_stats AS
-                SELECT
-                    h3_latlng_to_cell(
-                        ST_Y(ST_Centroid({source_geom})),
-                        ST_X(ST_Centroid({source_geom})),
-                        {h3_resolution}
-                    ) AS h3_index,
-                    {stats_sql} AS total_stats
+                SELECT {h3_cell_expr} AS h3_index, {total_select}
                 FROM {source_view}
-                GROUP BY h3_latlng_to_cell(
-                    ST_Y(ST_Centroid({source_geom})),
-                    ST_X(ST_Centroid({source_geom})),
-                    {h3_resolution}
-                )
+                GROUP BY {h3_cell_expr}
             """)
 
-            # Join and create H3 polygon geometries
+            total_proj = ", ".join(f"t.{col} AS {col}" for col, _ in agg_specs)
+            grouped_proj = ", ".join(
+                f"g.{col}_grouped AS {col}_grouped" for col, _ in agg_specs
+            )
             self.con.execute(f"""
                 CREATE OR REPLACE TABLE aggregation_result AS
                 SELECT
                     ST_GeomFromText(h3_cell_to_boundary_wkt(t.h3_index)) AS geometry,
                     h3_h3_to_string(t.h3_index) AS h3_{h3_resolution},
-                    t.total_stats AS {result_col},
-                    g.grouped_stats AS {result_col}_grouped
+                    {total_proj},
+                    {grouped_proj}
                 FROM total_stats t
                 LEFT JOIN grouped_json g ON t.h3_index = g.h3_index
             """)
         else:
-            # Simple aggregation without grouping
             self.con.execute(f"""
                 CREATE OR REPLACE TEMP TABLE total_stats AS
-                SELECT
-                    h3_latlng_to_cell(
-                        ST_Y(ST_Centroid({source_geom})),
-                        ST_X(ST_Centroid({source_geom})),
-                        {h3_resolution}
-                    ) AS h3_index,
-                    {stats_sql} AS total_stats
+                SELECT {h3_cell_expr} AS h3_index, {total_select}
                 FROM {source_view}
-                GROUP BY h3_latlng_to_cell(
-                    ST_Y(ST_Centroid({source_geom})),
-                    ST_X(ST_Centroid({source_geom})),
-                    {h3_resolution}
-                )
+                GROUP BY {h3_cell_expr}
             """)
 
-            # Create H3 polygon geometries
+            total_proj = ", ".join(f"{col} AS {col}" for col, _ in agg_specs)
             self.con.execute(f"""
                 CREATE OR REPLACE TABLE aggregation_result AS
                 SELECT
                     ST_GeomFromText(h3_cell_to_boundary_wkt(h3_index)) AS geometry,
                     h3_h3_to_string(h3_index) AS h3_{h3_resolution},
-                    total_stats AS {result_col}
+                    {total_proj}
                 FROM total_stats
             """)
 
-        logger.info("H3 aggregation completed at resolution %d", h3_resolution)
+        logger.info(
+            "H3 aggregation completed at resolution %d with %d output stat columns",
+            h3_resolution,
+            len(agg_specs),
+        )
+
+    def _build_agg_specs(
+        self: Self,
+        params: AggregatePointsParams,
+        source_prefix: str = "",
+    ) -> List[Tuple[str, str]]:
+        """Return [(result_col, sql_expr), ...] — one per FieldStatistic entry."""
+        specs: list[Tuple[str, str]] = []
+        for stat in params.column_statistics:
+            source_field = stat.field or ""
+            field_expr = f"{source_prefix}{source_field}" if source_field else ""
+            sql_expr = self.get_statistics_sql(field_expr, stat.operation.value)
+            specs.append((stat.get_result_column_name(), sql_expr))
+        return specs

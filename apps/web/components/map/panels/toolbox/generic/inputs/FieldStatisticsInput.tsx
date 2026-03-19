@@ -76,9 +76,12 @@ export default function FieldStatisticsInput({
   const safePredictedColumns =
     predictedColumns && Object.keys(predictedColumns).length > 0 ? predictedColumns : EMPTY_PREDICTED_COLUMNS;
 
-  // Parse the current value - backend expects array but we show single selector
+  // Opt-in via widget_options.multi (aggregate sets it; join doesn't).
+  const isMultiField = useMemo(() => {
+    return input.uiMeta?.widget_options?.multi === true;
+  }, [input.uiMeta]);
+
   const currentValue = useMemo((): FieldStatisticsValue => {
-    // Handle array format from backend
     if (Array.isArray(value) && value.length > 0) {
       const v = value[0] as FieldStatisticsValue;
       return {
@@ -99,11 +102,19 @@ export default function FieldStatisticsInput({
     return { operation: "", field: null, result_name: null };
   }, [value]);
 
-  // Helper to emit value in array format (backend expects List[FieldStatistic])
+  const currentFieldNames = useMemo((): string[] => {
+    if (!isMultiField || !Array.isArray(value)) return [];
+    return value
+      .map((entry) =>
+        typeof entry === "object" && entry !== null
+          ? (entry as FieldStatisticsValue).field
+          : null
+      )
+      .filter((f): f is string => typeof f === "string");
+  }, [isMultiField, value]);
+
   const emitChange = (newValue: FieldStatisticsValue) => {
-    // Only emit if there's a valid operation
     if (newValue.operation) {
-      // Clean up result_name if empty string
       const cleanedValue = {
         ...newValue,
         result_name: newValue.result_name?.trim() || null,
@@ -112,6 +123,27 @@ export default function FieldStatisticsInput({
     } else {
       onChange(null);
     }
+  };
+
+  // Expands (operation, [f1, f2, ...]) into N FieldStatistic entries sharing
+  // the same operation. When fields are still empty we emit a placeholder so
+  // the operation persists and the field selector can render.
+  const emitMultiChange = (operation: string, fieldNames: string[]) => {
+    if (!operation) {
+      onChange(null);
+      return;
+    }
+    if (operation === "count") {
+      onChange([{ operation, field: null, result_name: null }]);
+      return;
+    }
+    if (fieldNames.length === 0) {
+      onChange([{ operation, field: null, result_name: null }]);
+      return;
+    }
+    onChange(
+      fieldNames.map((field) => ({ operation, field, result_name: null }))
+    );
   };
 
   // Determine which layer this field relates to from widget_options.source_layer
@@ -195,6 +227,13 @@ export default function FieldStatisticsInput({
     return numericFields.find((f) => f.name === currentValue.field);
   }, [currentValue.field, numericFields, requiresField]);
 
+  const selectedFields = useMemo((): LayerFieldType[] => {
+    if (!isMultiField || !requiresField) return [];
+    return currentFieldNames
+      .map((name) => numericFields.find((f) => f.name === name))
+      .filter((f): f is LayerFieldType => f !== undefined);
+  }, [isMultiField, requiresField, currentFieldNames, numericFields]);
+
   // Convert operations to SelectorItems for the Selector component
   const operationItems: SelectorItem[] = useMemo(() => {
     return STATISTIC_OPERATIONS.map((op) => ({
@@ -212,6 +251,10 @@ export default function FieldStatisticsInput({
   const handleOperationChange = (item: SelectorItem | SelectorItem[] | undefined) => {
     if (Array.isArray(item)) return;
     const operation = (item?.value as string) || "";
+    if (isMultiField) {
+      emitMultiChange(operation, currentFieldNames);
+      return;
+    }
     if (operation === "count") {
       emitChange({ operation, field: null, result_name: currentValue.result_name });
     } else {
@@ -225,6 +268,10 @@ export default function FieldStatisticsInput({
       field: field?.name ?? null,
       result_name: currentValue.result_name,
     });
+  };
+
+  const handleMultiFieldsChange = (fields: LayerFieldType[] | undefined) => {
+    emitMultiChange(currentValue.operation, (fields ?? []).map((f) => f.name));
   };
 
   const handleResultNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,20 +316,34 @@ export default function FieldStatisticsInput({
         disabled={disabled}
       />
 
-      {/* Field Selector (hidden for count operation) */}
       {requiresField && (
-        <LayerFieldSelector
-          selectedField={selectedField}
-          setSelectedField={handleFieldChange}
-          fields={numericFields}
-          label={t("select_field")}
-          tooltip={t("select_numeric_field_for_statistics")}
-          disabled={disabled || isLoading}
-        />
+        isMultiField ? (
+          <LayerFieldSelector
+            // LayerFieldSelector's generic isn't exposed; cast as in FieldInput.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            selectedField={selectedFields as any}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setSelectedField={handleMultiFieldsChange as any}
+            fields={numericFields}
+            label={t("select_fields")}
+            tooltip={t("select_numeric_field_for_statistics")}
+            disabled={disabled || isLoading}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            multiple={true as any}
+          />
+        ) : (
+          <LayerFieldSelector
+            selectedField={selectedField}
+            setSelectedField={handleFieldChange}
+            fields={numericFields}
+            label={t("select_field")}
+            tooltip={t("select_numeric_field_for_statistics")}
+            disabled={disabled || isLoading}
+          />
+        )
       )}
 
-      {/* Result Column Name (optional) - uses FormLabelHelper like StringInput */}
-      {currentValue.operation && (
+      {!isMultiField && currentValue.operation && (
         <Stack>
           <FormLabelHelper label={t("result_column_name")} color="inherit" tooltip={t("result_column_name_helper")} />
           <TextField

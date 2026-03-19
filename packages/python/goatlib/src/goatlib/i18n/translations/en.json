@@ -96,6 +96,9 @@
     "join_options": {
       "label": "Join Options"
     },
+    "merge_options": {
+      "label": "Merge Options"
+    },
     "result": {
       "label": "Results"
     },
@@ -997,6 +1000,10 @@
     "travel_cost_matrix": {
       "title": "Travel Cost Matrix",
       "description": "Compute travel times and distances between origin and destination point layers."
+    },
+    "merge": {
+      "title": "Merge",
+      "description": "Parameters for merge tool. By default, fields with the same name are mapped together, while fields unique to inputs are retained in the output."
     }
   },
   "groups": {
@@ -1030,6 +1037,7 @@
     "dissolve": "Dissolve",
     "intersection": "Intersection",
     "union": "Union",
+    "merge": "Merge",
     "aggregate_points": "Aggregate Points",
     "aggregate_polygon": "Aggregate Polygons",
     "aggregate_polygons": "Aggregate Polygons",

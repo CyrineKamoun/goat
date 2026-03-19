@@ -136,7 +136,7 @@ class AggregatePolygonToolParams(
             field_order=1,
             label_key="select_statistics_configuration",
             widget="field-statistics-selector",
-            widget_options={"source_layer": "source_layer_id"},
+            widget_options={"source_layer": "source_layer_id", "multi": True},
         ),
     )
 
@@ -258,7 +258,8 @@ class AggregatePolygonToolRunner(BaseToolRunner[AggregatePolygonToolParams]):
             if operation == "count":
                 continue  # count already added
             elif field:
-                base_name = result_name if result_name else f"{field}_{operation}"
+                # Match polygon runner: `{op}_{field}` (or result_name override).
+                base_name = result_name if result_name else f"{operation}_{field}"
                 col_name = cls.unique_column_name(columns, base_name)
                 columns[col_name] = "DOUBLE"
 
