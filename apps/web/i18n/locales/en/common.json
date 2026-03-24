@@ -567,7 +567,12 @@
     "is_not_on": "Is not on",
     "is_on": "Is on",
     "not_in_the_last": "Not in the last",
-    "starts_with": "Starts with"
+    "starts_with": "Starts with",
+    "select_operator": "Select operator",
+    "select_value": "Select value",
+    "select_values": "Select values",
+    "enter_number": "Enter a number",
+    "enter_value": "Enter a value"
   },
   "filter_applied": "Filter applied",
   "filter_layer_message": "Filter layer by applying logical or spatial expressions to narrow down data displayed.",
@@ -1830,10 +1835,19 @@
   "column_deleted": "Column deleted",
   "error_deleting_column": "Failed to delete column",
   "delete_column": "Delete column",
-  "sort_asc": "Sort from A-Z",
-  "sort_desc": "Sort from Z-A",
+  "sort_asc": "Sort ascending",
+  "sort_desc": "Sort descending",
   "edit_field": "Edit field",
   "view_stats": "View stats",
   "add_filter": "Add filter",
-  "calculate_field": "Calculate field"
+  "calculate_field": "Calculate field",
+  "top_values": "Top Values",
+  "total_values": "Total Values",
+  "unique_values": "Unique Values",
+  "std_dev": "Std Dev",
+  "previous": "Previous",
+  "next": "Next",
+  "null": "Null",
+  "active_filters": "{{count}} active filter(s)",
+  "no_filters": "No filters applied"
 }

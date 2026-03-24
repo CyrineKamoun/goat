@@ -573,7 +573,12 @@
     "is_not_on": "Ist nicht eingeschaltet",
     "is_on": "Ist eingeschaltet",
     "not_in_the_last": "Nicht im letzten",
-    "starts_with": "Beginnt mit"
+    "starts_with": "Beginnt mit",
+    "select_operator": "Operator wählen",
+    "select_value": "Wert wählen",
+    "select_values": "Werte wählen",
+    "enter_number": "Zahl eingeben",
+    "enter_value": "Wert eingeben"
   },
   "filter_applied": "Filter angewendet",
   "filter_layer_message": "Filtern Sie Layer unter Verwendung von einem oder mehreren Ausdrücken.",
@@ -1827,10 +1832,19 @@
   "column_deleted": "Spalte gelöscht",
   "error_deleting_column": "Spalte konnte nicht gelöscht werden",
   "delete_column": "Spalte löschen",
-  "sort_asc": "Sortieren A-Z",
-  "sort_desc": "Sortieren Z-A",
+  "sort_asc": "Aufsteigend sortieren",
+  "sort_desc": "Absteigend sortieren",
   "edit_field": "Feld bearbeiten",
   "view_stats": "Statistiken anzeigen",
   "add_filter": "Filter hinzufügen",
-  "calculate_field": "Feld berechnen"
+  "calculate_field": "Feld berechnen",
+  "top_values": "Häufigste Werte",
+  "total_values": "Gesamtwerte",
+  "unique_values": "Eindeutige Werte",
+  "std_dev": "Std Abw",
+  "previous": "Vorherige",
+  "next": "Nächste",
+  "null": "Null",
+  "active_filters": "{{count}} aktive(r) Filter",
+  "no_filters": "Keine Filter angewendet"
 }

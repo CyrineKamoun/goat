@@ -7,19 +7,24 @@ import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
 import EditIcon from "@mui/icons-material/Edit";
-import FilterListIcon from "@mui/icons-material/FilterList";
+import FilterAltIcon from "@mui/icons-material/FilterAlt";
+import bbox from "@turf/bbox";
+
+import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import SaveIcon from "@mui/icons-material/Save";
 import SearchIcon from "@mui/icons-material/Search";
 import UndoIcon from "@mui/icons-material/Undo";
 import {
+  Badge,
   Box,
   Button,
   CircularProgress,
   Divider,
   IconButton,
   InputAdornment,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   Menu,
@@ -35,6 +40,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { debounce } from "@mui/material/utils";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
@@ -49,7 +55,15 @@ import {
 import type { GetCollectionItemsQueryParams } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
 
+import { setSelectedLayers } from "@/lib/store/layer/slice";
+import { setActiveRightPanel } from "@/lib/store/map/slice";
+import { MapSidebarItemID } from "@/types/map/common";
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
+import { useMap } from "react-map-gl/maplibre";
 import useLayerFields from "@/hooks/map/CommonHooks";
+
+import ColumnStatsPanel from "@/components/map/panels/ColumnStatsPanel";
+import QuickFilterPopover from "@/components/map/panels/QuickFilterPopover";
 
 type SortDirection = "asc" | "desc";
 type EditingCell = { rowId: string; column: string } | null;
@@ -69,6 +83,7 @@ const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 const EditableDataTable: React.FC<EditableDataTableProps> = ({
   layerId,
+  projectLayer,
   layerName,
   isExpanded,
   onToggleExpand,
@@ -76,7 +91,19 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   onDownload,
 }) => {
   const { t } = useTranslation("common");
+  const dispatch = useAppDispatch();
+  const { map } = useMap();
+  const activeRightPanel = useAppSelector((state) => state.map.activeRightPanel);
   const { layerFields, isLoading: areFieldsLoading } = useLayerFields(layerId);
+
+  // CQL filter from layer settings — applied to table queries and stats
+  const cqlArgs = projectLayer?.query?.cql?.args;
+  const activeFilterCount = cqlArgs?.length ?? 0;
+  const cqlFilter = useMemo(() => {
+    const cql = projectLayer?.query?.cql;
+    if (!cql || !cql.args?.length) return undefined;
+    return JSON.stringify(cql);
+  }, [projectLayer?.query?.cql]);
 
   // Pagination state
   const [page, setPage] = useState(0);
@@ -100,6 +127,10 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedSetSearch = useCallback(debounce((val: string) => setDebouncedSearch(val), 400), []);
 
   // Column header menu state
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<HTMLElement | null>(null);
@@ -110,6 +141,19 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   const [renameFieldName, setRenameFieldName] = useState("");
   const [renameFieldOriginal, setRenameFieldOriginal] = useState("");
 
+  // Column stats state
+  const [statsColumn, setStatsColumn] = useState<string | null>(null);
+  const statsNavRef = useRef(false); // true when navigating via prev/next buttons
+
+  // Quick filter popover state
+  const [quickFilterAnchor, setQuickFilterAnchor] = useState<HTMLElement | null>(null);
+  const [quickFilterColumn, setQuickFilterColumn] = useState<string | null>(null);
+
+  // Row context menu state
+  const [rowMenuAnchor, setRowMenuAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [rowMenuRowId, setRowMenuRowId] = useState<string | null>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
   // Column resize state
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const activeResizeRef = useRef<{
@@ -117,6 +161,40 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     startX: number;
     startWidth: number;
   } | null>(null);
+
+  // Filter to primitive fields only (no objects/geometry)
+  const displayFields = useMemo(
+    () => layerFields.filter((f) => f.type !== "object" && f.type !== "geometry"),
+    [layerFields]
+  );
+
+  // Build search CQL — OR across all display fields (temporary, not persisted)
+  const searchCql = useMemo(() => {
+    const term = debouncedSearch.trim();
+    if (!term || displayFields.length === 0) return undefined;
+    const isNum = !isNaN(Number(term));
+    const args: object[] = [];
+    for (const field of displayFields) {
+      if (field.type === "string") {
+        args.push({ op: "like", args: [{ property: field.name }, `%${term}%`] });
+      } else if ((field.type === "number" || field.type === "integer") && isNum) {
+        args.push({ op: "=", args: [{ property: field.name }, Number(term)] });
+      }
+    }
+    if (args.length === 0) return undefined;
+    return args.length === 1 ? args[0] : { op: "or", args };
+  }, [debouncedSearch, displayFields]);
+
+  // Combine layer CQL filter + search CQL into one filter param
+  const combinedFilter = useMemo(() => {
+    const layerCql = projectLayer?.query?.cql;
+    const hasLayerCql = layerCql && layerCql.args?.length;
+    if (!hasLayerCql && !searchCql) return undefined;
+    if (!hasLayerCql) return JSON.stringify(searchCql);
+    if (!searchCql) return JSON.stringify(layerCql);
+    // Merge: AND(layerFilter, searchFilter)
+    return JSON.stringify({ op: "and", args: [layerCql, searchCql] });
+  }, [projectLayer?.query?.cql, searchCql]);
 
   // Build query params
   const queryParams = useMemo<GetCollectionItemsQueryParams>(() => {
@@ -127,30 +205,16 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     if (sortBy) {
       params.sortby = sortDirection === "desc" ? `-${sortBy}` : sortBy;
     }
+    if (combinedFilter) {
+      params.filter = combinedFilter;
+    }
     return params;
-  }, [page, rowsPerPage, sortBy, sortDirection]);
+  }, [page, rowsPerPage, sortBy, sortDirection, combinedFilter]);
 
   // Fetch data
   const { data: collectionData, isLoading, mutate } = useDatasetCollectionItems(layerId, queryParams);
 
-  // Filter to primitive fields only (no objects/geometry)
-  const displayFields = useMemo(
-    () => layerFields.filter((f) => f.type !== "object" && f.type !== "geometry"),
-    [layerFields]
-  );
-
-  // Client-side search filter
-  const filteredFeatures = useMemo(() => {
-    const features = collectionData?.features || [];
-    if (!searchText.trim()) return features;
-    const lower = searchText.toLowerCase();
-    return features.filter((f) =>
-      displayFields.some((field) => {
-        const val = f.properties?.[field.name];
-        return val != null && String(val).toLowerCase().includes(lower);
-      })
-    );
-  }, [collectionData?.features, searchText, displayFields]);
+  const filteredFeatures = collectionData?.features || [];
 
   // Reset page when layer changes
   useEffect(() => {
@@ -159,8 +223,24 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     setDirtyCells(new Map());
     setEditingCell(null);
     setSearchText("");
+    setDebouncedSearch("");
     setSearchOpen(false);
+    setStatsColumn(null);
   }, [layerId]);
+
+  // Scroll to active stats column only when navigating via prev/next
+  useEffect(() => {
+    if (!statsNavRef.current || !statsColumn || !tableContainerRef.current) return;
+    statsNavRef.current = false;
+    const idx = displayFields.findIndex((f) => f.name === statsColumn);
+    if (idx < 0) return;
+    // Find the header cell by index (+1 for the row-number column)
+    const headerRow = tableContainerRef.current.querySelector("thead tr");
+    const cell = headerRow?.children[idx + 1] as HTMLElement | undefined;
+    if (cell) {
+      cell.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    }
+  }, [statsColumn, displayFields]);
 
   // --- Column Resize ---
 
@@ -375,6 +455,46 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     setColumnMenuField(fieldName);
   };
 
+  // --- Row Context Menu ---
+
+  const handleRowContextMenu = (event: React.MouseEvent, rowId: string) => {
+    event.preventDefault();
+    setRowMenuAnchor({ top: event.clientY, left: event.clientX });
+    setRowMenuRowId(rowId);
+    setSelectedRowId(rowId);
+  };
+
+  const handleRowMenuClose = () => {
+    setRowMenuAnchor(null);
+    setRowMenuRowId(null);
+  };
+
+  const handleZoomToFeature = () => {
+    if (!rowMenuRowId || !map) return;
+    const feature = collectionData?.features.find(
+      (f, i) => `${f.id}-${page}-${i}` === rowMenuRowId
+    );
+    if (feature?.geometry) {
+      const bounds = bbox(feature) as [number, number, number, number];
+      map.fitBounds(bounds, { padding: 100, maxZoom: 18, duration: 1000 });
+    }
+    handleRowMenuClose();
+  };
+
+  const handleDeleteRow = async () => {
+    if (!rowMenuRowId) return;
+    try {
+      await deleteFeaturesBulk(layerId, [getFeatureId(rowMenuRowId)]);
+      setSelectedRowId(null);
+      mutate();
+      toast.success(t("rows_deleted", { defaultValue: "{{count}} row(s) deleted", count: 1 }));
+    } catch (error) {
+      toast.error(t("error_deleting_rows", { defaultValue: "Failed to delete rows" }));
+      console.error("Delete error:", error);
+    }
+    handleRowMenuClose();
+  };
+
   const handleColumnMenuClose = () => {
     setColumnMenuAnchor(null);
     setColumnMenuField(null);
@@ -480,11 +600,16 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
             size="small"
             placeholder={t("search", { defaultValue: "Search..." })}
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
+            onChange={(e) => {
+              setSearchText(e.target.value);
+              debouncedSetSearch(e.target.value);
+              setPage(0);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 setSearchOpen(false);
                 setSearchText("");
+                setDebouncedSearch("");
               }
             }}
             InputProps={{
@@ -500,6 +625,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
                     onClick={() => {
                       setSearchOpen(false);
                       setSearchText("");
+                      setDebouncedSearch("");
                     }}>
                     <CloseIcon sx={{ fontSize: 14 }} />
                   </IconButton>
@@ -516,11 +642,30 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           </Tooltip>
         )}
         <Tooltip title={t("filter", { defaultValue: "Filter" })}>
-          <span>
-            <IconButton size="small" disabled>
-              <FilterListIcon fontSize="small" />
-            </IconButton>
-          </span>
+          <IconButton
+            size="small"
+            color={activeFilterCount > 0 ? "primary" : "default"}
+            onClick={() => {
+              if (activeRightPanel === MapSidebarItemID.FILTER) {
+                dispatch(setActiveRightPanel(undefined));
+              } else {
+                dispatch(setSelectedLayers([projectLayer.id]));
+                dispatch(setActiveRightPanel(MapSidebarItemID.FILTER));
+              }
+            }}>
+            <Badge
+              badgeContent={activeFilterCount}
+              color="primary"
+              sx={{
+                "& .MuiBadge-badge": {
+                  fontSize: 9,
+                  height: 15,
+                  minWidth: 15,
+                },
+              }}>
+              <FilterAltIcon fontSize="small" />
+            </Badge>
+          </IconButton>
         </Tooltip>
         <Tooltip title={isExpanded ? t("collapse", { defaultValue: "Collapse" }) : t("expand", { defaultValue: "Expand" })}>
           <IconButton size="small" onClick={onToggleExpand}>
@@ -580,8 +725,23 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
         </Box>
       )}
 
-      {/* Table */}
-      <TableContainer sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+      {/* Table + Stats panel side by side */}
+      <Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <TableContainer
+        ref={tableContainerRef}
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "auto",
+          // Thin scrollbar that starts below the sticky header
+          "&::-webkit-scrollbar": { width: 8, height: 8 },
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: "rgba(0,0,0,0.2)",
+            borderRadius: 4,
+          },
+          "&::-webkit-scrollbar-track": { backgroundColor: "transparent" },
+          scrollbarWidth: "thin",
+        }}>
         {(isLoading || areFieldsLoading) && !collectionData ? (
           <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
             <CircularProgress size={32} />
@@ -634,6 +794,10 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
                         cursor: "pointer",
                         userSelect: "none",
                         whiteSpace: "nowrap",
+                        ...(statsColumn === field.name && {
+                          boxShadow: (theme) =>
+                            `inset 2px 0 0 0 ${theme.palette.primary.main}, inset -2px 0 0 0 ${theme.palette.primary.main}, inset 0 2px 0 0 ${theme.palette.primary.main}`,
+                        }),
                       }}
                       onClick={(e) => handleColumnMenuOpen(e, field.name)}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
@@ -686,6 +850,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
                     hover
                     selected={isSelected}
                     onClick={() => selectRow(rowId)}
+                    onContextMenu={(e) => handleRowContextMenu(e, rowId)}
                     sx={{
                       cursor: "pointer",
                       backgroundColor: isRowDirty ? "rgba(255, 193, 7, 0.08)" : undefined,
@@ -717,6 +882,10 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
                             cursor: "text",
                             backgroundColor: isDirty ? "rgba(255, 193, 7, 0.12)" : undefined,
                             p: isEditing ? 0 : undefined,
+                            ...(statsColumn === field.name && {
+                              boxShadow: (theme) =>
+                                `inset 2px 0 0 0 ${theme.palette.primary.main}, inset -2px 0 0 0 ${theme.palette.primary.main}`,
+                            }),
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -769,6 +938,30 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           </Table>
         )}
       </TableContainer>
+
+      {/* Column Stats Panel */}
+      {statsColumn && (
+        <ColumnStatsPanel
+          layerId={layerId}
+          columnName={statsColumn}
+          columnType={displayFields.find((f) => f.name === statsColumn)?.type ?? "string"}
+          cqlFilter={cqlFilter}
+          onClose={() => setStatsColumn(null)}
+          onPrev={() => {
+            const idx = displayFields.findIndex((f) => f.name === statsColumn);
+            const prevIdx = idx <= 0 ? displayFields.length - 1 : idx - 1;
+            statsNavRef.current = true;
+            setStatsColumn(displayFields[prevIdx].name);
+          }}
+          onNext={() => {
+            const idx = displayFields.findIndex((f) => f.name === statsColumn);
+            const nextIdx = idx >= displayFields.length - 1 ? 0 : idx + 1;
+            statsNavRef.current = true;
+            setStatsColumn(displayFields[nextIdx].name);
+          }}
+        />
+      )}
+      </Box>
 
       {/* Pagination */}
       <TablePagination
@@ -843,15 +1036,26 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           </ListItemIcon>
           <ListItemText>{t("edit_field", { defaultValue: "Edit field" })}</ListItemText>
         </MenuItem>
-        <MenuItem disabled>
+        <MenuItem
+          onClick={() => {
+            if (columnMenuField) setStatsColumn(columnMenuField);
+            handleColumnMenuClose();
+          }}>
           <ListItemIcon>
             <BarChartIcon />
           </ListItemIcon>
           <ListItemText>{t("view_stats", { defaultValue: "View stats" })}</ListItemText>
         </MenuItem>
-        <MenuItem disabled>
+        <MenuItem
+          onClick={() => {
+            if (columnMenuField && columnMenuAnchor) {
+              setQuickFilterColumn(columnMenuField);
+              setQuickFilterAnchor(columnMenuAnchor);
+            }
+            handleColumnMenuClose();
+          }}>
           <ListItemIcon>
-            <FilterListIcon />
+            <FilterAltIcon />
           </ListItemIcon>
           <ListItemText>{t("add_filter", { defaultValue: "Add filter" })}</ListItemText>
         </MenuItem>
@@ -874,6 +1078,52 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           <ListItemText>{t("delete_column", { defaultValue: "Delete column" })}</ListItemText>
         </MenuItem>
       </Menu>
+
+      {/* Row Context Menu */}
+      <Menu
+        open={!!rowMenuAnchor}
+        onClose={handleRowMenuClose}
+        anchorReference="anchorPosition"
+        anchorPosition={rowMenuAnchor ?? undefined}
+        slotProps={{
+          paper: {
+            sx: { minWidth: 220, maxWidth: 340, py: 2 },
+          },
+        }}
+        MenuListProps={{ dense: true, disablePadding: true }}>
+        <ListItemButton onClick={handleZoomToFeature}>
+          <ListItemIcon sx={{ minWidth: 0, pr: 4 }}>
+            <Icon iconName={ICON_NAME.ZOOM_IN} style={{ fontSize: 15 }} htmlColor="inherit" />
+          </ListItemIcon>
+          <ListItemText primary={t("zoom_to_feature", { defaultValue: "Zoom to feature" })} />
+        </ListItemButton>
+        <ListItemButton
+          onClick={handleDeleteRow}
+          sx={{ color: (theme) => theme.palette.error.main }}>
+          <ListItemIcon sx={{ minWidth: 0, pr: 4, color: "inherit" }}>
+            <Icon iconName={ICON_NAME.TRASH} style={{ fontSize: 15 }} htmlColor="inherit" />
+          </ListItemIcon>
+          <ListItemText
+            primary={t("delete")}
+            sx={{ "& .MuiTypography-root": { color: "inherit" } }}
+          />
+        </ListItemButton>
+      </Menu>
+
+      {/* Quick Filter Popover */}
+      {quickFilterColumn && (
+        <QuickFilterPopover
+          anchorEl={quickFilterAnchor}
+          columnName={quickFilterColumn}
+          columnType={displayFields.find((f) => f.name === quickFilterColumn)?.type ?? "string"}
+          layerId={layerId}
+          projectLayer={projectLayer}
+          onClose={() => {
+            setQuickFilterAnchor(null);
+            setQuickFilterColumn(null);
+          }}
+        />
+      )}
     </Box>
   );
 };
