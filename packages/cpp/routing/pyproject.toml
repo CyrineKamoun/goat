@@ -1,0 +1,18 @@
+[build-system]
+requires = ["scikit-build-core>=0.8", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "routing"
+version = "0.1.0"
+description = "C++ routing engine with Python bindings"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Plan4Better GmbH", email = "info@plan4better.de" }]
+dependencies = []
+
+[tool.scikit-build]
+cmake.build-type = "Release"
+cmake.source-dir = "."
+wheel.packages = ["routing"]

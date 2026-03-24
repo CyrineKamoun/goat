@@ -12,9 +12,11 @@ https://github.com/plan4better/goat/blob/0089611acacbebf4e2978c404171ebbae75591e
 """
 
 import asyncio
+import importlib
 import json
 import logging
 import math
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Self, Sequence
@@ -30,8 +32,9 @@ from shapely.geometry import shape
 from goatlib.analysis.core.base import AnalysisTool
 from goatlib.analysis.schemas.catchment_area import (
     AccessEgressMode,
-    CatchmentAreaRoutingMode,
     CatchmentAreaMeasureType,
+    CatchmentAreaOutputFormat,
+    CatchmentAreaRoutingMode,
     CatchmentAreaToolParams,
     CatchmentAreaType,
     PTMode,
@@ -43,6 +46,7 @@ from goatlib.models.io import DatasetMetadata
 logger = logging.getLogger(__name__)
 
 MAX_COORDS = 20000
+WEB_MERCATOR_RADIUS_M = 6378137.0
 
 
 # =============================================================================
@@ -839,9 +843,9 @@ class CatchmentAreaTool(AnalysisTool):
     """
     Tool for computing catchment areas (isochrones) via routing services.
 
-    This tool calls routing APIs to compute isochrones for various transport modes:
-    - Active mobility: walking, bicycle, pedelec, wheelchair (via GOAT Routing)
-    - Motorized: car (via GOAT Routing)
+    This tool computes isochrones for various transport modes:
+    - Active mobility: walking, bicycle, pedelec (via local routing backend)
+    - Motorized: car (via local routing backend)
     - Public transport: bus, tram, rail, etc. (via R5)
 
     Routing URL and authorization can be provided either:
@@ -884,6 +888,7 @@ class CatchmentAreaTool(AnalysisTool):
     DEFAULT_TIMEOUT = 300.0
     DEFAULT_RETRIES = 60
     DEFAULT_RETRY_INTERVAL = 2
+    DEFAULT_ROUTING_EDGE_DIR = "/app/apps/routing/cache/street_network/hive"
 
     def __init__(
         self: Self,
@@ -923,6 +928,14 @@ class CatchmentAreaTool(AnalysisTool):
         self._retry_interval = getattr(
             settings.routing, "request_retry_interval", self.DEFAULT_RETRY_INTERVAL
         )
+        self._routing_edge_dir = getattr(
+            settings.routing, "street_network_dir", self.DEFAULT_ROUTING_EDGE_DIR
+        )
+
+    @staticmethod
+    def _enum_value(value: Any) -> Any:
+        """Return enum value when needed, otherwise return the input as-is."""
+        return value.value if hasattr(value, "value") else value
 
     def _get_routing_url(self: Self, params: CatchmentAreaToolParams) -> str:
         """Get routing URL from params or defaults."""
@@ -932,15 +945,155 @@ class CatchmentAreaTool(AnalysisTool):
         """Get authorization from params or defaults."""
         return params.authorization or self._default_authorization
 
+    def _get_routing_module(self: Self) -> Any:
+        """Load the local routing package used for active/car catchments."""
+        try:
+            return importlib.import_module("routing")
+        except Exception as exc:  # pragma: no cover - depends on local runtime setup
+            raise RuntimeError(
+                "Local routing package is not available. "
+                "Install the 'routing' package to run active/car catchments."
+            ) from exc
+
+    def _to_web_mercator(self: Self, lon: float, lat: float) -> tuple[float, float]:
+        """Convert lon/lat (EPSG:4326) to Web Mercator (EPSG:3857)."""
+        x = WEB_MERCATOR_RADIUS_M * math.radians(lon)
+        y = WEB_MERCATOR_RADIUS_M * math.log(
+            math.tan(math.pi / 4.0 + math.radians(lat) / 2.0)
+        )
+        return x, y
+
+    def _build_routing_request_config(
+        self: Self,
+        params: CatchmentAreaToolParams,
+        routing_type: str,
+    ) -> Any:
+        """Translate goatlib tool params into the routing RequestConfig."""
+        routing = self._get_routing_module()
+
+        lat_list = (
+            [params.latitude]
+            if isinstance(params.latitude, (int, float))
+            else list(params.latitude)
+        )
+        lon_list = (
+            [params.longitude]
+            if isinstance(params.longitude, (int, float))
+            else list(params.longitude)
+        )
+
+        if len(lat_list) != len(lon_list):
+            raise ValueError("Latitude and longitude must have the same length")
+
+        mode_map = {
+            "walking": routing.RoutingMode.Walking,
+            "bicycle": routing.RoutingMode.Bicycle,
+            "pedelec": routing.RoutingMode.Pedelec,
+            "car": routing.RoutingMode.Car,
+        }
+        catchment_map = {
+            CatchmentAreaType.polygon.value: routing.CatchmentType.Polygon,
+            CatchmentAreaType.network.value: routing.CatchmentType.Network,
+            CatchmentAreaType.hexagonal_grid.value: routing.CatchmentType.HexagonalGrid,
+            "rectangular_grid": routing.CatchmentType.HexagonalGrid,
+        }
+
+        measure_type = self._enum_value(params.measure_type)
+        area_type = self._enum_value(params.catchment_area_type)
+        output_format = self._enum_value(params.output_format)
+
+        if routing_type not in mode_map:
+            raise ValueError(
+                "Local routing backend supports only walking, bicycle, pedelec, and car modes"
+            )
+
+        cfg = routing.RequestConfig()
+        cfg.starting_points = [
+            routing.Point3857(*self._to_web_mercator(lon, lat))
+            for lat, lon in zip(lat_list, lon_list)
+        ]
+        cfg.mode = mode_map[routing_type]
+        cfg.cost_mode = (
+            routing.CostMode.Distance
+            if measure_type == CatchmentAreaMeasureType.distance
+            else routing.CostMode.Time
+        )
+        cfg.max_traveltime = (
+            float(params.distance)
+            if measure_type == CatchmentAreaMeasureType.distance
+            else float(params.travel_time)
+        )
+        cfg.steps = int(params.steps)
+        cfg.speed_km_h = float(params.speed or 5.0)
+        cfg.edge_dir = self._routing_edge_dir
+        cfg.output_path = str(params.output_path)
+        cfg.catchment_type = catchment_map[area_type]
+        cfg.output_format = (
+            routing.OutputFormat.GeoJSON
+            if output_format == CatchmentAreaOutputFormat.geojson.value
+            else routing.OutputFormat.Parquet
+        )
+        cfg.polygon_difference = bool(params.polygon_difference)
+        return cfg
+
+    def _save_geojson_payload(self: Self, geojson_payload: str, output_path: str) -> Path:
+        """Persist GeoJSON payload as UTF-8 text file."""
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(geojson_payload, encoding="utf-8")
+        logger.info("Saved catchment area GeoJSON to: %s", path)
+        return path
+
+    async def _compute_routing_catchment(
+        self: Self,
+        params: CatchmentAreaToolParams,
+        routing_type: str,
+    ) -> Path:
+        """Compute active/car catchments via local routing backend and persist output."""
+        if params.scenario_id:
+            logger.info(
+                "Ignoring scenario_id for local routing backend (not supported): %s",
+                params.scenario_id,
+            )
+
+        output_format = self._enum_value(params.output_format)
+        cfg = self._build_routing_request_config(params, routing_type)
+        routing = self._get_routing_module()
+        path = Path(params.output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        t0 = time.perf_counter()
+        cfg.output_path = str(path)
+        result = routing.compute_catchment(cfg)
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+
+        if output_format == CatchmentAreaOutputFormat.geojson.value:
+            logger.info("[goatlib] compute_catchment(geojson) total_ms=%.3f", elapsed_ms)
+            print(f"[goatlib] compute_catchment(geojson) total_ms={elapsed_ms:.3f}")
+            return self._save_geojson_payload(result, params.output_path)
+
+        logger.info("[goatlib] compute_catchment(parquet) total_ms=%.3f", elapsed_ms)
+        print(f"[goatlib] compute_catchment(parquet) total_ms={elapsed_ms:.3f}")
+        logger.info("Saved catchment area Parquet directly from C++ to: %s", path)
+        return path
+
+    async def _compute_active_mobility_catchment(
+        self: Self, params: CatchmentAreaToolParams
+    ) -> Path:
+        """Compute catchment for walking/bicycle/pedelec via local routing."""
+        routing_type = self._enum_value(params.routing_mode)
+        return await self._compute_routing_catchment(params, routing_type)
+
+    async def _compute_car_catchment(self: Self, params: CatchmentAreaToolParams) -> Path:
+        """Compute catchment for car mode via local routing."""
+        return await self._compute_routing_catchment(
+            params, CatchmentAreaRoutingMode.car.value
+        )
+
     def _run_implementation(
         self: Self, params: CatchmentAreaToolParams
     ) -> list[tuple[Path, DatasetMetadata]]:
         """Execute catchment area analysis by calling routing APIs."""
-        routing_mode = (
-            params.routing_mode.value
-            if isinstance(params.routing_mode, CatchmentAreaRoutingMode)
-            else params.routing_mode
-        )
+        routing_mode = self._enum_value(params.routing_mode)
 
         logger.info(
             "Computing catchment area: routing_mode=%s, lat=%s, lon=%s",
@@ -965,184 +1118,17 @@ class CatchmentAreaTool(AnalysisTool):
             geometry_column="geometry",
         )
 
-        if routing_mode == "pt":
+        if routing_mode == CatchmentAreaRoutingMode.pt.value:
             result_gdf = loop.run_until_complete(self._compute_pt_catchment(params))
             path = self._save_geodataframe(result_gdf, params.output_path)
             return [(path, metadata)]
-        elif routing_mode == "car":
-            result_bytes = loop.run_until_complete(self._compute_car_catchment(params))
-            path = self._save_bytes(result_bytes, params.output_path)
-            return [(path, metadata)]
-        else:
-            # Active mobility modes (walking, bicycle, pedelec, wheelchair)
-            result_bytes = loop.run_until_complete(
-                self._compute_active_mobility_catchment(params)
-            )
-            path = self._save_bytes(result_bytes, params.output_path)
+
+        if routing_mode == CatchmentAreaRoutingMode.car.value:
+            path = loop.run_until_complete(self._compute_car_catchment(params))
             return [(path, metadata)]
 
-    # =========================================================================
-    # GOAT Routing: Active Mobility
-    # =========================================================================
-
-    async def _compute_active_mobility_catchment(
-        self: Self, params: CatchmentAreaToolParams
-    ) -> bytes:
-        """Compute catchment area for active mobility modes via GOAT Routing."""
-        routing_url = self._get_routing_url(params)
-        authorization = self._get_authorization(params)
-
-        url = f"{routing_url}/active-mobility/catchment-area"
-
-        # Normalize coordinates to lists
-        lat_list = (
-            [params.latitude]
-            if isinstance(params.latitude, (int, float))
-            else list(params.latitude)
-        )
-        lon_list = (
-            [params.longitude]
-            if isinstance(params.longitude, (int, float))
-            else list(params.longitude)
-        )
-
-        # Get routing type string
-        routing_type = (
-            params.routing_mode.value
-            if isinstance(params.routing_mode, CatchmentAreaRoutingMode)
-            else params.routing_mode
-        )
-        # Get measure type string
-        measure_type = (
-            params.measure_type.value
-            if isinstance(params.measure_type, CatchmentAreaMeasureType)
-            else params.measure_type
-        )
-        # Get catchment area type string
-        area_type = (
-            params.catchment_area_type.value
-            if isinstance(params.catchment_area_type, CatchmentAreaType)
-            else params.catchment_area_type
-        )
-        # Build payload
-        if measure_type == CatchmentAreaMeasureType.time:
-            payload = {
-                "starting_points": {
-                    "latitude": lat_list,
-                    "longitude": lon_list,
-                },
-                "routing_type": routing_type,
-                "travel_cost": {
-                    "max_traveltime": params.travel_time,
-                    "steps": params.steps,
-                    "speed": params.speed or 5.0,
-                },
-                "catchment_area_type": area_type,
-                "output_format": "parquet",
-            }
-        elif measure_type == CatchmentAreaMeasureType.distance:
-            payload = {
-                "starting_points": {
-                    "latitude": lat_list,
-                    "longitude": lon_list,
-                },
-                "routing_type": routing_type,
-                "travel_cost": {
-                    "max_distance": params.distance,
-                    "steps": params.steps
-                },
-                "catchment_area_type": area_type,
-                "output_format": "parquet",
-            }
-        if area_type == "polygon":
-            payload["polygon_difference"] = params.polygon_difference
-
-        # Note: scenario_id is only sent to routing when a street_network
-        # is also provided (routing requires both). Feature-only scenarios
-        # don't affect the routing graph.
-        if params.scenario_id and hasattr(params, "street_network") and params.street_network:
-            payload["scenario_id"] = params.scenario_id
-            payload["street_network"] = params.street_network
-
-        logger.info(payload)
-        return await self._post_with_retry(url, payload, authorization)
-
-    # =========================================================================
-    # GOAT Routing: Car
-    # =========================================================================
-
-    async def _compute_car_catchment(
-        self: Self, params: CatchmentAreaToolParams
-    ) -> bytes:
-        """Compute catchment area for car mode via GOAT Routing."""
-        routing_url = self._get_routing_url(params)
-        authorization = self._get_authorization(params)
-
-        url = f"{routing_url}/motorized-mobility/catchment-area"
-
-        # Normalize coordinates to lists
-        lat_list = (
-            [params.latitude]
-            if isinstance(params.latitude, (int, float))
-            else list(params.latitude)
-        )
-        lon_list = (
-            [params.longitude]
-            if isinstance(params.longitude, (int, float))
-            else list(params.longitude)
-        )
-        measure_type = (
-            params.measure_type.value
-            if isinstance(params.measure_type, CatchmentAreaMeasureType)
-            else params.measure_type
-        )
-        # Get catchment area type string
-        area_type = (
-            params.catchment_area_type.value
-            if isinstance(params.catchment_area_type, CatchmentAreaType)
-            else params.catchment_area_type
-        )
-
-        # Build payload
-        if measure_type == CatchmentAreaMeasureType.time:
-            payload = {
-                "starting_points": {
-                    "latitude": lat_list,
-                    "longitude": lon_list,
-                },
-                "routing_type": "car",
-                "travel_cost": {
-                    "max_traveltime": params.travel_time,
-                    "steps": params.steps,
-                },
-                "catchment_area_type": area_type,
-                "output_format": "parquet",
-            }
-        elif measure_type == CatchmentAreaMeasureType.distance:
-            payload = {
-                "starting_points": {
-                    "latitude": lat_list,
-                    "longitude": lon_list,
-                },
-                "routing_type": "car",
-                "travel_cost": {
-                    "max_distance": params.distance,
-                    "steps": params.steps
-                },
-                "catchment_area_type": area_type,
-                "output_format": "parquet",
-            }
-        if area_type == "polygon":
-            payload["polygon_difference"] = params.polygon_difference
-
-        # Note: scenario_id is only sent to routing when a street_network
-        # is also provided (routing requires both). Feature-only scenarios
-        # don't affect the routing graph.
-        if params.scenario_id and hasattr(params, "street_network") and params.street_network:
-            payload["scenario_id"] = params.scenario_id
-            payload["street_network"] = params.street_network
-
-        return await self._post_with_retry(url, payload, authorization)
+        path = loop.run_until_complete(self._compute_active_mobility_catchment(params))
+        return [(path, metadata)]
 
     # =========================================================================
     # R5: Public Transport
