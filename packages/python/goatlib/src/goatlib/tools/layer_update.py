@@ -443,6 +443,53 @@ class LayerUpdateRunner(SimpleToolRunner):
             logger.warning("Error deleting old PMTiles for layer %s: %s", layer_id, e)
             return False
 
+    def _regenerate_pmtiles(
+        self: Self,
+        user_id: str,
+        layer_id: str,
+        table_info: dict[str, Any],
+    ) -> None:
+        """Generate new PMTiles from updated DuckLake data.
+
+        Args:
+            user_id: Layer owner's UUID
+            layer_id: Layer UUID
+            table_info: DuckLake table metadata (must include table_name, columns)
+        """
+        if self.settings is None or not getattr(self.settings, "pmtiles_enabled", False):
+            return
+
+        # Find geometry column
+        geom_col = "geometry"
+        for col_name, col_type in table_info.get("columns", {}).items():
+            if "GEOMETRY" in col_type.upper():
+                geom_col = col_name
+                break
+
+        try:
+            from goatlib.io.pmtiles import PMTilesConfig, PMTilesGenerator
+
+            config = PMTilesConfig(
+                enabled=True,
+                min_zoom=self.settings.pmtiles_min_zoom,
+                max_zoom=self.settings.pmtiles_max_zoom,
+            )
+            generator = PMTilesGenerator(
+                tiles_data_dir=self.settings.tiles_data_dir,
+                config=config,
+            )
+            pmtiles_path = generator.generate_from_table(
+                duckdb_con=self.duckdb_con,
+                table_name=table_info["table_name"],
+                geometry_column=geom_col,
+                user_id=user_id,
+                layer_id=layer_id,
+            )
+            if pmtiles_path:
+                logger.info("Generated PMTiles for layer %s: %s", layer_id, pmtiles_path)
+        except Exception as e:
+            logger.warning("PMTiles generation failed for layer %s: %s", layer_id, e)
+
     async def _update_layer_metadata(
         self: Self,
         layer_id: str,
@@ -617,18 +664,10 @@ class LayerUpdateRunner(SimpleToolRunner):
                 )
 
                 # Then generate new PMTiles from updated data
-                # Find geometry column for tile generation
-                geom_col = "geometry"
-                for col_name, col_type in table_info.get("columns", {}).items():
-                    if "GEOMETRY" in col_type.upper():
-                        geom_col = col_name
-                        break
-
-                self._generate_pmtiles(
+                self._regenerate_pmtiles(
                     user_id=layer_info["user_id"],
                     layer_id=params.layer_id,
-                    table_name=table_info["table_name"],
-                    geometry_column=geom_col,
+                    table_info=table_info,
                 )
 
                 # Step 4: Update PostgreSQL metadata
