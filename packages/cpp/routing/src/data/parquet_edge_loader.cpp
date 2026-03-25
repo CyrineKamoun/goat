@@ -11,6 +11,8 @@
 namespace routing::data
 {
 
+    static constexpr char kLoadedEdgesTempTable[] = "routing_loaded_edges_tmp";
+
     namespace
     {
         double elapsed_ms(std::chrono::steady_clock::time_point const start,
@@ -249,7 +251,7 @@ namespace routing::data
             << "SELECT e.id, e.source, e.target, e.length_m, e.length_3857, "
             << "class_, impedance_slope, impedance_slope_reverse, "
             << "impedance_surface, maxspeed_forward, maxspeed_backward, "
-            << "h3_3, h3_6, "
+            << "h3_3, h3_6, coordinates_3857, "
             << "src_nodes.x_3857 AS source_x, "
             << "src_nodes.y_3857 AS source_y, "
             << "dst_nodes.x_3857 AS target_x, "
@@ -272,8 +274,31 @@ namespace routing::data
                 << "(maxspeed_backward IS NOT NULL AND maxspeed_backward <= 50))";
         }
 
+        auto drop_temp = con.Query(std::string("DROP TABLE IF EXISTS ") + kLoadedEdgesTempTable);
+        if (drop_temp->HasError())
+        {
+            throw std::runtime_error("Failed to drop temp loaded-edge table: " +
+                                     drop_temp->GetError());
+        }
+
+        std::string create_temp_sql =
+            std::string("CREATE TEMP TABLE ") + kLoadedEdgesTempTable +
+            " AS " + sql.str();
+
         auto t_duckdb_start = std::chrono::steady_clock::now();
-        auto result = con.Query(sql.str());
+        auto create_temp = con.Query(create_temp_sql);
+        if (create_temp->HasError())
+        {
+            throw std::runtime_error("DuckDB temp table materialization failed: " +
+                                     create_temp->GetError());
+        }
+
+        auto result = con.Query(
+            std::string("SELECT id, source, target, length_m, length_3857, ") +
+            "class_, impedance_slope, impedance_slope_reverse, "
+            "impedance_surface, maxspeed_forward, maxspeed_backward, "
+            "h3_3, h3_6, source_x, source_y, target_x, target_y "
+            "FROM " + kLoadedEdgesTempTable);
         auto t_duckdb_end = std::chrono::steady_clock::now();
         if (result->HasError())
         {
@@ -393,13 +418,17 @@ namespace routing::data
                 e.source_coord = {source_x_data[rid_source_x], source_y_data[rid_source_y]};
                 e.target_coord = {target_x_data[rid_target_x], target_y_data[rid_target_y]};
 
-                if (e.source_coord.x != e.target_coord.x || e.source_coord.y != e.target_coord.y)
+                if (e.geometry.empty())
                 {
-                    e.geometry = {e.source_coord, e.target_coord};
-                }
-                else
-                {
-                    e.geometry = {e.source_coord};
+                    if (e.source_coord.x != e.target_coord.x ||
+                        e.source_coord.y != e.target_coord.y)
+                    {
+                        e.geometry = {e.source_coord, e.target_coord};
+                    }
+                    else
+                    {
+                        e.geometry = {e.source_coord};
+                    }
                 }
                 e.cost = 0.0;
                 e.reverse_cost = 0.0;

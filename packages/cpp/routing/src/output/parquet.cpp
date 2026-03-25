@@ -17,6 +17,8 @@ namespace
 {
 static constexpr double kEarthRadius = 6378137.0;
 
+static constexpr char kLoadedEdgesTempTable[] = "routing_loaded_edges_tmp";
+
 std::string sql_escape(std::string const &s)
 {
     std::string out;
@@ -76,11 +78,7 @@ void write_network_parquet(ReachabilityField const &field,
         "CREATE TEMP TABLE reached_edges ("
         "edge_id BIGINT, "
         "cost DOUBLE, "
-        "step_cost DOUBLE, "
-        "source_x DOUBLE, "
-        "source_y DOUBLE, "
-        "target_x DOUBLE, "
-        "target_y DOUBLE"
+        "step_cost DOUBLE"
         ")");
     if (create_result->HasError())
     {
@@ -104,15 +102,10 @@ void write_network_parquet(ReachabilityField const &field,
             continue;
         }
 
-        auto const &edge = field.network->edges[it->second];
         appender.BeginRow();
         appender.Append(r.edge_id);
         appender.Append(r.cost);
         appender.Append(r.step_cost);
-        appender.Append(edge.source_coord.x);
-        appender.Append(edge.source_coord.y);
-        appender.Append(edge.target_coord.x);
-        appender.Append(edge.target_coord.y);
         appender.EndRow();
     }
     appender.Close();
@@ -121,18 +114,35 @@ void write_network_parquet(ReachabilityField const &field,
 
     std::ostringstream sql;
     sql << "COPY ("
+        << "  WITH line_parts AS ("
+        << "    SELECT "
+        << "      r.edge_id, "
+        << "      r.step_cost, "
+        << "      e.source_x, e.source_y, e.target_x, e.target_y, "
+        << "      string_agg("
+        << "        CAST(pt[1]/" << kEarthRadius << "*(180/pi()) AS VARCHAR) || ' ' || "
+        << "        CAST((2*atan(exp(pt[2]/" << kEarthRadius << ")) - pi()/2)*(180/pi()) AS VARCHAR), "
+        << "        ',' ORDER BY ord"
+        << "      ) AS coords_text "
+        << "    FROM reached_edges r "
+        << "    JOIN " << kLoadedEdgesTempTable << " e ON e.id = r.edge_id "
+        << "    LEFT JOIN UNNEST(e.coordinates_3857) WITH ORDINALITY AS t(pt, ord) ON TRUE "
+        << "    GROUP BY r.edge_id, r.step_cost, e.source_x, e.source_y, e.target_x, e.target_y"
+        << "  ) "
         << "  SELECT "
         << "    CAST(row_number() OVER (ORDER BY edge_id) AS INTEGER) AS id, "
         << "    CAST(ROUND(step_cost) AS INTEGER) AS cost_step, "
         << "    ST_GeomFromText("
-        << "      'LINESTRING(' || "
-        << "      CAST(source_x/" << kEarthRadius << "*(180/pi()) AS VARCHAR) || ' ' || "
-        << "      CAST((2*atan(exp(source_y/" << kEarthRadius << ")) - pi()/2)*(180/pi()) AS VARCHAR) || ',' || "
-        << "      CAST(target_x/" << kEarthRadius << "*(180/pi()) AS VARCHAR) || ' ' || "
-        << "      CAST((2*atan(exp(target_y/" << kEarthRadius << ")) - pi()/2)*(180/pi()) AS VARCHAR) || "
-        << "      ')'"
+        << "      CASE "
+        << "        WHEN coords_text IS NOT NULL AND length(coords_text) > 0 THEN 'LINESTRING(' || coords_text || ')' "
+        << "        ELSE 'LINESTRING(' || "
+        << "          CAST(source_x/" << kEarthRadius << "*(180/pi()) AS VARCHAR) || ' ' || "
+        << "          CAST((2*atan(exp(source_y/" << kEarthRadius << ")) - pi()/2)*(180/pi()) AS VARCHAR) || ',' || "
+        << "          CAST(target_x/" << kEarthRadius << "*(180/pi()) AS VARCHAR) || ' ' || "
+        << "          CAST((2*atan(exp(target_y/" << kEarthRadius << ")) - pi()/2)*(180/pi()) AS VARCHAR) || ')' "
+        << "      END"
         << "    ) AS geometry "
-        << "  FROM reached_edges"
+        << "  FROM line_parts"
         << ") TO '" << escaped_path << "' "
         << "(FORMAT PARQUET, COMPRESSION ZSTD)";
 
