@@ -73,6 +73,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.2 /uv /usr/local/bin/uv
 
 # Copy goatlib and install with all dependencies
 COPY packages/python/goatlib /app/packages/python/goatlib
+COPY scripts/catalog /app/scripts/catalog
 COPY pyproject.toml uv.lock /app/
 WORKDIR /app
 RUN uv sync --all-extras --frozen --no-dev --no-editable --package=goatlib
@@ -95,6 +96,9 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.2 /uv /usr/local/bin/uv
 COPY --from=python-build $UV_PYTHON_INSTALL_DIR $UV_PYTHON_INSTALL_DIR
 COPY --from=python-build $UV_PROJECT_ENVIRONMENT $UV_PROJECT_ENVIRONMENT
 COPY --from=python-build /app /app
+
+# Datacatalog Windmill pipeline runtime deps (not guaranteed by goatlib extras).
+RUN uv pip install --python "$UV_PROJECT_ENVIRONMENT/bin/python" "psycopg[binary]" httpx duckdb
 
 WORKDIR ${APP}
 

@@ -30,6 +30,46 @@ const CatalogDatasetCard = ({
   const { t } = useTranslation(["common"]);
   const getMetadataValueTranslation = useGetMetadataValueTranslation();
 
+  const csw = (dataset.other_properties as Record<string, unknown> | undefined)?.csw as
+    | Record<string, unknown>
+    | undefined;
+
+  const getCatalogValue = (key: string): unknown => {
+    if (key === "data_category") {
+      return dataset.data_category || csw?.topic_category;
+    }
+    if (key === "distributor_name") {
+      if (dataset.distributor_name) {
+        return dataset.distributor_name;
+      }
+      const contacts = Array.isArray(csw?.contacts) ? csw.contacts : [];
+      const firstContact = contacts.find(
+        (contact) =>
+          contact &&
+          typeof contact === "object" &&
+          typeof (contact as Record<string, unknown>).organization === "string"
+      ) as Record<string, unknown> | undefined;
+      return firstContact?.organization;
+    }
+    if (key === "geographical_code") {
+      return dataset.geographical_code || csw?.geographical_code;
+    }
+    if (key === "language_code") {
+      return dataset.language_code || csw?.language;
+    }
+    if (key === "license") {
+      return dataset.license || csw?.license;
+    }
+    if (key === "type") {
+      return dataset.type || "feature";
+    }
+    return (dataset as unknown as Record<string, unknown>)[key];
+  };
+
+  const metadataKeys = Object.keys(datasetMetadataAggregated.shape) as Array<
+    keyof typeof datasetMetadataAggregated.shape
+  >;
+
   return (
     <Paper
       onClick={() => onClick && onClick(dataset)}
@@ -89,32 +129,24 @@ const CatalogDatasetCard = ({
               </Box>
             </Stack>
             <Grid container justifyContent="flex-start" sx={{ pl: 0 }}>
-              {Object.keys(datasetMetadataAggregated.shape).map((key, index) => {
+              {metadataKeys.map((key) => {
+                const iconName = METADATA_HEADER_ICONS[key];
                 return (
-                  <Grid
-                    item
-                    {...(index < Object.keys(datasetMetadataAggregated.shape).length - 1 && {
-                      xs: 12,
-                      sm: 6,
-                      md: 4,
-                      lg: 3,
-                    })}
-                    key={key}
-                    sx={{ pl: 0 }}>
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={key} sx={{ pl: 0 }}>
                     <Stack
                       direction="row"
                       width="100%"
                       alignItems="center"
                       justifyContent="start"
-                      sx={{ py: 2, pr: 2 }}
-                      spacing={2}>
+                      sx={{ py: 1.25, pr: 2 }}
+                      spacing={1.5}>
                       <Icon
-                        iconName={METADATA_HEADER_ICONS[key]}
+                        iconName={iconName}
                         style={{ fontSize: 14 }}
                         htmlColor={theme.palette.text.secondary}
                       />
-                      <Typography variant="body2" fontWeight="bold">
-                        {getMetadataValueTranslation(key, dataset[key])}
+                      <Typography variant="body2" fontWeight={600}>
+                        {getMetadataValueTranslation(key, getCatalogValue(key))}
                       </Typography>
                     </Stack>
                   </Grid>

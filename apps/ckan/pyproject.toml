@@ -1,0 +1,10 @@
+[project]
+name = "goat-ckan-runtime"
+version = "0.1.0"
+description = "CKAN runtime assets for GOAT catalog ingestion"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false

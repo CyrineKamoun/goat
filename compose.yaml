@@ -99,9 +99,9 @@ x-env-workflows: &env-workflows
   MODE: worker
   WORKER_GROUP: workflows
   WORKER_TAGS: workflows
-  JOB_DEFAULT_TIMEOUT: 1800  # 30 min for long workflow chains
+  JOB_DEFAULT_TIMEOUT: 1800 # 30 min for long workflow chains
   PYTHONDONTWRITEBYTECODE: "1"
-  WHITELIST_ENVS: "POSTGRES_SERVER,POSTGRES_PORT,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_DATABASE_URI,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,TILES_DATA_DIR,S3_PROVIDER,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION_NAME,OD_MATRIX_BASE_PATH,GTFS_DATA_PATH,GOAT_ROUTING_URL,GOAT_ROUTING_AUTHORIZATION,R5_URL,R5_REGION_MAPPING_PATH,GEOCODING_URL,GEOCODING_AUTHORIZATION"
+  WHITELIST_ENVS: "POSTGRES_SERVER,POSTGRES_PORT,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_DATABASE_URI,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,TILES_DATA_DIR,S3_PROVIDER,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION_NAME,OD_MATRIX_BASE_PATH,GTFS_DATA_PATH,GOAT_ROUTING_URL,GOAT_ROUTING_AUTHORIZATION,R5_URL,R5_REGION_MAPPING_PATH,GEOCODING_URL,GEOCODING_AUTHORIZATION,DATACATALOG_CKAN_ENABLED,CKAN_API_URL,CKAN_PACKAGE_SEARCH_URL,CKAN_API_HEALTH_URL,CKAN_API_KEY"
   POSTGRES_SERVER: ${POSTGRES_SERVER}
   POSTGRES_PORT: 5432
   POSTGRES_USER: ${POSTGRES_USER}
@@ -126,6 +126,11 @@ x-env-workflows: &env-workflows
   R5_REGION_MAPPING_PATH: /app/data/gtfs/r5_region_mapping.parquet
   GEOCODING_URL: ${GEOCODING_URL}
   GEOCODING_AUTHORIZATION: ${GEOCODING_AUTHORIZATION}
+  DATACATALOG_CKAN_ENABLED: ${DATACATALOG_CKAN_ENABLED:-true}
+  CKAN_API_URL: ${CKAN_API_URL:-}
+  CKAN_PACKAGE_SEARCH_URL: ${CKAN_PACKAGE_SEARCH_URL:-}
+  CKAN_API_HEALTH_URL: ${CKAN_API_HEALTH_URL:-}
+  CKAN_API_KEY: ${CKAN_API_KEY:-}
 
 x-worker-tools-base: &worker-tools-base
   image: ghcr.io/plan4better/goat/windmill-worker-tools:latest
@@ -187,6 +192,7 @@ networks:
 volumes:
   goat-data:
 
+
 services:
   # ===========================================================================
   # Infrastructure (always on)
@@ -199,7 +205,7 @@ services:
     networks:
       - goat
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rds -d goat -h 127.0.0.1"]
+      test: [ "CMD-SHELL", "pg_isready -U rds -d goat -h 127.0.0.1" ]
       interval: 10s
       retries: 5
       start_period: 30s
@@ -256,7 +262,7 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
-    command: ["server", "--console-address", ":9001", "/data/s3"]
+    command: [ "server", "--console-address", ":9001", "/data/s3" ]
     volumes:
       - goat-data:/data
     healthcheck:
@@ -278,11 +284,7 @@ services:
         condition: service_healthy
     restart: on-failure
     entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc alias set p4b http://minio:9000 ${S3_ACCESS_KEY_ID} ${S3_SECRET_ACCESS_KEY};
-      /usr/bin/mc mb p4b/${S3_BUCKET_NAME};
-      exit 0;
-      "
+      /bin/sh -c " /usr/bin/mc alias set p4b http://minio:9000 ${S3_ACCESS_KEY_ID} ${S3_SECRET_ACCESS_KEY}; /usr/bin/mc mb p4b/${S3_BUCKET_NAME}; exit 0; "
 
   rabbitmq:
     image: rabbitmq:4.0.3-management
@@ -345,13 +347,13 @@ services:
 
   # Tools worker (analytics: buffer, heatmap, isochrone, etc.)
   windmill-worker-tools:
-    profiles: [prod]
+    profiles: [ prod ]
     <<: *worker-tools-base
     volumes:
       - goat-data:/app/data
 
   windmill-worker-tools-dev:
-    profiles: [dev]
+    profiles: [ dev ]
     <<: *worker-tools-base
     volumes:
       - ./packages/python/goatlib/src/goatlib:/venv/lib/python3.11/site-packages/goatlib:ro
@@ -359,7 +361,7 @@ services:
 
   # Workflows worker (workflow orchestration - long-running jobs)
   windmill-worker-workflows:
-    profiles: [prod]
+    profiles: [ prod ]
     <<: *worker-workflows-base
     deploy:
       replicas: 3
@@ -367,7 +369,7 @@ services:
       - goat-data:/app/data
 
   windmill-worker-workflows-dev:
-    profiles: [dev]
+    profiles: [ dev ]
     <<: *worker-workflows-base
     deploy:
       replicas: 5
@@ -377,18 +379,18 @@ services:
 
   # Print worker (PDF reports, thumbnails)
   windmill-worker-print:
-    profiles: [prod]
+    profiles: [ prod ]
     <<: *worker-print-base
     networks:
       - goat
     environment:
-      <<: [*env-windmill, *env-print]
+      <<: [ *env-windmill, *env-print ]
       PRINT_BASE_URL: ${PRINT_BASE_URL:-http://web:3000}
     volumes:
       - goat-data:/app/data:ro
 
   windmill-worker-print-dev:
-    profiles: [dev]
+    profiles: [ dev ]
     <<: *worker-print-base
     # Share network with goat-dev so localhost reaches dev services
     network_mode: "service:goat-dev"
@@ -406,7 +408,7 @@ services:
   # ===========================================================================
 
   goat-dev:
-    profiles: [dev]
+    profiles: [ dev ]
     build:
       context: .devcontainer
       dockerfile: Dockerfile
@@ -433,7 +435,7 @@ services:
   # ===========================================================================
 
   core-migrate:
-    profiles: [prod]
+    profiles: [ prod ]
     <<: *service-core
     container_name: goat-core-migrate
     networks:
@@ -442,7 +444,7 @@ services:
     command: bash -c "cd apps/core && src/core/scripts/prestart.sh"
 
   ducklake-init:
-    profiles: [prod]
+    profiles: [ prod ]
     image: ghcr.io/plan4better/goat/windmill-worker-tools:latest
     build:
       context: .
@@ -474,7 +476,7 @@ services:
     command: python /app/init-ducklake.py
 
   windmill-init:
-    profiles: [prod]
+    profiles: [ prod ]
     image: python:3.11-slim
     container_name: goat-windmill-init
     networks:
@@ -495,7 +497,7 @@ services:
     command: python /app/init-windmill.py
 
   windmill-sync:
-    profiles: [prod]
+    profiles: [ prod ]
     image: ghcr.io/plan4better/goat/windmill-worker-tools:latest
     build:
       context: .
@@ -522,7 +524,7 @@ services:
   # ===========================================================================
 
   core:
-    profiles: [prod]
+    profiles: [ prod ]
     <<: *service-core
     container_name: goat-core
     networks:
@@ -531,14 +533,14 @@ services:
     ports:
       - 8000:8000
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/healthz"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/healthz" ]
       interval: 120s
       timeout: 60s
       retries: 3
       start_period: 20s
 
   geoapi:
-    profiles: [prod]
+    profiles: [ prod ]
     image: ghcr.io/plan4better/goat/geoapi:latest
     build:
       context: .
@@ -561,7 +563,7 @@ services:
         condition: service_completed_successfully
 
   processes:
-    profiles: [prod]
+    profiles: [ prod ]
     image: ghcr.io/plan4better/goat/processes:latest
     build:
       context: .
@@ -595,7 +597,7 @@ services:
         condition: service_started
 
   web:
-    profiles: [prod]
+    profiles: [ prod ]
     image: ghcr.io/plan4better/goat/web:latest
     build:
       context: .

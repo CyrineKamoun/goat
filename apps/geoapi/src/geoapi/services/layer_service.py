@@ -185,6 +185,39 @@ class LayerService:
                     await self._create_pool()
         raise last_error
 
+    async def _fetch_catalog_layer_metadata(self, layer_id: UUID) -> Optional[dict[str, Any]]:
+        row = await self._execute_with_retry(
+            """
+            SELECT
+                l.id,
+                l.resource_id,
+                l.name,
+                l.feature_layer_geometry_type,
+                l.schema_name,
+                l.table_name,
+                ST_XMin(e.e) AS xmin,
+                ST_YMin(e.e) AS ymin,
+                ST_XMax(e.e) AS xmax,
+                ST_YMax(e.e) AS ymax
+            FROM datacatalog.layer l
+            LEFT JOIN LATERAL ST_Envelope(l.extent) e ON TRUE
+            WHERE l.id = $1
+            """,
+            layer_id,
+            fetch_one=True,
+        )
+        if not row:
+            return None
+        return {
+            "id": row["id"],
+            "resource_id": row["resource_id"],
+            "name": row["name"],
+            "feature_layer_geometry_type": row["feature_layer_geometry_type"],
+            "schema_name": row["schema_name"],
+            "table_name": row["table_name"],
+            "bounds": [row["xmin"], row["ymin"], row["xmax"], row["ymax"]],
+        }
+
     async def get_metadata_by_id(self, layer_id: UUID) -> Optional[LayerMetadata]:
         """Get layer metadata by UUID.
 
@@ -223,16 +256,36 @@ class LayerService:
             fetch_one=True,
         )
 
+        schema_name: str | None = None
+        table_name: str | None = None
+
         if not row:
-            return None
+            # Fallback: check datacatalog.layer in shared PostgreSQL.
+            catalog_metadata = await self._fetch_catalog_layer_metadata(layer_id)
+            if not catalog_metadata:
+                return None
+            schema_name = str(catalog_metadata.get("schema_name") or "") or None
+            table_name = str(catalog_metadata.get("table_name") or "") or None
+            row = {
+                "id": catalog_metadata.get("id"),
+                "user_id": None,
+                "name": catalog_metadata.get("name"),
+                "feature_layer_geometry_type": catalog_metadata.get("feature_layer_geometry_type"),
+                "xmin": (catalog_metadata.get("bounds") or [None, None, None, None])[0],
+                "ymin": (catalog_metadata.get("bounds") or [None, None, None, None])[1],
+                "xmax": (catalog_metadata.get("bounds") or [None, None, None, None])[2],
+                "ymax": (catalog_metadata.get("bounds") or [None, None, None, None])[3],
+            }
 
         user_id_str = str(row["user_id"]).replace("-", "") if row["user_id"] else None
 
         # Build LayerInfo for getting columns
         from geoapi.dependencies import LayerInfo
 
-        schema_name = f"user_{user_id_str}" if user_id_str else "public"
-        table_name = f"t_{layer_id_str}"
+        if not schema_name:
+            schema_name = f"user_{user_id_str}" if user_id_str else "public"
+        if not table_name:
+            table_name = f"t_{layer_id_str}"
 
         layer_info = LayerInfo(
             layer_id=layer_id_str,
@@ -320,7 +373,20 @@ class LayerService:
         )
 
         if not row:
-            return None
+            # Fallback: check datacatalog.layer in shared PostgreSQL.
+            catalog_metadata = await self._fetch_catalog_layer_metadata(UUID(layer_id_uuid))
+            if not catalog_metadata:
+                return None
+            row = {
+                "id": catalog_metadata.get("id"),
+                "user_id": None,
+                "name": catalog_metadata.get("name"),
+                "feature_layer_geometry_type": catalog_metadata.get("feature_layer_geometry_type"),
+                "xmin": (catalog_metadata.get("bounds") or [None, None, None, None])[0],
+                "ymin": (catalog_metadata.get("bounds") or [None, None, None, None])[1],
+                "xmax": (catalog_metadata.get("bounds") or [None, None, None, None])[2],
+                "ymax": (catalog_metadata.get("bounds") or [None, None, None, None])[3],
+            }
 
         # Get column information from DuckLake schema
         columns = await self._get_layer_columns(layer_info)

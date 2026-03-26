@@ -59,6 +59,15 @@ python -m goatlib.tasks.sync_windmill \
     --token "$WINDMILL_TOKEN"
 
 echo ""
+
+# Sync datacatalog pipeline script
+echo "Syncing datacatalog pipeline script..."
+python /app/scripts/windmill/sync-datacatalog-pipeline.py \
+    --url "$WINDMILL_URL" \
+    --workspace "$WINDMILL_WORKSPACE" \
+    --token "$WINDMILL_TOKEN"
+
+echo ""
 echo "============================================================"
 echo "Windmill sync complete!"
 echo "============================================================"

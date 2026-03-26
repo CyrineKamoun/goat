@@ -77,6 +77,120 @@ export const useMetadataAggregated = (payload: GetDatasetSchema = {}) => {
   return { metadata: data, isLoading, isError: error, mutate };
 };
 
+export interface CatalogDatasetDetailResponse {
+  dataset: Layer;
+  use_data?: Record<string, unknown>;
+  metadata: {
+    summary?: Record<string, unknown>;
+    technical?: Record<string, unknown>;
+    csw?: CatalogCswMetadata;
+    use_data?: Record<string, unknown>;
+  };
+}
+
+export interface CatalogCswMetadata {
+  identifier?: string;
+  title?: string;
+  abstract?: string;
+  keywords?: string[];
+  resource_type?: string;
+  contacts?: Array<Record<string, unknown>>;
+  language?: string;
+  geographical_code?: string;
+  license?: string;
+  attribution?: string;
+  topic_category?: string;
+  distribution_url?: string;
+  bbox?: {
+    west?: number;
+    south?: number;
+    east?: number;
+    north?: number;
+    crs?: string;
+  } | null;
+  crs?: string;
+  updated_at?: string;
+  source?: Record<string, unknown>;
+}
+
+export interface CatalogDatasetSampleResponse {
+  dataset_id: string;
+  status: string;
+  columns: Array<{
+    name: string;
+    type?: string;
+    nullable?: boolean;
+  }>;
+  rows: Array<Record<string, unknown>>;
+  row_count: number;
+  returned: number;
+  message?: string;
+}
+
+export interface CatalogDatasetMapPreviewResponse {
+  dataset_id: string;
+  status: string;
+  collection_id?: string;
+  title?: string;
+  source?: {
+    type?: string;
+    collection_items_url?: string;
+  };
+  style_hint?: Record<string, unknown>;
+}
+
+export const useCatalogDatasetDetail = (datasetId?: string) => {
+  const { data, isLoading, error, mutate } = useSWR<CatalogDatasetDetailResponse>(
+    () => (datasetId ? [`${LAYERS_API_BASE_URL}/catalog/${datasetId}/detail`] : null),
+    fetcher
+  );
+  return { detail: data, isLoading, isError: error, mutate };
+};
+
+export const useCatalogDatasetSample = (datasetId?: string, limit = 20) => {
+  const { data, isLoading, error, mutate } = useSWR<CatalogDatasetSampleResponse>(
+    () => (datasetId ? [`${LAYERS_API_BASE_URL}/catalog/${datasetId}/sample`, { limit }] : null),
+    fetcher
+  );
+  return { sample: data, isLoading, isError: error, mutate };
+};
+
+export const useCatalogDatasetMapPreview = (datasetId?: string) => {
+  const { data, isLoading, error, mutate } = useSWR<CatalogDatasetMapPreviewResponse>(
+    () => (datasetId ? [`${LAYERS_API_BASE_URL}/catalog/${datasetId}/map-preview`] : null),
+    fetcher
+  );
+  return { mapPreview: data, isLoading, isError: error, mutate };
+};
+
+export const useCatalogDatasetAsLayer = async (
+  datasetId: string,
+  payload: {
+    folder_id: string;
+  }
+): Promise<{
+  status: string;
+  layer: Layer;
+  use_data?: Record<string, unknown>;
+}> => {
+  const response = await apiRequestAuth(`${LAYERS_API_BASE_URL}/catalog/${datasetId}/use`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    const message =
+      errorBody?.detail?.detail ||
+      errorBody?.detail ||
+      "Failed to create pointer layer from catalog dataset";
+    throw new Error(message);
+  }
+  return await response.json();
+};
+
 export const useDataset = (datasetId: string) => {
   const { data, isLoading, error, mutate } = useSWR<Layer>(
     () => (datasetId ? [`${LAYERS_API_BASE_URL}/${datasetId}`] : null),

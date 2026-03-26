@@ -62,6 +62,30 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
     });
   }, [values, searchText]);
 
+  const getFilterHeading = (key: string) => {
+    if (key === "data_category") {
+      return "Topic category";
+    }
+    if (key === "geographical_code") {
+      return "Region code";
+    }
+    if (key === "language_code") {
+      return "Language";
+    }
+    if (key === "distributor_name") {
+      return "Distributor";
+    }
+    if (key === "license") {
+      return "License";
+    }
+    if (key === "type") {
+      return "Resource type";
+    }
+    return i18n.exists(`common:metadata.headings.${key}`)
+      ? t(`common:metadata.headings.${key}`)
+      : key;
+  };
+
   const getItemLabel = (filterType: string, item: { value: string }) => {
     let key = `common:metadata.${filterType}.${item.value}`;
     if (filterType === "language_code") {
@@ -83,9 +107,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             <Icon sx={{ ml: 2 }} iconName={icon} fontSize="small" htmlColor={theme.palette.text.secondary} />
           )}
           <Typography variant="body1">
-            {i18n.exists(`common:metadata.headings.${filterType}`)
-              ? t(`common:metadata.headings.${filterType}`)
-              : filterType}
+            {getFilterHeading(filterType)}
           </Typography>
         </Stack>
       </AccordionSummary>

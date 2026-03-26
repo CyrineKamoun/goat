@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Path, Query, Request, Response
 
 from geoapi.dependencies import (
     BBoxDep,
+    CatalogLayerInfoDep,
     CqlFilterDep,
     LayerInfoDep,
     PropertiesDep,
@@ -169,6 +170,119 @@ async def get_tile(
         )
     except TimeoutError:
         # Query exceeded timeout - return 504 Gateway Timeout
+        raise HTTPException(
+            status_code=504,
+            detail=f"Tile query timeout for z={z}, x={x}, y={y}. Try a higher zoom level or smaller area.",
+        )
+
+    if not result:
+        elapsed_ms = (time.monotonic() - start_time) * 1000
+        return Response(
+            status_code=204,
+            headers={
+                "X-Request-ID": request_id,
+                "X-Response-Time": f"{elapsed_ms:.1f}ms",
+            },
+        )
+
+    tile_data, is_gzip, source = result
+    elapsed_ms = (time.monotonic() - start_time) * 1000
+    headers = {
+        "Cache-Control": "public, max-age=3600",
+        "X-Tile-Source": source,
+        "X-Request-ID": request_id,
+        "X-Response-Time": f"{elapsed_ms:.1f}ms",
+    }
+    if is_gzip:
+        headers["Content-Encoding"] = "gzip"
+
+    return Response(
+        content=tile_data,
+        media_type="application/vnd.mapbox-vector-tile",
+        headers=headers,
+    )
+
+
+@router.get(
+    "/catalog/collections/{collectionId}/tiles/{tileMatrixSetId}/{z}/{x}/{y}",
+    summary="Get catalog preview vector tile",
+    response_class=Response,
+    responses={
+        200: {
+            "content": {"application/vnd.mapbox-vector-tile": {}},
+            "description": "Mapbox Vector Tile",
+        },
+        204: {"description": "Empty tile"},
+        404: {"description": "Collection not found"},
+        504: {"description": "Query timeout"},
+    },
+)
+async def get_catalog_tile(
+    request: Request,
+    layer_info: CatalogLayerInfoDep,
+    tileMatrixSetId: TileMatrixSetIdDep,
+    z: int = Path(..., ge=0, le=24, description="Zoom level"),
+    x: int = Path(..., ge=0, description="Tile column"),
+    y: int = Path(..., ge=0, description="Tile row"),
+    properties: PropertiesDep = None,
+    cql_filter: CqlFilterDep = None,
+    bbox: BBoxDep = None,
+    limit: int = Query(default=None, ge=1, le=100000, description="Max features"),
+    label: bool = Query(default=False, description="Merge polygon label anchor points into tile response"),
+) -> Response:
+    """Catalog-only preview tile route. Does not resolve customer.layer."""
+    request_id = str(uuid.uuid4())[:8]
+    start_time = time.monotonic()
+
+    if tile_service.can_serve_from_pmtiles(layer_info, cql_filter, bbox):
+        result = await tile_service.get_tile_from_pmtiles_only(
+            layer_info=layer_info,
+            z=z,
+            x=x,
+            y=y,
+            label=label,
+        )
+        if result is not None:
+            tile_data, is_gzip, source = result
+            if not tile_data:
+                return Response(status_code=204)
+            headers = {
+                "Cache-Control": "public, max-age=3600",
+                "X-Tile-Source": source,
+            }
+            if is_gzip:
+                headers["Content-Encoding"] = "gzip"
+            return Response(
+                content=tile_data,
+                media_type="application/vnd.mapbox-vector-tile",
+                headers=headers,
+            )
+
+    metadata = await layer_service.get_layer_metadata(layer_info)
+    if not metadata:
+        raise HTTPException(status_code=404, detail="Collection not found")
+
+    if not metadata.has_geometry:
+        raise HTTPException(status_code=400, detail="Collection has no geometry column")
+
+    columns = metadata.columns
+    geometry_column = metadata.geometry_column or "geometry"
+
+    try:
+        result = await tile_service.get_tile(
+            layer_info=layer_info,
+            z=z,
+            x=x,
+            y=y,
+            properties=properties,
+            cql_filter=cql_filter,
+            bbox=bbox,
+            limit=limit,
+            columns=columns,
+            geometry_column=geometry_column,
+            geometry_type=metadata.geometry_type,
+        )
+    except TimeoutError:
         raise HTTPException(
             status_code=504,
             detail=f"Tile query timeout for z={z}, x={x}, y={y}. Try a higher zoom level or smaller area.",

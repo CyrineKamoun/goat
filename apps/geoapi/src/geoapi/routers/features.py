@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 
 from geoapi.dependencies import (
     BBoxDep,
+    CatalogLayerInfoDep,
     CqlFilterDep,
     LayerInfoDep,
     LimitDep,
@@ -260,4 +261,58 @@ async def get_feature(
         geometry=feature["geometry"],
         properties=feature["properties"],
         links=links,
+    )
+
+
+@router.get(
+    "/catalog/collections/{collectionId}/items",
+    summary="Get catalog preview features",
+    response_model=FeatureCollection,
+)
+async def get_catalog_features(
+    request: Request,
+    layer_info: CatalogLayerInfoDep,
+    limit: LimitDep,
+    offset: OffsetDep,
+    bbox: BBoxDep = None,
+    properties: PropertiesDep = None,
+    cql_filter: CqlFilterDep = None,
+    ids: Optional[str] = Query(default=None, description="Comma-separated feature IDs"),
+    sortby: Optional[str] = Query(
+        default=None, description="Sort column (prefix with - for desc)"
+    ),
+) -> FeatureCollection:
+    """Catalog-only feature preview route. Does not resolve customer.layer."""
+    return await get_features(
+        request=request,
+        layer_info=layer_info,
+        limit=limit,
+        offset=offset,
+        bbox=bbox,
+        properties=properties,
+        cql_filter=cql_filter,
+        ids=ids,
+        sortby=sortby,
+        temp=False,
+        user_id=None,
+    )
+
+
+@router.get(
+    "/catalog/collections/{collectionId}/items/{itemId}",
+    summary="Get catalog preview feature by ID",
+    response_model=Feature,
+)
+async def get_catalog_feature(
+    request: Request,
+    layer_info: CatalogLayerInfoDep,
+    itemId: str = Path(..., description="Feature ID"),
+    properties: PropertiesDep = None,
+) -> Feature:
+    """Catalog-only single-feature preview route. Does not resolve customer.layer."""
+    return await get_feature(
+        request=request,
+        layer_info=layer_info,
+        itemId=itemId,
+        properties=properties,
     )

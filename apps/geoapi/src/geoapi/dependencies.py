@@ -107,6 +107,58 @@ def get_layer_info_sync(collection_id: str) -> LayerInfo:
     )
 
 
+async def _lookup_catalog_layer(layer_id: str) -> tuple[str, str] | None:
+    """Query datacatalog.layer for schema_name and table_name via asyncpg."""
+    from uuid import UUID as _UUID
+
+    from geoapi.services.layer_service import layer_service
+
+    try:
+        row = await layer_service._execute_with_retry(
+            "SELECT schema_name, table_name FROM datacatalog.layer WHERE id = $1",
+            _UUID(layer_id),
+            fetch_one=True,
+        )
+        if row:
+            return (row["schema_name"], row["table_name"])
+    except Exception as exc:
+        logger.debug("datacatalog.layer lookup failed: %s", exc)
+    return None
+
+
+async def _lookup_customer_layer(layer_id: str) -> dict[str, object] | None:
+    """Read customer.layer ownership and pointer metadata for deterministic routing."""
+    from uuid import UUID as _UUID
+
+    from geoapi.services.layer_service import layer_service
+
+    try:
+        row = await layer_service._execute_with_retry(
+            """
+            SELECT
+                user_id,
+                in_catalog,
+                other_properties->'canonical_pointer'->>'duckdb_schema' AS pointer_schema,
+                other_properties->'canonical_pointer'->>'duckdb_table' AS pointer_table
+            FROM customer.layer
+            WHERE id = $1
+            """,
+            _UUID(layer_id),
+            fetch_one=True,
+        )
+        if not row:
+            return None
+        return {
+            "user_id": row.get("user_id"),
+            "in_catalog": bool(row.get("in_catalog")),
+            "pointer_schema": row.get("pointer_schema"),
+            "pointer_table": row.get("pointer_table"),
+        }
+    except Exception as exc:
+        logger.debug("customer.layer metadata lookup failed: %s", exc)
+        return None
+
+
 async def get_layer_info(
     collection_id: Annotated[str, Path(alias="collectionId")],
     temp: Annotated[
@@ -117,6 +169,7 @@ async def get_layer_info(
 
     The collection ID is just the layer UUID (with or without hyphens).
     Schema is looked up from DuckLake catalog with caching.
+    Falls back to datacatalog.layer for catalog datasets.
 
     If temp=true query param is set, skip DuckLake lookup (for temp layer serving).
 
@@ -131,11 +184,67 @@ async def get_layer_info(
             table_name="",
         )
 
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
-        _layer_info_executor,
-        get_layer_info_sync,
-        collection_id,
+    layer_id = normalize_layer_id(collection_id)
+
+    # Deterministic branch 1: customer.layer context
+    customer_layer = await _lookup_customer_layer(layer_id)
+    if customer_layer is not None:
+        if bool(customer_layer.get("in_catalog")):
+            pointer_schema = customer_layer.get("pointer_schema")
+            pointer_table = customer_layer.get("pointer_table")
+            if not pointer_schema or not pointer_table:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Collection not found: {collection_id}",
+                )
+            return LayerInfo(
+                layer_id=layer_id,
+                schema_name=str(pointer_schema),
+                table_name=str(pointer_table),
+            )
+
+        # Non-catalog customer layers keep DuckLake lookup path via executor.
+        loop = asyncio.get_running_loop()
+        try:
+            return await loop.run_in_executor(
+                _layer_info_executor,
+                get_layer_info_sync,
+                layer_id,
+            )
+        except HTTPException:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Collection not found: {collection_id}",
+            )
+
+    # Deterministic branch 2: direct catalog resolution
+    catalog_info = await _lookup_catalog_layer(layer_id)
+    if catalog_info:
+        return LayerInfo(
+            layer_id=layer_id,
+            schema_name=catalog_info[0],
+            table_name=catalog_info[1],
+        )
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"Collection not found: {collection_id}",
+    )
+
+
+async def get_catalog_layer_info(
+    collection_id: Annotated[str, Path(alias="collectionId")],
+) -> LayerInfo:
+    """Resolve catalog preview collections only from datacatalog.layer."""
+    layer_id = normalize_layer_id(collection_id)
+    catalog_info = await _lookup_catalog_layer(layer_id)
+    if not catalog_info:
+        raise HTTPException(status_code=404, detail=f"Collection not found: {collection_id}")
+
+    return LayerInfo(
+        layer_id=layer_id,
+        schema_name=catalog_info[0],
+        table_name=catalog_info[1],
     )
 
 
@@ -240,6 +349,7 @@ async def tile_matrix_set_id(
 
 # Type aliases for cleaner dependency injection
 LayerInfoDep = Annotated[LayerInfo, Depends(get_layer_info)]
+CatalogLayerInfoDep = Annotated[LayerInfo, Depends(get_catalog_layer_info)]
 LimitDep = Annotated[int, Depends(limit_query)]
 OffsetDep = Annotated[int, Depends(offset_query)]
 BBoxDep = Annotated[Optional[list[float]], Depends(bbox_query)]

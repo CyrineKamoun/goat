@@ -38,6 +38,10 @@ const DatasetMapPreview: React.FC<DatasetMapPreviewProps> = ({ dataset }) => {
   const layerWithVisibility = useMemo(() => {
     return {
       ...dataset,
+      other_properties: {
+        ...dataset.other_properties,
+        preview_source: "catalog",
+      },
       properties: {
         ...dataset.properties,
         visibility: true,

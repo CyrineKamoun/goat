@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from . import (
     asset,
+    catalog,
     datasets,
     folder,
     layer,
@@ -18,6 +19,7 @@ router = APIRouter()
 router.include_router(user.router, prefix="/user", tags=["User"])
 router.include_router(folder.router, prefix="/folder", tags=["Folder"])
 router.include_router(layer.router, prefix="/layer", tags=["Layer"])
+router.include_router(catalog.router, prefix="/layer", tags=["Layer"])
 router.include_router(project.router, prefix="/project", tags=["Project"])
 router.include_router(report_layout.router, prefix="/project", tags=["Report Layout"])
 router.include_router(workflow.router, prefix="/project", tags=["Workflow"])

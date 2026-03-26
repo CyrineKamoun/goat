@@ -95,6 +95,9 @@ class Settings(BaseSettings):
     # GOAT GeoAPI config
     GOAT_GEOAPI_HOST: Optional[str] = None
 
+    # Catalog storage config (local database schema)
+    CATALOG_SCHEMA: str = "datacatalog"
+
     # GOAT Routing config
     GOAT_ROUTING_HOST: str = ""
     GOAT_ROUTING_PORT: int = 443

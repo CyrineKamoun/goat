@@ -23,12 +23,20 @@ import { ICON_NAME } from "@p4b/ui/components/Icon";
 import { useCatalogLayers, useMetadataAggregated } from "@/lib/api/layers";
 import type { PaginatedQueryParams } from "@/lib/validations/common";
 import type { GetDatasetSchema } from "@/lib/validations/layer";
-import { datasetMetadataAggregated } from "@/lib/validations/layer";
 
 import EmptySection from "@/components/common/EmptySection";
 import CatalogDatasetCard, { METADATA_HEADER_ICONS } from "@/components/dashboard/catalog/CatalogDatasetCard";
 import FilterPanel from "@/components/dashboard/catalog/FilterPanel";
 import ContentSearchBar from "@/components/dashboard/common/ContentSearchbar";
+
+const CATALOG_FILTER_ORDER = [
+  "data_category",
+  "geographical_code",
+  "language_code",
+  "distributor_name",
+  "license",
+  "type",
+] as const;
 
 const Catalog = () => {
   const { t } = useTranslation("common");
@@ -85,7 +93,7 @@ const Catalog = () => {
     ]
   );
   const datasetSchemaValues = useMemo(() => {
-    const keys = Object.keys(filterOptions);
+    const keys = CATALOG_FILTER_ORDER;
     return keys.reduce(
       (acc, key) => {
         if (filterOptions[key].value && filterOptions[key].value.length > 0) {
@@ -170,7 +178,7 @@ const Catalog = () => {
         <Grid item xs={3}>
           <Paper elevation={3}>
             <Stack sx={{ mt: 0 }}>
-              {Object.keys(datasetMetadataAggregated.shape).map((key, index) => {
+              {CATALOG_FILTER_ORDER.map((key, index) => {
                 return (
                   <Stack key={key}>
                     {index !== 0 && <Divider sx={{ py: 0, my: 0 }} />}
@@ -248,8 +256,8 @@ const Catalog = () => {
                   <CatalogDatasetCard
                     key={dataset.id}
                     dataset={dataset}
-                    onClick={(dataset) => {
-                      router.push(`/datasets/${dataset.id}`);
+                    onClick={(selectedDataset) => {
+                      router.push(`/catalog/${selectedDataset.id}`);
                     }}
                   />
                 ))}

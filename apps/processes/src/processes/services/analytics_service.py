@@ -28,9 +28,7 @@ from goatlib.storage import build_cql_filter
 from goatlib.tools.custom_sql import validate_sql_query
 
 from processes.dependencies import (
-    _layer_id_to_table_name,
-    get_schema_for_layer,
-    normalize_layer_id,
+    get_layer_location,
 )
 from processes.ducklake import ducklake_manager
 
@@ -49,10 +47,8 @@ class AnalyticsService:
         Returns:
             Full table name like 'lake.user_xxx.t_layerid'
         """
-        layer_id = normalize_layer_id(collection)
-        schema_name = get_schema_for_layer(layer_id)
-        table_name = _layer_id_to_table_name(layer_id)
-        return f"lake.{schema_name}.{table_name}"
+        location = get_layer_location(collection)
+        return f"lake.{location.schema_name}.{location.table_name}"
 
     def _get_column_names(self, table_name: str) -> list[str]:
         """Get column names for a table.
@@ -679,10 +675,10 @@ class AnalyticsService:
                 for alias, layer_id in ducklake_layers.items():
                     # Resolve layer to DuckLake table name
                     try:
-                        norm_id = normalize_layer_id(layer_id)
-                        schema_name = get_schema_for_layer(norm_id)
-                        table_name = _layer_id_to_table_name(norm_id)
-                        full_table = f"lake.{schema_name}.{table_name}"
+                        location = get_layer_location(layer_id)
+                        full_table = (
+                            f"lake.{location.schema_name}.{location.table_name}"
+                        )
                     except Exception as e:
                         return {
                             "success": False,

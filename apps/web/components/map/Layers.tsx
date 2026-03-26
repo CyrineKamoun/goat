@@ -121,7 +121,10 @@ const Layers = (props: LayersProps) => {
 
     const query = parts.length > 0 ? `?${parts.join("&")}` : "";
     const layerId = layer["layer_id"] || layer["id"];
-    return `${GEOAPI_BASE_URL}/collections/${layerId}/tiles/WebMercatorQuad/{z}/{x}/{y}${query}`;
+    const previewSource = (layer.other_properties as Record<string, unknown> | undefined)?.preview_source;
+    const isCatalogPreview = previewSource === "catalog";
+    const routePrefix = isCatalogPreview ? "catalog/collections" : "collections";
+    return `${GEOAPI_BASE_URL}/${routePrefix}/${layerId}/tiles/WebMercatorQuad/{z}/{x}/{y}${query}`;
   };
   const { useDataLayers, systemLayers } = useMemo(() => {
     const dataLayers = [] as ProjectLayer[] | Layer[];

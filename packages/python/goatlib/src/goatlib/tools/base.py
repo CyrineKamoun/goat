@@ -111,6 +111,7 @@ class ToolSettings:
 
     # Schema for customer tables
     customer_schema: str = "customer"
+    datacatalog_schema: str = "datacatalog"
 
     # Routing settings
     goat_routing_url: str = "http://localhost:8200/api/v2/routing"
@@ -272,6 +273,7 @@ class ToolSettings:
             or cls._get_secret("S3_REGION", "us-east-1"),
             s3_bucket_name=cls._get_secret("S3_BUCKET_NAME", ""),
             customer_schema=cls._get_secret("CUSTOMER_SCHEMA", "customer"),
+            datacatalog_schema=cls._get_secret("DATACATALOG_SCHEMA", "datacatalog"),
             goat_routing_url=cls._get_secret(
                 "GOAT_ROUTING_URL", "http://goat-dev:8200/api/v2/routing"
             ),
@@ -468,6 +470,77 @@ class SimpleToolRunner:
         user_schema = f"user_{user_id.replace('-', '')}"
         table_name = f"t_{layer_id.replace('-', '')}"
         return f"lake.{user_schema}.{table_name}"
+
+    async def get_layer_location(self: Self, layer_id: str) -> tuple[str, str, str | None] | None:
+        """Resolve a layer to (schema_name, table_name, owner_id).
+
+        Resolution order:
+        1) customer.layer catalog pointers via canonical_pointer
+        2) standard customer.layer owner-based table naming
+        3) datacatalog.layer canonical table mapping
+        """
+        if self.settings is None:
+            raise RuntimeError("Settings not initialized")
+
+        pool = await self.get_postgres_pool()
+        try:
+            layer_uuid = uuid_module.UUID(layer_id)
+
+            customer_row = await pool.fetchrow(
+                f"""
+                SELECT
+                    user_id,
+                    other_properties->>'source' AS source,
+                    other_properties->'canonical_pointer'->>'duckdb_schema' AS pointer_schema,
+                    other_properties->'canonical_pointer'->>'duckdb_table' AS pointer_table
+                FROM {self.settings.customer_schema}.layer
+                WHERE id = $1
+                """,
+                layer_uuid,
+            )
+
+            if customer_row:
+                source = customer_row["source"]
+                pointer_schema = customer_row["pointer_schema"]
+                pointer_table = customer_row["pointer_table"]
+                owner_id = (
+                    str(customer_row["user_id"]) if customer_row["user_id"] else None
+                )
+
+                if source == "catalog_pointer" and pointer_schema and pointer_table:
+                    return (str(pointer_schema), str(pointer_table), owner_id)
+
+                if owner_id:
+                    schema_name = f"user_{owner_id.replace('-', '')}"
+                    table_name = f"t_{layer_id.replace('-', '')}"
+                    return (schema_name, table_name, owner_id)
+
+            catalog_row = await pool.fetchrow(
+                f"SELECT schema_name, table_name FROM {self.settings.datacatalog_schema}.layer WHERE id = $1",
+                layer_uuid,
+            )
+            if catalog_row:
+                return (
+                    str(catalog_row["schema_name"]),
+                    str(catalog_row["table_name"]),
+                    None,
+                )
+
+            return None
+        finally:
+            await pool.close()
+
+    def get_layer_location_sync(
+        self: Self, layer_id: str
+    ) -> tuple[str, str, str | None] | None:
+        """Synchronous wrapper for get_layer_location."""
+        try:
+            return _get_or_create_event_loop().run_until_complete(
+                self.get_layer_location(layer_id)
+            )
+        except Exception as e:
+            logger.warning("Failed to resolve location for layer %s: %s", layer_id, e)
+            return None
 
     async def get_postgres_pool(self: Self) -> asyncpg.Pool:
         """Create PostgreSQL connection pool."""
@@ -896,19 +969,29 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
         if ":" in layer_id:
             return self._export_temp_layer_to_parquet(layer_id, user_id, cql_filter)
 
-        # Look up the layer's actual owner to correctly access shared/catalog layers
-        layer_owner_id = self.get_layer_owner_id_sync(layer_id)
-        if layer_owner_id is None:
-            layer_owner_id = user_id  # Fallback to passed user_id
-            logger.warning(
-                f"Could not find owner for layer {layer_id}, using current user {user_id}"
-            )
-        elif layer_owner_id != user_id:
-            logger.info(
-                f"Layer {layer_id} owned by {layer_owner_id}, accessed by {user_id}"
-            )
+        # Resolve storage location (supports standard, catalog, and pointer layers)
+        layer_location = self.get_layer_location_sync(layer_id)
+        if layer_location:
+            schema_name, table_only, layer_owner_id = layer_location
+            table_name = f"lake.{schema_name}.{table_only}"
+            if layer_owner_id and layer_owner_id != user_id:
+                logger.info(
+                    f"Layer {layer_id} owned by {layer_owner_id}, accessed by {user_id}"
+                )
+        else:
+            # Legacy fallback to owner-derived naming
+            layer_owner_id = self.get_layer_owner_id_sync(layer_id)
+            if layer_owner_id is None:
+                layer_owner_id = user_id
+                logger.warning(
+                    f"Could not resolve location for layer {layer_id}, using current user {user_id}"
+                )
+            elif layer_owner_id != user_id:
+                logger.info(
+                    f"Layer {layer_id} owned by {layer_owner_id}, accessed by {user_id}"
+                )
+            table_name = self.get_layer_table_path(layer_owner_id, layer_id)
 
-        table_name = self.get_layer_table_path(layer_owner_id, layer_id)
         logger.debug(f"Resolved table name for layer {layer_id}: {table_name}")
 
         # Verify the table exists before attempting to export

@@ -19,7 +19,10 @@ import { toast } from "react-toastify";
 
 import { Loading } from "@p4b/ui/components/Loading";
 
-import { useCatalogLayers } from "@/lib/api/layers";
+import {
+  useCatalogDatasetAsLayer as catalogDatasetAsLayer,
+  useCatalogLayers,
+} from "@/lib/api/layers";
 import { addProjectLayers, useProject } from "@/lib/api/projects";
 import type { PaginatedQueryParams } from "@/lib/validations/common";
 import type { GetDatasetSchema, Layer } from "@/lib/validations/layer";
@@ -61,7 +64,7 @@ const CatalogExplorerModal: React.FC<CatalogExplorerProps> = ({
   const { layers: datasets, isLoading: isDatasetLoading } = useCatalogLayers(queryParams, datasetSchema);
 
   const { mutate: mutateProjectLayers } = useFilteredProjectLayers(projectId);
-  const { mutate: mutateProject } = useProject(projectId);
+  const { project, mutate: mutateProject } = useProject(projectId);
   const [searchText, setSearchText] = useState<string>("");
   const [isBusy, setIsBusy] = useState<boolean>(false);
 
@@ -92,20 +95,33 @@ const CatalogExplorerModal: React.FC<CatalogExplorerProps> = ({
   const handleOnAdd = async () => {
     try {
       if (!selectedDataset) return;
-
-      // If onLayerSelect callback is provided, use it instead of adding to project
-      if (onLayerSelect) {
-        onLayerSelect(selectedDataset);
-        handleOnClose();
+      if (!project?.folder_id) {
+        toast.error(t("error_adding_layer"));
         return;
       }
 
       setIsBusy(true);
-      await addProjectLayers(projectId, [selectedDataset.id]);
+
+      const response = await catalogDatasetAsLayer(selectedDataset.id, {
+        folder_id: project.folder_id,
+      });
+
+      const createdLayer = response.layer;
+
+      // If onLayerSelect callback is provided, use it instead of adding to project
+      if (onLayerSelect) {
+        onLayerSelect(createdLayer);
+        handleOnClose();
+        return;
+      }
+
+      await addProjectLayers(projectId, [createdLayer.id]);
       mutateProjectLayers();
       mutateProject();
+      toast.success(t("layer_added_to_project"));
     } catch (error) {
-      toast.error(t("error_adding_layer"));
+      const message = error instanceof Error ? error.message : t("error_adding_layer");
+      toast.error(message);
     } finally {
       setIsBusy(false);
       handleOnClose();
