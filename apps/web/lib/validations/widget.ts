@@ -96,6 +96,10 @@ export const informationConfigSchema = z.object({
   options: informationConfigOptionsBaseSchema.optional().default({}),
 });
 
+export const layersLayoutStyleTypes = z.enum(["tree", "tabs"]);
+export const layersToggleStyleTypes = z.enum(["eye", "checkbox", "switch"]);
+export const layersTogglePositionTypes = z.enum(["left", "right"]);
+export const layersMoreOptionsStyleTypes = z.enum(["compact", "direct_actions"]);
 export const informationLayersConfigSchema = informationConfigSchema.extend({
   type: z.literal("layers"),
   setup: informationConfigSetupBaseSchema.extend({}).default({}),
@@ -103,6 +107,20 @@ export const informationLayersConfigSchema = informationConfigSchema.extend({
     .extend({
       show_search: z.boolean().optional().default(false),
       open_legend_by_default: z.boolean().optional().default(false),
+      layout_style: layersLayoutStyleTypes.optional().default("tree"),
+      toggle_style: layersToggleStyleTypes.optional().default("eye"),
+      toggle_position: layersTogglePositionTypes.optional().default("right"),
+      more_options_style: layersMoreOptionsStyleTypes.optional().default("compact"),
+      show_group_name: z.boolean().optional().default(true),
+      show_group_icons: z.boolean().optional().default(false),
+      hide_legend_heading: z.boolean().optional().default(false),
+      show_style_action: z.boolean().optional().default(true),
+      show_view_data_action: z.boolean().optional().default(true),
+      show_properties_action: z.boolean().optional().default(true),
+      show_zoom_to_action: z.boolean().optional().default(true),
+      excluded_layers: z.array(z.number()).optional().default([]),
+      legend_hidden_layers: z.array(z.number()).optional().default([]),
+      downloadable_layers: z.array(z.number()).optional().default([]),
     })
     .default({}),
 });
@@ -166,7 +184,6 @@ export const richTextDataConfigSchema = z.object({
     .object({
       description: z.string().optional(),
       filter_by_viewport: z.boolean().optional().default(false),
-      cross_filter: z.boolean().optional().default(false),
     })
     .default({}),
 });
@@ -530,5 +547,9 @@ export type WidgetElementConfig =
   | LinksElementSchema;
 export type WidgetInformationConfig = LayerInformationSchema;
 export type WidgetDataConfig = NumbersDataSchema | TableDataSchema | FilterDataSchema | RichTextDataSchema;
+
+export type LayersLayoutStyleType = z.infer<typeof layersLayoutStyleTypes>;
+export type LayersToggleStyleType = z.infer<typeof layersToggleStyleTypes>;
+export type LayersTogglePositionType = z.infer<typeof layersTogglePositionTypes>;
 
 export type WidgetConfigSchema = z.infer<typeof configSchemas>;

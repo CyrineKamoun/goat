@@ -92,6 +92,7 @@ const WidgetWrapper: React.FC<WidgetWrapperProps> = ({
     <Box sx={{ p: 1, height: isFullHeight ? "100%" : undefined }}>
       {widget.config?.type && informationTypes.options.includes(widget.config?.type as any) && (
         <WidgetInformation
+          widgetId={widget.id}
           config={widget.config as WidgetInformationConfig}
           projectLayers={projectLayers}
           projectLayerGroups={projectLayerGroups}

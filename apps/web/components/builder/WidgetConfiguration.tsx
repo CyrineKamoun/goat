@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { removeTemporaryFilter } from "@/lib/store/map/slice";
 import { hasNestedSchemaPath } from "@/lib/utils/zod";
 import type { BuilderWidgetSchema } from "@/lib/validations/project";
-import type { LinksElementSchema, RichTextDataSchema, TabsContainerSchema } from "@/lib/validations/widget";
+import type { LayerInformationSchema, LinksElementSchema, RichTextDataSchema, TabsContainerSchema } from "@/lib/validations/widget";
 import { widgetSchemaMap } from "@/lib/validations/widget";
 
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
@@ -20,6 +20,7 @@ import {
 import RichTextConfig from "@/components/builder/widgets/data/RichTextConfig";
 import LinksConfiguration from "@/components/builder/widgets/elements/LinksConfiguration";
 import TabsWidgetConfig from "@/components/builder/widgets/elements/TabsWidgetConfig";
+import LayersWidgetConfig from "@/components/builder/widgets/information/LayersWidgetConfig";
 
 interface WidgetConfigurationProps {
   onChange: (widget: BuilderWidgetSchema) => void;
@@ -110,6 +111,16 @@ const WidgetConfiguration = ({ onChange, samePanelWidgets }: WidgetConfiguration
         config={widgetConfig as TabsContainerSchema}
         onChange={handleWidgetChange}
         samePanelWidgets={samePanelWidgets}
+      />
+    );
+  }
+
+  // Special handling for layers widget
+  if (widgetConfig.type === "layers") {
+    return (
+      <LayersWidgetConfig
+        config={widgetConfig as LayerInformationSchema}
+        onChange={handleConfigChange}
       />
     );
   }

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Box } from "@mui/material";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMap } from "react-map-gl/maplibre";
 
 import { useDatasetCollectionItems } from "@/lib/api/layers";
@@ -45,6 +45,9 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
 
   // Local range state (for range filter)
   const [selectedRange, setSelectedRange] = useState<[number, number] | null>(null);
+
+  // Track previous selection to only zoom when the user actually changes the selection
+  const prevSelectedValuesRef = useRef(selectedValues);
 
   const existingFilter = useAppSelector((state) =>
     state.map.temporaryFilters.find((filter) => filter.id === id)
@@ -301,12 +304,16 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
       additional_targets: buildAdditionalTargets(normalizedValues),
     };
 
-    // Zoom to selection if enabled and we have geometry data
-    if (geometryData?.features?.length && rawConfig?.options?.zoom_to_selection && map) {
+    // Zoom to selection if enabled and we have geometry data,
+    // but only when the user actually changed their selection (not on unrelated re-renders)
+    const selectionChanged =
+      JSON.stringify(prevSelectedValuesRef.current) !== JSON.stringify(selectedValues);
+    if (selectionChanged && geometryData?.features?.length && rawConfig?.options?.zoom_to_selection && map) {
       zoomToFeatureCollection(map, geometryData as GeoJSON.FeatureCollection, {
         duration: 200,
       });
     }
+    prevSelectedValuesRef.current = selectedValues;
 
     if (!areFiltersEqual(existingFilter, newFilter)) {
       if (existingFilter) {

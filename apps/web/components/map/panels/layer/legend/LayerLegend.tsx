@@ -22,9 +22,11 @@ interface LayerLegendPanelProps {
   onTextSave?: (key: string, text: string) => void;
   /** Compact mode: render items inline in a flow layout (for print legends) */
   compact?: boolean;
+  /** Hide the attribute/field name headings while keeping color values */
+  hideHeading?: boolean;
 }
 
-export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, headingTypographySx, editable, textOverrides, onTextSave, compact }: LayerLegendPanelProps) => {
+export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, headingTypographySx, editable, textOverrides, onTextSave, compact, hideHeading }: LayerLegendPanelProps) => {
   const { t } = useTranslation("common");
 
   // Container sx for sections — compact indents items under layer name
@@ -37,6 +39,7 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, h
 
   // Editable heading helper
   const renderHeading = (defaultText: string, overrideKey: string) => {
+    if (hideHeading) return null;
     const displayText = editable && textOverrides?.[overrideKey] != null ? textOverrides[overrideKey] : defaultText;
     // Hide heading entirely when user has cleared the text
     if (editable && textOverrides?.[overrideKey] != null && !displayText.trim()) {

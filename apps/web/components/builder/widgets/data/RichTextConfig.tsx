@@ -149,17 +149,6 @@ const RichTextConfig = ({ config, onChange }: RichTextConfigProps) => {
               }
               label={<Typography variant="body2">{t("filter_viewport")}</Typography>}
             />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  size="small"
-                  color="primary"
-                  checked={!!options.cross_filter}
-                  onChange={(e) => handleOptionChange("cross_filter", e.target.checked)}
-                />
-              }
-              label={<Typography variant="body2">{t("cross_filter")}</Typography>}
-            />
           </Box>
         }
       />

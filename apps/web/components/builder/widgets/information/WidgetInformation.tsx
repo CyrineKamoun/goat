@@ -7,6 +7,7 @@ import { informationTypes } from "@/lib/validations/widget";
 import { LayerInformationWidget } from "@/components/builder/widgets/information/Layers";
 
 interface WidgetInformationProps {
+  widgetId: string;
   config: WidgetInformationConfig;
   projectLayers: ProjectLayer[];
   projectLayerGroups: ProjectLayerGroup[];
@@ -14,6 +15,7 @@ interface WidgetInformationProps {
 }
 
 const WidgetInformation: React.FC<WidgetInformationProps> = ({
+  widgetId,
   config,
   projectLayers,
   projectLayerGroups,
@@ -28,6 +30,7 @@ const WidgetInformation: React.FC<WidgetInformationProps> = ({
       )}
       {config.type === informationTypes.Values.layers && (
         <LayerInformationWidget
+          widgetId={widgetId}
           config={config}
           projectLayers={projectLayers}
           projectLayerGroups={projectLayerGroups}

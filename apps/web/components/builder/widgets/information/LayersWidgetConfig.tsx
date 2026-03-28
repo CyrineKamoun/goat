@@ -1,0 +1,477 @@
+import {
+  Box,
+  Checkbox,
+  FormControlLabel,
+  IconButton,
+  Popover,
+  Stack,
+  Switch,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import { useParams } from "next/navigation";
+import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+
+import { Icon, ICON_NAME } from "@p4b/ui/components/Icon";
+
+import { useProjectLayerGroups, useProjectLayers } from "@/lib/api/projects";
+import { SYSTEM_LAYERS_IDS } from "@/lib/constants";
+import type { LayerInformationSchema } from "@/lib/validations/widget";
+import type { Marker } from "@/lib/validations/layer";
+
+import type { SelectorItem } from "@/types/map/common";
+
+import { MAKI_ICON_SIZE } from "@/lib/constants/icons";
+
+import SectionHeader from "@/components/map/panels/common/SectionHeader";
+import SectionOptions from "@/components/map/panels/common/SectionOptions";
+import Selector from "@/components/map/panels/common/Selector";
+import TextFieldInput from "@/components/map/panels/common/TextFieldInput";
+import MarkerPopper from "@/components/map/panels/style/marker/MarkerPopper";
+import { MaskedImageIcon } from "@/components/map/panels/style/other/MaskedImageIcon";
+
+interface LayersWidgetConfigProps {
+  config: LayerInformationSchema;
+  onChange: (config: LayerInformationSchema) => void;
+}
+
+const LayersWidgetConfig = ({ config, onChange }: LayersWidgetConfigProps) => {
+  const { t } = useTranslation("common");
+  const { projectId } = useParams() as { projectId: string };
+  const { layers: projectLayers } = useProjectLayers(projectId);
+  const { layerGroups } = useProjectLayerGroups(projectId);
+
+  const handleSetupChange = useCallback(
+    (key: string, value: unknown) => {
+      onChange({
+        ...config,
+        setup: { ...config.setup, [key]: value },
+      } as LayerInformationSchema);
+    },
+    [config, onChange]
+  );
+
+  const handleOptionChange = useCallback(
+    (key: string, value: unknown) => {
+      onChange({
+        ...config,
+        options: { ...config.options, [key]: value },
+      } as LayerInformationSchema);
+    },
+    [config, onChange]
+  );
+
+  const options = config.options ?? {};
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const opts = options as Record<string, any>;
+  const excludedLayers: number[] = opts.excluded_layers ?? [];
+  const legendHiddenLayers: number[] = opts.legend_hidden_layers ?? [];
+  const downloadableLayers: number[] = opts.downloadable_layers ?? [];
+
+  const toggleLayerExclusion = useCallback(
+    (layerId: number) => {
+      const current = [...excludedLayers];
+      const idx = current.indexOf(layerId);
+      if (idx >= 0) {
+        current.splice(idx, 1);
+      } else {
+        current.push(layerId);
+      }
+      handleOptionChange("excluded_layers", current);
+    },
+    [excludedLayers, handleOptionChange]
+  );
+
+  const toggleGroupExclusion = useCallback(
+    (groupId: number) => {
+      const groupLayerIds = filteredLayers
+        .filter((l) => l.layer_project_group_id === groupId)
+        .map((l) => l.id);
+      const allExcluded = groupLayerIds.every((id) => excludedLayers.includes(id));
+      let current = [...excludedLayers];
+      if (allExcluded) {
+        // Include all
+        current = current.filter((id) => !groupLayerIds.includes(id));
+      } else {
+        // Exclude all
+        groupLayerIds.forEach((id) => {
+          if (!current.includes(id)) current.push(id);
+        });
+      }
+      handleOptionChange("excluded_layers", current);
+    },
+    [excludedLayers, handleOptionChange]
+  );
+
+  const toggleArrayOption = useCallback(
+    (key: string, arr: number[], id: number) => {
+      const current = [...arr];
+      const idx = current.indexOf(id);
+      if (idx >= 0) current.splice(idx, 1);
+      else current.push(id);
+      handleOptionChange(key, current);
+    },
+    [handleOptionChange]
+  );
+
+  const layoutStyleItems: SelectorItem[] = [
+    { value: "tree", label: t("tree") },
+    { value: "tabs", label: t("tabs") },
+  ];
+
+  const toggleStyleItems: SelectorItem[] = [
+    { value: "eye", label: t("eye") },
+    { value: "checkbox", label: t("checkbox") },
+    { value: "switch", label: t("switch") },
+  ];
+
+  const togglePositionItems: SelectorItem[] = [
+    { value: "left", label: t("left") },
+    { value: "right", label: t("right") },
+  ];
+
+  const moreOptionsStyleItems: SelectorItem[] = [
+    { value: "compact", label: t("compact_mode"), icon: ICON_NAME.MORE_VERT },
+    { value: "direct_actions", label: t("direct_actions_mode"), icon: ICON_NAME.MORE_HORIZ },
+  ];
+
+  const filteredLayers = useMemo(
+    () => (projectLayers || []).filter((l) => !l.layer_id || !SYSTEM_LAYERS_IDS.includes(l.layer_id)),
+    [projectLayers]
+  );
+
+  const topLevelGroups = useMemo(
+    () =>
+      (layerGroups || [])
+        .filter((g) => !g.parent_id)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    [layerGroups]
+  );
+
+  return (
+    <Stack direction="column" spacing={2} justifyContent="space-between">
+      {/* Info */}
+      <SectionHeader active alwaysActive label={t("info")} icon={ICON_NAME.CIRCLEINFO} disableAdvanceOptions />
+      <SectionOptions
+        active
+        baseOptions={
+          <>
+            <TextFieldInput
+              type="text"
+              label={t("title")}
+              placeholder={t("add_widget_title")}
+              clearable={false}
+              value={config.setup?.title || ""}
+              onChange={(value: string) => handleSetupChange("title", value)}
+            />
+            <TextFieldInput
+              type="text"
+              label={t("description")}
+              placeholder={t("add_widget_description")}
+              multiline
+              clearable={false}
+              value={options.description || ""}
+              onChange={(value: string) => handleOptionChange("description", value)}
+            />
+          </>
+        }
+      />
+
+      {/* Layers — tree with checkboxes to include/exclude + per-layer settings */}
+      <SectionHeader active alwaysActive label={t("layers")} icon={ICON_NAME.LAYERS} disableAdvanceOptions />
+      <SectionOptions
+        active
+        baseOptions={
+          <Stack spacing={0}>
+            {topLevelGroups.map((group) => {
+              const groupLayers = filteredLayers.filter((l) => l.layer_project_group_id === group.id);
+              const allExcluded = groupLayers.length > 0 && groupLayers.every((l) => excludedLayers.includes(l.id));
+              const someExcluded = groupLayers.some((l) => excludedLayers.includes(l.id));
+              return (
+                <Stack key={group.id} spacing={0}>
+                  {/* Group row */}
+                  <Stack direction="row" alignItems="center" spacing={0.5} sx={{ py: 0.25 }}>
+                    <Checkbox
+                      size="small"
+                      checked={!allExcluded}
+                      indeterminate={someExcluded && !allExcluded}
+                      onChange={() => toggleGroupExclusion(group.id)}
+                      sx={{ p: 0.25 }}
+                    />
+                    <GroupIconButton
+                      marker={opts[`group_icon_${group.id}`] as Marker | undefined}
+                      onSelectMarker={(marker) => handleOptionChange(`group_icon_${group.id}`, marker)}
+                    />
+                    <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }} noWrap>
+                      {group.name}
+                    </Typography>
+                  </Stack>
+                  {/* Layers in group */}
+                  {groupLayers.map((l) => (
+                    <ConfigLayerRow
+                      key={l.id}
+                      name={l.name || ""}
+                      included={!excludedLayers.includes(l.id)}
+                      legendShow={!legendHiddenLayers.includes(l.id)}
+                      downloadable={downloadableLayers.includes(l.id)}
+                      onToggleInclude={() => toggleLayerExclusion(l.id)}
+                      onToggleLegend={() => toggleArrayOption("legend_hidden_layers", legendHiddenLayers, l.id)}
+                      onToggleDownload={() => toggleArrayOption("downloadable_layers", downloadableLayers, l.id)}
+                    />
+                  ))}
+                </Stack>
+              );
+            })}
+            {/* Ungrouped layers */}
+            {filteredLayers
+              .filter((l) => !l.layer_project_group_id)
+              .map((l) => (
+                <ConfigLayerRow
+                  key={l.id}
+                  name={l.name || ""}
+                  included={!excludedLayers.includes(l.id)}
+                  legendShow={!legendHiddenLayers.includes(l.id)}
+                  downloadable={downloadableLayers.includes(l.id)}
+                  onToggleInclude={() => toggleLayerExclusion(l.id)}
+                  onToggleLegend={() => toggleArrayOption("legend_hidden_layers", legendHiddenLayers, l.id)}
+                  onToggleDownload={() => toggleArrayOption("downloadable_layers", downloadableLayers, l.id)}
+                />
+              ))}
+          </Stack>
+        }
+      />
+
+      {/* Layout */}
+      <SectionHeader active alwaysActive label={t("layout")} icon={ICON_NAME.SLIDERS} disableAdvanceOptions />
+      <SectionOptions
+        active
+        baseOptions={
+          <>
+            <Selector
+              selectedItems={layoutStyleItems.find((i) => i.value === (options.layout_style || "tree"))}
+              setSelectedItems={(item: SelectorItem) => handleOptionChange("layout_style", item.value)}
+              items={layoutStyleItems}
+              label={t("layout_style")}
+            />
+            <FormControlLabel
+              control={<Checkbox checked={options.show_search ?? false} onChange={(e) => handleOptionChange("show_search", e.target.checked)} size="small" />}
+              label={<Typography variant="body2">{t("search_layer_bar")}</Typography>}
+              sx={{ ml: 0 }}
+            />
+            {options.layout_style === "tabs" && (
+              <Stack spacing={1}>
+                <FormControlLabel
+                  control={<Checkbox checked={options.show_group_name ?? true} onChange={(e) => handleOptionChange("show_group_name", e.target.checked)} size="small" />}
+                  label={<Typography variant="body2">{t("show_group_name")}</Typography>}
+                  sx={{ ml: 0 }}
+                />
+                <FormControlLabel
+                  control={<Checkbox checked={options.show_group_icons ?? false} onChange={(e) => handleOptionChange("show_group_icons", e.target.checked)} size="small" />}
+                  label={<Typography variant="body2">{t("show_group_icons")}</Typography>}
+                  sx={{ ml: 0 }}
+                />
+              </Stack>
+            )}
+            <Selector
+              selectedItems={toggleStyleItems.find((i) => i.value === (options.toggle_style || "eye"))}
+              setSelectedItems={(item: SelectorItem) => handleOptionChange("toggle_style", item.value)}
+              items={toggleStyleItems}
+              label={t("toggle_style")}
+            />
+            <Selector
+              selectedItems={togglePositionItems.find((i) => i.value === (options.toggle_position || "right"))}
+              setSelectedItems={(item: SelectorItem) => handleOptionChange("toggle_position", item.value)}
+              items={togglePositionItems}
+              label={t("toggle_position")}
+            />
+            <FormControlLabel
+              control={<Checkbox checked={opts.hide_legend_heading ?? false} onChange={(e) => handleOptionChange("hide_legend_heading", e.target.checked)} size="small" />}
+              label={<Typography variant="body2">{t("hide_attribute_name")}</Typography>}
+              sx={{ ml: 0 }}
+            />
+          </>
+        }
+      />
+
+      {/* Layer Actions */}
+      <SectionHeader active alwaysActive label={t("layer_actions")} icon={ICON_NAME.SETTINGS} disableAdvanceOptions />
+      <SectionOptions
+        active
+        baseOptions={
+          <>
+            <Selector
+              selectedItems={moreOptionsStyleItems.find((i) => i.value === (options.more_options_style || "compact"))}
+              setSelectedItems={(item: SelectorItem) => handleOptionChange("more_options_style", item.value)}
+              items={moreOptionsStyleItems}
+              label={t("more_options_style")}
+            />
+            <Stack spacing={0}>
+              <FormControlLabel control={<Checkbox checked={options.show_style_action ?? true} onChange={(e) => handleOptionChange("show_style_action", e.target.checked)} size="small" />} label={<Typography variant="body2">{t("style")}</Typography>} sx={{ ml: 0 }} />
+              <FormControlLabel control={<Checkbox checked={options.show_view_data_action ?? true} onChange={(e) => handleOptionChange("show_view_data_action", e.target.checked)} size="small" />} label={<Typography variant="body2">{t("view_data")}</Typography>} sx={{ ml: 0 }} />
+              <FormControlLabel control={<Checkbox checked={options.show_properties_action ?? true} onChange={(e) => handleOptionChange("show_properties_action", e.target.checked)} size="small" />} label={<Typography variant="body2">{t("properties")}</Typography>} sx={{ ml: 0 }} />
+              <FormControlLabel control={<Checkbox checked={options.show_zoom_to_action ?? true} onChange={(e) => handleOptionChange("show_zoom_to_action", e.target.checked)} size="small" />} label={<Typography variant="body2">{t("zoom_to")}</Typography>} sx={{ ml: 0 }} />
+            </Stack>
+          </>
+        }
+      />
+    </Stack>
+  );
+};
+
+/** Clickable group icon — shows default layers icon or custom marker, opens MarkerPopper on click */
+const GroupIconButton = ({
+  marker,
+  onSelectMarker,
+}: {
+  marker?: Marker;
+  onSelectMarker: (marker: Marker) => void;
+}) => {
+  const { t } = useTranslation("common");
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+
+  return (
+    <>
+      <Tooltip title={t("change_icon")} placement="top">
+        <Box
+          onClick={(e) => setAnchorEl(anchorEl ? null : e.currentTarget as HTMLElement)}
+          sx={{
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 20,
+            height: 20,
+            borderRadius: 0.5,
+            "&:hover": { bgcolor: "action.hover" },
+          }}>
+          {marker?.url ? (
+            <MaskedImageIcon
+              imageUrl={marker.url}
+              dimension={`${MAKI_ICON_SIZE * 0.6}px`}
+              applyMask={marker.source === "library"}
+              imgColor=""
+            />
+          ) : (
+            <Icon iconName={ICON_NAME.LAYERS} style={{ fontSize: 14 }} />
+          )}
+        </Box>
+      </Tooltip>
+      <MarkerPopper
+        open={Boolean(anchorEl)}
+        anchorEl={anchorEl}
+        onClose={() => setAnchorEl(null)}
+        selectedMarker={marker}
+        onSelectMarker={(m) => {
+          onSelectMarker(m);
+          setAnchorEl(null);
+        }}
+      />
+    </>
+  );
+};
+
+/** Per-layer row with checkbox + three-dot → Show in legend / Download */
+const ConfigLayerRow = ({
+  name,
+  included,
+  legendShow,
+  downloadable,
+  onToggleInclude,
+  onToggleLegend,
+  onToggleDownload,
+}: {
+  name: string;
+  included: boolean;
+  legendShow: boolean;
+  downloadable: boolean;
+  onToggleInclude: () => void;
+  onToggleLegend: () => void;
+  onToggleDownload: () => void;
+}) => {
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+
+  return (
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={0.5}
+      sx={{ pl: 3, py: 0.25, opacity: included ? 1 : 0.5, "&:hover": { bgcolor: "action.hover" }, borderRadius: 0.5 }}>
+      <Checkbox
+        size="small"
+        checked={included}
+        onChange={onToggleInclude}
+        sx={{ p: 0.25 }}
+      />
+      <Typography variant="body2" sx={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {name}
+      </Typography>
+      <IconButton size="small" onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ p: 0.25 }}>
+        <Icon iconName={ICON_NAME.MORE_VERT} style={{ fontSize: 14 }} />
+      </IconButton>
+      {anchorEl && (
+        <LayerSettingsPopover
+          anchorEl={anchorEl}
+          legendShow={legendShow}
+          downloadable={downloadable}
+          onToggleLegend={onToggleLegend}
+          onToggleDownload={onToggleDownload}
+          onClose={() => setAnchorEl(null)}
+        />
+      )}
+    </Stack>
+  );
+};
+
+/** Separate component so parent ConfigLayerRow doesn't re-render when toggles fire */
+const LayerSettingsPopover = ({
+  anchorEl,
+  legendShow,
+  downloadable,
+  onToggleLegend,
+  onToggleDownload,
+  onClose,
+}: {
+  anchorEl: HTMLElement;
+  legendShow: boolean;
+  downloadable: boolean;
+  onToggleLegend: () => void;
+  onToggleDownload: () => void;
+  onClose: () => void;
+}) => {
+  const { t } = useTranslation("common");
+
+  return (
+    <Popover
+      open
+      anchorEl={anchorEl}
+      onClose={onClose}
+      anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      transformOrigin={{ vertical: "top", horizontal: "right" }}
+      slotProps={{ paper: { sx: { p: 1.5, minWidth: 180 } } }}>
+      <Stack spacing={0.5}>
+        <Stack direction="row" alignItems="center">
+          <Switch
+            size="small"
+            checked={legendShow}
+            onChange={onToggleLegend}
+            sx={{ transform: "scale(0.8)" }}
+          />
+          <Typography variant="body2">{t("show_in_legend")}</Typography>
+        </Stack>
+        <Stack direction="row" alignItems="center">
+          <Switch
+            size="small"
+            checked={downloadable}
+            onChange={onToggleDownload}
+            sx={{ transform: "scale(0.8)" }}
+          />
+          <Typography variant="body2">{t("download")}</Typography>
+        </Stack>
+      </Stack>
+    </Popover>
+  );
+};
+
+export default LayersWidgetConfig;

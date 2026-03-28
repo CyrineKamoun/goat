@@ -40,7 +40,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onProjectUpdate }) =
     setValue(newValue);
   };
 
-  const handleMapSettingsChange = async (name: string, value: boolean) => {
+  const handleMapSettingsChange = async (name: string, value: unknown) => {
     if (!builderConfig) {
       return;
     }

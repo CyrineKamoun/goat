@@ -90,6 +90,7 @@ const TabChildWidget: React.FC<{
     if ((informationTypes.options as readonly string[]).includes(config.type)) {
       return (
         <WidgetInformation
+          widgetId={childWidget.id}
           config={config as WidgetInformationConfig}
           projectLayers={projectLayers}
           projectLayerGroups={projectLayerGroups}

@@ -22,10 +22,12 @@ import { formatNumber } from "@/lib/utils/format-number";
 import type { AggregationStatsQueryParams, ProjectLayer } from "@/lib/validations/project";
 import type { RichTextDataSchema, RichTextVariableSchema } from "@/lib/validations/widget";
 
+
 import { TipTapEditorContent } from "@/components/builder/widgets/elements/text/Text";
 import { AlignSelect } from "@/components/builder/widgets/elements/text/AlignSelect";
-import { BlockTypeSelect } from "@/components/builder/widgets/elements/text/BlockTypeSelect";
+import LineHeightSelect from "@/components/builder/widgets/elements/text/LineHeightSelect";
 import MenuButton from "@/components/builder/widgets/elements/text/MenuButton";
+import RichTextFontSizeSelect from "@/components/builder/widgets/data/RichTextFontSizeSelect";
 import VariableInsertMenu from "@/components/builder/widgets/data/VariableInsertMenu";
 
 const extensions = [
@@ -65,32 +67,45 @@ const RichTextEditorContent = styled(TipTapEditorContent)(({ theme }) => ({
     padding: "0 6px",
     fontFamily: "monospace",
     fontSize: "0.85em",
+    fontWeight: "normal",
+    fontStyle: "normal",
     lineHeight: 1.6,
     whiteSpace: "nowrap",
     userSelect: "none",
     cursor: "default",
+    // Bold/italic set via inline style from node attributes override these defaults
   },
 }));
 
 /**
- * Replace variable chip HTML with resolved <strong>value</strong> or "..." placeholder.
+ * Replace variable chip spans with styled resolved values.
+ * Style attributes (bold, italic, font-size) are read from the chip's data attributes
+ * which are set directly in the TipTap editor via the toolbar.
  */
 function resolveVariablesInHtml(
   html: string,
   variables: RichTextVariableSchema[],
   resolvedValues: Record<string, string | number | null>
 ): string {
-  // Replace <span data-variable="name" class="variable-chip">...</span> with resolved value
   return html.replace(
-    /<span[^>]*data-variable="([^"]*)"[^>]*>.*?<\/span>/g,
-    (_match, variableName: string) => {
+    /<span[^>]*data-variable="([^"]*)"[^>]*>[\s\S]*?<\/span>/g,
+    (match, variableName: string) => {
+      const variable = variables.find((v) => v.name === variableName);
       const value = resolvedValues[variableName];
-      if (value !== undefined && value !== null) {
-        return `<strong>${String(value)}</strong>`;
-      }
-      // Check if variable still exists in config
-      const exists = variables.some((v) => v.name === variableName);
-      return exists ? "<strong>...</strong>" : "<strong>???</strong>";
+      const text = value !== undefined && value !== null ? String(value) : variable ? "..." : "???";
+
+      // Extract style attributes from the chip's HTML
+      const styles: string[] = [];
+      if (match.includes('data-bold="true"')) styles.push("font-weight:700");
+      if (match.includes('data-italic="true"')) styles.push("font-style:italic");
+      const fontSizeMatch = match.match(/data-font-size="([^"]*)"/);
+      if (fontSizeMatch) styles.push(`font-size:${fontSizeMatch[1]}`);
+      // Carry over any existing inline style from the chip
+      const styleMatch = match.match(/style="([^"]*)"/);
+      if (styleMatch) styles.push(styleMatch[1]);
+
+      if (styles.length === 0) return text;
+      return `<span style="${styles.join(";")}">${text}</span>`;
     }
   );
 }
@@ -259,12 +274,20 @@ const RichTextEditable = ({
 
   const editorState = useEditorState({
     editor,
-    selector: ({ editor }: { editor: Editor }) => ({
-      isBold: editor.isActive("bold"),
-      isItalic: editor.isActive("italic"),
-      isUnderline: editor.isActive("underline"),
-      isStrike: editor.isActive("strike"),
-    }),
+    selector: ({ editor }: { editor: Editor }) => {
+      // Check if a variable chip is selected
+      const node = editor.state.doc.nodeAt(editor.state.selection.from);
+      const isChipSelected = node?.type.name === "variableChip";
+      return {
+        isBold: isChipSelected ? !!node?.attrs.bold : editor.isActive("bold"),
+        isItalic: isChipSelected ? !!node?.attrs.italic : editor.isActive("italic"),
+        isUnderline: editor.isActive("underline"),
+        isStrike: editor.isActive("strike"),
+        isBulletList: editor.isActive("bulletList"),
+        isOrderedList: editor.isActive("orderedList"),
+        isChipSelected,
+      };
+    },
   });
 
   // Debounced config update on editor changes
@@ -357,11 +380,11 @@ const RichTextEditable = ({
             <ToolbarContainer>
               {editor && (
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <BlockTypeSelect
+                  <RichTextFontSizeSelect
                     editor={editor}
-                    onOpen={() => updateActiveDropdown("blockType")}
+                    onOpen={() => updateActiveDropdown("fontSize")}
                     onClose={() => updateActiveDropdown(null)}
-                    forceClose={activeDropdown !== "blockType" && activeDropdown !== null}
+                    forceClose={activeDropdown !== "fontSize" && activeDropdown !== null}
                   />
                   <Divider flexItem orientation="vertical" />
                   <Stack direction="row" spacing={0.5} alignItems="center">
@@ -369,13 +392,25 @@ const RichTextEditable = ({
                       value="bold"
                       iconName={ICON_NAME.BOLD}
                       selected={editorState?.isBold}
-                      onClick={() => editor.chain().focus().toggleBold().run()}
+                      onClick={() => {
+                        if (editorState?.isChipSelected) {
+                          editor.chain().focus().toggleVariableChipBold().run();
+                        } else {
+                          editor.chain().focus().toggleBold().run();
+                        }
+                      }}
                     />
                     <MenuButton
                       value="italic"
                       iconName={ICON_NAME.ITALIC}
                       selected={editorState?.isItalic}
-                      onClick={() => editor.chain().focus().toggleItalic().run()}
+                      onClick={() => {
+                        if (editorState?.isChipSelected) {
+                          editor.chain().focus().toggleVariableChipItalic().run();
+                        } else {
+                          editor.chain().focus().toggleItalic().run();
+                        }
+                      }}
                     />
                     <MenuButton
                       value="underline"
@@ -391,11 +426,32 @@ const RichTextEditable = ({
                     />
                   </Stack>
                   <Divider flexItem orientation="vertical" />
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <MenuButton
+                      value="bulletList"
+                      iconName={ICON_NAME.BULLET_LIST}
+                      selected={editorState?.isBulletList}
+                      onClick={() => editor.chain().focus().toggleBulletList().run()}
+                    />
+                    <MenuButton
+                      value="orderedList"
+                      iconName={ICON_NAME.NUMBERED_LIST}
+                      selected={editorState?.isOrderedList}
+                      onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                    />
+                  </Stack>
+                  <Divider flexItem orientation="vertical" />
                   <AlignSelect
                     editor={editor}
                     onOpen={() => updateActiveDropdown("align")}
                     onClose={() => updateActiveDropdown(null)}
                     forceClose={activeDropdown !== "align" && activeDropdown !== null}
+                  />
+                  <LineHeightSelect
+                    editor={editor}
+                    onOpen={() => updateActiveDropdown("lineHeight")}
+                    onClose={() => updateActiveDropdown(null)}
+                    forceClose={activeDropdown !== "lineHeight" && activeDropdown !== null}
                   />
                   <Divider flexItem orientation="vertical" />
                   <VariableInsertMenu
@@ -432,7 +488,8 @@ const RichTextEditable = ({
             height: "100%",
             pointerEvents: "none",
             userSelect: "none",
-            "& strong": { fontWeight: 700 },
+            fontFamily: "inherit",
+            "& p, & h1, & h2, & h3, & h4, & h5, & h6": { margin: 0 },
           }}
           dangerouslySetInnerHTML={{ __html: resolvedHtml || "<p></p>" }}
         />

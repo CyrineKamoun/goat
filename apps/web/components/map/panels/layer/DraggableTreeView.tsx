@@ -501,6 +501,8 @@ const MemoizedRecursiveTreeItem = React.memo(RecursiveTreeItemInner, (prevProps,
   if (prevSelected !== nextSelected) return false;
   // Check if enableSelection changed
   if (prevProps.enableSelection !== nextProps.enableSelection) return false;
+  // Check if renderActions changed (e.g. toggle style changed)
+  if (prevProps.renderActions !== nextProps.renderActions) return false;
   // Check if this item's children changed (for groups)
   if (prevProps.item.isGroup) {
     const prevChildren = prevProps.allData.filter((i) => i.parentId === prevProps.item.id);

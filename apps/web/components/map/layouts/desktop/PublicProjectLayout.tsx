@@ -68,11 +68,27 @@ const PublicProjectLayout = ({
 
   // Apply dashboard language override only for public/shared view
   const dashboardLanguage = project?.builder_config?.settings?.language;
+  const dashboardFont = (project?.builder_config?.settings?.font_family as string) || undefined;
   useEffect(() => {
     if (viewOnly && dashboardLanguage && dashboardLanguage !== "auto" && dashboardLanguage !== i18n.language) {
       i18n.changeLanguage(dashboardLanguage);
     }
   }, [viewOnly, dashboardLanguage, i18n]);
+
+  // Load Google Font for dashboard
+  useEffect(() => {
+    if (!dashboardFont) return;
+    const fontName = dashboardFont.split(",")[0].trim().replace(/^['"]|['"]$/g, "");
+    if (fontName === "Mulish") return; // Already loaded by next/font
+    const id = `google-font-${fontName.replace(/\s+/g, "-").toLowerCase()}`;
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName)}:wght@300;400;500;600;700&display=swap`;
+    document.head.appendChild(link);
+  }, [dashboardFont]);
+
   // Layer style change hook
   const { handleStyleChange } = useLayerStyleChange(projectLayers, viewOnly);
 
@@ -449,7 +465,7 @@ const PublicProjectLayout = ({
   }, [getOccupiedSpace]);
 
   return (
-    <Box sx={{ height: "100%", width: "100%", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ height: "100%", width: "100%", display: "flex", flexDirection: "column", fontFamily: dashboardFont }}>
       {project && builderConfig?.settings?.toolbar && (
         <Header showHambugerMenu={false} mapHeader={true} project={project} viewOnly />
       )}
