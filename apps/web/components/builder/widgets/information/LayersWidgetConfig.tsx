@@ -255,25 +255,6 @@ const LayersWidgetConfig = ({ config, onChange }: LayersWidgetConfigProps) => {
               items={layoutStyleItems}
               label={t("layout_style")}
             />
-            <FormControlLabel
-              control={<Checkbox checked={options.show_search ?? false} onChange={(e) => handleOptionChange("show_search", e.target.checked)} size="small" />}
-              label={<Typography variant="body2">{t("search_layer_bar")}</Typography>}
-              sx={{ ml: 0 }}
-            />
-            {options.layout_style === "tabs" && (
-              <Stack spacing={1}>
-                <FormControlLabel
-                  control={<Checkbox checked={options.show_group_name ?? true} onChange={(e) => handleOptionChange("show_group_name", e.target.checked)} size="small" />}
-                  label={<Typography variant="body2">{t("show_group_name")}</Typography>}
-                  sx={{ ml: 0 }}
-                />
-                <FormControlLabel
-                  control={<Checkbox checked={options.show_group_icons ?? false} onChange={(e) => handleOptionChange("show_group_icons", e.target.checked)} size="small" />}
-                  label={<Typography variant="body2">{t("show_group_icons")}</Typography>}
-                  sx={{ ml: 0 }}
-                />
-              </Stack>
-            )}
             <Selector
               selectedItems={toggleStyleItems.find((i) => i.value === (options.toggle_style || "eye"))}
               setSelectedItems={(item: SelectorItem) => handleOptionChange("toggle_style", item.value)}
@@ -286,11 +267,32 @@ const LayersWidgetConfig = ({ config, onChange }: LayersWidgetConfigProps) => {
               items={togglePositionItems}
               label={t("toggle_position")}
             />
-            <FormControlLabel
-              control={<Checkbox checked={opts.hide_legend_heading ?? false} onChange={(e) => handleOptionChange("hide_legend_heading", e.target.checked)} size="small" />}
-              label={<Typography variant="body2">{t("hide_attribute_name")}</Typography>}
-              sx={{ ml: 0 }}
-            />
+            <Stack spacing={0}>
+              <FormControlLabel
+                control={<Checkbox checked={options.show_search ?? false} onChange={(e) => handleOptionChange("show_search", e.target.checked)} size="small" />}
+                label={<Typography variant="body2">{t("search_layer_bar")}</Typography>}
+                sx={{ ml: 0 }}
+              />
+              {options.layout_style === "tabs" && (
+                <>
+                  <FormControlLabel
+                    control={<Checkbox checked={options.show_group_name ?? true} onChange={(e) => handleOptionChange("show_group_name", e.target.checked)} size="small" />}
+                    label={<Typography variant="body2">{t("show_group_name")}</Typography>}
+                    sx={{ ml: 0 }}
+                  />
+                  <FormControlLabel
+                    control={<Checkbox checked={options.show_group_icons ?? false} onChange={(e) => handleOptionChange("show_group_icons", e.target.checked)} size="small" />}
+                    label={<Typography variant="body2">{t("show_group_icons")}</Typography>}
+                    sx={{ ml: 0 }}
+                  />
+                </>
+              )}
+              <FormControlLabel
+                control={<Checkbox checked={opts.hide_legend_heading ?? false} onChange={(e) => handleOptionChange("hide_legend_heading", e.target.checked)} size="small" />}
+                label={<Typography variant="body2">{t("hide_attribute_name")}</Typography>}
+                sx={{ ml: 0 }}
+              />
+            </Stack>
           </>
         }
       />

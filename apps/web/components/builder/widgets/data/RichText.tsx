@@ -2,6 +2,7 @@ import { Box, Divider, Paper, Portal, Stack, styled } from "@mui/material";
 import { debounce } from "@mui/material/utils";
 import Color from "@tiptap/extension-color";
 import FontFamily from "@tiptap/extension-font-family";
+import Link from "@tiptap/extension-link";
 import Subscript from "@tiptap/extension-subscript";
 import Superscript from "@tiptap/extension-superscript";
 import TextAlign from "@tiptap/extension-text-align";
@@ -15,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { useProjectLayerAggregationStats } from "@/lib/api/projects";
+import InfoChip from "@/lib/extensions/info-chip";
 import VariableChip from "@/lib/extensions/variable-chip";
 import FontSize from "@/lib/extensions/font-size";
 import LineHeight from "@/lib/extensions/line-height";
@@ -27,6 +29,8 @@ import { TipTapEditorContent } from "@/components/builder/widgets/elements/text/
 import { AlignSelect } from "@/components/builder/widgets/elements/text/AlignSelect";
 import LineHeightSelect from "@/components/builder/widgets/elements/text/LineHeightSelect";
 import MenuButton from "@/components/builder/widgets/elements/text/MenuButton";
+import { InfoChipEditPopover, InfoChipViewPopover } from "@/components/builder/widgets/data/InfoChipPopover";
+import LinkPopover from "@/components/builder/widgets/data/LinkPopover";
 import RichTextFontSizeSelect from "@/components/builder/widgets/data/RichTextFontSizeSelect";
 import VariableInsertMenu from "@/components/builder/widgets/data/VariableInsertMenu";
 
@@ -42,7 +46,12 @@ const extensions = [
   TextAlign.configure({
     types: ["heading", "paragraph"],
   }),
+  Link.configure({
+    openOnClick: false,
+    HTMLAttributes: { target: "_blank", rel: "noopener noreferrer" },
+  }),
   VariableChip,
+  InfoChip,
 ];
 
 const ToolbarContainer = styled(Paper)(({ theme }) => ({
@@ -73,7 +82,30 @@ const RichTextEditorContent = styled(TipTapEditorContent)(({ theme }) => ({
     whiteSpace: "nowrap",
     userSelect: "none",
     cursor: "default",
-    // Bold/italic set via inline style from node attributes override these defaults
+  },
+  "& .ProseMirror .info-chip": {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 14,
+    height: 14,
+    borderRadius: "50%",
+    backgroundColor: theme.palette.grey[600],
+    color: theme.palette.common.white,
+    fontSize: 9,
+    fontWeight: 700,
+    fontStyle: "normal",
+    fontFamily: "serif",
+    lineHeight: 1,
+    cursor: "pointer",
+    userSelect: "none",
+    verticalAlign: "middle",
+    marginInline: "2px",
+  },
+  "& .ProseMirror a": {
+    color: theme.palette.primary.main,
+    textDecoration: "underline",
+    cursor: "pointer",
   },
 }));
 
@@ -110,18 +142,92 @@ function resolveVariablesInHtml(
   );
 }
 
-interface RichTextDataWidgetProps {
-  config: RichTextDataSchema;
-  projectLayers: ProjectLayer[];
-  viewOnly?: boolean;
-  onConfigChange?: (nextConfig: RichTextDataSchema) => void;
-}
+/**
+ * Preview renderer that makes info chips and links interactive.
+ */
+const RichTextPreview = ({ html }: { html: string }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [viewPopover, setViewPopover] = useState<{
+    anchorEl: HTMLElement;
+    text: string;
+    url?: string;
+  } | null>(null);
 
-/* ------------------------------------------------------------------ */
-/*  View-only renderer                                                 */
-/* ------------------------------------------------------------------ */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-const RichTextViewOnly = ({
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Handle info chip clicks
+      const chip = target.closest(".info-chip") as HTMLElement | null;
+      if (chip) {
+        e.preventDefault();
+        e.stopPropagation();
+        const text = chip.getAttribute("data-info-text") || "";
+        const url = chip.getAttribute("data-info-url") || undefined;
+        setViewPopover({ anchorEl: chip, text, url });
+        return;
+      }
+      // Handle link clicks — open in new tab
+      const link = target.closest("a") as HTMLAnchorElement | null;
+      if (link?.href) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open(link.href, "_blank", "noopener,noreferrer");
+      }
+    };
+
+    el.addEventListener("click", handleClick);
+    return () => el.removeEventListener("click", handleClick);
+  }, []);
+
+  return (
+    <>
+      <Box
+        ref={containerRef}
+        sx={{
+          height: "100%",
+          fontFamily: "inherit",
+          "& p, & h1, & h2, & h3, & h4, & h5, & h6": { margin: 0 },
+          "& a": { color: "primary.main", textDecoration: "underline" },
+          "& .info-chip": {
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 14,
+            height: 14,
+            borderRadius: "50%",
+            backgroundColor: "grey.600",
+            color: "common.white",
+            fontSize: 9,
+            fontWeight: 700,
+            fontStyle: "normal",
+            fontFamily: "serif",
+            lineHeight: 1,
+            cursor: "pointer",
+            verticalAlign: "middle",
+            mx: "2px",
+          },
+        }}
+        dangerouslySetInnerHTML={{ __html: html || "<p></p>" }}
+      />
+      {viewPopover && (
+        <InfoChipViewPopover
+          anchorEl={viewPopover.anchorEl}
+          text={viewPopover.text}
+          url={viewPopover.url}
+          onClose={() => setViewPopover(null)}
+        />
+      )}
+    </>
+  );
+};
+
+/**
+ * Wrapper that resolves variables then renders via RichTextPreview (with interactive info chips/links).
+ */
+const RichTextPreviewResolved = ({
   config,
   resolvedValues,
 }: {
@@ -133,41 +239,16 @@ const RichTextViewOnly = ({
     () => resolveVariablesInHtml(config.setup?.text || "", variables, resolvedValues),
     [config.setup?.text, variables, resolvedValues]
   );
-
-  const viewExtensions = useMemo(
-    () => [
-      StarterKit,
-      Subscript,
-      Superscript,
-      TextStyle,
-      Color,
-      FontFamily,
-      FontSize,
-      LineHeight,
-      TextAlign.configure({ types: ["heading", "paragraph"] }),
-    ],
-    []
-  );
-
-  const editor = useEditor({
-    extensions: viewExtensions,
-    content: resolvedHtml,
-    immediatelyRender: true,
-    shouldRerenderOnTransaction: false,
-    editable: false,
-  });
-
-  useEffect(() => {
-    if (editor) {
-      const current = editor.getHTML();
-      if (current !== resolvedHtml) {
-        editor.commands.setContent(resolvedHtml);
-      }
-    }
-  }, [editor, resolvedHtml]);
-
-  return <TipTapEditorContent editor={editor} />;
+  return <RichTextPreview html={resolvedHtml} />;
 };
+
+interface RichTextDataWidgetProps {
+  config: RichTextDataSchema;
+  projectLayers: ProjectLayer[];
+  viewOnly?: boolean;
+  onConfigChange?: (nextConfig: RichTextDataSchema) => void;
+}
+
 
 /* ------------------------------------------------------------------ */
 /*  Editable rich-text editor                                          */
@@ -272,12 +353,16 @@ const RichTextEditable = ({
     mouseDownPos.current = null;
   };
 
+  // Popover state for link and info chip editing
+  const [linkAnchorEl, setLinkAnchorEl] = useState<HTMLElement | null>(null);
+  const [infoChipAnchorEl, setInfoChipAnchorEl] = useState<HTMLElement | null>(null);
+
   const editorState = useEditorState({
     editor,
     selector: ({ editor }: { editor: Editor }) => {
-      // Check if a variable chip is selected
       const node = editor.state.doc.nodeAt(editor.state.selection.from);
       const isChipSelected = node?.type.name === "variableChip";
+      const isInfoChipSelected = node?.type.name === "infoChip";
       return {
         isBold: isChipSelected ? !!node?.attrs.bold : editor.isActive("bold"),
         isItalic: isChipSelected ? !!node?.attrs.italic : editor.isActive("italic"),
@@ -285,10 +370,34 @@ const RichTextEditable = ({
         isStrike: editor.isActive("strike"),
         isBulletList: editor.isActive("bulletList"),
         isOrderedList: editor.isActive("orderedList"),
+        isLink: editor.isActive("link"),
         isChipSelected,
+        isInfoChipSelected,
       };
     },
   });
+
+  // Open info chip popover when an info chip is selected via click
+  useEffect(() => {
+    if (!editor || !isEditMode) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const chipEl = target.closest(".info-chip") as HTMLElement | null;
+      if (chipEl) {
+        // Select the info chip node in the editor
+        const pos = editor.view.posAtDOM(chipEl, 0);
+        const resolvedPos = editor.state.doc.resolve(pos);
+        const node = resolvedPos.parent.type.name === "infoChip" ? resolvedPos.parent : editor.state.doc.nodeAt(pos);
+        if (node?.type.name === "infoChip") {
+          editor.chain().focus().setNodeSelection(pos).run();
+          setInfoChipAnchorEl(chipEl);
+        }
+      }
+    };
+    const editorEl = editor.view.dom;
+    editorEl.addEventListener("click", handleClick);
+    return () => editorEl.removeEventListener("click", handleClick);
+  }, [editor, isEditMode]);
 
   // Debounced config update on editor changes
   const debouncedUpdate = debounce(() => {
@@ -454,6 +563,43 @@ const RichTextEditable = ({
                     forceClose={activeDropdown !== "lineHeight" && activeDropdown !== null}
                   />
                   <Divider flexItem orientation="vertical" />
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <MenuButton
+                      value="link"
+                      iconName={ICON_NAME.LINK}
+                      selected={editorState?.isLink}
+                      onClick={(e) => {
+                        if (editorState?.isLink) {
+                          editor.chain().focus().extendMarkRange("link").unsetLink().run();
+                        } else {
+                          setLinkAnchorEl(e.currentTarget as HTMLElement);
+                        }
+                      }}
+                    />
+                    <MenuButton
+                      value="infoChip"
+                      iconName={ICON_NAME.INFO}
+                      selected={false}
+                      onClick={() => {
+                        editor.chain().focus().insertInfoChip().run();
+                        // The chip is inserted at the current selection position.
+                        // After insert, the cursor moves past the chip, so the chip is at cursor - 1.
+                        setTimeout(() => {
+                          const { selection } = editor.state;
+                          const pos = selection.from - 1;
+                          const domAtPos = editor.view.domAtPos(pos);
+                          const chipEl = (domAtPos.node as HTMLElement).closest?.(".info-chip")
+                            || (domAtPos.node as HTMLElement).querySelector?.(".info-chip")
+                            || (domAtPos.node.parentElement as HTMLElement)?.closest?.(".info-chip");
+                          if (chipEl) {
+                            editor.chain().setNodeSelection(pos).run();
+                            setInfoChipAnchorEl(chipEl as HTMLElement);
+                          }
+                        }, 50);
+                      }}
+                    />
+                  </Stack>
+                  <Divider flexItem orientation="vertical" />
                   <VariableInsertMenu
                     editor={editor}
                     variables={variables}
@@ -466,6 +612,16 @@ const RichTextEditable = ({
             </ToolbarContainer>
           </Box>
         </Portal>
+      )}
+
+      {/* Link editing popover */}
+      {editor && linkAnchorEl && (
+        <LinkPopover editor={editor} anchorEl={linkAnchorEl} onClose={() => setLinkAnchorEl(null)} />
+      )}
+
+      {/* Info chip editing popover */}
+      {editor && infoChipAnchorEl && (
+        <InfoChipEditPopover editor={editor} anchorEl={infoChipAnchorEl} onClose={() => setInfoChipAnchorEl(null)} />
       )}
 
       {/* Edit mode: show TipTap editor with variable chips */}
@@ -483,16 +639,7 @@ const RichTextEditable = ({
 
       {/* Preview mode: show resolved values */}
       {!isEditMode && (
-        <Box
-          sx={{
-            height: "100%",
-            pointerEvents: "none",
-            userSelect: "none",
-            fontFamily: "inherit",
-            "& p, & h1, & h2, & h3, & h4, & h5, & h6": { margin: 0 },
-          }}
-          dangerouslySetInnerHTML={{ __html: resolvedHtml || "<p></p>" }}
-        />
+        <RichTextPreview html={resolvedHtml} />
       )}
     </Box>
   );
@@ -577,7 +724,7 @@ export const RichTextDataWidget = ({
       ))}
 
       {viewOnly ? (
-        <RichTextViewOnly config={rawConfig} resolvedValues={resolvedValues} />
+        <RichTextPreviewResolved config={rawConfig} resolvedValues={resolvedValues} />
       ) : (
         <RichTextEditable config={rawConfig} onConfigChange={onConfigChange} resolvedValues={resolvedValues} />
       )}
