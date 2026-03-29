@@ -5,6 +5,7 @@
       "name": "Core Debug",
       "type": "debugpy",
       "request": "launch",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "module": "fastapi",
       "args": [
         "dev",
@@ -29,6 +30,7 @@
       "name": "GeoAPI Debug",
       "type": "debugpy",
       "request": "launch",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "module": "fastapi",
       "args": [
         "dev",
@@ -53,6 +55,7 @@
       "name": "Processes Debug",
       "type": "debugpy",
       "request": "launch",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "module": "fastapi",
       "args": [
         "dev",
@@ -77,6 +80,7 @@
       "name": "Accounts Debug",
       "type": "debugpy",
       "request": "launch",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "module": "fastapi",
       "args": [
         "dev",
@@ -101,6 +105,7 @@
       "name": "Routing Debug",
       "type": "debugpy",
       "request": "launch",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "module": "fastapi",
       "args": [
         "dev",
@@ -203,6 +208,22 @@
         "hidden": false,
         "group": "tools",
         "order": 5
+      }
+    },
+    {
+      "name": "Sync Datacatalog Pipeline",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/windmill/sync-datacatalog-pipeline.py",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": true,
+      "envFile": "${workspaceFolder}/.env",
+      "preLaunchTask": "uv-sync",
+      "presentation": {
+        "hidden": false,
+        "group": "tools",
+        "order": 6
       }
     }
   ],

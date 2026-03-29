@@ -1,0 +1,25 @@
+{
+    "version": 1,
+    "description": "Selected catalog data sources for GOAT Data Catalog",
+    "sources": [
+        {
+            "name": "berlin-csw",
+            "url": "https://gdi.berlin.de/geonetwork/srv/eng/csw",
+            "type": "csw",
+            "title": "Berlin Geoportal CSW",
+            "active": true,
+            "frequency": "WEEKLY",
+            "config": {
+                "max_datasets": 100,
+                "default_tags": [
+                    "berlin",
+                    "geodata"
+                ],
+                "default_groups": [],
+                "spatial": true,
+                "metadata_format": "iso19139",
+                "ignore_empty_datasets": true
+            }
+        }
+    ]
+}

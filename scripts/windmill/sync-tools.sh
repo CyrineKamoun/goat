@@ -59,6 +59,22 @@ python -m goatlib.tasks.sync_windmill \
     --token "$WINDMILL_TOKEN"
 
 echo ""
+
+# Sync datacatalog pipeline script by default so Windmill remains the single
+# operational path for catalog ingestion.
+DATACATALOG_WM_SYNC_ENABLED="${DATACATALOG_WM_SYNC_ENABLED:-true}"
+if [ "$DATACATALOG_WM_SYNC_ENABLED" = "true" ]; then
+    echo "Syncing datacatalog Windmill pipeline..."
+    python "$(dirname "$0")/sync-datacatalog-pipeline.py" \
+        --url "$WINDMILL_URL" \
+        --workspace "$WINDMILL_WORKSPACE" \
+        --token "$WINDMILL_TOKEN"
+    echo ""
+else
+    echo "Skipping datacatalog Windmill pipeline sync (DATACATALOG_WM_SYNC_ENABLED=$DATACATALOG_WM_SYNC_ENABLED)"
+    echo ""
+fi
+
 echo "============================================================"
 echo "Windmill sync complete!"
 echo "============================================================"

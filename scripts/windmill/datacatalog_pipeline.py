@@ -26,6 +26,8 @@ import psycopg
 import psycopg.rows
 from psycopg.types.json import Jsonb
 
+from goatlib.tools.style import get_default_style
+
 
 # ---------------------------------------------------------------------------
 # Config helpers — all settings come from environment variables only
@@ -48,6 +50,24 @@ def _require(*names: str) -> str:
 
 def _is_truthy(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _canonical_ducklake_metadata_dir(path: str) -> str:
+    """Resolve DuckLake data dir for persisted metadata paths.
+
+    Keep parity with regular layer upload behavior by honoring the configured
+    `DUCKLAKE_DATA_DIR`. When host-local paths leak into container runtime,
+    remap to the container mount path.
+    """
+    configured = (path or "").strip() or "/app/data/ducklake"
+    configured = configured.rstrip("/")
+
+    # In containers, host-local dev paths are not readable.
+    if os.path.exists("/.dockerenv") and configured.startswith("/home/"):
+        if "/data/ducklake" in configured:
+            return "/app/data/ducklake"
+
+    return configured
 
 # ---------------------------------------------------------------------------
 # CKAN API helpers
@@ -82,6 +102,70 @@ def _resolve_ckan_api_key() -> str | None:
             return str(row[0])
     except Exception as exc:
         logging.getLogger(__name__).warning("Could not auto-resolve CKAN API key from DB: %s", exc)
+
+    return None
+
+
+def _fetch_latest_harvest_xml(package_id: str) -> str | None:
+    """Fetch latest non-empty XML metadata from CKAN harvest_object.content."""
+    if not package_id:
+        return None
+
+    host = _env("CKAN_DB_HOST", "goat-ckan-db")
+    port = int(_env("CKAN_DB_PORT", "5432"))
+    dbname = _env("CKAN_DB_NAME", "ckan")
+    user = _env("CKAN_DB_USER", "ckan")
+    password = _env("CKAN_DB_PASSWORD", _env("CKAN_PG_PASSWORD", "ckan"))
+
+    query_latest_current = """
+        SELECT content
+        FROM harvest_object
+        WHERE package_id = %s
+          AND current IS TRUE
+          AND content IS NOT NULL
+          AND btrim(content) <> ''
+        ORDER BY
+            COALESCE(import_finished, fetch_finished, gathered, metadata_modified_date) DESC NULLS LAST,
+            id DESC
+        LIMIT 1
+    """
+    query_latest_any = """
+        SELECT content
+        FROM harvest_object
+        WHERE package_id = %s
+          AND content IS NOT NULL
+          AND btrim(content) <> ''
+        ORDER BY
+            COALESCE(import_finished, fetch_finished, gathered, metadata_modified_date) DESC NULLS LAST,
+            id DESC
+        LIMIT 1
+    """
+
+    try:
+        with psycopg.connect(
+            host=host,
+            port=port,
+            dbname=dbname,
+            user=user,
+            password=password,
+            connect_timeout=5,
+        ) as conn:
+            with conn.cursor() as cur:
+                cur.execute(query_latest_current, (package_id,))
+                row = cur.fetchone()
+                if row and row[0]:
+                    return str(row[0])
+
+                cur.execute(query_latest_any, (package_id,))
+                row = cur.fetchone()
+                if row and row[0]:
+                    return str(row[0])
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Could not fetch harvest metadata from CKAN DB for package_id=%s: %s",
+            package_id,
+            exc,
+        )
 
     return None
 
@@ -342,21 +426,11 @@ def extract_iso_metadata(xml: str) -> dict[str, Any]:
     return out
 
 
-def _extract_xml_from_package(package: dict[str, Any]) -> str:
-    xml_keys = {"xml", "xml_content", "metadata_xml", "csw_xml", "iso19139"}
-    for extra in package.get("extras") or []:
-        if isinstance(extra, dict) and str(extra.get("key") or "").lower() in xml_keys:
-            v = str(extra.get("value") or "").strip()
-            if v:
-                return v
-    for key in xml_keys:
-        v = str(package.get(key) or "").strip()
-        if v:
-            return v
-    return ""
-
-
-def build_csw_record(package: dict[str, Any], resource: dict[str, Any]) -> dict[str, Any]:
+def build_ckan_metadata(
+    package: dict[str, Any],
+    resource: dict[str, Any],
+    xml: str | None,
+) -> dict[str, Any]:
     resource_id = str(resource.get("id") or "")
     package_id = str(package.get("id") or "")
 
@@ -368,7 +442,6 @@ def build_csw_record(package: dict[str, Any], resource: dict[str, Any]) -> dict[
         "source": {"package_id": package_id, "resource_id": resource_id},
     }
 
-    xml = _extract_xml_from_package(package)
     if xml:
         meta = extract_iso_metadata(xml)
         if meta.get("title"):
@@ -380,6 +453,20 @@ def build_csw_record(package: dict[str, Any], resource: dict[str, Any]) -> dict[
                 record[field] = meta[field]
 
     return record
+
+
+def _build_customer_xml_metadata(
+    raw_xml: str | None,
+    metadata: dict[str, Any],
+) -> str | None:
+    """Return metadata payload for customer.layer.xml_metadata.
+
+    Use only CKAN CSW XML metadata. Do not persist JSON fallbacks.
+    """
+    _ = metadata
+    if raw_xml and raw_xml.strip():
+        return raw_xml
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -404,6 +491,37 @@ def _catalog_layer_uuid(resource_id: str) -> uuid.UUID:
     return uuid.uuid5(uuid.NAMESPACE_URL, f"goat:catalog:{resource_id}")
 
 
+def _bbox_to_extent_wkt(metadata: dict[str, Any]) -> str | None:
+    """Convert CSW bbox from metadata dict to WKT POLYGON."""
+    bbox = metadata.get("bbox")
+    if not bbox:
+        return None
+    try:
+        w, s, e, n = float(bbox["west"]), float(bbox["south"]), float(bbox["east"]), float(bbox["north"])
+        if w == e and s == n:
+            return None
+        return f"POLYGON(({w} {s}, {e} {s}, {e} {n}, {w} {n}, {w} {s}))"
+    except (KeyError, ValueError, TypeError):
+        return None
+
+
+def _is_degenerate_extent(wkt_text: str | None) -> bool:
+    """Return True if the extent is a degenerate single-point box."""
+    if not wkt_text:
+        return True
+    normalized = _normalize_extent_wkt(wkt_text)
+    if not normalized:
+        return True
+    # A degenerate polygon has all identical coordinates.
+    coords = re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", normalized)
+    if len(coords) >= 4:
+        xs = coords[0::2]
+        ys = coords[1::2]
+        if len(set(xs)) <= 1 and len(set(ys)) <= 1:
+            return True
+    return False
+
+
 def upsert_customer_catalog_layer(
     conn: psycopg.Connection,
     *,
@@ -416,16 +534,21 @@ def upsert_customer_catalog_layer(
     extent_wkt: str | None,
     resource_id: str,
     xml_metadata: str | None,
+    metadata: dict[str, Any] | None = None,
 ) -> str:
     """Upsert a catalog row in customer.layer and keep it pinned to Catalog folder."""
     s = _validate_schema(customer_schema)
+    _ = resource_id
+
+    # Use data extent if valid, otherwise fall back to CSW bbox.
+    if _is_degenerate_extent(extent_wkt) and metadata:
+        csw_extent = _bbox_to_extent_wkt(metadata)
+        if csw_extent:
+            extent_wkt = csw_extent
     normalized_extent_wkt = _normalize_extent_wkt(extent_wkt)
-    other_properties = {
-        "catalog_resource_id": resource_id,
-        "catalog_managed": True,
-        "user_layer_id": str(layer_id),
-        "usr_layer_id": str(layer_id),
-    }
+
+    # Generate default styling properties for the geometry type.
+    properties = Jsonb(get_default_style(geometry_type))
 
     with conn.cursor() as cur:
         cur.execute(
@@ -437,12 +560,12 @@ def upsert_customer_catalog_layer(
                 name = %s,
                 type = 'feature',
                 feature_layer_type = 'standard',
-                feature_layer_geometry_type = %s,
+                feature_layer_geometry_type = COALESCE(%s, feature_layer_geometry_type, 'polygon'),
                 extent = CASE WHEN %s::text IS NOT NULL
                               THEN ST_Multi(ST_GeomFromText(%s, 4326)) ELSE NULL END,
+                properties = COALESCE(%s, properties),
                 in_catalog = TRUE,
                 xml_metadata = %s,
-                other_properties = COALESCE(other_properties, '{{}}'::jsonb) || %s::jsonb,
                 updated_at = NOW()
             WHERE id = %s
             RETURNING id
@@ -454,8 +577,8 @@ def upsert_customer_catalog_layer(
                 geometry_type,
                 normalized_extent_wkt,
                 normalized_extent_wkt,
+                properties,
                 xml_metadata,
-                Jsonb(other_properties),
                 layer_id,
             ),
         )
@@ -468,14 +591,14 @@ def upsert_customer_catalog_layer(
             INSERT INTO {s}.layer (
                 id, user_id, folder_id, name, type,
                 feature_layer_type, feature_layer_geometry_type,
-                extent, in_catalog, xml_metadata, other_properties,
+                extent, properties, in_catalog, xml_metadata,
                 thumbnail_url, created_at, updated_at
             ) VALUES (
                 %s, %s, %s, %s, 'feature',
-                'standard', %s,
+                'standard', COALESCE(%s, 'polygon'),
                 CASE WHEN %s::text IS NOT NULL
                      THEN ST_Multi(ST_GeomFromText(%s, 4326)) ELSE NULL END,
-                TRUE, %s, %s,
+                %s, TRUE, %s,
                 'https://assets.plan4better.de/img/goat_new_dataset_thumbnail.png',
                 NOW(), NOW()
             )
@@ -489,8 +612,8 @@ def upsert_customer_catalog_layer(
                 geometry_type,
                 normalized_extent_wkt,
                 normalized_extent_wkt,
+                properties,
                 xml_metadata,
-                Jsonb(other_properties),
             ),
         )
         inserted = cur.fetchone()
@@ -525,32 +648,63 @@ def ensure_catalog_schema(conn: psycopg.Connection, schema: str) -> None:
         cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {s}.layer (
                 id                         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                layer_id                   UUID,
+                user_id                    UUID NOT NULL,
+                name                       TEXT NOT NULL,
                 resource_id                TEXT NOT NULL,
                 base_resource_id           TEXT,
-                version_num                INTEGER,
-                is_latest                  BOOLEAN,
+                version_num                INTEGER DEFAULT 1,
+                is_latest                  BOOLEAN DEFAULT TRUE,
                 superseded_at              TIMESTAMPTZ,
-                name                       TEXT NOT NULL,
-                feature_layer_geometry_type TEXT,
-                extent                     geometry(MultiPolygon, 4326),
-                csw_record_jsonb           JSONB,
-                csw_raw_xml                TEXT,
+                metadata_jsonb             JSONB,
+                xml_raw                    TEXT,
                 schema_name                TEXT NOT NULL,
                 table_name                 TEXT NOT NULL
             )
         """)
         # Migration-safe: add columns that might be missing in older deployments.
         for col, col_type in [
+            ("layer_id", "UUID"),
+            ("user_id", "UUID"),
+            ("name", "TEXT"),
             ("base_resource_id", "TEXT"),
             ("version_num", "INTEGER"),
             ("is_latest", "BOOLEAN"),
             ("superseded_at", "TIMESTAMPTZ"),
-            ("csw_record_jsonb", "JSONB"),
-            ("csw_raw_xml", "TEXT"),
+            ("metadata_jsonb", "JSONB"),
+            ("xml_raw", "TEXT"),
         ]:
             cur.execute(
                 f"ALTER TABLE {s}.layer ADD COLUMN IF NOT EXISTS {col} {col_type}"
             )
+        # Rename legacy columns if they exist.
+        for old_col, new_col in [
+            ("csw_record_jsonb", "metadata_jsonb"),
+            ("csw_raw_xml", "xml_raw"),
+        ]:
+            cur.execute(f"""
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = '{s}' AND table_name = 'layer'
+                          AND column_name = '{old_col}'
+                    ) AND NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema = '{s}' AND table_name = 'layer'
+                          AND column_name = '{new_col}'
+                    ) THEN
+                        ALTER TABLE {s}.layer RENAME COLUMN {old_col} TO {new_col};
+                    END IF;
+                END $$;
+            """)
+        # Drop legacy columns.
+        cur.execute(f"ALTER TABLE {s}.layer DROP COLUMN IF EXISTS csw_record_jsonb")
+        cur.execute(f"ALTER TABLE {s}.layer DROP COLUMN IF EXISTS csw_raw_xml")
+        cur.execute(
+            f"ALTER TABLE {s}.layer DROP COLUMN IF EXISTS feature_layer_geometry_type"
+        )
+        cur.execute(f"ALTER TABLE {s}.layer DROP COLUMN IF EXISTS extent")
         cur.execute(f"""
             CREATE UNIQUE INDEX IF NOT EXISTS ux_layer_resource_latest
             ON {s}.layer(resource_id)
@@ -561,8 +715,8 @@ def ensure_catalog_schema(conn: psycopg.Connection, schema: str) -> None:
             ON {s}.layer(resource_id)
         """)
         cur.execute(f"""
-            CREATE INDEX IF NOT EXISTS ix_layer_csw_record_gin
-            ON {s}.layer USING GIN (csw_record_jsonb)
+            CREATE INDEX IF NOT EXISTS ix_layer_metadata_gin
+            ON {s}.layer USING GIN (metadata_jsonb)
         """)
         cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {s}.ckan_package_dependency (
@@ -609,6 +763,109 @@ def ensure_catalog_schema(conn: psycopg.Connection, schema: str) -> None:
                 f"ALTER TABLE {s}.resource_run_history ADD COLUMN IF NOT EXISTS {col} {col_type}"
             )
     conn.commit()
+
+
+def sync_ckan_dependencies(
+    conn: psycopg.Connection,
+    *,
+    packages: list[dict[str, Any]],
+    schema: str,
+    synced_at: datetime,
+) -> int:
+    """Upsert all CKAN package relationships into ckan_package_dependency.
+
+    Processes both relationships_as_subject and relationships_as_object from
+    every package. Deduplication is handled by the unique constraint on
+    (subject_package_id, object_package_id, relationship_type).
+
+    Returns the number of rows upserted.
+    """
+    s = _validate_schema(schema)
+    seen: set[tuple[str, str, str]] = set()
+    rows: list[tuple[str, str, str, str | None, datetime]] = []
+
+    for pkg in packages:
+        for rel_list in (
+            pkg.get("relationships_as_subject") or [],
+            pkg.get("relationships_as_object") or [],
+        ):
+            for rel in rel_list:
+                if not isinstance(rel, dict):
+                    continue
+                subj = str(rel.get("subject") or "").strip()
+                obj = str(rel.get("object") or "").strip()
+                rel_type = str(rel.get("type") or "").strip()
+                comment = str(rel.get("comment") or "").strip() or None
+                if not (subj and obj and rel_type):
+                    continue
+                key = (subj, obj, rel_type)
+                if key in seen:
+                    continue
+                seen.add(key)
+                rows.append((subj, obj, rel_type, comment, synced_at))
+
+    if not rows:
+        return 0
+
+    with conn.cursor() as cur:
+        cur.executemany(
+            f"""
+            INSERT INTO {s}.ckan_package_dependency
+                (subject_package_id, object_package_id, relationship_type, comment, synced_at)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT ON CONSTRAINT uq_ckan_dep DO UPDATE SET
+                comment   = EXCLUDED.comment,
+                synced_at = EXCLUDED.synced_at
+            """,
+            rows,
+        )
+    conn.commit()
+    return len(rows)
+
+
+def insert_resource_run_history(
+    conn: psycopg.Connection,
+    *,
+    schema: str,
+    run_id: str,
+    package_id: str,
+    resource_id: str,
+    status: str,
+    version_num: int | None,
+    row_count: int | None,
+    error: str | None,
+    processed_at: datetime,
+) -> None:
+    """Append one row to resource_run_history. Never raises — failures are logged only."""
+    s = _validate_schema(schema)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                INSERT INTO {s}.resource_run_history
+                    (run_id, package_id, resource_id, status, version_num, row_count, error, processed_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    run_id,
+                    package_id,
+                    resource_id,
+                    status,
+                    version_num,
+                    row_count,
+                    error[:2000] if error else None,
+                    processed_at,
+                ),
+            )
+        conn.commit()
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "resource_run_history insert failed resource_id=%s: %s", resource_id, exc
+        )
+        try:
+            conn.rollback()
+        except Exception:
+            pass
 
 
 def _resource_signature(
@@ -695,14 +952,35 @@ def _get_existing_layer(
     with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
         cur.execute(
             f"""
-            SELECT schema_name, table_name, feature_layer_geometry_type,
-                   CASE WHEN extent IS NOT NULL THEN ST_AsText(extent) END AS extent_wkt
+            SELECT schema_name, table_name
             FROM {s}.layer
             WHERE resource_id = %s AND is_latest
             ORDER BY version_num DESC NULLS LAST
             LIMIT 1
             """,
             (resource_id,),
+        )
+        row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def _get_existing_customer_layer_info(
+    conn: psycopg.Connection,
+    customer_schema: str,
+    layer_id: uuid.UUID,
+) -> dict[str, Any] | None:
+    s = _validate_schema(customer_schema)
+    with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+        cur.execute(
+            f"""
+            SELECT
+                feature_layer_geometry_type,
+                CASE WHEN extent IS NOT NULL THEN ST_AsText(extent) END AS extent_wkt
+            FROM {s}.layer
+            WHERE id = %s
+            LIMIT 1
+            """,
+            (layer_id,),
         )
         row = cur.fetchone()
     return dict(row) if row else None
@@ -735,9 +1013,11 @@ def upsert_catalog_layer(
     *,
     schema: str,
     resource_id: str,
+    layer_id: str | None,
+    user_id: str,
     name: str,
-    geometry_type: str | None,
-    extent_wkt: str | None,
+    metadata: dict[str, Any],
+    xml_raw: str | None,
     schema_name: str,
     table_name: str,
     version_num: int,
@@ -745,7 +1025,6 @@ def upsert_catalog_layer(
 ) -> str:
     """Insert or update datacatalog.layer; returns the UUID of the row."""
     s = _validate_schema(schema)
-    normalized_extent_wkt = _normalize_extent_wkt(extent_wkt)
     with conn.cursor() as cur:
         if create_new_version:
             cur.execute(
@@ -756,21 +1035,21 @@ def upsert_catalog_layer(
             cur.execute(
                 f"""
                 INSERT INTO {s}.layer (
+                    layer_id, user_id, name,
                     resource_id, base_resource_id, version_num, is_latest, superseded_at,
-                    name, feature_layer_geometry_type, extent,
+                    metadata_jsonb, xml_raw,
                     schema_name, table_name
                 ) VALUES (
+                    %s, %s, %s,
                     %s, %s, %s, TRUE, NULL, %s, %s,
-                    CASE WHEN %s::text IS NOT NULL
-                         THEN ST_Multi(ST_GeomFromText(%s, 4326)) ELSE NULL END,
                     %s, %s
                 )
                 RETURNING id
                 """,
                 (
+                    layer_id, user_id, name,
                     resource_id, resource_id, version_num,
-                    name, geometry_type,
-                    normalized_extent_wkt, normalized_extent_wkt,
+                    Jsonb(metadata), xml_raw,
                     schema_name, table_name,
                 ),
             )
@@ -778,16 +1057,15 @@ def upsert_catalog_layer(
             cur.execute(
                 f"""
                 UPDATE {s}.layer SET
-                    name=%s, feature_layer_geometry_type=%s,
-                    extent=CASE WHEN %s::text IS NOT NULL
-                                THEN ST_Multi(ST_GeomFromText(%s, 4326)) ELSE NULL END,
+                    layer_id=%s, user_id=%s, name=%s,
+                    metadata_jsonb=%s, xml_raw=%s,
                     schema_name=%s, table_name=%s
                 WHERE resource_id=%s AND is_latest
                 RETURNING id
                 """,
                 (
-                    name, geometry_type,
-                    normalized_extent_wkt, normalized_extent_wkt,
+                    layer_id, user_id, name,
+                    Jsonb(metadata), xml_raw,
                     schema_name, table_name,
                     resource_id,
                 ),
@@ -801,26 +1079,130 @@ def upsert_catalog_layer(
         cur.execute(
             f"""
             INSERT INTO {s}.layer (
+                layer_id, user_id, name,
                 resource_id, base_resource_id, version_num, is_latest, superseded_at,
-                name, feature_layer_geometry_type, extent,
+                metadata_jsonb, xml_raw,
                 schema_name, table_name
             ) VALUES (
+                %s, %s, %s,
                 %s, %s, %s, TRUE, NULL, %s, %s,
-                CASE WHEN %s::text IS NOT NULL
-                     THEN ST_Multi(ST_GeomFromText(%s, 4326)) ELSE NULL END,
                 %s, %s
             )
             RETURNING id
             """,
             (
+                layer_id, user_id, name,
                 resource_id, resource_id, version_num or 1,
-                name, geometry_type,
-                normalized_extent_wkt, normalized_extent_wkt,
+                Jsonb(metadata), xml_raw,
                 schema_name, table_name,
             ),
         )
         inserted = cur.fetchone()
         return str(inserted[0]) if inserted else ""
+
+
+def resolve_catalog_ownership(
+    conn: psycopg.Connection,
+    *,
+    customer_schema: str,
+    owner_user_id: uuid.UUID,
+    folder_id: uuid.UUID,
+) -> tuple[uuid.UUID, uuid.UUID, str]:
+    """Resolve a valid catalog ownership pair for customer.layer writes.
+
+    Priority:
+    1. Use configured env IDs when both exist and belong together.
+    2. Reuse ownership from existing in-catalog layers.
+    3. Reuse a folder named "catalog".
+    4. Fall back to configured IDs (will fail loudly if invalid).
+    """
+    s = _validate_schema(customer_schema)
+
+    owner_exists = False
+    folder_owner_id: uuid.UUID | None = None
+
+    with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+        try:
+            cur.execute(
+                f'SELECT id FROM {s}."user" WHERE id = %s LIMIT 1',
+                (owner_user_id,),
+            )
+            owner_exists = cur.fetchone() is not None
+        except Exception:
+            owner_exists = False
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+        try:
+            cur.execute(
+                f"SELECT id, user_id FROM {s}.folder WHERE id = %s LIMIT 1",
+                (folder_id,),
+            )
+            folder_row = cur.fetchone()
+            if folder_row and folder_row.get("user_id"):
+                folder_owner_id = uuid.UUID(str(folder_row["user_id"]))
+        except Exception:
+            folder_owner_id = None
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+        if owner_exists and folder_owner_id and folder_owner_id == owner_user_id:
+            return owner_user_id, folder_id, "env"
+
+        try:
+            cur.execute(
+                f"""
+                SELECT user_id, folder_id
+                FROM {s}.layer
+                WHERE in_catalog IS TRUE
+                  AND user_id IS NOT NULL
+                  AND folder_id IS NOT NULL
+                LIMIT 1
+                """,
+            )
+            row = cur.fetchone()
+            if row and row.get("user_id") and row.get("folder_id"):
+                return (
+                    uuid.UUID(str(row["user_id"])),
+                    uuid.UUID(str(row["folder_id"])),
+                    "existing_catalog_layer",
+                )
+        except Exception:
+            pass
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+        try:
+            cur.execute(
+                f"""
+                SELECT id, user_id
+                FROM {s}.folder
+                WHERE lower(name) = 'catalog'
+                  AND user_id IS NOT NULL
+                LIMIT 1
+                """,
+            )
+            row = cur.fetchone()
+            if row and row.get("id") and row.get("user_id"):
+                return (
+                    uuid.UUID(str(row["user_id"])),
+                    uuid.UUID(str(row["id"])),
+                    "catalog_folder",
+                )
+        except Exception:
+            pass
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+
+    return owner_user_id, folder_id, "env_unvalidated"
 
 
 # ---------------------------------------------------------------------------
@@ -874,13 +1256,84 @@ def _get_duckdb_con():
         return runner.duckdb_con
 
 
+def _get_ducklake_snapshot_id(
+    *,
+    table_schema: str,
+    table_name: str,
+) -> int | None:
+    """Read current DuckLake snapshot id for a table, if available."""
+    con = _get_duckdb_con()
+    try:
+        row = con.execute(
+            f"""
+            SELECT t.begin_snapshot
+            FROM __ducklake_metadata_lake.ducklake.ducklake_table t
+            JOIN __ducklake_metadata_lake.ducklake.ducklake_schema s
+              ON t.schema_id = s.schema_id
+            WHERE s.schema_name = '{_validate_schema(table_schema)}'
+              AND t.table_name = '{table_name}'
+              AND t.end_snapshot IS NULL
+            """
+        ).fetchone()
+        if row:
+            return int(row[0])
+    except Exception:
+        return None
+    return None
+
+
+def generate_pmtiles_for_table(
+    *,
+    table_schema: str,
+    table_name: str,
+    user_id: str,
+    layer_id: str,
+    geometry_column: str,
+) -> str | None:
+    """Generate PMTiles from a DuckLake table; returns output path if created."""
+    runner = _get_tool_runner()
+    settings = runner.settings
+    if settings is None or not settings.pmtiles_enabled:
+        return None
+
+    from goatlib.io.pmtiles import PMTilesConfig, PMTilesGenerator
+
+    config = PMTilesConfig(
+        enabled=True,
+        min_zoom=settings.pmtiles_min_zoom,
+        max_zoom=settings.pmtiles_max_zoom,
+    )
+    generator = PMTilesGenerator(
+        tiles_data_dir=settings.tiles_data_dir,
+        config=config,
+    )
+
+    full_table_name = f"lake.{_validate_schema(table_schema)}.{table_name}"
+    snapshot_id = _get_ducklake_snapshot_id(
+        table_schema=table_schema,
+        table_name=table_name,
+    )
+
+    pmtiles_path = generator.generate_from_table(
+        duckdb_con=_get_duckdb_con(),
+        table_name=full_table_name,
+        user_id=user_id,
+        layer_id=layer_id,
+        geometry_column=geometry_column,
+        snapshot_id=snapshot_id,
+    )
+    return str(pmtiles_path) if pmtiles_path else None
+
+
 def load_into_ducklake(
     *,
     file_path: str,
     table_schema: str,
     table_name: str,
-) -> tuple[int, str | None, str | None]:
-    """Load a file into the DuckLake catalog; returns (row_count, geometry_type, extent_wkt).
+) -> tuple[int, str | None, str | None, str | None]:
+    """Load a file into the DuckLake catalog.
+
+    Returns ``(row_count, geometry_type, extent_wkt, geometry_column)``.
 
     Uses goatlib's ``SimpleToolRunner`` for DuckDB/DuckLake connection
     management so the ATTACH options, parquet settings, and S3 config
@@ -914,18 +1367,14 @@ def load_into_ducklake(
             select_parts.append(f'"{col_name}"')
 
     select_sql = ", ".join(select_parts)
+    source_sql = f"SELECT {select_sql} FROM read_parquet('{file_path}')"
     order_clause = f'ORDER BY ST_Hilbert("{geom_col}")' if geom_col else ""
 
-    # Create registered DuckLake table from the converted parquet file.
-    con.execute(f"""
-        CREATE TABLE {full_table} AS
-        SELECT {select_sql} FROM read_parquet('{file_path}')
-        {order_clause}
-    """)
-
-    # Collect stats from the ingested table.
+    # Compute stats from source query before writing into DuckLake.
+    # This avoids extra metadata reads on the target table, which can fail
+    # on forked environments with older DuckLake catalog schemas.
     row_count: int = con.execute(
-        f"SELECT COUNT(*) FROM {full_table}"
+        f"SELECT COUNT(*) FROM ({source_sql}) src"
     ).fetchone()[0]
 
     geometry_type: str | None = None
@@ -934,20 +1383,28 @@ def load_into_ducklake(
         try:
             raw_type_row = con.execute(
                 f"SELECT ST_GeometryType(\"{geom_col}\") "
-                f"FROM {full_table} "
+                f"FROM ({source_sql}) src "
                 f"WHERE \"{geom_col}\" IS NOT NULL LIMIT 1"
             ).fetchone()
             if raw_type_row:
                 geometry_type = _map_geometry_type(str(raw_type_row[0]))
+
             bbox_row = con.execute(
-                f"SELECT ST_AsText(ST_Extent(\"{geom_col}\")) FROM {full_table}"
+                f"SELECT ST_AsText(ST_Extent(\"{geom_col}\")) FROM ({source_sql}) src"
             ).fetchone()
             if bbox_row and bbox_row[0]:
                 extent_wkt = str(bbox_row[0])
         except Exception:
             pass
 
-    return row_count, geometry_type, extent_wkt
+    # Create registered DuckLake table from the converted parquet file.
+    con.execute(f"""
+        CREATE TABLE {full_table} AS
+        {source_sql}
+        {order_clause}
+    """)
+
+    return row_count, geometry_type, extent_wkt, geom_col
 
 
 def _download_resource(url: str) -> str:
@@ -1100,13 +1557,21 @@ def main() -> dict[str, Any]:
     pg_password = _env("META_PG_PASSWORD", _env("POSTGRES_PASSWORD", ""))
     catalog_schema = _env("META_PG_SCHEMA", "datacatalog")
     customer_schema = _env("CUSTOMER_SCHEMA", "customer")
-    # Temporary hardcoded ownership mapping requested by ops.
-    catalog_owner_user_id = uuid.UUID("744e4fd1-685c-495c-8b02-efebce875359")
-    catalog_folder_id = uuid.UUID("8526b040-082a-471f-b8ea-f11321e5b33a")
+    catalog_owner_user_id = _parse_uuid(
+        _env("CATALOG_OWNER_USER_ID", "744e4fd1-685c-495c-8b02-efebce875359"),
+        "CATALOG_OWNER_USER_ID",
+    )
+    catalog_folder_id = _parse_uuid(
+        _env("CATALOG_FOLDER_ID", "8526b040-082a-471f-b8ea-f11321e5b33a"),
+        "CATALOG_FOLDER_ID",
+    )
     catalog_folder_name = "catalog"
 
-    # DuckLake data dir for path bookkeeping (actual connection is via goatlib).
-    ducklake_data_dir = _env("DUCKLAKE_DATA_DIR", "/app/data/ducklake")
+    # DuckLake data dir for path bookkeeping in metadata tables.
+    # Keep this canonical so downstream services don't attempt host-local paths.
+    ducklake_data_dir = _canonical_ducklake_metadata_dir(
+        _env("DUCKLAKE_DATA_DIR", "/app/data/ducklake")
+    )
 
     # ---- CKAN health check -------------------------------------------------
     health = check_ckan_health(health_url, api_key)
@@ -1125,6 +1590,7 @@ def main() -> dict[str, Any]:
         package_search_url, api_key, page_size=page_size, max_pages=max_pages
     )
     log.info("Fetched %d packages", len(packages))
+    sync_run_at = datetime.now(timezone.utc)
 
     # ---- Connect to PostgreSQL and set up schema --------------------------
     pg_conn = psycopg.connect(
@@ -1137,20 +1603,44 @@ def main() -> dict[str, Any]:
     )
     ensure_catalog_schema(pg_conn, catalog_schema)
 
+    (
+        catalog_owner_user_id,
+        catalog_folder_id,
+        ownership_source,
+    ) = resolve_catalog_ownership(
+        pg_conn,
+        customer_schema=customer_schema,
+        owner_user_id=catalog_owner_user_id,
+        folder_id=catalog_folder_id,
+    )
+
     log.info(
-        "Catalog ownership hardcoded user_id=%s folder_id=%s",
+        "Catalog ownership resolved source=%s user_id=%s folder_id=%s",
+        ownership_source,
         catalog_owner_user_id,
         catalog_folder_id,
     )
 
+    dependencies_synced = sync_ckan_dependencies(
+        pg_conn,
+        packages=packages,
+        schema=catalog_schema,
+        synced_at=sync_run_at,
+    )
+    log.info("Synced %d CKAN package dependencies", dependencies_synced)
+
     run_id = str(uuid.uuid4())
     processed = skipped = failed = candidates = 0
+    harvest_xml_cache: dict[str, str | None] = {}
 
     for package in packages:
         if str(package.get("state") or "active").lower() != "active":
             continue
 
         package_id = str(package.get("id") or "")
+        if package_id not in harvest_xml_cache:
+            harvest_xml_cache[package_id] = _fetch_latest_harvest_xml(package_id)
+        package_xml_metadata = harvest_xml_cache.get(package_id)
         resources: list[dict[str, Any]] = package.get("resources") or []
 
         for resource in resources:
@@ -1178,18 +1668,24 @@ def main() -> dict[str, Any]:
 
             log.info("resource_id=%s resolved targets=%d", resource_id, len(wfs_targets))
 
-            base_csw = build_csw_record(package, resource)
-            xml_metadata = _extract_xml_from_package(package) or None
+            base_metadata = build_ckan_metadata(package, resource, package_xml_metadata)
+            raw_xml_metadata = package_xml_metadata
+            xml_metadata = _build_customer_xml_metadata(raw_xml_metadata, base_metadata)
 
             for resource_download_url, typename in wfs_targets:
                 candidates += 1
+                # Clear any stale failed transaction state from previous iterations.
+                try:
+                    pg_conn.rollback()
+                except Exception:
+                    pass
                 effective_resource_id = (
                     f"{resource_id}::{typename}" if typename else resource_id
                 )
                 customer_layer_id = _catalog_layer_uuid(effective_resource_id)
                 customer_layer_id_no_dash = str(customer_layer_id).replace("-", "")
                 layer_suffix = f" [{typename}]" if typename else ""
-                layer_name = str(base_csw.get("title") or resource_id) + layer_suffix
+                layer_name = str(base_metadata.get("title") or resource_id) + layer_suffix
 
                 sig = _resource_signature(
                     package_id,
@@ -1221,19 +1717,12 @@ def main() -> dict[str, Any]:
                                 f"user_{str(catalog_owner_user_id).replace('-', '')}"
                             )
                             existing_table_name = f"t_{customer_layer_id_no_dash}"
-
-                            upsert_catalog_layer(
+                            existing_customer = _get_existing_customer_layer_info(
                                 pg_conn,
-                                schema=catalog_schema,
-                                resource_id=effective_resource_id,
-                                name=layer_name,
-                                geometry_type=existing.get("feature_layer_geometry_type"),
-                                extent_wkt=existing.get("extent_wkt"),
-                                schema_name=existing_schema_name,
-                                table_name=existing_table_name,
-                                version_num=int(existing_sig.get("version_num") or 1),
-                                create_new_version=False,
+                                customer_schema,
+                                customer_layer_id,
                             )
+
                             upsert_customer_catalog_layer(
                                 pg_conn,
                                 customer_schema=customer_schema,
@@ -1241,10 +1730,27 @@ def main() -> dict[str, Any]:
                                 folder_id=catalog_folder_id,
                                 layer_id=customer_layer_id,
                                 layer_name=layer_name,
-                                geometry_type=existing.get("feature_layer_geometry_type"),
-                                extent_wkt=existing.get("extent_wkt"),
+                                geometry_type=(
+                                    existing_customer or {}
+                                ).get("feature_layer_geometry_type"),
+                                extent_wkt=(existing_customer or {}).get("extent_wkt"),
                                 resource_id=effective_resource_id,
                                 xml_metadata=xml_metadata,
+                                metadata=base_metadata,
+                            )
+                            upsert_catalog_layer(
+                                pg_conn,
+                                schema=catalog_schema,
+                                resource_id=effective_resource_id,
+                                layer_id=str(customer_layer_id),
+                                user_id=str(catalog_owner_user_id),
+                                name=layer_name,
+                                metadata=base_metadata,
+                                xml_raw=raw_xml_metadata,
+                                schema_name=existing_schema_name,
+                                table_name=existing_table_name,
+                                version_num=int(existing_sig.get("version_num") or 1),
+                                create_new_version=False,
                             )
                             with pg_conn.cursor() as cur:
                                 cur.execute(
@@ -1274,6 +1780,18 @@ def main() -> dict[str, Any]:
                             "resource_id=%s skipped duplicate signature (status=%s)",
                             effective_resource_id,
                             existing_sig.get("status"),
+                        )
+                        insert_resource_run_history(
+                            pg_conn,
+                            schema=catalog_schema,
+                            run_id=run_id,
+                            package_id=package_id,
+                            resource_id=effective_resource_id,
+                            status="skipped",
+                            version_num=int(existing_sig.get("version_num") or 0) or None,
+                            row_count=int(existing_sig.get("row_count") or 0) or None,
+                            error=None,
+                            processed_at=datetime.now(timezone.utc),
                         )
                         continue
 
@@ -1315,19 +1833,76 @@ def main() -> dict[str, Any]:
                             "resource_id=%s skipped: not a convertible spatial file",
                             effective_resource_id,
                         )
+                        insert_resource_run_history(
+                            pg_conn,
+                            schema=catalog_schema,
+                            run_id=run_id,
+                            package_id=package_id,
+                            resource_id=effective_resource_id,
+                            status="skipped",
+                            version_num=None,
+                            row_count=None,
+                            error="not a convertible spatial file",
+                            processed_at=datetime.now(timezone.utc),
+                        )
                         continue
 
-                    row_count, geometry_type, extent_wkt = load_into_ducklake(
+                    row_count, geometry_type, extent_wkt, geometry_column = load_into_ducklake(
                         file_path=parquet_path,
                         table_schema=target_table_schema,
                         table_name=target_table_name,
                     )
+                    if geometry_type is None:
+                        skipped += 1
+                        log.warning(
+                            "resource_id=%s skipped: geometry type could not be detected",
+                            effective_resource_id,
+                        )
+                        # Non-spatial/tabular datasets should not be published as feature layers.
+                        _get_duckdb_con().execute(
+                            f"DROP TABLE IF EXISTS lake.{_validate_schema(target_table_schema)}.{target_table_name}"
+                        )
+                        insert_resource_run_history(
+                            pg_conn,
+                            schema=catalog_schema,
+                            run_id=run_id,
+                            package_id=package_id,
+                            resource_id=effective_resource_id,
+                            status="skipped",
+                            version_num=None,
+                            row_count=row_count,
+                            error="geometry type could not be detected",
+                            processed_at=datetime.now(timezone.utc),
+                        )
+                        continue
                     log.info(
                         "resource_id=%s loaded table=%s rows=%d",
                         effective_resource_id,
                         f"{target_table_schema}.{target_table_name}",
                         row_count,
                     )
+
+                    try:
+                        pmtiles_path = generate_pmtiles_for_table(
+                            table_schema=target_table_schema,
+                            table_name=target_table_name,
+                            user_id=str(catalog_owner_user_id),
+                            layer_id=str(customer_layer_id),
+                            geometry_column=geometry_column or "geometry",
+                        )
+                        if pmtiles_path:
+                            log.info(
+                                "resource_id=%s pmtiles generated at %s",
+                                effective_resource_id,
+                                pmtiles_path,
+                            )
+                    except Exception as pmtiles_exc:
+                        # PMTiles are an optimization; failures should not block ingestion.
+                        log.warning(
+                            "resource_id=%s PMTiles generation failed (non-fatal): %s",
+                            effective_resource_id,
+                            pmtiles_exc,
+                        )
 
                     with pg_conn.cursor() as cur:
                         cur.execute(
@@ -1368,18 +1943,6 @@ def main() -> dict[str, Any]:
                             "processor_dataset_version upsert did not return row"
                         )
 
-                    upsert_catalog_layer(
-                        pg_conn,
-                        schema=catalog_schema,
-                        resource_id=effective_resource_id,
-                        name=layer_name,
-                        geometry_type=geometry_type,
-                        extent_wkt=extent_wkt,
-                        schema_name=target_table_schema,
-                        table_name=target_table_name,
-                        version_num=version_num,
-                        create_new_version=True,
-                    )
                     upsert_customer_catalog_layer(
                         pg_conn,
                         customer_schema=customer_schema,
@@ -1391,6 +1954,21 @@ def main() -> dict[str, Any]:
                         extent_wkt=extent_wkt,
                         resource_id=effective_resource_id,
                         xml_metadata=xml_metadata,
+                        metadata=base_metadata,
+                    )
+                    upsert_catalog_layer(
+                        pg_conn,
+                        schema=catalog_schema,
+                        resource_id=effective_resource_id,
+                        layer_id=str(customer_layer_id),
+                        user_id=str(catalog_owner_user_id),
+                        name=layer_name,
+                        metadata=base_metadata,
+                        xml_raw=raw_xml_metadata,
+                        schema_name=target_table_schema,
+                        table_name=target_table_name,
+                        version_num=version_num,
+                        create_new_version=True,
                     )
                     pg_conn.commit()
                     processed += 1
@@ -1398,6 +1976,18 @@ def main() -> dict[str, Any]:
                         "resource_id=%s processed version=%d",
                         effective_resource_id,
                         version_num,
+                    )
+                    insert_resource_run_history(
+                        pg_conn,
+                        schema=catalog_schema,
+                        run_id=run_id,
+                        package_id=package_id,
+                        resource_id=effective_resource_id,
+                        status="success",
+                        version_num=version_num,
+                        row_count=row_count,
+                        error=None,
+                        processed_at=processed_at,
                     )
 
                 except Exception as exc:
@@ -1443,6 +2033,18 @@ def main() -> dict[str, Any]:
                         pg_conn.commit()
                     except Exception:
                         pg_conn.rollback()
+                    insert_resource_run_history(
+                        pg_conn,
+                        schema=catalog_schema,
+                        run_id=run_id,
+                        package_id=package_id,
+                        resource_id=effective_resource_id,
+                        status="failed",
+                        version_num=version_num,
+                        row_count=None,
+                        error=str(exc)[:2000],
+                        processed_at=processed_at,
+                    )
 
                 finally:
                     if tmp_path and os.path.exists(tmp_path):
@@ -1460,6 +2062,7 @@ def main() -> dict[str, Any]:
         "processed": processed,
         "skipped": skipped,
         "failed": failed,
+        "dependencies_synced": dependencies_synced,
         "catalog_owner_user_id": str(catalog_owner_user_id),
         "catalog_folder_name": catalog_folder_name,
     }

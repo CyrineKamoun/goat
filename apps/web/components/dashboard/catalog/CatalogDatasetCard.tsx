@@ -5,6 +5,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import type { Layer } from "@/lib/validations/layer";
 import { datasetMetadataAggregated } from "@/lib/validations/layer";
+import { parseCatalogXmlMetadata } from "@/lib/utils/catalog-xml-metadata";
 
 import { useGetMetadataValueTranslation } from "@/hooks/map/DatasetHooks";
 
@@ -29,6 +30,11 @@ const CatalogDatasetCard = ({
   const theme = useTheme();
   const { t } = useTranslation(["common"]);
   const getMetadataValueTranslation = useGetMetadataValueTranslation();
+  const xmlMeta = parseCatalogXmlMetadata(dataset.xml_metadata);
+  const description = xmlMeta?.abstract || dataset.description || t("common:no_description");
+  const bboxLabel = xmlMeta?.bbox
+    ? `${xmlMeta.bbox.west.toFixed(3)}, ${xmlMeta.bbox.south.toFixed(3)} / ${xmlMeta.bbox.east.toFixed(3)}, ${xmlMeta.bbox.north.toFixed(3)}`
+    : null;
 
   return (
     <Paper
@@ -84,10 +90,27 @@ const CatalogDatasetCard = ({
                   WebkitLineClamp: 3,
                 }}>
                 <Typography variant="body2" color="text.secondary">
-                  {dataset.description || t("common:no_description")}
+                  {description}
                 </Typography>
               </Box>
             </Stack>
+            {(bboxLabel || (xmlMeta?.keywords?.length ?? 0) > 0) && (
+              <Stack spacing={1}>
+                {bboxLabel && (
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Icon iconName={ICON_NAME.GLOBE} style={{ fontSize: 14 }} htmlColor={theme.palette.text.secondary} />
+                    <Typography variant="caption" color="text.secondary">
+                      {bboxLabel}
+                    </Typography>
+                  </Stack>
+                )}
+                {(xmlMeta?.keywords?.length ?? 0) > 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    {xmlMeta?.keywords.slice(0, 4).join(", ")}
+                  </Typography>
+                )}
+              </Stack>
+            )}
             <Grid container justifyContent="flex-start" sx={{ pl: 0 }}>
               {Object.keys(datasetMetadataAggregated.shape).map((key, index) => {
                 return (

@@ -20,7 +20,7 @@ x-env-base: &env-base
   S3_PROVIDER: ${S3_PROVIDER}
   S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
   S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
-  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
+  S3_ENDPOINT_URL: http://minio:9000
   S3_BUCKET_NAME: ${S3_BUCKET_NAME}
   S3_REGION_NAME: ${S3_REGION_NAME}
   S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL}
@@ -32,7 +32,7 @@ x-env-core: &env-core
   REGION_MAPPING_PT_TABLE: basic.region_mapping_pt_04022025
 
 x-env-windmill: &env-windmill
-  DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_SERVER}:5432/windmill?sslmode=disable
+  DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/windmill?sslmode=disable
   DISABLE_NSJAIL: "true"
 
 x-env-print: &env-print
@@ -43,15 +43,15 @@ x-env-print: &env-print
   PYTHONDONTWRITEBYTECODE: "1"
   WHITELIST_ENVS: "POSTGRES_SERVER,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,S3_PROVIDER,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION_NAME,PRINT_BASE_URL,KEYCLOAK_SERVER_URL,REALM_NAME,KEYCLOAK_CLIENT_ID,KEYCLOAK_CLIENT_SECRET,ATLAS_BATCH_SIZE"
   ATLAS_BATCH_SIZE: ${ATLAS_BATCH_SIZE:-2}
-  POSTGRES_SERVER: ${POSTGRES_SERVER}
+  POSTGRES_SERVER: db
   POSTGRES_USER: ${POSTGRES_USER}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
   POSTGRES_DB: goat
   DUCKLAKE_DATA_DIR: /app/data/ducklake
   DUCKLAKE_CATALOG_SCHEMA: ducklake
-  S3_PROVIDER: ${S3_PROVIDER:-hetzner}
-  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
-  S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-${S3_ENDPOINT_URL}}
+  S3_PROVIDER: ${S3_PROVIDER:-minio}
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
   S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
   S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
   S3_BUCKET_NAME: ${S3_BUCKET_NAME}
@@ -69,18 +69,18 @@ x-env-tools: &env-tools
   JOB_DEFAULT_TIMEOUT: 600
   PYTHONDONTWRITEBYTECODE: "1"
   WHITELIST_ENVS: "POSTGRES_SERVER,POSTGRES_PORT,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_DATABASE_URI,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,TILES_DATA_DIR,S3_PROVIDER,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION_NAME,OD_MATRIX_BASE_PATH,GTFS_DATA_PATH,GOAT_ROUTING_URL,GOAT_ROUTING_AUTHORIZATION,R5_URL,R5_REGION_MAPPING_PATH,GEOCODING_URL,GEOCODING_AUTHORIZATION"
-  POSTGRES_SERVER: ${POSTGRES_SERVER}
+  POSTGRES_SERVER: db
   POSTGRES_PORT: 5432
   POSTGRES_USER: ${POSTGRES_USER}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
   POSTGRES_DB: ${POSTGRES_DB}
-  POSTGRES_DATABASE_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_SERVER}:5432/${POSTGRES_DB}
+  POSTGRES_DATABASE_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
   DUCKLAKE_DATA_DIR: /app/data/ducklake
   DUCKLAKE_CATALOG_SCHEMA: ducklake
   TILES_DATA_DIR: /app/data/tiles
-  S3_PROVIDER: ${S3_PROVIDER:-hetzner}
-  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
-  S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-${S3_ENDPOINT_URL}}
+  S3_PROVIDER: ${S3_PROVIDER:-minio}
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
   S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
   S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
   S3_BUCKET_NAME: ${S3_BUCKET_NAME}
@@ -99,21 +99,21 @@ x-env-workflows: &env-workflows
   MODE: worker
   WORKER_GROUP: workflows
   WORKER_TAGS: workflows
-  JOB_DEFAULT_TIMEOUT: 1800  # 30 min for long workflow chains
+  JOB_DEFAULT_TIMEOUT: 1800 # 30 min for long workflow chains
   PYTHONDONTWRITEBYTECODE: "1"
-  WHITELIST_ENVS: "POSTGRES_SERVER,POSTGRES_PORT,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_DATABASE_URI,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,TILES_DATA_DIR,S3_PROVIDER,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION_NAME,OD_MATRIX_BASE_PATH,GTFS_DATA_PATH,GOAT_ROUTING_URL,GOAT_ROUTING_AUTHORIZATION,R5_URL,R5_REGION_MAPPING_PATH,GEOCODING_URL,GEOCODING_AUTHORIZATION"
-  POSTGRES_SERVER: ${POSTGRES_SERVER}
+  WHITELIST_ENVS: "POSTGRES_SERVER,POSTGRES_PORT,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_DATABASE_URI,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,TILES_DATA_DIR,S3_PROVIDER,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION_NAME,OD_MATRIX_BASE_PATH,GTFS_DATA_PATH,GOAT_ROUTING_URL,GOAT_ROUTING_AUTHORIZATION,R5_URL,R5_REGION_MAPPING_PATH,GEOCODING_URL,GEOCODING_AUTHORIZATION,DATACATALOG_CKAN_ENABLED,CKAN_API_URL,CKAN_API_KEY,CKAN_DB_HOST,CKAN_DB_PORT,CKAN_DB_NAME,CKAN_DB_USER,CKAN_DB_PASSWORD,CKAN_PG_PASSWORD,META_PG_HOST,META_PG_PORT,META_PG_DB,META_PG_USER,META_PG_PASSWORD,META_PG_SCHEMA,CUSTOMER_SCHEMA"
+  POSTGRES_SERVER: db
   POSTGRES_PORT: 5432
   POSTGRES_USER: ${POSTGRES_USER}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
   POSTGRES_DB: ${POSTGRES_DB}
-  POSTGRES_DATABASE_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_SERVER}:5432/${POSTGRES_DB}
+  POSTGRES_DATABASE_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
   DUCKLAKE_DATA_DIR: /app/data/ducklake
   DUCKLAKE_CATALOG_SCHEMA: ducklake
   TILES_DATA_DIR: /app/data/tiles
-  S3_PROVIDER: ${S3_PROVIDER:-hetzner}
-  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
-  S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-${S3_ENDPOINT_URL}}
+  S3_PROVIDER: ${S3_PROVIDER:-minio}
+  S3_ENDPOINT_URL: http://minio:9000
+  S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
   S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
   S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
   S3_BUCKET_NAME: ${S3_BUCKET_NAME}
@@ -126,6 +126,22 @@ x-env-workflows: &env-workflows
   R5_REGION_MAPPING_PATH: /app/data/gtfs/r5_region_mapping.parquet
   GEOCODING_URL: ${GEOCODING_URL}
   GEOCODING_AUTHORIZATION: ${GEOCODING_AUTHORIZATION}
+  DATACATALOG_CKAN_ENABLED: ${DATACATALOG_CKAN_ENABLED:-false}
+  CKAN_API_URL: ${CKAN_API_URL:-}
+  CKAN_API_KEY: ${CKAN_API_KEY:-}
+  CKAN_DB_HOST: ${CKAN_DB_HOST:-goat-ckan-db}
+  CKAN_DB_PORT: ${CKAN_DB_PORT:-5432}
+  CKAN_DB_NAME: ${CKAN_DB_NAME:-ckan}
+  CKAN_DB_USER: ${CKAN_DB_USER:-ckan}
+  CKAN_DB_PASSWORD: ${CKAN_DB_PASSWORD:-${CKAN_PG_PASSWORD:-ckan}}
+
+x-env-datacatalog: &env-datacatalog
+  <<: *env-workflows
+  WORKER_GROUP: datacatalog
+  WORKER_TAGS: datacatalog
+  WHITELIST_ENVS: "POSTGRES_SERVER,POSTGRES_PORT,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_DATABASE_URI,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,TILES_DATA_DIR,S3_PROVIDER,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION_NAME,OD_MATRIX_BASE_PATH,GTFS_DATA_PATH,GOAT_ROUTING_URL,GOAT_ROUTING_AUTHORIZATION,R5_URL,R5_REGION_MAPPING_PATH,GEOCODING_URL,GEOCODING_AUTHORIZATION,DATACATALOG_CKAN_ENABLED,CKAN_API_URL,CKAN_API_KEY,CKAN_DB_HOST,CKAN_DB_PORT,CKAN_DB_NAME,CKAN_DB_USER,CKAN_DB_PASSWORD,CKAN_PG_PASSWORD,META_PG_HOST,META_PG_PORT,META_PG_DB,META_PG_USER,META_PG_PASSWORD,META_PG_SCHEMA,CUSTOMER_SCHEMA,CATALOG_OWNER_USER_ID,CATALOG_FOLDER_ID"
+  CATALOG_OWNER_USER_ID: ${CATALOG_OWNER_USER_ID:-744e4fd1-685c-495c-8b02-efebce875359}
+  CATALOG_FOLDER_ID: ${CATALOG_FOLDER_ID:-8526b040-082a-471f-b8ea-f11321e5b33a}
 
 x-worker-tools-base: &worker-tools-base
   image: ghcr.io/plan4better/goat/windmill-worker-tools:latest
@@ -152,6 +168,20 @@ x-worker-workflows-base: &worker-workflows-base
     - goat
   environment:
     <<: *env-workflows
+  depends_on:
+    - windmill-server
+
+x-worker-datacatalog-base: &worker-datacatalog-base
+  image: ghcr.io/plan4better/goat/windmill-worker-tools:latest
+  build:
+    context: .
+    dockerfile: apps/processes/workers/Dockerfile
+    target: worker-tools
+  restart: unless-stopped
+  networks:
+    - goat
+  environment:
+    <<: *env-datacatalog
   depends_on:
     - windmill-server
 
@@ -187,6 +217,7 @@ networks:
 volumes:
   goat-data:
 
+
 services:
   # ===========================================================================
   # Infrastructure (always on)
@@ -199,7 +230,7 @@ services:
     networks:
       - goat
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rds -d goat -h 127.0.0.1"]
+      test: [ "CMD-SHELL", "pg_isready -U rds -d goat -h 127.0.0.1" ]
       interval: 10s
       retries: 5
       start_period: 30s
@@ -256,7 +287,7 @@ services:
     ports:
       - "9000:9000"
       - "9001:9001"
-    command: ["server", "--console-address", ":9001", "/data/s3"]
+    command: [ "server", "--console-address", ":9001", "/data/s3" ]
     volumes:
       - goat-data:/data
     healthcheck:
@@ -278,11 +309,7 @@ services:
         condition: service_healthy
     restart: on-failure
     entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc alias set p4b http://minio:9000 ${S3_ACCESS_KEY_ID} ${S3_SECRET_ACCESS_KEY};
-      /usr/bin/mc mb p4b/${S3_BUCKET_NAME};
-      exit 0;
-      "
+      /bin/sh -c " /usr/bin/mc alias set p4b http://minio:9000 ${S3_ACCESS_KEY_ID} ${S3_SECRET_ACCESS_KEY}; /usr/bin/mc mb p4b/${S3_BUCKET_NAME}; exit 0; "
 
   rabbitmq:
     image: rabbitmq:4.0.3-management
@@ -345,13 +372,13 @@ services:
 
   # Tools worker (analytics: buffer, heatmap, isochrone, etc.)
   windmill-worker-tools:
-    profiles: [prod]
+    profiles: [ prod ]
     <<: *worker-tools-base
     volumes:
       - goat-data:/app/data
 
   windmill-worker-tools-dev:
-    profiles: [dev]
+    profiles: [ dev ]
     <<: *worker-tools-base
     volumes:
       - ./packages/python/goatlib/src/goatlib:/venv/lib/python3.11/site-packages/goatlib:ro
@@ -359,7 +386,7 @@ services:
 
   # Workflows worker (workflow orchestration - long-running jobs)
   windmill-worker-workflows:
-    profiles: [prod]
+    profiles: [ prod ]
     <<: *worker-workflows-base
     deploy:
       replicas: 3
@@ -367,7 +394,7 @@ services:
       - goat-data:/app/data
 
   windmill-worker-workflows-dev:
-    profiles: [dev]
+    profiles: [ dev ]
     <<: *worker-workflows-base
     deploy:
       replicas: 5
@@ -375,20 +402,34 @@ services:
       - ./packages/python/goatlib/src/goatlib:/venv/lib/python3.11/site-packages/goatlib:ro
       - goat-data:/app/data
 
+  # Datacatalog worker (catalog/AI preprocessing pipeline)
+  windmill-worker-datacatalog:
+    profiles: [ prod ]
+    <<: *worker-datacatalog-base
+    volumes:
+      - ${DATA_DIR}:/app/data
+
+  windmill-worker-datacatalog-dev:
+    profiles: [ dev ]
+    <<: *worker-datacatalog-base
+    volumes:
+      - ./packages/python/goatlib/src/goatlib:/venv/lib/python3.11/site-packages/goatlib:ro
+      - ${DATA_DIR}:/app/data
+
   # Print worker (PDF reports, thumbnails)
   windmill-worker-print:
-    profiles: [prod]
+    profiles: [ prod ]
     <<: *worker-print-base
     networks:
       - goat
     environment:
-      <<: [*env-windmill, *env-print]
+      <<: [ *env-windmill, *env-print ]
       PRINT_BASE_URL: ${PRINT_BASE_URL:-http://web:3000}
     volumes:
       - goat-data:/app/data:ro
 
   windmill-worker-print-dev:
-    profiles: [dev]
+    profiles: [ dev ]
     <<: *worker-print-base
     # Share network with goat-dev so localhost reaches dev services
     network_mode: "service:goat-dev"
@@ -406,7 +447,7 @@ services:
   # ===========================================================================
 
   goat-dev:
-    profiles: [dev]
+    profiles: [ dev ]
     build:
       context: .devcontainer
       dockerfile: Dockerfile
@@ -433,7 +474,7 @@ services:
   # ===========================================================================
 
   core-migrate:
-    profiles: [prod]
+    profiles: [ prod ]
     <<: *service-core
     container_name: goat-core-migrate
     networks:
@@ -442,7 +483,7 @@ services:
     command: bash -c "cd apps/core && src/core/scripts/prestart.sh"
 
   ducklake-init:
-    profiles: [prod]
+    profiles: [ prod ]
     image: ghcr.io/plan4better/goat/windmill-worker-tools:latest
     build:
       context: .
@@ -453,14 +494,14 @@ services:
       - goat
     restart: "no"
     environment:
-      POSTGRES_SERVER: ${POSTGRES_SERVER}
+      POSTGRES_SERVER: db
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: goat
       DUCKLAKE_DATA_DIR: /app/data/ducklake
       DUCKLAKE_CATALOG_SCHEMA: ducklake
       S3_PROVIDER: ${S3_PROVIDER:-minio}
-      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
+      S3_ENDPOINT_URL: http://minio:9000
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
     volumes:
@@ -474,7 +515,7 @@ services:
     command: python /app/init-ducklake.py
 
   windmill-init:
-    profiles: [prod]
+    profiles: [ prod ]
     image: python:3.11-slim
     container_name: goat-windmill-init
     networks:
@@ -495,7 +536,7 @@ services:
     command: python /app/init-windmill.py
 
   windmill-sync:
-    profiles: [prod]
+    profiles: [ prod ]
     image: ghcr.io/plan4better/goat/windmill-worker-tools:latest
     build:
       context: .
@@ -522,7 +563,7 @@ services:
   # ===========================================================================
 
   core:
-    profiles: [prod]
+    profiles: [ prod ]
     <<: *service-core
     container_name: goat-core
     networks:
@@ -531,14 +572,14 @@ services:
     ports:
       - 8000:8000
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/healthz"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/healthz" ]
       interval: 120s
       timeout: 60s
       retries: 3
       start_period: 20s
 
   geoapi:
-    profiles: [prod]
+    profiles: [ prod ]
     image: ghcr.io/plan4better/goat/geoapi:latest
     build:
       context: .
@@ -561,7 +602,7 @@ services:
         condition: service_completed_successfully
 
   processes:
-    profiles: [prod]
+    profiles: [ prod ]
     image: ghcr.io/plan4better/goat/processes:latest
     build:
       context: .
@@ -595,7 +636,7 @@ services:
         condition: service_started
 
   web:
-    profiles: [prod]
+    profiles: [ prod ]
     image: ghcr.io/plan4better/goat/web:latest
     build:
       context: .

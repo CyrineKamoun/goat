@@ -448,6 +448,11 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         sa_column=Column(JSONB, nullable=True),
         description="Other properties of the layer",
     )
+    xml_metadata: str | None = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+        description="Raw harvested metadata XML",
+    )
     url: str | None = Field(
         default=None,
         sa_column=Column(Text, nullable=True),

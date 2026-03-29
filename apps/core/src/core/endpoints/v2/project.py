@@ -321,7 +321,7 @@ async def add_layers_to_project(
         description="The ID of the project to get",
         example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
     ),
-    layer_ids: List[UUID4] = Query(
+    layer_ids: List[UUID] = Query(
         ...,
         description="List of layer IDs to add to the project",
         example=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],

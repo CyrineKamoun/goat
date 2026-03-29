@@ -90,6 +90,9 @@ class AreaStatisticsOperation(Enum):
 
 class LayerReadBaseAttributes(BaseModel):
     user_id: UUID = Field(..., description="User ID of the owner")
+    xml_metadata: str | None = Field(
+        default=None, description="Raw XML metadata for catalog-harvested layers"
+    )
     shared_with: Dict[str, Any] | None = Field(
         None, description="List of user IDs the layer is shared with"
     )

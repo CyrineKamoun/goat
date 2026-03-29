@@ -362,6 +362,7 @@ export const rasterLayerPropertiesSchema = layerPropertiesBaseSchema.extend({
 
 export const layerSchema = layerMetadataSchema.extend({
   id: z.string(),
+  xml_metadata: z.string().optional(),
   properties: featureLayerProperties.or(rasterLayerPropertiesSchema).or(z.record(z.any())).default({}),
   total_count: z.number().optional(),
   extent: z.string().default(DEFAULT_WKT_EXTENT),
