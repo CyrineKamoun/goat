@@ -641,7 +641,7 @@ export const ProjectLayerTree = ({
 
     return (
       <Stack
-        direction={togglePosition === "right" ? "row-reverse" : "row"}
+        direction="row"
         alignItems="center"
         spacing={1}
         // Class for parent CSS to keep opacity 1 when menu open
@@ -693,8 +693,8 @@ export const ProjectLayerTree = ({
           </Tooltip>
         )}
 
-        {/* Visibility - Don't show for table layers or when hideActions is true */}
-        {!hideActions && node.layer_type !== "table" && (
+        {/* Visibility toggle - only in actions area when position is "right" */}
+        {togglePosition !== "left" && !hideActions && node.layer_type !== "table" && (
           <>
             {toggleStyle === "checkbox" ? (
               <Checkbox
@@ -1125,6 +1125,37 @@ export const ProjectLayerTree = ({
             }
           }}
           renderActions={(item) => <RenderRowActions item={item} />}
+          renderPrefix={togglePosition === "left" ? (item) => {
+            const node = item.data as ProjectLayerTreeNode;
+            if (hideActions || node.layer_type === "table") return null;
+            const nodeVisibility = node.properties?.visibility ?? true;
+            return (
+              <Box onClick={(e) => e.stopPropagation()} sx={{ display: "flex", alignItems: "center" }}>
+                {toggleStyle === "checkbox" ? (
+                  <Checkbox
+                    size="small"
+                    checked={nodeVisibility}
+                    onChange={(e) => handleVisibilityToggle(node, e as unknown as React.MouseEvent)}
+                    sx={{ p: 0.25 }}
+                  />
+                ) : toggleStyle === "switch" ? (
+                  <Switch
+                    size="small"
+                    checked={nodeVisibility}
+                    onChange={(e) => handleVisibilityToggle(node, e as unknown as React.MouseEvent)}
+                    sx={{ transform: "scale(0.75)", mx: -0.5 }}
+                  />
+                ) : (
+                  <IconButton size="small" onClick={(e) => handleVisibilityToggle(node, e)} sx={{ p: 0.25 }}>
+                    <Icon
+                      iconName={!nodeVisibility ? ICON_NAME.EYE_SLASH : ICON_NAME.EYE}
+                      style={{ fontSize: "15px" }}
+                    />
+                  </IconButton>
+                )}
+              </Box>
+            );
+          } : undefined}
           enableSelection={isEditMode}
           selectedIds={treeSelectedIds}
           onSelect={handleNodeClick}

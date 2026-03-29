@@ -68,7 +68,7 @@ const InfoChip = Node.create<InfoChipOptions>({
       mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
         class: "info-chip",
       }),
-      "ⓘ",
+      "i",
     ];
   },
 

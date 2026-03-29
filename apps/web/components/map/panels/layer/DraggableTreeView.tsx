@@ -41,6 +41,7 @@ interface DraggableTreeViewProps<T extends BaseTreeItem> {
   items: T[];
   onItemsChange: (newItems: T[]) => void;
   renderActions?: (item: T) => React.ReactNode;
+  renderPrefix?: (item: T) => React.ReactNode;
   enableSelection?: boolean;
   selectedIds?: string[];
   onSelect?: (ids: string[]) => void;
@@ -257,6 +258,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
   level,
   onCollapse,
   renderActions,
+  renderPrefix,
   isOverlay,
   enableSelection,
   selectedIds,
@@ -268,6 +270,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
   level: number;
   onCollapse: (id: string) => void;
   renderActions?: (item: T) => React.ReactNode;
+  renderPrefix?: (item: T) => React.ReactNode;
   isOverlay?: boolean;
   enableSelection?: boolean;
   selectedIds: string[];
@@ -383,6 +386,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
             className="tree-content-area"
             sx={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
             <Box sx={{ ml: `${baseIndent}px` }} />
+            {renderPrefix && <Box onClick={(e) => e.stopPropagation()}>{renderPrefix(item)}</Box>}
             <LeftIconContainer>{LeftIconContent}</LeftIconContainer>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <TruncatedLabel label={item.label} />
@@ -457,6 +461,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
                     level={level + 1}
                     onCollapse={onCollapse}
                     renderActions={renderActions}
+                    renderPrefix={renderPrefix}
                     selectedIds={selectedIds}
                     onSelect={onSelect}
                     enableSelection={enableSelection}
@@ -501,8 +506,9 @@ const MemoizedRecursiveTreeItem = React.memo(RecursiveTreeItemInner, (prevProps,
   if (prevSelected !== nextSelected) return false;
   // Check if enableSelection changed
   if (prevProps.enableSelection !== nextProps.enableSelection) return false;
-  // Check if renderActions changed (e.g. toggle style changed)
+  // Check if renderActions or renderPrefix changed (e.g. toggle style/position changed)
   if (prevProps.renderActions !== nextProps.renderActions) return false;
+  if (prevProps.renderPrefix !== nextProps.renderPrefix) return false;
   // Check if this item's children changed (for groups)
   if (prevProps.item.isGroup) {
     const prevChildren = prevProps.allData.filter((i) => i.parentId === prevProps.item.id);
@@ -521,6 +527,7 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
     items,
     onItemsChange,
     renderActions,
+    renderPrefix,
     selectedIds = [],
     onSelect,
     enableSelection = false,
@@ -587,6 +594,7 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
             level={0}
             onCollapse={handleCollapse}
             renderActions={renderActions}
+            renderPrefix={renderPrefix}
             selectedIds={selectedIds}
             onSelect={onSelect}
             enableSelection={enableSelection}
@@ -602,6 +610,7 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
             level={0}
             onCollapse={() => {}}
             renderActions={renderActions}
+            renderPrefix={renderPrefix}
             isOverlay
             selectedIds={selectedIds}
             enableSelection={true}

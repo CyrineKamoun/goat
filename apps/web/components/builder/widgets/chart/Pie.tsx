@@ -11,7 +11,7 @@ import type { AggregationStatsQueryParams } from "@/lib/validations/project";
 import { aggregationStatsQueryParams } from "@/lib/validations/project";
 import type { ColorRange } from "@/lib/validations/layer";
 import type { PieChartSchema } from "@/lib/validations/widget";
-import { pieChartConfigSchema, pieLayoutTypes } from "@/lib/validations/widget";
+import { pieChartConfigSchema, pieLayoutTypes, pieChartTypes, labelSizeTypes } from "@/lib/validations/widget";
 
 import { useChartWidget } from "@/hooks/map/DashboardBuilderHooks";
 
@@ -20,6 +20,41 @@ import { WidgetStatusContainer } from "@/components/builder/widgets/common/Widge
 
 const FALLBACK_COLORS = ["#5A1846", "#900C3F", "#C70039", "#E3611C", "#F1920E", "#FFC300"];
 const OPACITY_MODIFIER = "33";
+
+const isNumericValue = (value: unknown): boolean => {
+  const str = String(value ?? "").trim();
+  return str.length > 0 && !isNaN(Number(str));
+};
+
+const PIE_SIZE_PRESETS = {
+  sm: {
+    centerPercent: 12,
+    centerSublabel: 8,
+    outsideLabel: 8,
+    legendText: 10,
+    innerRadius: "70%",
+    outerRadius: "72%",
+    aspect: 1.1,
+  },
+  md: {
+    centerPercent: 19,
+    centerSublabel: 12,
+    outsideLabel: 13,
+    legendText: 13,
+    innerRadius: "63%",
+    outerRadius: "66%",
+    aspect: 1.25,
+  },
+  lg: {
+    centerPercent: 26,
+    centerSublabel: 15,
+    outsideLabel: 16,
+    legendText: 16,
+    innerRadius: "58%",
+    outerRadius: "62%",
+    aspect: 1.35,
+  },
+} as const;
 
 export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }) => {
   const { t, i18n } = useTranslation("common");
@@ -84,9 +119,19 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
 
   const data = orderedData;
   const pieLayout = config?.options?.layout || pieLayoutTypes.Values.center_active;
-  const isCenterActiveLayout = pieLayout === pieLayoutTypes.Values.center_active;
-  const isAllLabelsOutsideLayout = pieLayout === pieLayoutTypes.Values.all_labels_outside;
-  const isLegendLayout = pieLayout === pieLayoutTypes.Values.legend;
+  const chartType = config?.options?.chart_type || pieChartTypes.Values.donut;
+  const isFullPie = chartType === pieChartTypes.Values.pie;
+  const isHalfDonut = chartType === pieChartTypes.Values.half_donut;
+  const labelSize = config?.options?.label_size || labelSizeTypes.Values.md;
+  const sizePreset = PIE_SIZE_PRESETS[labelSize];
+
+  // Full pie cannot use center_active (no hole for label)
+  const effectiveLayout = isFullPie && pieLayout === pieLayoutTypes.Values.center_active
+    ? pieLayoutTypes.Values.legend
+    : pieLayout;
+  const isCenterActiveLayout = effectiveLayout === pieLayoutTypes.Values.center_active;
+  const isAllLabelsOutsideLayout = effectiveLayout === pieLayoutTypes.Values.all_labels_outside;
+  const isLegendLayout = effectiveLayout === pieLayoutTypes.Values.legend;
   const chartMargin = {
     top: 8,
     right: isAllLabelsOutsideLayout ? 24 : 8,
@@ -94,7 +139,11 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
     bottom: 12,
   };
 
-  const chartAspect = isAllLabelsOutsideLayout ? 1.35 : 1.2;
+  const chartAspect = isHalfDonut
+    ? sizePreset.aspect * 0.7
+    : isAllLabelsOutsideLayout
+      ? sizePreset.aspect + 0.15
+      : sizePreset.aspect;
 
   const displayData = useMemo(() => {
     return data.length > 0 ? data : [{ grouped_value: t("no_data"), operation_value: 1 }];
@@ -151,7 +200,15 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
     (groupedValue: unknown) => {
       const fallback = String(groupedValue ?? t("no_data", { defaultValue: "No data" }));
       const mapped = labelMapLookup.get(normalizeValue(fallback));
-      return mapped ? String(mapped) : fallback;
+      if (mapped) return String(mapped);
+      // Format long numeric values to a readable length
+      if (isNumericValue(fallback)) {
+        const num = Number(fallback);
+        if (Number.isInteger(num)) return String(num);
+        // Show up to 3 significant digits for decimals
+        return parseFloat(num.toPrecision(3)).toString();
+      }
+      return fallback;
     },
     [labelMapLookup, t]
   );
@@ -221,34 +278,6 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
     }));
   }, [baseColors, displayData, getDisplayLabel, i18n.language, isLegendLayout, totalOperationValue]);
 
-  const renderLegendPercentOutsideLabel = useCallback(
-    ({
-      x,
-      y,
-      textAnchor,
-      percent,
-    }: {
-      x?: number;
-      y?: number;
-      textAnchor?: "start" | "middle" | "end";
-      percent?: number;
-    }) => {
-      return (
-        <text
-          x={x}
-          y={y}
-          textAnchor={textAnchor}
-          dominantBaseline="central"
-          fontSize={12}
-          fontWeight={500}
-          fill={theme.palette.text.primary}>
-          {formatNumber(percent || 0, "percent_1d", i18n.language)}
-        </text>
-      );
-    },
-    [i18n.language, theme.palette.text.primary]
-  );
-
   useEffect(() => {
     const newIndex = calculateDefaultActiveIndex();
     setActiveIndex(Math.max(newIndex, 0));
@@ -283,7 +312,7 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
       />
 
       {config && !isError && aggregationStats && isChartConfigured && (
-        <Box sx={{ position: "relative", width: "100%" }}>
+        <Box sx={{ position: "relative", width: "100%", ...(isHalfDonut && { mt: -12, mb: -14 }) }}>
           <ResponsiveContainer width="100%" aspect={chartAspect}>
             <PieChart
               margin={chartMargin}
@@ -299,12 +328,20 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
                 dataKey="operation_value"
                 nameKey="grouped_value"
                 cx="50%"
-                cy={isAllLabelsOutsideLayout ? "46%" : "50%"}
-                innerRadius={isAllLabelsOutsideLayout ? "50%" : "65%"}
-                outerRadius={isAllLabelsOutsideLayout ? "68%" : undefined}
-                cursor="pointer"
+                cy={isHalfDonut ? "75%" : isAllLabelsOutsideLayout ? "46%" : "50%"}
+                innerRadius={
+                  isFullPie
+                    ? 0
+                    : isAllLabelsOutsideLayout
+                      ? "48%"
+                      : sizePreset.innerRadius
+                }
+                outerRadius={isAllLabelsOutsideLayout ? "66%" : undefined}
+                startAngle={isHalfDonut ? 180 : undefined}
+                endAngle={isHalfDonut ? 0 : undefined}
+                cursor="default"
                 isAnimationActive={false}
-                paddingAngle={piePaddingAngle}
+                paddingAngle={isFullPie ? 0 : piePaddingAngle}
                 onMouseEnter={handlePieEnter}
                 labelLine={(isAllLabelsOutsideLayout || isLegendLayout) && data.length > 0}
                 label={
@@ -332,7 +369,7 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
                             y={y}
                             textAnchor={textAnchor}
                             dominantBaseline="central"
-                            fontSize={11}
+                            fontSize={sizePreset.outsideLabel}
                             fill={theme.palette.text.primary}>
                             <tspan x={x} dy="0">{shortLabel}</tspan>
                             <tspan x={x} dy="1.1em">{percentLabel}</tspan>
@@ -340,14 +377,35 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
                         );
                       }
                     : isLegendLayout && data.length > 0
-                      ? renderLegendPercentOutsideLabel
+                      ? ({
+                          x,
+                          y,
+                          textAnchor,
+                          percent,
+                        }: {
+                          x?: number;
+                          y?: number;
+                          textAnchor?: "start" | "middle" | "end";
+                          percent?: number;
+                        }) => (
+                          <text
+                            x={x}
+                            y={y}
+                            textAnchor={textAnchor}
+                            dominantBaseline="central"
+                            fontSize={sizePreset.outsideLabel}
+                            fontWeight={500}
+                            fill={theme.palette.text.primary}>
+                            {formatNumber(percent || 0, "percent_1d", i18n.language)}
+                          </text>
+                        )
                       : false
                 }>
                 {displayData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={computedColors[index]} stroke="none" />
                 ))}
 
-                {isCenterActiveLayout && (
+                {isCenterActiveLayout && !isFullPie && (
                   <>
                     <Label
                       content={(props: Record<string, unknown>) => {
@@ -377,7 +435,7 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
                         }
                         if (currentLine) lines.push(currentLine);
                         const labelLineHeight = 14;
-                        const percentSize = 16;
+                        const percentSize = sizePreset.centerPercent;
                         const gap = 4;
                         const totalLabelHeight = lines.length * labelLineHeight;
                         const totalHeight = percentSize + gap + totalLabelHeight;
@@ -398,7 +456,7 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
                               y={startY + percentSize / 2 + gap}
                               textAnchor="middle"
                               dominantBaseline="hanging"
-                              fontSize={11}
+                              fontSize={sizePreset.centerSublabel}
                               fontWeight="bold"
                               fill={activeColor}>
                               {lines.map((line, i) => (
@@ -419,7 +477,7 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
           {isLegendLayout && legendItems.length > 0 && (
             <Box
               sx={{
-                mt: 1,
+                mt: isHalfDonut ? -4 : 1,
                 display: "flex",
                 flexWrap: "wrap",
                 gap: 1,
@@ -444,7 +502,7 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
                       flexShrink: 0,
                     }}
                   />
-                  <Typography variant="caption" sx={{ minWidth: 0, color: "text.primary" }} title={item.label}>
+                  <Typography variant="caption" sx={{ minWidth: 0, color: "text.primary", fontSize: sizePreset.legendText }} title={item.label}>
                     {truncateLabel(item.label, 22)}
                   </Typography>
                 </Box>

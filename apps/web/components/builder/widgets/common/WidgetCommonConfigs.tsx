@@ -15,6 +15,8 @@ import type { FormatNumberTypes, WidgetConfigSchema } from "@/lib/validations/wi
 import {
   formatNumberTypes,
   pieLayoutTypes,
+  pieChartTypes,
+  labelSizeTypes,
   tableQueryModeTypes,
   tableModeTypes,
   widgetSchemaMap,
@@ -1292,6 +1294,14 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
     return hasNestedSchemaPath(schema, "options.layout") && config.type === widgetTypes.Enum.pie_chart;
   }, [schema, config.type]);
 
+  const hasPieChartTypeDef = useMemo(() => {
+    return hasNestedSchemaPath(schema, "options.chart_type") && config.type === widgetTypes.Enum.pie_chart;
+  }, [schema, config.type]);
+
+  const hasLabelSizeDef = useMemo(() => {
+    return hasNestedSchemaPath(schema, "options.label_size") && config.type === widgetTypes.Enum.pie_chart;
+  }, [schema, config.type]);
+
   const hasDisplayFieldLabelDef = useMemo(() => {
     return hasNestedSchemaPath(schema, "options.display_field_label");
   }, [schema]);
@@ -1315,7 +1325,13 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
   const showSimpleColorPicker = hasColorDef && (!supportsAttributeStylingToggle || !isAttributeStylingEnabled);
   const valueColorScale = (config as any)?.options?.value_color_scale || "quantile";
   const styleAttributeSource = (config as any)?.options?.style_attribute_source || "statistics";
-  const pieLayout = (config as any)?.options?.layout || pieLayoutTypes.Values.center_active;
+  const currentChartType = (config as any)?.options?.chart_type || "donut";
+  const isFullPieType = currentChartType === pieChartTypes.Values.pie;
+  const rawPieLayout = (config as any)?.options?.layout || pieLayoutTypes.Values.center_active;
+  // Full pie can't use center_active — fall back to legend (matches Pie.tsx effectiveLayout logic)
+  const pieLayout = isFullPieType && rawPieLayout === pieLayoutTypes.Values.center_active
+    ? pieLayoutTypes.Values.legend
+    : rawPieLayout;
 
   const valueColorScaleOptions = useMemo(
     () => [
@@ -1349,17 +1365,52 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
   }, [styleAttributeSourceOptions, styleAttributeSource]);
 
   const pieLayoutOptions = useMemo(
-    () => [
-      { value: pieLayoutTypes.Values.center_active, label: t("pie_layout_center_active") },
-      { value: pieLayoutTypes.Values.all_labels_outside, label: t("pie_layout_all_labels_outside") },
-      { value: pieLayoutTypes.Values.legend, label: t("pie_layout_legend") },
-    ],
-    [t]
+    () => {
+      const allOptions = [
+        { value: pieLayoutTypes.Values.center_active, label: t("pie_layout_center_active") },
+        { value: pieLayoutTypes.Values.all_labels_outside, label: t("pie_layout_all_labels_outside") },
+        { value: pieLayoutTypes.Values.legend, label: t("pie_layout_legend") },
+      ];
+      // Full pie has no hole, so center_active is not applicable
+      if (isFullPieType) {
+        return allOptions.filter((o) => o.value !== pieLayoutTypes.Values.center_active);
+      }
+      return allOptions;
+    },
+    [t, isFullPieType]
   );
 
   const selectedPieLayout = useMemo(() => {
     return pieLayoutOptions.find((option) => option.value === pieLayout);
   }, [pieLayoutOptions, pieLayout]);
+
+  const pieChartTypeOptions = useMemo(
+    () => [
+      { value: pieChartTypes.Values.donut, label: t("pie_chart_type_donut") },
+      { value: pieChartTypes.Values.pie, label: t("pie_chart_type_pie") },
+      { value: pieChartTypes.Values.half_donut, label: t("pie_chart_type_half_donut") },
+    ],
+    [t]
+  );
+
+  const selectedPieChartType = useMemo(() => {
+    const chartType = (config as any)?.options?.chart_type || "donut";
+    return pieChartTypeOptions.find((option) => option.value === chartType);
+  }, [pieChartTypeOptions, config]);
+
+  const labelSizeOptions = useMemo(
+    () => [
+      { value: labelSizeTypes.Values.sm, label: t("label_size_sm") },
+      { value: labelSizeTypes.Values.md, label: t("label_size_md") },
+      { value: labelSizeTypes.Values.lg, label: t("label_size_lg") },
+    ],
+    [t]
+  );
+
+  const selectedLabelSize = useMemo(() => {
+    const labelSizeVal = (config as any)?.options?.label_size || "md";
+    return labelSizeOptions.find((option) => option.value === labelSizeVal);
+  }, [labelSizeOptions, config]);
 
   const histogramXAxisTickValues = useMemo(() => {
     const values = (config as any)?.options?.x_axis_ticks;
@@ -1504,6 +1555,8 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
       hasColorRangeDef ||
       hasCustomOrderDef ||
       hasContextLabelDef ||
+      hasPieChartTypeDef ||
+      hasLabelSizeDef ||
       hasPieLayoutDef ||
       hasDisplayFieldLabelDef ||
       hasHistogramNumBinsDef ||
@@ -1517,6 +1570,8 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
     hasColorRangeDef,
     hasCustomOrderDef,
     hasContextLabelDef,
+    hasPieChartTypeDef,
+    hasLabelSizeDef,
     hasPieLayoutDef,
     hasDisplayFieldLabelDef,
     hasHistogramNumBinsDef,
@@ -1675,6 +1730,28 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
                     label={t("highlight_color")}
                     color={normalizedHighlightColor}
                     onChange={(color) => handleOptionChange("highlight_color", color)}
+                  />
+                )}
+
+                {hasPieChartTypeDef && (
+                  <Selector
+                    selectedItems={selectedPieChartType}
+                    setSelectedItems={(item: SelectorItem) => {
+                      handleOptionChange("chart_type", item?.value);
+                    }}
+                    items={pieChartTypeOptions}
+                    label={t("pie_chart_type")}
+                  />
+                )}
+
+                {hasLabelSizeDef && (
+                  <Selector
+                    selectedItems={selectedLabelSize}
+                    setSelectedItems={(item: SelectorItem) => {
+                      handleOptionChange("label_size", item?.value);
+                    }}
+                    items={labelSizeOptions}
+                    label={t("label_size")}
                   />
                 )}
 

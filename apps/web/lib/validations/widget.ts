@@ -1,8 +1,11 @@
 import * as z from "zod";
 
 import { DEFAULT_COLOR_RANGE } from "@/lib/constants/color";
-import { sortTypes, statisticOperationEnum } from "@/lib/validations/common";
+import { formatNumberTypes, sortTypes, statisticOperationEnum } from "@/lib/validations/common";
 import { colorRange } from "@/lib/validations/layer";
+
+export { formatNumberTypes };
+export type { FormatNumberTypes } from "@/lib/validations/common";
 
 export const informationTypes = z.enum(["layers", "bookmarks", "comments"]);
 export const dataTypes = z.enum(["filter", "table", "numbers", "feature_list", "rich_text"]);
@@ -17,23 +20,6 @@ export const widgetTypes = z.enum([
 
 export const widgetTypesWithoutConfig = [elementTypes.Values.text, elementTypes.Values.divider];
 
-export const formatNumberTypes = z.enum([
-  "none", // 1000
-  "decimal_max", // All decimals (up to 3)
-  "integer", // 1000 (no commas)
-  "grouping", // 1,000
-  "grouping_2d", // 12,345.67
-  "signed_2d", // +12,345.67
-  "compact", // 1k
-  "compact_1d", // 12.3k
-  "decimal_2", // 1.23
-  "decimal_3", // 1.234
-  "currency_usd", // $12,345.67
-  "currency_eur", // €12,345.67
-  "percent", // 1%
-  "percent_1d", // 1.0%
-  "percent_2d", // 1.00%
-]);
 
 // How chart widgets respond to cross-filter selections
 export const selectionResponseTypes = z.enum(["filter", "highlight"]);
@@ -242,6 +228,8 @@ export const tableDataConfigSchema = dataConfigSchema.extend({
 
 export const filterLayoutTypes = z.enum(["checkbox", "cards", "chips", "select", "range"]);
 export const pieLayoutTypes = z.enum(["center_active", "all_labels_outside", "legend"]);
+export const pieChartTypes = z.enum(["donut", "pie", "half_donut"]);
+export const labelSizeTypes = z.enum(["sm", "md", "lg"]);
 
 // Target layer schema for multi-layer attribute filtering
 export const filterTargetLayerSchema = z.object({
@@ -386,6 +374,8 @@ export const pieChartConfigSchema = chartsConfigBaseSchema.extend({
   options: chartConfigOptionsBaseSchema
     .extend({
       layout: pieLayoutTypes.optional().default("center_active"),
+      chart_type: pieChartTypes.optional().default("donut"),
+      label_size: labelSizeTypes.optional().default("md"),
       num_categories: z.number().min(1).max(15).optional().default(1),
       cap_others: z.boolean().optional().default(false),
       color_range: widgetColorRange.optional().default(DEFAULT_COLOR_RANGE),
@@ -519,7 +509,6 @@ export const widgetSchemaMap = {
 };
 
 export type WidgetTypes = z.infer<typeof widgetTypes>;
-export type FormatNumberTypes = z.infer<typeof formatNumberTypes>;
 export type ChartConfigBaseSchema = z.infer<typeof chartsConfigBaseSchema>;
 export type HistogramChartSchema = z.infer<typeof histogramChartConfigSchema>;
 export type CategoriesChartSchema = z.infer<typeof categoriesChartConfigSchema>;
