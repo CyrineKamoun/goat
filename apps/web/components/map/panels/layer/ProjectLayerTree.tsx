@@ -471,14 +471,20 @@ export const ProjectLayerTree = ({
     // Update local UI state optimistically - create deep copies to avoid read-only errors
     const newItems = items.map((i) => {
       if (i.data.id === node.id && i.data.type === node.type) {
+        const newVisibility = !currentVisibility;
         const updatedData = {
           ...i.data,
           properties: {
             ...i.data.properties,
-            visibility: !currentVisibility,
+            visibility: newVisibility,
           },
         };
-        return { ...i, data: updatedData };
+        return {
+          ...i,
+          data: updatedData,
+          // Collapse legend when hiding, expand when showing
+          collapsed: !newVisibility,
+        };
       }
       return i;
     });
@@ -693,36 +699,6 @@ export const ProjectLayerTree = ({
           </Tooltip>
         )}
 
-        {/* Visibility toggle - only in actions area when position is "right" */}
-        {togglePosition !== "left" && !hideActions && node.layer_type !== "table" && (
-          <>
-            {toggleStyle === "checkbox" ? (
-              <Checkbox
-                size="small"
-                checked={nodeVisibility}
-                onChange={(e) => handleVisibilityToggle(node, e as unknown as React.MouseEvent)}
-                sx={{ p: 0.5 }}
-              />
-            ) : toggleStyle === "switch" ? (
-              <Switch
-                size="small"
-                checked={nodeVisibility}
-                onChange={(e) => handleVisibilityToggle(node, e as unknown as React.MouseEvent)}
-                sx={{ transform: "scale(0.75)", mx: -0.5 }}
-              />
-            ) : (
-              <Tooltip title={nodeVisibility ? t("hide") : t("show")} placement="top">
-                <IconButton size="small" onClick={(e) => handleVisibilityToggle(node, e)} sx={{ px: 0.5 }}>
-                  <Icon
-                    iconName={!nodeVisibility ? ICON_NAME.EYE_SLASH : ICON_NAME.EYE}
-                    style={{ fontSize: "15px" }}
-                  />
-                </IconButton>
-              </Tooltip>
-            )}
-          </>
-        )}
-
         {/* Actions: direct buttons or compact three-dot menu */}
         {!hideActions && menuOptions.length > 0 && (
           moreOptionsStyle === "direct_actions" ? (
@@ -810,6 +786,36 @@ export const ProjectLayerTree = ({
               }}
             />
           )
+        )}
+
+        {/* Visibility toggle - very right when position is "right" */}
+        {togglePosition !== "left" && !hideActions && node.layer_type !== "table" && (
+          <>
+            {toggleStyle === "checkbox" ? (
+              <Checkbox
+                size="small"
+                checked={nodeVisibility}
+                onChange={(e) => handleVisibilityToggle(node, e as unknown as React.MouseEvent)}
+                sx={{ p: 0.5 }}
+              />
+            ) : toggleStyle === "switch" ? (
+              <Switch
+                size="small"
+                checked={nodeVisibility}
+                onChange={(e) => handleVisibilityToggle(node, e as unknown as React.MouseEvent)}
+                sx={{ transform: "scale(0.75)", mx: -0.5 }}
+              />
+            ) : (
+              <Tooltip title={nodeVisibility ? t("hide") : t("show")} placement="top">
+                <IconButton size="small" onClick={(e) => handleVisibilityToggle(node, e)} sx={{ px: 0.5 }}>
+                  <Icon
+                    iconName={!nodeVisibility ? ICON_NAME.EYE_SLASH : ICON_NAME.EYE}
+                    style={{ fontSize: "15px" }}
+                  />
+                </IconButton>
+              </Tooltip>
+            )}
+          </>
         )}
       </Stack>
     );

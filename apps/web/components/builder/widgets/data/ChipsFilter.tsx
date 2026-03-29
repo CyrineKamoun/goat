@@ -1,4 +1,4 @@
-import { Box, Chip, Skeleton, Stack, Typography, useTheme } from "@mui/material";
+import { Box, Chip, Divider, Skeleton, Stack, Typography, useTheme } from "@mui/material";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -12,6 +12,7 @@ interface ChipsFilterProps {
   minVisibleOptions?: number;
   multiple?: boolean;
   wrap?: boolean;
+  showAllOption?: boolean;
   customOrder?: string[];
   cqlFilter?: object;
   color?: string;
@@ -26,6 +27,7 @@ const ChipsFilter = ({
   minVisibleOptions = 5,
   multiple = false,
   wrap = true,
+  showAllOption = true,
   customOrder,
   cqlFilter,
   color = "#0e58ff",
@@ -56,6 +58,16 @@ const ChipsFilter = ({
     });
     return lookup;
   }, [labelMap]);
+
+  const allSelected = allValues.length > 0 && allValues.every((v) => selectedValues.includes(v));
+
+  const handleAllClick = () => {
+    if (allSelected) {
+      onSelectedValuesChange([]);
+    } else {
+      onSelectedValuesChange([...allValues]);
+    }
+  };
 
   const handleChipClick = (value: string) => {
     const isSelected = selectedValues.includes(value);
@@ -113,6 +125,29 @@ const ChipsFilter = ({
             borderRadius: 2,
           },
         }}>
+        {multiple && showAllOption && (
+          <>
+            <Chip
+              label={t("all")}
+              size="small"
+              clickable
+              onClick={handleAllClick}
+              sx={{
+                borderRadius: 4,
+                fontWeight: allSelected ? 600 : 400,
+                backgroundColor: allSelected ? color : theme.palette.action.hover,
+                color: allSelected ? theme.palette.getContrastText(color) : theme.palette.text.primary,
+                borderColor: allSelected ? color : theme.palette.divider,
+                "&:hover": {
+                  backgroundColor: allSelected ? color : theme.palette.action.selected,
+                  filter: allSelected ? "brightness(0.9)" : "none",
+                },
+                transition: "all 0.15s ease-in-out",
+              }}
+            />
+            <Divider orientation="vertical" flexItem sx={{ mx: 0.5, borderColor: theme.palette.text.disabled }} />
+          </>
+        )}
         {visibleValues.map((value) => {
           const isSelected = selectedValues.includes(value);
           return (

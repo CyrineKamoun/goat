@@ -1848,6 +1848,7 @@
   "workflow_variables": "Variables",
   "workflows": "Workflows",
   "wrap_chips": "Wrap",
+  "show_all_button": "Show 'All' button",
   "write_sql_query": "Write SQL Query",
   "x_axis_tick_values": "X-axis ticks",
   "x_axis_tick_values_help": "Add values with Enter or comma; only values within the chart range are shown.",

@@ -409,6 +409,27 @@ export const WidgetFilterLayout = ({
                     }
                     label={<Typography variant="body2">{t("wrap_chips")}</Typography>}
                   />
+                  {config.setup?.multiple && (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          color="primary"
+                          checked={config.setup?.show_all_option !== false}
+                          onChange={(e) => {
+                            onChange({
+                              ...config,
+                              setup: {
+                                ...config.setup,
+                                show_all_option: e.target.checked,
+                              },
+                            });
+                          }}
+                        />
+                      }
+                      label={<Typography variant="body2">{t("show_all_button")}</Typography>}
+                    />
+                  )}
                 </Stack>
               </>
             )}

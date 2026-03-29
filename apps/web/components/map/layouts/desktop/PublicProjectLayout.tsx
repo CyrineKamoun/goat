@@ -23,6 +23,7 @@ import {
 
 import { MapSidebarItemID } from "@/types/map/common";
 
+import { useDashboardFont } from "@/hooks/dashboard/useDashboardFont";
 import { useLayerStyleChange } from "@/hooks/map/LayerStyleHooks";
 import { useBasemap } from "@/hooks/map/MapHooks";
 import { useMeasureTool } from "@/hooks/map/useMeasureTool";
@@ -68,26 +69,16 @@ const PublicProjectLayout = ({
 
   // Apply dashboard language override only for public/shared view
   const dashboardLanguage = project?.builder_config?.settings?.language;
-  const dashboardFont = (project?.builder_config?.settings?.font_family as string) || undefined;
+  const dashboardFont = useDashboardFont();
   useEffect(() => {
     if (viewOnly && dashboardLanguage && dashboardLanguage !== "auto" && dashboardLanguage !== i18n.language) {
+      const prevLang = i18n.language;
       i18n.changeLanguage(dashboardLanguage);
+      return () => {
+        i18n.changeLanguage(prevLang);
+      };
     }
   }, [viewOnly, dashboardLanguage, i18n]);
-
-  // Load Google Font for dashboard
-  useEffect(() => {
-    if (!dashboardFont) return;
-    const fontName = dashboardFont.split(",")[0].trim().replace(/^['"]|['"]$/g, "");
-    if (fontName === "Mulish") return; // Already loaded by next/font
-    const id = `google-font-${fontName.replace(/\s+/g, "-").toLowerCase()}`;
-    if (document.getElementById(id)) return;
-    const link = document.createElement("link");
-    link.id = id;
-    link.rel = "stylesheet";
-    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName)}:wght@300;400;500;600;700&display=swap`;
-    document.head.appendChild(link);
-  }, [dashboardFont]);
 
   // Layer style change hook
   const { handleStyleChange } = useLayerStyleChange(projectLayers, viewOnly);

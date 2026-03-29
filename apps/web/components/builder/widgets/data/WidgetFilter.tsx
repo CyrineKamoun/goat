@@ -432,6 +432,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
             cqlFilter={crossFilterCql}
             color={rawConfig?.options?.color}
             labelMap={rawConfig?.options?.label_map}
+            showAllOption={rawConfig?.setup.show_all_option}
           />
         )}
       {layer &&

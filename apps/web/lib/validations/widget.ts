@@ -248,6 +248,7 @@ export const filterDataConfigSchema = dataConfigSchema.extend({
       // Chips/Checkbox-specific settings
       min_visible_options: z.number().min(1).max(20).optional().default(5),
       wrap: z.boolean().optional().default(true),
+      show_all_option: z.boolean().optional().default(true),
       default_value: z.array(z.string()).optional(),
       custom_order: z.array(z.string()).optional(), // Custom chip order (values in desired order)
       // Range-specific settings

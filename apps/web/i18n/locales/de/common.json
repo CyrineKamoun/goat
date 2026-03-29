@@ -1848,6 +1848,7 @@
   "workflow_variables": "Variablen",
   "workflows": "Workflows",
   "wrap_chips": "Zeilenumbruch",
+  "show_all_button": "'Alle' Schaltfläche anzeigen",
   "write_sql_query": "SQL-Abfrage schreiben",
   "x_axis_tick_values": "X-Achsenwerte",
   "x_axis_tick_values_help": "Werte mit Enter oder Komma hinzufügen; nur Werte im Diagrammbereich werden angezeigt.",
