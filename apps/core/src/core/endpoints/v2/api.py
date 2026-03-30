@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from . import (
     asset,
+    catalog_records,
     datasets,
     folder,
     layer,
@@ -25,3 +26,8 @@ router.include_router(system.router, prefix="/system", tags=["System Settings"])
 router.include_router(status.router, prefix="/status", tags=["Status"])
 router.include_router(asset.router, prefix="/asset", tags=["Asset"])
 router.include_router(datasets.router, prefix="/datasets", tags=["Datasets"])
+router.include_router(
+    catalog_records.router,
+    prefix="/catalog/records",
+    tags=["Catalog (OGC Records API)"],
+)

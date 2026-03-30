@@ -20,7 +20,7 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
-import { useCatalogLayers, useMetadataAggregated } from "@/lib/api/layers";
+import { useCatalogGroupedLayers, useMetadataAggregated } from "@/lib/api/layers";
 import type { PaginatedQueryParams } from "@/lib/validations/common";
 import type { GetDatasetSchema } from "@/lib/validations/layer";
 import { datasetMetadataAggregated } from "@/lib/validations/layer";
@@ -109,7 +109,7 @@ const Catalog = () => {
     page: queryParamPage || 1,
   });
   const { metadata, isLoading: filtersLoading } = useMetadataAggregated(datasetSchema);
-  const { layers: datasets, isLoading: datasetsLoading } = useCatalogLayers(queryParams, datasetSchema);
+  const { datasets, isLoading: datasetsLoading } = useCatalogGroupedLayers(queryParams, datasetSchema);
 
   const resetPage = useCallback(() => {
     setQueryParamPage(1);
@@ -248,8 +248,11 @@ const Catalog = () => {
                   <CatalogDatasetCard
                     key={dataset.id}
                     dataset={dataset}
-                    onClick={(dataset) => {
-                      router.push(`/datasets/${dataset.id}`);
+                    onClick={(groupedDataset, selectedLayer) => {
+                      const target = groupedDataset.package_id && groupedDataset.layers.length > 1
+                        ? `/datasets/group/${encodeURIComponent(groupedDataset.package_id)}`
+                        : `/datasets/${selectedLayer.id}`;
+                      router.push(target);
                     }}
                   />
                 ))}

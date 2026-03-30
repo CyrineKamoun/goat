@@ -1,10 +1,24 @@
-import { Box, CardMedia, Grid, Paper, Stack, Typography, useTheme } from "@mui/material";
+import {
+  Box,
+  CardMedia,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import type { Layer } from "@/lib/validations/layer";
+import type { CatalogDatasetGrouped, CatalogLayerSummary, Layer } from "@/lib/validations/layer";
 import { datasetMetadataAggregated } from "@/lib/validations/layer";
+import { formatCatalogGroupName, formatCatalogLayerName } from "@/lib/utils/catalog-labels";
 import { parseCatalogXmlMetadata } from "@/lib/utils/catalog-xml-metadata";
 
 import { useGetMetadataValueTranslation } from "@/hooks/map/DatasetHooks";
@@ -18,15 +32,39 @@ export const METADATA_HEADER_ICONS = {
   license: ICON_NAME.LICENSE,
 };
 
+/** Normalise a raw catalog API response (grouped or plain layer) into the
+ *  shape CatalogDatasetCard needs internally. */
+function toGrouped(dataset: CatalogDatasetGrouped | Layer): CatalogDatasetGrouped {
+  if ("layers" in dataset && Array.isArray(dataset.layers)) {
+    return dataset as CatalogDatasetGrouped;
+  }
+  // Plain Layer — wrap it so the card can use a uniform interface.
+  const layer = dataset as Layer;
+  return {
+    ...layer,
+    layers: [
+      {
+        id: layer.id,
+        name: layer.name,
+        type: layer.type ?? "feature",
+        feature_layer_geometry_type: layer.feature_layer_geometry_type,
+      },
+    ],
+  } as CatalogDatasetGrouped;
+}
+
 const CatalogDatasetCard = ({
-  dataset,
+  dataset: rawDataset,
   onClick,
   selected,
+  showFileSelect = false,
 }: {
-  dataset: Layer;
-  onClick?: (dataset: Layer) => void;
+  dataset: CatalogDatasetGrouped | Layer;
+  onClick?: (dataset: CatalogDatasetGrouped, selectedLayer: CatalogLayerSummary) => void;
   selected?: boolean;
+  showFileSelect?: boolean;
 }) => {
+  const dataset = toGrouped(rawDataset);
   const theme = useTheme();
   const { t } = useTranslation(["common"]);
   const getMetadataValueTranslation = useGetMetadataValueTranslation();
@@ -36,13 +74,23 @@ const CatalogDatasetCard = ({
     ? `${xmlMeta.bbox.west.toFixed(3)}, ${xmlMeta.bbox.south.toFixed(3)} / ${xmlMeta.bbox.east.toFixed(3)}, ${xmlMeta.bbox.north.toFixed(3)}`
     : null;
 
+  const multipleFiles = dataset.layers.length > 1;
+  const [selectedLayerId, setSelectedLayerId] = useState<string>(dataset.layers[0]?.id ?? "");
+  const selectedLayer = dataset.layers.find((l) => l.id === selectedLayerId) ?? dataset.layers[0];
+
+  const handleCardClick = () => {
+    if (onClick && selectedLayer) {
+      onClick(dataset, selectedLayer);
+    }
+  };
+
   return (
     <Paper
-      onClick={() => onClick && onClick(dataset)}
+      onClick={multipleFiles ? undefined : handleCardClick}
       sx={{
         overflow: "hidden",
         "&:hover": {
-          cursor: "pointer",
+          cursor: multipleFiles ? "default" : "pointer",
           boxShadow: 10,
           "& img": {
             transform: "scale(1.2)",
@@ -77,8 +125,12 @@ const CatalogDatasetCard = ({
         <Grid item xs={12} sm={6} md={8} lg={9}>
           <Stack direction="column" sx={{ p: 2 }} spacing={2}>
             <Stack spacing={2}>
-              <Typography variant="h6" fontWeight="bold">
-                {dataset.name}
+              <Typography
+                variant="h6"
+                fontWeight="bold"
+                onClick={multipleFiles ? handleCardClick : undefined}
+                sx={multipleFiles ? { cursor: "pointer", "&:hover": { textDecoration: "underline" } } : undefined}>
+                {formatCatalogGroupName(dataset.name)}
               </Typography>
               <Box
                 sx={{
@@ -110,6 +162,24 @@ const CatalogDatasetCard = ({
                   </Typography>
                 )}
               </Stack>
+            )}
+            {multipleFiles && showFileSelect && (
+              <FormControl size="small" onClick={(e) => e.stopPropagation()}>
+                <InputLabel id={`file-select-label-${dataset.id}`}>{t("common:select_file")}</InputLabel>
+                <Select
+                  labelId={`file-select-label-${dataset.id}`}
+                  value={selectedLayerId}
+                  label={t("common:select_file")}
+                  onChange={(e) => setSelectedLayerId(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}>
+                  {dataset.layers.map((layer) => (
+                    <MenuItem key={layer.id} value={layer.id} onClick={() => onClick?.(dataset, layer)}>
+                      {formatCatalogLayerName(layer.name)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             )}
             <Grid container justifyContent="flex-start" sx={{ pl: 0 }}>
               {Object.keys(datasetMetadataAggregated.shape).map((key, index) => {

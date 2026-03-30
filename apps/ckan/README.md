@@ -93,13 +93,20 @@ docker compose up -d --build
 
 ## Catalog Pipeline Scripts
 
-CKAN in this folder is runtime-only. Catalog pipeline scripts now live in:
+CKAN in this folder is runtime-only. The supported catalog ingestion scripts
+now live in:
 
-- `scripts/catalog/catalog/`
+- `scripts/windmill/catalog/`
 
-Run pipeline commands from the repository root using your existing environment:
+Run commands from the repository root using your existing environment:
 
 ```bash
-python -m scripts.catalog.catalog.harvest_readiness --pg-host 127.0.0.1 --pg-port 5433 --pg-db ckan --pg-user ckan --pg-password ckan --max-age-minutes 180
-python -m scripts.catalog.catalog.pipeline --ckan-pg-host 127.0.0.1 --ckan-pg-port 5433 --ckan-pg-db ckan --ckan-pg-user ckan --ckan-pg-password ckan --meta-pg-host <goat-postgres-host> --meta-pg-port <goat-postgres-port> --meta-pg-db <goat-postgres-db> --meta-pg-user <goat-postgres-user> --meta-pg-password <goat-postgres-password> --meta-pg-schema datacatalog --duckdb-path apps/ckan/data/catalog.duckdb --timeout-seconds 900 --poll-seconds 15
+python scripts/windmill/catalog/datacatalog_pipeline.py
+python scripts/windmill/catalog/catalog_ai_flow.py
+```
+
+Sync scripts to Windmill with:
+
+```bash
+python scripts/windmill/sync-datacatalog-pipeline.py
 ```

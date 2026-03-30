@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "GOAT Core API"
     USER_DATA_SCHEMA: str = "user_data"
     CUSTOMER_SCHEMA: str = "customer"
+    CATALOG_SCHEMA: str = "datacatalog"
     ACCOUNTS_SCHEMA: str = "accounts"
     REGION_MAPPING_PT_TABLE: str = "basic.region_mapping_pt"
     BASE_STREET_NETWORK: UUID = UUID("903ecdca-b717-48db-bbce-0219e41439cf")

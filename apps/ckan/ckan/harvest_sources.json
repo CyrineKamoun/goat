@@ -20,6 +20,25 @@
                 "metadata_format": "iso19139",
                 "ignore_empty_datasets": true
             }
+        },
+        {
+            "name": "bw-csw",
+            "url": "https://www.geoportal-bw.de/geonetwork/srv/eng/csw",
+            "type": "csw",
+            "title": "Baden-Württemberg Geoportal CSW",
+            "active": true,
+            "frequency": "WEEKLY",
+            "config": {
+                "max_datasets": 500,
+                "default_tags": [
+                    "baden-wuerttemberg",
+                    "geodata"
+                ],
+                "default_groups": [],
+                "spatial": true,
+                "metadata_format": "iso19139",
+                "ignore_empty_datasets": true
+            }
         }
     ]
 }

@@ -27,6 +27,7 @@ from core.endpoints.deps import get_db, get_user_id
 from core.schemas.common import OrderEnum
 from core.schemas.error import HTTPErrorHandler
 from core.schemas.layer import (
+    ICatalogDatasetGrouped,
     ICatalogLayerGet,
     IFeatureStandardLayerRead,
     IFeatureStreetNetworkLayerRead,
@@ -198,6 +199,56 @@ async def read_catalog_layers(
         )
 
     return layers
+
+
+@router.post(
+    "/catalog/grouped",
+    response_model=Page[ICatalogDatasetGrouped],
+    response_model_exclude_none=True,
+    status_code=200,
+    summary=(
+        "Retrieve catalog layers grouped by package id. "
+        "Layers from the same dataset appear as one entry with a list of available files."
+    ),
+    dependencies=[Depends(auth_z)],
+)
+async def read_catalog_layers_grouped(
+    async_session: AsyncSession = Depends(get_db),
+    page_params: PaginationParams = Depends(),
+    user_id: UUID4 = Depends(get_user_id),
+    obj_in: ICatalogLayerGet = Body(
+        None,
+        description="Catalog filter parameters",
+    ),
+) -> Page:
+    with HTTPErrorHandler():
+        return await crud_layer.get_grouped_catalog_layers(
+            async_session=async_session,
+            params=obj_in,
+            page_params=page_params,
+        )
+
+
+@router.get(
+    "/catalog/grouped/{package_id}",
+    response_model=ICatalogDatasetGrouped,
+    response_model_exclude_none=True,
+    status_code=200,
+    summary="Retrieve one grouped catalog dataset by package ID",
+    dependencies=[Depends(auth_z)],
+)
+async def read_catalog_layer_grouped_by_package(
+    async_session: AsyncSession = Depends(get_db),
+    package_id: str = Path(
+        ...,
+        description="Package id (or fallback layer UUID for single entries)",
+    ),
+) -> ICatalogDatasetGrouped:
+    with HTTPErrorHandler():
+        return await crud_layer.get_grouped_catalog_layer_by_package_id(
+            async_session=async_session,
+            package_id=package_id,
+        )
 
 
 @router.put(

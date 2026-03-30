@@ -26,8 +26,6 @@ import psycopg
 import psycopg.rows
 from psycopg.types.json import Jsonb
 
-from goatlib.tools.style import get_default_style
-
 
 # ---------------------------------------------------------------------------
 # Config helpers — all settings come from environment variables only
@@ -50,6 +48,454 @@ def _require(*names: str) -> str:
 
 def _is_truthy(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _parse_csv_set(raw: str) -> set[str]:
+    return {item.strip() for item in (raw or "").split(",") if item.strip()}
+
+
+_AI_RUNTIME_CONFIG_CACHE: dict[str, str] | None = None
+_AI_RUNTIME_UNAVAILABLE_REASON: str | None = None
+
+def _windmill_get_resource(path: str) -> dict[str, Any]:
+    """Best-effort Windmill resource lookup for structured AI config."""
+    if not path:
+        return {}
+
+    try:
+        import wmill
+    except Exception:
+        return {}
+
+    candidate_paths = [path.strip()]
+    if not path.startswith("u/") and not path.startswith("f/"):
+        candidate_paths.append(f"f/goat/{path.strip()}")
+
+    for candidate in candidate_paths:
+        try:
+            value = wmill.get_resource(candidate)
+        except Exception:
+            continue
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                continue
+            try:
+                parsed = json.loads(text)
+            except Exception:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+
+    return {}
+
+
+def _normalize_ai_chat_url(url: str) -> str:
+    """Normalize an OpenAI-compatible base URL to chat completions endpoint."""
+    value = (url or "").strip().rstrip("/")
+    if not value:
+        return ""
+    if value.endswith("/chat/completions"):
+        return value
+    if value.endswith("/v1"):
+        return f"{value}/chat/completions"
+    if "openrouter.ai/api/v1" in value:
+        return f"{value}/chat/completions"
+    return value
+
+
+def _resolve_ai_runtime_config() -> dict[str, str]:
+    """Resolve AI settings from Windmill resource, with env overrides."""
+    global _AI_RUNTIME_CONFIG_CACHE
+    if _AI_RUNTIME_CONFIG_CACHE is not None:
+        return _AI_RUNTIME_CONFIG_CACHE
+
+    # AI settings are optional; avoid noisy Windmill variable 404 probes.
+    resource_path = _env(
+        "WINDMILL_AI_RESOURCE",
+        _env("AI_RESOURCE", "u/admin/fabulous_openrouter"),
+    ).strip()
+    resource = _windmill_get_resource(resource_path)
+
+    resource_url = _normalize_ai_chat_url(
+        str(
+            resource.get("chat_url")
+            or resource.get("url")
+            or resource.get("base_url")
+            or resource.get("endpoint")
+            or ""
+        )
+    )
+    if not resource_url and "openrouter" in resource_path.lower():
+        resource_url = "https://openrouter.ai/api/v1/chat/completions"
+
+    enabled_models = resource.get("enabled_models")
+    first_enabled_model = ""
+    if isinstance(enabled_models, list) and enabled_models:
+        first_enabled_model = str(enabled_models[0]).strip()
+
+    resource_model = str(
+        resource.get("model")
+        or resource.get("default_model")
+        or first_enabled_model
+        or ""
+    ).strip()
+    resource_key = str(
+        resource.get("token")
+        or resource.get("api_key")
+        or resource.get("key")
+        or ""
+    ).strip()
+
+    ai_url = (
+        _env("WINDMILL_AI_CHAT_URL", _env("AI_CHAT_URL", "")).strip()
+        or resource_url
+    )
+    ai_url = _normalize_ai_chat_url(ai_url)
+
+    model = "mimo-v2-pro"
+    api_key = (
+        _env("WINDMILL_AI_API_KEY", _env("AI_API_KEY", "")).strip()
+        or resource_key
+    )
+
+    _AI_RUNTIME_CONFIG_CACHE = {
+        "url": ai_url,
+        "model": model,
+        "api_key": api_key,
+    }
+    return _AI_RUNTIME_CONFIG_CACHE
+
+
+def _default_layer_properties(geometry_type: str | None) -> dict[str, Any]:
+    """Return deterministic default layer style properties by geometry type.
+
+    Keep this local to avoid importing goatlib in Windmill script dependency
+    resolution, which expects pip-installable packages only.
+    """
+    if geometry_type == "point":
+        return {
+            "color": [158, 1, 66],
+            "min_zoom": 1,
+            "max_zoom": 22,
+            "visibility": True,
+            "filled": True,
+            "fixed_radius": False,
+            "radius_range": [0, 10],
+            "radius_scale": "linear",
+            "radius": 5,
+            "opacity": 1,
+            "stroked": False,
+        }
+    if geometry_type == "line":
+        return {
+            "color": [214, 62, 79],
+            "stroke_color": [214, 62, 79],
+            "min_zoom": 1,
+            "max_zoom": 22,
+            "visibility": True,
+            "filled": True,
+            "opacity": 1,
+            "stroked": True,
+            "stroke_width": 7,
+            "stroke_width_range": [0, 10],
+            "stroke_width_scale": "linear",
+        }
+    if geometry_type == "polygon":
+        return {
+            "color": [102, 194, 165],
+            "min_zoom": 1,
+            "max_zoom": 22,
+            "visibility": True,
+            "filled": True,
+            "opacity": 0.8,
+            "stroked": False,
+            "stroke_width": 3,
+            "stroke_width_range": [0, 10],
+            "stroke_width_scale": "linear",
+            "stroke_color": [217, 25, 85],
+        }
+    return {
+        "color": [158, 1, 66],
+        "min_zoom": 1,
+        "max_zoom": 22,
+        "visibility": True,
+        "opacity": 1,
+    }
+
+
+def _clamp_float(value: Any, default: float, min_value: float, max_value: float) -> float:
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return default
+    return max(min(v, max_value), min_value)
+
+
+def _normalize_color(value: Any) -> list[int] | None:
+    if not isinstance(value, list) or len(value) != 3:
+        return None
+    out: list[int] = []
+    for channel in value:
+        try:
+            iv = int(channel)
+        except (TypeError, ValueError):
+            return None
+        out.append(max(min(iv, 255), 0))
+    return out
+
+
+def _normalize_data_category(value: Any) -> str | None:
+    if not value:
+        return None
+    candidate = str(value).strip().lower()
+    allowed = {
+        "basemap",
+        "imagery",
+        "boundary",
+        "people",
+        "transportation",
+        "environment",
+        "landuse",
+        "places",
+    }
+    return candidate if candidate in allowed else None
+
+
+def _default_theme_style(planning_theme: str | None, geometry_type: str | None) -> dict[str, Any]:
+    base = _default_layer_properties(geometry_type)
+    theme = (planning_theme or "").strip().lower()
+    color_by_theme: dict[str, list[int]] = {
+        "transport": [31, 119, 180],
+        "mobility": [31, 119, 180],
+        "housing": [231, 138, 56],
+        "land_use": [141, 160, 203],
+        "landuse": [141, 160, 203],
+        "environment": [52, 160, 72],
+        "utilities": [224, 130, 20],
+        "demographics": [166, 118, 29],
+        "facilities": [111, 66, 193],
+        "hazard": [203, 24, 29],
+    }
+    if color := color_by_theme.get(theme):
+        base["color"] = color
+        if geometry_type == "line":
+            base["stroke_color"] = color
+    return base
+
+
+def _merge_style_with_ai(
+    geometry_type: str | None,
+    metadata: dict[str, Any] | None,
+) -> dict[str, Any]:
+    planning_theme = None
+    if metadata:
+        ai_decision = metadata.get("ai")
+        if isinstance(ai_decision, dict):
+            planning_theme = ai_decision.get("planning_theme")
+    style = _default_theme_style(planning_theme, geometry_type)
+
+    if not metadata:
+        return style
+
+    ai_decision = metadata.get("ai")
+    if not isinstance(ai_decision, dict):
+        return style
+    ai_style = ai_decision.get("suggested_style")
+    if not isinstance(ai_style, dict):
+        return style
+
+    if color := _normalize_color(ai_style.get("color")):
+        style["color"] = color
+    if stroke_color := _normalize_color(ai_style.get("stroke_color")):
+        style["stroke_color"] = stroke_color
+
+    for key, default, minimum, maximum in [
+        ("opacity", style.get("opacity", 1), 0.0, 1.0),
+        ("stroke_width", style.get("stroke_width", 2), 0.0, 20.0),
+        ("radius", style.get("radius", 5), 0.0, 50.0),
+    ]:
+        if key in ai_style:
+            style[key] = _clamp_float(ai_style.get(key), float(default), minimum, maximum)
+
+    for bool_key in ["visibility", "filled", "stroked", "fixed_radius"]:
+        if bool_key in ai_style and isinstance(ai_style.get(bool_key), bool):
+            style[bool_key] = ai_style[bool_key]
+
+    return style
+
+
+def _ai_evaluate_dataset(
+    *,
+    metadata: dict[str, Any],
+    package: dict[str, Any],
+    resource: dict[str, Any],
+    log: logging.Logger,
+) -> dict[str, Any]:
+    """Classify urban-planning relevance and suggest data category/style.
+
+    The endpoint is expected to be OpenAI-compatible chat completions API.
+    When unavailable or invalid, fallback keeps dataset and uses deterministic styling.
+    """
+    global _AI_RUNTIME_UNAVAILABLE_REASON
+
+    ai_config = _resolve_ai_runtime_config()
+    ai_url = ai_config.get("url", "").strip()
+    if not ai_url:
+        return {
+            "is_relevant": True,
+            "confidence": 1.0,
+            "planning_theme": "other",
+            "rationale": "ai_disabled",
+            "suggested_data_category": None,
+            "suggested_style": None,
+        }
+    if _AI_RUNTIME_UNAVAILABLE_REASON:
+        return {
+            "is_relevant": True,
+            "confidence": 0.0,
+            "planning_theme": "other",
+            "rationale": f"ai_unavailable:{_AI_RUNTIME_UNAVAILABLE_REASON}",
+            "suggested_data_category": None,
+            "suggested_style": None,
+        }
+
+    model = ai_config.get("model", "mimo-v2-pro")
+    api_key = ai_config.get("api_key", "").strip()
+
+    schema_hint = {
+        "is_relevant": "boolean",
+        "confidence": "number 0..1",
+        "planning_theme": "transport|housing|land_use|environment|utilities|demographics|facilities|economy|hazard|other",
+        "rationale": "short string",
+        "suggested_data_category": "basemap|imagery|boundary|people|transportation|environment|landuse|places|null",
+        "suggested_style": {
+            "color": [0, 0, 0],
+            "stroke_color": [0, 0, 0],
+            "opacity": 0.8,
+            "stroke_width": 2,
+            "radius": 5,
+            "filled": True,
+            "stroked": False,
+            "visibility": True,
+        },
+    }
+
+    system_prompt = (
+        "You are a strict geodata classifier for urban planning relevance. "
+        "Return only JSON object. No markdown."
+    )
+    user_payload = {
+        "task": "Keep only datasets relevant for urban planning and suggest style.",
+        "output_schema": schema_hint,
+        "dataset": {
+            "title": metadata.get("title"),
+            "abstract": metadata.get("abstract"),
+            "keywords": metadata.get("keywords") or [],
+            "topic_category": metadata.get("topic_category") or [],
+            "resource_format": resource.get("format"),
+            "resource_name": resource.get("name"),
+            "package_title": package.get("title"),
+            "package_notes": package.get("notes"),
+        },
+    }
+
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    request_body = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},
+        ],
+        "temperature": 0,
+        "response_format": {"type": "json_object"},
+    }
+
+    ai_timeout = _clamp_float(
+        _env("CATALOG_AI_TIMEOUT_SECONDS", "20"),
+        20.0,
+        1.0,
+        120.0,
+    )
+
+    try:
+        with httpx.Client(timeout=ai_timeout) as client:
+            resp = client.post(ai_url, headers=headers, json=request_body)
+            resp.raise_for_status()
+            payload = resp.json()
+
+        content = (
+            (((payload.get("choices") or [{}])[0]).get("message") or {}).get("content")
+            if isinstance(payload, dict)
+            else None
+        )
+        if not content:
+            raise ValueError("AI response missing choices[0].message.content")
+
+        parsed = json.loads(content)
+        is_relevant = bool(parsed.get("is_relevant", True))
+        confidence = _clamp_float(parsed.get("confidence", 0.5), 0.5, 0.0, 1.0)
+        planning_theme = str(parsed.get("planning_theme") or "other").strip().lower()
+        rationale = str(parsed.get("rationale") or "")
+        suggested_data_category = _normalize_data_category(parsed.get("suggested_data_category"))
+        suggested_style = parsed.get("suggested_style") if isinstance(parsed.get("suggested_style"), dict) else None
+
+        return {
+            "is_relevant": is_relevant,
+            "confidence": confidence,
+            "planning_theme": planning_theme,
+            "rationale": rationale,
+            "suggested_data_category": suggested_data_category,
+            "suggested_style": suggested_style,
+        }
+    except httpx.HTTPStatusError as exc:
+        _AI_RUNTIME_UNAVAILABLE_REASON = (
+            f"http_{exc.response.status_code}"
+            if exc.response is not None
+            else "http_status_error"
+        )
+        log.warning(
+            "AI HTTP error; disabling AI for remaining resources in this run: %s",
+            _AI_RUNTIME_UNAVAILABLE_REASON,
+        )
+        return {
+            "is_relevant": True,
+            "confidence": 0.0,
+            "planning_theme": "other",
+            "rationale": f"ai_error:{exc}",
+            "suggested_data_category": None,
+            "suggested_style": None,
+        }
+    except httpx.RequestError as exc:
+        _AI_RUNTIME_UNAVAILABLE_REASON = "request_error"
+        log.warning(
+            "AI request error; disabling AI for remaining resources in this run: %s",
+            exc,
+        )
+        return {
+            "is_relevant": True,
+            "confidence": 0.0,
+            "planning_theme": "other",
+            "rationale": f"ai_error:{exc}",
+            "suggested_data_category": None,
+            "suggested_style": None,
+        }
+    except Exception as exc:
+        _AI_RUNTIME_UNAVAILABLE_REASON = "unexpected_error"
+        log.warning("AI evaluation failed; using fallback classification: %s", exc)
+        return {
+            "is_relevant": True,
+            "confidence": 0.0,
+            "planning_theme": "other",
+            "rationale": f"ai_error:{exc}",
+            "suggested_data_category": None,
+            "suggested_style": None,
+        }
 
 
 def _canonical_ducklake_metadata_dir(path: str) -> str:
@@ -168,6 +614,79 @@ def _fetch_latest_harvest_xml(package_id: str) -> str | None:
         )
 
     return None
+
+
+def _fetch_harvest_xml_batch(package_ids: list[str]) -> dict[str, str]:
+    """Fetch latest XML metadata for many packages in two queries (one connection).
+
+    Returns a dict of package_id -> xml_content for packages that have content.
+    """
+    if not package_ids:
+        return {}
+
+    host = _env("CKAN_DB_HOST", "goat-ckan-db")
+    port = int(_env("CKAN_DB_PORT", "5432"))
+    dbname = _env("CKAN_DB_NAME", "ckan")
+    user = _env("CKAN_DB_USER", "ckan")
+    password = _env("CKAN_DB_PASSWORD", _env("CKAN_PG_PASSWORD", "ckan"))
+
+    result: dict[str, str] = {}
+    try:
+        with psycopg.connect(
+            host=host,
+            port=port,
+            dbname=dbname,
+            user=user,
+            password=password,
+            connect_timeout=5,
+        ) as conn:
+            with conn.cursor() as cur:
+                # Pass 1: current=TRUE rows (preferred)
+                cur.execute(
+                    """
+                    SELECT DISTINCT ON (package_id) package_id, content
+                    FROM harvest_object
+                    WHERE package_id = ANY(%s)
+                      AND current IS TRUE
+                      AND content IS NOT NULL
+                      AND btrim(content) <> ''
+                    ORDER BY package_id,
+                        COALESCE(import_finished, fetch_finished, gathered,
+                                 metadata_modified_date) DESC NULLS LAST,
+                        id DESC
+                    """,
+                    (package_ids,),
+                )
+                for row in cur.fetchall():
+                    if row[0] and row[1]:
+                        result[str(row[0])] = str(row[1])
+
+                # Pass 2: fill in any packages not found above
+                missing = [pid for pid in package_ids if pid not in result]
+                if missing:
+                    cur.execute(
+                        """
+                        SELECT DISTINCT ON (package_id) package_id, content
+                        FROM harvest_object
+                        WHERE package_id = ANY(%s)
+                          AND content IS NOT NULL
+                          AND btrim(content) <> ''
+                        ORDER BY package_id,
+                            COALESCE(import_finished, fetch_finished, gathered,
+                                     metadata_modified_date) DESC NULLS LAST,
+                            id DESC
+                        """,
+                        (missing,),
+                    )
+                    for row in cur.fetchall():
+                        if row[0] and row[1] and str(row[0]) not in result:
+                            result[str(row[0])] = str(row[1])
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Could not batch-fetch harvest XML: %s", exc
+        )
+
+    return result
 
 
 def _ckan_headers(api_key: str | None) -> dict[str, str]:
@@ -392,9 +911,36 @@ def extract_iso_metadata(xml: str) -> dict[str, Any]:
         ".//{*}identificationInfo//{*}abstract//{*}CharacterString",
         ".//{*}identificationInfo//{*}abstract//{*}Anchor",
     )
+    out["lineage"] = _xml_text(
+        root,
+        ".//{*}dataQualityInfo//{*}lineage//{*}statement//{*}CharacterString",
+    )
+    out["distribution_url"] = _xml_text(
+        root,
+        ".//{*}distributionInfo//{*}CI_OnlineResource//{*}URL",
+        ".//{*}transferOptions//{*}CI_OnlineResource//{*}URL",
+    )
+    out["language_code"] = _xml_text(
+        root,
+        ".//{*}language//{*}LanguageCode",
+        ".//{*}language//{*}CharacterString",
+    )
+    date_value = _xml_text(
+        root,
+        ".//{*}identificationInfo//{*}citation//{*}date//{*}Date",
+        ".//{*}identificationInfo//{*}citation//{*}date//{*}DateTime",
+    )
+    if date_value:
+        year_match = re.match(r"^(\d{4})", date_value.strip())
+        if year_match:
+            out["data_reference_year"] = int(year_match.group(1))
     out["keywords"] = _xml_all_text(
         root,
         ".//{*}descriptiveKeywords//{*}keyword//{*}CharacterString",
+    )
+    out["topic_category"] = _xml_all_text(
+        root,
+        ".//{*}identificationInfo//{*}topicCategory//{*}MD_TopicCategoryCode",
     )
 
     for contact in root.findall(".//{*}CI_ResponsibleParty"):
@@ -448,7 +994,17 @@ def build_ckan_metadata(
             record["title"] = meta["title"]
         if meta.get("abstract"):
             record["abstract"] = meta["abstract"]
-        for field in ("keywords", "distributor_name", "distributor_email", "bbox"):
+        for field in (
+            "keywords",
+            "topic_category",
+            "distributor_name",
+            "distributor_email",
+            "bbox",
+            "lineage",
+            "distribution_url",
+            "language_code",
+            "data_reference_year",
+        ):
             if meta.get(field):
                 record[field] = meta[field]
 
@@ -522,6 +1078,67 @@ def _is_degenerate_extent(wkt_text: str | None) -> bool:
     return False
 
 
+def _normalize_language_code(code: str | None) -> str | None:
+    """Normalize language code to ISO-639-1 when possible."""
+    if not code:
+        return None
+    normalized = code.strip().lower()
+    if len(normalized) == 2 and normalized.isalpha():
+        return normalized
+    return None
+
+
+def _normalize_email(email: str | None) -> str | None:
+    """Return email when it looks valid enough for API schema validation."""
+    if not email:
+        return None
+    candidate = email.strip()
+    if "@" not in candidate or candidate.startswith("@") or candidate.endswith("@"):
+        return None
+    return candidate
+
+
+def _map_iso_topic_to_data_category(
+    topic_categories: list[str] | None,
+) -> str | None:
+    """Map ISO 19115 topicCategory values to GOAT DataCategory values."""
+    if not topic_categories:
+        return None
+
+    normalized = [t.strip().lower() for t in topic_categories if t and t.strip()]
+    if not normalized:
+        return None
+
+    topic_to_category = {
+        "imagerybasemapsearthcover": "imagery",
+        "transportation": "transportation",
+        "boundaries": "boundary",
+        "planningcadastre": "landuse",
+        "farming": "landuse",
+        "location": "places",
+        "structure": "places",
+        "society": "people",
+        "health": "people",
+        "biota": "environment",
+        "climatologymeteorologyatmosphere": "environment",
+        "elevation": "environment",
+        "environment": "environment",
+        "geoscientificinformation": "environment",
+        "inlandwaters": "environment",
+        "oceans": "environment",
+        "utilitiescommunication": "transportation",
+        "economy": "people",
+        "intelligencemilitary": "boundary",
+    }
+
+    for topic in normalized:
+        mapped = topic_to_category.get(topic)
+        if mapped:
+            return mapped
+
+    return None
+
+
 def upsert_customer_catalog_layer(
     conn: psycopg.Connection,
     *,
@@ -532,13 +1149,18 @@ def upsert_customer_catalog_layer(
     layer_name: str,
     geometry_type: str | None,
     extent_wkt: str | None,
-    resource_id: str,
+    source_resource_id: str,
     xml_metadata: str | None,
     metadata: dict[str, Any] | None = None,
 ) -> str:
-    """Upsert a catalog row in customer.layer and keep it pinned to Catalog folder."""
+    """Upsert a catalog row in customer.layer and keep it pinned to Catalog folder.
+
+    Structured metadata fields (distributor_name, distributor_email, tags)
+    are populated from *metadata* (ISO 19139 extraction result)
+    so that the OGC Records API can serve them without requiring client-side XML parsing.
+    """
     s = _validate_schema(customer_schema)
-    _ = resource_id
+    _ = source_resource_id
 
     # Use data extent if valid, otherwise fall back to CSW bbox.
     if _is_degenerate_extent(extent_wkt) and metadata:
@@ -547,8 +1169,30 @@ def upsert_customer_catalog_layer(
             extent_wkt = csw_extent
     normalized_extent_wkt = _normalize_extent_wkt(extent_wkt)
 
-    # Generate default styling properties for the geometry type.
-    properties = Jsonb(get_default_style(geometry_type))
+    # Generate style properties using AI suggestion when available.
+    properties = Jsonb(_merge_style_with_ai(geometry_type, metadata))
+
+    # Extract structured fields from ISO metadata for direct DB storage.
+    distributor_name: str | None = (metadata or {}).get("distributor_name")
+    distributor_email: str | None = _normalize_email(
+        (metadata or {}).get("distributor_email")
+    )
+    raw_keywords: list[str] = (metadata or {}).get("keywords") or []
+    tags = raw_keywords if raw_keywords else None
+    description: str | None = (metadata or {}).get("abstract")
+    lineage: str | None = (metadata or {}).get("lineage")
+    distribution_url: str | None = (metadata or {}).get("distribution_url")
+    language_code: str | None = _normalize_language_code(
+        (metadata or {}).get("language_code")
+    )
+    data_reference_year: int | None = (metadata or {}).get("data_reference_year")
+    data_category: str | None = _map_iso_topic_to_data_category(
+        (metadata or {}).get("topic_category")
+    )
+    if not data_category:
+        data_category = _normalize_data_category(
+            ((metadata or {}).get("ai") or {}).get("suggested_data_category")
+        )
 
     with conn.cursor() as cur:
         cur.execute(
@@ -566,6 +1210,15 @@ def upsert_customer_catalog_layer(
                 properties = COALESCE(%s, properties),
                 in_catalog = TRUE,
                 xml_metadata = %s,
+                description = COALESCE(%s, description),
+                lineage = COALESCE(%s, lineage),
+                distribution_url = COALESCE(%s, distribution_url),
+                language_code = COALESCE(%s, language_code),
+                data_reference_year = COALESCE(%s, data_reference_year),
+                data_category = COALESCE(%s, data_category),
+                distributor_name = COALESCE(%s, distributor_name),
+                distributor_email = COALESCE(%s, distributor_email),
+                tags = COALESCE(%s, tags),
                 updated_at = NOW()
             WHERE id = %s
             RETURNING id
@@ -579,6 +1232,15 @@ def upsert_customer_catalog_layer(
                 normalized_extent_wkt,
                 properties,
                 xml_metadata,
+                description,
+                lineage,
+                distribution_url,
+                language_code,
+                data_reference_year,
+                data_category,
+                distributor_name,
+                distributor_email,
+                tags,
                 layer_id,
             ),
         )
@@ -592,6 +1254,9 @@ def upsert_customer_catalog_layer(
                 id, user_id, folder_id, name, type,
                 feature_layer_type, feature_layer_geometry_type,
                 extent, properties, in_catalog, xml_metadata,
+                description, lineage, distribution_url, language_code, data_reference_year,
+                data_category,
+                distributor_name, distributor_email, tags,
                 thumbnail_url, created_at, updated_at
             ) VALUES (
                 %s, %s, %s, %s, 'feature',
@@ -599,6 +1264,9 @@ def upsert_customer_catalog_layer(
                 CASE WHEN %s::text IS NOT NULL
                      THEN ST_Multi(ST_GeomFromText(%s, 4326)) ELSE NULL END,
                 %s, TRUE, %s,
+                %s, %s, %s, %s, %s,
+                %s,
+                %s, %s, %s,
                 'https://assets.plan4better.de/img/goat_new_dataset_thumbnail.png',
                 NOW(), NOW()
             )
@@ -614,6 +1282,15 @@ def upsert_customer_catalog_layer(
                 normalized_extent_wkt,
                 properties,
                 xml_metadata,
+                description,
+                lineage,
+                distribution_url,
+                language_code,
+                data_reference_year,
+                data_category,
+                distributor_name,
+                distributor_email,
+                tags,
             ),
         )
         inserted = cur.fetchone()
@@ -673,6 +1350,7 @@ def ensure_catalog_schema(conn: psycopg.Connection, schema: str) -> None:
             ("superseded_at", "TIMESTAMPTZ"),
             ("metadata_jsonb", "JSONB"),
             ("xml_raw", "TEXT"),
+            ("package_id", "TEXT"),
         ]:
             cur.execute(
                 f"ALTER TABLE {s}.layer ADD COLUMN IF NOT EXISTS {col} {col_type}"
@@ -1022,6 +1700,7 @@ def upsert_catalog_layer(
     table_name: str,
     version_num: int,
     create_new_version: bool,
+    package_id: str | None = None,
 ) -> str:
     """Insert or update datacatalog.layer; returns the UUID of the row."""
     s = _validate_schema(schema)
@@ -1038,11 +1717,11 @@ def upsert_catalog_layer(
                     layer_id, user_id, name,
                     resource_id, base_resource_id, version_num, is_latest, superseded_at,
                     metadata_jsonb, xml_raw,
-                    schema_name, table_name
+                    schema_name, table_name, package_id
                 ) VALUES (
                     %s, %s, %s,
                     %s, %s, %s, TRUE, NULL, %s, %s,
-                    %s, %s
+                    %s, %s, %s
                 )
                 RETURNING id
                 """,
@@ -1050,7 +1729,7 @@ def upsert_catalog_layer(
                     layer_id, user_id, name,
                     resource_id, resource_id, version_num,
                     Jsonb(metadata), xml_raw,
-                    schema_name, table_name,
+                    schema_name, table_name, package_id,
                 ),
             )
         else:
@@ -1059,7 +1738,8 @@ def upsert_catalog_layer(
                 UPDATE {s}.layer SET
                     layer_id=%s, user_id=%s, name=%s,
                     metadata_jsonb=%s, xml_raw=%s,
-                    schema_name=%s, table_name=%s
+                    schema_name=%s, table_name=%s,
+                    package_id=COALESCE(%s, package_id)
                 WHERE resource_id=%s AND is_latest
                 RETURNING id
                 """,
@@ -1067,6 +1747,7 @@ def upsert_catalog_layer(
                     layer_id, user_id, name,
                     Jsonb(metadata), xml_raw,
                     schema_name, table_name,
+                    package_id,
                     resource_id,
                 ),
             )
@@ -1082,11 +1763,11 @@ def upsert_catalog_layer(
                 layer_id, user_id, name,
                 resource_id, base_resource_id, version_num, is_latest, superseded_at,
                 metadata_jsonb, xml_raw,
-                schema_name, table_name
+                schema_name, table_name, package_id
             ) VALUES (
                 %s, %s, %s,
                 %s, %s, %s, TRUE, NULL, %s, %s,
-                %s, %s
+                %s, %s, %s
             )
             RETURNING id
             """,
@@ -1094,7 +1775,7 @@ def upsert_catalog_layer(
                 layer_id, user_id, name,
                 resource_id, resource_id, version_num or 1,
                 Jsonb(metadata), xml_raw,
-                schema_name, table_name,
+                schema_name, table_name, package_id,
             ),
         )
         inserted = cur.fetchone()
@@ -1549,6 +2230,8 @@ def main() -> dict[str, Any]:
     ckan_base, package_search_url, health_url = _resolve_ckan_urls(api_key)
     page_size = int(_env("CKAN_API_PAGE_SIZE", "200"))
     max_pages = int(_env("CKAN_API_MAX_PAGES", "100"))
+    selected_resource_ids = _parse_csv_set(_env("CATALOG_SELECTED_RESOURCE_IDS", ""))
+    selected_package_ids = _parse_csv_set(_env("CATALOG_SELECTED_PACKAGE_IDS", ""))
 
     pg_host = _require("META_PG_HOST", "POSTGRES_SERVER")
     pg_port = int(_env("META_PG_PORT", _env("POSTGRES_PORT", "5432")))
@@ -1638,6 +2321,8 @@ def main() -> dict[str, Any]:
             continue
 
         package_id = str(package.get("id") or "")
+        if selected_package_ids and package_id not in selected_package_ids:
+            continue
         if package_id not in harvest_xml_cache:
             harvest_xml_cache[package_id] = _fetch_latest_harvest_xml(package_id)
         package_xml_metadata = harvest_xml_cache.get(package_id)
@@ -1652,6 +2337,8 @@ def main() -> dict[str, Any]:
                 continue
 
             resource_id = str(resource.get("id") or "")
+            if selected_resource_ids and resource_id not in selected_resource_ids:
+                continue
             resource_url = str(resource.get("url") or "")
             resource_format = str(resource.get("format") or "")
             resource_hash = str(resource.get("hash") or "")
@@ -1669,8 +2356,38 @@ def main() -> dict[str, Any]:
             log.info("resource_id=%s resolved targets=%d", resource_id, len(wfs_targets))
 
             base_metadata = build_ckan_metadata(package, resource, package_xml_metadata)
+            ai_decision = _ai_evaluate_dataset(
+                metadata=base_metadata,
+                package=package,
+                resource=resource,
+                log=log,
+            )
+            base_metadata["ai"] = ai_decision
+
+            ai_filter_threshold = _clamp_float(
+                _env("CATALOG_AI_FILTER_MIN_CONFIDENCE", "0.75"),
+                0.75,
+                0.0,
+                1.0,
+            )
+            ai_review_threshold = _clamp_float(
+                _env("CATALOG_AI_REVIEW_MIN_CONFIDENCE", "0.45"),
+                0.45,
+                0.0,
+                1.0,
+            )
+
+            is_relevant = bool(ai_decision.get("is_relevant", True))
+            confidence = _clamp_float(ai_decision.get("confidence", 1.0), 1.0, 0.0, 1.0)
+
             raw_xml_metadata = package_xml_metadata
             xml_metadata = _build_customer_xml_metadata(raw_xml_metadata, base_metadata)
+            resource_display_name = str(
+                resource.get("name")
+                or resource.get("description")
+                or resource.get("id")
+                or "resource"
+            )
 
             for resource_download_url, typename in wfs_targets:
                 candidates += 1
@@ -1686,6 +2403,39 @@ def main() -> dict[str, Any]:
                 customer_layer_id_no_dash = str(customer_layer_id).replace("-", "")
                 layer_suffix = f" [{typename}]" if typename else ""
                 layer_name = str(base_metadata.get("title") or resource_id) + layer_suffix
+                child_display_name = (
+                    f"{resource_display_name} [{typename}]"
+                    if typename
+                    else resource_display_name
+                )
+
+                if not is_relevant and confidence >= ai_filter_threshold:
+                    skipped += 1
+                    log.info(
+                        "resource_id=%s skipped by AI relevance filter (confidence=%.2f)",
+                        effective_resource_id,
+                        confidence,
+                    )
+                    insert_resource_run_history(
+                        pg_conn,
+                        schema=catalog_schema,
+                        run_id=run_id,
+                        package_id=package_id,
+                        resource_id=effective_resource_id,
+                        status="skipped",
+                        version_num=None,
+                        row_count=None,
+                        error=(
+                            "ai_filtered_not_relevant:"
+                            f"{ai_decision.get('rationale') or 'no_rationale'}"
+                        ),
+                        processed_at=datetime.now(timezone.utc),
+                    )
+                    continue
+
+                if not is_relevant and confidence >= ai_review_threshold:
+                    base_metadata["ai_review_required"] = True
+                    base_metadata["ai_review_reason"] = ai_decision.get("rationale")
 
                 sig = _resource_signature(
                     package_id,
@@ -1734,7 +2484,7 @@ def main() -> dict[str, Any]:
                                     existing_customer or {}
                                 ).get("feature_layer_geometry_type"),
                                 extent_wkt=(existing_customer or {}).get("extent_wkt"),
-                                resource_id=effective_resource_id,
+                                source_resource_id=resource_id,
                                 xml_metadata=xml_metadata,
                                 metadata=base_metadata,
                             )
@@ -1751,6 +2501,7 @@ def main() -> dict[str, Any]:
                                 table_name=existing_table_name,
                                 version_num=int(existing_sig.get("version_num") or 1),
                                 create_new_version=False,
+                                package_id=package_id,
                             )
                             with pg_conn.cursor() as cur:
                                 cur.execute(
@@ -1952,7 +2703,7 @@ def main() -> dict[str, Any]:
                         layer_name=layer_name,
                         geometry_type=geometry_type,
                         extent_wkt=extent_wkt,
-                        resource_id=effective_resource_id,
+                        source_resource_id=resource_id,
                         xml_metadata=xml_metadata,
                         metadata=base_metadata,
                     )
@@ -1969,6 +2720,7 @@ def main() -> dict[str, Any]:
                         table_name=target_table_name,
                         version_num=version_num,
                         create_new_version=True,
+                        package_id=package_id,
                     )
                     pg_conn.commit()
                     processed += 1

@@ -19,10 +19,10 @@ import { toast } from "react-toastify";
 
 import { Loading } from "@p4b/ui/components/Loading";
 
-import { useCatalogLayers } from "@/lib/api/layers";
+import { getDataset, useCatalogGroupedLayers } from "@/lib/api/layers";
 import { addProjectLayers, useProject } from "@/lib/api/projects";
 import type { PaginatedQueryParams } from "@/lib/validations/common";
-import type { GetDatasetSchema, Layer } from "@/lib/validations/layer";
+import type { CatalogLayerSummary, GetDatasetSchema, Layer } from "@/lib/validations/layer";
 
 import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 
@@ -58,14 +58,14 @@ const CatalogExplorerModal: React.FC<CatalogExplorerProps> = ({
     in_catalog: true,
   });
 
-  const { layers: datasets, isLoading: isDatasetLoading } = useCatalogLayers(queryParams, datasetSchema);
+  const { datasets, isLoading: isDatasetLoading } = useCatalogGroupedLayers(queryParams, datasetSchema);
 
   const { mutate: mutateProjectLayers } = useFilteredProjectLayers(projectId);
   const { mutate: mutateProject } = useProject(projectId);
   const [searchText, setSearchText] = useState<string>("");
   const [isBusy, setIsBusy] = useState<boolean>(false);
 
-  const [selectedDataset, setSelectedDataset] = useState<Layer>();
+  const [selectedLayerId, setSelectedLayerId] = useState<string>();
 
   const resetPage = useCallback(() => {
     setQueryParams({
@@ -91,17 +91,18 @@ const CatalogExplorerModal: React.FC<CatalogExplorerProps> = ({
   };
   const handleOnAdd = async () => {
     try {
-      if (!selectedDataset) return;
+      if (!selectedLayerId) return;
 
       // If onLayerSelect callback is provided, use it instead of adding to project
       if (onLayerSelect) {
-        onLayerSelect(selectedDataset);
+        const selectedLayer = await getDataset(selectedLayerId);
+        onLayerSelect(selectedLayer);
         handleOnClose();
         return;
       }
 
       setIsBusy(true);
-      await addProjectLayers(projectId, [selectedDataset.id]);
+      await addProjectLayers(projectId, [selectedLayerId]);
       mutateProjectLayers();
       mutateProject();
     } catch (error) {
@@ -145,13 +146,14 @@ const CatalogExplorerModal: React.FC<CatalogExplorerProps> = ({
                       <CatalogDatasetCard
                         key={dataset.id}
                         dataset={dataset}
-                        selected={selectedDataset?.id === dataset.id}
-                        onClick={(dataset) => {
-                          if (selectedDataset?.id === dataset.id) {
-                            setSelectedDataset(undefined);
+                        showFileSelect
+                        selected={dataset.layers.some((l) => l.id === selectedLayerId)}
+                        onClick={(_groupedDataset, selectedLayer: CatalogLayerSummary) => {
+                          if (selectedLayerId === selectedLayer.id) {
+                            setSelectedLayerId(undefined);
                             return;
                           }
-                          setSelectedDataset(dataset);
+                          setSelectedLayerId(selectedLayer.id);
                         }}
                       />
                     ))}
@@ -205,7 +207,7 @@ const CatalogExplorerModal: React.FC<CatalogExplorerProps> = ({
               variant="contained"
               color="primary"
               onClick={handleOnAdd}
-              disabled={!selectedDataset || isDatasetLoading}>
+              disabled={!selectedLayerId || isDatasetLoading}>
               {t("add_layer")}
             </LoadingButton>
           </Stack>

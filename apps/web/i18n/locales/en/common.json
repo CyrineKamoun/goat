@@ -1438,6 +1438,7 @@
   "select_field_to_calculate_statistics_tooltip": "This field will be used to calculate the statistic method",
   "select_fields": "Select fields",
   "select_file": "Select File",
+  "files_available": "{{count}} files available",
   "select_file_to_upload": "Select a file to upload from your device.",
   "select_folder_destination": "Select Folder Destination",
   "select_from_point_layer": "Select from layer",

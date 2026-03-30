@@ -1,5 +1,6 @@
 # Standard library imports
 import logging
+import math
 from datetime import datetime
 from typing import Any, Dict, List
 from uuid import UUID
@@ -35,7 +36,9 @@ from core.schemas.error import (
 from core.schemas.layer import (
     AreaStatisticsOperation,
     ComputeBreakOperation,
+    ICatalogDatasetGrouped,
     ICatalogLayerGet,
+    ICatalogLayerSummary,
     ILayerGet,
     IMetadataAggregate,
     IMetadataAggregateRead,
@@ -609,6 +612,307 @@ class CRUDLayer(CRUDLayerBase):
             result[key] = metadata
 
         return IMetadataAggregateRead(**result)
+
+    async def get_grouped_catalog_layers(
+        self,
+        async_session: AsyncSession,
+        params: ICatalogLayerGet | None,
+        page_params: PaginationParams,
+    ) -> Page:
+        """Return catalog layers grouped by datacatalog.layer.package_id."""
+        if params is None:
+            params = ICatalogLayerGet()
+
+        cs = settings.CUSTOMER_SCHEMA
+        ds = settings.CATALOG_SCHEMA
+        where_clauses = ["cl.in_catalog = TRUE"]
+        bind_params: Dict[str, Any] = {}
+
+        list_filters = (
+            "type",
+            "data_category",
+            "geographical_code",
+            "language_code",
+            "distributor_name",
+            "license",
+        )
+        for key in list_filters:
+            values = getattr(params, key, None)
+            if values:
+                param_name = f"filter_{key}"
+                where_clauses.append(f"cl.{key} = ANY(:{param_name})")
+                bind_params[param_name] = [
+                    v.value if hasattr(v, "value") else str(v) for v in values
+                ]
+
+        if params.search:
+            where_clauses.append(
+                "(lower(cl.name) LIKE :search"
+                " OR lower(cl.description) LIKE :search"
+                " OR lower(cl.distributor_name) LIKE :search)"
+            )
+            bind_params["search"] = f"%{params.search.lower()}%"
+
+        if params.spatial_search:
+            where_clauses.append(
+                "cl.extent && ST_GeomFromText(:spatial_search, 4326)"
+            )
+            bind_params["spatial_search"] = params.spatial_search
+
+        where_sql = " AND ".join(where_clauses)
+
+        # Check whether datacatalog.layer exists and has package_id so we can
+        # group by CKAN package. Falls back to per-layer grouping when the
+        # pipeline has not yet populated the datacatalog schema.
+        col_check = await async_session.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns"
+                " WHERE table_schema = :schema AND table_name = 'layer'"
+                " AND column_name = 'package_id'"
+            ),
+            {"schema": ds},
+        )
+        has_package_id = col_check.fetchone() is not None
+
+        if has_package_id:
+            join_sql = (
+                f"FROM {cs}.layer cl "
+                f"LEFT JOIN {ds}.layer dl ON dl.layer_id = cl.id AND dl.is_latest = TRUE"
+            )
+            group_expr = "COALESCE(NULLIF(dl.package_id, ''), cl.id::text)"
+            package_id_expr = "NULLIF(dl.package_id, '')"
+            child_name_expr = "COALESCE(NULLIF(dl.name, ''), cl.name)"
+        else:
+            join_sql = f"FROM {cs}.layer cl"
+            group_expr = "cl.id::text"
+            package_id_expr = "NULL::text"
+            child_name_expr = "cl.name"
+
+        count_res = await async_session.execute(
+            text(
+                f"SELECT COUNT(DISTINCT {group_expr})"
+                f" {join_sql} WHERE {where_sql}"
+            ),
+            bind_params,
+        )
+        total: int = count_res.scalar() or 0
+
+        if total == 0:
+            return Page(
+                items=[],
+                total=0,
+                page=page_params.page,
+                size=page_params.size,
+                pages=0,
+            )
+
+        offset = (page_params.page - 1) * page_params.size
+        reps_res = await async_session.execute(
+            text(
+                f"""
+                SELECT DISTINCT ON ({group_expr})
+                    cl.id AS representative_id,
+                    {group_expr} AS group_key,
+                    {package_id_expr} AS package_id
+                {join_sql}
+                WHERE {where_sql}
+                ORDER BY {group_expr}, cl.updated_at DESC
+                LIMIT :limit OFFSET :offset
+                """
+            ),
+            {**bind_params, "limit": page_params.size, "offset": offset},
+        )
+        page_groups = reps_res.fetchall()
+
+        if not page_groups:
+            return Page(
+                items=[],
+                total=total,
+                page=page_params.page,
+                size=page_params.size,
+                pages=0,
+            )
+
+        rep_ids = [g.representative_id for g in page_groups]
+        group_keys = [g.group_key for g in page_groups]
+
+        rep_res = await async_session.execute(
+            select(Layer).where(Layer.id.in_(rep_ids))
+        )
+        rep_layers: Dict[str, Layer] = {
+            str(layer_obj.id): layer_obj
+            for layer_obj in rep_res.scalars().all()
+        }
+
+        siblings_res = await async_session.execute(
+            text(
+                f"""
+                  SELECT cl.id,
+                                                 {child_name_expr} AS name,
+                         cl.type,
+                         cl.feature_layer_geometry_type,
+                         {group_expr} AS group_key
+                {join_sql}
+                WHERE cl.in_catalog = TRUE
+                AND {group_expr} = ANY(:group_keys)
+                ORDER BY name
+                """
+            ),
+            {"group_keys": group_keys},
+        )
+        siblings_by_group: Dict[str, List[ICatalogLayerSummary]] = {}
+        for row in siblings_res.fetchall():
+            gk = row.group_key
+            if gk not in siblings_by_group:
+                siblings_by_group[gk] = []
+            siblings_by_group[gk].append(
+                ICatalogLayerSummary(
+                    id=row.id,
+                    name=row.name,
+                    type=row.type,
+                    feature_layer_geometry_type=row.feature_layer_geometry_type,
+                )
+            )
+
+        pages = math.ceil(total / page_params.size) if page_params.size else 1
+
+        items: List[ICatalogDatasetGrouped] = []
+        for group in page_groups:
+            rep = rep_layers.get(str(group.representative_id))
+            if not rep:
+                continue
+
+            group_layers = siblings_by_group.get(
+                group.group_key,
+                [
+                    ICatalogLayerSummary(
+                        id=rep.id,
+                        name=rep.name,
+                        type=rep.type,
+                        feature_layer_geometry_type=rep.feature_layer_geometry_type,
+                    )
+                ],
+            )
+
+            items.append(
+                ICatalogDatasetGrouped(
+                    id=rep.id,
+                    name=rep.name,
+                    description=rep.description,
+                    thumbnail_url=rep.thumbnail_url,
+                    xml_metadata=rep.xml_metadata,
+                    package_id=group.package_id,
+                    type=rep.type,
+                    data_category=rep.data_category,
+                    geographical_code=rep.geographical_code,
+                    language_code=rep.language_code,
+                    distributor_name=rep.distributor_name,
+                    license=rep.license,
+                    layers=group_layers,
+                )
+            )
+
+        return Page(
+            items=items,
+            total=total,
+            page=page_params.page,
+            size=page_params.size,
+            pages=pages,
+        )
+
+    async def get_grouped_catalog_layer_by_package_id(
+        self,
+        async_session: AsyncSession,
+        package_id: str,
+    ) -> ICatalogDatasetGrouped:
+        """Return one grouped catalog dataset by package id."""
+        cs = settings.CUSTOMER_SCHEMA
+        ds = settings.CATALOG_SCHEMA
+
+        rows = await async_session.execute(
+            text(
+                f"""
+                SELECT cl.id,
+                       cl.name,
+                       cl.description,
+                       cl.thumbnail_url,
+                       cl.xml_metadata,
+                       cl.type,
+                       cl.data_category,
+                       cl.geographical_code,
+                       cl.language_code,
+                       cl.distributor_name,
+                       cl.license,
+                       cl.feature_layer_geometry_type,
+                       COALESCE(NULLIF(dl.name, ''), cl.name) AS child_name,
+                       NULLIF(dl.package_id, '') AS package_id
+                FROM {cs}.layer cl
+                LEFT JOIN {ds}.layer dl ON dl.layer_id = cl.id AND dl.is_latest = TRUE
+                WHERE cl.in_catalog = TRUE
+                AND NULLIF(dl.package_id, '') = :package_id
+                ORDER BY cl.updated_at DESC, child_name
+                """
+            ),
+            {"package_id": package_id},
+        )
+        fetched = rows.fetchall()
+
+        if not fetched:
+            try:
+                layer_uuid = UUID(package_id)
+            except ValueError as exc:
+                raise LayerNotFoundError() from exc
+
+            layer = await self.get(async_session=async_session, id=layer_uuid)
+            if not layer or not layer.in_catalog:
+                raise LayerNotFoundError()
+            return ICatalogDatasetGrouped(
+                id=layer.id,
+                name=layer.name,
+                description=layer.description,
+                thumbnail_url=layer.thumbnail_url,
+                xml_metadata=layer.xml_metadata,
+                package_id=None,
+                type=layer.type,
+                data_category=layer.data_category,
+                geographical_code=layer.geographical_code,
+                language_code=layer.language_code,
+                distributor_name=layer.distributor_name,
+                license=layer.license,
+                layers=[
+                    ICatalogLayerSummary(
+                        id=layer.id,
+                        name=layer.name,
+                        type=layer.type,
+                        feature_layer_geometry_type=layer.feature_layer_geometry_type,
+                    )
+                ],
+            )
+
+        rep = fetched[0]
+        return ICatalogDatasetGrouped(
+            id=rep.id,
+            name=rep.name,
+            description=rep.description,
+            thumbnail_url=rep.thumbnail_url,
+            xml_metadata=rep.xml_metadata,
+            package_id=rep.package_id,
+            type=rep.type,
+            data_category=rep.data_category,
+            geographical_code=rep.geographical_code,
+            language_code=rep.language_code,
+            distributor_name=rep.distributor_name,
+            license=rep.license,
+            layers=[
+                ICatalogLayerSummary(
+                    id=row.id,
+                    name=row.child_name,
+                    type=row.type,
+                    feature_layer_geometry_type=row.feature_layer_geometry_type,
+                )
+                for row in fetched
+            ],
+        )
 
 
 layer = CRUDLayer(Layer)

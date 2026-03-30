@@ -512,6 +512,40 @@ export const datasetMetadataAggregated = z.object({
   license: z.array(datasetMetadataValue),
 });
 
+/** Summary of one file (layer) within a grouped catalog dataset. */
+export const catalogLayerSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: layerType,
+  feature_layer_geometry_type: featureLayerGeometryType.optional(),
+});
+
+/**
+ * A catalog dataset that may contain multiple files (layers) from the same
+ * CKAN package. The UI shows one card per dataset with a file-picker dropdown
+ * when there are multiple files.
+ */
+export const catalogDatasetGroupedSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  thumbnail_url: z.string().optional(),
+  xml_metadata: z.string().optional(),
+  package_id: z.string().optional(),
+  type: layerType.optional(),
+  data_category: dataCategory.optional(),
+  geographical_code: z.string().optional(),
+  language_code: z.string().optional(),
+  distributor_name: z.string().optional(),
+  license: dataLicense.optional(),
+  layers: z.array(catalogLayerSummarySchema),
+});
+
+export const catalogDatasetGroupedResponseSchema = responseSchema(catalogDatasetGroupedSchema);
+
+export type CatalogLayerSummary = z.infer<typeof catalogLayerSummarySchema>;
+export type CatalogDatasetGrouped = z.infer<typeof catalogDatasetGroupedSchema>;
+export type CatalogDatasetGroupedPaginated = z.infer<typeof catalogDatasetGroupedResponseSchema>;
 export type DatasetCollectionItems = z.infer<typeof datasetCollectionItems>;
 export type GetCollectionItemsQueryParams = z.infer<typeof datasetCollectionItemsQueryParams>;
 export type GetDatasetSchema = z.infer<typeof getDatasetSchema>;

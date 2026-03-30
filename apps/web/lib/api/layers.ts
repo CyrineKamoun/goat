@@ -5,6 +5,8 @@ import { type Job, PROCESSES_API_BASE_URL, executeProcessAsync } from "@/lib/api
 import { GEOAPI_BASE_URL } from "@/lib/constants";
 import type { PaginatedQueryParams } from "@/lib/validations/common";
 import type {
+  CatalogDatasetGrouped,
+  CatalogDatasetGroupedPaginated,
   ClassBreaks,
   CreateLayerFromDataset,
   CreateRasterLayer,
@@ -66,6 +68,33 @@ export const useCatalogLayers = (queryParams?: PaginatedQueryParams, payload: Ge
     isError: error,
     mutate,
     isValidating,
+  };
+};
+
+export const useCatalogGroupedLayers = (queryParams?: PaginatedQueryParams, payload: GetDatasetSchema = {}) => {
+  const { data, isLoading, error, mutate, isValidating } = useSWR<CatalogDatasetGroupedPaginated>(
+    [`${LAYERS_API_BASE_URL}/catalog/grouped`, queryParams, payload],
+    fetcher
+  );
+  return {
+    datasets: data,
+    isLoading,
+    isError: error,
+    mutate,
+    isValidating,
+  };
+};
+
+export const useCatalogGroupedDataset = (packageId: string) => {
+  const { data, isLoading, error, mutate } = useSWR<CatalogDatasetGrouped>(
+    () => (packageId ? [`${LAYERS_API_BASE_URL}/catalog/grouped/${packageId}`] : null),
+    fetcher
+  );
+  return {
+    datasetGroup: data,
+    isLoading,
+    isError: error,
+    mutate,
   };
 };
 

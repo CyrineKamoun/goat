@@ -768,6 +768,42 @@ class IMetadataAggregateRead(BaseModel):
     )
 
 
+class ICatalogLayerSummary(BaseModel):
+    """Minimal layer info for use inside a grouped catalog dataset."""
+
+    id: UUID = Field(..., description="Layer ID")
+    name: str = Field(..., description="Layer name")
+    type: LayerType = Field(..., description="Layer type")
+    feature_layer_geometry_type: FeatureGeometryType | None = Field(
+        default=None, description="Geometry type for feature layers"
+    )
+
+
+class ICatalogDatasetGrouped(ThumbnailUrlMixin, BaseModel):
+    """A catalog dataset grouping one or more layers from the same package."""
+
+    id: UUID = Field(..., description="Representative layer ID")
+    name: str = Field(..., description="Dataset name")
+    description: str | None = Field(default=None, description="Dataset description")
+    thumbnail_url: str | None = Field(default=None, description="Thumbnail URL")
+    xml_metadata: str | None = Field(
+        default=None, description="Raw ISO 19139 XML metadata"
+    )
+    package_id: str | None = Field(default=None, description="Package ID")
+    type: LayerType | None = Field(default=None, description="Layer type")
+    data_category: DataCategory | None = Field(
+        default=None, description="Data category"
+    )
+    geographical_code: str | None = Field(default=None, description="Geographical code")
+    language_code: str | None = Field(default=None, description="Language code")
+    distributor_name: str | None = Field(default=None, description="Distributor name")
+    license: DataLicense | None = Field(default=None, description="Data license")
+    layers: List[ICatalogLayerSummary] = Field(
+        default_factory=list,
+        description="All layers belonging to this dataset (one per file/format)",
+    )
+
+
 request_examples = {
     "get": {
         "ids": [
