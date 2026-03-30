@@ -356,7 +356,7 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
             return (
               <Box
                 key={category.grouped_value}
-                onMouseEnter={() => setActiveCategory(category.grouped_value)}
+                onMouseEnter={() => setActiveCategory(category.grouped_value ?? undefined)}
                 sx={{
                   width: "100%",
                   cursor: "pointer",
@@ -369,7 +369,7 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
                 }}>
                 <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
                   <Typography variant="caption" fontWeight={500}>
-                    {getDisplayLabel(category.grouped_value)}
+                    {getDisplayLabel(category.grouped_value ?? "")}
                   </Typography>
                   <Typography variant="caption" fontWeight={500}>
                     {showHighlight && selectedValue > 0 ? `${selectedValue} / ${displayValue}` : displayValue}

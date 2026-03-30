@@ -733,6 +733,8 @@ const VariableResolver: React.FC<{
 
   const queryParams = useMemo((): AggregationStatsQueryParams | undefined => {
     if (!variable.layer_project_id || !variable.operation_type) return undefined;
+    // operation_value is required for all operations except count
+    if (variable.operation_type !== "count" && !variable.operation_value) return undefined;
     return {
       operation_type: variable.operation_type,
       operation_value: variable.operation_value,

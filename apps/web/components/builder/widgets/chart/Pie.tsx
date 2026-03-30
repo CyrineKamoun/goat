@@ -178,7 +178,7 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
 
     // Fallback: show the item with max value
     const candidates = data.filter((item) =>
-      selectedValues.length > 0 ? selectedValues.includes(item.grouped_value) : true
+      selectedValues.length > 0 ? selectedValues.includes(item.grouped_value ?? "") : true
     );
 
     const validData = candidates.length > 0 ? candidates : data;
@@ -255,7 +255,7 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
   const computedColors = useMemo(() => {
     return displayData.map((item, index) => {
       const baseColor = baseColors[index % baseColors.length];
-      const isSelected = selectedValues.includes(item.grouped_value);
+      const isSelected = selectedValues.includes(item.grouped_value ?? "");
 
       if (data.length === 0) return baseColor; // Keep full color for "No data" state
 
