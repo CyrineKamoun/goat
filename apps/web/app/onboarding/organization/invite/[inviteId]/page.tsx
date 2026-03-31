@@ -37,7 +37,7 @@ export default function OrganizationInviteJoin({ params: { inviteId } }) {
     if (
       invitations?.items &&
       invitations?.items?.length > 0 &&
-      invitations?.items?.[0].payload?.user_email === session?.user?.email
+      invitations?.items?.[0].payload?.user_email?.toLowerCase() === session?.user?.email?.toLowerCase()
     )
       return invitations?.items?.[0];
   }, [invitations, session]);

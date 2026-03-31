@@ -30,6 +30,34 @@ const Layers = (props: LayersProps) => {
   const { current: mapRef } = useMap();
   const temporaryFilters = useAppSelector((state) => state.map.temporaryFilters);
   const mapMode = useAppSelector((state) => state.map.mapMode);
+  const pendingFeatures = useAppSelector((state) => state.featureEditor.pendingFeatures);
+  const editLayerId = useAppSelector((state) => state.featureEditor.activeLayerId);
+
+  // Get editing layer to copy its style to the overlay
+  const editingLayer = useMemo(() => {
+    if (!editLayerId || !props.layers) return null;
+    return props.layers.find((l) => (l as ProjectLayer).layer_id === editLayerId) as ProjectLayer | undefined;
+  }, [editLayerId, props.layers]);
+
+  // Build list of feature IDs to hide from the tile layer (features being edited)
+  const editExcludeIds = useMemo(() => {
+    return Object.values(pendingFeatures)
+      .filter((f) => f.action === "update" || f.action === "delete")
+      .map((f) => f.id);
+  }, [pendingFeatures]);
+
+  // Build GeoJSON FeatureCollection from pending features for overlay rendering
+  const pendingGeoJSON = useMemo(() => {
+    const features = Object.values(pendingFeatures)
+      .filter((f) => f.geometry !== null && f.committed && f.action !== "delete" && !f.drawFeatureId)
+      .map((f) => ({
+        type: "Feature" as const,
+        id: f.id,
+        geometry: f.geometry!,
+        properties: { ...f.properties, _pending: true, _pendingId: f.id },
+      }));
+    return { type: "FeatureCollection" as const, features };
+  }, [pendingFeatures]);
 
   const splitLayerFilter = (style: LayerProps) => {
     const styleWithFilter = style as LayerProps & { filter?: unknown };
@@ -118,6 +146,16 @@ const Layers = (props: LayersProps) => {
     if (label) {
       parts.push("label=true");
     }
+    // Cache-busting: if layer was updated within the last hour, append a version
+    // param so the browser doesn't serve stale cached tiles after schema changes
+    const updatedAt = layer["updated_at"];
+    if (updatedAt) {
+      const updatedMs = new Date(updatedAt).getTime();
+      const ageMs = Date.now() - updatedMs;
+      if (ageMs < 3600_000) {
+        parts.push(`v=${Math.floor(updatedMs / 1000)}`);
+      }
+    }
 
     const query = parts.length > 0 ? `?${parts.join("&")}` : "";
     const layerId = layer["layer_id"] || layer["id"];
@@ -189,6 +227,7 @@ const Layers = (props: LayersProps) => {
     }
   }, [useDataLayers, mapRef]);
 
+
   return (
     <>
       {reversedDataLayers.length
@@ -223,9 +262,29 @@ const Layers = (props: LayersProps) => {
                   layer.feature_layer_geometry_type === "polygon" &&
                   !!(layer.properties as FeatureLayerProperties)?.text_label;
 
+                // Build exclusion filter for features being edited on this layer
+                const isEditingThisLayer = editLayerId === (layer as ProjectLayer).layer_id;
+                const mergeEditExclusion = (baseFilter: FilterSpecification | undefined): FilterSpecification | undefined => {
+                  if (!isEditingThisLayer || editExcludeIds.length === 0) return baseFilter;
+                  // MapLibre filter: exclude features whose "id" property is in the list
+                  // Vector tiles use numeric sequential IDs stored as property "id"
+                  // Try both string and number versions for matching
+                  const excludeFilter: FilterSpecification = [
+                    "!",
+                    ["any",
+                      ["in", ["get", "id"], ["literal", editExcludeIds.map(Number)]],
+                      ["in", ["to-string", ["get", "id"]], ["literal", editExcludeIds]],
+                    ],
+                  ];
+                  if (baseFilter) {
+                    return ["all", baseFilter, excludeFilter] as FilterSpecification;
+                  }
+                  return excludeFilter;
+                };
+
                 return (
                   <Source
-                    key={layer.id}
+                    key={`${layer.id}-${layer.updated_at || ""}`}
                     type="vector"
                     tiles={[getFeatureTileUrl(layer, needsLabel)]}
                     maxzoom={14}>
@@ -236,7 +295,7 @@ const Layers = (props: LayersProps) => {
                         maxzoom={layer.properties.max_zoom || 24}
                         id={layer.id.toString()}
                         {...layerStyleSpec}
-                        {...(mapLayerFilter ? { filter: mapLayerFilter } : {})}
+                        {...(mergeEditExclusion(mapLayerFilter) ? { filter: mergeEditExclusion(mapLayerFilter) } : {})}
                         source-layer="default"
                       />
                     )}
@@ -247,7 +306,7 @@ const Layers = (props: LayersProps) => {
                         minzoom={layer.properties.min_zoom || 0}
                         maxzoom={layer.properties.max_zoom || 24}
                         {...strokeStyleSpec}
-                        {...(mapStrokeFilter ? { filter: mapStrokeFilter } : {})}
+                        {...(mergeEditExclusion(mapStrokeFilter) ? { filter: mergeEditExclusion(mapStrokeFilter) } : {})}
                         source-layer="default"
                       />
                     )}
@@ -268,7 +327,10 @@ const Layers = (props: LayersProps) => {
                         minzoom={layer.properties.min_zoom || 0}
                         maxzoom={layer.properties.max_zoom || 24}
                         {...labelStyleSpec}
-                        {...(mapLabelFilter ? { filter: mapLabelFilter } : {})}
+                        {...(layer.properties?.["custom_marker"] || layer.feature_layer_geometry_type === "polygon"
+                          ? (mergeEditExclusion(mapLabelFilter) ? { filter: mergeEditExclusion(mapLabelFilter) } : {})
+                          : (mapLabelFilter ? { filter: mapLabelFilter } : {})
+                        )}
                       />
                     )}
 
@@ -340,7 +402,7 @@ const Layers = (props: LayersProps) => {
                 const mapLayerFilter = getMapLayerFilter(layerFilter);
                 return (
               <Source
-                key={layer.id}
+                key={`${layer.id}-${layer.updated_at || ""}`}
                 type="vector"
                 tiles={[getFeatureTileUrl(layer)]}
                 minzoom={14}
@@ -360,6 +422,91 @@ const Layers = (props: LayersProps) => {
             ) : null
           )
         : null}
+      {/* Pending features overlay — uses editing layer's original style */}
+      {editLayerId && editingLayer && pendingGeoJSON.features.length > 0 && (() => {
+        const layerStyle = transformToMapboxLayerStyleSpec(editingLayer) as LayerProps & { paint?: Record<string, unknown> };
+        const geomType = editingLayer.feature_layer_geometry_type;
+        const isCustomMarker = !!editingLayer.properties?.["custom_marker"];
+        const symbolStyle = isCustomMarker
+          ? getSymbolStyleSpec(undefined, editingLayer) as LayerProps & { layout?: Record<string, unknown>; paint?: Record<string, unknown> }
+          : null;
+
+        return (
+          <Source key="pending-features" type="geojson" data={pendingGeoJSON}>
+            {geomType === "polygon" && layerStyle.type === "fill" && (
+              <MapLayer
+                id="pending-features-fill"
+                type="fill"
+                paint={layerStyle.paint as Record<string, unknown>}
+                filter={["==", "$type", "Polygon"]}
+              />
+            )}
+            {(geomType === "line" || geomType === "polygon") && (
+              <MapLayer
+                id="pending-features-line"
+                type="line"
+                paint={{
+                  "line-color": "#ef4444",
+                  "line-dasharray": [3, 2],
+                  "line-width": 2,
+                }}
+                filter={["any", ["==", "$type", "LineString"], ["==", "$type", "Polygon"]]}
+              />
+            )}
+            {geomType === "point" && isCustomMarker && symbolStyle && (
+              <MapLayer
+                id="pending-features-ring"
+                type="circle"
+                paint={{
+                  "circle-radius": Math.max(12, Math.round(((editingLayer.properties as Record<string, unknown>)?.marker_size as number ?? 100) / 200 * 16) + 4),
+                  "circle-color": "transparent",
+                  "circle-stroke-color": "#ef4444",
+                  "circle-stroke-width": 2,
+                }}
+                filter={["==", "$type", "Point"]}
+              />
+            )}
+            {geomType === "point" && isCustomMarker && symbolStyle && (
+              <MapLayer
+                id="pending-features-symbol"
+                type="symbol"
+                layout={{
+                  ...symbolStyle.layout,
+                  visibility: "visible",
+                  "icon-allow-overlap": true,
+                }}
+                paint={symbolStyle.paint as Record<string, unknown>}
+                filter={["==", "$type", "Point"]}
+              />
+            )}
+            {geomType === "point" && !isCustomMarker && layerStyle.type === "circle" && (
+              <MapLayer
+                id="pending-features-circle"
+                type="circle"
+                paint={layerStyle.paint as Record<string, unknown>}
+                filter={["==", "$type", "Point"]}
+              />
+            )}
+            {/* Fallbacks if style type doesn't match */}
+            {geomType === "polygon" && layerStyle.type !== "fill" && (
+              <MapLayer
+                id="pending-features-fill"
+                type="fill"
+                paint={{ "fill-color": "#ef4444", "fill-opacity": 0.15 }}
+                filter={["==", "$type", "Polygon"]}
+              />
+            )}
+            {geomType === "point" && !isCustomMarker && layerStyle.type !== "circle" && (
+              <MapLayer
+                id="pending-features-circle"
+                type="circle"
+                paint={{ "circle-radius": 6, "circle-color": "#ef4444", "circle-stroke-width": 2, "circle-stroke-color": "#fff" }}
+                filter={["==", "$type", "Point"]}
+              />
+            )}
+          </Source>
+        );
+      })()}
     </>
   );
 };

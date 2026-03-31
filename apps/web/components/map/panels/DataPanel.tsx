@@ -12,7 +12,7 @@ import EditableDataTable from "@/components/map/panels/EditableDataTable";
 const MIN_PANEL_HEIGHT = 150;
 const DEFAULT_PANEL_HEIGHT = 350;
 const MAX_PANEL_HEIGHT_RATIO = 0.8; // Max 80% of container
-const RESIZE_HANDLE_HEIGHT = 4;
+const RESIZE_HANDLE_HEIGHT = 12;
 
 /** CSS custom property name used to communicate panel height to sibling layout components */
 export const DATA_PANEL_HEIGHT_VAR = "--data-panel-height";
@@ -150,19 +150,35 @@ const DataPanel: React.FC<DataPanelProps> = ({ projectLayers }) => {
         <Box
           onMouseDown={handleDragStart}
           sx={{
+            position: "absolute",
+            top: -2,
+            left: 0,
+            right: 0,
             height: RESIZE_HANDLE_HEIGHT,
             cursor: "ns-resize",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            flexShrink: 0,
-            backgroundColor: isDragging ? theme.palette.primary.main : "transparent",
-            transition: isDragging ? "none" : "background-color 0.15s ease",
-            "&:hover": {
-              backgroundColor: isDragging ? theme.palette.primary.main : theme.palette.action.hover,
+            zIndex: 1,
+            borderTop: isDragging ? `4px solid ${theme.palette.primary.main}` : "2px solid transparent",
+            "&:hover .drag-pill": {
+              backgroundColor: theme.palette.text.secondary,
             },
-          }}
-        />
+          }}>
+          {/* Visual drag indicator pill */}
+          <Box
+            className="drag-pill"
+            sx={{
+              width: 32,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: isDragging
+                ? theme.palette.primary.main
+                : theme.palette.action.disabled,
+              transition: "background-color 0.15s ease",
+            }}
+          />
+        </Box>
       )}
 
       {/* Table content — includes its own toolbar/header */}

@@ -6,6 +6,7 @@ import maplibregl from "maplibre-gl";
 import { useCallback, useMemo, useRef } from "react";
 import { Map, type MapLayerMouseEvent, type MapRef, type ViewState } from "react-map-gl/maplibre";
 import type { ViewStateChangeEvent } from "react-map-gl/maplibre";
+import { useTranslation } from "react-i18next";
 import { v4 } from "uuid";
 
 import { PATTERN_IMAGES } from "@/lib/constants/pattern-images";
@@ -24,12 +25,15 @@ import type { ScenarioFeatures } from "@/lib/validations/scenario";
 
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
+import { useFeatureEditor } from "@/hooks/map/useFeatureEditor";
 import GeocoderLayer from "@/components/map/GeocoderLayer";
 import Layers from "@/components/map/Layers";
 import ScenarioLayer from "@/components/map/ScenarioLayer";
 import ToolboxLayers from "@/components/map/ToolboxLayers";
 import UserLocationLayer from "@/components/map/UserLocationLayer";
 import DrawControl from "@/components/map/controls/Draw";
+import FeatureEditToolbar from "@/components/map/controls/FeatureEditToolbar";
+import ConfirmModal from "@/components/modals/Confirm";
 import { MapPopoverInfo } from "@/components/map/controls/LayerInfo";
 import MapPopoverEditor from "@/components/map/controls/PopoverEditor";
 import { MeasureLabels } from "@/components/map/controls/measure";
@@ -80,6 +84,7 @@ const MapViewer: React.FC<MapProps> = ({
   containerSx,
   isEditor,
 }) => {
+  const { t } = useTranslation("common");
   const theme = useTheme();
   const dispatch = useAppDispatch();
   const isGetInfoActive = useAppSelector((state) => state.map.isMapGetInfoActive);
@@ -93,7 +98,18 @@ const MapViewer: React.FC<MapProps> = ({
     return layers?.find((layer) => layer.id === _selectedScenarioEditLayer?.value);
   }, [_selectedScenarioEditLayer, layers]);
 
-  const interactiveLayerIds = useMemo(() => layers?.map((layer) => layer.id.toString()), [layers]);
+  const featureEditorHandlers = useFeatureEditor(mapRef);
+
+  const pendingFeaturesExist = useAppSelector(
+    (state) => Object.keys(state.featureEditor.pendingFeatures).length > 0
+  );
+  const interactiveLayerIds = useMemo(() => {
+    const ids = layers?.map((layer) => layer.id.toString()) || [];
+    if (pendingFeaturesExist) {
+      ids.push("pending-features-fill", "pending-features-line", "pending-features-circle", "pending-features-symbol");
+    }
+    return ids;
+  }, [layers, pendingFeaturesExist]);
 
   const hiddenSystemProperties = useMemo(
     () =>
@@ -300,6 +316,7 @@ const MapViewer: React.FC<MapProps> = ({
     <>
       <Box
         sx={{
+          position: "relative",
           width: "100%",
           ".maplibregl-ctrl .maplibregl-ctrl-logo": {
             display: "none",
@@ -380,6 +397,33 @@ const MapViewer: React.FC<MapProps> = ({
             />
           )}
         </Map>
+        <FeatureEditToolbar
+          onSave={featureEditorHandlers.handleSave}
+          onDiscard={featureEditorHandlers.handleDiscardRequest}
+          onStopEditing={featureEditorHandlers.handleStopEditingRequest}
+          onUndo={featureEditorHandlers.handleUndo}
+          onRedo={featureEditorHandlers.handleRedo}
+          hasUndo={featureEditorHandlers.hasUndo}
+          hasRedo={featureEditorHandlers.hasRedo}
+        />
+        <ConfirmModal
+          open={featureEditorHandlers.discardConfirmOpen}
+          title={t("discard_edits")}
+          body={t("discard_edits_confirmation")}
+          closeText={t("cancel")}
+          confirmText={t("discard_edits")}
+          onClose={featureEditorHandlers.handleDiscardCancel}
+          onConfirm={featureEditorHandlers.handleDiscardConfirm}
+        />
+        <ConfirmModal
+          open={featureEditorHandlers.stopConfirmOpen}
+          title={t("stop_editing")}
+          body={t("discard_edits_confirmation")}
+          closeText={t("cancel")}
+          confirmText={t("stop_editing")}
+          onClose={featureEditorHandlers.handleStopCancel}
+          onConfirm={featureEditorHandlers.handleStopConfirm}
+        />
         {children}
       </Box>
     </>

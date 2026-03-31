@@ -28,6 +28,7 @@ from geoapi.models import (
 )
 from geoapi.services.feature_write_service import feature_write_service
 from geoapi.services.layer_service import LayerMetadata, _metadata_cache, layer_service
+from geoapi.services.tile_service import tile_service
 from geoapi.tile_cache import invalidate_layer_cache
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,47 @@ def _invalidate_caches(layer_id: str) -> None:
     logger.debug("Caches invalidated for layer %s", layer_id)
 
 
+async def _invalidate_caches_and_pmtiles(layer_info: LayerInfo) -> None:
+    """Invalidate all caches and delete PMTiles for a layer.
+
+    Used after schema changes (add/rename/delete column) which don't
+    increment the DuckLake snapshot, so stale PMTiles would keep being served.
+    Deleting the PMTiles forces fallback to dynamic tile generation.
+    Also updates the layer's updated_at timestamp in core PostgreSQL.
+    """
+    _invalidate_caches(layer_info.layer_id)
+
+    # Delete PMTiles file + anchor file so tiles fall back to dynamic generation
+    pmtiles_path = tile_service._get_pmtiles_path(layer_info)
+    anchor_path = pmtiles_path.with_name(
+        pmtiles_path.stem + "_anchor" + pmtiles_path.suffix
+    )
+    for path in (pmtiles_path, anchor_path):
+        if path.exists():
+            path.unlink()
+            logger.info("Deleted %s for layer %s", path.name, layer_info.layer_id)
+
+    # Invalidate PMTiles path and existence caches
+    tile_service.invalidate_pmtiles_path_cache(layer_info.layer_id)
+    tile_service.invalidate_pmtiles_cache(layer_info.schema_name, layer_info.table_name)
+
+    # Update updated_at in core PostgreSQL so clients know the layer changed
+    try:
+        pool = layer_service._pool
+        if pool:
+            layer_uuid = layer_info.layer_id
+            # Normalize to UUID format if needed
+            if "-" not in layer_uuid and len(layer_uuid) == 32:
+                layer_uuid = f"{layer_uuid[:8]}-{layer_uuid[8:12]}-{layer_uuid[12:16]}-{layer_uuid[16:20]}-{layer_uuid[20:]}"
+            await pool.execute(
+                "UPDATE customer.layer SET updated_at = NOW() WHERE id = $1::uuid",
+                layer_uuid,
+            )
+            logger.debug("Updated updated_at for layer %s", layer_info.layer_id)
+    except Exception as e:
+        logger.warning("Failed to update layer updated_at: %s", e)
+
+
 # --- Feature CRUD Endpoints ---
 
 
@@ -113,8 +155,9 @@ async def create_features(
                 features=features_data,
                 column_names=metadata.column_names,
                 geometry_column=metadata.geometry_column,
+                column_types=metadata.native_column_types,
             )
-            _invalidate_caches(layer_info.layer_id)
+            await _invalidate_caches_and_pmtiles(layer_info)
             return BulkWriteResponse(ids=ids, count=len(ids))
         else:
             # Single creation
@@ -124,8 +167,9 @@ async def create_features(
                 properties=body.properties,
                 column_names=metadata.column_names,
                 geometry_column=metadata.geometry_column,
+                column_types=metadata.native_column_types,
             )
-            _invalidate_caches(layer_info.layer_id)
+            await _invalidate_caches_and_pmtiles(layer_info)
             return FeatureWriteResponse(id=feature_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -215,12 +259,13 @@ async def delete_feature(
     itemId: str = Path(..., description="Feature ID"),
 ) -> DeleteResponse:
     """Delete a single feature."""
-    await _get_authorized_metadata(layer_info, user_id)
+    metadata = await _get_authorized_metadata(layer_info, user_id)
 
     try:
         found = feature_write_service.delete_feature(
             layer_info=layer_info,
             feature_id=itemId,
+            column_names=metadata.column_names,
         )
         if not found:
             raise HTTPException(status_code=404, detail="Feature not found")
@@ -244,12 +289,13 @@ async def bulk_delete_features(
     body: BulkDeleteRequest,
 ) -> BulkDeleteResponse:
     """Delete multiple features by ID."""
-    await _get_authorized_metadata(layer_info, user_id)
+    metadata = await _get_authorized_metadata(layer_info, user_id)
 
     try:
         count = feature_write_service.delete_features_bulk(
             layer_info=layer_info,
             feature_ids=body.ids,
+            column_names=metadata.column_names,
         )
         _invalidate_caches(layer_info.layer_id)
         return BulkDeleteResponse(count=count)
@@ -284,7 +330,7 @@ async def add_column(
             type_name=body.type,
             default_value=body.default_value,
         )
-        _invalidate_caches(layer_info.layer_id)
+        await _invalidate_caches_and_pmtiles(layer_info)
         return ColumnResponse(name=body.name, type=body.type)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -314,7 +360,7 @@ async def update_column(
                 old_name=columnName,
                 new_name=body.new_name,
             )
-            _invalidate_caches(layer_info.layer_id)
+            await _invalidate_caches_and_pmtiles(layer_info)
             return ColumnResponse(name=body.new_name, type="", message="renamed")
         else:
             raise HTTPException(
@@ -347,7 +393,7 @@ async def delete_column(
             layer_info=layer_info,
             name=columnName,
         )
-        _invalidate_caches(layer_info.layer_id)
+        await _invalidate_caches_and_pmtiles(layer_info)
         return ColumnResponse(name=columnName, type="", message="deleted")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -508,6 +508,17 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         worker_tag="print",
     ),
     ToolDefinition(
+        name="layer_create",
+        display_name="Layer Create",
+        description="Create a new empty layer with user-defined fields",
+        module_path="goatlib.tools.layer_create",
+        params_class_name="LayerCreateParams",
+        windmill_path="f/goat/tools/layer_create",
+        category="data",
+        keywords=("create", "empty", "layer", "new"),
+        toolbox_hidden=True,
+    ),
+    ToolDefinition(
         name="custom_sql",
         display_name="Custom SQL",
         description="Execute custom SQL query against workflow layers",

@@ -1,4 +1,4 @@
-import { Divider, List, ListItemButton, ListItemIcon, ListItemText, Paper, useTheme } from "@mui/material";
+import { Chip, Divider, List, ListItemButton, ListItemIcon, ListItemText, Paper, Tooltip, useTheme } from "@mui/material";
 import { useState } from "react";
 
 import type { ICON_NAME } from "@p4b/ui/components/Icon";
@@ -12,7 +12,9 @@ export interface PopperMenuItem {
   icon?: ICON_NAME;
   color?: string;
   disabled?: boolean;
-  group?: string; // Add this line
+  group?: string;
+  tag?: string;
+  tagTooltip?: string;
   onClick?: () => void;
 }
 
@@ -104,6 +106,20 @@ export default function PopperMenu(props: PopperMenuProps) {
                         },
                       }}
                     />
+                    {item.tag && (
+                      <Tooltip title={item.tagTooltip || ""} placement="right" arrow>
+                        <Chip
+                          label={item.tag}
+                          size="small"
+                          sx={{
+                            ml: 1,
+                            height: 18,
+                            fontSize: "0.65rem",
+                            fontWeight: 600,
+                          }}
+                        />
+                      </Tooltip>
+                    )}
                   </ListItemButton>
                 ))}
                 {groupIndex < Object.keys(groupedMenuItems).length - 1 && <Divider sx={{ mx: 2 }} />}

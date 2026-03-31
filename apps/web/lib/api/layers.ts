@@ -134,11 +134,11 @@ export const useDatasetCollectionItems = (datasetId: string, queryParams?: GetCo
 };
 
 export const useLayerQueryables = (layerId: string) => {
-  const { data, isLoading, error } = useSWR<LayerQueryables>(
+  const { data, isLoading, error, mutate } = useSWR<LayerQueryables>(
     () => (layerId ? [`${COLLECTIONS_API_BASE_URL}/${layerId}/queryables`] : null),
     fetcher
   );
-  return { queryables: data, isLoading, isError: error };
+  return { queryables: data, isLoading, isError: error, mutate };
 };
 
 //TODO: remove this hook and use useLayerQueryables instead
@@ -236,6 +236,27 @@ export const createRasterLayer = async (payload: CreateRasterLayer, projectId?: 
     throw new Error("Failed to create raster layer");
   }
   return await response.json();
+};
+
+/**
+ * Create a new empty layer with user-defined fields.
+ * Executed as a Windmill job via the Processes API.
+ */
+export const createEmptyLayer = async (
+  payload: {
+    name: string;
+    geometry_type: "point" | "line" | "polygon" | null;
+    fields: Array<{ name: string; type: "string" | "number" }>;
+  },
+  projectId: string
+): Promise<Job> => {
+  const inputs: Record<string, unknown> = {
+    name: payload.name,
+    geometry_type: payload.geometry_type,
+    fields: payload.fields,
+    project_id: projectId,
+  };
+  return executeProcessAsync("layer_create", inputs);
 };
 
 export const getLayerClassBreaks = async (
@@ -460,6 +481,17 @@ export const useClassBreak = (layerId: string, operation: string, column: string
 };
 
 // --- Feature Write API Functions ---
+
+export const getFeature = async (layerId: string, featureId: string) => {
+  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/items/${featureId}`, {
+    method: "GET",
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to get feature");
+  }
+  return response.json() as Promise<GeoJSON.Feature>;
+};
 
 export const createFeature = async (
   layerId: string,

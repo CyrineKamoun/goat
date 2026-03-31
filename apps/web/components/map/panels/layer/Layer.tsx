@@ -36,6 +36,7 @@ import {
   useProjectScenarioFeatures,
   useProjectScenarios,
 } from "@/lib/api/projects";
+import { startEditing } from "@/lib/store/featureEditor/slice";
 import { setActiveLayer } from "@/lib/store/layer/slice";
 import {
   setActiveLeftPanel,
@@ -659,6 +660,15 @@ const LayerPanel = ({ projectId }: PanelProps) => {
                               } else if (menuItem.id === MapLayerActions.ZOOM_TO) {
                                 if (map) {
                                   await zoomToProjectLayer(map, layer);
+                                }
+                              } else if (menuItem.id === MapLayerActions.EDIT_FEATURES) {
+                                if (layer.feature_layer_geometry_type) {
+                                  dispatch(
+                                    startEditing({
+                                      layerId: layer.layer_id,
+                                      geometryType: layer.feature_layer_geometry_type,
+                                    })
+                                  );
                                 }
                               } else if (menuItem.id === ContentActions.TABLE) {
                                 openMoreMenu(menuItem, layer);

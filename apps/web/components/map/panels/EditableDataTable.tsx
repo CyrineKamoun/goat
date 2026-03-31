@@ -13,9 +13,7 @@ import bbox from "@turf/bbox";
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
-import SaveIcon from "@mui/icons-material/Save";
 import SearchIcon from "@mui/icons-material/Search";
-import UndoIcon from "@mui/icons-material/Undo";
 import { emphasize } from "@mui/material/styles";
 import {
   Badge,
@@ -42,6 +40,7 @@ import {
   Typography,
 } from "@mui/material";
 import { debounce } from "@mui/material/utils";
+import { useParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
@@ -49,9 +48,8 @@ import { toast } from "react-toastify";
 import {
   deleteColumn,
   deleteFeaturesBulk,
-  renameColumn,
-  updateFeatureProperties,
   useDatasetCollectionItems,
+  useLayerQueryables,
 } from "@/lib/api/layers";
 import type { GetCollectionItemsQueryParams } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
@@ -63,8 +61,11 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import { useMap } from "react-map-gl/maplibre";
 import useLayerFields from "@/hooks/map/CommonHooks";
 
+import { useProjectLayers } from "@/lib/api/projects";
 import ColumnStatsPanel from "@/components/map/panels/ColumnStatsPanel";
 import QuickFilterPopover from "@/components/map/panels/QuickFilterPopover";
+import ConfirmModal from "@/components/modals/Confirm";
+import EditFieldsModal from "@/components/modals/EditFields";
 
 type SortDirection = "asc" | "desc";
 type EditingCell = { rowId: string; column: string } | null;
@@ -94,8 +95,11 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const { map } = useMap();
+  const { projectId } = useParams();
+  const { layers: projectLayers, mutate: mutateProjectLayers } = useProjectLayers(projectId as string);
   const activeRightPanel = useAppSelector((state) => state.map.activeRightPanel);
   const { layerFields, isLoading: areFieldsLoading } = useLayerFields(layerId);
+  const { mutate: mutateQueryables } = useLayerQueryables(layerId);
 
   // CQL filter from layer settings — applied to table queries and stats
   const cqlArgs = projectLayer?.query?.cql?.args;
@@ -123,7 +127,6 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
 
   // Dirty tracking
   const [dirtyCells, setDirtyCells] = useState<Map<string, DirtyCell>>(new Map());
-  const [isSaving, setIsSaving] = useState(false);
 
   // Search state
   const [searchOpen, setSearchOpen] = useState(false);
@@ -137,10 +140,13 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<HTMLElement | null>(null);
   const [columnMenuField, setColumnMenuField] = useState<string | null>(null);
 
-  // Rename field state
-  const [renameFieldOpen, setRenameFieldOpen] = useState(false);
-  const [renameFieldName, setRenameFieldName] = useState("");
-  const [renameFieldOriginal, setRenameFieldOriginal] = useState("");
+  // Edit fields modal state
+  const [editFieldsOpen, setEditFieldsOpen] = useState(false);
+  const [editFieldsInitialField, setEditFieldsInitialField] = useState<string | null>(null);
+
+  // Delete column confirmation state
+  const [deleteColumnConfirmOpen, setDeleteColumnConfirmOpen] = useState(false);
+  const [pendingDeleteColumn, setPendingDeleteColumn] = useState<string | null>(null);
 
   // Column stats state
   const [statsColumn, setStatsColumn] = useState<string | null>(null);
@@ -308,10 +314,21 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     return dirty ? dirty.newValue : originalValue;
   };
 
+  // Track selected (highlighted) cell — separate from editing
+  const [selectedCell, setSelectedCell] = useState<{ rowId: string; column: string } | null>(null);
+
   const handleCellClick = (rowId: string, column: string, value: unknown) => {
-    setEditingCell({ rowId, column });
-    const displayValue = getCellValue(rowId, column, value);
-    setEditValue(displayValue === null || displayValue === undefined ? "" : String(displayValue));
+    const isAlreadySelected = selectedCell?.rowId === rowId && selectedCell?.column === column;
+    if (isAlreadySelected) {
+      // Second click — enter edit mode
+      setEditingCell({ rowId, column });
+      const displayValue = getCellValue(rowId, column, value);
+      setEditValue(displayValue === null || displayValue === undefined ? "" : String(displayValue));
+    } else {
+      // First click — select only
+      setSelectedCell({ rowId, column });
+      setEditingCell(null);
+    }
   };
 
   const handleCellBlur = () => {
@@ -347,6 +364,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     }
 
     setEditingCell(null);
+    setSelectedCell(null);
   };
 
   const handleCellKeyDown = (event: React.KeyboardEvent) => {
@@ -357,67 +375,43 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     }
   };
 
-  // --- Save Changes ---
-
-  const handleSave = async () => {
-    if (dirtyCells.size === 0) return;
-
-    setIsSaving(true);
-    try {
-      const rowUpdates = new Map<string, Record<string, unknown>>();
-      for (const [, cell] of dirtyCells) {
-        if (!rowUpdates.has(cell.rowId)) {
-          rowUpdates.set(cell.rowId, {});
-        }
-        rowUpdates.get(cell.rowId)![cell.column] = cell.newValue;
-      }
-
-      const promises = Array.from(rowUpdates.entries()).map(([rowId, properties]) =>
-        updateFeatureProperties(layerId, getFeatureId(rowId), properties)
-      );
-      await Promise.all(promises);
-
-      setDirtyCells(new Map());
-      mutate();
-      toast.success(t("changes_saved", { defaultValue: "Changes saved" }));
-    } catch (error) {
-      toast.error(t("error_saving_changes", { defaultValue: "Failed to save changes" }));
-      console.error("Save error:", error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // --- Discard Changes ---
-
-  const handleDiscard = () => {
-    setDirtyCells(new Map());
-    setEditingCell(null);
-  };
-
-  // --- Rename Field ---
-
-  const handleRenameField = async () => {
-    if (!renameFieldName.trim() || !renameFieldOriginal) return;
-    try {
-      await renameColumn(layerId, renameFieldOriginal, renameFieldName.trim());
-      setRenameFieldOpen(false);
-      setRenameFieldName("");
-      setRenameFieldOriginal("");
-      mutate();
-      toast.success(t("field_renamed", { defaultValue: "Field renamed" }));
-    } catch (error) {
-      toast.error(t("error_renaming_field", { defaultValue: "Failed to rename field" }));
-      console.error("Rename field error:", error);
-    }
-  };
-
   // --- Delete Column ---
 
-  const handleDeleteColumn = async (columnName: string) => {
+  const handleDeleteColumnRequest = (columnName: string) => {
+    setPendingDeleteColumn(columnName);
+    setDeleteColumnConfirmOpen(true);
+  };
+
+  const handleDeleteColumnConfirm = async () => {
+    if (!pendingDeleteColumn) return;
+    const columnName = pendingDeleteColumn;
+    setDeleteColumnConfirmOpen(false);
+    setPendingDeleteColumn(null);
     try {
       await deleteColumn(layerId, columnName);
+      // Clear any state referencing the deleted column
+      if (statsColumn === columnName) setStatsColumn(null);
+      if (quickFilterColumn === columnName) {
+        setQuickFilterColumn(null);
+        setQuickFilterAnchor(null);
+      }
+      if (sortBy === columnName) {
+        setSortBy(undefined);
+        setSortDirection("asc");
+      }
+      // Refresh data and schema
       mutate();
+      mutateQueryables();
+      // Optimistically update project layers for tile cache busting
+      if (projectLayers) {
+        const now = new Date().toISOString();
+        mutateProjectLayers(
+          projectLayers.map((l) =>
+            l.layer_id === layerId ? { ...l, updated_at: now } : l
+          ),
+          { revalidate: false },
+        );
+      }
       toast.success(t("column_deleted", { defaultValue: "Column deleted" }));
     } catch (error) {
       toast.error(t("error_deleting_column", { defaultValue: "Failed to delete column" }));
@@ -425,27 +419,6 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     }
   };
 
-  // --- Delete Selected ---
-
-  const getFeatureId = (rowId: string): string => {
-    // rowId format is `${feature.id}-${page}-${index}` — extract just the feature ID
-    const parts = rowId.split("-");
-    // Remove last two parts (page and index)
-    return parts.slice(0, -2).join("-");
-  };
-
-  const handleDeleteSelected = async () => {
-    if (!selectedRowId) return;
-    try {
-      await deleteFeaturesBulk(layerId, [getFeatureId(selectedRowId)]);
-      setSelectedRowId(null);
-      mutate();
-      toast.success(t("rows_deleted", { defaultValue: "{{count}} row(s) deleted", count: 1 }));
-    } catch (error) {
-      toast.error(t("error_deleting_rows", { defaultValue: "Failed to delete rows" }));
-      console.error("Delete error:", error);
-    }
-  };
 
   // --- Column Header Menu ---
 
@@ -480,6 +453,11 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
       map.fitBounds(bounds, { padding: 100, maxZoom: 18, duration: 1000 });
     }
     handleRowMenuClose();
+  };
+
+  const getFeatureId = (rowId: string): string => {
+    const parts = rowId.split("-");
+    return parts.slice(0, -2).join("-");
   };
 
   const handleDeleteRow = async () => {
@@ -540,39 +518,6 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           {layerName}
         </Typography>
 
-        {/* Unsaved changes */}
-        {dirtyCells.size > 0 && (
-          <>
-            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {dirtyCells.size} {t("unsaved", { defaultValue: "unsaved" })}
-            </Typography>
-            <IconButton size="small" onClick={handleDiscard}>
-              <UndoIcon fontSize="small" />
-            </IconButton>
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={isSaving ? <CircularProgress size={14} /> : <SaveIcon />}
-              onClick={handleSave}
-              disabled={isSaving}
-              sx={{ textTransform: "none", minWidth: "auto" }}>
-              {t("save", { defaultValue: "Save" })}
-            </Button>
-          </>
-        )}
-
-        {selectedRowId && (
-          <>
-            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-            <Tooltip title={t("delete_selected", { defaultValue: "Delete selected" })}>
-              <IconButton size="small" onClick={handleDeleteSelected} color="error">
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </>
-        )}
-
         <Box sx={{ flex: 1 }} />
 
         {/* Right: action buttons + utility icons */}
@@ -580,7 +525,10 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           size="small"
           variant="outlined"
           startIcon={<AddIcon />}
-          disabled
+          onClick={() => {
+            setEditFieldsInitialField(null);
+            setEditFieldsOpen(true);
+          }}
           sx={{ textTransform: "none", whiteSpace: "nowrap" }}>
           {t("add_field", { defaultValue: "Add a field" })}
         </Button>
@@ -689,42 +637,41 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
         )}
       </Box>
 
-      {/* Rename Field Inline Form */}
-      {renameFieldOpen && (
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            px: 1,
-            py: 0.5,
-            borderBottom: "1px solid",
-            borderColor: "divider",
-            backgroundColor: (theme) => emphasize(theme.palette.background.paper, 0.03),
-            flexShrink: 0,
-          }}>
-          <Typography variant="caption" color="text.secondary" noWrap>
-            {t("rename_field", { defaultValue: "Rename" })} &quot;{renameFieldOriginal}&quot;:
-          </Typography>
-          <TextField
-            autoFocus
-            size="small"
-            value={renameFieldName}
-            onChange={(e) => setRenameFieldName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleRenameField();
-              if (e.key === "Escape") setRenameFieldOpen(false);
-            }}
-            sx={{ width: 160, "& .MuiInputBase-root": { height: 30, fontSize: "0.8rem" } }}
-          />
-          <Button size="small" variant="contained" onClick={handleRenameField} sx={{ textTransform: "none", minWidth: "auto", height: 30 }}>
-            {t("rename", { defaultValue: "Rename" })}
-          </Button>
-          <IconButton size="small" onClick={() => setRenameFieldOpen(false)}>
-            <CloseIcon sx={{ fontSize: 14 }} />
-          </IconButton>
-        </Box>
-      )}
+      {/* Delete Column Confirmation */}
+      <ConfirmModal
+        open={deleteColumnConfirmOpen}
+        title={t("delete_field")}
+        body={t("delete_field_confirmation", { name: pendingDeleteColumn })}
+        closeText={t("cancel")}
+        confirmText={t("delete")}
+        onClose={() => {
+          setDeleteColumnConfirmOpen(false);
+          setPendingDeleteColumn(null);
+        }}
+        onConfirm={handleDeleteColumnConfirm}
+      />
+
+      {/* Edit Fields Modal */}
+      <EditFieldsModal
+        open={editFieldsOpen}
+        onClose={() => {
+          setEditFieldsOpen(false);
+          setEditFieldsInitialField(null);
+          mutate();
+          // Optimistically update updated_at so tile URLs get a new cache-buster
+          if (projectLayers) {
+            const now = new Date().toISOString();
+            mutateProjectLayers(
+              projectLayers.map((l) =>
+                l.layer_id === layerId ? { ...l, updated_at: now } : l
+              ),
+              { revalidate: false },
+            );
+          }
+        }}
+        layerId={layerId}
+        initialFieldName={editFieldsInitialField}
+      />
 
       {/* Table + Stats panel side by side */}
       <Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
@@ -874,6 +821,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
                       const originalValue = feature.properties?.[field.name];
                       const displayValue = getCellValue(rowId, field.name, originalValue);
                       const isEditing = editingCell?.rowId === rowId && editingCell?.column === field.name;
+                      const isSelected = selectedCell?.rowId === rowId && selectedCell?.column === field.name;
                       const isDirty = dirtyCells.has(`${rowId}:${field.name}`);
 
                       return (
@@ -882,8 +830,17 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
                           sx={{
                             ...(columnWidths[field.name] ? { width: columnWidths[field.name], minWidth: columnWidths[field.name], maxWidth: columnWidths[field.name] } : {}),
                             cursor: "text",
-                            backgroundColor: isDirty ? "rgba(255, 193, 7, 0.12)" : undefined,
+                            position: "relative",
+                            backgroundColor: isDirty
+                              ? "rgba(255, 193, 7, 0.12)"
+                              : isSelected && !isEditing
+                                ? "action.hover"
+                                : undefined,
                             p: isEditing ? 0 : undefined,
+                            ...(isEditing && {
+                              outline: (theme) => `2px solid ${theme.palette.primary.main}`,
+                              outlineOffset: -2,
+                            }),
                             ...(statsColumn === field.name && {
                               boxShadow: (theme) =>
                                 `inset 2px 0 0 0 ${theme.palette.primary.main}, inset -2px 0 0 0 ${theme.palette.primary.main}`,
@@ -892,7 +849,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedRowId(rowId);
-                            if (!isEditing) handleCellClick(rowId, field.name, originalValue);
+                            handleCellClick(rowId, field.name, originalValue);
                           }}>
                           {isEditing ? (
                             <TextField
@@ -911,8 +868,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
                                   borderRadius: 0,
                                 },
                                 "& .MuiOutlinedInput-notchedOutline": {
-                                  borderColor: "primary.main",
-                                  borderWidth: 2,
+                                  border: "none",
                                 },
                               }}
                             />
@@ -1027,9 +983,8 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
         <MenuItem
           onClick={() => {
             if (columnMenuField) {
-              setRenameFieldOriginal(columnMenuField);
-              setRenameFieldName(columnMenuField);
-              setRenameFieldOpen(true);
+              setEditFieldsInitialField(columnMenuField);
+              setEditFieldsOpen(true);
             }
             handleColumnMenuClose();
           }}>
@@ -1070,7 +1025,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
         <Divider sx={{ my: 0.5 }} />
         <MenuItem
           onClick={() => {
-            if (columnMenuField) handleDeleteColumn(columnMenuField);
+            if (columnMenuField) handleDeleteColumnRequest(columnMenuField);
             handleColumnMenuClose();
           }}
           sx={{ color: "error.main" }}>

@@ -233,6 +233,7 @@ async def get_feature(
         properties=properties,
         geometry_column=geometry_column,
         has_geometry=has_geometry,
+        column_names=metadata.column_names,
     )
 
     if not feature:

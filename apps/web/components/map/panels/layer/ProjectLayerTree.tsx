@@ -27,6 +27,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 // ----------------------------------------------------------------------
 // Redux
 import { useProject, useProjectScenarioFeatures } from "@/lib/api/projects";
+import { startEditing } from "@/lib/store/featureEditor/slice";
 import { setSelectedLayers } from "@/lib/store/layer/slice";
 import { setActiveRightPanel, setDataPanelLayerId, setIsDataPanelOpen } from "@/lib/store/map/slice";
 import { rgbToHex } from "@/lib/utils/helpers";
@@ -53,6 +54,7 @@ import CatalogExplorerModal from "@/components/modals/CatalogExplorer";
 import ContentDialogWrapper from "@/components/modals/ContentDialogWrapper";
 import DatasetExplorerModal from "@/components/modals/DatasetExplorer";
 import DatasetExternalModal from "@/components/modals/DatasetExternal";
+import CreateLayerModal from "@/components/modals/CreateLayer";
 import DatasetUploadModal from "@/components/modals/DatasetUpload";
 import MapLayerChartModal from "@/components/modals/MapLayerChart";
 import ProjectLayerDeleteModal from "@/components/modals/ProjectLayerDelete";
@@ -92,6 +94,7 @@ export const AddLayerButton = ({
     { type: AddLayerSourceType.DatasourceUpload, icon: ICON_NAME.UPLOAD, label: t("dataset_upload") },
     { type: AddLayerSourceType.DataSourceExternal, icon: ICON_NAME.LINK, label: t("dataset_external") },
     { type: AddLayerSourceType.CatalogExplorer, icon: ICON_NAME.GLOBE, label: t("catalog_explorer") },
+    { type: AddLayerSourceType.CreateEmptyLayer, icon: ICON_NAME.PLUS, label: t("create_layer") },
   ];
   return (
     <>
@@ -134,6 +137,9 @@ export const AddLayerButton = ({
       )}
       {addSourceType === AddLayerSourceType.CatalogExplorer && (
         <CatalogExplorerModal open={true} onClose={() => setAddSourceType(null)} projectId={projectId} />
+      )}
+      {addSourceType === AddLayerSourceType.CreateEmptyLayer && (
+        <CreateLayerModal open={true} onClose={() => setAddSourceType(null)} projectId={projectId} />
       )}
     </>
   );
@@ -702,6 +708,13 @@ export const ProjectLayerTree = ({
                   handleStyle(target);
                 } else if (menuItem.id === MapLayerActions.DUPLICATE) {
                   handleDuplicate(target);
+                } else if (menuItem.id === MapLayerActions.EDIT_FEATURES) {
+                  if (target.feature_layer_geometry_type) {
+                    dispatch(startEditing({
+                      layerId: target.layer_id,
+                      geometryType: target.feature_layer_geometry_type,
+                    }));
+                  }
                 } else if (menuItem.id === ContentActions.TABLE) {
                   if (isEditMode) {
                     dispatch(setDataPanelLayerId(target.id));

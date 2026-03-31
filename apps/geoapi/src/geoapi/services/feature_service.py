@@ -207,6 +207,7 @@ class FeatureService:
         properties: Optional[list[str]] = None,
         geometry_column: str = "geometry",
         has_geometry: bool = True,
+        column_names: Optional[list[str]] = None,
     ) -> Optional[dict[str, Any]]:
         """Get a single feature by ID.
 
@@ -239,10 +240,14 @@ class FeatureService:
             else:
                 select_clause = "*"
 
+        # Use rowid as fallback when table has no id column
+        has_id_col = column_names is None or "id" in column_names
+        id_filter = '"id" = ?' if has_id_col else 'rowid = ?'
+
         query = f"""
             SELECT {select_clause}
             FROM {table}
-            WHERE "id" = ?
+            WHERE {id_filter}
             LIMIT 1
         """
 

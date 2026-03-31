@@ -29,6 +29,7 @@ import { useMeasureTool } from "@/hooks/map/useMeasureTool";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { FloatingPanel } from "@/components/common/FloatingPanel";
+import FeatureEditPanel from "@/components/map/panels/FeatureEditPanel";
 import AttributionControl from "@/components/map/controls/Attribution";
 import { BasemapSelector } from "@/components/map/controls/BasemapSelector";
 import { Fullscren } from "@/components/map/controls/Fullscreen";
@@ -74,6 +75,10 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
 
   const { translatedBaseMaps, activeBasemap } = useBasemap(project);
   const activeRight = useAppSelector((state) => state.map.activeRightPanel);
+  const featureEditorActive = useAppSelector((state) => state.featureEditor.activeLayerId);
+  const featureEditorMode = useAppSelector((state) => state.featureEditor.mode);
+  const featureEditorActiveFeature = useAppSelector((state) => state.featureEditor.activeFeatureId);
+  const showFeatureEditPanel = featureEditorActive && (featureEditorMode === "draw" || !!featureEditorActiveFeature);
   // Panel height is read via CSS variable --data-panel-height for real-time updates
   const isDataPanelOpen = useAppSelector((state) => state.map.isDataPanelOpen);
   const mapMode = useAppSelector((state) => state.map.mapMode);
@@ -329,6 +334,11 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
               overflow: "hidden",
             }}>
             <MeasureResultsPanel {...measureTool} />
+            {showFeatureEditPanel && (
+              <FloatingPanel width={320} maxHeight="100%" fillHeight>
+                <FeatureEditPanel />
+              </FloatingPanel>
+            )}
             {activeRightComponent && (
               <FloatingPanel width={panelWidth} maxHeight="100%" fillHeight>
                 {activeRightComponent}
@@ -371,6 +381,11 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
           }}>
           <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start", height: "100%", overflow: "hidden" }}>
             <MeasureResultsPanel {...measureTool} />
+            {showFeatureEditPanel && (
+              <FloatingPanel width={320} maxHeight="100%" fillHeight>
+                <FeatureEditPanel />
+              </FloatingPanel>
+            )}
             {activeRightComponent && (
               <FloatingPanel width={panelWidth} maxHeight="100%" fillHeight>
                 {activeRightComponent}
