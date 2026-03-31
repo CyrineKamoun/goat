@@ -127,7 +127,7 @@ namespace routing
         {
             bool use_distance = (cfg.cost_mode == CostMode::Distance);
             auto adj = kernel::build_adjacency_list(net);
-            return kernel::dijkstra(adj, valid_starts, cfg.max_traveltime,
+            return kernel::dijkstra(adj, valid_starts, cfg.cost_budget(),
                                     use_distance);
         }
 
@@ -255,7 +255,7 @@ namespace routing
         auto adj = kernel::build_adjacency_list(net);
         auto t_adjacency_end = std::chrono::steady_clock::now();
         auto t_dijkstra_start = std::chrono::steady_clock::now();
-        auto costs = kernel::dijkstra(adj, valid_starts, cfg.max_traveltime,
+        auto costs = kernel::dijkstra(adj, valid_starts, cfg.cost_budget(),
                                       use_distance);
         auto t_dijkstra_end = std::chrono::steady_clock::now();
         auto t_routing_end = std::chrono::steady_clock::now();

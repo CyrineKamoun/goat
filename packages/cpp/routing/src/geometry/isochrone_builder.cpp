@@ -98,7 +98,7 @@ std::vector<ReachedEdgeCost> collect_reached_edges(ReachabilityField const &fiel
 		}
 
 		double cost = std::min(source_cost, target_cost);
-		if (!std::isfinite(cost) || cost > cfg.max_traveltime)
+		if (!std::isfinite(cost) || cost > cfg.cost_budget())
 		{
 			continue;
 		}
@@ -163,19 +163,26 @@ std::string build_isochrone_polygon_geojson(ReachabilityField const &field,
 
 	std::ostringstream step_values;
 	step_values << std::setprecision(15);
-	if (cfg.steps <= 0)
+	if (!cfg.cutoffs.empty())
 	{
-		step_values << "(" << cfg.max_traveltime << ")";
+		for (size_t i = 0; i < cfg.cutoffs.size(); ++i)
+		{
+			if (i > 0)
+				step_values << ",";
+			step_values << "(" << cfg.cutoffs[i] << ")";
+		}
+	}
+	else if (cfg.steps <= 0)
+	{
+		step_values << "(" << cfg.cost_budget() << ")";
 	}
 	else
 	{
-		double step_cost = cfg.max_traveltime / static_cast<double>(cfg.steps);
+		double step_cost = cfg.cost_budget() / static_cast<double>(cfg.steps);
 		for (int i = 1; i <= cfg.steps; ++i)
 		{
 			if (i > 1)
-			{
 				step_values << ",";
-			}
 			step_values << "(" << (step_cost * static_cast<double>(i)) << ")";
 		}
 	}

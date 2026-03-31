@@ -53,6 +53,7 @@ PYBIND11_MODULE(_routing, m)
         .def_readwrite("cost_mode", &routing::RequestConfig::cost_mode)
         .def_readwrite("max_traveltime",
                        &routing::RequestConfig::max_traveltime)
+        .def_readwrite("max_distance", &routing::RequestConfig::max_distance)
         .def_readwrite("steps", &routing::RequestConfig::steps)
         .def_readwrite("speed_km_h", &routing::RequestConfig::speed_km_h)
         .def_readwrite("edge_dir", &routing::RequestConfig::edge_dir)
@@ -63,7 +64,19 @@ PYBIND11_MODULE(_routing, m)
         .def_readwrite("polygon_difference",
                        &routing::RequestConfig::polygon_difference)
         .def_readwrite("departure_time", &routing::RequestConfig::departure_time)
-        .def_readwrite("max_transfers", &routing::RequestConfig::max_transfers);
+        .def_readwrite("max_transfers", &routing::RequestConfig::max_transfers)
+        // PT access/egress
+        .def_readwrite("access_mode", &routing::RequestConfig::access_mode)
+        .def_readwrite("egress_mode", &routing::RequestConfig::egress_mode)
+        .def_readwrite("access_max_time", &routing::RequestConfig::access_max_time)
+        .def_readwrite("egress_max_time", &routing::RequestConfig::egress_max_time)
+        .def_readwrite("access_speed_km_h",
+                       &routing::RequestConfig::access_speed_km_h)
+        .def_readwrite("egress_speed_km_h",
+                       &routing::RequestConfig::egress_speed_km_h)
+        // Transit mode filter and explicit cutoffs
+        .def_readwrite("transit_modes", &routing::RequestConfig::transit_modes)
+        .def_readwrite("cutoffs", &routing::RequestConfig::cutoffs);
 
     m.def("compute_catchment",
           [elapsed_ms](routing::RequestConfig const &config)

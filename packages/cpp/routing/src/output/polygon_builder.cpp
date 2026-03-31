@@ -86,14 +86,24 @@ std::vector<int32_t> compute_node_components(ReachabilityField const &field,
 // mirrors the polygon_steps appender logic so C++ and SQL stay in sync.
 std::vector<double> make_step_costs(RequestConfig const &cfg)
 {
+    // Explicit cutoffs take priority over the steps/max_traveltime derivation.
+    if (!cfg.cutoffs.empty())
+    {
+        std::vector<double> steps;
+        steps.reserve(cfg.cutoffs.size());
+        for (int c : cfg.cutoffs)
+            steps.push_back(static_cast<double>(c));
+        return steps;
+    }
+
     std::vector<double> steps;
     if (cfg.steps <= 0)
     {
-        steps.push_back(cfg.max_traveltime);
+        steps.push_back(cfg.cost_budget());
     }
     else
     {
-        double const step_size = cfg.max_traveltime / static_cast<double>(cfg.steps);
+        double const step_size = cfg.cost_budget() / static_cast<double>(cfg.steps);
         for (int i = 1; i <= cfg.steps; ++i)
             steps.push_back(step_size * static_cast<double>(i));
     }
@@ -137,7 +147,7 @@ int64_t materialize_polygon_features_table(ReachabilityField const &field,
         for (int32_t nid = 0; nid < field.node_count; ++nid)
         {
             double const cost = field.costs[static_cast<std::size_t>(nid)];
-            if (!std::isfinite(cost) || cost < 0.0 || cost > cfg.max_traveltime)
+            if (!std::isfinite(cost) || cost < 0.0 || cost > cfg.cost_budget())
                 continue;
             if (!field.network ||
                 static_cast<std::size_t>(nid) >= field.network->node_coords.size())

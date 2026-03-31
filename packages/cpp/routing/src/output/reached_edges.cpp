@@ -9,16 +9,23 @@ namespace routing::output
 
 double compute_step_cost(double cost, RequestConfig const &cfg)
 {
-    if (cfg.steps <= 0)
+    // Explicit cutoffs take priority: snap to the first cutoff >= cost.
+    if (!cfg.cutoffs.empty())
     {
-        return cost;
+        for (int c : cfg.cutoffs)
+        {
+            if (cost <= static_cast<double>(c))
+                return static_cast<double>(c);
+        }
+        return static_cast<double>(cfg.cutoffs.back());
     }
 
-    double step_size = cfg.max_traveltime / static_cast<double>(cfg.steps);
-    if (step_size <= 0.0 || !std::isfinite(step_size))
-    {
+    if (cfg.steps <= 0)
         return cost;
-    }
+
+    double step_size = cfg.cost_budget() / static_cast<double>(cfg.steps);
+    if (step_size <= 0.0 || !std::isfinite(step_size))
+        return cost;
 
     return std::ceil(cost / step_size) * step_size;
 }
@@ -57,7 +64,7 @@ std::vector<ReachedEdgeCost> collect_reached_edges(ReachabilityField const &fiel
 
         double cost = use_min_endpoint_cost ? std::min(source_cost, target_cost)
                                             : target_cost;
-        if (!std::isfinite(cost) || cost > cfg.max_traveltime)
+        if (!std::isfinite(cost) || cost > cfg.cost_budget())
         {
             continue;
         }

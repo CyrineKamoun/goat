@@ -77,9 +77,33 @@ int64_t materialize_hexagon_features_table(ReachabilityField const &field,
     }
     appender.Close();
 
-    double const step_size = (cfg.steps > 0)
-                                 ? (cfg.max_traveltime / static_cast<double>(cfg.steps))
-                                 : 0.0;
+    // Build the SQL expression that maps min_cost to its step band.
+    // When explicit cutoffs are provided use a CASE expression; otherwise use
+    // the equal-interval ceil formula that was here before.
+    std::string step_cost_expr;
+    if (!cfg.cutoffs.empty())
+    {
+        std::ostringstream cases;
+        cases << "CASE ";
+        for (int c : cfg.cutoffs)
+            cases << "WHEN min_cost <= " << c << " THEN " << c << " ";
+        cases << "ELSE " << cfg.cutoffs.back() << " END";
+        step_cost_expr = cases.str();
+    }
+    else
+    {
+        double const step_size = (cfg.steps > 0)
+            ? (cfg.cost_budget() / static_cast<double>(cfg.steps))
+            : 0.0;
+        if (cfg.steps <= 0 || step_size <= 0.0)
+            step_cost_expr = "min_cost";
+        else
+        {
+            std::ostringstream expr;
+            expr << "CEIL(min_cost / " << step_size << ") * " << step_size;
+            step_cost_expr = expr.str();
+        }
+    }
 
     std::ostringstream create_sql;
     create_sql << "CREATE TEMP TABLE " << kHexagonFeaturesTempTable << " AS "
@@ -139,10 +163,7 @@ int64_t materialize_hexagon_features_table(ReachabilityField const &field,
                << "  SELECT "
                << "    cell, "
                << "    min_cost, "
-               << "    CASE "
-               << "      WHEN " << cfg.steps << " <= 0 OR " << step_size << " <= 0 THEN min_cost "
-               << "      ELSE CEIL(min_cost / " << step_size << ") * " << step_size << " "
-               << "    END AS step_cost "
+               << "    " << step_cost_expr << " AS step_cost "
                << "  FROM sampled_cells"
                << ") "
                << "SELECT "

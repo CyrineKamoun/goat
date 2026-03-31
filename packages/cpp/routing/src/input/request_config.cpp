@@ -42,12 +42,14 @@ namespace routing::input
             if (cfg.mode == RoutingMode::Car)
                 speed_km_h = kCarBufferSpeedKmH;
             else if (cfg.mode == RoutingMode::PublicTransport)
-                speed_km_h = cfg.speed_km_h;  // walk speed only — transit range irrelevant
+                // Use access_speed_km_h when set; fall back to speed_km_h
+                speed_km_h = (cfg.access_speed_km_h > 0.0) ? cfg.access_speed_km_h
+                                                            : cfg.speed_km_h;
             else
                 speed_km_h = cfg.speed_km_h;
             return cfg.max_traveltime * (speed_km_h * 1000.0 / 60.0);
         }
-        return cfg.max_traveltime; // distance mode: value is already in meters
+        return cfg.cost_budget(); // distance mode: use max_distance when set
     }
 
 } // namespace routing::input
