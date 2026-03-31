@@ -53,6 +53,8 @@ namespace routing::pt
         auto access = compute_access(cfg, con, *tt);
 
         // 3. RAPTOR one-to-all transit search
+        //    When departure_window > 0, sweeps every minute in the window
+        //    and keeps the best arrival per destination.
         auto transit_costs = run_raptor(*tt, access.seeds, cfg);
 
         // 4. Egress leg: load street network around reachable stops
@@ -70,8 +72,6 @@ namespace routing::pt
             std::move(egress_edges), access.raw_edges);
 
         // Cost the combined edges for the egress/walking mode
-        // (access and egress both default to walking, so one costing suffices
-        //  in the common case; the access Dijkstra recomputes if modes differ)
         RequestConfig walk_cfg = cfg;
         walk_cfg.mode = cfg.egress_mode;
         if (cfg.egress_speed_km_h > 0.0)

@@ -5,6 +5,7 @@
 #include <nigiri/routing/one_to_all.h>
 #include <nigiri/types.h>
 
+#include <algorithm>
 #include <limits>
 
 namespace routing::pt
@@ -48,6 +49,55 @@ nigiri::routing::clasz_mask_t build_clasz_mask(
     return mask;
 }
 
+// Run a single RAPTOR one-to-all search for the given departure time
+// and collect per-location costs.
+void run_single_departure(
+    nigiri::timetable const &tt,
+    std::vector<nigiri::routing::offset> const &seed_stops,
+    RequestConfig const &cfg,
+    int32_t departure_minute,
+    nigiri::routing::clasz_mask_t clasz_mask,
+    std::vector<std::optional<double>> &results)
+{
+    nigiri::routing::query q;
+    q.start_time_ = nigiri::unixtime_t{
+        nigiri::i32_minutes{departure_minute}};
+    q.start_ = seed_stops;
+    q.max_travel_time_ = nigiri::duration_t{
+        static_cast<int16_t>(cfg.max_traveltime)};
+    q.max_transfers_ = static_cast<std::uint8_t>(cfg.max_transfers);
+    q.use_start_footpaths_ = true;
+    q.allowed_claszes_ = clasz_mask;
+
+    auto state = nigiri::routing::one_to_all<nigiri::direction::kForward>(
+        tt, nullptr, q);
+
+    auto const start_time = nigiri::unixtime_t{
+        nigiri::i32_minutes{departure_minute}};
+
+    auto const n_locs = tt.n_locations();
+    for (auto i = 0U; i < n_locs; ++i)
+    {
+        auto loc = nigiri::location_idx_t{i};
+        auto fastest = nigiri::routing::get_fastest_one_to_all_offsets(
+            tt, state,
+            nigiri::direction::kForward,
+            loc,
+            start_time,
+            static_cast<std::uint8_t>(cfg.max_transfers));
+
+        if (fastest.k_ == std::numeric_limits<std::uint8_t>::max())
+            continue;
+
+        double total_minutes = static_cast<double>(fastest.duration_);
+        if (total_minutes <= 0.0 || total_minutes > cfg.max_traveltime)
+            continue;
+
+        if (!results[i].has_value() || total_minutes < *results[i])
+            results[i] = total_minutes;
+    }
+}
+
 } // namespace
 
     std::vector<std::optional<double>> run_raptor(
@@ -61,40 +111,27 @@ nigiri::routing::clasz_mask_t build_clasz_mask(
         if (seed_stops.empty())
             return results;
 
-        nigiri::routing::query q;
-        q.start_time_ = nigiri::unixtime_t{
-            nigiri::i32_minutes{static_cast<int32_t>(cfg.departure_time)}};
-        q.start_ = seed_stops;
-        q.max_travel_time_ = nigiri::duration_t{
-            static_cast<int16_t>(cfg.max_traveltime)};
-        q.max_transfers_ = static_cast<std::uint8_t>(cfg.max_transfers);
-        q.use_start_footpaths_ = true;
-        q.allowed_claszes_ = build_clasz_mask(cfg.transit_modes);
+        auto const clasz_mask = build_clasz_mask(cfg.transit_modes);
+        int const window = std::max(0, cfg.departure_window);
 
-        auto state = nigiri::routing::one_to_all<nigiri::direction::kForward>(
-            tt, nullptr, q);
-
-        auto const start_time = nigiri::unixtime_t{
-            nigiri::i32_minutes{static_cast<int32_t>(cfg.departure_time)}};
-
-        for (auto i = 0U; i < n_locs; ++i)
+        if (window <= 1)
         {
-            auto loc = nigiri::location_idx_t{i};
-            auto fastest = nigiri::routing::get_fastest_one_to_all_offsets(
-                tt, state,
-                nigiri::direction::kForward,
-                loc,
-                start_time,
-                static_cast<std::uint8_t>(cfg.max_transfers));
-
-            // Default-constructed fastest_offset has k_ = 255 (unreachable).
-            if (fastest.k_ == std::numeric_limits<std::uint8_t>::max())
-                continue;
-
-            // fastest.duration_ is delta_t (int16 minutes from departure to arrival)
-            double total_minutes = static_cast<double>(fastest.duration_);
-            if (total_minutes > 0.0 && total_minutes <= cfg.max_traveltime)
-                results[i] = total_minutes;
+            // Single departure
+            run_single_departure(
+                tt, seed_stops, cfg,
+                static_cast<int32_t>(cfg.departure_time),
+                clasz_mask, results);
+        }
+        else
+        {
+            // Sweep: run RAPTOR for each minute in the window,
+            // keeping the best (minimum) cost per destination.
+            for (int offset = 0; offset < window; ++offset)
+            {
+                int32_t dep = static_cast<int32_t>(cfg.departure_time) + offset;
+                run_single_departure(
+                    tt, seed_stops, cfg, dep, clasz_mask, results);
+            }
         }
 
         return results;

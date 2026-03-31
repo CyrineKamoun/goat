@@ -103,6 +103,11 @@ namespace routing
         // PT transit mode filter (empty → all modes allowed)
         std::vector<std::string> transit_modes;
 
+        // Number of minutes to sweep around departure_time (0 → single departure).
+        // Runs RAPTOR for each minute in [departure_time, departure_time + window)
+        // and keeps the best (minimum) arrival cost per destination stop.
+        int departure_window = 0;
+
         // Explicit output step thresholds (empty → derive from max_traveltime / steps)
         std::vector<int> cutoffs;
     };

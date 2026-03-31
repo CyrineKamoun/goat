@@ -1082,6 +1082,14 @@ class CatchmentAreaTool(AnalysisTool):
             cfg.departure_time = int(self._pt_departure_unix_minutes(params))
             cfg.max_transfers = self._routing_pt_max_transfers
 
+            # Derive departure window from time_window (from_time → to_time)
+            if params.time_window:
+                from_sec = self._seconds_from_time_value(params.time_window.from_time)
+                to_sec = self._seconds_from_time_value(params.time_window.to_time)
+                window_min = max(0, (to_sec - from_sec) // 60)
+                if window_min > 0:
+                    cfg.departure_window = window_min
+
         return cfg
 
     def _save_geojson_payload(self: Self, geojson_payload: str, output_path: str) -> Path:

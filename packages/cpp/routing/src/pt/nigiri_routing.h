@@ -12,8 +12,9 @@ namespace routing::pt
 {
 
     // Run RAPTOR one-to-all forward search from the given seed stops.
-    // seed_stops: nigiri offsets with location_idx and access_minutes pre-baked
-    //   as duration.
+    // When cfg.departure_window > 0, runs RAPTOR for each minute in
+    // [departure_time, departure_time + departure_window) and returns
+    // the minimum cost per destination across all departures.
     // Returns a vector indexed by location_idx_t integer value.
     // Empty optional means the stop is unreachable within the budget.
     // Value is total travel time in minutes (access walk + transit).

@@ -74,8 +74,9 @@ PYBIND11_MODULE(_routing, m)
                        &routing::RequestConfig::access_speed_km_h)
         .def_readwrite("egress_speed_km_h",
                        &routing::RequestConfig::egress_speed_km_h)
-        // Transit mode filter and explicit cutoffs
+        // Transit mode filter, departure window, and explicit cutoffs
         .def_readwrite("transit_modes", &routing::RequestConfig::transit_modes)
+        .def_readwrite("departure_window", &routing::RequestConfig::departure_window)
         .def_readwrite("cutoffs", &routing::RequestConfig::cutoffs);
 
     m.def("compute_catchment",
