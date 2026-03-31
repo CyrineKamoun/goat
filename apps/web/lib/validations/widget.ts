@@ -108,6 +108,7 @@ export const informationLayersConfigSchema = informationConfigSchema.extend({
       legend_hidden_layers: z.array(z.number()).optional().default([]),
       downloadable_layers: z.array(z.number()).optional().default([]),
     })
+    .passthrough()
     .default({}),
 });
 

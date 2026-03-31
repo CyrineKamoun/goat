@@ -7,6 +7,8 @@ import { Icon, ICON_NAME } from "@p4b/ui/components/Icon";
 import type { ProjectLayer, ProjectLayerGroup, ProjectLayerTreeUpdate } from "@/lib/validations/project";
 import type { LayerInformationSchema } from "@/lib/validations/widget";
 
+import { MaskedImageIcon } from "@/components/map/panels/style/other/MaskedImageIcon";
+
 import { ProjectLayerTree } from "@/components/map/panels/layer/ProjectLayerTree";
 
 interface TabsLayerLayoutProps {
@@ -92,7 +94,16 @@ const TabsLayerLayout = ({
             label={options?.show_group_name !== false ? group.name : undefined}
             icon={
               options?.show_group_icons ? (
-                <Icon iconName={ICON_NAME.LAYERS} style={{ fontSize: 14 }} />
+                groupIcons?.[`group_icon_${group.id}`]?.url ? (
+                  <MaskedImageIcon
+                    imageUrl={groupIcons[`group_icon_${group.id}`].url}
+                    dimension="16px"
+                    applyMask={groupIcons[`group_icon_${group.id}`].source === "library"}
+                    imgColor=""
+                  />
+                ) : (
+                  <Icon iconName={ICON_NAME.LAYERS} style={{ fontSize: 14 }} />
+                )
               ) : undefined
             }
             iconPosition="start"

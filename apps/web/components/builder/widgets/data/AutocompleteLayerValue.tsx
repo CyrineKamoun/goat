@@ -136,7 +136,7 @@ const AutocompleteLayerValue = (props: AutocompleteLayerValueProps) => {
         noOptionsText={t("no_values_found")}
         loadingText={t("loading")}
         slotProps={{
-          paper: {
+          listbox: {
             sx: {
               maxHeight: "350px",
             },

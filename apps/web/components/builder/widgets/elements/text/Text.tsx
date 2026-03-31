@@ -9,7 +9,7 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import type { Editor } from "@tiptap/react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
@@ -135,6 +135,30 @@ const TextElementWidgetEditable = ({
     editable: isEditMode,
   });
 
+  // Refs for latest values — accessible from stable callbacks without re-registering handlers
+  const onWidgetUpdateRef = useRef(onWidgetUpdate);
+  const configRef = useRef(config);
+  useEffect(() => {
+    onWidgetUpdateRef.current = onWidgetUpdate;
+    configRef.current = config;
+  });
+
+  // Stable save function that always reads the latest config/callback from refs
+  const saveContent = useCallback(() => {
+    if (editor && onWidgetUpdateRef.current) {
+      const currentText = editor.getHTML();
+      if (currentText !== configRef.current.setup.text) {
+        onWidgetUpdateRef.current({
+          ...configRef.current,
+          setup: { ...configRef.current.setup, text: currentText },
+        });
+      }
+    }
+  }, [editor]);
+
+  // Stable debounced save — only recreated when editor changes
+  const debouncedSave = useMemo(() => debounce(() => saveContent(), 300), [saveContent]);
+
   // Update editor editable state when isEditMode changes
   useEffect(() => {
     if (editor) {
@@ -180,6 +204,9 @@ const TextElementWidgetEditable = ({
       if (colorPickerOpenRef.current || activeDropdownRef.current) return;
       // Don't close if toolbar was just clicked (mousedown fires before blur resolves)
       if (toolbarClickedRef.current) return;
+      // Flush any pending debounced save to ensure changes persist before leaving edit mode
+      debouncedSave.clear();
+      saveContent();
       setToolbarOpen(false);
       setIsEditMode(false);
     };
@@ -191,7 +218,7 @@ const TextElementWidgetEditable = ({
       editor.off("focus", handleFocus);
       editor.off("blur", handleBlur);
     };
-  }, [editor]);
+  }, [editor, debouncedSave, saveContent]);
 
   // Handle mouse events to distinguish click from drag
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -233,28 +260,20 @@ const TextElementWidgetEditable = ({
     }),
   });
 
-  const debouncedUpdate = debounce(() => {
-    if (editor && onWidgetUpdate) {
-      onWidgetUpdate({
-        ...config,
-        setup: { ...config.setup, text: editor.getHTML() },
-      });
-    }
-  }, 300); // Adjust debounce delay as needed
-
   useEffect(() => {
     if (!editor) return;
 
     const handleUpdate = () => {
-      debouncedUpdate();
+      debouncedSave();
     };
 
     editor.on("update", handleUpdate);
 
     return () => {
       editor.off("update", handleUpdate);
+      debouncedSave.clear();
     };
-  }, [editor, debouncedUpdate]);
+  }, [editor, debouncedSave]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0, width: 0 });
