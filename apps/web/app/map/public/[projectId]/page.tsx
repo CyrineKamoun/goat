@@ -48,6 +48,12 @@ export default function MapPage({ params: { projectId } }) {
     shallowEqual
   );
 
+  // Include all layers (with tables) for widgets that need to resolve variables
+  const _allProjectLayers = useSelector(
+    (state: RootState) => selectFilteredProjectLayers(state, [], []),
+    shallowEqual
+  );
+
   const project = useMemo(() => {
     if (!_project) return undefined;
     const parsedProject = projectSchema.safeParse(_project);
@@ -102,7 +108,7 @@ export default function MapPage({ params: { projectId } }) {
                   {isMobile ? (
                     <MobileProjectLayout
                       project={project}
-                      projectLayers={_projectLayers}
+                      projectLayers={_allProjectLayers}
                       projectLayerGroups={projectLayerGroups}
                       viewOnly
                       onProjectUpdate={onProjectUpdate}
@@ -110,7 +116,7 @@ export default function MapPage({ params: { projectId } }) {
                   ) : (
                     <PublicProjectLayout
                       project={project}
-                      projectLayers={_projectLayers}
+                      projectLayers={_allProjectLayers}
                       projectLayerGroups={projectLayerGroups}
                       viewOnly
                       onProjectUpdate={onProjectUpdate}
