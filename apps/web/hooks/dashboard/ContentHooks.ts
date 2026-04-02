@@ -78,6 +78,16 @@ export const useContentMoreMenu = () => {
           icon: ICON_NAME.SHARE,
         },
         {
+          id: ContentActions.EXPORT,
+          label: t("export"),
+          icon: ICON_NAME.DOWNLOAD,
+        },
+        {
+          id: ContentActions.DUPLICATE,
+          label: t("duplicate"),
+          icon: ICON_NAME.COPY,
+        },
+        {
           id: ContentActions.DELETE,
           label: t("delete"),
           icon: ICON_NAME.TRASH,

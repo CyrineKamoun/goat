@@ -33,8 +33,11 @@ const RichTextVariableForm = ({ variable, onChange }: RichTextVariableFormProps)
       <TextField
         size="small"
         fullWidth
+        required
         label={t("name")}
         value={variable.name}
+        error={!variable.name}
+        helperText={!variable.name ? t("field_required") : undefined}
         onChange={(e) => {
           const sanitized = e.target.value.replace(/[^a-zA-Z0-9_]/g, "");
           onChange({ ...variable, name: sanitized });

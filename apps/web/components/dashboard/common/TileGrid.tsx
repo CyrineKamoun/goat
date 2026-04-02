@@ -6,7 +6,7 @@ import { ICON_NAME } from "@p4b/ui/components/Icon";
 import type { Layer } from "@/lib/validations/layer";
 import type { Project } from "@/lib/validations/project";
 
-import type { ContentActions } from "@/types/common";
+import { ContentActions } from "@/types/common";
 
 import { useContentMoreMenu } from "@/hooks/dashboard/ContentHooks";
 
@@ -21,6 +21,7 @@ interface TileGridProps {
   isLoading: boolean;
   enableActions?: boolean;
   onClick?: (item: Project | Layer) => void;
+  onAction?: (action: ContentActions, item: Project | Layer) => void;
   selected?: Project | Layer;
 }
 
@@ -37,8 +38,18 @@ const TileGrid = (props: TileGridProps) => {
     lg: 3,
   };
 
+  const NON_DIALOG_ACTIONS = new Set([ContentActions.EXPORT, ContentActions.DUPLICATE]);
+
   const { getMoreMenuOptions, activeContent, moreMenuState, closeMoreMenu, openMoreMenu } =
     useContentMoreMenu();
+
+  const handleMoreMenuSelect = (menuItem: Parameters<typeof openMoreMenu>[0], contentItem: Project | Layer) => {
+    if (NON_DIALOG_ACTIONS.has(menuItem.id as ContentActions) && props.onAction) {
+      props.onAction(menuItem.id as ContentActions, contentItem);
+      return;
+    }
+    openMoreMenu(menuItem, contentItem);
+  };
 
   return (
     <>
@@ -89,7 +100,7 @@ const TileGrid = (props: TileGridProps) => {
                     cardType={props.view}
                     item={item}
                     moreMenuOptions={getMoreMenuOptions(props.type, item)}
-                    onMoreMenuSelect={openMoreMenu}
+                    onMoreMenuSelect={handleMoreMenuSelect}
                   />
                 )}
               </Grid>
