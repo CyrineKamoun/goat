@@ -1062,6 +1062,7 @@
   "no_configuration_available": "Keine Konfiguration verfügbar",
   "no_custom_icons": "Keine benutzerdefinierten Symbole",
   "no_custom_icons_yet": "Laden Sie benutzerdefinierte Symbole hoch, um das Schichtstyling zu personalisieren.",
+  "no_attributes": "Dieser Layer hat keine Attribute. Fügen Sie ein Feld hinzu, um zu beginnen.",
   "no_data": "Keine Daten",
   "no_data_available": "Keine Daten verfügbar",
   "no_dataset": "Kein Datensatz",

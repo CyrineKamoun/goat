@@ -63,7 +63,7 @@ import {
   updatePendingProperties,
 } from "@/lib/store/featureEditor/slice";
 import { setSelectedLayers } from "@/lib/store/layer/slice";
-import { setActiveRightPanel } from "@/lib/store/map/slice";
+import { setActiveRightPanel, setHighlightedFeature, setPopupInfo } from "@/lib/store/map/slice";
 import { MapSidebarItemID } from "@/types/map/common";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import { useMap } from "react-map-gl/maplibre";
@@ -247,7 +247,15 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     setDebouncedSearch("");
     setSearchOpen(false);
     setStatsColumn(null);
-  }, [layerId]);
+    dispatch(setHighlightedFeature(undefined));
+  }, [layerId, dispatch]);
+
+  // Clear highlight on unmount (table closed)
+  useEffect(() => {
+    return () => {
+      dispatch(setHighlightedFeature(undefined));
+    };
+  }, [dispatch]);
 
   // Scroll to active stats column only when navigating via prev/next
   useEffect(() => {
@@ -317,7 +325,34 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   // --- Selection (single row) ---
 
   const selectRow = (rowId: string) => {
-    setSelectedRowId((prev) => (prev === rowId ? null : rowId));
+    setSelectedRowId(rowId);
+    dispatch(setPopupInfo(undefined));
+
+    // Highlight feature on the map (only outside edit mode)
+    if (!isEditing) {
+      const feature = collectionData?.features.find((f, i) => `${f.id}-${page}-${i}` === rowId);
+      if (feature) {
+        // Determine the MapLibre layer type from the geometry type
+        const geomType = projectLayer.feature_layer_geometry_type;
+        const isCustomMarker = !!projectLayer.properties?.["custom_marker"];
+        const layerType = geomType === "polygon" ? "fill" : geomType === "line" ? "line" : isCustomMarker ? "symbol" : "circle";
+        dispatch(setHighlightedFeature({
+          id: feature.id != null ? Number(feature.id) : undefined,
+          properties: feature.properties || {},
+          layer: { id: projectLayer.id.toString(), type: layerType },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any));
+      }
+    }
+  };
+
+  const handleRowDoubleClick = (rowId: string) => {
+    if (!map) return;
+    const feature = collectionData?.features.find((f, i) => `${f.id}-${page}-${i}` === rowId);
+    if (feature?.geometry) {
+      const bounds = bbox(feature) as [number, number, number, number];
+      map.fitBounds(bounds, { padding: 100, maxZoom: 18, duration: 1000 });
+    }
   };
 
   // --- Cell Editing ---
@@ -339,8 +374,9 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
       setEditingCell(null);
       setSelectedCell(null);
       setSelectedRowId(null);
+      dispatch(setHighlightedFeature(undefined));
     }
-  }, [isEditing, pendingCount]);
+  }, [isEditing, pendingCount, dispatch]);
 
   const handleCellClick = (rowId: string, column: string, value: unknown) => {
     if (!isEditing) return; // Cells are only editable in edit mode
@@ -783,6 +819,12 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
             <CircularProgress size={32} />
           </Box>
+        ) : displayFields.length === 0 ? (
+          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
+            <Typography variant="body2" color="text.secondary">
+              {t("no_attributes")}
+            </Typography>
+          </Box>
         ) : (
           <Table
             size="small"
@@ -888,6 +930,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
                     hover
                     selected={isSelected}
                     onClick={() => selectRow(rowId)}
+                    onDoubleClick={() => handleRowDoubleClick(rowId)}
                     onContextMenu={(e) => handleRowContextMenu(e, rowId)}
                     sx={{
                       cursor: "pointer",
@@ -937,7 +980,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setSelectedRowId(rowId);
+                            selectRow(rowId);
                             handleCellClick(rowId, field.name, originalValue);
                           }}>
                           {isEditing ? (

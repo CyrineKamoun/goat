@@ -1049,6 +1049,7 @@
   "no_custom_icons": "No custom icons",
   "no_configuration_available": "No configuration available",
   "no_custom_icons_yet": "Upload custom icons to personalize layer styling.",
+  "no_attributes": "This layer has no attributes. Add a field to get started.",
   "no_data": "No data",
   "no_data_available": "No data available",
   "no_dataset": "No dataset",

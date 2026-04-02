@@ -157,10 +157,12 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
           dispatch(removePendingFeature(activeFeatureId));
         }
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      drawControl.changeMode(getDrawMode() as any);
-      dispatch(setMapCursor("crosshair"));
+      // Only activate MapboxDraw for geospatial layers
+      if (geometryType) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        drawControl.changeMode(getDrawMode() as any);
+        dispatch(setMapCursor("crosshair"));
+      }
     } else if (activeFeature?.drawFeatureId) {
       // Feature is being edited in MapboxDraw
       const drawId = activeFeature.drawFeatureId;

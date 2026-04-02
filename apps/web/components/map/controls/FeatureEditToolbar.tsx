@@ -112,7 +112,7 @@ const FeatureEditToolbar: React.FC<FeatureEditToolbarProps> = ({
     <ToolbarContainer>
       {/* Draw tools — hidden for table layers */}
       <ToolGroup>
-        {!isTableLayer && (
+        {!isTableLayer ? (
           <>
             <Tooltip title={t("select_mode")} placement="top">
               <ToolButton active={mode === "select"} onClick={() => handleModeChange("select")}>
@@ -121,6 +121,16 @@ const FeatureEditToolbar: React.FC<FeatureEditToolbarProps> = ({
             </Tooltip>
 
             <Tooltip title={t("add_feature")} placement="top">
+              <ToolButton active={mode === "draw"} onClick={() => handleModeChange("draw")}>
+                <Icon iconName={ICON_NAME.PLUS} style={{ fontSize: 18 }} />
+              </ToolButton>
+            </Tooltip>
+
+            <ToolDivider />
+          </>
+        ) : (
+          <>
+            <Tooltip title={t("add_row", { defaultValue: "Add row" })} placement="top">
               <ToolButton active={mode === "draw"} onClick={() => handleModeChange("draw")}>
                 <Icon iconName={ICON_NAME.PLUS} style={{ fontSize: 18 }} />
               </ToolButton>

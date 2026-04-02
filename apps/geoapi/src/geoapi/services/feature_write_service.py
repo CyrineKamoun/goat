@@ -115,13 +115,17 @@ class FeatureWriteService:
                 placeholders.append("?")
                 values.append(col_value)
 
-        columns_str = ", ".join(columns)
-        placeholders_str = ", ".join(placeholders)
-        query = f"INSERT INTO {table} ({columns_str}) VALUES ({placeholders_str})"
+        if columns:
+            columns_str = ", ".join(columns)
+            placeholders_str = ", ".join(placeholders)
+            query = f"INSERT INTO {table} ({columns_str}) VALUES ({placeholders_str})"
+        else:
+            query = f"INSERT INTO {table} DEFAULT VALUES"
+
         logger.debug("Create feature: %s", query)
 
         with ducklake_write_manager.connection() as con:
-            con.execute(query, values)
+            con.execute(query, values if columns else [])
             result = con.execute(f"SELECT max(rowid) FROM {table}").fetchone()
             rowid = result[0] if result and result[0] is not None else 0
             return _rowid_to_feature_id(rowid)
@@ -170,10 +174,13 @@ class FeatureWriteService:
                         placeholders.append("?")
                         values.append(col_value)
 
-                columns_str = ", ".join(columns)
-                placeholders_str = ", ".join(placeholders)
-                query = f"INSERT INTO {table} ({columns_str}) VALUES ({placeholders_str})"
-                con.execute(query, values)
+                if columns:
+                    columns_str = ", ".join(columns)
+                    placeholders_str = ", ".join(placeholders)
+                    query = f"INSERT INTO {table} ({columns_str}) VALUES ({placeholders_str})"
+                else:
+                    query = f"INSERT INTO {table} DEFAULT VALUES"
+                con.execute(query, values if columns else [])
 
                 result = con.execute(f"SELECT max(rowid) FROM {table}").fetchone()
                 rowid = result[0] if result and result[0] is not None else 0
