@@ -7,7 +7,6 @@ import { useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Map, type MapLayerMouseEvent, type MapRef, type ViewState } from "react-map-gl/maplibre";
 import type { ViewStateChangeEvent } from "react-map-gl/maplibre";
-import { useTranslation } from "react-i18next";
 import { v4 } from "uuid";
 
 import { PATTERN_IMAGES } from "@/lib/constants/pattern-images";
@@ -87,9 +86,8 @@ const MapViewer: React.FC<MapProps> = ({
   containerSx,
   isEditor,
 }) => {
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   const theme = useTheme();
-  const { i18n } = useTranslation("common");
   const dispatch = useAppDispatch();
   const isGetInfoActive = useAppSelector((state) => state.map.isMapGetInfoActive);
   const mapCursor = useAppSelector((state) => state.map.mapCursor);
