@@ -155,7 +155,6 @@ async def create_features(
                 features=features_data,
                 column_names=metadata.column_names,
                 geometry_column=metadata.geometry_column,
-                column_types=metadata.native_column_types,
             )
             await _invalidate_caches_and_pmtiles(layer_info)
             return BulkWriteResponse(ids=ids, count=len(ids))
@@ -167,7 +166,6 @@ async def create_features(
                 properties=body.properties,
                 column_names=metadata.column_names,
                 geometry_column=metadata.geometry_column,
-                column_types=metadata.native_column_types,
             )
             await _invalidate_caches_and_pmtiles(layer_info)
             return FeatureWriteResponse(id=feature_id)
@@ -201,7 +199,7 @@ async def update_feature(
         )
         if not found:
             raise HTTPException(status_code=404, detail="Feature not found")
-        _invalidate_caches(layer_info.layer_id)
+        await _invalidate_caches_and_pmtiles(layer_info)
         return FeatureWriteResponse(id=itemId, message="updated")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -237,7 +235,7 @@ async def replace_feature(
         )
         if not found:
             raise HTTPException(status_code=404, detail="Feature not found")
-        _invalidate_caches(layer_info.layer_id)
+        await _invalidate_caches_and_pmtiles(layer_info)
         return FeatureWriteResponse(id=itemId, message="replaced")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -258,18 +256,17 @@ async def delete_feature(
     user_id: UserIdDep,
     itemId: str = Path(..., description="Feature ID"),
 ) -> DeleteResponse:
-    """Delete a single feature."""
-    metadata = await _get_authorized_metadata(layer_info, user_id)
+    """Delete a single feature by rowid."""
+    await _get_authorized_metadata(layer_info, user_id)
 
     try:
         found = feature_write_service.delete_feature(
             layer_info=layer_info,
             feature_id=itemId,
-            column_names=metadata.column_names,
         )
         if not found:
             raise HTTPException(status_code=404, detail="Feature not found")
-        _invalidate_caches(layer_info.layer_id)
+        await _invalidate_caches_and_pmtiles(layer_info)
         return DeleteResponse(id=itemId)
     except HTTPException:
         raise
@@ -288,16 +285,15 @@ async def bulk_delete_features(
     user_id: UserIdDep,
     body: BulkDeleteRequest,
 ) -> BulkDeleteResponse:
-    """Delete multiple features by ID."""
-    metadata = await _get_authorized_metadata(layer_info, user_id)
+    """Delete multiple features by rowid."""
+    await _get_authorized_metadata(layer_info, user_id)
 
     try:
         count = feature_write_service.delete_features_bulk(
             layer_info=layer_info,
             feature_ids=body.ids,
-            column_names=metadata.column_names,
         )
-        _invalidate_caches(layer_info.layer_id)
+        await _invalidate_caches_and_pmtiles(layer_info)
         return BulkDeleteResponse(count=count)
     except Exception as e:
         logger.error("Bulk delete error: %s", e, exc_info=True)

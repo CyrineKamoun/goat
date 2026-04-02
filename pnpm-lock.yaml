@@ -262,7 +262,7 @@ importers:
         version: 11.11.0(@emotion/react@11.11.4(@types/react@18.3.27)(react@18.3.1))(@types/react@18.3.27)(react@18.3.1)
       '@geomatico/maplibre-cog-protocol':
         specifier: ^0.8.0
-        version: 0.8.0(maplibre-gl@4.5.2)
+        version: 0.8.0(maplibre-gl@5.21.1)
       '@hookform/resolvers':
         specifier: ^3.9.0
         version: 3.9.0(react-hook-form@7.52.2(react@18.3.1))
@@ -444,8 +444,8 @@ importers:
         specifier: ^4.5.0
         version: 4.5.0
       maplibre-gl:
-        specifier: ^4.5.2
-        version: 4.5.2
+        specifier: ^5.21.1
+        version: 5.21.1
       next:
         specifier: 14.2.35
         version: 14.2.35(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.46.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -460,7 +460,7 @@ importers:
         version: 10.1.0
       plotly.js:
         specifier: ^2.30.1
-        version: 2.34.0(mapbox-gl@3.6.0)
+        version: 2.34.0
       pretty-bytes:
         specifier: ^6.1.1
         version: 6.1.1
@@ -486,8 +486,8 @@ importers:
         specifier: 18.2.0
         version: 18.2.0
       react-map-gl:
-        specifier: ^7.1.2
-        version: 7.1.7(mapbox-gl@3.6.0)(maplibre-gl@4.5.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: ^8.1.0
+        version: 8.1.0(maplibre-gl@5.21.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react-markdown:
         specifier: ^9.0.1
         version: 9.0.1(@types/react@18.3.27)(react@18.3.1)
@@ -496,7 +496,7 @@ importers:
         version: 3.4.2(5c04e76e989f45ad31945fc14c30b66d)
       react-plotly.js:
         specifier: ^2.6.0
-        version: 2.6.0(plotly.js@2.34.0(mapbox-gl@3.6.0))(react@18.3.1)
+        version: 2.6.0(plotly.js@2.34.0)(react@18.3.1)
       react-redux:
         specifier: ^8.1.1
         version: 8.1.3(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(redux@4.2.1)
@@ -715,7 +715,7 @@ importers:
     devDependencies:
       '@craco/craco':
         specifier: ^7.1.0
-        version: 7.1.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(postcss@8.5.6)(react-scripts@5.0.1(@babel/plugin-syntax-flow@7.24.7(@babel/core@7.28.5))(@babel/plugin-transform-react-jsx@7.25.2(@babel/core@7.28.5))(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/babel__core@7.20.5)(eslint@8.57.0)(react@18.3.1)(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))(type-fest@2.19.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1))(typescript@5.9.3)
+        version: 7.1.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(postcss@8.5.6)(react-scripts@5.0.1(@babel/plugin-syntax-flow@7.24.7(@babel/core@7.28.5))(@babel/plugin-transform-react-jsx@7.25.2(@babel/core@7.28.5))(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/babel__core@7.20.5)(esbuild@0.18.20)(eslint@8.57.0)(react@18.3.1)(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))(type-fest@2.19.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1))(typescript@5.9.3)
       '@p4b/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
@@ -742,7 +742,7 @@ importers:
         version: 7.11.3
       react-scripts:
         specifier: 5.0.1
-        version: 5.0.1(@babel/plugin-syntax-flow@7.24.7(@babel/core@7.28.5))(@babel/plugin-transform-react-jsx@7.25.2(@babel/core@7.28.5))(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/babel__core@7.20.5)(eslint@8.57.0)(react@18.3.1)(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))(type-fest@2.19.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1)
+        version: 5.0.1(@babel/plugin-syntax-flow@7.24.7(@babel/core@7.28.5))(@babel/plugin-transform-react-jsx@7.25.2(@babel/core@7.28.5))(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/babel__core@7.20.5)(esbuild@0.18.20)(eslint@8.57.0)(react@18.3.1)(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))(type-fest@2.19.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1)
       storybook:
         specifier: ^7.4.0
         version: 7.6.20(encoding@0.1.13)
@@ -3332,6 +3332,9 @@ packages:
   '@mapbox/point-geometry@0.1.0':
     resolution: {integrity: sha512-6j56HdLTwWGO0fJPlrZtdU/B13q8Uwmo18Ck2GnGgN9PCFyKTZ3UbXeEdRFh18i9XQ92eH2VdtpJHpBD3aripQ==}
 
+  '@mapbox/point-geometry@1.1.0':
+    resolution: {integrity: sha512-YGcBz1cg4ATXDCM/71L9xveh4dynfGmcLDqufR+nQQy3fKwsAZsWd/x4621/6uJaeB9mwOHE6hPeDgXz9uViUQ==}
+
   '@mapbox/sphericalmercator@1.2.0':
     resolution: {integrity: sha512-ZTOuuwGuMOJN+HEmG/68bSEw15HHaMWmQ5gdTsWdWsjDe56K1kGvLOK6bOSC8gWgIvEO0w6un/2Gvv1q5hJSkQ==}
     hasBin: true
@@ -3342,6 +3345,9 @@ packages:
   '@mapbox/tiny-sdf@2.0.6':
     resolution: {integrity: sha512-qMqa27TLw+ZQz5Jk+RcwZGH7BQf5G/TrutJhspsca/3SHwmgKQ1iq+d3Jxz5oysPVYTGP6aXxCo5Lk9Er6YBAA==}
 
+  '@mapbox/tiny-sdf@2.0.7':
+    resolution: {integrity: sha512-25gQLQMcpivjOSA40g3gO6qgiFPDpWRoMfd+G/GoppPIeP6JDaMMkMrEJnMZhKyyS6iKwVt5YKu02vCUyJM3Ug==}
+
   '@mapbox/unitbezier@0.0.0':
     resolution: {integrity: sha512-HPnRdYO0WjFjRTSwO3frz1wKaU649OBFPX3Zo/2WZvuRi6zMiRGui8SnPQiQABgqCf8YikDe5t3HViTVw1WUzA==}
 
@@ -3351,9 +3357,18 @@ packages:
   '@mapbox/vector-tile@1.3.1':
     resolution: {integrity: sha512-MCEddb8u44/xfQ3oD+Srl/tNcQoqTw3goGk2oLsrFxOTc3dUp+kAnby3PvAeeBYSMSjSPD1nd1AJA6W49WnoUw==}
 
+  '@mapbox/vector-tile@2.0.4':
+    resolution: {integrity: sha512-AkOLcbgGTdXScosBWwmmD7cDlvOjkg/DetGva26pIRiZPdeJYjYKarIlb4uxVzi6bwHO6EWH82eZ5Nuv4T5DUg==}
+
   '@mapbox/whoots-js@3.1.0':
     resolution: {integrity: sha512-Es6WcD0nO5l+2BOQS4uLfNPYQaNDfbot3X1XUoloz+x0mPDS3eeORZJl06HXjwBG1fOGwCRnzK88LMdxKRrd6Q==}
     engines: {node: '>=6.0.0'}
+
+  '@maplibre/geojson-vt@5.0.4':
+    resolution: {integrity: sha512-KGg9sma45S+stfH9vPCJk1J0lSDLWZgCT9Y8u8qWZJyjFlP8MNP1WGTxIMYJZjDvVT3PDn05kN1C95Sut1HpgQ==}
+
+  '@maplibre/geojson-vt@6.0.4':
+    resolution: {integrity: sha512-HYv3POhMRCdhP3UPPATM/hfcy6/WuVIf5FKboH8u/ZuFMTnAIcSVlq5nfOqroLokd925w2QtE7YwquFOIacwVQ==}
 
   '@maplibre/maplibre-gl-style-spec@19.3.3':
     resolution: {integrity: sha512-cOZZOVhDSulgK0meTsTkmNXb1ahVvmTmWmfx9gRBwc6hq98wS9JP35ESIoNq3xqEan+UN+gn8187Z6E4NKhLsw==}
@@ -3362,6 +3377,16 @@ packages:
   '@maplibre/maplibre-gl-style-spec@20.3.1':
     resolution: {integrity: sha512-5ueL4UDitzVtceQ8J4kY+Px3WK+eZTsmGwha3MBKHKqiHvKrjWWwBCIl1K8BuJSc5OFh83uI8IFNoFvQxX2uUw==}
     hasBin: true
+
+  '@maplibre/maplibre-gl-style-spec@24.7.0':
+    resolution: {integrity: sha512-Ed7rcKYU5iELfablg9Mj+TVCsXsPBgdMyXPRAxb2v7oWg9YJnpQdZ5msDs1LESu/mtXy3Z48Vdppv2t/x5kAhw==}
+    hasBin: true
+
+  '@maplibre/mlt@1.1.8':
+    resolution: {integrity: sha512-8vtfYGidr1rNkv5IwIoU2lfe3Oy+Wa8HluzQYcQi9cveU9K3pweAal/poQj4GJ0K/EW4bTQp2wVAs09g2yDRZg==}
+
+  '@maplibre/vt-pbf@4.3.0':
+    resolution: {integrity: sha512-jIvp8F5hQCcreqOOpEt42TJMUlsrEcpf/kI1T2v85YrQRV6PPXUcEXUg5karKtH6oh47XJZ4kHu56pUkOuqA7w==}
 
   '@marijn/find-cluster-break@1.0.2':
     resolution: {integrity: sha512-l0h88YhZFyKdXIFNfSWpyjStDjGHwZ/U7iobcK1cQQD8sejsONdQtTVU+1wVN1PBw40PiiHB1vA5S7VTfQiP9g==}
@@ -5687,6 +5712,9 @@ packages:
   '@types/geojson@7946.0.14':
     resolution: {integrity: sha512-WCfD5Ht3ZesJUsONdhvm84dmzWOiOzOAqOncN0++w0lBw1o8OuDNJF2McvvCef/yBqb/HYRahp1BYtODFQ8bRg==}
 
+  '@types/geojson@7946.0.16':
+    resolution: {integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==}
+
   '@types/graceful-fs@4.1.9':
     resolution: {integrity: sha512-olP3sd1qOEe5dXTSaFvQG+02VdRXcdytWLAZsAq1PecU8uqQAhkrnbli7DagjtXKW/Bl7YJbUsa8MPcuc8LHEQ==}
 
@@ -5734,9 +5762,6 @@ packages:
 
   '@types/lodash@4.17.7':
     resolution: {integrity: sha512-8wTvZawATi/lsmNu10/j2hk1KEP0IvjubqPE3cu1Xz7xfXXt5oCq3SNUz4fMIP4XGF9Ky+Ue2tBA3hcS7LSBlA==}
-
-  '@types/mapbox-gl@3.4.0':
-    resolution: {integrity: sha512-tbn++Mm94H1kE7W6FF0oVC9rMXHVzDDNUbS7KfBMRF8NV/8csFi+67ytKcZJ4LsrpsJ+8MC6Os6ZinEDCsrunw==}
 
   '@types/mapbox__mapbox-gl-draw@1.4.7':
     resolution: {integrity: sha512-SNiewXzHCgbJ4EIEG6B7ZMFTwYhHAoEWLdD179AujwmGBaYjn/LZBEQRJLjjq2utB4dEsy5ys2t4cXwEmShpPQ==}
@@ -6094,6 +6119,26 @@ packages:
 
   '@ungap/structured-clone@1.2.0':
     resolution: {integrity: sha512-zuVdFrMJiuCDQUMCzQaD6KL28MjnqqN8XnAqiEq9PNm/hCPTSGfrXCOfwj1ow4LFb/tNymJPwsNbVePc1xFqrQ==}
+
+  '@vis.gl/react-mapbox@8.1.0':
+    resolution: {integrity: sha512-FwvH822oxEjWYOr+pP2L8hpv+7cZB2UsQbHHHT0ryrkvvqzmTgt7qHDhamv0EobKw86e1I+B4ojENdJ5G5BkyQ==}
+    peerDependencies:
+      mapbox-gl: '>=3.5.0'
+      react: '>=16.3.0'
+      react-dom: '>=16.3.0'
+    peerDependenciesMeta:
+      mapbox-gl:
+        optional: true
+
+  '@vis.gl/react-maplibre@8.1.0':
+    resolution: {integrity: sha512-PkAK/gp3mUfhCLhUuc+4gc3PN9zCtVGxTF2hB6R5R5yYUw+hdg84OZ770U5MU4tPMTCG6fbduExuIW6RRKN6qQ==}
+    peerDependencies:
+      maplibre-gl: '>=4.0.0'
+      react: '>=16.3.0'
+      react-dom: '>=16.3.0'
+    peerDependenciesMeta:
+      maplibre-gl:
+        optional: true
 
   '@vitejs/plugin-react@4.7.0':
     resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
@@ -8184,6 +8229,9 @@ packages:
   earcut@3.0.0:
     resolution: {integrity: sha512-41Fs7Q/PLq1SDbqjsgcY7GA42T0jvaCNGXgGtsNdvg+Yv8eIu06bxv4/PoREkZ9nMDNwnUSG9OFB9+yv8eKhDg==}
 
+  earcut@3.0.2:
+    resolution: {integrity: sha512-X7hshQbLyMJ/3RPhyObLARM2sNxxmRALLKx1+NVFFnQ9gKzmCrxm9+uLIAdBcvc8FNLpctqlQ2V6AE92Ol9UDQ==}
+
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
 
@@ -9162,6 +9210,9 @@ packages:
 
   gl-matrix@3.4.3:
     resolution: {integrity: sha512-wcCp8vu8FT22BnvKVPjXa/ICBWRq/zjFfdofZy1WSpQZpphblv12/bOQLBC1rMM7SGOFS9ltVmKOHil5+Ml7gA==}
+
+  gl-matrix@3.4.4:
+    resolution: {integrity: sha512-latSnyDNt/8zYUB6VIJ6PCh2jBjJX6gnDsoCZ7LyW7GkqrD51EWwa9qCoGixj8YqBtETQK/xY7OmpTF8xz1DdQ==}
 
   gl-text@1.4.0:
     resolution: {integrity: sha512-o47+XBqLCj1efmuNyCHt7/UEJmB9l66ql7pnobD6p+sgmBUdzfMZXIF0zD2+KRfpd99DJN+QXdvTFAGCKCVSmQ==}
@@ -10832,6 +10883,10 @@ packages:
     resolution: {integrity: sha512-vlWL9EY2bSGg5FAt0mKPfYqlfX15uLW5D3kKv4Xjn54nIVn01MKdfUJMAVIr+8fXVqfSX6c095Iy5XnV+T76kQ==}
     engines: {node: '>=16.14.0', npm: '>=8.1.0'}
 
+  maplibre-gl@5.21.1:
+    resolution: {integrity: sha512-zto1RTnFkOpOO1bm93ElCXF1huey2N4LvXaGLMFcYAu9txh0OhGIdX1q3LZLkrMKgMxMeYduaQo+DVNzg098fg==}
+    engines: {node: '>=16.14.0', npm: '>=8.1.0'}
+
   mark.js@8.11.1:
     resolution: {integrity: sha512-1I+1qpDt4idfgLQG+BNWmrqku+7/2bi5nLf4YwF8y8zXvmfiTBY3PV3ZibfrjBueCByROpuBjLLFCajqkgYoLQ==}
 
@@ -12444,6 +12499,9 @@ packages:
   potpack@2.0.0:
     resolution: {integrity: sha512-Q+/tYsFU9r7xoOJ+y/ZTtdVQwTWfzjbiXBDMM/JKUux3+QPP02iUuIoeBQ+Ot6oEDlC+/PGjB/5A3K7KKb7hcw==}
 
+  potpack@2.1.0:
+    resolution: {integrity: sha512-pcaShQc1Shq0y+E7GqJqvZj8DTthWV1KeHGdi0Z6IAin2Oi3JnLCOfwnCo84qc+HAp52wT9nK9H7FAJp5a44GQ==}
+
   powerhooks@0.26.16:
     resolution: {integrity: sha512-J505fYUL7hpe96rYsdUMj7Ju5qzBY6khvE5MWOSYTXj3emckCAZn1xV4OW+sF/inoRK5BSK3zkYROwKhAMCPWg==}
 
@@ -12925,8 +12983,8 @@ packages:
       react-loadable: '*'
       webpack: '>=4.41.1 || 5.x'
 
-  react-map-gl@7.1.7:
-    resolution: {integrity: sha512-mwjc0obkBJOXCcoXQr3VoLqmqwo9vS4bXfbGsdxXzEgVCv/PM0v+1QggL7W0d/ccIy+VCjbXNlGij+PENz6VNg==}
+  react-map-gl@8.1.0:
+    resolution: {integrity: sha512-vDx/QXR3Tb+8/ap/z6gdMjJQ8ZEyaZf6+uMSPz7jhWF5VZeIsKsGfPvwHVPPwGF43Ryn+YR4bd09uEFNR5OPdg==}
     peerDependencies:
       mapbox-gl: '>=1.13.0'
       maplibre-gl: '>=1.13.0'
@@ -18220,14 +18278,14 @@ snapshots:
       chalk: 5.3.0
     optional: true
 
-  '@craco/craco@7.1.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(postcss@8.5.6)(react-scripts@5.0.1(@babel/plugin-syntax-flow@7.24.7(@babel/core@7.28.5))(@babel/plugin-transform-react-jsx@7.25.2(@babel/core@7.28.5))(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/babel__core@7.20.5)(eslint@8.57.0)(react@18.3.1)(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))(type-fest@2.19.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1))(typescript@5.9.3)':
+  '@craco/craco@7.1.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(postcss@8.5.6)(react-scripts@5.0.1(@babel/plugin-syntax-flow@7.24.7(@babel/core@7.28.5))(@babel/plugin-transform-react-jsx@7.25.2(@babel/core@7.28.5))(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/babel__core@7.20.5)(esbuild@0.18.20)(eslint@8.57.0)(react@18.3.1)(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))(type-fest@2.19.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1))(typescript@5.9.3)':
     dependencies:
       autoprefixer: 10.4.20(postcss@8.5.6)
       cosmiconfig: 7.1.0
       cosmiconfig-typescript-loader: 1.0.9(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(cosmiconfig@7.1.0)(typescript@5.9.3)
       cross-spawn: 7.0.3
       lodash: 4.17.21
-      react-scripts: 5.0.1(@babel/plugin-syntax-flow@7.24.7(@babel/core@7.28.5))(@babel/plugin-transform-react-jsx@7.25.2(@babel/core@7.28.5))(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/babel__core@7.20.5)(eslint@8.57.0)(react@18.3.1)(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))(type-fest@2.19.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1)
+      react-scripts: 5.0.1(@babel/plugin-syntax-flow@7.24.7(@babel/core@7.28.5))(@babel/plugin-transform-react-jsx@7.25.2(@babel/core@7.28.5))(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/babel__core@7.20.5)(esbuild@0.18.20)(eslint@8.57.0)(react@18.3.1)(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))(type-fest@2.19.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1)
       semver: 7.6.3
       webpack-merge: 5.10.0
     transitivePeerDependencies:
@@ -19528,12 +19586,12 @@ snapshots:
       prop-types: 15.8.1
       react: 18.3.1
 
-  '@geomatico/maplibre-cog-protocol@0.8.0(maplibre-gl@4.5.2)':
+  '@geomatico/maplibre-cog-protocol@0.8.0(maplibre-gl@5.21.1)':
     dependencies:
       '@mapbox/sphericalmercator': 1.2.0
       d3-scale: 4.0.2
       geotiff: 2.1.3
-      maplibre-gl: 4.5.2
+      maplibre-gl: 5.21.1
       quick-lru: 7.3.0
 
   '@hapi/hoek@9.3.0': {}
@@ -19949,19 +20007,21 @@ snapshots:
       lodash.isequal: 4.5.0
       xtend: 4.0.2
 
-  '@mapbox/mapbox-gl-supported@1.5.0(mapbox-gl@3.6.0)':
-    dependencies:
-      mapbox-gl: 3.6.0
+  '@mapbox/mapbox-gl-supported@1.5.0': {}
 
   '@mapbox/mapbox-gl-supported@3.0.0': {}
 
   '@mapbox/point-geometry@0.1.0': {}
+
+  '@mapbox/point-geometry@1.1.0': {}
 
   '@mapbox/sphericalmercator@1.2.0': {}
 
   '@mapbox/tiny-sdf@1.2.5': {}
 
   '@mapbox/tiny-sdf@2.0.6': {}
+
+  '@mapbox/tiny-sdf@2.0.7': {}
 
   '@mapbox/unitbezier@0.0.0': {}
 
@@ -19971,7 +20031,19 @@ snapshots:
     dependencies:
       '@mapbox/point-geometry': 0.1.0
 
+  '@mapbox/vector-tile@2.0.4':
+    dependencies:
+      '@mapbox/point-geometry': 1.1.0
+      '@types/geojson': 7946.0.16
+      pbf: 4.0.1
+
   '@mapbox/whoots-js@3.1.0': {}
+
+  '@maplibre/geojson-vt@5.0.4': {}
+
+  '@maplibre/geojson-vt@6.0.4':
+    dependencies:
+      kdbush: 4.0.2
 
   '@maplibre/maplibre-gl-style-spec@19.3.3':
     dependencies:
@@ -19992,6 +20064,30 @@ snapshots:
       rw: 1.3.3
       sort-object: 3.0.3
       tinyqueue: 3.0.0
+
+  '@maplibre/maplibre-gl-style-spec@24.7.0':
+    dependencies:
+      '@mapbox/jsonlint-lines-primitives': 2.0.2
+      '@mapbox/unitbezier': 0.0.1
+      json-stringify-pretty-compact: 4.0.0
+      minimist: 1.2.8
+      quickselect: 3.0.0
+      rw: 1.3.3
+      tinyqueue: 3.0.0
+
+  '@maplibre/mlt@1.1.8':
+    dependencies:
+      '@mapbox/point-geometry': 1.1.0
+
+  '@maplibre/vt-pbf@4.3.0':
+    dependencies:
+      '@mapbox/point-geometry': 1.1.0
+      '@mapbox/vector-tile': 2.0.4
+      '@maplibre/geojson-vt': 5.0.4
+      '@types/geojson': 7946.0.16
+      '@types/supercluster': 7.1.3
+      pbf: 4.0.1
+      supercluster: 8.0.1
 
   '@marijn/find-cluster-break@1.0.2': {}
 
@@ -20758,12 +20854,12 @@ snapshots:
 
   '@plotly/d3@3.8.2': {}
 
-  '@plotly/mapbox-gl@1.13.4(mapbox-gl@3.6.0)':
+  '@plotly/mapbox-gl@1.13.4':
     dependencies:
       '@mapbox/geojson-rewind': 0.5.2
       '@mapbox/geojson-types': 1.0.2
       '@mapbox/jsonlint-lines-primitives': 2.0.2
-      '@mapbox/mapbox-gl-supported': 1.5.0(mapbox-gl@3.6.0)
+      '@mapbox/mapbox-gl-supported': 1.5.0
       '@mapbox/point-geometry': 0.1.0
       '@mapbox/tiny-sdf': 1.2.5
       '@mapbox/unitbezier': 0.0.0
@@ -20800,7 +20896,7 @@ snapshots:
 
   '@plotly/regl@2.1.2': {}
 
-  '@pmmmwh/react-refresh-webpack-plugin@0.5.15(react-refresh@0.11.0)(type-fest@2.19.0)(webpack-dev-server@4.15.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))))(webpack-hot-middleware@2.26.1)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))':
+  '@pmmmwh/react-refresh-webpack-plugin@0.5.15(react-refresh@0.11.0)(type-fest@2.19.0)(webpack-dev-server@4.15.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)))(webpack-hot-middleware@2.26.1)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))':
     dependencies:
       ansi-html: 0.0.9
       core-js-pure: 3.38.1
@@ -20810,10 +20906,10 @@ snapshots:
       react-refresh: 0.11.0
       schema-utils: 4.2.0
       source-map: 0.7.4
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
     optionalDependencies:
       type-fest: 2.19.0
-      webpack-dev-server: 4.15.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      webpack-dev-server: 4.15.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       webpack-hot-middleware: 2.26.1
 
   '@pmmmwh/react-refresh-webpack-plugin@0.5.15(react-refresh@0.14.2)(type-fest@2.19.0)(webpack-dev-server@4.15.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)))(webpack-hot-middleware@2.26.1)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))':
@@ -22137,7 +22233,7 @@ snapshots:
   '@storybook/cli@7.6.20(encoding@0.1.13)':
     dependencies:
       '@babel/core': 7.25.2
-      '@babel/preset-env': 7.25.3(@babel/core@7.28.5)
+      '@babel/preset-env': 7.25.3(@babel/core@7.25.2)
       '@babel/types': 7.25.2
       '@ndelangen/get-tarball': 3.0.9
       '@storybook/codemod': 7.6.20
@@ -23594,6 +23690,8 @@ snapshots:
 
   '@types/geojson@7946.0.14': {}
 
+  '@types/geojson@7946.0.16': {}
+
   '@types/graceful-fs@4.1.9':
     dependencies:
       '@types/node': 20.4.6
@@ -23642,10 +23740,6 @@ snapshots:
   '@types/linkify-it@5.0.0': {}
 
   '@types/lodash@4.17.7': {}
-
-  '@types/mapbox-gl@3.4.0':
-    dependencies:
-      '@types/geojson': 7946.0.14
 
   '@types/mapbox__mapbox-gl-draw@1.4.7':
     dependencies:
@@ -24070,6 +24164,19 @@ snapshots:
       - '@codemirror/search'
 
   '@ungap/structured-clone@1.2.0': {}
+
+  '@vis.gl/react-mapbox@8.1.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+
+  '@vis.gl/react-maplibre@8.1.0(maplibre-gl@5.21.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@maplibre/maplibre-gl-style-spec': 19.3.3
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+    optionalDependencies:
+      maplibre-gl: 5.21.1
 
   '@vitejs/plugin-react@4.7.0(vite@7.3.0(@types/node@20.4.6)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.31.6)(tsx@4.21.0)(yaml@2.5.0))':
     dependencies:
@@ -24662,14 +24769,14 @@ snapshots:
       schema-utils: 2.7.1
       webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
 
-  babel-loader@8.3.0(@babel/core@7.28.5)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
+  babel-loader@8.3.0(@babel/core@7.28.5)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
     dependencies:
       '@babel/core': 7.28.5
       find-cache-dir: 3.3.2
       loader-utils: 2.0.4
       make-dir: 3.1.0
       schema-utils: 2.7.1
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
 
   babel-loader@9.1.3(@babel/core@7.25.2)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
     dependencies:
@@ -25893,7 +26000,7 @@ snapshots:
     optionalDependencies:
       webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
 
-  css-minimizer-webpack-plugin@3.4.1(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
+  css-minimizer-webpack-plugin@3.4.1(esbuild@0.18.20)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
     dependencies:
       cssnano: 5.1.15(postcss@8.5.6)
       jest-worker: 27.5.1
@@ -25901,7 +26008,9 @@ snapshots:
       schema-utils: 4.2.0
       serialize-javascript: 6.0.2
       source-map: 0.6.1
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
+    optionalDependencies:
+      esbuild: 0.18.20
 
   css-minimizer-webpack-plugin@4.2.2(clean-css@5.3.3)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
     dependencies:
@@ -26627,6 +26736,8 @@ snapshots:
 
   earcut@3.0.0: {}
 
+  earcut@3.0.2: {}
+
   eastasianwidth@0.2.0: {}
 
   easy-stack@1.0.1: {}
@@ -27272,7 +27383,7 @@ snapshots:
 
   eslint-visitor-keys@3.4.3: {}
 
-  eslint-webpack-plugin@3.2.0(eslint@8.57.0)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
+  eslint-webpack-plugin@3.2.0(eslint@8.57.0)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
     dependencies:
       '@types/eslint': 8.56.11
       eslint: 8.57.0
@@ -27280,7 +27391,7 @@ snapshots:
       micromatch: 4.0.7
       normalize-path: 3.0.0
       schema-utils: 4.2.0
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
 
   eslint@8.57.0:
     dependencies:
@@ -27607,6 +27718,12 @@ snapshots:
     dependencies:
       flat-cache: 3.2.0
 
+  file-loader@6.2.0(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
+    dependencies:
+      loader-utils: 2.0.4
+      schema-utils: 3.3.0
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
+
   file-loader@6.2.0(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
     dependencies:
       loader-utils: 2.0.4
@@ -27771,7 +27888,7 @@ snapshots:
     optionalDependencies:
       eslint: 8.57.0
 
-  fork-ts-checker-webpack-plugin@6.5.3(eslint@8.57.0)(typescript@5.9.3)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
+  fork-ts-checker-webpack-plugin@6.5.3(eslint@8.57.0)(typescript@5.9.3)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
     dependencies:
       '@babel/code-frame': 7.24.7
       '@types/json-schema': 7.0.15
@@ -27787,7 +27904,7 @@ snapshots:
       semver: 7.6.3
       tapable: 1.1.3
       typescript: 5.9.3
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
     optionalDependencies:
       eslint: 8.57.0
 
@@ -28010,6 +28127,8 @@ snapshots:
   gl-mat4@1.2.0: {}
 
   gl-matrix@3.4.3: {}
+
+  gl-matrix@3.4.4: {}
 
   gl-text@1.4.0:
     dependencies:
@@ -29602,7 +29721,7 @@ snapshots:
       temp: 0.8.4
       write-file-atomic: 2.4.3
     optionalDependencies:
-      '@babel/preset-env': 7.25.3(@babel/core@7.28.5)
+      '@babel/preset-env': 7.25.3(@babel/core@7.25.2)
     transitivePeerDependencies:
       - supports-color
 
@@ -30160,6 +30279,28 @@ snapshots:
       tinyqueue: 3.0.0
       vt-pbf: 3.1.3
 
+  maplibre-gl@5.21.1:
+    dependencies:
+      '@mapbox/jsonlint-lines-primitives': 2.0.2
+      '@mapbox/point-geometry': 1.1.0
+      '@mapbox/tiny-sdf': 2.0.7
+      '@mapbox/unitbezier': 0.0.1
+      '@mapbox/vector-tile': 2.0.4
+      '@mapbox/whoots-js': 3.1.0
+      '@maplibre/geojson-vt': 6.0.4
+      '@maplibre/maplibre-gl-style-spec': 24.7.0
+      '@maplibre/mlt': 1.1.8
+      '@maplibre/vt-pbf': 4.3.0
+      '@types/geojson': 7946.0.16
+      earcut: 3.0.2
+      gl-matrix: 3.4.4
+      kdbush: 4.0.2
+      murmurhash-js: 1.0.0
+      pbf: 4.0.1
+      potpack: 2.1.0
+      quickselect: 3.0.0
+      tinyqueue: 3.0.0
+
   mark.js@8.11.1: {}
 
   markdown-escapes@1.0.4: {}
@@ -30545,6 +30686,12 @@ snapshots:
   mimic-response@3.1.0: {}
 
   min-indent@1.0.1: {}
+
+  mini-css-extract-plugin@2.9.1(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
+    dependencies:
+      schema-utils: 4.2.0
+      tapable: 2.2.1
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
 
   mini-css-extract-plugin@2.9.1(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
     dependencies:
@@ -31422,12 +31569,12 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.2
 
-  plotly.js@2.34.0(mapbox-gl@3.6.0):
+  plotly.js@2.34.0:
     dependencies:
       '@plotly/d3': 3.8.2
       '@plotly/d3-sankey': 0.7.2
       '@plotly/d3-sankey-circular': 0.33.1
-      '@plotly/mapbox-gl': 1.13.4(mapbox-gl@3.6.0)
+      '@plotly/mapbox-gl': 1.13.4
       '@turf/area': 6.5.0
       '@turf/bbox': 6.5.0
       '@turf/centroid': 6.5.0
@@ -31697,13 +31844,13 @@ snapshots:
       postcss: 8.5.6
       ts-node: 10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3)
 
-  postcss-loader@6.2.1(postcss@8.5.6)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
+  postcss-loader@6.2.1(postcss@8.5.6)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
     dependencies:
       cosmiconfig: 7.1.0
       klona: 2.0.6
       postcss: 8.5.6
       semver: 7.6.3
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
 
   postcss-loader@7.3.4(postcss@8.4.41)(typescript@4.9.5)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
     dependencies:
@@ -32145,6 +32292,8 @@ snapshots:
   potpack@1.0.2: {}
 
   potpack@2.0.0: {}
+
+  potpack@2.1.0: {}
 
   powerhooks@0.26.16:
     dependencies:
@@ -32590,7 +32739,7 @@ snapshots:
       - supports-color
       - vue-template-compiler
 
-  react-dev-utils@12.0.1(eslint@8.57.0)(typescript@5.9.3)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
+  react-dev-utils@12.0.1(eslint@8.57.0)(typescript@5.9.3)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
     dependencies:
       '@babel/code-frame': 7.24.7
       address: 1.2.2
@@ -32601,7 +32750,7 @@ snapshots:
       escape-string-regexp: 4.0.0
       filesize: 8.0.7
       find-up: 5.0.0
-      fork-ts-checker-webpack-plugin: 6.5.3(eslint@8.57.0)(typescript@5.9.3)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      fork-ts-checker-webpack-plugin: 6.5.3(eslint@8.57.0)(typescript@5.9.3)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       global-modules: 2.0.0
       globby: 11.1.0
       gzip-size: 6.0.0
@@ -32616,7 +32765,7 @@ snapshots:
       shell-quote: 1.8.1
       strip-ansi: 6.0.1
       text-table: 0.2.0
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
     optionalDependencies:
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -32776,15 +32925,14 @@ snapshots:
       react-loadable: '@docusaurus/react-loadable@5.5.2(react@17.0.2)'
       webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
 
-  react-map-gl@7.1.7(mapbox-gl@3.6.0)(maplibre-gl@4.5.2)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+  react-map-gl@8.1.0(maplibre-gl@5.21.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
-      '@maplibre/maplibre-gl-style-spec': 19.3.3
-      '@types/mapbox-gl': 3.4.0
+      '@vis.gl/react-mapbox': 8.1.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@vis.gl/react-maplibre': 8.1.0(maplibre-gl@5.21.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
     optionalDependencies:
-      mapbox-gl: 3.6.0
-      maplibre-gl: 4.5.2
+      maplibre-gl: 5.21.1
 
   react-markdown@5.0.3(@types/react@18.3.27)(react@18.3.1):
     dependencies:
@@ -32836,9 +32984,9 @@ snapshots:
       load-script: 1.0.0
       react: 17.0.2
 
-  react-plotly.js@2.6.0(plotly.js@2.34.0(mapbox-gl@3.6.0))(react@18.3.1):
+  react-plotly.js@2.6.0(plotly.js@2.34.0)(react@18.3.1):
     dependencies:
-      plotly.js: 2.34.0(mapbox-gl@3.6.0)
+      plotly.js: 2.34.0
       prop-types: 15.8.1
       react: 18.3.1
 
@@ -32935,56 +33083,56 @@ snapshots:
       tiny-invariant: 1.3.3
       tiny-warning: 1.0.3
 
-  react-scripts@5.0.1(@babel/plugin-syntax-flow@7.24.7(@babel/core@7.28.5))(@babel/plugin-transform-react-jsx@7.25.2(@babel/core@7.28.5))(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/babel__core@7.20.5)(eslint@8.57.0)(react@18.3.1)(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))(type-fest@2.19.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1):
+  react-scripts@5.0.1(@babel/plugin-syntax-flow@7.24.7(@babel/core@7.28.5))(@babel/plugin-transform-react-jsx@7.25.2(@babel/core@7.28.5))(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/babel__core@7.20.5)(esbuild@0.18.20)(eslint@8.57.0)(react@18.3.1)(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))(type-fest@2.19.0)(typescript@5.9.3)(webpack-hot-middleware@2.26.1):
     dependencies:
       '@babel/core': 7.28.5
-      '@pmmmwh/react-refresh-webpack-plugin': 0.5.15(react-refresh@0.11.0)(type-fest@2.19.0)(webpack-dev-server@4.15.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))))(webpack-hot-middleware@2.26.1)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      '@pmmmwh/react-refresh-webpack-plugin': 0.5.15(react-refresh@0.11.0)(type-fest@2.19.0)(webpack-dev-server@4.15.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)))(webpack-hot-middleware@2.26.1)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       '@svgr/webpack': 5.5.0
       babel-jest: 27.5.1(@babel/core@7.28.5)
-      babel-loader: 8.3.0(@babel/core@7.28.5)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      babel-loader: 8.3.0(@babel/core@7.28.5)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       babel-plugin-named-asset-import: 0.3.8(@babel/core@7.28.5)
       babel-preset-react-app: 10.0.1
       bfj: 7.1.0
       browserslist: 4.28.1
       camelcase: 6.3.0
       case-sensitive-paths-webpack-plugin: 2.4.0
-      css-loader: 6.11.0(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
-      css-minimizer-webpack-plugin: 3.4.1(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      css-loader: 6.11.0(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
+      css-minimizer-webpack-plugin: 3.4.1(esbuild@0.18.20)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       dotenv: 10.0.0
       dotenv-expand: 5.1.0
       eslint: 8.57.0
       eslint-config-react-app: 7.0.1(@babel/plugin-syntax-flow@7.24.7(@babel/core@7.28.5))(@babel/plugin-transform-react-jsx@7.25.2(@babel/core@7.28.5))(eslint@8.57.0)(jest@27.5.1(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3)))(typescript@5.9.3)
-      eslint-webpack-plugin: 3.2.0(eslint@8.57.0)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
-      file-loader: 6.2.0(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      eslint-webpack-plugin: 3.2.0(eslint@8.57.0)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
+      file-loader: 6.2.0(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       fs-extra: 10.1.0
-      html-webpack-plugin: 5.6.0(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      html-webpack-plugin: 5.6.0(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       identity-obj-proxy: 3.0.0
       jest: 27.5.1(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))
       jest-resolve: 27.5.1
       jest-watch-typeahead: 1.1.0(jest@27.5.1(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3)))
-      mini-css-extract-plugin: 2.9.1(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      mini-css-extract-plugin: 2.9.1(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       postcss: 8.5.6
       postcss-flexbugs-fixes: 5.0.2(postcss@8.5.6)
-      postcss-loader: 6.2.1(postcss@8.5.6)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      postcss-loader: 6.2.1(postcss@8.5.6)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       postcss-normalize: 10.0.1(browserslist@4.28.1)(postcss@8.5.6)
       postcss-preset-env: 7.8.3(postcss@8.5.6)
       prompts: 2.4.2
       react: 18.3.1
       react-app-polyfill: 3.0.0
-      react-dev-utils: 12.0.1(eslint@8.57.0)(typescript@5.9.3)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      react-dev-utils: 12.0.1(eslint@8.57.0)(typescript@5.9.3)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       react-refresh: 0.11.0
       resolve: 1.22.8
       resolve-url-loader: 4.0.0
-      sass-loader: 12.6.0(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      sass-loader: 12.6.0(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       semver: 7.6.3
-      source-map-loader: 3.0.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
-      style-loader: 3.3.4(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      source-map-loader: 3.0.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
+      style-loader: 3.3.4(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
       tailwindcss: 3.4.10(ts-node@10.9.2(@swc/core@1.7.14(@swc/helpers@0.5.5))(@types/node@20.4.6)(typescript@5.9.3))
-      terser-webpack-plugin: 5.3.10(@swc/core@1.7.14(@swc/helpers@0.5.5))(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
-      webpack-dev-server: 4.15.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
-      webpack-manifest-plugin: 4.1.1(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
-      workbox-webpack-plugin: 6.6.0(@types/babel__core@7.20.5)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5)))
+      terser-webpack-plugin: 5.3.10(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
+      webpack-dev-server: 4.15.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
+      webpack-manifest-plugin: 4.1.1(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
+      workbox-webpack-plugin: 6.6.0(@types/babel__core@7.20.5)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20))
     optionalDependencies:
       fsevents: 2.3.3
       typescript: 5.9.3
@@ -33709,12 +33857,6 @@ snapshots:
       neo-async: 2.6.2
       webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
 
-  sass-loader@12.6.0(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
-    dependencies:
-      klona: 2.0.6
-      neo-async: 2.6.2
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
-
   sax@1.2.4: {}
 
   sax@1.4.1: {}
@@ -34070,12 +34212,12 @@ snapshots:
 
   source-map-js@1.2.1: {}
 
-  source-map-loader@3.0.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
+  source-map-loader@3.0.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
     dependencies:
       abab: 2.0.6
       iconv-lite: 0.6.3
       source-map-js: 1.2.1
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
 
   source-map-support@0.5.21:
     dependencies:
@@ -35741,7 +35883,6 @@ snapshots:
       range-parser: 1.2.1
       schema-utils: 4.2.0
       webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
-    optional: true
 
   webpack-dev-middleware@5.3.4(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
     dependencies:
@@ -35801,7 +35942,6 @@ snapshots:
       - debug
       - supports-color
       - utf-8-validate
-    optional: true
 
   webpack-dev-server@4.15.2(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
     dependencies:
@@ -35849,10 +35989,10 @@ snapshots:
       html-entities: 2.5.2
       strip-ansi: 6.0.1
 
-  webpack-manifest-plugin@4.1.1(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
+  webpack-manifest-plugin@4.1.1(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
     dependencies:
       tapable: 2.2.1
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
       webpack-sources: 2.3.1
 
   webpack-merge@5.10.0:
@@ -36191,12 +36331,12 @@ snapshots:
 
   workbox-sw@6.6.0: {}
 
-  workbox-webpack-plugin@6.6.0(@types/babel__core@7.20.5)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))):
+  workbox-webpack-plugin@6.6.0(@types/babel__core@7.20.5)(webpack@5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)):
     dependencies:
       fast-json-stable-stringify: 2.1.0
       pretty-bytes: 5.6.0
       upath: 1.2.0
-      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))
+      webpack: 5.93.0(@swc/core@1.7.14(@swc/helpers@0.5.5))(esbuild@0.18.20)
       webpack-sources: 1.4.3
       workbox-build: 6.6.0(@types/babel__core@7.20.5)
     transitivePeerDependencies:

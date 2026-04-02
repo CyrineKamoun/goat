@@ -90,31 +90,19 @@ class FeatureService:
         table = layer_info.full_table_name
         geom_col = geometry_column if has_geometry else None
 
-        # Build SELECT clause - always include rowid as fallback for id
-        # Check if 'id' column exists in the table
-        has_id_column = "id" in (column_names or [])
-
+        # Always include rowid as the canonical feature identifier
         if properties:
-            # Ensure id is always included if it exists
             props_set = set(properties)
-            if has_id_column:
-                props_set.add("id")
             select_cols = ", ".join(f'"{p}"' for p in props_set if p != geom_col)
-            # Add rowid as fallback if no id column
-            rowid_select = "" if has_id_column else ", rowid"
             if has_geometry and geom_col:
-                select_clause = f'{select_cols}{rowid_select}, ST_AsGeoJSON("{geom_col}") AS geom_json'
+                select_clause = f'rowid, {select_cols}, ST_AsGeoJSON("{geom_col}") AS geom_json'
             else:
-                select_clause = f"{select_cols}{rowid_select}"
+                select_clause = f"rowid, {select_cols}"
         else:
-            # Add rowid to select all
-            rowid_select = "" if has_id_column else ", rowid"
             if has_geometry and geom_col:
-                select_clause = (
-                    f'*{rowid_select}, ST_AsGeoJSON("{geom_col}") AS geom_json'
-                )
+                select_clause = f'rowid, *, ST_AsGeoJSON("{geom_col}") AS geom_json'
             else:
-                select_clause = f"*{rowid_select}" if not has_id_column else "*"
+                select_clause = "rowid, *"
 
         # Build WHERE clause using shared query builder
         filters = build_filters(
@@ -176,12 +164,10 @@ class FeatureService:
                     # Remove raw geometry column if present
                     row_dict.pop(geom_col, None)
 
-                # Get ID - use actual id column if present, otherwise use rowid
-                feature_id = row_dict.pop("id", None)
-                if feature_id is None:
-                    # Use DuckLake's stable rowid as fallback
-                    feature_id = row_dict.pop("rowid", None)
-                effective_id = feature_id
+                # Use rowid+1 as the canonical feature identifier
+                # (+1 because MVT feature ID 0 is "unset" in MapLibre)
+                raw_rowid = row_dict.pop("rowid", None)
+                effective_id = raw_rowid + 1 if raw_rowid is not None else None
 
                 # Sanitize string values to ensure valid UTF-8
                 sanitized_props = sanitize_properties(row_dict)
@@ -209,77 +195,65 @@ class FeatureService:
         has_geometry: bool = True,
         column_names: Optional[list[str]] = None,
     ) -> Optional[dict[str, Any]]:
-        """Get a single feature by ID.
-
-        Args:
-            layer_info: Layer information
-            feature_id: Feature ID
-            properties: Properties to include
-            geometry_column: Name of the geometry column
-            has_geometry: Whether the layer has a geometry column
-
-        Returns:
-            Feature dict or None if not found
-        """
+        """Get a single feature by rowid."""
         table = layer_info.full_table_name
         geom_col = geometry_column if has_geometry else None
 
-        # Build SELECT clause
+        # Build SELECT clause — always include rowid
         if properties:
-            props_set = set(properties) | {"id"}
+            props_set = set(properties)
             select_cols = ", ".join(f'"{p}"' for p in props_set if p != geom_col)
             if has_geometry and geom_col:
                 select_clause = (
-                    f'{select_cols}, ST_AsGeoJSON("{geom_col}") AS geom_json'
+                    f'rowid, {select_cols}, ST_AsGeoJSON("{geom_col}") AS geom_json'
                 )
             else:
-                select_clause = select_cols
+                select_clause = f'rowid, {select_cols}'
         else:
             if has_geometry and geom_col:
-                select_clause = f'*, ST_AsGeoJSON("{geom_col}") AS geom_json'
+                select_clause = f'rowid, *, ST_AsGeoJSON("{geom_col}") AS geom_json'
             else:
-                select_clause = "*"
-
-        # Use rowid as fallback when table has no id column
-        has_id_col = column_names is None or "id" in column_names
-        id_filter = '"id" = ?' if has_id_col else 'rowid = ?'
+                select_clause = "rowid, *"
 
         query = f"""
             SELECT {select_clause}
             FROM {table}
-            WHERE {id_filter}
+            WHERE rowid = ?
             LIMIT 1
         """
 
         try:
+            # Convert public feature ID to internal rowid (feature_id = rowid + 1)
+            rowid = int(feature_id) - 1
             result, description = execute_with_retry(
-                ducklake_manager, query, [feature_id], fetch_all=False
+                ducklake_manager, query, [rowid], fetch_all=False
             )
 
             if not result:
                 return None
 
-            # Get column names
             col_names = [desc[0] for desc in description]
             row_dict = dict(zip(col_names, result))
 
-            # Extract geometry (only if layer has geometry)
+            # Extract rowid and convert to public feature ID
+            raw_rowid = row_dict.pop("rowid", None)
+            fid = raw_rowid + 1 if raw_rowid is not None else None
+
+            # Extract geometry
             geometry = None
             if has_geometry and geom_col:
                 geom_json = row_dict.pop("geom_json", None)
                 geometry = json.loads(geom_json) if geom_json else None
-                # Remove raw geometry column
                 row_dict.pop(geom_col, None)
 
-            # Get ID
-            fid = row_dict.pop("id", None)
+            # Remove system columns from properties
+            row_dict.pop("bbox", None)
 
-            # Sanitize string values to ensure valid UTF-8
             sanitized_props = sanitize_properties(row_dict)
 
             return {
                 "type": "Feature",
-                "id": str(fid) if fid else None,
+                "id": str(fid) if fid is not None else None,
                 "geometry": geometry,
                 "properties": sanitized_props,
             }

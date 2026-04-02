@@ -3,12 +3,14 @@
 Handles feature CRUD (create, update, delete) and column management
 (add, rename, delete columns) via the write-capable DuckLake manager.
 
+All writes use DuckDB's stable `rowid` as the canonical feature identifier.
+rowid is immutable, unique, monotonically increasing, and never recycled.
+
 All writes are serialized by BaseDuckLakeManager's internal threading.Lock.
 """
 
 import json
 import logging
-import uuid
 from typing import Any, Optional
 
 from geoapi.config import settings
@@ -21,9 +23,19 @@ logger = logging.getLogger(__name__)
 # Columns that cannot be modified by users
 PROTECTED_COLUMNS = {"id", "geometry", "geom", "rowid"}
 
-# Integer types where we should NOT insert a UUID string
-_INTEGER_TYPES = {"INTEGER", "INT", "INT4", "INT32", "BIGINT", "INT8", "INT64",
-                  "SMALLINT", "INT2", "INT16", "TINYINT", "INT1", "HUGEINT"}
+
+def _feature_id_to_rowid(feature_id: str) -> int:
+    """Convert a public feature ID to internal DuckDB rowid.
+
+    Feature IDs are rowid + 1 because MVT feature ID 0 is treated
+    as "unset" by MapLibre (known limitation).
+    """
+    return int(feature_id) - 1
+
+
+def _rowid_to_feature_id(rowid: int) -> str:
+    """Convert internal DuckDB rowid to public feature ID."""
+    return str(rowid + 1)
 
 
 def _validate_column_name(name: str, existing_columns: list[str]) -> None:
@@ -69,87 +81,50 @@ class FeatureWriteService:
         properties: dict[str, Any],
         column_names: list[str],
         geometry_column: Optional[str] = None,
-        column_types: Optional[dict[str, str]] = None,
     ) -> str:
-        """Create a new feature.
-
-        Args:
-            layer_info: Layer info with table name
-            geometry: GeoJSON geometry dict or None
-            properties: Feature properties
-            column_names: Known column names for validation
-            geometry_column: Geometry column name
-            column_types: Column name -> data_type mapping
-
-        Returns:
-            New feature ID
-        """
+        """Create a new feature. Returns the new rowid as string."""
         table = layer_info.full_table_name
-        has_id_column = "id" in column_names
-        id_is_integer = (
-            column_types is not None
-            and column_types.get("id", "").upper() in _INTEGER_TYPES
-        )
 
-        # Build column list and values
         columns: list[str] = []
         placeholders: list[str] = []
         values: list[Any] = []
 
+        # Add geometry if present
+        geom_json = None
+        if geometry and geometry_column:
+            geom_json = json.dumps(geometry)
+            columns.append(f'"{geometry_column}"')
+            placeholders.append("ST_GeomFromGeoJSON(?)")
+            values.append(geom_json)
+
+            if "bbox" in column_names:
+                columns.append('"bbox"')
+                placeholders.append(
+                    "struct_pack("
+                    "xmin := ST_XMin(ST_GeomFromGeoJSON(?)), "
+                    "ymin := ST_YMin(ST_GeomFromGeoJSON(?)), "
+                    "xmax := ST_XMax(ST_GeomFromGeoJSON(?)), "
+                    "ymax := ST_YMax(ST_GeomFromGeoJSON(?)))"
+                )
+                values.extend([geom_json, geom_json, geom_json, geom_json])
+
+        # Add properties (only known columns, skip protected)
+        for col_name, col_value in properties.items():
+            if col_name in column_names and col_name not in PROTECTED_COLUMNS:
+                columns.append(f'"{col_name}"')
+                placeholders.append("?")
+                values.append(col_value)
+
+        columns_str = ", ".join(columns)
+        placeholders_str = ", ".join(placeholders)
+        query = f"INSERT INTO {table} ({columns_str}) VALUES ({placeholders_str})"
+        logger.debug("Create feature: %s", query)
+
         with ducklake_write_manager.connection() as con:
-            if has_id_column:
-                if id_is_integer:
-                    # Generate next integer ID
-                    max_result = con.execute(
-                        f'SELECT COALESCE(MAX("id"), 0) + 1 FROM {table}'
-                    ).fetchone()
-                    feature_id = str(max_result[0]) if max_result else "1"
-                    columns.append('"id"')
-                    placeholders.append("?")
-                    values.append(int(feature_id))
-                else:
-                    feature_id = str(uuid.uuid4())
-                    columns.append('"id"')
-                    placeholders.append("?")
-                    values.append(feature_id)
-            else:
-                feature_id = str(uuid.uuid4())
-
-            # Add geometry if present
-            geom_json = None
-            if geometry and geometry_column:
-                geom_json = json.dumps(geometry)
-                columns.append(f'"{geometry_column}"')
-                placeholders.append("ST_GeomFromGeoJSON(?)")
-                values.append(geom_json)
-
-                # Compute bbox struct if table has a bbox column
-                if "bbox" in column_names:
-                    columns.append('"bbox"')
-                    placeholders.append(
-                        "struct_pack("
-                        "xmin := ST_XMin(ST_GeomFromGeoJSON(?)), "
-                        "ymin := ST_YMin(ST_GeomFromGeoJSON(?)), "
-                        "xmax := ST_XMax(ST_GeomFromGeoJSON(?)), "
-                        "ymax := ST_YMax(ST_GeomFromGeoJSON(?)))"
-                    )
-                    values.extend([geom_json, geom_json, geom_json, geom_json])
-
-            # Add properties (only known columns)
-            for col_name, col_value in properties.items():
-                if col_name in column_names and col_name not in PROTECTED_COLUMNS:
-                    columns.append(f'"{col_name}"')
-                    placeholders.append("?")
-                    values.append(col_value)
-
-            columns_str = ", ".join(columns)
-            placeholders_str = ", ".join(placeholders)
-
-            query = f"INSERT INTO {table} ({columns_str}) VALUES ({placeholders_str})"
-            logger.debug("Create feature: %s", query)
             con.execute(query, values)
-
-        return feature_id
+            result = con.execute(f"SELECT max(rowid) FROM {table}").fetchone()
+            rowid = result[0] if result and result[0] is not None else 0
+            return _rowid_to_feature_id(rowid)
 
     def create_features_bulk(
         self,
@@ -157,37 +132,12 @@ class FeatureWriteService:
         features: list[dict[str, Any]],
         column_names: list[str],
         geometry_column: Optional[str] = None,
-        column_types: Optional[dict[str, str]] = None,
     ) -> list[str]:
-        """Create multiple features in a single transaction.
-
-        Args:
-            layer_info: Layer info with table name
-            features: List of {geometry, properties} dicts
-            column_names: Known column names for validation
-            geometry_column: Geometry column name
-            column_types: Column name -> data_type mapping
-
-        Returns:
-            List of new feature IDs
-        """
+        """Create multiple features. Returns list of new rowids as strings."""
         table = layer_info.full_table_name
         feature_ids: list[str] = []
-        has_id_column = "id" in column_names
-        id_is_integer = (
-            column_types is not None
-            and column_types.get("id", "").upper() in _INTEGER_TYPES
-        )
 
         with ducklake_write_manager.connection() as con:
-            # For integer id columns, get the current max to generate sequential IDs
-            next_int_id = 1
-            if has_id_column and id_is_integer:
-                max_result = con.execute(
-                    f'SELECT COALESCE(MAX("id"), 0) FROM {table}'
-                ).fetchone()
-                next_int_id = (max_result[0] if max_result else 0) + 1
-
             for feature_data in features:
                 geometry = feature_data.get("geometry")
                 properties = feature_data.get("properties", {})
@@ -195,22 +145,6 @@ class FeatureWriteService:
                 columns: list[str] = []
                 placeholders: list[str] = []
                 values: list[Any] = []
-
-                if has_id_column:
-                    if id_is_integer:
-                        feature_id = str(next_int_id)
-                        columns.append('"id"')
-                        placeholders.append("?")
-                        values.append(next_int_id)
-                        next_int_id += 1
-                    else:
-                        feature_id = str(uuid.uuid4())
-                        columns.append('"id"')
-                        placeholders.append("?")
-                        values.append(feature_id)
-                else:
-                    feature_id = str(uuid.uuid4())
-                feature_ids.append(feature_id)
 
                 geom_json = None
                 if geometry and geometry_column:
@@ -241,6 +175,10 @@ class FeatureWriteService:
                 query = f"INSERT INTO {table} ({columns_str}) VALUES ({placeholders_str})"
                 con.execute(query, values)
 
+                result = con.execute(f"SELECT max(rowid) FROM {table}").fetchone()
+                rowid = result[0] if result and result[0] is not None else 0
+                feature_ids.append(_rowid_to_feature_id(rowid))
+
         return feature_ids
 
     def update_feature_properties(
@@ -250,20 +188,9 @@ class FeatureWriteService:
         properties: dict[str, Any],
         column_names: list[str],
     ) -> bool:
-        """Update feature properties (partial update).
-
-        Args:
-            layer_info: Layer info with table name
-            feature_id: Feature ID
-            properties: Properties to update
-            column_names: Known column names for validation
-
-        Returns:
-            True if feature was found and updated
-        """
+        """Update feature properties by rowid (partial update)."""
         table = layer_info.full_table_name
 
-        # Filter to only known, non-protected columns
         safe_props = {
             k: v for k, v in properties.items()
             if k in column_names and k not in PROTECTED_COLUMNS
@@ -277,17 +204,16 @@ class FeatureWriteService:
             set_clauses.append(f'"{col_name}" = ?')
             values.append(col_value)
 
-        has_id_col = "id" in column_names
-        id_filter = '"id" = ?' if has_id_col else 'rowid = ?'
-        values.append(int(feature_id) if not has_id_col else feature_id)
+        rid = _feature_id_to_rowid(feature_id)
+        values.append(rid)
         set_str = ", ".join(set_clauses)
-        query = f'UPDATE {table} SET {set_str} WHERE {id_filter}'
+        query = f'UPDATE {table} SET {set_str} WHERE rowid = ?'
         logger.debug("Update feature: %s", query)
 
         with ducklake_write_manager.connection() as con:
             con.execute(query, values)
             count_result = con.execute(
-                f'SELECT COUNT(*) FROM {table} WHERE {id_filter}', [int(feature_id) if not has_id_col else feature_id]
+                f'SELECT COUNT(*) FROM {table} WHERE rowid = ?', [rid]
             ).fetchone()
             return count_result is not None and count_result[0] > 0
 
@@ -300,30 +226,16 @@ class FeatureWriteService:
         column_names: list[str],
         geometry_column: Optional[str] = None,
     ) -> bool:
-        """Replace a feature entirely (geometry + properties).
-
-        Args:
-            layer_info: Layer info with table name
-            feature_id: Feature ID
-            geometry: New GeoJSON geometry or None
-            properties: New properties (replaces all)
-            column_names: Known column names for validation
-            geometry_column: Geometry column name
-
-        Returns:
-            True if feature was found and replaced
-        """
+        """Replace a feature entirely by rowid (geometry + properties)."""
         table = layer_info.full_table_name
 
         set_clauses = []
         values: list[Any] = []
 
-        # Update geometry if provided
         if geometry and geometry_column:
             set_clauses.append(f'"{geometry_column}" = ST_GeomFromGeoJSON(?)')
             values.append(json.dumps(geometry))
 
-        # Update all properties
         for col_name, col_value in properties.items():
             if col_name in column_names and col_name not in PROTECTED_COLUMNS:
                 set_clauses.append(f'"{col_name}" = ?')
@@ -332,7 +244,6 @@ class FeatureWriteService:
         if not set_clauses:
             raise ValueError("No valid fields to update")
 
-        # Also update bbox if geometry changed and table has bbox column
         if geometry and geometry_column and "bbox" in column_names:
             geom_json = json.dumps(geometry)
             set_clauses.append(
@@ -344,17 +255,16 @@ class FeatureWriteService:
             )
             values.extend([geom_json, geom_json, geom_json, geom_json])
 
-        has_id_col = "id" in column_names
-        id_filter = '"id" = ?' if has_id_col else 'rowid = ?'
-        values.append(int(feature_id) if not has_id_col else feature_id)
+        rid = _feature_id_to_rowid(feature_id)
+        values.append(rid)
         set_str = ", ".join(set_clauses)
-        query = f'UPDATE {table} SET {set_str} WHERE {id_filter}'
+        query = f'UPDATE {table} SET {set_str} WHERE rowid = ?'
         logger.debug("Replace feature: %s", query)
 
         with ducklake_write_manager.connection() as con:
             con.execute(query, values)
             count_result = con.execute(
-                f'SELECT COUNT(*) FROM {table} WHERE {id_filter}', [int(feature_id) if not has_id_col else feature_id]
+                f'SELECT COUNT(*) FROM {table} WHERE rowid = ?', [rid]
             ).fetchone()
             return count_result is not None and count_result[0] > 0
 
@@ -362,70 +272,39 @@ class FeatureWriteService:
         self,
         layer_info: LayerInfo,
         feature_id: str,
-        column_names: Optional[list[str]] = None,
     ) -> bool:
-        """Delete a single feature.
-
-        Args:
-            layer_info: Layer info with table name
-            feature_id: Feature ID
-            column_names: Known column names (to detect id vs rowid)
-
-        Returns:
-            True if feature was found and deleted
-        """
+        """Delete a single feature by feature ID."""
         table = layer_info.full_table_name
-        has_id_col = column_names is None or "id" in column_names
-        id_filter = '"id" = ?' if has_id_col else 'rowid = ?'
-        id_val = feature_id if has_id_col else int(feature_id)
+        rid = _feature_id_to_rowid(feature_id)
 
         with ducklake_write_manager.connection() as con:
             count = con.execute(
-                f'SELECT COUNT(*) FROM {table} WHERE {id_filter}', [id_val]
+                f'SELECT COUNT(*) FROM {table} WHERE rowid = ?', [rid]
             ).fetchone()
             if not count or count[0] == 0:
                 return False
-
-            con.execute(f'DELETE FROM {table} WHERE {id_filter}', [id_val])
+            con.execute(f'DELETE FROM {table} WHERE rowid = ?', [rid])
             return True
 
     def delete_features_bulk(
         self,
         layer_info: LayerInfo,
         feature_ids: list[str],
-        column_names: Optional[list[str]] = None,
     ) -> int:
-        """Delete multiple features.
-
-        Args:
-            layer_info: Layer info with table name
-            feature_ids: List of feature IDs to delete
-            column_names: Known column names (to detect id vs rowid)
-
-        Returns:
-            Number of features deleted
-        """
+        """Delete multiple features by feature ID."""
         table = layer_info.full_table_name
-
         if not feature_ids:
             return 0
 
-        has_id_col = column_names is None or "id" in column_names
-        id_col = '"id"' if has_id_col else 'rowid'
-        id_vals = feature_ids if has_id_col else [int(fid) for fid in feature_ids]
-
+        id_vals = [_feature_id_to_rowid(fid) for fid in feature_ids]
         placeholders = ", ".join(["?"] * len(id_vals))
-        query = f'DELETE FROM {table} WHERE {id_col} IN ({placeholders})'
+        query = f'DELETE FROM {table} WHERE rowid IN ({placeholders})'
         logger.debug("Bulk delete: %s ids", len(id_vals))
 
         with ducklake_write_manager.connection() as con:
-            count_before = con.execute(
-                f"SELECT COUNT(*) FROM {table}"
-            ).fetchone()[0]
+            count_before = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             con.execute(query, id_vals)
-            count_after = con.execute(
-                f"SELECT COUNT(*) FROM {table}"
-            ).fetchone()[0]
+            count_after = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
             return count_before - count_after
 
     # --- Column Management ---

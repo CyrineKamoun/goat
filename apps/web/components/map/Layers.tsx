@@ -146,6 +146,11 @@ const Layers = (props: LayersProps) => {
     if (label) {
       parts.push("label=true");
     }
+    // Force dynamic tiles when editing — bypasses old PMTiles that lack MVT feature IDs
+    const layerId = layer["layer_id"] || layer["id"];
+    if (editLayerId && editLayerId === layerId) {
+      parts.push("dynamic=true");
+    }
     // Cache-busting: if layer was updated within the last hour, append a version
     // param so the browser doesn't serve stale cached tiles after schema changes
     const updatedAt = layer["updated_at"];
@@ -158,7 +163,6 @@ const Layers = (props: LayersProps) => {
     }
 
     const query = parts.length > 0 ? `?${parts.join("&")}` : "";
-    const layerId = layer["layer_id"] || layer["id"];
     return `${GEOAPI_BASE_URL}/collections/${layerId}/tiles/WebMercatorQuad/{z}/{x}/{y}${query}`;
   };
   const { useDataLayers, systemLayers } = useMemo(() => {
@@ -266,15 +270,11 @@ const Layers = (props: LayersProps) => {
                 const isEditingThisLayer = editLayerId === (layer as ProjectLayer).layer_id;
                 const mergeEditExclusion = (baseFilter: FilterSpecification | undefined): FilterSpecification | undefined => {
                   if (!isEditingThisLayer || editExcludeIds.length === 0) return baseFilter;
-                  // MapLibre filter: exclude features whose "id" property is in the list
-                  // Vector tiles use numeric sequential IDs stored as property "id"
-                  // Try both string and number versions for matching
+                  // Exclude by MVT feature ID (rowid+1). IDs are always numeric.
+                  const numericIds = editExcludeIds.map(Number);
                   const excludeFilter: FilterSpecification = [
                     "!",
-                    ["any",
-                      ["in", ["get", "id"], ["literal", editExcludeIds.map(Number)]],
-                      ["in", ["to-string", ["get", "id"]], ["literal", editExcludeIds]],
-                    ],
+                    ["in", ["id"], ["literal", numericIds]],
                   ];
                   if (baseFilter) {
                     return ["all", baseFilter, excludeFilter] as FilterSpecification;
@@ -294,7 +294,7 @@ const Layers = (props: LayersProps) => {
                         minzoom={layer.properties.min_zoom || 0}
                         maxzoom={layer.properties.max_zoom || 24}
                         id={layer.id.toString()}
-                        {...layerStyleSpec}
+                        {...(layerStyleSpec as any)}
                         {...(mergeEditExclusion(mapLayerFilter) ? { filter: mergeEditExclusion(mapLayerFilter) } : {})}
                         source-layer="default"
                       />
@@ -305,7 +305,7 @@ const Layers = (props: LayersProps) => {
                         id={`stroke-${layer.id.toString()}`}
                         minzoom={layer.properties.min_zoom || 0}
                         maxzoom={layer.properties.max_zoom || 24}
-                        {...strokeStyleSpec}
+                        {...(strokeStyleSpec as any)}
                         {...(mergeEditExclusion(mapStrokeFilter) ? { filter: mergeEditExclusion(mapStrokeFilter) } : {})}
                         source-layer="default"
                       />
@@ -326,7 +326,7 @@ const Layers = (props: LayersProps) => {
                         }
                         minzoom={layer.properties.min_zoom || 0}
                         maxzoom={layer.properties.max_zoom || 24}
-                        {...labelStyleSpec}
+                        {...(labelStyleSpec as any)}
                         {...(layer.properties?.["custom_marker"] || layer.feature_layer_geometry_type === "polygon"
                           ? (mergeEditExclusion(mapLabelFilter) ? { filter: mergeEditExclusion(mapLabelFilter) } : {})
                           : (mapLabelFilter ? { filter: mapLabelFilter } : {})
@@ -336,7 +336,6 @@ const Layers = (props: LayersProps) => {
 
                     {/* HighlightLayer */}
                     {props.highlightFeature &&
-                      props.highlightFeature.properties?.id &&
                       props.highlightFeature.layer.id === layer.id.toString() && (
                         <MapLayer
                           id={`highlight-${layer.id}`}
@@ -410,7 +409,7 @@ const Layers = (props: LayersProps) => {
                 <MapLayer
                   key={getLayerKey(layer)}
                   id={layer.id.toString()}
-                  {...layerStyleSpec}
+                  {...(layerStyleSpec as any)}
                   {...(mapLayerFilter ? { filter: mapLayerFilter } : {})}
                   source-layer="default"
                   minzoom={14}

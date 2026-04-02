@@ -57,6 +57,7 @@ async def get_tile(
     bbox: BBoxDep = None,
     limit: int = Query(default=None, ge=1, le=100000, description="Max features"),
     label: bool = Query(default=False, description="Merge polygon label anchor points into tile response"),
+    dynamic: bool = Query(default=False, description="Force dynamic tile generation, bypassing PMTiles"),
 ) -> Response:
     """Get a vector tile for the specified collection and tile coordinates."""
     request_id = str(uuid.uuid4())[:8]
@@ -73,7 +74,7 @@ async def get_tile(
 
     # Try ultra-fast PMTiles path first (wrapped in try-except to ensure fallback)
     try:
-        if tile_service.can_serve_from_pmtiles_by_layer_id(layer_id, cql_filter, bbox):
+        if not dynamic and tile_service.can_serve_from_pmtiles_by_layer_id(layer_id, cql_filter, bbox):
             result = await tile_service.get_tile_from_pmtiles_by_layer_id(
                 layer_id=layer_id,
                 z=z,
@@ -116,7 +117,7 @@ async def get_tile(
     layer_info = await get_layer_info(collection_id)
 
     # Check if we can still use PMTiles with layer_info (redundant but safe)
-    if tile_service.can_serve_from_pmtiles(layer_info, cql_filter, bbox):
+    if not dynamic and tile_service.can_serve_from_pmtiles(layer_info, cql_filter, bbox):
         result = await tile_service.get_tile_from_pmtiles_only(
             layer_info=layer_info,
             z=z,
@@ -166,6 +167,7 @@ async def get_tile(
             columns=columns,
             geometry_column=geometry_column,
             geometry_type=metadata.geometry_type,
+            force_dynamic=dynamic,
         )
     except TimeoutError:
         # Query exceeded timeout - return 504 Gateway Timeout

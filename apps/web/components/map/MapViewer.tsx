@@ -116,6 +116,7 @@ const MapViewer: React.FC<MapProps> = ({
       new Set([
         "layer_id",
         "id",
+        "_rowid",
         "feature_id",
         "h3_3",
         "h3_6",

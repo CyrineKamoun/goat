@@ -183,13 +183,11 @@ def _normalize_geometry_property(filter_str: str, geometry_column: str) -> str:
 
 def build_id_filter(
     ids: list[str],
-    id_column: str = "id",
 ) -> QueryFilters:
-    """Build an ID list filter.
+    """Build a rowid list filter.
 
     Args:
-        ids: List of IDs to filter
-        id_column: Name of the ID column
+        ids: List of feature IDs (rowid + 1) to filter
 
     Returns:
         QueryFilters with IN clause
@@ -197,7 +195,8 @@ def build_id_filter(
     filters = QueryFilters()
     if ids:
         placeholders = ", ".join("?" for _ in ids)
-        filters.add(f'"{id_column}" IN ({placeholders})', *ids)
+        # Convert feature IDs to rowids (feature_id = rowid + 1)
+        filters.add(f"rowid IN ({placeholders})", *[int(i) - 1 for i in ids])
     return filters
 
 

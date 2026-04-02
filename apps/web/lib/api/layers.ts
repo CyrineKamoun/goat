@@ -493,6 +493,38 @@ export const getFeature = async (layerId: string, featureId: string) => {
   return response.json() as Promise<GeoJSON.Feature>;
 };
 
+/**
+ * Fetch features from a collection with optional query parameters.
+ */
+export const getFeatures = async (
+  layerId: string,
+  params?: {
+    filter?: Record<string, unknown>;
+    limit?: number;
+    offset?: number;
+    properties?: string[];
+  },
+): Promise<GeoJSON.FeatureCollection> => {
+  const parts: string[] = [];
+  if (params?.filter) {
+    parts.push(`filter=${encodeURIComponent(JSON.stringify(params.filter))}`);
+    parts.push("filter-lang=cql2-json");
+  }
+  if (params?.limit) parts.push(`limit=${params.limit}`);
+  if (params?.offset) parts.push(`offset=${params.offset}`);
+  if (params?.properties) parts.push(`properties=${params.properties.join(",")}`);
+  const query = parts.length > 0 ? `?${parts.join("&")}` : "";
+  const response = await apiRequestAuth(
+    `${COLLECTIONS_API_BASE_URL}/${layerId}/items${query}`,
+    { method: "GET" },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || "Failed to get features");
+  }
+  return response.json() as Promise<GeoJSON.FeatureCollection>;
+};
+
 export const createFeature = async (
   layerId: string,
   feature: { geometry?: Record<string, unknown> | null; properties: Record<string, unknown> }

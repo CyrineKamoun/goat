@@ -8,7 +8,7 @@ import { toast } from "react-toastify";
 
 import type { MapLayerMouseEvent } from "react-map-gl/maplibre";
 
-import { createFeaturesBulk, deleteFeature, getFeature, replaceFeature } from "@/lib/api/layers";
+import { createFeaturesBulk, deleteFeature, getFeature, getFeatures, replaceFeature } from "@/lib/api/layers";
 import { useProjectLayers } from "@/lib/api/projects";
 import {
   addPendingFeature,
@@ -352,11 +352,12 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
         return;
       }
 
-      // Get the feature ID — pending overlay features use _pendingId, tile features use id property
+      // Get the feature ID — pending overlay features use _pendingId,
+      // tile features use MVT feature.id (rowid+1). Fallback to properties.id for legacy PMTiles.
       const isPendingOverlay = clickedFeature.layer?.id?.startsWith("pending-features");
       const featureId = isPendingOverlay
         ? clickedFeature.properties?._pendingId
-        : (clickedFeature.properties?.id ?? clickedFeature.id);
+        : (clickedFeature.id ?? clickedFeature.properties?.id);
       if (featureId === undefined || featureId === null) return;
 
       // Capture rendered fill color from the tile feature for MapboxDraw styling
@@ -401,9 +402,26 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
       }
 
       // Fetch full feature from backend
+      // Use MVT feature ID (rowid+1) when available, fall back to CQL filter on
+      // the "id" property for legacy tiles that don't have MVT feature IDs.
       try {
-        const fullFeature = await getFeature(activeLayerIdRef.current, String(featureId));
+        const hasMvtId = clickedFeature.id != null;
+        let fullFeature: GeoJSON.Feature | null | undefined;
+        if (hasMvtId) {
+          fullFeature = await getFeature(activeLayerIdRef.current, String(featureId));
+        } else {
+          // Legacy tiles: fetch by CQL filter on the "id" property
+          const fc = await getFeatures(activeLayerIdRef.current, {
+            filter: { op: "=", args: [{ property: "id" }, featureId] },
+            limit: 1,
+          });
+          fullFeature = fc.features[0] || null;
+        }
         if (!fullFeature?.geometry) return;
+
+        // Use the API-returned feature ID (rowid+1) as the canonical ID.
+        // For legacy tiles, this converts from properties.id to the real rowid+1.
+        const canonicalId = String(fullFeature.id ?? featureId);
 
         // Add to MapboxDraw for geometry editing — use a unique draw ID to avoid conflicts
         // Include _fillColor/_fillOpacity as properties so MapboxDraw styles can read them
@@ -422,7 +440,7 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
 
         dispatch(
           addPendingFeature({
-            id: String(featureId),
+            id: canonicalId,
             drawFeatureId: drawId || null,
             geometry: fullFeature.geometry,
             properties: {
@@ -462,8 +480,8 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
   // Clean up when editing stops
   useEffect(() => {
     if (!activeLayerId && drawControl) {
-      drawControl.deleteAll();
-      drawControl.changeMode(MapboxDraw.constants.modes.SIMPLE_SELECT);
+      try { drawControl.deleteAll(); } catch { /* map may be unmounted */ }
+      try { drawControl.changeMode(MapboxDraw.constants.modes.SIMPLE_SELECT); } catch { /* */ }
       dispatch(setMapCursor(undefined));
       dispatch(setIsMapGetInfoActive(true));
     }
