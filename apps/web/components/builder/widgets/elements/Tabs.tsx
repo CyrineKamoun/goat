@@ -202,20 +202,21 @@ const TabsWidget: React.FC<TabsWidgetProps> = ({
   }, [panelWidgets, widget.id]);
 
   return (
-    <Box sx={{ width: "100%" }}>
+    <Box sx={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
       {/* Show title if it has a value */}
       {config.setup?.title && (
-        <Typography variant="body1" fontWeight="bold" sx={{ mb: 1 }}>
+        <Typography variant="body1" fontWeight="bold" sx={{ mb: 1, flexShrink: 0 }}>
           {config.setup.title}
         </Typography>
       )}
 
-      {/* Tabs header */}
+      {/* Tabs header — stays pinned while content scrolls */}
       <Box
         sx={{
           borderBottom: 1,
           borderColor: "divider",
           position: "relative",
+          flexShrink: 0,
           "& .MuiTabs-scrollButtons.Mui-disabled": {
             display: "none",
           },
@@ -266,37 +267,39 @@ const TabsWidget: React.FC<TabsWidgetProps> = ({
         </MuiTabs>
       </Box>
 
-      {/* Tab panels */}
-      {tabs.map((tab, index) => {
-        const tabWidgets = getWidgetsForTab(tab);
+      {/* Tab panels — scrollable area takes remaining space */}
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+        {tabs.map((tab, index) => {
+          const tabWidgets = getWidgetsForTab(tab);
 
-        return (
-          <TabPanel key={tab.id} value={activeTab} index={index}>
-            {tabWidgets.length === 0 ? (
-              // Empty state - use standard widget status container
-              <WidgetStatusContainer isNotConfigured isNotConfiguredMessage={t("no_widgets_in_tab")} />
-            ) : (
-              // Render widgets
-              <Stack spacing={2}>
-                {tabWidgets.map((childWidget) => (
-                  <TabChildWidget
-                    key={childWidget.id}
-                    childWidget={childWidget}
-                    projectLayers={projectLayers}
-                    projectLayerGroups={projectLayerGroups}
-                    viewOnly={viewOnly}
-                    isSelected={
-                      selectedBuilderItem?.type === "widget" && selectedBuilderItem?.id === childWidget.id
-                    }
-                    onSelect={() => dispatch(setSelectedBuilderItem(childWidget))}
-                    onNestedWidgetUpdate={onNestedWidgetUpdate}
-                  />
-                ))}
-              </Stack>
-            )}
-          </TabPanel>
-        );
-      })}
+          return (
+            <TabPanel key={tab.id} value={activeTab} index={index}>
+              {tabWidgets.length === 0 ? (
+                // Empty state - use standard widget status container
+                <WidgetStatusContainer isNotConfigured isNotConfiguredMessage={t("no_widgets_in_tab")} />
+              ) : (
+                // Render widgets
+                <Stack spacing={2}>
+                  {tabWidgets.map((childWidget) => (
+                    <TabChildWidget
+                      key={childWidget.id}
+                      childWidget={childWidget}
+                      projectLayers={projectLayers}
+                      projectLayerGroups={projectLayerGroups}
+                      viewOnly={viewOnly}
+                      isSelected={
+                        selectedBuilderItem?.type === "widget" && selectedBuilderItem?.id === childWidget.id
+                      }
+                      onSelect={() => dispatch(setSelectedBuilderItem(childWidget))}
+                      onNestedWidgetUpdate={onNestedWidgetUpdate}
+                    />
+                  ))}
+                </Stack>
+              )}
+            </TabPanel>
+          );
+        })}
+      </Box>
     </Box>
   );
 };

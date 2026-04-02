@@ -147,11 +147,10 @@ export const numbersDataConfigSchema = dataConfigSchema.extend({
 
 export const richTextVariableSchema = z.object({
   id: z.string(),
-  name: z
-    .string()
-    .min(1)
-    .max(64)
-    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
+  name: z.preprocess(
+    (val) => (typeof val === "string" && val.length === 0 ? `var_${Date.now() % 1000}` : val),
+    z.string().min(1).max(64).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/)
+  ),
   layer_project_id: z.number().optional(),
   operation_type: statisticOperationEnum.optional(),
   operation_value: z.string().optional(),

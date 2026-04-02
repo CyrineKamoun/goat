@@ -8,6 +8,8 @@ export enum ContentActions {
   MOVE_TO_FOLDER = "moveToFolder",
   DOWNLOAD = "download",
   SHARE = "share",
+  EXPORT = "export",
+  DUPLICATE = "duplicate",
   DELETE = "delete",
   TABLE = "table",
   UPDATE = "update",

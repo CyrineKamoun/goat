@@ -38,10 +38,10 @@ export const BASEMAPS: Basemap[] = [
     thumbnail: "https://media.maptiler.com/old/img/cloud/slider/streets-v2-dark.png",
   },
   {
-    value: "basemap_de_col",
-    url: `https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/styles/bm_web_col.json`,
+    value: "basemap_wld_col",
+    url: `https://sgx.geodatenzentrum.de/gdz_basemapworld_vektor/styles/bm_web_wld_col.json`,
     title: "BKG Basemap",
-    subtitle: "Colored",
+    subtitle: "Color (World)",
     thumbnail: "https://basemap.de/viewer/assets/basemap_colour.png",
   },
   {

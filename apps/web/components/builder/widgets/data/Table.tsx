@@ -85,8 +85,6 @@ export const TableDataWidget = ({
   const [recordsColumnWidths, setRecordsColumnWidths] = useState<Record<string, number>>({});
   const [groupedColumnWidths, setGroupedColumnWidths] = useState<Record<string, number>>({});
   const [sqlColumnWidths, setSqlColumnWidths] = useState<Record<string, number>>({});
-  const [measuredHeaderHeight, setMeasuredHeaderHeight] = useState(44);
-  const [measuredRowHeight, setMeasuredRowHeight] = useState(40);
   const [isRecordsOverflowing, setIsRecordsOverflowing] = useState(false);
   const [isGroupedOverflowing, setIsGroupedOverflowing] = useState(false);
   const [isSqlOverflowing, setIsSqlOverflowing] = useState(false);
@@ -125,25 +123,6 @@ export const TableDataWidget = ({
     []
   );
 
-  const persistentScrollbarSx = {
-    "&::-webkit-scrollbar": {
-      width: 10,
-      height: 10,
-    },
-    "&::-webkit-scrollbar-track": {
-      backgroundColor: "transparent",
-    },
-    "&::-webkit-scrollbar-thumb": {
-      backgroundColor: "rgba(110, 110, 110, 0.5)",
-      borderRadius: 8,
-      border: "2px solid transparent",
-      backgroundClip: "padding-box",
-      minHeight: 40,
-    },
-    "&::-webkit-scrollbar-thumb:hover": {
-      backgroundColor: "rgba(100, 100, 100, 0.65)",
-    },
-  };
 
   useEffect(() => {
     setRowsPerPage(rowsShownSetting);
@@ -1210,15 +1189,6 @@ export const TableDataWidget = ({
     if (!container) return;
 
     const measureHeights = () => {
-      const headerRow = container.querySelector("thead tr") as HTMLTableRowElement | null;
-      const bodyRow = container.querySelector("tbody tr") as HTMLTableRowElement | null;
-
-      const nextHeaderHeight = Math.max(32, Math.round(headerRow?.getBoundingClientRect().height || 44));
-      const nextRowHeight = Math.max(28, Math.round(bodyRow?.getBoundingClientRect().height || 40));
-
-      setMeasuredHeaderHeight((previous) => (previous !== nextHeaderHeight ? nextHeaderHeight : previous));
-      setMeasuredRowHeight((previous) => (previous !== nextRowHeight ? nextRowHeight : previous));
-
       const isOverflowing = container.scrollHeight > container.clientHeight + 1;
       if (isSqlMode) {
         setIsSqlOverflowing(isOverflowing);
@@ -1278,40 +1248,47 @@ export const TableDataWidget = ({
   }, [isGroupedMode, isSqlMode]);
 
   const tableViewportHeight = useMemo(() => {
-    return Math.max(180, measuredHeaderHeight + rowsPerPage * measuredRowHeight);
-  }, [measuredHeaderHeight, measuredRowHeight, rowsPerPage]);
+    return Math.max(180, 44 + rowsPerPage * 40);
+  }, [rowsPerPage]);
 
-  const loadMoreRecordsIfNeeded = useCallback((target: HTMLDivElement) => {
-    if (!hasMoreRecords || isRecordsLoading || !displayRecordsData) return;
-    const reachedBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 8;
-    if (reachedBottom) {
-      setRecordsPage((previous) => previous + 1);
-    }
-  }, [displayRecordsData, hasMoreRecords, isRecordsLoading]);
+  const tableScrollSx = {
+    flex: 1,
+    minHeight: 0,
+    maxHeight: `${tableViewportHeight}px`,
+    overflowX: "auto" as const,
+    overflowY: "auto" as const,
+    overscrollBehaviorY: "auto" as const,
+    pb: 2,
+    scrollPaddingBottom: 16,
+    scrollbarWidth: "none" as const,
+    "&::-webkit-scrollbar": { display: "none" },
+  };
 
-  const handleRecordsScroll = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      loadMoreRecordsIfNeeded(event.currentTarget);
-    },
-    [loadMoreRecordsIfNeeded]
-  );
+  // Sentinel-based infinite scroll: loads more when sentinel enters viewport
+  const recordsSentinelRef = useRef<HTMLDivElement>(null);
+  // Use refs so the observer callback always reads fresh state
+  const canLoadMoreRecords = useRef(false);
+  canLoadMoreRecords.current = hasMoreRecords && !isRecordsLoading && !!displayRecordsData;
 
   useEffect(() => {
+    const sentinel = recordsSentinelRef.current;
+    const container = recordsScrollRef.current;
+    if (!sentinel || !container) return;
     if (isGroupedMode || isSqlMode) return;
-    if (!hasMoreRecords || isRecordsLoading || !displayRecordsData) return;
-    const target = recordsScrollRef.current;
-    if (!target) return;
 
-    const stillAtBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 8;
-    if (stillAtBottom) {
-      setRecordsPage((previous) => previous + 1);
-      return;
-    }
-
-    if (target.scrollHeight <= target.clientHeight + 1) {
-      setRecordsPage((previous) => previous + 1);
-    }
-  }, [displayRecordsData, hasMoreRecords, isGroupedMode, isRecordsLoading, isSqlMode]);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && canLoadMoreRecords.current) {
+          setRecordsPage((previous) => previous + 1);
+        }
+      },
+      { root: container, rootMargin: "200px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  // Re-create when data changes (sentinel position moves) or loading finishes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayRecordsData, hasMoreRecords, isRecordsLoading, isGroupedMode, isSqlMode]);
 
   useEffect(() => {
     if (!isGroupedMode || isSqlMode) return;
@@ -1362,39 +1339,29 @@ export const TableDataWidget = ({
     [hasMoreGroupedRows, rowsPerPage, sortedGroupedRows.length]
   );
 
-  const handleSqlScroll = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      if (!hasMoreSqlRows || isSqlLoading || isSqlNextPagePending) return;
-      const target = event.currentTarget;
-      const reachedBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 8;
-      if (reachedBottom) {
-        setIsSqlNextPagePending(true);
-        setSqlPage((previous) => previous + 1);
-      }
-    },
-    [hasMoreSqlRows, isSqlLoading, isSqlNextPagePending]
-  );
+  const sqlSentinelRef = useRef<HTMLDivElement>(null);
+  const canLoadMoreSql = useRef(false);
+  canLoadMoreSql.current = hasMoreSqlRows && !isSqlLoading && !isSqlNextPagePending;
 
   useEffect(() => {
+    const sentinel = sqlSentinelRef.current;
+    const container = sqlScrollRef.current;
+    if (!sentinel || !container) return;
     if (!isSqlMode || isGroupedMode) return;
-    if (!hasMoreSqlRows || isSqlLoading || isSqlNextPagePending) return;
-    if (sqlColumns.length === 0) return;
-    const target = sqlScrollRef.current;
-    if (!target) return;
 
-    const stillAtBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 8;
-    if (stillAtBottom) {
-      setIsSqlNextPagePending(true);
-      setSqlPage((previous) => previous + 1);
-    }
-  }, [
-    hasMoreSqlRows,
-    isGroupedMode,
-    isSqlLoading,
-    isSqlMode,
-    isSqlNextPagePending,
-    sqlColumns.length,
-  ]);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && canLoadMoreSql.current) {
+          setIsSqlNextPagePending(true);
+          setSqlPage((previous) => previous + 1);
+        }
+      },
+      { root: container, rootMargin: "200px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMoreSqlRows, isSqlLoading, isSqlNextPagePending, isGroupedMode, isSqlMode]);
 
   const handleSqlWheel = useCallback(
     (event: React.WheelEvent<HTMLDivElement>) => {
@@ -1642,7 +1609,7 @@ export const TableDataWidget = ({
   );
 
   return (
-    <>
+    <Box sx={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
       <WidgetStatusContainer
         isLoading={
           isSqlMode
@@ -1657,20 +1624,11 @@ export const TableDataWidget = ({
       />
 
       {!isSqlMode && !isGroupedMode && displayRecordsData && isRecordsConfigured && (
-        <Box>
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
           <Box
             ref={recordsScrollRef}
-            sx={{
-              maxHeight: `${tableViewportHeight}px`,
-              overflowX: "auto",
-              overflowY: "auto",
-              overscrollBehaviorY: "auto",
-              pb: 2,
-              scrollPaddingBottom: 16,
-              ...persistentScrollbarSx,
-            }}
-            onWheel={trapWheelInTable}
-            onScroll={handleRecordsScroll}>
+            sx={tableScrollSx}
+            onWheel={trapWheelInTable}>
             <WidgetRecordsTable
               areFieldsLoading={areFieldsLoading}
               displayData={displayRecordsData}
@@ -1689,6 +1647,7 @@ export const TableDataWidget = ({
                   : (event, fieldName) => startColumnResize(event, "records", fieldName)
               }
             />
+            <div ref={recordsSentinelRef} style={{ height: 1 }} />
           </Box>
           {(hasMoreRecords || isRecordsOverflowing) && (
             <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
@@ -1699,18 +1658,10 @@ export const TableDataWidget = ({
       )}
 
       {!isSqlMode && isGroupedMode && isGroupedConfigured && (
-        <Box>
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
           <Box
             ref={groupedScrollRef}
-            sx={{
-              overflowX: "auto",
-              maxHeight: `${tableViewportHeight}px`,
-              overflowY: "auto",
-              overscrollBehaviorY: "auto",
-              pb: 2,
-              scrollPaddingBottom: 16,
-              ...persistentScrollbarSx,
-            }}
+            sx={tableScrollSx}
             onWheel={trapWheelInTable}
             onScroll={handleGroupedScroll}>
             <WidgetRecordsTable
@@ -1768,20 +1719,11 @@ export const TableDataWidget = ({
       )}
 
       {isSqlMode && isSqlConfigured && (
-        <Box>
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
           <Box
             ref={sqlScrollRef}
-            sx={{
-              overflowX: "auto",
-              maxHeight: `${tableViewportHeight}px`,
-              overflowY: "scroll",
-              overscrollBehaviorY: "auto",
-              pb: 2,
-              scrollPaddingBottom: 16,
-              ...persistentScrollbarSx,
-            }}
-            onWheel={handleSqlWheel}
-            onScroll={handleSqlScroll}>
+            sx={tableScrollSx}
+            onWheel={handleSqlWheel}>
             <WidgetRecordsTable
               areFieldsLoading={false}
               fields={[]}
@@ -1826,6 +1768,7 @@ export const TableDataWidget = ({
                 },
               })}
             />
+            <div ref={sqlSentinelRef} style={{ height: 1 }} />
           </Box>
           {sqlTotalsRow && !isSqlCollapsibleMode && sqlTableColumns.length > 0 && (
             <Box sx={{ overflowX: "auto" }}>
@@ -1922,6 +1865,6 @@ export const TableDataWidget = ({
           </Stack>
         </Stack>
       </Popover>
-    </>
+    </Box>
   );
 };
