@@ -21,7 +21,7 @@ const featureEditorSlice = createSlice({
   reducers: {
     startEditing(
       state,
-      action: PayloadAction<{ layerId: string; geometryType: "point" | "line" | "polygon" }>
+      action: PayloadAction<{ layerId: string; geometryType: "point" | "line" | "polygon" | null }>
     ) {
       state.activeLayerId = action.payload.layerId;
       state.geometryType = action.payload.geometryType;

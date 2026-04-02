@@ -23,9 +23,10 @@ const FeatureEditPanel: React.FC = () => {
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const { drawControl } = useDraw();
-  const { activeLayerId, activeFeatureId, pendingFeatures, mode } = useAppSelector(
+  const { activeLayerId, activeFeatureId, pendingFeatures, mode, geometryType } = useAppSelector(
     (state) => state.featureEditor
   );
+  const isTableLayer = !geometryType;
   const { layerFields } = useLayerFields(activeLayerId || "");
 
   const pushHistory = () => {
@@ -74,7 +75,9 @@ const FeatureEditPanel: React.FC = () => {
   // For update features, check if anything actually changed
   const hasChanges = (() => {
     if (!feature) return false;
-    if (feature.action === "create") return hasGeometry;
+    // For table layers, new features are always committable (no geometry needed)
+    // For geospatial layers, require geometry to be drawn
+    if (feature.action === "create") return isTableLayer || hasGeometry;
     // Compare geometry and properties with originals
     const geomChanged = JSON.stringify(feature.geometry) !== JSON.stringify(feature.originalGeometry);
     const filterInternal = (props: Record<string, unknown>) => {

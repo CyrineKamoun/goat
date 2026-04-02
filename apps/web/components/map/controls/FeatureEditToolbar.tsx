@@ -95,12 +95,13 @@ const FeatureEditToolbar: React.FC<FeatureEditToolbarProps> = ({
 }) => {
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
-  const { activeLayerId, mode, pendingFeatures, isSaving } = useAppSelector(
+  const { activeLayerId, geometryType, mode, pendingFeatures, isSaving } = useAppSelector(
     (state) => state.featureEditor
   );
 
   if (!activeLayerId) return null;
 
+  const isTableLayer = !geometryType;
   const pendingCount = Object.values(pendingFeatures).filter((f) => f.committed).length;
 
   const handleModeChange = (newMode: FeatureEditMode) => {
@@ -109,21 +110,25 @@ const FeatureEditToolbar: React.FC<FeatureEditToolbarProps> = ({
 
   return (
     <ToolbarContainer>
-      {/* Draw tools */}
+      {/* Draw tools — hidden for table layers */}
       <ToolGroup>
-        <Tooltip title={t("select_mode")} placement="top">
-          <ToolButton active={mode === "select"} onClick={() => handleModeChange("select")}>
-            <Icon iconName={ICON_NAME.ARROW_POINTER} style={{ fontSize: 18 }} />
-          </ToolButton>
-        </Tooltip>
+        {!isTableLayer && (
+          <>
+            <Tooltip title={t("select_mode")} placement="top">
+              <ToolButton active={mode === "select"} onClick={() => handleModeChange("select")}>
+                <Icon iconName={ICON_NAME.ARROW_POINTER} style={{ fontSize: 18 }} />
+              </ToolButton>
+            </Tooltip>
 
-        <Tooltip title={t("add_feature")} placement="top">
-          <ToolButton active={mode === "draw"} onClick={() => handleModeChange("draw")}>
-            <Icon iconName={ICON_NAME.PLUS} style={{ fontSize: 18 }} />
-          </ToolButton>
-        </Tooltip>
+            <Tooltip title={t("add_feature")} placement="top">
+              <ToolButton active={mode === "draw"} onClick={() => handleModeChange("draw")}>
+                <Icon iconName={ICON_NAME.PLUS} style={{ fontSize: 18 }} />
+              </ToolButton>
+            </Tooltip>
 
-        <ToolDivider />
+            <ToolDivider />
+          </>
+        )}
 
         {/* Undo/Redo */}
         <Tooltip title={t("undo")} placement="top">

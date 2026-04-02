@@ -623,8 +623,8 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
     const committed = Object.values(pendingFeatures).filter((f) => f.committed);
     if (committed.length === 0) return;
 
-    const newFeatures = committed.filter((f) => f.action === "create" && f.geometry !== null);
-    const updatedFeatures = committed.filter((f) => f.action === "update" && f.geometry !== null);
+    const newFeatures = committed.filter((f) => f.action === "create");
+    const updatedFeatures = committed.filter((f) => f.action === "update");
     const deletedFeatures = committed.filter((f) => f.action === "delete");
 
     const cleanProps = (props: Record<string, unknown>) => {

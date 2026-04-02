@@ -54,6 +54,13 @@ import {
 import type { GetCollectionItemsQueryParams } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
 
+import {
+  addPendingFeature,
+  commitFeature,
+  startEditing,
+  stopEditing,
+  updatePendingProperties,
+} from "@/lib/store/featureEditor/slice";
 import { setSelectedLayers } from "@/lib/store/layer/slice";
 import { setActiveRightPanel } from "@/lib/store/map/slice";
 import { MapSidebarItemID } from "@/types/map/common";
@@ -98,6 +105,9 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   const { projectId } = useParams();
   const { layers: projectLayers, mutate: mutateProjectLayers } = useProjectLayers(projectId as string);
   const activeRightPanel = useAppSelector((state) => state.map.activeRightPanel);
+  const editLayerId = useAppSelector((state) => state.featureEditor.activeLayerId);
+  const pendingFeatures = useAppSelector((state) => state.featureEditor.pendingFeatures);
+  const isEditing = editLayerId === layerId;
   const { layerFields, isLoading: areFieldsLoading } = useLayerFields(layerId);
   const { mutate: mutateQueryables } = useLayerQueryables(layerId);
 
@@ -143,6 +153,9 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   // Edit fields modal state
   const [editFieldsOpen, setEditFieldsOpen] = useState(false);
   const [editFieldsInitialField, setEditFieldsInitialField] = useState<string | null>(null);
+
+  // Stop editing confirmation state
+  const [stopEditConfirmOpen, setStopEditConfirmOpen] = useState(false);
 
   // Delete column confirmation state
   const [deleteColumnConfirmOpen, setDeleteColumnConfirmOpen] = useState(false);
@@ -317,7 +330,19 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   // Track selected (highlighted) cell — separate from editing
   const [selectedCell, setSelectedCell] = useState<{ rowId: string; column: string } | null>(null);
 
+  // Clear dirty state when editing stops or pending features are cleared (save/discard)
+  const pendingCount = Object.keys(pendingFeatures).length;
+  useEffect(() => {
+    if (!isEditing || pendingCount === 0) {
+      setDirtyCells(new Map());
+      setEditingCell(null);
+      setSelectedCell(null);
+      setSelectedRowId(null);
+    }
+  }, [isEditing, pendingCount]);
+
   const handleCellClick = (rowId: string, column: string, value: unknown) => {
+    if (!isEditing) return; // Cells are only editable in edit mode
     const isAlreadySelected = selectedCell?.rowId === rowId && selectedCell?.column === column;
     if (isAlreadySelected) {
       // Second click — enter edit mode
@@ -349,7 +374,8 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     }
 
     // Check if value actually changed
-    if (parsedValue === originalValue || (parsedValue === null && (originalValue === null || originalValue === undefined))) {
+    const unchanged = parsedValue === originalValue || (parsedValue === null && (originalValue === null || originalValue === undefined));
+    if (unchanged) {
       setDirtyCells((prev) => {
         const next = new Map(prev);
         next.delete(key);
@@ -361,6 +387,35 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
         next.set(key, { rowId, column, originalValue, newValue: parsedValue });
         return next;
       });
+
+      // Dispatch to Redux pending features when in edit mode
+      if (isEditing && feature) {
+        const featureId = getFeatureId(rowId);
+        const existingPending = pendingFeatures[featureId];
+        if (existingPending) {
+          // Update existing pending feature's properties
+          dispatch(updatePendingProperties({
+            id: featureId,
+            properties: { ...existingPending.properties, [column]: parsedValue },
+          }));
+        } else {
+          // Create a new pending feature for this row
+          dispatch(addPendingFeature({
+            id: featureId,
+            drawFeatureId: null,
+            geometry: (feature.geometry as GeoJSON.Geometry) || null,
+            properties: { ...feature.properties, [column]: parsedValue },
+            committed: false,
+            action: "update",
+            originalGeometry: (feature.geometry as GeoJSON.Geometry) || null,
+            originalProperties: { ...feature.properties },
+          }));
+        }
+        // Auto-commit table edits (no "Done" button needed for inline editing)
+        if (!pendingFeatures[featureId]?.committed) {
+          dispatch(commitFeature(featureId));
+        }
+      }
     }
 
     setEditingCell(null);
@@ -506,7 +561,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           display: "flex",
           alignItems: "center",
           minHeight: 42,
-          gap: 0.5,
+          gap: 1,
           px: 1.5,
           py: 0.5,
           borderBottom: "1px solid",
@@ -535,10 +590,24 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
         <Button
           size="small"
           variant="outlined"
-          startIcon={<AddIcon />}
-          disabled
+          color={isEditing ? "error" : "primary"}
+          startIcon={isEditing ? <CloseIcon /> : <EditIcon />}
+          onClick={() => {
+            if (isEditing) {
+              if (pendingCount > 0) {
+                setStopEditConfirmOpen(true);
+              } else {
+                dispatch(stopEditing());
+              }
+            } else {
+              dispatch(startEditing({
+                layerId,
+                geometryType: projectLayer.feature_layer_geometry_type as "point" | "line" | "polygon" | null ?? null,
+              }));
+            }
+          }}
           sx={{ textTransform: "none", whiteSpace: "nowrap" }}>
-          {t("add_feature", { defaultValue: "Add a feature" })}
+          {isEditing ? t("stop_editing") : t("edit_features")}
         </Button>
 
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
@@ -636,6 +705,20 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           </Tooltip>
         )}
       </Box>
+
+      {/* Stop Editing Confirmation */}
+      <ConfirmModal
+        open={stopEditConfirmOpen}
+        title={t("stop_editing")}
+        body={t("discard_edits_confirmation")}
+        closeText={t("cancel")}
+        confirmText={t("discard_edits")}
+        onClose={() => setStopEditConfirmOpen(false)}
+        onConfirm={() => {
+          setStopEditConfirmOpen(false);
+          dispatch(stopEditing());
+        }}
+      />
 
       {/* Delete Column Confirmation */}
       <ConfirmModal

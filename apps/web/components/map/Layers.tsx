@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { setColorFunction } from "@geomatico/maplibre-cog-protocol";
 import React, { useEffect, useMemo, useRef } from "react";
 import type { FilterSpecification } from "maplibre-gl";
@@ -60,9 +61,9 @@ const Layers = (props: LayersProps) => {
   }, [pendingFeatures]);
 
   const splitLayerFilter = (style: LayerProps) => {
-    const styleWithFilter = style as LayerProps & { filter?: unknown };
+    const styleWithFilter = style as any & { filter?: unknown };
     const { filter, ...layerStyleSpec } = styleWithFilter;
-    return { filter, layerStyleSpec: layerStyleSpec as LayerProps };
+    return { filter, layerStyleSpec: layerStyleSpec as any };
   };
 
   const getMapLayerFilter = (filter: unknown): FilterSpecification | undefined => {
@@ -239,7 +240,7 @@ const Layers = (props: LayersProps) => {
             (() => {
               if (layer.type === "feature") {
                 const { filter: layerFilter, layerStyleSpec } = splitLayerFilter(
-                  transformToMapboxLayerStyleSpec(layer) as LayerProps
+                  transformToMapboxLayerStyleSpec(layer) as any
                 );
                 const mapLayerFilter = getMapLayerFilter(layerFilter);
                 const { filter: strokeFilter, layerStyleSpec: strokeStyleSpec } = splitLayerFilter(
@@ -253,12 +254,12 @@ const Layers = (props: LayersProps) => {
                         layer.properties?.visibility &&
                         (layer.properties as FeatureLayerProperties)?.stroked,
                     },
-                  }) as LayerProps
+                  }) as any
                 );
                 const mapStrokeFilter = getMapLayerFilter(strokeFilter);
 
                 const { filter: labelFilter, layerStyleSpec: labelStyleSpec } = splitLayerFilter(
-                  getSymbolStyleSpec((layer.properties as FeatureLayerProperties)?.text_label, layer) as LayerProps
+                  getSymbolStyleSpec((layer.properties as FeatureLayerProperties)?.text_label, layer) as any
                 );
                 const mapLabelFilter = getMapLayerFilter(labelFilter);
 
@@ -340,7 +341,7 @@ const Layers = (props: LayersProps) => {
                         <MapLayer
                           id={`highlight-${layer.id}`}
                           source-layer="default"
-                          {...(getHightlightStyleSpec(props.highlightFeature) as LayerProps)}
+                          {...(getHightlightStyleSpec(props.highlightFeature) as any)}
                         />
                       )}
                   </Source>
@@ -396,7 +397,7 @@ const Layers = (props: LayersProps) => {
             props.selectedScenarioLayer?.id === layer.id ? (
               (() => {
                 const { filter: layerFilter, layerStyleSpec } = splitLayerFilter(
-                  transformToMapboxLayerStyleSpec(layer) as LayerProps
+                  transformToMapboxLayerStyleSpec(layer) as any
                 );
                 const mapLayerFilter = getMapLayerFilter(layerFilter);
                 return (
@@ -423,11 +424,11 @@ const Layers = (props: LayersProps) => {
         : null}
       {/* Pending features overlay — uses editing layer's original style */}
       {editLayerId && editingLayer && pendingGeoJSON.features.length > 0 && (() => {
-        const layerStyle = transformToMapboxLayerStyleSpec(editingLayer) as LayerProps & { paint?: Record<string, unknown> };
+        const layerStyle = transformToMapboxLayerStyleSpec(editingLayer) as any & { paint?: Record<string, unknown> };
         const geomType = editingLayer.feature_layer_geometry_type;
         const isCustomMarker = !!editingLayer.properties?.["custom_marker"];
         const symbolStyle = isCustomMarker
-          ? getSymbolStyleSpec(undefined, editingLayer) as LayerProps & { layout?: Record<string, unknown>; paint?: Record<string, unknown> }
+          ? getSymbolStyleSpec(undefined, editingLayer) as any & { layout?: Record<string, unknown>; paint?: Record<string, unknown> }
           : null;
 
         return (
