@@ -135,11 +135,9 @@ const AutocompleteLayerValue = (props: AutocompleteLayerValueProps) => {
         onFocus={props.onFocus}
         noOptionsText={t("no_values_found")}
         loadingText={t("loading")}
-        slotProps={{
-          listbox: {
-            sx: {
-              maxHeight: "350px",
-            },
+        ListboxProps={{
+          sx: {
+            maxHeight: "350px",
           },
         }}
         renderOption={(renderProps, option: OptionItem, { selected }) => (
