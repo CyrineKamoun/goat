@@ -517,7 +517,9 @@ class ProjectImportRunner(SimpleToolRunner):
                     )
 
                     # layer_project link
-                    old_group_id = link_data.get("group_id")
+                    old_group_id = link_data.get(
+                        "layer_project_group_id"
+                    ) or link_data.get("group_id")
                     group_serial = (
                         group_new_serial.get(str(old_group_id))
                         if old_group_id
@@ -658,7 +660,7 @@ class ProjectImportRunner(SimpleToolRunner):
                 archive_dir.mkdir()
                 with zipfile.ZipFile(zip_path, "r") as zf:
                     # Check for path traversal (Zip Slip) and size limits
-                    max_uncompressed = 500 * 1024 * 1024  # 500 MB
+                    max_uncompressed = 1 * 1024 * 1024 * 1024  # 1 GB
                     max_files = 10_000
                     total_size = 0
                     if len(zf.infolist()) > max_files:
@@ -733,6 +735,16 @@ class ProjectImportRunner(SimpleToolRunner):
                     old_layer_id = layer_meta["id"]
                     if not uuid_re.match(old_layer_id):
                         raise ValueError(f"Invalid layer ID in archive: {old_layer_id}")
+
+                    # Skip system layers (e.g. street_network)
+                    if layer_meta.get("feature_layer_type") == "street_network":
+                        logger.info(
+                            "Skipping system layer: %s (%s)",
+                            layer_meta.get("name"),
+                            old_layer_id,
+                        )
+                        continue
+
                     new_layer_id = id_map.get(old_layer_id, str(uuid4()))
                     is_external = layer_meta.get(
                         "data_type"

@@ -216,9 +216,21 @@ class ProjectExportRunner(SimpleToolRunner):
                         "folder_id": str(row["folder_id"]),
                     }
 
-            # Serialise layer_project_links keyed by layer_id
+            # Exclude system layers (e.g. street_network) from export
+            excluded_layer_ids: set[str] = set()
+            for lid, layer_data in list(layers_by_id.items()):
+                if layer_data.get("feature_layer_type") == "street_network":
+                    excluded_layer_ids.add(lid)
+                    del layers_by_id[lid]
+                    logger.info(
+                        "Excluding system layer from export: %s", layer_data.get("name")
+                    )
+
+            # Serialise layer_project_links keyed by layer_id (skip excluded layers)
             layer_project_links_dict: dict[str, dict[str, Any]] = {}
             for lp in lp_rows:
+                if str(lp["layer_id"]) in excluded_layer_ids:
+                    continue
                 layer_project_links_dict[str(lp["layer_id"])] = {
                     "id": lp["id"],
                     "layer_id": str(lp["layer_id"]),
