@@ -1,13 +1,19 @@
 import { Box, Grid, Skeleton } from "@mui/material";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "react-toastify";
 
+import { executeProcessAsync } from "@/lib/api/processes";
+import { copyProject } from "@/lib/api/projects";
+import { setRunningJobIds } from "@/lib/store/jobs/slice";
+import type { Layer } from "@/lib/validations/layer";
 import type { Project } from "@/lib/validations/project";
 
-import type { ContentActions } from "@/types/common";
+import { ContentActions } from "@/types/common";
 
 import { useContentMoreMenu } from "@/hooks/dashboard/ContentHooks";
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import EmptyCard from "@/components/dashboard/common/EmptyCard";
 import TileCard from "@/components/dashboard/common/TileCard";
@@ -20,6 +26,8 @@ interface ProjectSectionProps {
   hideCreate?: boolean;
 }
 
+const NON_DIALOG_ACTIONS = new Set([ContentActions.EXPORT, ContentActions.DUPLICATE]);
+
 const ProjectSection = (props: ProjectSectionProps) => {
   const router = useRouter();
   const { projects, isLoading } = props;
@@ -28,6 +36,45 @@ const ProjectSection = (props: ProjectSectionProps) => {
 
   const { t } = useTranslation("common");
   const [openProjectModal, setOpenProjectModal] = useState(false);
+  const dispatch = useAppDispatch();
+  const runningJobIds = useAppSelector((state) => state.jobs.runningJobIds);
+
+  const handleMoreMenuSelect = (menuItem: Parameters<typeof openMoreMenu>[0], contentItem: Project | Layer) => {
+    if (NON_DIALOG_ACTIONS.has(menuItem.id as ContentActions)) {
+      handleProjectAction(menuItem.id as ContentActions, contentItem as Project);
+      return;
+    }
+    openMoreMenu(menuItem, contentItem);
+  };
+
+  const handleProjectAction = useCallback(
+    async (action: ContentActions, project: Project) => {
+      if (action === ContentActions.DUPLICATE) {
+        try {
+          const newProject = await copyProject(project.id);
+          toast.success(t("project_duplicated"));
+          if (newProject?.id) {
+            router.push(`/map/${newProject.id}`);
+          }
+        } catch (_error) {
+          toast.error(t("error_duplicating_project"));
+        }
+      } else if (action === ContentActions.EXPORT) {
+        try {
+          const job = await executeProcessAsync("project_export", {
+            project_id: project.id,
+          });
+          if (job?.jobID) {
+            dispatch(setRunningJobIds([...runningJobIds, job.jobID]));
+          }
+          toast.info(t("project_export_submitted"));
+        } catch (_error) {
+          toast.error(t("error_exporting_project"));
+        }
+      }
+    },
+    [dispatch, runningJobIds, router, t]
+  );
   return (
     <Box>
       <ProjectModal type="create" open={openProjectModal} onClose={() => setOpenProjectModal(false)} />
@@ -68,7 +115,7 @@ const ProjectSection = (props: ProjectSectionProps) => {
                 cardType="grid"
                 item={item}
                 moreMenuOptions={getMoreMenuOptions("project", item)}
-                onMoreMenuSelect={openMoreMenu}
+                onMoreMenuSelect={handleMoreMenuSelect}
               />
             )}
           </Grid>

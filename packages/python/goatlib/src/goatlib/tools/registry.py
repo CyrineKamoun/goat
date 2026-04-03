@@ -519,6 +519,28 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         toolbox_hidden=True,
         worker_tag="tools",
     ),
+    ToolDefinition(
+        name="project_export",
+        display_name="Project Export",
+        description="Export a complete project as a portable ZIP archive",
+        module_path="goatlib.tools.project_export",
+        params_class_name="ProjectExportParams",
+        windmill_path="f/goat/tools/project_export",
+        category="data",
+        keywords=("export", "project", "archive", "zip", "backup"),
+        toolbox_hidden=True,
+    ),
+    ToolDefinition(
+        name="project_import",
+        display_name="Project Import",
+        description="Import a project from a ZIP archive exported by another GOAT instance",
+        module_path="goatlib.tools.project_import",
+        params_class_name="ProjectImportParams",
+        windmill_path="f/goat/tools/project_import",
+        category="data",
+        keywords=("import", "project", "archive", "zip", "restore"),
+        toolbox_hidden=True,
+    ),
 )
 
 

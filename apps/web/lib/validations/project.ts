@@ -53,6 +53,7 @@ export const builderPanelConfigSchema = z.object({
   appearance: z
     .object({
       opacity: z.number().min(0).max(1).optional().default(1),
+      backgroundColor: z.string().optional(),
       backgroundBlur: z.number().min(0).max(20).optional().default(0),
       shadow: z.number().min(0).max(10).optional().default(0),
     })
@@ -62,6 +63,7 @@ export const builderPanelConfigSchema = z.object({
     .object({
       alignItems: z.enum(["start", "center", "end"]).default("start"),
       spacing: z.number().min(0).max(15).optional().default(0),
+      padding: z.number().min(0).max(2).optional().default(0),
     })
     .optional()
     .default({ alignItems: "start" }),

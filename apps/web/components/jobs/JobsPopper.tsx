@@ -115,7 +115,7 @@ export default function JobsPopper() {
         jobs.jobs
           .filter(
             (job) =>
-              (job.processID === "layer_export" || job.processID === "print_report") &&
+              (job.processID === "layer_export" || job.processID === "print_report" || job.processID === "project_export") &&
               job.status === "successful"
           )
           .map((job) => job.jobID)
@@ -130,7 +130,7 @@ export default function JobsPopper() {
       // 3. Were NOT already successful on initial load
       // 4. Haven't been downloaded yet in this session
       if (
-        (job.processID === "layer_export" || job.processID === "print_report") &&
+        (job.processID === "layer_export" || job.processID === "print_report" || job.processID === "project_export") &&
         job.status === "successful" &&
         !initialSuccessfulJobsRef.current?.has(job.jobID) &&
         !downloadedJobsRef.current.has(job.jobID)
@@ -242,7 +242,7 @@ export default function JobsPopper() {
       return renderCancelButton(job);
     }
     // For completed jobs, show type-specific buttons
-    if (job.processID === "layer_export") {
+    if (job.processID === "layer_export" || job.processID === "project_export") {
       return renderExportDownloadButton(job);
     }
     if (job.processID === "print_report") {

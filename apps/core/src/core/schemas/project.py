@@ -33,6 +33,14 @@ class ProjectContentType(str, Enum):
     layer = "layer"
 
 
+class IProjectCopy(BaseModel):
+    """Request body for project copy."""
+
+    folder_id: UUID4 | None = Field(
+        None, description="Target folder. If None, same folder as original."
+    )
+
+
 class InitialViewState(BaseModel):
     latitude: float = Field(..., description="Latitude", ge=-90, le=90)
     longitude: float = Field(..., description="Longitude", ge=-180, le=180)

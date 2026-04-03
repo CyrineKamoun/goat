@@ -87,7 +87,7 @@ const WidgetWrapper: React.FC<WidgetWrapperProps> = ({
   onWidgetUpdate,
   panelWidgets,
 }) => {
-  const isFullHeight = widget.config?.type === "rich_text" || widget.config?.type === "text";
+  const isFullHeight = widget.config?.type === "rich_text" || widget.config?.type === "text" || widget.config?.type === "tabs" || widget.config?.type === "table";
   const widgetContent = (
     <Box sx={{ p: 1, height: isFullHeight ? "100%" : undefined }}>
       {widget.config?.type && informationTypes.options.includes(widget.config?.type as any) && (

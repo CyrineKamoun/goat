@@ -22,6 +22,7 @@ from core.crud.crud_layer_project_group import (
     layer_project_group as crud_layer_project_group,
 )
 from core.crud.crud_project import project as crud_project
+from core.crud.crud_project_copy import copy_project as copy_project_fn
 from core.crud.crud_scenario import scenario as crud_scenario
 from core.crud.crud_user_project import user_project as crud_user_project
 from core.db.models._link_model import (
@@ -44,6 +45,7 @@ from core.schemas.project import (
     ILayerProjectGroupUpdate,
     InitialViewState,
     IProjectBaseUpdate,
+    IProjectCopy,
     IProjectCreate,
     IProjectRead,
     IRasterProjectRead,
@@ -850,6 +852,33 @@ async def get_public_project(
     )
 
     return result
+
+
+@router.post(
+    "/{project_id}/copy",
+    response_model=IProjectRead,
+    response_model_exclude_none=True,
+    status_code=201,
+    summary="Copy project",
+    dependencies=[Depends(auth_z)],
+)
+async def copy_project(
+    project_id: UUID4 = Path(..., description="Source project ID"),
+    body: IProjectCopy = Body(default=None),
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+) -> IProjectRead:
+    """Create a shallow copy of a project."""
+    try:
+        new_project = await copy_project_fn(
+            async_session,
+            project_id=project_id,
+            user_id=user_id,
+            target_folder_id=body.folder_id if body else None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return IProjectRead.model_validate(new_project)
 
 
 @router.post(
