@@ -379,7 +379,14 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
           width: "100%",
           height: "100%",
           position: "relative",
-          cursor: isNavigationMode ? "grab" : "default",
+          cursor: isNavigationMode ? "grab" : "inherit",
+          "&:active": isNavigationMode ? { cursor: "grabbing" } : {},
+          // Override MapLibre's internal canvas cursor to stay consistent
+          ...(isNavigationMode && {
+            "& .maplibregl-canvas": {
+              cursor: "inherit !important",
+            },
+          }),
           outline: "none",
           pointerEvents: "auto",
           overflow: "hidden",

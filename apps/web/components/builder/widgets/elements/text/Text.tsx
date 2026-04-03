@@ -311,7 +311,7 @@ const TextElementWidgetEditable = ({
       ref={containerRef}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      sx={{ height: "100%", width: "100%", cursor: isEditMode ? "text" : "default" }}>
+      sx={{ height: "100%", width: "100%", cursor: isEditMode ? "text" : "inherit" }}>
       {/* Toolbar rendered via Portal to escape overflow:hidden */}
       {toolbarOpen && (
         <Portal>
