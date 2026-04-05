@@ -1890,5 +1890,18 @@
   "zoom_visibility": "Zoom Visibility",
   "out_of_zoom_behavior": "Out of zoom range",
   "out_of_zoom_hide": "Hide layers",
-  "out_of_zoom_dim": "Show greyed out"
+  "out_of_zoom_dim": "Show greyed out",
+  "hide_when_no_filter": "Hide when no filter",
+  "no_filter_text": "Fallback text",
+  "no_filter_text_placeholder": "e.g. Select a city to see details",
+  "no_filter_text_helper": "Shown when no filter is active",
+  "hidden_when_no_filter": "Hidden until a filter is applied",
+  "info_text": "Info text",
+  "enter_info_text": "Enter explanation text...",
+  "general": "General",
+  "font": "Font",
+  "variables": "Variables",
+  "variable": "variable",
+  "add_variable": "Add Variable",
+  "optional": "optional"
 }

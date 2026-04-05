@@ -1890,5 +1890,18 @@
   "zoom_visibility": "Zoom-Sichtbarkeit",
   "out_of_zoom_behavior": "Außerhalb des Zoombereichs",
   "out_of_zoom_hide": "Ebenen ausblenden",
-  "out_of_zoom_dim": "Ausgegraut anzeigen"
+  "out_of_zoom_dim": "Ausgegraut anzeigen",
+  "hide_when_no_filter": "Ausblenden ohne Filter",
+  "no_filter_text": "Fallback-Text",
+  "no_filter_text_placeholder": "z.B. Wählen Sie eine Stadt aus",
+  "no_filter_text_helper": "Wird angezeigt, wenn kein Filter aktiv ist",
+  "hidden_when_no_filter": "Ausgeblendet bis ein Filter gesetzt wird",
+  "info_text": "Infotext",
+  "enter_info_text": "Erklärungstext eingeben...",
+  "general": "Allgemein",
+  "font": "Schriftart",
+  "variables": "Variablen",
+  "variable": "Variable",
+  "add_variable": "Variable hinzufügen",
+  "optional": "optional"
 }
