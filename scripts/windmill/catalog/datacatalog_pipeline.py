@@ -18,7 +18,7 @@ import tempfile
 import uuid
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlunparse
 from xml.etree import ElementTree as ET
 
 import httpx
@@ -346,7 +346,7 @@ def _ai_evaluate_dataset(
     if not ai_url:
         return {
             "is_relevant": True,
-            "confidence": 1.0,
+            "exclusion_confidence": 0.0,
             "planning_theme": "other",
             "rationale": "ai_disabled",
             "suggested_data_category": None,
@@ -355,7 +355,7 @@ def _ai_evaluate_dataset(
     if _AI_RUNTIME_UNAVAILABLE_REASON:
         return {
             "is_relevant": True,
-            "confidence": 0.0,
+            "exclusion_confidence": 0.0,
             "planning_theme": "other",
             "rationale": f"ai_unavailable:{_AI_RUNTIME_UNAVAILABLE_REASON}",
             "suggested_data_category": None,
@@ -367,7 +367,7 @@ def _ai_evaluate_dataset(
 
     schema_hint = {
         "is_relevant": "boolean",
-        "confidence": "number 0..1",
+        "exclusion_confidence": "number 0..1 — probability this dataset should be EXCLUDED (0=definitely keep, 1=definitely exclude)",
         "planning_theme": "transport|housing|land_use|environment|utilities|demographics|facilities|economy|hazard|other",
         "rationale": "short string",
         "suggested_data_category": "basemap|imagery|boundary|people|transportation|environment|landuse|places|null",
@@ -384,11 +384,23 @@ def _ai_evaluate_dataset(
     }
 
     system_prompt = (
-        "You are a strict geodata classifier for urban planning relevance. "
-        "Return only JSON object. No markdown."
+        "You are a very strict geodata classifier for urban planning relevance. "
+        "Relevant datasets are those useful for urban planners: land use, zoning, "
+        "transport networks, buildings, population, environment, utilities, hazards, "
+        "administrative boundaries, or socioeconomic data at city/regional scale. "
+        "Exclude: satellite/aerial imagery catalogues, purely scientific/geological "
+        "datasets with no planning use, sensor raw data, and historic datasets "
+        "with no current planning relevance, older then 2012. "
+        " Spatially don't allow data for one  neighborhood, district or municiplaity  and try as maximum larger data"
+        "Set is_relevant=false for irrelevant datasets. "
+        "I don't want to have duplicates in data so you also need at the end to check all teh relevant data and only keep most recent or if similar data but slightly differnet format keep the more complete"
+        "For exclusion_confidence: 1.0 = certainly should be excluded, "
+        "0.0 = certainly should be kept, 0.5 = uncertain. "
+        "This is the probability of exclusion"
+        "Return only a JSON object. No markdown, no explanation outside the JSON."
     )
     user_payload = {
-        "task": "Keep only datasets relevant for urban planning and suggest style.",
+        "task": "Classify urban planning relevance and suggest visualization style.",
         "output_schema": schema_hint,
         "dataset": {
             "title": metadata.get("title"),
@@ -397,8 +409,11 @@ def _ai_evaluate_dataset(
             "topic_category": metadata.get("topic_category") or [],
             "resource_format": resource.get("format"),
             "resource_name": resource.get("name"),
+            "resource_url": resource.get("url"),
             "package_title": package.get("title"),
             "package_notes": package.get("notes"),
+            "organization": (package.get("organization") or {}).get("title"),
+            "data_provider": metadata.get("contact_organisation") or metadata.get("contact_name"),
         },
     }
 
@@ -439,7 +454,14 @@ def _ai_evaluate_dataset(
 
         parsed = json.loads(content)
         is_relevant = bool(parsed.get("is_relevant", True))
-        confidence = _clamp_float(parsed.get("confidence", 0.5), 0.5, 0.0, 1.0)
+        # exclusion_confidence: probability this dataset should be excluded.
+        # 1.0 = certainly exclude, 0.0 = certainly keep, 0.5 = uncertain.
+        exclusion_confidence = _clamp_float(
+            parsed.get("exclusion_confidence", 0.0 if is_relevant else 1.0),
+            0.0 if is_relevant else 1.0,
+            0.0,
+            1.0,
+        )
         planning_theme = str(parsed.get("planning_theme") or "other").strip().lower()
         rationale = str(parsed.get("rationale") or "")
         suggested_data_category = _normalize_data_category(parsed.get("suggested_data_category"))
@@ -447,7 +469,7 @@ def _ai_evaluate_dataset(
 
         return {
             "is_relevant": is_relevant,
-            "confidence": confidence,
+            "exclusion_confidence": exclusion_confidence,
             "planning_theme": planning_theme,
             "rationale": rationale,
             "suggested_data_category": suggested_data_category,
@@ -465,7 +487,7 @@ def _ai_evaluate_dataset(
         )
         return {
             "is_relevant": True,
-            "confidence": 0.0,
+            "exclusion_confidence": 0.0,
             "planning_theme": "other",
             "rationale": f"ai_error:{exc}",
             "suggested_data_category": None,
@@ -479,7 +501,7 @@ def _ai_evaluate_dataset(
         )
         return {
             "is_relevant": True,
-            "confidence": 0.0,
+            "exclusion_confidence": 0.0,
             "planning_theme": "other",
             "rationale": f"ai_error:{exc}",
             "suggested_data_category": None,
@@ -490,7 +512,7 @@ def _ai_evaluate_dataset(
         log.warning("AI evaluation failed; using fallback classification: %s", exc)
         return {
             "is_relevant": True,
-            "confidence": 0.0,
+            "exclusion_confidence": 0.0,
             "planning_theme": "other",
             "rationale": f"ai_error:{exc}",
             "suggested_data_category": None,
@@ -616,6 +638,8 @@ def _fetch_latest_harvest_xml(package_id: str) -> str | None:
     return None
 
 
+
+
 def _fetch_harvest_xml_batch(package_ids: list[str]) -> dict[str, str]:
     """Fetch latest XML metadata for many packages in two queries (one connection).
 
@@ -687,7 +711,6 @@ def _fetch_harvest_xml_batch(package_ids: list[str]) -> dict[str, str]:
         )
 
     return result
-
 
 def _ckan_headers(api_key: str | None) -> dict[str, str]:
     headers = {"Accept": "application/json"}
@@ -1559,27 +1582,6 @@ def _resource_signature(
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-def _latest_signature(
-    conn: psycopg.Connection,
-    resource_id: str,
-    schema: str,
-) -> str | None:
-    s = _validate_schema(schema)
-    with conn.cursor() as cur:
-        cur.execute(
-            f"""
-            SELECT signature
-            FROM {s}.processor_dataset_version
-            WHERE resource_id = %s AND status = 'success'
-            ORDER BY version_num DESC
-            LIMIT 1
-            """,
-            (resource_id,),
-        )
-        row = cur.fetchone()
-    return str(row[0]) if row else None
-
-
 def _existing_signature(
     conn: psycopg.Connection,
     resource_id: str,
@@ -2041,8 +2043,9 @@ def load_into_ducklake(
         if "GEOMETRY" in col_type.upper():
             geom_col = col_name
             select_parts.append(f'"{col_name}"')
-        elif "VARCHAR" in col_type.upper():
+        elif col_type.upper() == "VARCHAR":
             # Replace literal string 'NULL' with actual NULL (common in WFS data).
+            # Only for plain VARCHAR, not VARCHAR[] arrays.
             select_parts.append(f'NULLIF("{col_name}", \'NULL\') AS "{col_name}"')
         else:
             select_parts.append(f'"{col_name}"')
@@ -2101,12 +2104,18 @@ def _download_resource(url: str) -> str:
     with httpx.Client(timeout=120, follow_redirects=True) as client:
         with client.stream("GET", url) as resp:
             resp.raise_for_status()
-            # If URL has no useful extension, infer from content type.
+            # If URL has no useful extension, infer from content type or
+            # URL query params (WFS servers sometimes return a generic
+            # content-type like application/octet-stream even when the
+            # actual payload is GeoJSON because outputFormat=application/json).
             if suffix == ".bin":
                 ctype = str(resp.headers.get("content-type") or "").lower()
-                if "json" in ctype:
+                # Also check the requested outputFormat in the URL query string.
+                qs = parse_qs(parsed.query)
+                output_format = (qs.get("outputFormat") or qs.get("outputformat") or [""])[0].lower()
+                if "json" in ctype or "json" in output_format:
                     new_suffix = ".geojson"
-                elif "xml" in ctype or "gml" in ctype:
+                elif "xml" in ctype or "gml" in ctype or "xml" in output_format or "gml" in output_format:
                     new_suffix = ".xml"
                 elif "zip" in ctype:
                     new_suffix = ".zip"
@@ -2132,7 +2141,24 @@ def _build_wfs_getfeature_targets(url: str) -> list[tuple[str, str | None]]:
     """
     parsed = urlparse(url)
     params = {k.lower(): v for k, v in parse_qsl(parsed.query, keep_blank_values=True)}
+
+    # Bare WFS base URL (no query params at all, or no service=WFS param):
+    # probe it as GetCapabilities before giving up.
     if params.get("service", "").lower() != "wfs":
+        if not params:
+            # No query string at all — try appending GetCapabilities.
+            caps_url = urlunparse(
+                (parsed.scheme, parsed.netloc, parsed.path, "",
+                 urlencode({"service": "WFS", "request": "GetCapabilities"}), "")
+            )
+            try:
+                with httpx.Client(timeout=30, follow_redirects=True) as client:
+                    r = client.get(caps_url)
+                if r.status_code == 200 and b"WFS_Capabilities" in r.content:
+                    # It IS a WFS — recurse with proper GetCapabilities URL.
+                    return _build_wfs_getfeature_targets(caps_url)
+            except Exception:
+                pass
         return [(url, None)]
 
     request = params.get("request", "").lower()
@@ -2356,13 +2382,6 @@ def main() -> dict[str, Any]:
             log.info("resource_id=%s resolved targets=%d", resource_id, len(wfs_targets))
 
             base_metadata = build_ckan_metadata(package, resource, package_xml_metadata)
-            ai_decision = _ai_evaluate_dataset(
-                metadata=base_metadata,
-                package=package,
-                resource=resource,
-                log=log,
-            )
-            base_metadata["ai"] = ai_decision
 
             ai_filter_threshold = _clamp_float(
                 _env("CATALOG_AI_FILTER_MIN_CONFIDENCE", "0.75"),
@@ -2377,8 +2396,53 @@ def main() -> dict[str, Any]:
                 1.0,
             )
 
+            # Prefer the decision already stored in ai_relevance_queue by the
+            # AI relevance step (step 1) so we don't call the LLM twice.
+            # Fall back to calling the AI directly only when running standalone
+            # (no ai_relevance_run_id provided or no queue entry found).
+            ai_relevance_run_id = _env("CATALOG_AI_RELEVANCE_RUN_ID", "")
+            ai_decision: dict[str, Any] | None = None
+            if ai_relevance_run_id:
+                s = _validate_schema(catalog_schema)
+                with pg_conn.cursor(row_factory=psycopg.rows.dict_row) as _cur:
+                    _cur.execute(
+                        f"""
+                        SELECT selected, confidence, rationale, planning_theme, decision_jsonb
+                        FROM {s}.ai_relevance_queue
+                        WHERE run_id = %s AND resource_id = %s
+                        LIMIT 1
+                        """,
+                        (ai_relevance_run_id, resource_id),
+                    )
+                    row = _cur.fetchone()
+                if row:
+                    ai_decision = dict(row.get("decision_jsonb") or {})
+                    ai_decision["is_relevant"] = bool(row["selected"])
+                    ai_decision["exclusion_confidence"] = float(row["confidence"])
+                    ai_decision["rationale"] = row.get("rationale") or ""
+                    ai_decision["planning_theme"] = row.get("planning_theme") or "other"
+                    log.debug(
+                        "resource_id=%s using cached AI decision from relevance queue (run=%s)",
+                        resource_id,
+                        ai_relevance_run_id,
+                    )
+
+            if ai_decision is None:
+                ai_decision = _ai_evaluate_dataset(
+                    metadata=base_metadata,
+                    package=package,
+                    resource=resource,
+                    log=log,
+                )
+
+            base_metadata["ai"] = ai_decision
             is_relevant = bool(ai_decision.get("is_relevant", True))
-            confidence = _clamp_float(ai_decision.get("confidence", 1.0), 1.0, 0.0, 1.0)
+            exclusion_confidence = _clamp_float(
+                ai_decision.get("exclusion_confidence", 0.0 if is_relevant else 1.0),
+                0.0 if is_relevant else 1.0,
+                0.0,
+                1.0,
+            )
 
             raw_xml_metadata = package_xml_metadata
             xml_metadata = _build_customer_xml_metadata(raw_xml_metadata, base_metadata)
@@ -2409,12 +2473,12 @@ def main() -> dict[str, Any]:
                     else resource_display_name
                 )
 
-                if not is_relevant and confidence >= ai_filter_threshold:
+                if exclusion_confidence >= ai_filter_threshold:
                     skipped += 1
                     log.info(
-                        "resource_id=%s skipped by AI relevance filter (confidence=%.2f)",
+                        "resource_id=%s skipped by AI exclusion filter (exclusion_confidence=%.2f)",
                         effective_resource_id,
-                        confidence,
+                        exclusion_confidence,
                     )
                     insert_resource_run_history(
                         pg_conn,
@@ -2433,7 +2497,7 @@ def main() -> dict[str, Any]:
                     )
                     continue
 
-                if not is_relevant and confidence >= ai_review_threshold:
+                if exclusion_confidence >= ai_review_threshold:
                     base_metadata["ai_review_required"] = True
                     base_metadata["ai_review_reason"] = ai_decision.get("rationale")
 
@@ -2626,6 +2690,32 @@ def main() -> dict[str, Any]:
                             processed_at=datetime.now(timezone.utc),
                         )
                         continue
+
+                    min_rows = int(_env("CATALOG_MIN_ROW_COUNT", "3"))
+                    if row_count < min_rows:
+                        skipped += 1
+                        log.warning(
+                            "resource_id=%s skipped: only %d rows (min=%d)",
+                            effective_resource_id,
+                            row_count,
+                            min_rows,
+                        )
+                        _get_duckdb_con().execute(
+                            f"DROP TABLE IF EXISTS lake.{_validate_schema(target_table_schema)}.{target_table_name}"
+                        )
+                        insert_resource_run_history(
+                            pg_conn,
+                            schema=catalog_schema,
+                            run_id=run_id,
+                            package_id=package_id,
+                            resource_id=effective_resource_id,
+                            status="skipped",
+                            version_num=None,
+                            row_count=row_count,
+                            error=f"too few rows: {row_count} < {min_rows}",
+                            processed_at=datetime.now(timezone.utc),
+                        )
+                        continue
                     log.info(
                         "resource_id=%s loaded table=%s rows=%d",
                         effective_resource_id,
@@ -2633,27 +2723,31 @@ def main() -> dict[str, Any]:
                         row_count,
                     )
 
-                    try:
-                        pmtiles_path = generate_pmtiles_for_table(
-                            table_schema=target_table_schema,
-                            table_name=target_table_name,
-                            user_id=str(catalog_owner_user_id),
-                            layer_id=str(customer_layer_id),
-                            geometry_column=geometry_column or "geometry",
-                        )
-                        if pmtiles_path:
-                            log.info(
-                                "resource_id=%s pmtiles generated at %s",
-                                effective_resource_id,
-                                pmtiles_path,
+                    # PMTiles generation disabled for catalog pipeline.
+                    # Catalog layers are previewed occasionally; DuckLake on-demand
+                    # tile serving is sufficient. Re-enable via CATALOG_PMTILES=true
+                    # if tile performance becomes a bottleneck.
+                    if _env("CATALOG_PMTILES", "false").lower() == "true":
+                        try:
+                            pmtiles_path = generate_pmtiles_for_table(
+                                table_schema=target_table_schema,
+                                table_name=target_table_name,
+                                user_id=str(catalog_owner_user_id),
+                                layer_id=str(customer_layer_id),
+                                geometry_column=geometry_column or "geometry",
                             )
-                    except Exception as pmtiles_exc:
-                        # PMTiles are an optimization; failures should not block ingestion.
-                        log.warning(
-                            "resource_id=%s PMTiles generation failed (non-fatal): %s",
-                            effective_resource_id,
-                            pmtiles_exc,
-                        )
+                            if pmtiles_path:
+                                log.info(
+                                    "resource_id=%s pmtiles generated at %s",
+                                    effective_resource_id,
+                                    pmtiles_path,
+                                )
+                        except Exception as pmtiles_exc:
+                            log.warning(
+                                "resource_id=%s PMTiles generation failed (non-fatal): %s",
+                                effective_resource_id,
+                                pmtiles_exc,
+                            )
 
                     with pg_conn.cursor() as cur:
                         cur.execute(

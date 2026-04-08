@@ -56,9 +56,17 @@ dp = _load_pipeline_module()
 
 
 def main(
+    run_id: str | None = None,
     selected_resource_ids: list[str] | None = None,
     selected_package_ids: list[str] | None = None,
 ) -> dict[str, Any]:
+    # Pass the AI relevance run_id so the pipeline can look up cached decisions
+    # from ai_relevance_queue instead of calling the LLM again.
+    if run_id:
+        os.environ["CATALOG_AI_RELEVANCE_RUN_ID"] = run_id
+    else:
+        os.environ.pop("CATALOG_AI_RELEVANCE_RUN_ID", None)
+
     if selected_resource_ids:
         os.environ["CATALOG_SELECTED_RESOURCE_IDS"] = ",".join(selected_resource_ids)
     else:

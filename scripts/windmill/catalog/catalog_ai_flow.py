@@ -106,6 +106,7 @@ def main() -> dict[str, Any]:
         step2 = _run_windmill_task(
             "f/goat/tasks/catalog_download_ingest",
             {
+                "run_id": step1.get("run_id"),
                 "selected_resource_ids": selected_resource_ids,
                 "selected_package_ids": selected_package_ids,
             },

@@ -18,7 +18,7 @@ services:
         condition: service_healthy
       solr:
         condition: service_healthy
-      redis:
+      ckan-redis:
         condition: service_healthy
     ports:
       - "5050:5000"
@@ -62,7 +62,7 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
+  ckan-redis:
     container_name: goat-ckan-redis
     image: redis:7-alpine
     volumes:

@@ -976,6 +976,7 @@
     },
     "title": "Metadata",
     "type": {
+      "dataset": "Dataset",
       "feature": "Feature",
       "raster": "Raster",
       "table": "Table"

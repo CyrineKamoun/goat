@@ -986,6 +986,7 @@
     },
     "title": "Metadaten",
     "type": {
+      "dataset": "Datensatz",
       "feature": "Feature",
       "raster": "Raster",
       "table": "Table"

@@ -75,6 +75,8 @@ const CatalogDatasetCard = ({
     : null;
 
   const multipleFiles = dataset.layers.length > 1;
+  // Override displayed type for grouped datasets (multiple layers).
+  const displayType = multipleFiles ? "dataset" : dataset.type;
   const [selectedLayerId, setSelectedLayerId] = useState<string>(dataset.layers[0]?.id ?? "");
   const selectedLayer = dataset.layers.find((l) => l.id === selectedLayerId) ?? dataset.layers[0];
 
@@ -207,7 +209,7 @@ const CatalogDatasetCard = ({
                         htmlColor={theme.palette.text.secondary}
                       />
                       <Typography variant="body2" fontWeight="bold">
-                        {getMetadataValueTranslation(key, dataset[key])}
+                        {getMetadataValueTranslation(key, key === "type" ? displayType : dataset[key])}
                       </Typography>
                     </Stack>
                   </Grid>

@@ -68,13 +68,14 @@ def _ensure_queue_table(conn: psycopg.Connection, schema: str) -> None:
     with conn.cursor() as cur:
         cur.execute(
             f"""
+            DROP  TABLE if exists {s}.ai_relevance_queue;
             CREATE TABLE IF NOT EXISTS {s}.ai_relevance_queue (
                 id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
                 run_id           TEXT NOT NULL,
                 package_id       TEXT NOT NULL,
                 resource_id      TEXT NOT NULL,
                 selected         BOOLEAN NOT NULL,
-                confidence       DOUBLE PRECISION NOT NULL,
+                exclusion_confidence       DOUBLE PRECISION NOT NULL,
                 rationale        TEXT,
                 planning_theme   TEXT,
                 decision_jsonb   JSONB,
@@ -160,10 +161,16 @@ def main() -> dict[str, Any]:
             log.info("ai_evaluate resource_id=%s: %.1fs rationale=%s", resource_id, time.monotonic() - t_ai, decision.get("rationale"))
 
             is_relevant = bool(decision.get("is_relevant", True))
-            confidence = dp._clamp_float(decision.get("confidence", 1.0), 1.0, 0.0, 1.0)
-            selected = bool(is_relevant) or confidence < keep_threshold
+            exclusion_confidence = dp._clamp_float(
+                decision.get("exclusion_confidence", 0.0 if is_relevant else 1.0),
+                0.0 if is_relevant else 1.0,
+                0.0,
+                1.0,
+            )
+            # Keep if exclusion_confidence is below the filter threshold.
+            selected = exclusion_confidence < keep_threshold
             # In review band we keep for now; downstream can inspect queue metadata.
-            if not is_relevant and confidence >= review_threshold:
+            if not selected and exclusion_confidence < review_threshold:
                 selected = True
 
             if selected:
@@ -174,12 +181,12 @@ def main() -> dict[str, Any]:
                 cur.execute(
                     f"""
                     INSERT INTO {dp._validate_schema(schema)}.ai_relevance_queue (
-                        run_id, package_id, resource_id, selected, confidence,
+                        run_id, package_id, resource_id, selected, exclusion_confidence,
                         rationale, planning_theme, decision_jsonb, created_at
                     ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     ON CONFLICT (run_id, package_id, resource_id) DO UPDATE SET
                         selected = EXCLUDED.selected,
-                        confidence = EXCLUDED.confidence,
+                        exclusion_confidence = EXCLUDED.exclusion_confidence,
                         rationale = EXCLUDED.rationale,
                         planning_theme = EXCLUDED.planning_theme,
                         decision_jsonb = EXCLUDED.decision_jsonb,
@@ -190,7 +197,7 @@ def main() -> dict[str, Any]:
                         package_id,
                         resource_id,
                         selected,
-                        confidence,
+                        exclusion_confidence,
                         str(decision.get("rationale") or ""),
                         str(decision.get("planning_theme") or "other"),
                         dp.Jsonb(decision),
