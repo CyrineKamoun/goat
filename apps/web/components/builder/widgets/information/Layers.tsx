@@ -37,12 +37,6 @@ export const LayerInformationWidget = ({
   const dispatch = useAppDispatch();
   const { projectId } = useParams() as { projectId: string };
   const { mutate: mutateProjectLayers } = useFilteredProjectLayers(projectId);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const outOfZoomBehaviorRaw = ((configProp.options as Record<string, any>)?.out_of_zoom_behavior) ?? "hide";
-  // Only subscribe to currentZoom when we need it for filtering (hide mode)
-  const currentZoom = useAppSelector((state) =>
-    viewOnly && outOfZoomBehaviorRaw === "hide" ? state.map.currentZoom : undefined
-  );
   const [searchText, setSearchText] = useState("");
 
   // In edit mode, read the latest config from Redux for instant updates — but ONLY for THIS widget
@@ -69,8 +63,12 @@ export const LayerInformationWidget = ({
   const excludedLayers: number[] = opts?.excluded_layers ?? [];
   const legendHiddenLayers: number[] = opts?.legend_hidden_layers ?? [];
   const downloadableLayers: number[] = opts?.downloadable_layers ?? [];
-
   const outOfZoomBehavior = opts?.out_of_zoom_behavior ?? "hide";
+
+  // Subscribe to currentZoom when we need it for zoom-based behavior (hide or dim)
+  const currentZoom = useAppSelector((state) =>
+    outOfZoomBehavior !== undefined ? state.map.currentZoom : undefined
+  );
 
   const filteredLayers = useMemo(() => {
     const layersToUse = viewOnly ? reduxProjectLayers : editProjectLayers || [];
@@ -81,11 +79,11 @@ export const LayerInformationWidget = ({
       // Hidden from legend by "Show in legend" toggle
       if (legendHiddenLayers.includes(layer.id)) return false;
       // Hide layers outside zoom range (only when behavior is "hide")
-      if (viewOnly && outOfZoomBehavior === "hide" && currentZoom !== undefined) {
+      if (outOfZoomBehavior === "hide" && currentZoom !== undefined) {
         const minZoom = layer.properties?.min_zoom;
         const maxZoom = layer.properties?.max_zoom;
         if (minZoom !== undefined && maxZoom !== undefined) {
-          return currentZoom >= minZoom && currentZoom <= maxZoom;
+          if (currentZoom < minZoom || currentZoom > maxZoom) return false;
         }
       }
       if (searchText) {
@@ -236,6 +234,7 @@ export const LayerInformationWidget = ({
           downloadableLayers={downloadableLayers}
           hideLegendHeading={!!opts?.hide_legend_heading}
           groupIcons={opts as Record<string, { url: string; source?: string }> | undefined}
+          dimOutOfZoom={outOfZoomBehavior === "dim"}
         />
       ) : (
         <ProjectLayerTree
@@ -257,6 +256,7 @@ export const LayerInformationWidget = ({
           downloadableLayers={downloadableLayers}
           hideLegendHeading={!!opts?.hide_legend_heading}
           groupIcons={opts as Record<string, { url: string; source?: string }> | undefined}
+          dimOutOfZoom={outOfZoomBehavior === "dim"}
         />
       )}
     </Box>

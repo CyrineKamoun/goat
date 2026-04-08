@@ -32,7 +32,8 @@ export const loadImage = (
       | HTMLImageElement
       | { width: number; height: number; data: Uint8Array | Uint8ClampedArray }
       | ImageData
-      | ImageBitmap
+      | ImageBitmap,
+    pixelRatio?: number
   ) => {
     // Check if map exists and is ready (style loaded)
     if (!map) return;
@@ -42,7 +43,7 @@ export const loadImage = (
       if (map.hasImage(marker_name)) {
         map.removeImage(marker_name);
       }
-      map.addImage(marker_name, image, { sdf: sdf ?? true });
+      map.addImage(marker_name, image, { sdf: sdf ?? true, pixelRatio: pixelRatio ?? 1 });
     } catch (error) {
       // Map may have been unmounted or style not loaded yet - ignore silently
       console.debug(`Failed to add/update map image "${marker_name}":`, error);
@@ -63,11 +64,14 @@ export const loadImage = (
       context.drawImage(img, 0, 0, targetW, targetH);
 
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-      addOrUpdateImage({
-        width: canvas.width,
-        height: canvas.height,
-        data: new Uint8Array(imageData.data.buffer),
-      });
+      addOrUpdateImage(
+        {
+          width: canvas.width,
+          height: canvas.height,
+          data: new Uint8Array(imageData.data.buffer),
+        },
+        pixelRatio
+      );
     }
   };
 

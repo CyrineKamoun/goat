@@ -49,7 +49,7 @@ const AutocompleteLayerValue = (props: AutocompleteLayerValueProps) => {
   const { data, isLoading, searchText, setSearchText, debouncedSetSearchText } =
     useDatasetValueSelectorMethods({
       selectedValues: props.multiple
-        ? (props.selectedValues as string[])
+        ? (Array.isArray(props.selectedValues) ? props.selectedValues : props.selectedValues ? [props.selectedValues as string] : [])
         : [props.selectedValues as string],
       onSelectedValuesChange: props.onSelectedValuesChange,
       fieldName: props.fieldName,
@@ -59,7 +59,7 @@ const AutocompleteLayerValue = (props: AutocompleteLayerValueProps) => {
 
   // Build the options list: selected values first, then the rest
   const selectedValuesArray: string[] = props.multiple
-    ? ((props.selectedValues as string[]) || []).filter((v) => v != null)
+    ? (Array.isArray(props.selectedValues) ? props.selectedValues : props.selectedValues ? [props.selectedValues as string] : []).filter((v) => v != null)
     : props.selectedValues
       ? [props.selectedValues as string]
       : [];

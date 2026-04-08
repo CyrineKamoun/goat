@@ -323,27 +323,6 @@ export const WidgetFilterLayout = ({
                     });
                   }}
                 />
-                <Stack>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        size="small"
-                        color="primary"
-                        checked={!!config.setup?.multiple}
-                        onChange={(e) => {
-                          onChange({
-                            ...config,
-                            setup: {
-                              ...config.setup,
-                              multiple: e.target.checked,
-                            },
-                          });
-                        }}
-                      />
-                    }
-                    label={<Typography variant="body2">{t("allow_multiple_selection")}</Typography>}
-                  />
-                </Stack>
               </>
             )}
             {/* Chips specific settings */}
@@ -546,6 +525,68 @@ export const WidgetFilterLayout = ({
                 </Stack>
               </>
             )}
+            {/* Common filter behavior settings */}
+            <Stack>
+              {selectedLayout?.value === filterLayoutTypes.Values.select && (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      color="primary"
+                      checked={!!config.setup?.multiple}
+                      onChange={(e) => {
+                        onChange({
+                          ...config,
+                          setup: {
+                            ...config.setup,
+                            multiple: e.target.checked,
+                          },
+                        });
+                      }}
+                    />
+                  }
+                  label={<Typography variant="body2">{t("allow_multiple_selection")}</Typography>}
+                />
+              )}
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    color="primary"
+                    checked={config.options?.zoom_to_selection !== false}
+                    onChange={(e) => {
+                      onChange({
+                        ...config,
+                        options: {
+                          ...config.options,
+                          zoom_to_selection: e.target.checked,
+                        },
+                      });
+                    }}
+                  />
+                }
+                label={<Typography variant="body2">{t("zoom_to_selection")}</Typography>}
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    color="primary"
+                    checked={!!config.options?.filter_by_map_click}
+                    onChange={(e) => {
+                      onChange({
+                        ...config,
+                        options: {
+                          ...config.options,
+                          filter_by_map_click: e.target.checked,
+                        },
+                      });
+                    }}
+                  />
+                }
+                label={<Typography variant="body2">{t("filter_by_map_click")}</Typography>}
+              />
+            </Stack>
           </>
         }
       />

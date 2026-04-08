@@ -21,7 +21,14 @@ export function fitBounds(
   maxZoom = 18,
   duration = 1000
 ) {
-  map.fitBounds(bounds, {
+  // Clamp to valid WGS84 range to prevent MapLibre "Invalid LngLat" errors
+  const clampedBounds: [number, number, number, number] = [
+    Math.max(-180, Math.min(180, bounds[0])),
+    Math.max(-90, Math.min(90, bounds[1])),
+    Math.max(-180, Math.min(180, bounds[2])),
+    Math.max(-90, Math.min(90, bounds[3])),
+  ];
+  map.fitBounds(clampedBounds, {
     padding: padding,
     maxZoom: maxZoom,
     duration: duration,
