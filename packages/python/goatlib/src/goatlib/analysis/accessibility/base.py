@@ -6,6 +6,7 @@ from typing import Self
 
 from goatlib.analysis.core.base import AnalysisTool
 from goatlib.analysis.schemas.base import PTTimeWindow
+from goatlib.io.utils import Metadata
 from goatlib.io.parquet import write_optimized_parquet
 
 logger = logging.getLogger(__name__)
@@ -355,6 +356,54 @@ class HeatmapToolBase(AnalysisTool):
             f"SELECT DISTINCT {column_name} FROM {table} WHERE {column_name} IS NOT NULL"
         ).fetchall()
         return [row[0] for row in result] if result else []
+
+    def _process_table_to_h3(
+        self: Self,
+        input_table: str,
+        meta: Metadata,
+        h3_resolution: int,
+        output_table: str,
+        h3_column: str = "dest_id",
+    ) -> str:
+        """Convert Polygon/MultiPolygon geometries to H3 cells (experimental)."""
+        geom_type = (meta.geometry_type or "").lower()
+        geom_col = meta.geometry_column or "geom"
+
+        if "polygon" not in geom_type:
+            raise ValueError(
+                f"Unsupported geometry type '{geom_type}'. Only Polygon/MultiPolygon supported."
+            )
+        if not hasattr(meta, "crs") or meta.crs is None:
+            raise ValueError("No CRS information found in input data.")
+
+        transform_to_4326 = geom_col
+        if meta.crs.to_epsg() != 4326:
+            source_crs = meta.crs.to_string()
+            logger.info(f"Transforming geometry from {source_crs} to EPSG:4326")
+            transform_to_4326 = f"ST_Transform({geom_col}, '{source_crs}', 'EPSG:4326')"
+
+        query = f"""
+            CREATE OR REPLACE TEMP TABLE {output_table} AS
+            WITH features AS (
+                SELECT {transform_to_4326} AS geom
+                FROM {input_table}
+                WHERE {geom_col} IS NOT NULL
+            ),
+            polygons AS (
+                SELECT (UNNEST(ST_Dump(ST_Force2D(geom)))).geom AS simple_geom
+                FROM features
+            ),
+            h3_cells_raw AS (
+                SELECT
+                    UNNEST(h3_polygon_wkt_to_cells_experimental(ST_AsText(simple_geom), {h3_resolution}, 'CONTAINMENT_OVERLAPPING')) AS {h3_column}
+                FROM polygons
+            )
+            SELECT DISTINCT {h3_column} FROM h3_cells_raw
+        """
+        self.con.execute(query)
+        count = self.con.execute(f"SELECT COUNT(*) FROM {output_table}").fetchone()[0]
+        logger.info("Converted %d polygons to H3 cells: %s", count, output_table)
+        return output_table
 
 
     def _export_h3_results(

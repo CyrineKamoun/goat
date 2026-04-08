@@ -371,6 +371,19 @@ class HeatmapGravityParams(HeatmapCommon):
         ),
     )
 
+    reference_area_path: str | None = Field(
+        None,
+        description="Path to reference area polygon dataset",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=4,
+            label_key="reference_area_path",
+            widget="layer-selector",
+            widget_options={"geometry_types": ["Polygon", "MultiPolygon"]},
+            advanced=True,
+        ),
+        )
+
 
 class OpportunityClosestAverage(OpportunityBase):
     """Opportunity dataset parameters for closest-average heatmaps."""
@@ -397,6 +410,21 @@ class HeatmapClosestAverageParams(HeatmapCommon):
             min_items=1,
         ),
     )
+
+    reference_area_path: str | None = Field(
+        None,
+        description="Path to reference area polygon dataset",
+        json_schema_extra=ui_field(
+            section="opportunities",
+            field_order=4,
+            label_key="reference_area_path",
+            widget="layer-selector",
+            widget_options={"geometry_types": ["Polygon", "MultiPolygon"]},
+            advanced=True,
+        ),
+    )
+
+
 
 
 class HeatmapConnectivityParams(HeatmapCommon):
@@ -595,6 +623,19 @@ class Heatmap2SFCAParams(HeatmapCommon):
             min_items=1,
         ),
     )
+
+    reference_area_path: str = Field(
+        None,
+        description="Path to reference area polygon dataset",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=4,
+            label_key="reference_area_path",
+            widget="layer-selector",
+            widget_options={"geometry_types": ["Polygon", "MultiPolygon"]},
+            advanced=True,
+        ),
+        )
 
 
 class HuffmodelParams(HeatmapCommon):

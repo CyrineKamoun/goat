@@ -81,6 +81,16 @@ class Heatmap2SFCATool(HeatmapToolBase):
             params.two_sfca_type,
             params.impedance,
         )
+
+        if params.reference_area_path:
+            meta, reference_table = self.import_input(
+                params.reference_area_path, table_name="reference_area"
+            )
+            reference_table_h3 = self._process_table_to_h3(
+                reference_table, meta, h3_resolution, "reference_area_h3", "dest_id"
+            )
+            result_table = self._project_to_reference_area(result_table, reference_table_h3)
+
         logger.info("2SFCA result table created: %s", result_table)
 
         # Export results
@@ -629,3 +639,54 @@ class Heatmap2SFCATool(HeatmapToolBase):
         logger.info("Final 2SFCA result schema: %s", [col[0] for col in schema])
 
         return result_table
+    
+
+
+    def _project_to_reference_area(
+        self: Self,
+        result_table: str,
+        reference_table_h3: str,
+    ) -> str:
+        """Extend result to all H3 cells in the reference area.
+
+        Cells in the reference area that were not reached get NULL values.
+        The output is clipped to the reference area (cells outside are dropped).
+        If there is no overlap between the result and the reference area,
+        the original result_table is returned unchanged.
+        """
+        projected_table = "result_projected_to_reference"
+
+        overlap_count = self.con.execute(f"""
+            SELECT COUNT(*) FROM {result_table} r
+            JOIN {reference_table_h3} ref ON r.h3_index = ref.dest_id
+        """).fetchone()[0]
+
+        if overlap_count == 0:
+            logger.info(
+                "Reference area has no overlap with result — skipping projection"
+            )
+            return result_table
+
+        # Collect value columns (everything except h3_index)
+        schema = self.con.execute(f"DESCRIBE {result_table}").fetchall()
+        value_cols = [col[0] for col in schema if col[0] != "h3_index"]
+        select_cols = ", ".join(f"r.{col}" for col in value_cols)
+
+        query = f"""
+            CREATE OR REPLACE TEMP TABLE {projected_table} AS
+            SELECT
+                ref.dest_id AS h3_index,
+                {select_cols}
+            FROM {reference_table_h3} ref
+            LEFT JOIN {result_table} r ON ref.dest_id = r.h3_index
+        """
+        self.con.execute(query)
+
+        count = self.con.execute(f"SELECT COUNT(*) FROM {projected_table}").fetchone()[0]
+        original_count = self.con.execute(f"SELECT COUNT(*) FROM {result_table}").fetchone()[0]
+        logger.info(
+            "Projected result to reference area: %d H3 cells (original result had %d)",
+            count,
+            original_count,
+        )
+        return projected_table
