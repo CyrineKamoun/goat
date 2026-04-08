@@ -19,6 +19,7 @@ from .catchment_area import (
     PTMode,
     PTTimeWindow,
 )
+from .catchment_area_v2 import CatchmentAreaV2Params
 from .base import FieldStatistic, StatisticOperation
 from .data_management import (
     AttributeRelationship,
@@ -191,6 +192,7 @@ __all__ = [
     "CatchmentAreaType",
     "CatchmentAreaRoutingMode",
     "CatchmentAreaToolParams",
+    "CatchmentAreaV2Params",
     "PTTimeWindow",
     # ÖV-Güteklassen schemas
     "oev_gueteklasse",

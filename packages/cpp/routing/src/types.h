@@ -46,7 +46,7 @@ namespace routing
         PublicTransport,
     };
 
-    enum class CostMode : uint8_t
+    enum class CostType : uint8_t
     {
         Time,
         Distance,
@@ -71,9 +71,8 @@ namespace routing
     {
         std::vector<Point3857> starting_points;
         RoutingMode mode;
-        CostMode cost_mode;
-        double max_traveltime; // time mode budget in minutes
-        double max_distance = 0.0; // distance mode budget in meters (0 → falls back to max_traveltime)
+        CostType cost_type;
+        double max_cost;   // budget: minutes (time) or meters (distance)
         int steps;
         double speed_km_h;
         std::string edge_dir;
@@ -85,22 +84,17 @@ namespace routing
         int64_t departure_time = 0;  // unix minutes since epoch (PT mode)
         int max_transfers = 5;       // RAPTOR transfer limit (PT mode)
 
-        // Returns the effective cost budget: max_distance for distance mode (when set),
-        // max_traveltime for everything else.
-        double cost_budget() const noexcept
-        {
-            if (cost_mode == CostMode::Distance && max_distance > 0.0)
-                return max_distance;
-            return max_traveltime;
-        }
+        double cost_budget() const noexcept { return max_cost; }
 
         // PT access/egress settings
-        RoutingMode access_mode = RoutingMode::Walking;  // mode for access leg
-        RoutingMode egress_mode = RoutingMode::Walking;  // mode for egress leg
-        double access_max_time = 0.0;    // 0 → falls back to max_traveltime
-        double egress_max_time = 0.0;    // 0 → falls back to max_traveltime
-        double access_speed_km_h = 0.0;  // 0 → falls back to speed_km_h
-        double egress_speed_km_h = 0.0;  // 0 → falls back to speed_km_h
+        RoutingMode access_mode = RoutingMode::Walking;
+        RoutingMode egress_mode = RoutingMode::Walking;
+        CostType access_cost_type = CostType::Time;
+        CostType egress_cost_type = CostType::Time;
+        double access_max_cost = 0.0;      // 0 → falls back to max_cost
+        double egress_max_cost = 0.0;      // 0 → falls back to max_cost
+        double access_speed_km_h = 0.0;    // 0 → falls back to speed_km_h (time cost type only)
+        double egress_speed_km_h = 0.0;    // 0 → falls back to speed_km_h (time cost type only)
 
         // PT transit mode filter (empty → all modes allowed)
         std::vector<std::string> transit_modes;
@@ -115,7 +109,7 @@ namespace routing
         // PointGrid: max snapping distance in meters (0 → default 500m)
         double grid_snap_distance = 0.0;
 
-        // Explicit output step thresholds (empty → derive from max_traveltime / steps)
+        // Explicit output step thresholds (empty → derive from max_cost / steps)
         std::vector<int> cutoffs;
     };
 

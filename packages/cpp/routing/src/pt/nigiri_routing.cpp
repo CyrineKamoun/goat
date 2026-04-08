@@ -64,7 +64,7 @@ void run_single_departure(
         nigiri::i32_minutes{departure_minute}};
     q.start_ = seed_stops;
     q.max_travel_time_ = nigiri::duration_t{
-        static_cast<int16_t>(cfg.max_traveltime)};
+        static_cast<int16_t>(cfg.max_cost)};
     q.max_transfers_ = static_cast<std::uint8_t>(cfg.max_transfers);
     q.use_start_footpaths_ = true;
     q.allowed_claszes_ = clasz_mask;
@@ -90,7 +90,7 @@ void run_single_departure(
             continue;
 
         double total_minutes = static_cast<double>(fastest.duration_);
-        if (total_minutes <= 0.0 || total_minutes > cfg.max_traveltime)
+        if (total_minutes <= 0.0 || total_minutes > cfg.max_cost)
             continue;
 
         if (!results[i].has_value() || total_minutes < *results[i])

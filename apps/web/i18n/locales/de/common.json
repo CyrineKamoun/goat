@@ -175,6 +175,8 @@
   "catalog_explorer": "Katalog-Explorer",
   "catalogue": "Katalog",
   "catchment_area": "Einzugsgebiet",
+  "catchment_area_v2": "Einzugsgebiet v2 (Beta)",
+  "catchment_area_v2_description": "Einzugsgebiete zeigen, wie weit Personen innerhalb einer festgelegten Reisezeit oder Entfernung von einem oder mehreren ausgewählten Punkten reisen können.",
   "catchment_area_active_mobility": "Einzugsgebiet Aktive Mobilität",
   "catchment_area_car": "Einzugsgebiet Auto",
   "catchment_area_computation_started": "Berechnung des Einzugsgebiets gestartet",

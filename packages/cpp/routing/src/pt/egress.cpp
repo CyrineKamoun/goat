@@ -21,8 +21,18 @@ namespace routing::pt
     {
         double const egress_speed =
             (cfg.egress_speed_km_h > 0.0) ? cfg.egress_speed_km_h : cfg.speed_km_h;
-        double const egress_max =
-            (cfg.egress_max_time > 0.0) ? cfg.egress_max_time : cfg.max_traveltime;
+        double egress_max;
+        if (cfg.egress_max_cost > 0.0)
+        {
+            if (cfg.egress_cost_type == CostType::Distance)
+                egress_max = cfg.egress_max_cost / (egress_speed * 1000.0 / 60.0);
+            else
+                egress_max = cfg.egress_max_cost;
+        }
+        else
+        {
+            egress_max = cfg.max_cost;
+        }
 
         // Collect reachable stop coordinates and determine the maximum remaining
         // budget across all stops for the spatial buffer.
@@ -34,11 +44,11 @@ namespace routing::pt
             if (!transit_costs[i].has_value())
                 continue;
             double const transit_min = *transit_costs[i];
-            if (transit_min >= cfg.max_traveltime)
+            if (transit_min >= cfg.max_cost)
                 continue;
 
             double const remaining = std::min(
-                cfg.max_traveltime - transit_min, egress_max);
+                cfg.max_cost - transit_min, egress_max);
             if (remaining <= 0.0)
                 continue;
 
@@ -67,11 +77,23 @@ namespace routing::pt
         std::vector<std::optional<double>> const &transit_costs,
         RequestConfig const &cfg)
     {
-        double const egress_max =
-            (cfg.egress_max_time > 0.0) ? cfg.egress_max_time : cfg.max_traveltime;
+        double const egress_speed_local =
+            (cfg.egress_speed_km_h > 0.0) ? cfg.egress_speed_km_h : cfg.speed_km_h;
+        double egress_max;
+        if (cfg.egress_max_cost > 0.0)
+        {
+            if (cfg.egress_cost_type == CostType::Distance)
+                egress_max = cfg.egress_max_cost / (egress_speed_local * 1000.0 / 60.0);
+            else
+                egress_max = cfg.egress_max_cost;
+        }
+        else
+        {
+            egress_max = cfg.max_cost;
+        }
 
         // Build Dijkstra sources: each reachable stop seeded at its transit cost.
-        // Per-stop egress is capped at min(max_traveltime - transit, egress_max).
+        // Per-stop egress is capped at min(max_cost - transit, egress_max).
         std::vector<std::pair<int32_t, double>> sources;
         sources.reserve(transit_costs.size());
 
@@ -84,7 +106,7 @@ namespace routing::pt
                 continue;
             double const transit_min = *transit_costs[i];
             double const remaining = std::min(
-                cfg.max_traveltime - transit_min, egress_max);
+                cfg.max_cost - transit_min, egress_max);
             if (remaining <= 0.0)
                 continue;
 
@@ -99,9 +121,9 @@ namespace routing::pt
 
         // The overall Dijkstra budget is max_traveltime. Each source starts at
         // its transit cost, so egress walk naturally stays within the remaining
-        // budget. The per-stop cap (egress_max_time) is already enforced by
+        // budget. The per-stop cap (egress_max_cost) is already enforced by
         // filtering sources above — stops with no remaining budget are excluded.
-        double const egress_budget = cfg.max_traveltime;
+        double const egress_budget = cfg.max_cost;
 
         // If egress mode or speed differs from the network's costing, recompute.
         bool const needs_recompute =

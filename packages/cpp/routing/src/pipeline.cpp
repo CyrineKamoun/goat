@@ -125,7 +125,7 @@ namespace routing
             std::vector<int32_t> const &valid_starts,
             RequestConfig const &cfg)
         {
-            bool use_distance = (cfg.cost_mode == CostMode::Distance);
+            bool use_distance = (cfg.cost_type == CostType::Distance);
             auto adj = kernel::build_adjacency_list(net);
             return kernel::dijkstra(adj, valid_starts, cfg.cost_budget(),
                                     use_distance);
@@ -250,7 +250,7 @@ namespace routing
         auto t_prep_end = t_snap_end;
 
         auto t_routing_start = t_prep_end;
-        bool use_distance = (cfg.cost_mode == CostMode::Distance);
+        bool use_distance = (cfg.cost_type == CostType::Distance);
         auto t_adjacency_start = t_routing_start;
         auto adj = kernel::build_adjacency_list(net);
         auto t_adjacency_end = std::chrono::steady_clock::now();

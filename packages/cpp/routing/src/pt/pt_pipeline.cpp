@@ -90,7 +90,7 @@ namespace routing::pt
         for (size_t i = 0; i < transit_costs.size(); ++i)
         {
             if (transit_costs[i].has_value() &&
-                *transit_costs[i] < cfg.max_traveltime)
+                *transit_costs[i] < cfg.max_cost)
             {
                 reachable_coords.push_back(all_stop_coords[i]);
                 reachable_indices.push_back(i);
@@ -112,8 +112,24 @@ namespace routing::pt
             if (s >= 0)
                 valid_starts.push_back(s);
 
-        double const access_budget =
-            (cfg.access_max_time > 0.0) ? cfg.access_max_time : cfg.max_traveltime;
+        double access_budget;
+        if (cfg.access_max_cost > 0.0)
+        {
+            if (cfg.access_cost_type == CostType::Distance)
+            {
+                double speed = (cfg.access_speed_km_h > 0.0)
+                                   ? cfg.access_speed_km_h : cfg.speed_km_h;
+                access_budget = cfg.access_max_cost / (speed * 1000.0 / 60.0);
+            }
+            else
+            {
+                access_budget = cfg.access_max_cost;
+            }
+        }
+        else
+        {
+            access_budget = cfg.max_cost;
+        }
 
         // 7. Access Dijkstra on combined network
         std::vector<double> access_costs;

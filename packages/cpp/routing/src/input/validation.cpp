@@ -10,8 +10,8 @@ namespace routing::input
     {
         if (cfg.starting_points.empty())
             throw std::invalid_argument("At least one starting point required");
-        if (cfg.max_traveltime <= 0)
-            throw std::invalid_argument("max_traveltime must be positive");
+        if (cfg.max_cost <= 0)
+            throw std::invalid_argument("max_cost must be positive");
         if (!cfg.cutoffs.empty())
         {
             if (!std::is_sorted(cfg.cutoffs.begin(), cfg.cutoffs.end()))
@@ -20,7 +20,7 @@ namespace routing::input
             double const budget = cfg.cost_budget();
             if (static_cast<double>(cfg.cutoffs.back()) > budget)
                 throw std::invalid_argument(
-                    "all cutoffs must be within the travel time/distance budget");
+                    "all cutoffs must be within the cost budget");
             if (cfg.cutoffs.front() <= 0)
                 throw std::invalid_argument(
                     "cutoffs must be positive");
@@ -29,29 +29,28 @@ namespace routing::input
         {
             throw std::invalid_argument("steps must be positive when cutoffs are not provided");
         }
-        if (cfg.cost_mode == CostMode::Time)
+        if (cfg.cost_type == CostType::Time)
         {
             if (cfg.mode != RoutingMode::Car && cfg.speed_km_h <= 0)
                 throw std::invalid_argument(
                     "speed_km_h required for active mobility time mode");
-            if (cfg.mode == RoutingMode::Walking && cfg.max_traveltime > 45)
+            if (cfg.mode == RoutingMode::Walking && cfg.max_cost > 45)
                 throw std::invalid_argument(
-                    "Walking max traveltime cannot exceed 45 min");
+                    "Walking max travel time cannot exceed 45 min");
             if ((cfg.mode == RoutingMode::Bicycle ||
                  cfg.mode == RoutingMode::Pedelec) &&
-                cfg.max_traveltime > 45)
+                cfg.max_cost > 45)
                 throw std::invalid_argument(
-                    "Cycling max traveltime cannot exceed 45 min");
-            if (cfg.mode == RoutingMode::Car && cfg.max_traveltime > 90)
+                    "Cycling max travel time cannot exceed 45 min");
+            if (cfg.mode == RoutingMode::Car && cfg.max_cost > 90)
                 throw std::invalid_argument(
-                    "Car max traveltime cannot exceed 90 min");
+                    "Car max travel time cannot exceed 90 min");
         }
-        if (cfg.cost_mode == CostMode::Distance)
+        if (cfg.cost_type == CostType::Distance)
         {
-            double const budget = cfg.cost_budget();
-            if (cfg.mode == RoutingMode::Car && budget > 100000)
+            if (cfg.mode == RoutingMode::Car && cfg.max_cost > 100000)
                 throw std::invalid_argument("Car max distance cannot exceed 100km");
-            if (cfg.mode != RoutingMode::Car && budget > 20000)
+            if (cfg.mode != RoutingMode::Car && cfg.max_cost > 20000)
                 throw std::invalid_argument(
                     "Active mobility max distance cannot exceed 20km");
         }
@@ -69,23 +68,35 @@ namespace routing::input
             if (cfg.departure_time <= 0)
                 throw std::invalid_argument(
                     "departure_time (unix minutes) must be set for PublicTransport mode");
+            if (cfg.cost_type != CostType::Time)
+                throw std::invalid_argument(
+                    "PublicTransport mode only supports time cost type");
+            if (cfg.max_cost > 120)
+                throw std::invalid_argument(
+                    "PublicTransport max travel time cannot exceed 120 min");
+
+            // Access leg: speed is always required (for time-based Dijkstra).
+            // For distance-based access, speed converts the distance budget to time.
             double const effective_access_speed =
                 (cfg.access_speed_km_h > 0.0) ? cfg.access_speed_km_h : cfg.speed_km_h;
             if (effective_access_speed <= 0.0)
                 throw std::invalid_argument(
-                    "access_speed_km_h (or speed_km_h) is required for PublicTransport mode");
-            if (cfg.cost_mode != CostMode::Time)
+                    "access speed (or speed_km_h) is required for PublicTransport mode");
+            double const effective_egress_speed =
+                (cfg.egress_speed_km_h > 0.0) ? cfg.egress_speed_km_h : cfg.speed_km_h;
+            if (effective_egress_speed <= 0.0)
                 throw std::invalid_argument(
-                    "PublicTransport mode only supports CostMode::Time");
-            if (cfg.max_traveltime > 120)
+                    "egress speed (or speed_km_h) is required for PublicTransport mode");
+
+            // Time-based access/egress budgets cannot exceed the overall budget.
+            if (cfg.access_cost_type == CostType::Time &&
+                cfg.access_max_cost > 0.0 && cfg.access_max_cost > cfg.max_cost)
                 throw std::invalid_argument(
-                    "PublicTransport max_traveltime cannot exceed 120 min");
-            if (cfg.access_max_time > 0.0 && cfg.access_max_time > cfg.max_traveltime)
+                    "access_max_cost (time) cannot exceed max_cost");
+            if (cfg.egress_cost_type == CostType::Time &&
+                cfg.egress_max_cost > 0.0 && cfg.egress_max_cost > cfg.max_cost)
                 throw std::invalid_argument(
-                    "access_max_time cannot exceed max_traveltime");
-            if (cfg.egress_max_time > 0.0 && cfg.egress_max_time > cfg.max_traveltime)
-                throw std::invalid_argument(
-                    "egress_max_time cannot exceed max_traveltime");
+                    "egress_max_cost (time) cannot exceed max_cost");
         }
     }
 

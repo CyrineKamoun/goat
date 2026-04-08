@@ -27,9 +27,9 @@ PYBIND11_MODULE(_routing, m)
         .value("Car", routing::RoutingMode::Car)
         .value("PublicTransport", routing::RoutingMode::PublicTransport);
 
-    py::enum_<routing::CostMode>(m, "CostMode")
-        .value("Time", routing::CostMode::Time)
-        .value("Distance", routing::CostMode::Distance);
+    py::enum_<routing::CostType>(m, "CostType")
+        .value("Time", routing::CostType::Time)
+        .value("Distance", routing::CostType::Distance);
 
     py::enum_<routing::CatchmentType>(m, "CatchmentType")
         .value("Polygon", routing::CatchmentType::Polygon)
@@ -41,7 +41,6 @@ PYBIND11_MODULE(_routing, m)
         .value("GeoJSON", routing::OutputFormat::GeoJSON)
         .value("Parquet", routing::OutputFormat::Parquet);
 
-
     py::class_<routing::Point3857>(m, "Point3857")
         .def(py::init<double, double>())
         .def_readwrite("x", &routing::Point3857::x)
@@ -49,13 +48,10 @@ PYBIND11_MODULE(_routing, m)
 
     py::class_<routing::RequestConfig>(m, "RequestConfig")
         .def(py::init<>())
-        .def_readwrite("starting_points",
-                       &routing::RequestConfig::starting_points)
+        .def_readwrite("starting_points", &routing::RequestConfig::starting_points)
         .def_readwrite("mode", &routing::RequestConfig::mode)
-        .def_readwrite("cost_mode", &routing::RequestConfig::cost_mode)
-        .def_readwrite("max_traveltime",
-                       &routing::RequestConfig::max_traveltime)
-        .def_readwrite("max_distance", &routing::RequestConfig::max_distance)
+        .def_readwrite("cost_type", &routing::RequestConfig::cost_type)
+        .def_readwrite("max_cost", &routing::RequestConfig::max_cost)
         .def_readwrite("steps", &routing::RequestConfig::steps)
         .def_readwrite("speed_km_h", &routing::RequestConfig::speed_km_h)
         .def_readwrite("edge_dir", &routing::RequestConfig::edge_dir)
@@ -63,19 +59,18 @@ PYBIND11_MODULE(_routing, m)
         .def_readwrite("output_path", &routing::RequestConfig::output_path)
         .def_readwrite("catchment_type", &routing::RequestConfig::catchment_type)
         .def_readwrite("output_format", &routing::RequestConfig::output_format)
-        .def_readwrite("polygon_difference",
-                       &routing::RequestConfig::polygon_difference)
+        .def_readwrite("polygon_difference", &routing::RequestConfig::polygon_difference)
         .def_readwrite("departure_time", &routing::RequestConfig::departure_time)
         .def_readwrite("max_transfers", &routing::RequestConfig::max_transfers)
         // PT access/egress
         .def_readwrite("access_mode", &routing::RequestConfig::access_mode)
         .def_readwrite("egress_mode", &routing::RequestConfig::egress_mode)
-        .def_readwrite("access_max_time", &routing::RequestConfig::access_max_time)
-        .def_readwrite("egress_max_time", &routing::RequestConfig::egress_max_time)
-        .def_readwrite("access_speed_km_h",
-                       &routing::RequestConfig::access_speed_km_h)
-        .def_readwrite("egress_speed_km_h",
-                       &routing::RequestConfig::egress_speed_km_h)
+        .def_readwrite("access_cost_type", &routing::RequestConfig::access_cost_type)
+        .def_readwrite("egress_cost_type", &routing::RequestConfig::egress_cost_type)
+        .def_readwrite("access_max_cost", &routing::RequestConfig::access_max_cost)
+        .def_readwrite("egress_max_cost", &routing::RequestConfig::egress_max_cost)
+        .def_readwrite("access_speed_km_h", &routing::RequestConfig::access_speed_km_h)
+        .def_readwrite("egress_speed_km_h", &routing::RequestConfig::egress_speed_km_h)
         // Transit mode filter, departure window, and explicit cutoffs
         .def_readwrite("transit_modes", &routing::RequestConfig::transit_modes)
         .def_readwrite("departure_window", &routing::RequestConfig::departure_window)
@@ -96,5 +91,4 @@ PYBIND11_MODULE(_routing, m)
           },
           py::arg("config"),
           "Run the full routing pipeline and dispatch output by RequestConfig.output_format");
-
 }

@@ -175,6 +175,8 @@
   "catalog_explorer": "Catalog Explorer",
   "catalogue": "Catalogue",
   "catchment_area": "Catchment Area",
+  "catchment_area_v2": "Catchment Area v2 (Beta)",
+  "catchment_area_v2_description": "Catchment Areas show how far people can travel within a set travel time or distance from one or more selected points.",
   "catchment_area_active_mobility": "Catchment Area Active Mobility",
   "catchment_area_car": "Catchment Area Car",
   "catchment_area_computation_started": "Catchment area computation started",

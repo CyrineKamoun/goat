@@ -252,7 +252,7 @@ CostGrid build_cost_grid(ReachabilityField const &field,
                 continue;
 
             double base_cost = points[idx].cost;
-            double walk_cost = (cfg.cost_mode == CostMode::Distance)
+            double walk_cost = (cfg.cost_type == CostType::Distance)
                                    ? dist
                                    : (dist / speed_m_per_s) / 60.0; // minutes
             double total = std::round(base_cost + walk_cost);

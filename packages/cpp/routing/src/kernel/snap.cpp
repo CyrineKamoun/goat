@@ -57,7 +57,7 @@ namespace routing::kernel
 
     double connector_cost(double snap_distance_m, RequestConfig const &cfg)
     {
-        if (cfg.cost_mode == CostMode::Distance)
+        if (cfg.cost_type == CostType::Distance)
             return snap_distance_m;
 
         double speed_km_h = cfg.speed_km_h;

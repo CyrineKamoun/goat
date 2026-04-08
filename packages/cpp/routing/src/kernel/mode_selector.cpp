@@ -21,7 +21,7 @@ namespace routing::kernel
 
         for (auto &e : edges)
         {
-            if (cfg.cost_mode == CostMode::Distance)
+            if (cfg.cost_type == CostType::Distance)
             {
                 e.cost = e.length_m;
                 e.reverse_cost = e.length_m;

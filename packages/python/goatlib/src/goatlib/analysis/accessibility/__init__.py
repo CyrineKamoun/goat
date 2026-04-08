@@ -27,6 +27,7 @@ from .catchment_area import (
     generate_jsolines,
     jsolines,
 )
+from .catchment_area_v2 import CatchmentAreaToolV2
 from .closest_average import HeatmapClosestAverageTool
 from .connectivity import HeatmapConnectivityTool
 from .gravity import HeatmapGravityTool

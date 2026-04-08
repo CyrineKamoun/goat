@@ -22,9 +22,27 @@ namespace routing::pt
         access_cfg.mode = cfg.access_mode;
         if (cfg.access_speed_km_h > 0.0)
             access_cfg.speed_km_h = cfg.access_speed_km_h;
-        double const access_budget =
-            (cfg.access_max_time > 0.0) ? cfg.access_max_time : cfg.max_traveltime;
-        access_cfg.max_traveltime = access_budget;
+
+        double access_budget;
+        if (cfg.access_max_cost > 0.0)
+        {
+            if (cfg.access_cost_type == CostType::Distance)
+            {
+                // Convert distance (meters) to time (minutes) using access speed.
+                double speed = (cfg.access_speed_km_h > 0.0)
+                                   ? cfg.access_speed_km_h : cfg.speed_km_h;
+                access_budget = cfg.access_max_cost / (speed * 1000.0 / 60.0);
+            }
+            else
+            {
+                access_budget = cfg.access_max_cost;
+            }
+        }
+        else
+        {
+            access_budget = cfg.max_cost;
+        }
+        access_cfg.max_cost = access_budget;
 
         double buffer_m = input::buffer_distance(access_cfg);
         auto access_classes = input::valid_classes(cfg.access_mode);
