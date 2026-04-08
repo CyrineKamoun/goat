@@ -306,22 +306,45 @@ export const WidgetFilterLayout = ({
             />
             {/* Select (Dropdown) specific settings */}
             {selectedLayout?.value === filterLayoutTypes.Values.select && (
-              <TextFieldInput
-                type="text"
-                label={t("placeholder")}
-                placeholder={t("enter_placeholder_text")}
-                clearable={false}
-                value={config.setup.placeholder || ""}
-                onChange={(value: string) => {
-                  onChange({
-                    ...config,
-                    setup: {
-                      ...config.setup,
-                      placeholder: value,
-                    },
-                  });
-                }}
-              />
+              <>
+                <TextFieldInput
+                  type="text"
+                  label={t("placeholder")}
+                  placeholder={t("enter_placeholder_text")}
+                  clearable={false}
+                  value={config.setup.placeholder || ""}
+                  onChange={(value: string) => {
+                    onChange({
+                      ...config,
+                      setup: {
+                        ...config.setup,
+                        placeholder: value,
+                      },
+                    });
+                  }}
+                />
+                <Stack>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        size="small"
+                        color="primary"
+                        checked={!!config.setup?.multiple}
+                        onChange={(e) => {
+                          onChange({
+                            ...config,
+                            setup: {
+                              ...config.setup,
+                              multiple: e.target.checked,
+                            },
+                          });
+                        }}
+                      />
+                    }
+                    label={<Typography variant="body2">{t("allow_multiple_selection")}</Typography>}
+                  />
+                </Stack>
+              </>
             )}
             {/* Chips specific settings */}
             {selectedLayout?.value === filterLayoutTypes.Values.chips && (
@@ -386,6 +409,27 @@ export const WidgetFilterLayout = ({
                     }
                     label={<Typography variant="body2">{t("wrap_chips")}</Typography>}
                   />
+                  {config.setup?.multiple && (
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          color="primary"
+                          checked={config.setup?.show_all_option !== false}
+                          onChange={(e) => {
+                            onChange({
+                              ...config,
+                              setup: {
+                                ...config.setup,
+                                show_all_option: e.target.checked,
+                              },
+                            });
+                          }}
+                        />
+                      }
+                      label={<Typography variant="body2">{t("show_all_button")}</Typography>}
+                    />
+                  )}
                 </Stack>
               </>
             )}

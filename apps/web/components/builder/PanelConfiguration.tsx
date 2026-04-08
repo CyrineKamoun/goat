@@ -9,6 +9,7 @@ import type { BuilderPanelSchema } from "@/lib/validations/project";
 
 import type { SelectorItem } from "@/types/map/common";
 
+import WidgetColorPicker from "@/components/builder/widgets/common/WidgetColorPicker";
 import FormLabelHelper from "@/components/common/FormLabelHelper";
 import SectionHeader from "@/components/map/panels/common/SectionHeader";
 import SectionOptions from "@/components/map/panels/common/SectionOptions";
@@ -83,16 +84,22 @@ const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) 
   const [backgroundBlur, setBackgroundBlur] = useState(panel.config?.appearance?.backgroundBlur ?? 0);
   const [shadow, setShadow] = useState(panel.config?.appearance?.shadow ?? 0);
   const [spacing, setSpacing] = useState(panel.config?.position?.spacing ?? 0);
+  const [padding, setPadding] = useState(panel.config?.position?.padding ?? 0);
   const [collapsible, setCollapsible] = useState(panel.config?.options?.collapsible ?? false);
   const [collapsedDefault, setCollapsedDefault] = useState(panel.config?.options?.collapsed_default ?? false);
+  const [panelWidth, setPanelWidth] = useState(panel.config?.size?.width ?? 300);
+  const [panelHeight, setPanelHeight] = useState(panel.config?.size?.height ?? 300);
 
   useEffect(() => {
     setOpacity(panel.config?.appearance?.opacity ?? 1);
     setBackgroundBlur(panel.config?.appearance?.backgroundBlur ?? 0);
     setShadow(panel.config?.appearance?.shadow ?? 0);
     setSpacing(panel.config?.position?.spacing ?? 0);
+    setPadding(panel.config?.position?.padding ?? 0);
     setCollapsible(panel.config?.options?.collapsible ?? false);
     setCollapsedDefault(panel.config?.options?.collapsed_default ?? false);
+    setPanelWidth(panel.config?.size?.width ?? 300);
+    setPanelHeight(panel.config?.size?.height ?? 300);
   }, [panel]);
 
   // Handlers
@@ -217,6 +224,15 @@ const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) 
               case "spacing":
                 setSpacing(val);
                 break;
+              case "padding":
+                setPadding(val);
+                break;
+              case "width":
+                setPanelWidth(val);
+                break;
+              case "height":
+                setPanelHeight(val);
+                break;
             }
           }
         }}
@@ -247,6 +263,11 @@ const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) 
         </ConfigSection>
 
         <ConfigSection title={t("appearance")} icon={ICON_NAME.PANEL_APPERANCE}>
+          <WidgetColorPicker
+            label={t("background_color")}
+            color={panel.config?.appearance?.backgroundColor || "#ffffff"}
+            onChange={(color) => updateConfig("appearance.backgroundColor", color)}
+          />
           {renderSlider(t("opacity"), opacity, "appearance.opacity", 0, 1, 0.1)}
           {renderSlider(t("background_blur"), backgroundBlur, "appearance.backgroundBlur", 0, 20, 1)}
           {renderSlider(t("shadow"), shadow, "appearance.shadow", 0, 10, 1)}
@@ -255,6 +276,14 @@ const PanelConfiguration = ({ panel, onDelete, onChange }: PanelContainerProps) 
         <ConfigSection title={t("position")} icon={ICON_NAME.PANEL_POSITION}>
           {renderSelector(panelAlignItem, panelAlignItemOptions, t("align_items"), "position.alignItems")}
           {renderSlider(t("spacing"), spacing, "position.spacing", 0, 10, 1)}
+          {renderSlider(t("padding"), padding, "position.padding", 0, 2, 0.1)}
+        </ConfigSection>
+
+        <ConfigSection title={t("size")} icon={ICON_NAME.RULER_HORIZONTAL}>
+          {(panel.position === "left" || panel.position === "right") &&
+            renderSlider(`${t("width")} (px)`, panelWidth, "size.width", 200, 800, 10)}
+          {(panel.position === "top" || panel.position === "bottom") &&
+            renderSlider(`${t("height")} (px)`, panelHeight, "size.height", 150, 600, 10)}
         </ConfigSection>
       </Stack>
 

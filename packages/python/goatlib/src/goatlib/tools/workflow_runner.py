@@ -19,6 +19,15 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+# Pattern to strip usernames from Windmill cancellation messages
+# e.g. "cancelled by majkshkurti (reason: User requested dismissal)" -> "cancelled (reason: User requested dismissal)"
+_CANCEL_USER_RE = re.compile(r"cancelled by \S+")
+
+
+def _sanitize_error_msg(msg: str) -> str:
+    """Remove usernames from Windmill cancellation error messages."""
+    return _CANCEL_USER_RE.sub("cancelled", msg)
+
 
 class WorkflowNode(BaseModel):
     """A node in the workflow graph."""
@@ -311,6 +320,115 @@ def get_input_layer_id(
     return None
 
 
+# Mapping from frontend expression names to CQL2 operators
+_EXPRESSION_TO_CQL_OP = {
+    "is": "=",
+    "is_not": "!=",
+    "is_at_least": ">=",
+    "is_at_most": "<=",
+    "is_less_than": "<",
+    "is_greater_than": ">",
+    "is_empty_string": "=",
+    "is_not_empty_string": "!=",
+}
+
+
+def _convert_expression_to_cql(expression: dict) -> dict | None:
+    """Convert a single frontend Expression object to a CQL2-JSON node."""
+    expr_type = expression.get("expression")
+    attribute = expression.get("attribute")
+    value = expression.get("value")
+
+    if not expr_type or not attribute:
+        return None
+
+    prop = {"property": attribute}
+
+    if expr_type == "is_blank":
+        return {"op": "isNull", "args": prop}
+    if expr_type == "is_not_blank":
+        return {"op": "not", "args": [{"op": "isNull", "args": prop}]}
+    if expr_type == "starts_with":
+        return {"op": "like", "args": [prop, f"{value}%"]}
+    if expr_type == "ends_with":
+        return {"op": "like", "args": [prop, f"%{value}"]}
+    if expr_type == "contains_the_text":
+        return {"op": "like", "args": [prop, f"%{value}%"]}
+    if expr_type == "does_not_contains_the_text":
+        return {
+            "op": "not",
+            "args": [{"op": "like", "args": [prop, f"%{value}%"]}],
+        }
+    if expr_type == "is_between":
+        parts = str(value).split("-")
+        v1, v2 = float(parts[0]), float(parts[1])
+        return {
+            "op": "and",
+            "args": [
+                {"op": ">=", "args": [prop, v1]},
+                {"op": "<=", "args": [prop, v2]},
+            ],
+        }
+    if expr_type == "s_intersects":
+        import json as _json
+
+        geom = _json.loads(value) if isinstance(value, str) else value
+        return {"op": "s_intersects", "args": [prop, geom]}
+    if expr_type == "includes":
+        values = value if isinstance(value, list) else [value]
+        args = [{"op": "=", "args": [prop, v]} for v in values]
+        return {"op": "or", "args": args}
+    if expr_type == "excludes":
+        values = value if isinstance(value, list) else [value]
+        args = [{"op": "!=", "args": [prop, v]} for v in values]
+        return {"op": "and", "args": args}
+    if expr_type in ("is_empty_string", "is_not_empty_string"):
+        op = "=" if expr_type == "is_empty_string" else "!="
+        return {"op": op, "args": [prop, ""]}
+
+    # Simple comparison operators (is, is_not, is_at_least, etc.)
+    cql_op = _EXPRESSION_TO_CQL_OP.get(expr_type)
+    if cql_op:
+        return {"op": cql_op, "args": [prop, value]}
+
+    return None
+
+
+def convert_filter_to_cql(filter_config: dict) -> dict | None:
+    """Convert frontend Expression-format filter to CQL2-JSON format.
+
+    Frontend stores filters as:
+        {op: "and", expressions: [{attribute, expression, value, ...}, ...]}
+    Backend expects CQL2-JSON:
+        {op: "and", args: [{op: "=", args: [{property: "field"}, value]}, ...]}
+
+    If already in CQL2-JSON format (has 'args' key), returns as-is.
+    """
+    if not filter_config:
+        return None
+
+    # Already in CQL2-JSON format
+    if "args" in filter_config and "expressions" not in filter_config:
+        return filter_config
+
+    expressions = filter_config.get("expressions", [])
+    if not expressions:
+        return None
+
+    logical_op = filter_config.get("op", "and")
+    cql_args = []
+    for expr in expressions:
+        cql_node = _convert_expression_to_cql(expr)
+        if cql_node:
+            cql_args.append(cql_node)
+
+    if not cql_args:
+        return None
+    if len(cql_args) == 1:
+        return cql_args[0]
+    return {"op": logical_op, "args": cql_args}
+
+
 def build_tool_inputs(
     node: dict,
     edges: list[dict],
@@ -366,7 +484,8 @@ def build_tool_inputs(
             source_type = source_node.get("data", {}).get("type")
             filter_config = None
             if source_type == "dataset":
-                filter_config = source_node.get("data", {}).get("filter") or None
+                raw_filter = source_node.get("data", {}).get("filter") or None
+                filter_config = convert_filter_to_cql(raw_filter) if raw_filter else None
 
             # Check if the target field expects an object with a layer_id
             # property (e.g. StartingPointsLayer) rather than a plain string
@@ -401,7 +520,7 @@ def build_tool_inputs(
 
     # For heatmap gravity/closest_average: build opportunities list from
     # numbered opportunity_layer_N_id inputs and per-opportunity config keys.
-    if process_id in ("heatmap_gravity", "heatmap_closest_average"):
+    if process_id in ("heatmap_gravity", "heatmap_closest_average", "heatmap_2sfca"):
         opp_keys = sorted(
             k
             for k in list(inputs)
@@ -787,6 +906,6 @@ def main(
         else:
             error_msg = str(error_info)
         node_id = first_error.get("node_id", "unknown")
-        raise RuntimeError(f"Node {node_id} failed: {error_msg}")
+        raise RuntimeError(f"Node {node_id} failed: {_sanitize_error_msg(error_msg)}")
 
     return result

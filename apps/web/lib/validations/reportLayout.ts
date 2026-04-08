@@ -16,6 +16,8 @@ export const pageConfigSchema = z.object({
   height: z.number().optional(),
   snapToGuides: z.boolean().default(false), // Enable/disable snapping to guides
   showRulers: z.boolean().default(false), // Show rulers on canvas
+  dpi: z.number().optional(),
+  export_format: z.enum(["pdf", "png", "jpeg"]).optional(),
 });
 
 // Layout grid configuration
@@ -192,6 +194,10 @@ export const atlasFeatureCoverageSchema = z.object({
   sort_by: z.string().optional(),
   /** Sort order */
   sort_order: z.enum(["asc", "desc"]).default("asc"),
+  /** Only render the current feature on the coverage layer (filter others out) */
+  filter_to_current_feature: z.boolean().optional(),
+  /** Hide the coverage layer entirely from the map */
+  hidden_coverage_layer: z.boolean().optional(),
 });
 
 /**

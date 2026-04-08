@@ -8,7 +8,7 @@ sidebar_position: 1
 **Das Öffnen eines Projekts führt Sie zur Karten-Oberfläche**. Hier können Sie Layer erstellen, organisieren und gestalten, räumliche Daten visualisieren und alle mächtigen räumlichen Analysefähigkeiten von GOAT nutzen.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/map/interface/map_interface.png').default} alt="Kartenoberfläche Übersicht" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/map/interface/map_interface.webp').default} alt="Kartenoberfläche Übersicht" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div> 
 
 
@@ -16,7 +16,7 @@ sidebar_position: 1
 ### Obere Leiste
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/map/interface/upper_bar.png').default} alt="Obere Leiste Oberflächenelemente" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/map/interface/upper_bar.webp').default} alt="Obere Leiste Oberflächenelemente" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div> 
 
 
@@ -34,11 +34,8 @@ sidebar_position: 1
 - <code>Benutzerprofil</code>: <strong>Zugriff auf Kontoeinstellungen</strong> und abmelden.
 
 
-### Navigationsleiste
-Die Navigationsleiste auf der linken Seite der Kartenoberfläche bietet Zugriff auf Layer und Legende.
-
-- <img src={require('/img/icons/layer.png').default} alt="Layer" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Layer</code>: <strong>Hinzufügen und verwalten</strong> Ihrer Assets in Form von Layern innerhalb Ihres GOAT-Projekts.
-- <img src={require('/img/icons/list.png').default} alt="Legende" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Legende</code>: <strong>Visualisieren Sie die Legende</strong> der Layer.
+### Layer Panel
+Das Layer Panel auf der linken Seite der Kartenoberfläche bietet Zugang zu allen Projektlayern. Von hier aus können Benutzer ihre Daten verwalten, indem sie neue Layer mit <code>+ Layer hinzufügen</code> hinzufügen und sie mit <img src={require('/img/icons/layer.png').default} alt="Layer gruppieren" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/><code>Layer gruppieren</code> organisieren, um logische Sammlungen verwandter Datensätze zu erstellen.
 
 
 ### Räumliche Operationen Leiste
@@ -52,10 +49,10 @@ Die räumlichen Operationen Werkzeugleiste auf der rechten Seite der Kartenoberf
 
 - <img src={require('/img/icons/toolbox.png').default} alt="Werkzeugkiste" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Werkzeugkiste</code>: Lesen Sie mehr in [Werkzeugkiste](../category/toolbox).
 
-- <img src={require('/img/icons/compass-drafting.png').default} alt="Szenarien" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Szenarien</code>: Lesen Sie mehr in [Szenarien](../Scenarios).
+- <img src={require('/img/icons/compass.png').default} alt="Szenarien" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Szenarien</code>: Lesen Sie mehr in [Szenarien](../Scenarios).
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/map/interface/right_left_bars.png').default} alt="aktuelle Datensätze" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/map/interface/right-left_panels.webp').default} alt="aktuelle Datensätze" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div> 
 
 
@@ -73,6 +70,6 @@ Die räumlichen Operationen Werkzeugleiste auf der rechten Seite der Kartenoberf
 - <img src={require('/img/icons/map.png').default} alt="Grundkarte" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Grundkarte</code>: <strong>Wählen Sie zwischen</strong> den verfügbaren Grundkartenoptionen.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/map/interface/map_navigation.png').default} alt="aktuelle Datensätze" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/map/interface/map_navigation.webp').default} alt="aktuelle Datensätze" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div> 
 

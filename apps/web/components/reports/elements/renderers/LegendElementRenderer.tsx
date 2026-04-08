@@ -2,10 +2,8 @@
 
 import { Box, Stack, Typography } from "@mui/material";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
-import { useTranslation } from "react-i18next";
-
 import type { TypographyStyle } from "@/lib/constants/typography";
-import { DEFAULT_FONT_FAMILY } from "@/lib/constants/typography";
+import { DEFAULT_FONT_FAMILY, LEGEND_TYPOGRAPHY_DEFAULTS } from "@/lib/constants/typography";
 import { rgbToHex } from "@/lib/utils/helpers";
 import type { RGBColor } from "@/types/map/color";
 import type { ProjectLayer } from "@/lib/validations/project";
@@ -17,13 +15,13 @@ import { LayerLegendPanel } from "@/components/map/panels/layer/legend/LayerLege
 /**
  * Convert TypographyStyle to MUI sx props
  */
-function typographyToSx(style?: TypographyStyle): Record<string, unknown> {
-  if (!style) return { fontFamily: DEFAULT_FONT_FAMILY };
+function typographyToSx(style?: TypographyStyle, role?: string): Record<string, unknown> {
+  const defaults = role ? LEGEND_TYPOGRAPHY_DEFAULTS[role] : undefined;
   const sx: Record<string, unknown> = {};
-  sx.fontFamily = style.fontFamily || DEFAULT_FONT_FAMILY;
-  if (style.fontSize) sx.fontSize = style.fontSize;
-  if (style.fontColor) sx.color = style.fontColor;
-  if (style.fontWeight) sx.fontWeight = style.fontWeight;
+  sx.fontFamily = style?.fontFamily || defaults?.fontFamily || DEFAULT_FONT_FAMILY;
+  sx.fontSize = style?.fontSize || defaults?.fontSize;
+  sx.fontWeight = style?.fontWeight || defaults?.fontWeight;
+  if (style?.fontColor) sx.color = style.fontColor;
   return sx;
 }
 
@@ -55,6 +53,7 @@ interface LegendTypographyConfig {
   layerName?: TypographyStyle;
   legendItem?: TypographyStyle;
   caption?: TypographyStyle;
+  heading?: TypographyStyle;
 }
 
 /**
@@ -145,10 +144,9 @@ const LegendElementRenderer: React.FC<LegendElementRendererProps> = ({
   zoom = 1,
   onElementUpdate,
 }) => {
-  const { t } = useTranslation("common");
   // Extract legend config
   const config = element.config as LegendElementConfig;
-  const titleText = config?.title?.text ?? t("legend");
+  const titleText = config?.title?.text ?? "";
   const layoutConfig = config?.layout ?? { columns: 1, showLayerNames: true };
   const typography = config?.typography;
   const textOverrides = config?.textOverrides;
@@ -267,9 +265,8 @@ const LegendElementRenderer: React.FC<LegendElementRendererProps> = ({
           onSave={(text) => saveTextOverride("title", text)}
           variant="subtitle2"
           sx={{
-            fontWeight: "bold",
             mb: 1,
-            ...typographyToSx(typography?.title),
+            ...typographyToSx(typography?.title, "title"),
           }}
         />
       )}
@@ -318,6 +315,7 @@ interface LayerLegendItemProps {
   onTextSave?: (key: string, text: string) => void;
 }
 
+
 const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
   layer,
   showLayerName = true,
@@ -334,7 +332,11 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
       : "polygon";
 
   // Same check as ProjectLayerTree line 756
-  const hasComplexLegend = !!(props.color_field || props.stroke_color_field || props.marker_field);
+  const hasComplexLegend = !!(
+    (props.filled !== false && props.color_field) ||
+    (props.stroked !== false && props.stroke_color_field) ||
+    props.marker_field
+  );
 
   // Raster legend check
   const rasterStyle = props.style as { style_type?: string; categories?: unknown[]; color_map?: unknown[] } | undefined;
@@ -352,7 +354,8 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
         ? `rgb(${(props.color as number[]).join(",")})`
         : String(props.color)
     : "#ccc";
-  const strokeColor: string | undefined = props.stroke_color
+  const stroked = props.stroked !== false;
+  const strokeColor: string | undefined = stroked && props.stroke_color
     ? Array.isArray(props.stroke_color) && (props.stroke_color as number[]).length >= 3
       ? rgbToHex(props.stroke_color as RGBColor)
       : Array.isArray(props.stroke_color)
@@ -362,10 +365,16 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
 
   return (
     <Box sx={{ minWidth: 0 }}>
-      {/* Layer name with simple icon for non-complex legends */}
-      {showLayerName && (
+      {/* Layer name with icon */}
+      {showLayerName && (() => {
+        const isComplex = hasComplexLegend || hasRasterLegend;
+        const layerNameKey = `layer_${layer.id}`;
+        const layerNameCleared = editable && textOverrides?.[layerNameKey] != null && !textOverrides[layerNameKey].trim();
+        // Hide the layer name row entirely when user has cleared the text
+        if (layerNameCleared) return null;
+        return (
         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
-          {!hasComplexLegend && !hasRasterLegend && (
+          {!isComplex && (
             <Box sx={{ flexShrink: 0 }}>
               <LayerIcon
                 type={geomType}
@@ -391,13 +400,13 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
             onSave={(text) => onTextSave?.(`layer_${layer.id}`, text)}
             variant="caption"
             sx={{
-              fontWeight: 500,
               wordBreak: "break-word",
-              ...typographyToSx(typography?.layerName),
+              ...typographyToSx(typography?.layerName, "layerName"),
             }}
           />
         </Stack>
-      )}
+        );
+      })()}
 
       {/* Legend caption */}
       {!!(props.legend && (props.legend as Record<string, unknown>).caption) && (
@@ -410,16 +419,18 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
           editable={editable}
           onSave={(text) => onTextSave?.(`caption_${layer.id}`, text)}
           variant="caption"
-          sx={{ display: "block", mb: 0.5, fontWeight: "bold", ...typographyToSx(typography?.caption) }}
+          sx={{ display: "block", mb: 0.5, ...typographyToSx(typography?.caption, "caption") }}
         />
       )}
 
-      {/* Complex feature legend - attribute-based styling */}
+      {/* Complex feature legend - attribute-based styling (compact/inline) */}
       {hasComplexLegend && layer.type === "feature" && (
         <LayerLegendPanel
           properties={props}
           geometryType={geomType}
-          itemTypographySx={typographyToSx(typography?.legendItem)}
+          itemTypographySx={typographyToSx(typography?.legendItem, "legendItem")}
+          headingTypographySx={typographyToSx(typography?.heading, "heading")}
+          compact
           editable={editable}
           textOverrides={editable ? extractPrefixedOverrides(textOverrides, `legenditem_${layer.id}_`) : undefined}
           onTextSave={editable ? (key, text) => onTextSave?.(`legenditem_${layer.id}_${key}`, text) : undefined}
@@ -431,7 +442,7 @@ const LayerLegendItem: React.FC<LayerLegendItemProps> = ({
         <LayerLegendPanel
           properties={props}
           geometryType="raster"
-          itemTypographySx={typographyToSx(typography?.legendItem)}
+          itemTypographySx={typographyToSx(typography?.legendItem, "legendItem")}
           editable={editable}
           textOverrides={editable ? extractPrefixedOverrides(textOverrides, `legenditem_${layer.id}_`) : undefined}
           onTextSave={editable ? (key, text) => onTextSave?.(`legenditem_${layer.id}_${key}`, text) : undefined}

@@ -1,0 +1,11 @@
+id,city,country,population,area_km2,founded_year
+1,Munich,Germany,1488202,310.7,1158
+2,Hamburg,Germany,1853935,755.2,808
+3,Berlin,Germany,3677472,891.7,1237
+4,Vienna,Austria,1982097,414.6,881
+5,Zurich,Switzerland,436332,87.9,929
+6,Amsterdam,Netherlands,907976,219.3,1275
+7,Prague,Czech Republic,1357326,496.0,885
+8,Copenhagen,Denmark,644431,88.3,1167
+9,Stockholm,Sweden,978770,188.0,1252
+10,Warsaw,Poland,1862345,517.2,1300

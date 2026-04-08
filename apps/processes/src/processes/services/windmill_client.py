@@ -456,14 +456,14 @@ class WindmillClient:
             # Fetch full details for jobs that need args/results
             if include_results:
                 # Jobs that need full details:
-                # - layer_export, print_report: need args for filtering and results for download
+                # - layer_export, project_export, print_report: need args for filtering and results for download
                 # - workflow_runner: need results for temp_layer_ids
                 # - failed jobs: need result to extract error name/message
                 jobs_needing_details = [
                     j
                     for j in jobs
                     if j.get("script_path", "").endswith(
-                        ("layer_export", "print_report", "workflow_runner")
+                        ("layer_export", "project_export", "print_report", "workflow_runner")
                     )
                     or j.get("success") is False  # Failed jobs need error details
                     or j.get("running") is True  # Running jobs may need flow_status

@@ -78,12 +78,16 @@ export type JobType =
   | "heatmap_gravity_active_mobility"
   | "heatmap_gravity_pt"
   | "heatmap_gravity_car"
+  | "heatmap_2sfca"
+  | "huff_model"
   | "aggregate_point"
   | "aggregate_polygon"
   | "trip_count_station"
   | "origin_destination"
   | "nearby_station_access"
-  | "finalize_layer";
+  | "finalize_layer"
+  | "project_export"
+  | "project_import";
 
 /**
  * OGC Job status response

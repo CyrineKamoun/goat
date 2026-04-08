@@ -1,0 +1,8 @@
+{
+  "label": "Workflows",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "Erstellen Sie visuelle Analyse-Workflows durch das Verbinden von Datensätzen, Werkzeugen und Export-Knoten. Bauen Sie komplexe räumliche Analysepipelines mit Drag-and-Drop-Einfachheit auf, führen Sie Workflows schrittweise aus und verketten Sie mehrere Werkzeuge für anspruchsvolle räumliche Analysen."
+  }
+}

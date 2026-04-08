@@ -14,6 +14,7 @@ import {
   useTheme,
 } from "@mui/material";
 import { type CSSProperties, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   getOevStationConfigPreset,
@@ -125,6 +126,7 @@ export default function OevStationConfigInput({
   disabled,
 }: OevStationConfigInputProps) {
   const theme = useTheme();
+  const { t } = useTranslation("common");
 
   const parsedValue = stationConfigSchema.safeParse(value);
   const stationConfig = parsedValue.success
@@ -368,7 +370,7 @@ export default function OevStationConfigInput({
 
         <Dialog open={dialogOpen} onClose={handleCloseDialog} fullWidth maxWidth="lg">
           <DialogTitle>Haltestellenkonfiguration</DialogTitle>
-          <DialogContent dividers>
+          <DialogContent dividers sx={{ mb: 2 }}>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1.75, pt: 0.5 }}>
               <Selector
                 selectedItems={selectedDraftPresetItem}
@@ -625,10 +627,16 @@ export default function OevStationConfigInput({
               ) : null}
             </Box>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancel</Button>
+          <DialogActions sx={{ px: 3, py: 2 }}>
+            <Button onClick={handleCloseDialog} variant="text">
+              <Typography variant="body2" fontWeight="bold">
+                {t("cancel")}
+              </Typography>
+            </Button>
             <Button onClick={handleApplyDialog} variant="contained" disabled={!isDraftValid}>
-              Apply
+              <Typography variant="body2" fontWeight="bold" color="inherit">
+                {t("apply")}
+              </Typography>
             </Button>
           </DialogActions>
         </Dialog>

@@ -352,6 +352,48 @@ def get_ordinal_polygon_style(
     }
 
 
+def get_ordinal_line_style(
+    color_field: str,
+    values: list[int | float | str],
+    palette: str | list[str] = "OrRd",
+    opacity: float = 1.0,
+    stroke_width: int = 3,
+) -> dict[str, Any]:
+    """Generate a complete ordinal line style for discrete values.
+
+    Similar to get_ordinal_polygon_style but uses stroke_color properties
+    so that MapLibre line layers render the color map correctly.
+
+    Args:
+        color_field: Name of the field containing the values
+        values: List of discrete values to map to colors
+        palette: Either a palette name (YlGn, OrRd, Sunset, BuPu) or list of hex colors
+        opacity: Line opacity (default 1.0)
+        stroke_width: Line width in pixels (default 3)
+
+    Returns:
+        Complete style dict for ordinal line visualization
+    """
+    colors, color_map = build_ordinal_color_map(values, palette)
+
+    return {
+        **DEFAULT_LINE_STYLE,
+        "stroke_color": hex_to_rgb(colors[len(colors) // 2]),  # Middle color as default
+        "color": hex_to_rgb(colors[len(colors) // 2]),
+        "opacity": opacity,
+        "stroke_width": stroke_width,
+        "stroke_color_field": {"name": color_field, "type": "number"},
+        "stroke_color_range": {
+            "name": "Custom",
+            "type": "custom",
+            "colors": colors,
+            "category": "Custom",
+            "color_map": color_map,
+        },
+        "stroke_color_scale": "ordinal",
+    }
+
+
 def get_default_style(geometry_type: str | None) -> dict[str, Any]:
     """Generate default layer style based on geometry type.
 

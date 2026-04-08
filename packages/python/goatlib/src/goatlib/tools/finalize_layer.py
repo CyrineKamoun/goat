@@ -179,6 +179,11 @@ class FinalizeLayerRunner(BaseToolRunner[FinalizeLayerParams]):
                 f"{bbox[0]} {bbox[1]}))"
             )
 
+        # Get snapshot_id for PMTiles metadata
+        snapshot_id = self._get_ducklake_snapshot_id(
+            user_schema, f"t_{new_layer_id.replace('-', '')}"
+        )
+
         # Generate PMTiles for the permanent layer
         if (
             geometry_type
@@ -201,6 +206,7 @@ class FinalizeLayerRunner(BaseToolRunner[FinalizeLayerParams]):
                     user_id=user_id,
                     layer_id=new_layer_id,
                     geometry_column=geom_col or "geometry",
+                    snapshot_id=snapshot_id,
                 )
                 logger.info(f"Generated PMTiles for finalized layer: {new_layer_id}")
             except Exception as e:

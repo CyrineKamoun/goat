@@ -10,6 +10,8 @@ import numpy as np
 import polars as pl
 from redis import Redis
 from shapely.geometry import mapping
+from shapely.geometry import MultiPolygon, Polygon
+from shapely.ops import unary_union
 from routing.core.config import settings
 from routing.core.isochrone import compute_isochrone, compute_isochrone_h3
 from routing.core.jsoline import generate_jsolines
@@ -556,16 +558,11 @@ class CRUDCatchmentArea:
             # Format polygon catchment area as GeoJSON
             if shapes is None:
                 return {"type": "FeatureCollection", "features": []}
-            # Use incremental shapes if polygon_difference is True, otherwise use full
-            shapes_key = "incremental" if obj_in.polygon_difference else "full"
-            shapes_data = shapes[shapes_key]
+            # Always start from full polygons, fill holes, then optionally cut out smaller steps.
+            shapes_data = shapes["full"]
+            processed_shapes = self._prepare_polygon_shapes(shapes_data, obj_in)
             features = []
-            for i in shapes_data.index:
-                geom = shapes_data["geometry"][i]
-                # Skip empty geometries
-                if geom is None or geom.is_empty:
-                    continue
-                minute: Union[float, int] = shapes_data["minute"][i]
+            for minute, geom in processed_shapes:
                 # Convert Shapely geometry to GeoJSON dict
                 geom_dict = mapping(geom)
                 features.append(
@@ -663,18 +660,13 @@ class CRUDCatchmentArea:
             if shapes is None:
                 df = pl.DataFrame({"geometry": [], "minute": [], "cost_step": []})
             else:
-                # Use incremental shapes if polygon_difference is True, otherwise use full
-                shapes_key = "incremental" if obj_in.polygon_difference else "full"
-                shapes_data = shapes[shapes_key]
+                # Always start from full polygons, fill holes, then optionally cut out smaller steps.
+                shapes_data = shapes["full"]
+                processed_shapes = self._prepare_polygon_shapes(shapes_data, obj_in)
                 rows = []
-                for i in shapes_data.index:
-                    geom = shapes_data["geometry"][i]
-                    # Skip empty geometries
-                    if geom is None or geom.is_empty:
-                        continue
+                for minute, geom in processed_shapes:
                     # Convert Shapely geometry to WKT string
                     geom_wkt = geom.wkt if hasattr(geom, "wkt") else str(geom)
-                    minute: Union[float, int] = shapes_data["minute"][i]
                     cost_step = (
                         math.ceil(minute / step_size) * step_size
                         if step_size > 0
@@ -755,6 +747,62 @@ class CRUDCatchmentArea:
         df.write_parquet(buffer)
         buffer.seek(0)
         return buffer.read()
+
+    def _fill_polygon_holes(self, geom: Any) -> Any:
+        """Remove interior rings from Polygon/MultiPolygon geometries."""
+        if geom is None or geom.is_empty:
+            return geom
+
+        if isinstance(geom, Polygon):
+            return Polygon(geom.exterior)
+
+        if isinstance(geom, MultiPolygon):
+            filled_parts = [Polygon(part.exterior) for part in geom.geoms if not part.is_empty]
+            if not filled_parts:
+                return geom
+            if len(filled_parts) == 1:
+                return filled_parts[0]
+            return MultiPolygon(filled_parts)
+
+        # Keep non-polygon geometries unchanged.
+        return geom
+
+    def _prepare_polygon_shapes(self, shapes_data: Any, obj_in: Any) -> list[tuple[Union[float, int], Any]]:
+        """Fill holes first; optionally cut smaller steps out of larger ones."""
+        prepared: list[tuple[Union[float, int], Any]] = []
+        should_fill_holes = obj_in.routing_type == CatchmentAreaRoutingTypeCar.car
+
+        # Build ordered cumulative geometries with holes removed.
+        for i in shapes_data.index:
+            geom = shapes_data["geometry"][i]
+            if geom is None or geom.is_empty:
+                continue
+            minute: Union[float, int] = shapes_data["minute"][i]
+            processed_geom = self._fill_polygon_holes(geom) if should_fill_holes else geom
+            if processed_geom is None or processed_geom.is_empty:
+                continue
+            prepared.append((minute, processed_geom))
+
+        prepared.sort(key=lambda x: x[0])
+
+        if not obj_in.polygon_difference:
+            return prepared
+
+        # For difference output, remove all smaller-step coverage from each larger step.
+        diff_prepared: list[tuple[Union[float, int], Any]] = []
+        accumulated = None
+        for minute, geom in prepared:
+            if accumulated is None:
+                band = geom
+                accumulated = geom
+            else:
+                band = geom.difference(accumulated)
+                accumulated = unary_union([accumulated, geom])
+            if band is None or band.is_empty:
+                continue
+            diff_prepared.append((minute, band))
+
+        return diff_prepared
 
     async def save_result(
         self,

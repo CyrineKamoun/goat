@@ -16,6 +16,40 @@ import { chartTypes, dataTypes, elementTypes, informationTypes } from "@/lib/val
 
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
+/**
+ * Check if a widget should be completely hidden in public view
+ * (e.g. rich_text with hide_when_no_filter and no active cross-filters).
+ */
+function useWidgetHidden(widget: BuilderWidgetSchema, viewOnly?: boolean): boolean {
+  const { temporaryFilters } = useAppSelector((state) => state.map);
+
+  return useMemo(() => {
+    if (!viewOnly) return false;
+    const config = widget.config as any;
+    if (!config?.options?.hide_when_no_filter) return false;
+
+    // Get layer IDs from the widget's variables (rich_text) or setup
+    const layerIds: number[] = [];
+    if (config.setup?.variables) {
+      for (const v of config.setup.variables) {
+        if (v.layer_project_id) layerIds.push(v.layer_project_id);
+      }
+    } else if (config.setup?.layer_project_id) {
+      layerIds.push(config.setup.layer_project_id);
+    }
+
+    if (layerIds.length === 0) return false;
+
+    const hasFilter = temporaryFilters.some(
+      (f) =>
+        layerIds.includes(f.layer_id) ||
+        f.additional_targets?.some((t: any) => layerIds.includes(t.layer_id))
+    );
+
+    return !hasFilter;
+  }, [viewOnly, widget.config, temporaryFilters]);
+}
+
 import WidgetChart from "@/components/builder/widgets/chart/WidgetChart";
 import WidgetData from "@/components/builder/widgets/data/WidgetData";
 import WidgetElement from "@/components/builder/widgets/elements/WidgetElement";
@@ -87,10 +121,17 @@ const WidgetWrapper: React.FC<WidgetWrapperProps> = ({
   onWidgetUpdate,
   panelWidgets,
 }) => {
+  const isHidden = useWidgetHidden(widget, viewOnly);
+
+  // Completely remove the widget from the layout in public view
+  if (isHidden) return null;
+
+  const isFullHeight = widget.config?.type === "rich_text" || widget.config?.type === "text" || widget.config?.type === "tabs" || widget.config?.type === "table";
   const widgetContent = (
-    <Box sx={{ p: 1 }}>
+    <Box sx={{ p: 1, height: isFullHeight ? "100%" : undefined }}>
       {widget.config?.type && informationTypes.options.includes(widget.config?.type as any) && (
         <WidgetInformation
+          widgetId={widget.id}
           config={widget.config as WidgetInformationConfig}
           projectLayers={projectLayers}
           projectLayerGroups={projectLayerGroups}

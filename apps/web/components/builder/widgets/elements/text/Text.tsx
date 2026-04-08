@@ -9,7 +9,7 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import type { Editor } from "@tiptap/react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
@@ -19,12 +19,12 @@ import LineHeight from "@/lib/extensions/line-height";
 import type { TextElementSchema } from "@/lib/validations/widget";
 
 import { AlignSelect } from "@/components/builder/widgets/elements/text/AlignSelect";
-import { BlockTypeSelect } from "@/components/builder/widgets/elements/text/BlockTypeSelect";
 import DynamicTextMenu from "@/components/builder/widgets/elements/text/DynamicTextMenu";
 import FontFamilySelect from "@/components/builder/widgets/elements/text/FontFamilySelect";
 import FontSizeInput from "@/components/builder/widgets/elements/text/FontSizeInput";
 import LineHeightSelect from "@/components/builder/widgets/elements/text/LineHeightSelect";
 import MenuButton from "@/components/builder/widgets/elements/text/MenuButton";
+import RichTextFontSizeSelect from "@/components/builder/widgets/data/RichTextFontSizeSelect";
 import TextColorPicker from "@/components/builder/widgets/elements/text/TextColorPicker";
 
 export type TextEditorContext = "dashboard" | "report";
@@ -50,7 +50,7 @@ export const TipTapEditorContent = styled(EditorContent)(() => ({
   wordBreak: "break-word",
   overflowWrap: "break-word",
   "& .ProseMirror": {
-    fontFamily: DEFAULT_FONT_FAMILY,
+    fontFamily: "inherit",
     wordBreak: "break-word",
     overflowWrap: "break-word",
     padding: 0,
@@ -135,6 +135,30 @@ const TextElementWidgetEditable = ({
     editable: isEditMode,
   });
 
+  // Refs for latest values — accessible from stable callbacks without re-registering handlers
+  const onWidgetUpdateRef = useRef(onWidgetUpdate);
+  const configRef = useRef(config);
+  useEffect(() => {
+    onWidgetUpdateRef.current = onWidgetUpdate;
+    configRef.current = config;
+  });
+
+  // Stable save function that always reads the latest config/callback from refs
+  const saveContent = useCallback(() => {
+    if (editor && onWidgetUpdateRef.current) {
+      const currentText = editor.getHTML();
+      if (currentText !== configRef.current.setup.text) {
+        onWidgetUpdateRef.current({
+          ...configRef.current,
+          setup: { ...configRef.current.setup, text: currentText },
+        });
+      }
+    }
+  }, [editor]);
+
+  // Stable debounced save — only recreated when editor changes
+  const debouncedSave = useMemo(() => debounce(() => saveContent(), 300), [saveContent]);
+
   // Update editor editable state when isEditMode changes
   useEffect(() => {
     if (editor) {
@@ -180,6 +204,9 @@ const TextElementWidgetEditable = ({
       if (colorPickerOpenRef.current || activeDropdownRef.current) return;
       // Don't close if toolbar was just clicked (mousedown fires before blur resolves)
       if (toolbarClickedRef.current) return;
+      // Flush any pending debounced save to ensure changes persist before leaving edit mode
+      debouncedSave.clear();
+      saveContent();
       setToolbarOpen(false);
       setIsEditMode(false);
     };
@@ -191,7 +218,7 @@ const TextElementWidgetEditable = ({
       editor.off("focus", handleFocus);
       editor.off("blur", handleBlur);
     };
-  }, [editor]);
+  }, [editor, debouncedSave, saveContent]);
 
   // Handle mouse events to distinguish click from drag
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -228,31 +255,25 @@ const TextElementWidgetEditable = ({
       isSuperscript: editor.isActive("superscript"),
       isSubscript: editor.isActive("subscript"),
       isLink: editor.isActive("link"),
+      isBulletList: editor.isActive("bulletList"),
+      isOrderedList: editor.isActive("orderedList"),
     }),
   });
-
-  const debouncedUpdate = debounce(() => {
-    if (editor && onWidgetUpdate) {
-      onWidgetUpdate({
-        ...config,
-        setup: { ...config.setup, text: editor.getHTML() },
-      });
-    }
-  }, 300); // Adjust debounce delay as needed
 
   useEffect(() => {
     if (!editor) return;
 
     const handleUpdate = () => {
-      debouncedUpdate();
+      debouncedSave();
     };
 
     editor.on("update", handleUpdate);
 
     return () => {
       editor.off("update", handleUpdate);
+      debouncedSave.clear();
     };
-  }, [editor, debouncedUpdate]);
+  }, [editor, debouncedSave]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [toolbarPosition, setToolbarPosition] = useState({ top: 0, left: 0, width: 0 });
@@ -290,7 +311,7 @@ const TextElementWidgetEditable = ({
       ref={containerRef}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      sx={{ height: "100%", width: "100%", cursor: isEditMode ? "text" : "default" }}>
+      sx={{ height: "100%", width: "100%", cursor: isEditMode ? "text" : "inherit" }}>
       {/* Toolbar rendered via Portal to escape overflow:hidden */}
       {toolbarOpen && (
         <Portal>
@@ -339,12 +360,14 @@ const TextElementWidgetEditable = ({
                       />
                     </>
                   ) : (
-                    <BlockTypeSelect
-                      editor={editor}
-                      onOpen={() => updateActiveDropdown("blockType")}
-                      onClose={() => updateActiveDropdown(null)}
-                      forceClose={activeDropdown !== "blockType" && activeDropdown !== null}
-                    />
+                    <>
+                      <RichTextFontSizeSelect
+                        editor={editor}
+                        onOpen={() => updateActiveDropdown("fontSize")}
+                        onClose={() => updateActiveDropdown(null)}
+                        forceClose={activeDropdown !== "fontSize" && activeDropdown !== null}
+                      />
+                    </>
                   )}
                   <Divider flexItem orientation="vertical" />
                   <Stack direction="row" spacing={0.5} alignItems="center">
@@ -372,19 +395,38 @@ const TextElementWidgetEditable = ({
                       selected={editorState?.isStrike}
                       onClick={() => editor.chain().focus().toggleStrike().run()}
                     />
+                    {context === "report" && (
+                      <>
+                        <MenuButton
+                          value="superscript"
+                          iconName={ICON_NAME.SUPERSCRIPT}
+                          selected={editorState?.isSuperscript}
+                          onClick={() => editor.chain().focus().toggleSuperscript().run()}
+                          disabled={!editor.can().toggleSuperscript()}
+                        />
+                        <MenuButton
+                          value="subscript"
+                          iconName={ICON_NAME.SUBSCRIPT}
+                          selected={editorState?.isSubscript}
+                          onClick={() => editor.chain().focus().toggleSubscript().run()}
+                          disabled={!editor.can().toggleSubscript()}
+                        />
+                      </>
+                    )}
+                  </Stack>
+                  <Divider flexItem orientation="vertical" />
+                  <Stack direction="row" spacing={0.5} alignItems="center">
                     <MenuButton
-                      value="superscript"
-                      iconName={ICON_NAME.SUPERSCRIPT}
-                      selected={editorState?.isSuperscript}
-                      onClick={() => editor.chain().focus().toggleSuperscript().run()}
-                      disabled={!editor.can().toggleSuperscript()}
+                      value="bulletList"
+                      iconName={ICON_NAME.BULLET_LIST}
+                      selected={editorState?.isBulletList}
+                      onClick={() => editor.chain().focus().toggleBulletList().run()}
                     />
                     <MenuButton
-                      value="subscript"
-                      iconName={ICON_NAME.SUBSCRIPT}
-                      selected={editorState?.isSubscript}
-                      onClick={() => editor.chain().focus().toggleSubscript().run()}
-                      disabled={!editor.can().toggleSubscript()}
+                      value="orderedList"
+                      iconName={ICON_NAME.NUMBERED_LIST}
+                      selected={editorState?.isOrderedList}
+                      onClick={() => editor.chain().focus().toggleOrderedList().run()}
                     />
                   </Stack>
                   <Divider flexItem orientation="vertical" />
@@ -394,14 +436,12 @@ const TextElementWidgetEditable = ({
                     onClose={() => updateActiveDropdown(null)}
                     forceClose={activeDropdown !== "align" && activeDropdown !== null}
                   />
-                  {context === "report" && (
-                    <LineHeightSelect
-                      editor={editor}
-                      onOpen={() => updateActiveDropdown("lineHeight")}
-                      onClose={() => updateActiveDropdown(null)}
-                      forceClose={activeDropdown !== "lineHeight" && activeDropdown !== null}
-                    />
-                  )}
+                  <LineHeightSelect
+                    editor={editor}
+                    onOpen={() => updateActiveDropdown("lineHeight")}
+                    onClose={() => updateActiveDropdown(null)}
+                    forceClose={activeDropdown !== "lineHeight" && activeDropdown !== null}
+                  />
                   {context === "report" && (
                     <>
                       <Divider flexItem orientation="vertical" />
@@ -457,7 +497,7 @@ const TextElementWidget = ({
   onWidgetUpdate?: (newConfig: TextElementSchema) => void;
   featureAttributes?: string[];
 }) => {
-  return viewOnly ? (
+  const content = viewOnly ? (
     <TextElementWidgetViewOnly config={config} />
   ) : (
     <TextElementWidgetEditable
@@ -467,6 +507,17 @@ const TextElementWidget = ({
       featureAttributes={featureAttributes}
     />
   );
+
+  // Report/layout context uses its own font; dashboard inherits from layout
+  if (context === "report") {
+    return (
+      <Box sx={{ fontFamily: DEFAULT_FONT_FAMILY, height: "100%", width: "100%" }}>
+        {content}
+      </Box>
+    );
+  }
+
+  return content;
 };
 
 export default TextElementWidget;

@@ -1,0 +1,8 @@
+{
+  "label": "Workflows",
+  "position": 4,
+  "link": {
+    "type": "generated-index",
+    "description": "Create visual analysis workflows by connecting datasets, tools, and export nodes. Build complex spatial analysis pipelines with drag-and-drop simplicity, execute workflows step by step, and chain multiple tools together for sophisticated spatial analysis."
+  }
+}

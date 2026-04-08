@@ -151,7 +151,7 @@ const ImageElementWidget = ({
         height: fitMode === "contain" ? "100%" : "fit-content",
         overflow: "hidden",
         borderRadius: 0,
-        cursor: "pointer",
+        cursor: "inherit",
         "&:hover .overlay": { opacity: 1 },
         "&:hover .action-buttons": {
           opacity: 1,

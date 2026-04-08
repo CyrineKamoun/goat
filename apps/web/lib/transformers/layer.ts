@@ -58,6 +58,10 @@ export function getMapboxStyleColor(data: ProjectLayer | Layer, type: "color" | 
       });
     });
 
+    // A match expression needs at least one label+output pair; fall back to default if empty.
+    if (valuesAndColors.length < 2) {
+      return data.properties[type] ? rgbToHex(data.properties[type] as RGBColor) : "#AAAAAA";
+    }
     // Use to-string to ensure string comparison — MapLibre match only supports
     // integer numeric labels, so string matching is needed for float/decimal values.
     return ["match", ["to-string", ["get", fieldName]], ...valuesAndColors, "#AAAAAA"];
@@ -79,6 +83,10 @@ export function getMapboxStyleColor(data: ProjectLayer | Layer, type: "color" | 
     // Similar to "ordinal" above but we treat them in a different way.
     const colorSteps = [] as unknown[];
     const colorMapsFiltered = removeColorMapsDuplicates(colorMaps);
+    // With only 1 unique entry, we can't build a valid step expression — fall back to simple color
+    if (colorMapsFiltered.length < 2) {
+      return colorMapsFiltered[0]?.[1] || (data.properties[type] ? rgbToHex(data.properties[type] as RGBColor) : "#AAAAAA");
+    }
     colorMapsFiltered.forEach((colorMap, index) => {
       if (index < colorMapsFiltered.length - 1) {
         colorSteps.push(colorMap[1], Number(colorMapsFiltered[index + 1]?.[0]?.[0]) || 0);
@@ -108,6 +116,13 @@ export function getMapboxStyleColor(data: ProjectLayer | Layer, type: "color" | 
     _breakValues = filtered.map((value) => value[0][0]);
     _colors = filtered.map((value) => value[1]);
   }
+
+  // A step expression needs at least one stop (default color + stop value + color),
+  // so if we have fewer than 2 colors after dedup, fall back to simple color.
+  if (_colors.length < 2) {
+    return _colors[0] || (data.properties[type] ? rgbToHex(data.properties[type] as RGBColor) : "#AAAAAA");
+  }
+
   const colorSteps = _colors
     .map((color, index) => {
       if (index === _colors.length - 1 || !_breakValues) {
@@ -212,7 +227,7 @@ export function getSymbolStyleSpec(data: TextLabelSchemaData | undefined, layer:
     iconLayout["icon-anchor"] = pointProperties.marker_anchor || "center";
     iconLayout["icon-offset"] = pointProperties.marker_offset || [0, 0];
     iconPaint["icon-opacity"] = pointProperties.filled ? pointProperties.opacity : 1;
-    iconPaint["icon-color"] = getMapboxStyleColor(layer, "color");
+    iconPaint["icon-color"] = pointProperties.filled ? getMapboxStyleColor(layer, "color") : "#000000";
   }
   if (data?.field) {
     textLayout["text-field"] = ["get", data.field];

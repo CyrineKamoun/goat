@@ -18,6 +18,7 @@ import TabItem from '@theme/TabItem';
 
 ## Wie Sie Ihre Layer verwalten
 
+Das Layer Panel ist Ihre zentrale Anlaufstelle für die Organisation und Steuerung aller Daten in Ihrem GOAT-Projekt. Hier können Sie neue Datensätze hinzufügen, die Layer-Reihenfolge für eine optimale Visualisierung anordnen, verwandte Layer gruppieren und die Sichtbarkeit steuern. Dieser Abschnitt führt Sie durch alle wesentlichen Layer-Verwaltungsfunktionen, um Ihnen beim Erstellen gut organisierter und visuell effektiver Karten zu helfen.
 
 ### Layer hinzufügen
 
@@ -165,6 +166,41 @@ Klicken Sie auf das <img src={require('/img/icons/eye.png').default} alt="Layer 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
   <img src={require('/img/map/layers/hide_layers.gif').default} alt="Layer ausblenden" style={{ maxHeight: "flex", maxWidth: "flex", objectFit: "cover"}}/>
 </div> 
+
+#### Layer gruppieren
+
+Klicken Sie auf die <img src={require('/img/icons/layer.png').default} alt="Layer gruppieren" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code> Layer gruppieren</code> Schaltfläche oben im Layer Panel, um **Layer-Gruppen zu erstellen**, die dabei helfen, verwandte Datensätze zusammen zu organisieren.
+
+<div class="step">
+  <div class="step-number">1</div>
+  <div class="content">Klicken Sie auf die <code>Layer gruppieren</code> Schaltfläche <img src={require('/img/icons/layer.png').default} alt="Layer gruppieren" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> oben im Layer Panel.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">2</div>
+  <div class="content">Geben Sie einen <strong>Namen für Ihre Layer-Gruppe</strong> in das erscheinende Dialogfeld ein.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Klicken Sie auf <code>Erstellen</code>, um <strong>die neue Layer-Gruppe zu erstellen</strong>.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content"><strong>Ziehen Sie Layer</strong> aus der Haupt-Layer-Liste in Ihre neu erstellte Gruppe, um sie zu organisieren.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Verwenden Sie den <strong>Aufklappen/Zuklappen-Pfeil</strong> neben dem Gruppennamen, um den Gruppeninhalt anzuzeigen oder zu verbergen.</div>
+</div>
+
+Layer-Gruppen ermöglichen es Ihnen:
+- **Verwandte Layer** in logische Sammlungen zu organisieren
+- **Ganze Gruppen auf- oder zuzuklappen** für bessere Arbeitsbereich-Verwaltung
+- **Gruppenebenen-Operationen** wie das Anzeigen/Verbergen aller Layer in einer Gruppe anzuwenden
+- **Visuelle Hierarchie** in komplexen Projekten mit vielen Layern zu erhalten
 
 
 #### Optionen

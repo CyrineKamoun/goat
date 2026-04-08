@@ -1,13 +1,16 @@
 import * as z from "zod";
 
 import { DEFAULT_COLOR_RANGE } from "@/lib/constants/color";
-import { sortTypes, statisticOperationEnum } from "@/lib/validations/common";
+import { formatNumberTypes, sortTypes, statisticOperationEnum } from "@/lib/validations/common";
 import { colorRange } from "@/lib/validations/layer";
 
+export { formatNumberTypes };
+export type { FormatNumberTypes } from "@/lib/validations/common";
+
 export const informationTypes = z.enum(["layers", "bookmarks", "comments"]);
-export const dataTypes = z.enum(["filter", "table", "numbers", "feature_list"]);
+export const dataTypes = z.enum(["filter", "table", "numbers", "feature_list", "rich_text"]);
 export const chartTypes = z.enum(["histogram_chart", "categories_chart", "pie_chart"]);
-export const elementTypes = z.enum(["text", "divider", "image", "tabs"]);
+export const elementTypes = z.enum(["text", "divider", "image", "tabs", "links"]);
 export const widgetTypes = z.enum([
   ...informationTypes.options,
   ...dataTypes.options,
@@ -17,23 +20,6 @@ export const widgetTypes = z.enum([
 
 export const widgetTypesWithoutConfig = [elementTypes.Values.text, elementTypes.Values.divider];
 
-export const formatNumberTypes = z.enum([
-  "none", // 1000
-  "decimal_max", // All decimals (up to 3)
-  "integer", // 1000 (no commas)
-  "grouping", // 1,000
-  "grouping_2d", // 12,345.67
-  "signed_2d", // +12,345.67
-  "compact", // 1k
-  "compact_1d", // 12.3k
-  "decimal_2", // 1.23
-  "decimal_3", // 1.234
-  "currency_usd", // $12,345.67
-  "currency_eur", // €12,345.67
-  "percent", // 1%
-  "percent_1d", // 1.0%
-  "percent_2d", // 1.00%
-]);
 
 // How chart widgets respond to cross-filter selections
 export const selectionResponseTypes = z.enum(["filter", "highlight"]);
@@ -96,6 +82,11 @@ export const informationConfigSchema = z.object({
   options: informationConfigOptionsBaseSchema.optional().default({}),
 });
 
+export const layersLayoutStyleTypes = z.enum(["tree", "tabs"]);
+export const layersToggleStyleTypes = z.enum(["eye", "checkbox", "switch"]);
+export const layersTogglePositionTypes = z.enum(["left", "right"]);
+export const layersMoreOptionsStyleTypes = z.enum(["compact", "direct_actions"]);
+export const layersOutOfZoomBehaviorTypes = z.enum(["hide", "dim"]);
 export const informationLayersConfigSchema = informationConfigSchema.extend({
   type: z.literal("layers"),
   setup: informationConfigSetupBaseSchema.extend({}).default({}),
@@ -103,7 +94,23 @@ export const informationLayersConfigSchema = informationConfigSchema.extend({
     .extend({
       show_search: z.boolean().optional().default(false),
       open_legend_by_default: z.boolean().optional().default(false),
+      out_of_zoom_behavior: layersOutOfZoomBehaviorTypes.optional().default("hide"),
+      layout_style: layersLayoutStyleTypes.optional().default("tree"),
+      toggle_style: layersToggleStyleTypes.optional().default("eye"),
+      toggle_position: layersTogglePositionTypes.optional().default("right"),
+      more_options_style: layersMoreOptionsStyleTypes.optional().default("compact"),
+      show_group_name: z.boolean().optional().default(true),
+      show_group_icons: z.boolean().optional().default(false),
+      hide_legend_heading: z.boolean().optional().default(false),
+      show_style_action: z.boolean().optional().default(true),
+      show_view_data_action: z.boolean().optional().default(true),
+      show_properties_action: z.boolean().optional().default(true),
+      show_zoom_to_action: z.boolean().optional().default(true),
+      excluded_layers: z.array(z.number()).optional().default([]),
+      legend_hidden_layers: z.array(z.number()).optional().default([]),
+      downloadable_layers: z.array(z.number()).optional().default([]),
     })
+    .passthrough()
     .default({}),
 });
 
@@ -136,6 +143,38 @@ export const numbersDataConfigSchema = dataConfigSchema.extend({
       cross_filter: z.boolean().optional().default(true),
       format: formatNumberTypes.optional().default("none"),
       description: z.string().optional(),
+    })
+    .default({}),
+});
+
+export const richTextVariableSchema = z.object({
+  id: z.string(),
+  name: z.preprocess(
+    (val) => (typeof val === "string" && val.length === 0 ? `var_${Date.now() % 1000}` : val),
+    z.string().min(1).max(64).regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/)
+  ),
+  layer_project_id: z.number().optional(),
+  operation_type: statisticOperationEnum.optional(),
+  operation_value: z.string().optional(),
+  format: formatNumberTypes.optional().default("none"),
+});
+
+export const richTextDataConfigSchema = z.object({
+  type: z.literal("rich_text"),
+  setup: z
+    .object({
+      title: z.string().optional().default("Rich Text"),
+      text: z.string().optional().default(""),
+      variables: z.array(richTextVariableSchema).optional().default([]),
+    })
+    .default({}),
+  options: z
+    .object({
+      description: z.string().optional(),
+      filter_by_viewport: z.boolean().optional().default(false),
+      cross_filter: z.boolean().optional().default(true),
+      hide_when_no_filter: z.boolean().optional().default(false),
+      no_filter_text: z.string().optional().default(""),
     })
     .default({}),
 });
@@ -194,6 +233,8 @@ export const tableDataConfigSchema = dataConfigSchema.extend({
 
 export const filterLayoutTypes = z.enum(["checkbox", "cards", "chips", "select", "range"]);
 export const pieLayoutTypes = z.enum(["center_active", "all_labels_outside", "legend"]);
+export const pieChartTypes = z.enum(["donut", "pie", "half_donut"]);
+export const labelSizeTypes = z.enum(["sm", "md", "lg"]);
 
 // Target layer schema for multi-layer attribute filtering
 export const filterTargetLayerSchema = z.object({
@@ -212,6 +253,7 @@ export const filterDataConfigSchema = dataConfigSchema.extend({
       // Chips/Checkbox-specific settings
       min_visible_options: z.number().min(1).max(20).optional().default(5),
       wrap: z.boolean().optional().default(true),
+      show_all_option: z.boolean().optional().default(true),
       default_value: z.array(z.string()).optional(),
       custom_order: z.array(z.string()).optional(), // Custom chip order (values in desired order)
       // Range-specific settings
@@ -338,6 +380,8 @@ export const pieChartConfigSchema = chartsConfigBaseSchema.extend({
   options: chartConfigOptionsBaseSchema
     .extend({
       layout: pieLayoutTypes.optional().default("center_active"),
+      chart_type: pieChartTypes.optional().default("donut"),
+      label_size: labelSizeTypes.optional().default("md"),
       num_categories: z.number().min(1).max(15).optional().default(1),
       cap_others: z.boolean().optional().default(false),
       color_range: widgetColorRange.optional().default(DEFAULT_COLOR_RANGE),
@@ -412,6 +456,32 @@ export const tabsContainerConfigSchema = z.object({
   ]),
 });
 
+export const linksSeparatorTypes = z.enum(["vertical_line", "dot", "dash"]);
+
+export const linksItemSchema = z.object({
+  label: z.string(),
+  url: z.string(),
+});
+
+export const linksElementConfigSchema = z.object({
+  type: z.literal("links"),
+  setup: z
+    .object({
+      title: z.string().optional(),
+      links: z.array(linksItemSchema).default([]),
+    })
+    .default({}),
+  options: z
+    .object({
+      description: z.string().optional(),
+      show_external_icon: z.boolean().optional().default(true),
+      open_in_new_tab: z.boolean().optional().default(true),
+      secondary_text: z.string().optional(),
+      separator: linksSeparatorTypes.optional().default("vertical_line"),
+    })
+    .default({}),
+});
+
 export const configSchemas = z.union([
   informationLayersConfigSchema,
   numbersDataConfigSchema,
@@ -424,6 +494,8 @@ export const configSchemas = z.union([
   dividerElementConfigSchema,
   imageElementConfigSchema,
   tabsContainerConfigSchema,
+  linksElementConfigSchema,
+  richTextDataConfigSchema,
 ]);
 
 export const widgetSchemaMap = {
@@ -438,10 +510,11 @@ export const widgetSchemaMap = {
   divider: dividerElementConfigSchema,
   image: imageElementConfigSchema,
   tabs: tabsContainerConfigSchema,
+  links: linksElementConfigSchema,
+  rich_text: richTextDataConfigSchema,
 };
 
 export type WidgetTypes = z.infer<typeof widgetTypes>;
-export type FormatNumberTypes = z.infer<typeof formatNumberTypes>;
 export type ChartConfigBaseSchema = z.infer<typeof chartsConfigBaseSchema>;
 export type HistogramChartSchema = z.infer<typeof histogramChartConfigSchema>;
 export type CategoriesChartSchema = z.infer<typeof categoriesChartConfigSchema>;
@@ -456,14 +529,22 @@ export type NumbersDataSchema = z.infer<typeof numbersDataConfigSchema>;
 export type TableDataSchema = z.infer<typeof tableDataConfigSchema>;
 export type FilterDataSchema = z.infer<typeof filterDataConfigSchema>;
 export type FilterLayoutTypes = z.infer<typeof filterLayoutTypes>;
+export type RichTextVariableSchema = z.infer<typeof richTextVariableSchema>;
+export type RichTextDataSchema = z.infer<typeof richTextDataConfigSchema>;
 
 export type WidgetChartConfig = HistogramChartSchema | CategoriesChartSchema | PieChartSchema;
+export type LinksElementSchema = z.infer<typeof linksElementConfigSchema>;
 export type WidgetElementConfig =
   | TextElementSchema
   | DividerElementSchema
   | ImageElementSchema
-  | TabsContainerSchema;
+  | TabsContainerSchema
+  | LinksElementSchema;
 export type WidgetInformationConfig = LayerInformationSchema;
-export type WidgetDataConfig = NumbersDataSchema | TableDataSchema | FilterDataSchema;
+export type WidgetDataConfig = NumbersDataSchema | TableDataSchema | FilterDataSchema | RichTextDataSchema;
+
+export type LayersLayoutStyleType = z.infer<typeof layersLayoutStyleTypes>;
+export type LayersToggleStyleType = z.infer<typeof layersToggleStyleTypes>;
+export type LayersTogglePositionType = z.infer<typeof layersTogglePositionTypes>;
 
 export type WidgetConfigSchema = z.infer<typeof configSchemas>;

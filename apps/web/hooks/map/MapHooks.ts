@@ -1,3 +1,4 @@
+import type maplibregl from "maplibre-gl";
 import { useCallback, useMemo } from "react";
 
 import type { Basemap } from "@/types/map/common";
@@ -5,6 +6,35 @@ import type { Basemap } from "@/types/map/common";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import { useTranslation } from 'react-i18next'
 import { setActiveBasemap as setActiveBasemapAction } from "@/lib/store/map/slice";
+
+/**
+ * Apply label language to a MapLibre map instance by rewriting text-field
+ * expressions on all symbol layers to prefer the given locale.
+ * Works with OpenMapTiles / MapTiler vector tiles that have name:{lang} fields.
+ */
+export function applyMapLanguage(map: maplibregl.Map, locale: string) {
+  if (!map.isStyleLoaded()) return;
+  const style = map.getStyle();
+  if (!style?.layers) return;
+
+  for (const layer of style.layers) {
+    if (layer.type !== "symbol") continue;
+    const textField = map.getLayoutProperty(layer.id, "text-field");
+    if (!textField) continue;
+
+    // Only rewrite layers that reference a "name" field (OpenMapTiles convention)
+    const textStr = JSON.stringify(textField);
+    if (!textStr.includes("name")) continue;
+
+    // Build a coalesce expression: prefer name:{locale}, fall back to name:en, then name
+    map.setLayoutProperty(layer.id, "text-field", [
+      "coalesce",
+      ["get", `name:${locale}`],
+      ["get", "name:en"],
+      ["get", "name"],
+    ]);
+  }
+}
 
 export const useBasemap = (project) => {
   const { t, i18n } = useTranslation("common");

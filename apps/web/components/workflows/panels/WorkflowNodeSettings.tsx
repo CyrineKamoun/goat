@@ -440,7 +440,7 @@ export default function WorkflowNodeSettings({
 
   // Heatmap tools with per-opportunity config
   const isHeatmapOpportunityTool =
-    processId === "heatmap_gravity" || processId === "heatmap_closest_average";
+    processId === "heatmap_gravity" || processId === "heatmap_closest_average" || processId === "heatmap_2sfca";
 
   // Compute predicted columns for connected tool outputs
   // This enables field selectors to show fields from upstream tool nodes
@@ -1030,7 +1030,13 @@ export default function WorkflowNodeSettings({
                 // In workflows, skip sections that are handled by node connections or not applicable
                 // Starting points and opportunities come from connected input nodes
                 // Scenario and result sections are not supported in workflows
-                const workflowHiddenSections = ["starting", "opportunities", "scenario", "result"];
+                const workflowHiddenSections = ["starting", "scenario", "result"];
+                // Only hide opportunities section for tools with repeatable per-opportunity config
+                // (gravity, closest_average, 2sfca). Other tools like huff_model have
+                // non-repeatable fields in the opportunities section that must remain visible.
+                if (isHeatmapOpportunityTool) {
+                  workflowHiddenSections.push("opportunities");
+                }
                 if (workflowHiddenSections.includes(section.id)) {
                   return null;
                 }

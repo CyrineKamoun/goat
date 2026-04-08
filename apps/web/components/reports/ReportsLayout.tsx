@@ -89,6 +89,7 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
   projectLayers = [],
   onProjectUpdate: _onProjectUpdate,
 }) => {
+  const { t } = useTranslation("common");
   // Shared state for the selected report layout
   const [selectedReport, setSelectedReport] = useState<ReportLayout | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
@@ -186,10 +187,11 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
             let posX = 20 + stackOffset; // mm from left
             let posY = 20 + stackOffset; // mm from top
 
-            // If we have paper rect and the event has coordinates, try to calculate relative position
-            if (paperRect && over.rect) {
-              const dropX = over.rect.left + over.rect.width / 2 - paperRect.left;
-              const dropY = over.rect.top + over.rect.height / 2 - paperRect.top;
+            // Use the dragged element's final translated position to place where the user actually dropped
+            const translated = active.rect.current.translated;
+            if (paperRect && translated) {
+              const dropX = translated.left + translated.width / 2 - paperRect.left;
+              const dropY = translated.top + translated.height / 2 - paperRect.top;
               const zoomAttr = paperElement?.getAttribute("data-zoom");
               const currentZoom = zoomAttr ? parseFloat(zoomAttr) : paperRect.width / (210 * (96 / 25.4));
               const pxPerMm = 96 / 25.4;
@@ -219,7 +221,13 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
                         pitch: initialView?.pitch ?? 0,
                       },
                     }
-                  : elementType === "north_arrow" || elementType === "legend" || elementType === "scalebar"
+                  : elementType === "legend"
+                    ? {
+                        title: { text: t("legend") },
+                        mapElementId:
+                          prev.config.elements?.find((el) => el.type === "map")?.id ?? null,
+                      }
+                  : elementType === "north_arrow" || elementType === "scalebar"
                     ? {
                         mapElementId:
                           prev.config.elements?.find((el) => el.type === "map")?.id ?? null,

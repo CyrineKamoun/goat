@@ -9,7 +9,7 @@ export const ACCOUNTS_ENABLED = Boolean(ACCOUNTS_BASE);
 export const BILLING_API_BASE_URL = ACCOUNTS_ENABLED ? new URL("api/v1/billing", ACCOUNTS_BASE!).href : "";
 
 // If your PlansList isn't an array, adjust this stub accordingly.
-const STUB_PLANS = [] as unknown as PlansList;
+const STUB_PLANS: PlansList = { plans: [] };
 
 export const useAppPlans = () => {
   const disabled = !ACCOUNTS_ENABLED;

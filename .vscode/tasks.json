@@ -84,8 +84,22 @@
       "dependsOrder": "sequence"
     },
     {
+      "label": "kill-port-3001",
+      "type": "shell",
+      "command": "kill $(ss -tlnp | grep ':3001 ' | grep -oP 'pid=\\K[0-9]+') 2>/dev/null || true",
+      "presentation": {
+        "reveal": "silent",
+        "close": true
+      }
+    },
+    {
       "label": "web-pre-launch",
       "dependsOn": ["kill-port-3000"],
+      "dependsOrder": "sequence"
+    },
+    {
+      "label": "docs-pre-launch",
+      "dependsOn": ["kill-port-3001"],
       "dependsOrder": "sequence"
     }
   ]

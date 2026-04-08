@@ -136,13 +136,23 @@ class DuckLakeSettings(Protocol):
 
 
 class BaseDuckLakeManager:
-    """Single DuckDB connection with lock for thread-safety."""
+    """Single DuckDB connection with lock for thread-safety.
+
+    Connections are automatically recycled after MAX_CONNECTION_AGE_SECONDS
+    to prevent accumulation of DuckLake metadata cache, libpq buffers,
+    and SSL contexts in long-running services.
+    """
 
     REQUIRED_EXTENSIONS = ["spatial", "httpfs", "postgres", "ducklake"]
+
+    # Max age before connection is recycled. Prevents unbounded growth of
+    # DuckLake metadata cache and libpq/SSL state in long-running processes.
+    MAX_CONNECTION_AGE_SECONDS = 300  # 5 minutes
 
     def __init__(self: "BaseDuckLakeManager", read_only: bool = False) -> None:
         self._connection: duckdb.DuckDBPyConnection | None = None
         self._lock = threading.Lock()
+        self._created_at: float = 0.0
         self._postgres_uri: str | None = None
         self._storage_path: str | None = None
         self._catalog_schema: str | None = None
@@ -208,6 +218,8 @@ class BaseDuckLakeManager:
 
     def _create_connection(self: "BaseDuckLakeManager") -> None:
         """Create and configure the DuckDB connection."""
+        import time
+
         con = duckdb.connect()
         if self._memory_limit:
             con.execute(f"SET memory_limit='{self._memory_limit}'")
@@ -223,10 +235,15 @@ class BaseDuckLakeManager:
         self._setup_s3(con)
         self._attach_ducklake(con)
         self._connection = con
+        self._created_at = time.time()
 
     def close(self: "BaseDuckLakeManager") -> None:
-        """Close the connection."""
+        """Close the connection, explicitly detaching DuckLake first."""
         if self._connection:
+            try:
+                self._connection.execute("DETACH lake")
+            except Exception:
+                pass
             self._connection.close()
             self._connection = None
             logger.info("DuckLake connection closed")
@@ -245,14 +262,47 @@ class BaseDuckLakeManager:
         self._setup_s3(con)
         self._attach_ducklake(con)
 
+    def _recycle_if_stale(self: "BaseDuckLakeManager") -> None:
+        """Recreate connection if it has exceeded MAX_CONNECTION_AGE_SECONDS.
+
+        Must be called while holding self._lock.
+        Prevents unbounded growth of DuckLake metadata cache, libpq buffers,
+        and SSL contexts in long-running services.
+        """
+        import time
+
+        if not self._connection or not self._created_at:
+            return
+        age = time.time() - self._created_at
+        if age > self.MAX_CONNECTION_AGE_SECONDS:
+            logger.info(
+                "Recycling DuckLake connection (age %.0fs > %ds)",
+                age,
+                self.MAX_CONNECTION_AGE_SECONDS,
+            )
+            try:
+                self._connection.execute("DETACH lake")
+            except Exception:
+                pass
+            try:
+                self._connection.close()
+            except Exception:
+                pass
+            self._create_connection()
+
     @contextmanager
     def connection(
         self: "BaseDuckLakeManager",
     ) -> Generator[duckdb.DuckDBPyConnection, None, None]:
-        """Get DuckDB connection (with lock)."""
+        """Get DuckDB connection (with lock).
+
+        Automatically recycles the connection if it has exceeded
+        MAX_CONNECTION_AGE_SECONDS to prevent memory accumulation.
+        """
         if not self._connection:
             raise RuntimeError("DuckLakeManager not initialized")
         with self._lock:
+            self._recycle_if_stale()
             yield self._connection
 
     @contextmanager
@@ -289,6 +339,10 @@ class BaseDuckLakeManager:
         """Reconnect to DuckLake."""
         with self._lock:
             if self._connection:
+                try:
+                    self._connection.execute("DETACH lake")
+                except Exception:
+                    pass
                 try:
                     self._connection.close()
                 except Exception:

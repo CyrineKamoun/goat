@@ -4,8 +4,10 @@ import {
   Box,
   Button,
   ClickAwayListener,
+  Collapse,
   Divider,
   Fade,
+  IconButton,
   ListItemIcon,
   Menu,
   MenuItem,
@@ -16,12 +18,14 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { v4 } from "uuid";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
+import type { FormatNumberTypes } from "@/lib/validations/common";
+import { formatNumber } from "@/lib/utils/format-number";
 import type {
   LayerInteractionContent,
   LayerInteractionContentType,
@@ -41,6 +45,7 @@ import type { SelectorItem } from "@/types/map/common";
 import useLayerFields from "@/hooks/map/CommonHooks";
 import { useInteractionOptions } from "@/hooks/map/LayerDesignHooks";
 
+import { NumberFormatSelector } from "@/components/builder/widgets/common/WidgetCommonConfigs";
 import { OverflowTypograpy } from "@/components/common/OverflowTypography";
 import { FieldTypeTag } from "@/components/map/common/LayerFieldSelector";
 import SectionHeader from "@/components/map/panels/common/SectionHeader";
@@ -54,10 +59,11 @@ const InteractionFieldListOptions: React.FC<{
   item: LayerInteractionFieldListContent;
   onSave: (item: LayerInteractionFieldListContent) => void;
 }> = ({ layer, item, onSave }) => {
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   const theme = useTheme();
   const [addContentAnchorEl, setAddContentAnchorEl] = useState<null | HTMLElement>(null);
   const [existingFields, setExistingFields] = useState(item.attributes || []);
+  const [expandedField, setExpandedField] = useState<string | null>(null);
   const open = Boolean(addContentAnchorEl);
   const handleAddContentOnClose = () => {
     setAddContentAnchorEl(null);
@@ -68,6 +74,16 @@ const InteractionFieldListOptions: React.FC<{
 
   const { layerFields } = useLayerFields(layer?.layer_id || "");
 
+  // Auto-populate fields when layer fields are loaded and no attributes exist
+  useEffect(() => {
+    if (layerFields.length > 0 && existingFields.length === 0) {
+      setExistingFields(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        layerFields.map((field) => ({ name: field.name, type: field.type as any }))
+      );
+    }
+  }, [layerFields]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const unAddedFields = useMemo(() => {
     return layerFields.filter((field) => !existingFields.some((attr) => attr.name === field.name));
   }, [layerFields, existingFields]);
@@ -77,8 +93,23 @@ const InteractionFieldListOptions: React.FC<{
     setExistingFields([...existingFields, { name: field.name, type: field.type as any }]);
   };
 
+  const resetToAllFields = () => {
+    setExistingFields(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      layerFields.map((field) => ({ name: field.name, type: field.type as any }))
+    );
+  };
+
+  const updateField = (fieldName: string, updates: Record<string, unknown>) => {
+    setExistingFields(existingFields.map((f) => (f.name === fieldName ? { ...f, ...updates } : f)));
+  };
+
+  const removeField = (fieldName: string) => {
+    setExistingFields(existingFields.filter((f) => f.name !== fieldName));
+    if (expandedField === fieldName) setExpandedField(null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
-    console.log("Drag End Event:", event);
     const { active, over } = event;
     const oldIndex = existingFields.findIndex((value) => value.name === active.id);
     const newIndex = existingFields.findIndex((value) => value.name === over?.id);
@@ -86,84 +117,191 @@ const InteractionFieldListOptions: React.FC<{
     setExistingFields(newOrderArray);
   };
 
+  const getFormatPreview = (field: { format?: FormatNumberTypes; prefix?: string; suffix?: string }) => {
+    const sampleValue = 12345.678;
+    const formatted = field.format
+      ? formatNumber(sampleValue, field.format, i18n.language)
+      : String(sampleValue);
+    return `${field.prefix || ""}${formatted}${field.suffix || ""}`;
+  };
+
+  const hasFormatConfig = (field: { format?: unknown; prefix?: string; suffix?: string }) =>
+    !!(field.format || field.prefix || field.suffix);
+
   return (
-    <Box sx={{ minWidth: "400px", maxHeight: "400px", overflowY: "auto" }}>
-      <Typography variant="body2" fontWeight="bold" gutterBottom sx={{ p: 2 }}>
-        {t("field_list")}
-      </Typography>
-      <Box sx={{ mb: 2, maxHeight: "210px", overflowY: "auto" }}>
+    <Box sx={{ minWidth: "400px", maxHeight: "500px", display: "flex", flexDirection: "column" }}>
+      {/* Header */}
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2, pt: 2, pb: 1 }}>
+        <Typography variant="body2" fontWeight="bold">
+          {t("field_list")}
+        </Typography>
+        {unAddedFields.length > 0 && (
+          <Typography
+            variant="caption"
+            color="primary"
+            sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+            onClick={resetToAllFields}>
+            {t("common:add_all_fields")}
+          </Typography>
+        )}
+      </Stack>
+
+      {/* Field list — no overflow clipping so Select dropdowns render correctly */}
+      <Box sx={{ flex: 1, overflowY: "auto", maxHeight: "320px", px: 1 }}>
         <SortableWrapper
           handleDragEnd={handleDragEnd}
           items={existingFields.map((field) => ({ ...field, id: field.name }))}>
-          {existingFields.map((field) => (
-            <SortableItem
-              key={field.name}
-              item={{ ...field, id: field.name }}
-              label={field.name}
-              active={false}
-              actions={
-                <Icon
-                  sx={{
-                    transition: (theme) =>
-                      theme.transitions.create(["color", "transform"], {
-                        duration: theme.transitions.duration.standard,
-                      }),
-                    "&:hover": {
-                      cursor: "pointer",
-                      color: theme.palette.error.main,
-                    },
-                  }}
-                  onClick={() => {
-                    setExistingFields(existingFields.filter((f) => f.name !== field.name));
-                  }}
-                  iconName={ICON_NAME.TRASH}
-                  style={{ fontSize: 12 }}
-                  htmlColor="inherit"
-                />
-              }>
-              <Stack
-                direction="row"
-                spacing={2}
-                alignItems="center"
-                sx={{
-                  py: 1,
-                  pr: 0,
-                  "&:hover": {
-                    color: "primary.main",
-                  },
-                }}>
-                <FieldTypeTag fieldType={field.type}>{field.type}</FieldTypeTag>
-                <OverflowTypograpy variant="body2" fontWeight="bold" sx={{ minWidth: "100px" }}>
-                  {field.name}
-                </OverflowTypograpy>
-                <Box sx={{ flexGrow: 1, width: "100%" }}>
+          {existingFields.map((field) => {
+            const isExpanded = expandedField === field.name;
+            const isNumber = field.type === "number";
+
+            return (
+              <SortableItem
+                key={field.name}
+                item={{ ...field, id: field.name }}
+                label={field.name}
+                active={false}>
+                <Stack spacing={0.5} sx={{ py: 0.5 }}>
+                  {/* Row 1: Type tag + field name + actions */}
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <FieldTypeTag fieldType={field.type}>{field.type}</FieldTypeTag>
+                    <OverflowTypograpy variant="body2" fontWeight="bold" sx={{ flex: 1 }}>
+                      {field.name}
+                    </OverflowTypograpy>
+                    {isNumber && hasFormatConfig(field) && !isExpanded && (
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          bgcolor: theme.palette.action.selected,
+                          color: theme.palette.text.secondary,
+                          px: 0.75,
+                          py: 0.125,
+                          borderRadius: 0.5,
+                          fontSize: 10,
+                          lineHeight: 1.4,
+                          whiteSpace: "nowrap",
+                        }}>
+                        {field.suffix || field.prefix || field.format}
+                      </Typography>
+                    )}
+                    {isNumber && (
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedField(isExpanded ? null : field.name);
+                        }}
+                        sx={{ p: 0.25 }}>
+                        <Icon
+                          iconName={ICON_NAME.SETTINGS}
+                          style={{ fontSize: 12 }}
+                          htmlColor={
+                            hasFormatConfig(field)
+                              ? theme.palette.primary.main
+                              : theme.palette.text.secondary
+                          }
+                        />
+                      </IconButton>
+                    )}
+                    <IconButton
+                      size="small"
+                      onClick={() => removeField(field.name)}
+                      sx={{
+                        p: 0.25,
+                        "&:hover": { color: theme.palette.error.main },
+                      }}>
+                      <Icon
+                        iconName={ICON_NAME.TRASH}
+                        style={{ fontSize: 12 }}
+                        htmlColor="inherit"
+                      />
+                    </IconButton>
+                  </Stack>
+                  {/* Row 2: Label input */}
                   <TextField
                     value={field.label || ""}
-                    inputProps={{ style: { fontSize: 13 } }}
-                    onChange={(e) => {
-                      const newFields = existingFields.map((f) =>
-                        f.name === field.name ? { ...f, label: e.target.value } : f
-                      );
-                      setExistingFields(newFields);
-                    }}
+                    inputProps={{ style: { fontSize: 12, padding: "6px 10px" } }}
+                    placeholder={field.name}
+                    onChange={(e) => updateField(field.name, { label: e.target.value })}
                     fullWidth
                     variant="outlined"
                     size="small"
                   />
-                </Box>
-              </Stack>
-            </SortableItem>
-          ))}
+                  {/* Row 3: Expandable format options (number fields only) */}
+                  {isNumber && (
+                    <Collapse in={isExpanded}>
+                      <Stack
+                        spacing={1}
+                        sx={{
+                          pt: 1,
+                          pb: 0.5,
+                          mt: 0.5,
+                          borderTop: `1px solid ${theme.palette.divider}`,
+                        }}>
+                        <Box sx={{
+                          "& .MuiSelect-select": { fontSize: 12, py: "6px" },
+                          "& .MuiInputLabel-root": { fontSize: 12 },
+                        }}>
+                          <NumberFormatSelector
+                            numberFormat={field.format as FormatNumberTypes | undefined}
+                            onNumberFormatChange={(format) => updateField(field.name, { format })}
+                          />
+                        </Box>
+                        <Stack direction="row" spacing={1}>
+                          <TextField
+                            value={field.prefix || ""}
+                            inputProps={{ style: { fontSize: 12, padding: "6px 10px" } }}
+                            placeholder={t("prefix")}
+                            onChange={(e) => updateField(field.name, { prefix: e.target.value })}
+                            variant="outlined"
+                            size="small"
+                            sx={{ flex: 1 }}
+                          />
+                          <TextField
+                            value={field.suffix || ""}
+                            inputProps={{ style: { fontSize: 12, padding: "6px 10px" } }}
+                            placeholder={t("suffix")}
+                            onChange={(e) => updateField(field.name, { suffix: e.target.value })}
+                            variant="outlined"
+                            size="small"
+                            sx={{ flex: 1 }}
+                          />
+                        </Stack>
+                        {hasFormatConfig(field) && (
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              bgcolor: theme.palette.action.hover,
+                              color: theme.palette.text.secondary,
+                              px: 1,
+                              py: 0.5,
+                              borderRadius: 1,
+                              display: "inline-block",
+                              width: "fit-content",
+                              fontSize: 11,
+                            }}>
+                            {t("preview")}:{" "}
+                            <strong>{getFormatPreview(field)}</strong>
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Collapse>
+                  )}
+                </Stack>
+              </SortableItem>
+            );
+          })}
         </SortableWrapper>
       </Box>
 
-      <Stack spacing={2} height="100%" sx={{ overflowY: "auto", maxHeight: "300px", px: 2, pt: 2, pb: 0 }}>
-        {/* Add any specific options for field list content here */}
+      {/* Add field button + menu */}
+      <Stack sx={{ px: 2, pt: 1, pb: 0 }}>
         <Button
           variant="outlined"
           size="small"
           onClick={handleContentAddOnClick}
-          disabled={unAddedFields.length === 0}>
+          disabled={unAddedFields.length === 0}
+          startIcon={<Icon iconName={ICON_NAME.PLUS} style={{ fontSize: 12 }} />}>
           {t("add_field")}
         </Button>
         <Menu
@@ -178,7 +316,6 @@ const InteractionFieldListOptions: React.FC<{
           transformOrigin={{ vertical: "bottom", horizontal: "center" }}
           open={open}
           MenuListProps={{
-            "aria-labelledby": "basic-button",
             sx: {
               width: addContentAnchorEl && addContentAnchorEl.offsetWidth - 10,
               p: 0,
@@ -191,10 +328,7 @@ const InteractionFieldListOptions: React.FC<{
                 <MenuItem
                   key="add-all-fields"
                   onClick={() => {
-                    setExistingFields(
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      layerFields.map((field) => ({ name: field.name, type: field.type as any }))
-                    );
+                    resetToAllFields();
                     handleAddContentOnClose();
                   }}>
                   <Typography variant="body2" fontWeight="bold">
@@ -217,14 +351,15 @@ const InteractionFieldListOptions: React.FC<{
           </Box>
         </Menu>
       </Stack>
-      <Stack sx={{ p: 2 }}>
+
+      {/* Save footer */}
+      <Stack sx={{ px: 2, pt: 1, pb: 2 }}>
         <Divider />
-        <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ px: 2 }}>
+        <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ pt: 1 }}>
           <Button
             variant="text"
             size="small"
             color="primary"
-            sx={{ borderRadius: 0 }}
             onClick={() => {
               onSave({
                 ...item,
@@ -257,7 +392,7 @@ const InteractionContentPopper = ({
       open={editingContentItem !== null}
       anchorEl={anchorEl}
       transition
-      sx={{ zIndex: 2000 }}
+      sx={{ zIndex: 1250 }}
       placement="left"
       modifiers={[
         {
@@ -297,7 +432,6 @@ const InteractionOptions = ({
 }) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
-
   const { interactionOptions, contentTypes } = useInteractionOptions(layer);
 
   const selectedInteractionOption = useMemo(() => {
@@ -399,26 +533,22 @@ const InteractionOptions = ({
   return (
     <>
       {editingContentItem && (
-        <ClickAwayListener onClickAway={() => setEditingContentItem(undefined)}>
-          <Box>
-            <InteractionContentPopper
-              layer={layer}
-              editingContentItem={editingContentItem}
-              anchorEl={contentPopoverAnchorEl}
-              onSave={(item: LayerInteractionContent) => {
-                const newStyle = JSON.parse(JSON.stringify(layer.properties)) || {};
-                newStyle.interaction = {
-                  ...newStyle.interaction,
-                  content: newStyle.interaction?.content?.map((content) =>
-                    content.id === item.id ? item : content
-                  ) || [item],
-                };
-                onStyleChange?.(newStyle);
-                setEditingContentItem(undefined);
-              }}
-            />
-          </Box>
-        </ClickAwayListener>
+        <InteractionContentPopper
+          layer={layer}
+          editingContentItem={editingContentItem}
+          anchorEl={contentPopoverAnchorEl}
+          onSave={(item: LayerInteractionContent) => {
+            const newStyle = JSON.parse(JSON.stringify(layer.properties)) || {};
+            newStyle.interaction = {
+              ...newStyle.interaction,
+              content: newStyle.interaction?.content?.map((content) =>
+                content.id === item.id ? item : content
+              ) || [item],
+            };
+            onStyleChange?.(newStyle);
+            setEditingContentItem(undefined);
+          }}
+        />
       )}
 
       <SectionHeader active alwaysActive label={t("options")} disableAdvanceOptions />
@@ -484,8 +614,12 @@ const InteractionOptions = ({
                       spacing={2}
                       alignItems="center"
                       onClick={(e) => {
-                        setEditingContentItem(item);
-                        setContentPopoverAnchorEl(e.currentTarget);
+                        if (editingContentItem?.id === item.id) {
+                          setEditingContentItem(undefined);
+                        } else {
+                          setEditingContentItem(item);
+                          setContentPopoverAnchorEl(e.currentTarget);
+                        }
                         e.stopPropagation();
                       }}
                       sx={{

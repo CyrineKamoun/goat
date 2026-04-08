@@ -3,6 +3,7 @@ import * as z from "zod";
 
 import { DEFAULT_WKT_EXTENT } from "@/lib/constants";
 import { DEFAULT_COLOR, DEFAULT_COLOR_RANGE } from "@/lib/constants/color";
+import { formatNumberTypes } from "@/lib/validations/common";
 import {
   contentMetadataSchema,
   dataCategory,
@@ -196,7 +197,9 @@ export const attributeSchema = z.object({
   name: z.string(),
   label: z.string().optional(),
   type: z.enum(["string", "number", "boolean"]),
-  format: z.string().optional(),
+  format: formatNumberTypes.optional(),
+  prefix: z.string().optional(),
+  suffix: z.string().optional(),
 });
 
 export const interactionFieldListContent = z.object({

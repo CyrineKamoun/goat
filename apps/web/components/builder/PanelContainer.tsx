@@ -139,6 +139,8 @@ export const Container: React.FC<ContainerProps> = ({
   const collapsedPanels = useAppSelector((state) => state.map.collapsedPanels);
   const isCollapsed = !!collapsedPanels?.[panel.id];
 
+  const panelBgColor = panel.config?.appearance?.backgroundColor || theme.palette.background.paper;
+
   const handleToggleCollapse = () => {
     dispatch(setCollapsedPanels({ [panel.id]: !isCollapsed }));
   };
@@ -147,6 +149,21 @@ export const Container: React.FC<ContainerProps> = ({
     if (widget.config?.type !== "tabs") return false;
     if (panel.orientation !== "horizontal") return false;
     return Boolean((widget.config as TabsContainerSchema)?.setup?.full_width);
+  };
+
+  const shouldFillAvailableHeight = (widget: BuilderWidgetSchema) => {
+    return widget.config?.type === "tabs" || widget.config?.type === "table";
+  };
+
+  // In horizontal panels, widgets share width equally; tables/tabs fill height, others are capped
+  const getHorizontalWidgetSx = (widget: BuilderWidgetSchema) => {
+    if (panel.orientation !== "horizontal" || isCollapsed) return {};
+    return {
+      flex: "1 1 0%",
+      minWidth: 0,
+      height: "100%",
+      overflow: shouldFillAvailableHeight(widget) ? "hidden" : "auto",
+    };
   };
 
   const collapsedSize = 40; // width/height of mini sidebar
@@ -243,7 +260,7 @@ export const Container: React.FC<ContainerProps> = ({
             ...(isCollapsed && {
               width: "100%",
               height: "100%",
-              backgroundColor: alpha(theme.palette.background.paper, 0.7),
+              backgroundColor: alpha(panelBgColor, 0.7),
               boxShadow: `rgba(0,0,0,0.2) 0px 0px 4px`,
               borderRadius: 0,
               margin: 0,
@@ -254,7 +271,7 @@ export const Container: React.FC<ContainerProps> = ({
               ...(panel.config?.options?.style === "default" && {
                 width: "100%",
                 height: "100%",
-                backgroundColor: alpha(theme.palette.background.paper, panel.config?.appearance?.opacity),
+                backgroundColor: alpha(panelBgColor, panel.config?.appearance?.opacity),
                 backdropFilter: `blur(${panel.config.appearance.backgroundBlur}px)`,
               }),
               ...(panel.config?.options?.style === "rounded" && {
@@ -271,7 +288,7 @@ export const Container: React.FC<ContainerProps> = ({
                 }),
                 borderRadius: "1rem",
                 margin: "0.5rem",
-                backgroundColor: alpha(theme.palette.background.paper, panel.config?.appearance?.opacity),
+                backgroundColor: alpha(panelBgColor, panel.config?.appearance?.opacity),
                 backdropFilter: `blur(${panel.config.appearance.backgroundBlur}px)`,
                 boxShadow: `rgba(0, 0, 0, 0.2) 0px 0px ${panel.config.appearance.shadow}px`,
               }),
@@ -288,7 +305,7 @@ export const Container: React.FC<ContainerProps> = ({
                 backgroundColor: "transparent",
               }),
               ...(panel.widgets?.length === 0 && {
-                backgroundColor: alpha(theme.palette.background.paper, panel.config?.appearance?.opacity),
+                backgroundColor: alpha(panelBgColor, panel.config?.appearance?.opacity),
                 ...(panel.config?.options?.style !== "default" && {
                   height: "calc(100% - 1rem)",
                   width: "calc(100% - 1rem)",
@@ -310,22 +327,20 @@ export const Container: React.FC<ContainerProps> = ({
               alignSelf: "stretch",
               ...(panel.orientation === "horizontal" && {
                 flexDirection: "row",
-                overflow: isCollapsed ? "hidden" : "auto",
+                overflow: isCollapsed ? "hidden" : "auto hidden",
               }),
               ...(panel.orientation === "vertical" && {
                 flexDirection: "column",
                 overflow: isCollapsed ? "hidden" : "hidden auto",
               }),
               gap: isCollapsed ? 0 : `${panel?.config?.position?.spacing}rem`,
+              padding: isCollapsed
+                ? 0
+                : `${Math.max(panel?.config?.position?.padding ?? 0, !viewOnly && visibleWidgets.length > 0 ? 0.25 : 0)}rem`,
               transition: "all 0.3s",
               ...(panel.config?.options?.style === "default" && {
                 justifyContent: panel.config?.position?.alignItems,
               }),
-              // Add minimal padding for clickable area to select panel (only in edit mode with widgets)
-              ...(!viewOnly &&
-                visibleWidgets.length > 0 && {
-                  p: 0.5,
-                }),
             }}>
             {/* Show empty message if widgets array is empty */}
             {visibleWidgets.length === 0 ? (
@@ -356,6 +371,7 @@ export const Container: React.FC<ContainerProps> = ({
                     key={widget.id}
                     sx={{
                       transition: "all 0.3s",
+                      ...getHorizontalWidgetSx(widget),
                       // Hide widgets when collapsed but maintain their size for smooth transition
                       ...(isCollapsed && {
                         opacity: 0,
@@ -368,11 +384,16 @@ export const Container: React.FC<ContainerProps> = ({
                           width: "100%",
                           minWidth: 0,
                         }),
+                        ...(panel.orientation === "horizontal" && shouldFillAvailableHeight(widget) && {
+                          flex: 1,
+                          minHeight: 0,
+                          overflow: "hidden",
+                        }),
                         ...(panel.config?.options?.style === "floated" && {
                           justifyContent: "center",
                           alignItems: "center",
                           backgroundColor: alpha(
-                            theme.palette.background.paper,
+                            panelBgColor,
                             panel.config?.appearance?.opacity
                           ),
                           backdropFilter: `blur(${panel.config.appearance.backgroundBlur}px)`,
@@ -403,6 +424,7 @@ export const Container: React.FC<ContainerProps> = ({
                   key={widget.id}
                   sx={{
                     transition: "all 0.3s",
+                    ...getHorizontalWidgetSx(widget),
                     // Hide widgets when collapsed but maintain their size for smooth transition
                     ...(isCollapsed && {
                       opacity: 0,
@@ -415,11 +437,16 @@ export const Container: React.FC<ContainerProps> = ({
                         width: "100%",
                         minWidth: 0,
                       }),
+                      ...(panel.orientation === "horizontal" && shouldFillAvailableHeight(widget) && {
+                        flex: 1,
+                        minHeight: 0,
+                        overflow: "hidden",
+                      }),
                       ...(panel.config?.options?.style === "floated" && {
                         justifyContent: "center",
                         alignItems: "center",
                         backgroundColor: alpha(
-                          theme.palette.background.paper,
+                          panelBgColor,
                           panel.config?.appearance?.opacity
                         ),
                         backdropFilter: `blur(${panel.config.appearance.backgroundBlur}px)`,

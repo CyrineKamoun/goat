@@ -204,7 +204,7 @@ class AggregationStatsItem(BaseModel):
         None,
         description="The secondary grouped value (null if no secondary grouping)",
     )
-    operation_value: float = Field(
+    operation_value: float | str = Field(
         ..., description="Result of the statistical operation"
     )
 

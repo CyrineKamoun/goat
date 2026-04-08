@@ -758,7 +758,21 @@ class AnalyticsService:
             logger.exception("Error previewing SQL")
             return {"success": False, "columns": [], "rows": [], "error": str(e)}
         finally:
+            # Explicitly DETACH DuckLake before closing to ensure the extension
+            # cleans up its internal PostgreSQL connection, libpq buffers, and
+            # SSL contexts. Without this, con.close() may not fully release
+            # extension-internal memory, causing slow leaks in long-running services.
+            if ducklake_layers:
+                try:
+                    con.execute("DETACH lake")
+                except Exception:
+                    pass
             con.close()
+            # Force Python GC to trigger C++ destructors for DuckDB/extension
+            # objects that may hold memory outside Python's allocator
+            import gc
+
+            gc.collect()
 
 
 # Singleton instance

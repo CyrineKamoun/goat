@@ -56,6 +56,7 @@ async def get_tile(
     cql_filter: CqlFilterDep = None,
     bbox: BBoxDep = None,
     limit: int = Query(default=None, ge=1, le=100000, description="Max features"),
+    label: bool = Query(default=False, description="Merge polygon label anchor points into tile response"),
 ) -> Response:
     """Get a vector tile for the specified collection and tile coordinates."""
     request_id = str(uuid.uuid4())[:8]
@@ -78,6 +79,7 @@ async def get_tile(
                 z=z,
                 x=x,
                 y=y,
+                label=label,
             )
             if result is not None:
                 tile_data, is_gzip, source = result
@@ -120,6 +122,7 @@ async def get_tile(
             z=z,
             x=x,
             y=y,
+            label=label,
         )
         if result is not None:
             tile_data, is_gzip, source = result
@@ -162,6 +165,7 @@ async def get_tile(
             limit=limit,
             columns=columns,
             geometry_column=geometry_column,
+            geometry_type=metadata.geometry_type,
         )
     except TimeoutError:
         # Query exceeded timeout - return 504 Gateway Timeout

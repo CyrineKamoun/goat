@@ -3,7 +3,8 @@ import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import type { Theme } from "@mui/material";
 import { Box, useMediaQuery, useTheme } from "@mui/material";
 import maplibregl from "maplibre-gl";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Map, type MapLayerMouseEvent, type MapRef, type ViewState } from "react-map-gl/maplibre";
 import type { ViewStateChangeEvent } from "react-map-gl/maplibre";
 import { v4 } from "uuid";
@@ -11,7 +12,10 @@ import { v4 } from "uuid";
 import { PATTERN_IMAGES } from "@/lib/constants/pattern-images";
 import { setCurrentZoom, setHighlightedFeature, setPopupInfo } from "@/lib/store/map/slice";
 import { addOrUpdateMarkerImages, addPatternImages } from "@/lib/transformers/map-image";
+import { applyMapLanguage } from "@/hooks/map/MapHooks";
+import { formatNumber } from "@/lib/utils/format-number";
 import createPulsingDot from "@/lib/utils/map/pulsing-dot-image";
+import type { FormatNumberTypes } from "@/lib/validations/common";
 import type { LayerInteractionFieldListContent } from "@/lib/validations/layer";
 import {
   type FeatureLayerPointProperties,
@@ -81,6 +85,7 @@ const MapViewer: React.FC<MapProps> = ({
   isEditor,
 }) => {
   const theme = useTheme();
+  const { i18n } = useTranslation("common");
   const dispatch = useAppDispatch();
   const isGetInfoActive = useAppSelector((state) => state.map.isMapGetInfoActive);
   const mapCursor = useAppSelector((state) => state.map.mapCursor);
@@ -167,9 +172,16 @@ const MapViewer: React.FC<MapProps> = ({
         const propertyLabels = interactionFieldLists?.reduce(
           (acc, content) => {
             content.attributes.forEach((attr) => {
-              if (attr.label) {
-                acc[attr.label] = interactiveFeature.properties[attr.name] || "";
+              const displayName = attr.label || attr.name;
+              const rawValue = interactiveFeature.properties[attr.name];
+              let displayValue = rawValue != null ? String(rawValue) : "";
+              if (attr.type === "number" && rawValue != null && !isNaN(Number(rawValue))) {
+                const formatted = attr.format
+                  ? formatNumber(Number(rawValue), attr.format as FormatNumberTypes, i18n.language)
+                  : String(rawValue);
+                displayValue = `${attr.prefix || ""}${formatted}${attr.suffix || ""}`;
               }
+              acc[displayName] = displayValue;
             });
             return acc;
           },
@@ -245,6 +257,8 @@ const MapViewer: React.FC<MapProps> = ({
 
   // Store ref to last dispatched zoom to avoid unnecessary Redux updates
   const lastDispatchedZoomRef = useRef<number | undefined>(undefined);
+  const pendingZoomRef = useRef<number | undefined>(undefined);
+  const zoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMapLoad = useCallback(() => {
     if (mapRef?.current) {
@@ -270,9 +284,28 @@ const MapViewer: React.FC<MapProps> = ({
       const roundedZoom = Math.round(zoom * 10) / 10;
       lastDispatchedZoomRef.current = roundedZoom;
       dispatch(setCurrentZoom(roundedZoom));
+
+      // Apply label language based on current locale
+      applyMapLanguage(map, i18n.language);
     }
     onLoad && onLoad();
-  }, [layers, mapRef, onLoad, dispatch]);
+  }, [layers, mapRef, onLoad, dispatch, i18n.language]);
+
+  // Re-apply label language when locale changes or basemap style reloads
+  useEffect(() => {
+    if (!mapRef?.current) return;
+    const map = mapRef.current.getMap();
+    const apply = () => applyMapLanguage(map, i18n.language);
+    // Apply now if style is already loaded
+    if (map.isStyleLoaded()) {
+      apply();
+    }
+    // Also apply whenever a new style finishes loading (basemap switch)
+    map.on("styledata", apply);
+    return () => {
+      map.off("styledata", apply);
+    };
+  }, [i18n.language, mapRef, mapStyle]);
 
   const _onMove = useCallback(
     (e: ViewStateChangeEvent) => {
@@ -286,8 +319,18 @@ const MapViewer: React.FC<MapProps> = ({
         // This prevents re-renders of components subscribed to currentZoom (like LayerTree)
         const roundedZoom = Math.round(zoom * 10) / 10;
         if (lastDispatchedZoomRef.current !== roundedZoom) {
-          lastDispatchedZoomRef.current = roundedZoom;
-          dispatch(setCurrentZoom(roundedZoom));
+          // Debounce the Redux dispatch — zoom visibility dimming in the layer tree
+          // doesn't need real-time updates during zoom animation
+          pendingZoomRef.current = roundedZoom;
+          if (zoomDebounceRef.current) {
+            clearTimeout(zoomDebounceRef.current);
+          }
+          zoomDebounceRef.current = setTimeout(() => {
+            if (pendingZoomRef.current !== undefined) {
+              lastDispatchedZoomRef.current = pendingZoomRef.current;
+              dispatch(setCurrentZoom(pendingZoomRef.current));
+            }
+          }, 150);
         }
       }
     },

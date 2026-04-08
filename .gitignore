@@ -1,6 +1,13 @@
 # MCP config (contains tokens)
 .mcp.json
 
+# Playwright
+test-results/
+
+# Superpowers brainstorm sessions
+.superpowers/
+docs/superpowers/
+
 # Logs
 logs
 *.log

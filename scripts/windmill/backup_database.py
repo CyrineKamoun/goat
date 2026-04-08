@@ -333,17 +333,23 @@ def main(
     backup_windmill: bool = True,
     windmill_db: str = "windmill",
     pg_server: str = "",
-    pg_user: str = "goat",
-    pg_password: str = "",
+    # Per-database credentials (fall back to POSTGRES_USER / POSTGRES_PASSWORD env vars)
+    goat_pg_user: str = "",
+    goat_pg_password: str = "",
+    keycloak_pg_user: str = "",
+    keycloak_pg_password: str = "",
+    windmill_pg_user: str = "",
+    windmill_pg_password: str = "",
     s3_access_key: str = "",
     s3_secret_key: str = "",
     s3_endpoint_url: str = "",
     dry_run: bool = False,
 ) -> dict:
-    """Back up PostgreSQL databases (goat + keycloak) and upload dumps to S3.
+    """Back up PostgreSQL databases (goat, keycloak, windmill) and upload dumps to S3.
 
     pg_dump is auto-provisioned on first run (cached in DATA_DIR/pg_tools/).
-    Credentials come from Windmill variables (f/goat/*) or env vars.
+    Each database can have its own pg user/password. Falls back to
+    POSTGRES_USER / POSTGRES_PASSWORD env vars if not specified.
     """
     start_time = time.time()
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -375,14 +381,16 @@ def main(
     if dry_run:
         log.info("=== DRY RUN MODE ===")
 
-    # Build database list: (name, schemas_or_None)
+    # Build database list: (name, schemas_or_None, user, password)
+    default_user = _get_secret("POSTGRES_USER", "goat")
+    default_password = _get_secret("POSTGRES_PASSWORD", "postgres")
     databases = []
     if backup_goat:
-        databases.append((goat_db, goat_schemas))
+        databases.append((goat_db, goat_schemas, goat_pg_user or default_user, goat_pg_password or default_password))
     if backup_keycloak:
-        databases.append((keycloak_db, None))
+        databases.append((keycloak_db, None, keycloak_pg_user or default_user, keycloak_pg_password or default_password))
     if backup_windmill:
-        databases.append((windmill_db, None))
+        databases.append((windmill_db, None, windmill_pg_user or default_user, windmill_pg_password or default_password))
 
     if not databases:
         log.warning("No databases selected for backup")
@@ -391,11 +399,11 @@ def main(
 
     s3_client = None if dry_run else _get_s3_client(s3_access_key, s3_secret_key, s3_endpoint_url)
 
-    for db_name, schemas in databases:
+    for db_name, schemas, db_user, db_password in databases:
         db_result = {"database": db_name, "schemas": schemas or "all"}
 
         # Connectivity check
-        if _check_db(pg_isready_path, db_name, pg_server, pg_user, pg_password):
+        if _check_db(pg_isready_path, db_name, pg_server, db_user, db_password):
             log.info(f"Connection to {db_name}: OK")
         else:
             log.warning(f"Connection to {db_name}: FAILED")
@@ -422,7 +430,7 @@ def main(
                 dump_file = Path(tmpdir) / f"{db_name}.sql.gz"
 
                 dump_start = time.time()
-                _run_pg_dump(pg_dump_path, db_name, dump_file, schemas, pg_server, pg_user, pg_password)
+                _run_pg_dump(pg_dump_path, db_name, dump_file, schemas, pg_server, db_user, db_password)
                 dump_duration = time.time() - dump_start
 
                 s3_key = f"{prefix}/{timestamp}_{db_name}.sql.gz"

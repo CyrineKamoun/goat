@@ -54,7 +54,7 @@ Sie können einfach die Datentypen Ihrer Layer-Attribute überprüfen:
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/data/view-data-layer.png').default} alt="Weitere Optionen" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/data/view_data.png').default} alt="Weitere Optionen" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
   <p style={{ textAlign: 'center', fontStyle: 'italic', marginTop: '8px', color: '#666' }}>Zugriff auf die Option "Daten anzeigen"</p>
 </div>
 

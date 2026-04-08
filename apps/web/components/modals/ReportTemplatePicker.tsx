@@ -105,7 +105,7 @@ const getSingleMapPortraitConfig = (t: TranslationFn, viewState: ViewStateParam)
       position: { x: 10, y: 10, width: 190, height: 15, z_index: 2 },
       config: {
         type: "text",
-        setup: { text: `<h1 style="text-align: center">${t("title_placeholder")}</h1>` },
+        setup: { text: `<p style="text-align: center"><strong><span style="font-size: 24pt">${t("title_placeholder")}</span></strong></p>` },
       },
       style: { padding: 0, opacity: 1 },
     },
@@ -130,7 +130,7 @@ const getSingleMapPortraitConfig = (t: TranslationFn, viewState: ViewStateParam)
       position: { x: 10, y: 242, width: 50, height: 45, z_index: 3 },
       config: {
         type: "text",
-        setup: { text: `<p>${t("description_placeholder")}</p>` },
+        setup: { text: `<p><span style="font-size: 12pt">${t("description_placeholder")}</span></p>` },
       },
       style: { padding: 0, opacity: 1 },
     },
@@ -140,6 +140,7 @@ const getSingleMapPortraitConfig = (t: TranslationFn, viewState: ViewStateParam)
       type: "legend",
       position: { x: 65, y: 242, width: 80, height: 45, z_index: 4 },
       config: {
+        title: { text: t("legend") },
         mapElementId: "map-1",
       },
       style: { padding: 0, opacity: 1, background: { enabled: true, color: "#ffffff", opacity: 0.9 } },
@@ -181,7 +182,7 @@ const getSingleMapLandscapeConfig = (t: TranslationFn, viewState: ViewStateParam
       position: { x: 10, y: 10, width: 277, height: 15, z_index: 2 },
       config: {
         type: "text",
-        setup: { text: `<h1 style="text-align: center">${t("title_placeholder")}</h1>` },
+        setup: { text: `<p style="text-align: center"><strong><span style="font-size: 24pt">${t("title_placeholder")}</span></strong></p>` },
       },
       style: { padding: 0, opacity: 1 },
     },
@@ -206,7 +207,7 @@ const getSingleMapLandscapeConfig = (t: TranslationFn, viewState: ViewStateParam
       position: { x: 235, y: 28, width: 52, height: 40, z_index: 3 },
       config: {
         type: "text",
-        setup: { text: `<p>${t("description_placeholder")}</p>` },
+        setup: { text: `<p><span style="font-size: 12pt">${t("description_placeholder")}</span></p>` },
       },
       style: { padding: 0, opacity: 1 },
     },
@@ -216,6 +217,7 @@ const getSingleMapLandscapeConfig = (t: TranslationFn, viewState: ViewStateParam
       type: "legend",
       position: { x: 235, y: 73, width: 52, height: 80, z_index: 4 },
       config: {
+        title: { text: t("legend") },
         mapElementId: "map-1",
       },
       style: { padding: 0, opacity: 1, background: { enabled: true, color: "#ffffff", opacity: 0.9 } },
@@ -257,7 +259,7 @@ const getPosterPortraitConfig = (t: TranslationFn, viewState: ViewStateParam): R
       position: { x: 10, y: 10, width: 200, height: 20, z_index: 2 },
       config: {
         type: "text",
-        setup: { text: `<h1 style="text-align: left">${t("poster_title_placeholder")}</h1>` },
+        setup: { text: `<p style="text-align: left"><strong><span style="font-size: 28pt">${t("poster_title_placeholder")}</span></strong></p>` },
       },
       style: { padding: 0, opacity: 1 },
     },
@@ -268,7 +270,7 @@ const getPosterPortraitConfig = (t: TranslationFn, viewState: ViewStateParam): R
       position: { x: 10, y: 33, width: 200, height: 25, z_index: 3 },
       config: {
         type: "text",
-        setup: { text: `<p>${t("subtitle_placeholder")}</p>` },
+        setup: { text: `<p><span style="font-size: 14pt">${t("subtitle_placeholder")}</span></p>` },
       },
       style: { padding: 0, opacity: 1 },
     },
@@ -313,6 +315,7 @@ const getPosterPortraitConfig = (t: TranslationFn, viewState: ViewStateParam): R
       type: "legend",
       position: { x: 242, y: 315, width: 40, height: 80, z_index: 8 },
       config: {
+        title: { text: t("legend") },
         mapElementId: "map-1",
       },
       style: { padding: 0, opacity: 1, background: { enabled: true, color: "#ffffff", opacity: 0.9 } },
@@ -344,7 +347,7 @@ const getPosterLandscapeConfig = (t: TranslationFn, viewState: ViewStateParam): 
       position: { x: 10, y: 10, width: 90, height: 20, z_index: 2 },
       config: {
         type: "text",
-        setup: { text: `<h1 style="text-align: left">${t("poster_title_placeholder")}</h1>` },
+        setup: { text: `<p style="text-align: left"><strong><span style="font-size: 28pt">${t("poster_title_placeholder")}</span></strong></p>` },
       },
       style: { padding: 0, opacity: 1 },
     },
@@ -355,7 +358,7 @@ const getPosterLandscapeConfig = (t: TranslationFn, viewState: ViewStateParam): 
       position: { x: 10, y: 33, width: 90, height: 90, z_index: 3 },
       config: {
         type: "text",
-        setup: { text: `<p>${t("subtitle_placeholder")}</p>` },
+        setup: { text: `<p><span style="font-size: 14pt">${t("subtitle_placeholder")}</span></p>` },
       },
       style: { padding: 0, opacity: 1 },
     },
@@ -376,7 +379,7 @@ const getPosterLandscapeConfig = (t: TranslationFn, viewState: ViewStateParam): 
       position: { x: 10, y: 193, width: 90, height: 84, z_index: 6 },
       config: {
         type: "text",
-        setup: { text: `<p>${t("graph_description_placeholder")}</p>` },
+        setup: { text: `<p><span style="font-size: 12pt">${t("graph_description_placeholder")}</span></p>` },
       },
       style: { padding: 0, opacity: 1 },
     },
@@ -411,6 +414,7 @@ const getPosterLandscapeConfig = (t: TranslationFn, viewState: ViewStateParam): 
       type: "legend",
       position: { x: 365, y: 192, width: 40, height: 80, z_index: 8 },
       config: {
+        title: { text: t("legend") },
         mapElementId: "map-1",
       },
       style: { padding: 0, opacity: 1, background: { enabled: true, color: "#ffffff", opacity: 0.9 } },

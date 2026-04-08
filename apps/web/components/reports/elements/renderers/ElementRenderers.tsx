@@ -222,7 +222,7 @@ export const ElementContentRenderer: React.FC<ElementContentRendererProps> = ({
   if (isChartElementType(element.type) || isElementElementType(element.type)) {
     // Apply atlas dynamic text substitution for text elements in viewOnly (print) mode
     let renderElement = element;
-    if (element.type === "text" && atlasPage && viewOnly) {
+    if (element.type === "text" && viewOnly) {
       const originalText =
         element.config.setup?.text ?? element.config.text ?? element.config.content ?? "";
       const resolvedText = resolveAtlasText(originalText as string, atlasPage);

@@ -108,14 +108,18 @@ const Layers = (props: LayersProps) => {
     return extendedFilter;
   };
 
-  const getFeatureTileUrl = (layer: ProjectLayer | Layer) => {
+  const getFeatureTileUrl = (layer: ProjectLayer | Layer, label = false) => {
     const extendedQuery = getLayerQueryFilter(layer);
-    let query = "";
+    const parts: string[] = [];
 
     if (extendedQuery && Object.keys(extendedQuery).length > 0) {
-      query = `?filter=${encodeURIComponent(JSON.stringify(extendedQuery))}`;
+      parts.push(`filter=${encodeURIComponent(JSON.stringify(extendedQuery))}`);
+    }
+    if (label) {
+      parts.push("label=true");
     }
 
+    const query = parts.length > 0 ? `?${parts.join("&")}` : "";
     const layerId = layer["layer_id"] || layer["id"];
     return `${GEOAPI_BASE_URL}/collections/${layerId}/tiles/WebMercatorQuad/{z}/{x}/{y}${query}`;
   };
@@ -215,8 +219,16 @@ const Layers = (props: LayersProps) => {
                 );
                 const mapLabelFilter = getMapLayerFilter(labelFilter);
 
+                const needsLabel =
+                  layer.feature_layer_geometry_type === "polygon" &&
+                  !!(layer.properties as FeatureLayerProperties)?.text_label;
+
                 return (
-                  <Source key={layer.id} type="vector" tiles={[getFeatureTileUrl(layer)]} maxzoom={14}>
+                  <Source
+                    key={layer.id}
+                    type="vector"
+                    tiles={[getFeatureTileUrl(layer, needsLabel)]}
+                    maxzoom={14}>
                     {!layer.properties?.["custom_marker"] && (
                       <MapLayer
                         key={getLayerKey(layer)}
@@ -250,7 +262,9 @@ const Layers = (props: LayersProps) => {
                         id={
                           layer.properties?.["custom_marker"] ? layer.id.toString() : `text-label-${layer.id}`
                         }
-                        source-layer="default"
+                        source-layer={
+                          layer.feature_layer_geometry_type === "polygon" ? "default_anchor" : "default"
+                        }
                         minzoom={layer.properties.min_zoom || 0}
                         maxzoom={layer.properties.max_zoom || 24}
                         {...labelStyleSpec}

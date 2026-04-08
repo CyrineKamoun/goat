@@ -1,10 +1,11 @@
 import { Box, Typography } from "@mui/material";
 
 import type { BuilderWidgetSchema, ProjectLayer, ProjectLayerGroup } from "@/lib/validations/project";
-import type { TabsContainerSchema, WidgetElementConfig } from "@/lib/validations/widget";
+import type { LinksElementSchema, TabsContainerSchema, WidgetElementConfig } from "@/lib/validations/widget";
 
 import DividerElementWidget from "@/components/builder/widgets/elements/Divider";
 import ImageElementWidget from "@/components/builder/widgets/elements/Image";
+import LinksElementWidget from "@/components/builder/widgets/elements/Links";
 import TabsWidget from "@/components/builder/widgets/elements/Tabs";
 import type { TextEditorContext } from "@/components/builder/widgets/elements/text/Text";
 import TextElementWidget from "@/components/builder/widgets/elements/text/Text";
@@ -63,6 +64,7 @@ const WidgetElement: React.FC<WidgetElementProps> = ({
           fitMode={fitMode}
         />
       )}
+      {config.type === "links" && <LinksElementWidget config={config as LinksElementSchema} />}
       {config.type === "tabs" && widget && projectLayers && projectLayerGroups && (
         <TabsWidget
           widget={widget}

@@ -577,3 +577,17 @@ export const deleteProjectLayerGroup = async (projectId: string, groupId: number
   }
   return response;
 };
+
+export const copyProject = async (projectId: string, folderId?: string): Promise<Project> => {
+  const response = await apiRequestAuth(`${PROJECTS_API_BASE_URL}/${projectId}/copy`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ folder_id: folderId ?? null }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to copy project");
+  }
+  return await response.json();
+};

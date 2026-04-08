@@ -36,7 +36,8 @@ export const NumbersDataWidget = ({ config: rawConfig }: NumbersDataProps) => {
   );
 
   const displayValue = useMemo(() => {
-    return aggregationStats?.items?.[0]?.operation_value || 0;
+    const val = aggregationStats?.items?.[0]?.operation_value;
+    return typeof val === "number" ? val : Number(val) || 0;
   }, [aggregationStats]);
 
   const renderIcon = useMemo(() => {

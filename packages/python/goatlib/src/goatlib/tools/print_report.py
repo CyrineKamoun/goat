@@ -29,6 +29,7 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from goatlib.config.settings import settings
 from goatlib.tools.base import SimpleToolRunner
 from goatlib.tools.schemas import ToolInputBase
 
@@ -38,10 +39,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_PAGE_TIMEOUT = 120000  # 120 seconds
 DEFAULT_RENDER_TIMEOUT = 90000  # 90 seconds (SwiftShader WebGL rendering is slow)
 
-# Batch size for parallel atlas rendering
-# Keep low (2) because each page runs a full MapLibre GL map with software WebGL (SwiftShader),
-# which is CPU-intensive. Higher values cause GPU stalls and data-print-ready timeouts.
-ATLAS_BATCH_SIZE = 2
+# Batch size for parallel atlas rendering — configurable via ATLAS_BATCH_SIZE env var.
+# Default is 2 because each page runs a full MapLibre GL map with software WebGL (SwiftShader),
+# which is CPU-intensive. Recommended: 1 per CPU core.
 
 
 class PrintReportParams(ToolInputBase):
@@ -90,6 +90,7 @@ class PrintReportParams(ToolInputBase):
     )
     total_atlas_pages: int = Field(
         default=1,
+        le=settings.print.atlas_max_pages,
         description="Total number of atlas pages to render. Ignored if atlas_page_indices is provided.",
         json_schema_extra={
             "x-ui": {"section": "output", "field_order": 2, "hidden": True}
@@ -626,25 +627,27 @@ class PrintReportRunner(SimpleToolRunner):
                 await self._refresh_access_token()
 
             # Determine pages to render
+            max_pages = settings.print.atlas_max_pages
             if params.atlas_page_indices is not None:
-                # Specific pages requested
-                page_indices = params.atlas_page_indices
+                # Specific pages requested — enforce limit
+                page_indices = params.atlas_page_indices[:max_pages]
             elif params.total_atlas_pages > 1:
-                # Render all atlas pages
-                page_indices = list(range(params.total_atlas_pages))
+                # Render all atlas pages — enforce limit
+                page_indices = list(range(min(params.total_atlas_pages, max_pages)))
             else:
                 # Single page (no atlas or atlas with 1 page)
                 page_indices = [None]
 
             logger.info(
-                f"Rendering {len(page_indices)} pages in {params.format} format"
+                f"Rendering {len(page_indices)} pages in {params.format} format "
+                f"(batch size: {settings.print.atlas_batch_size})"
             )
 
             # Render pages in batches
             rendered_pages: list[RenderedPage] = []
 
-            for i in range(0, len(page_indices), ATLAS_BATCH_SIZE):
-                batch = page_indices[i : i + ATLAS_BATCH_SIZE]
+            for i in range(0, len(page_indices), settings.print.atlas_batch_size):
+                batch = page_indices[i : i + settings.print.atlas_batch_size]
 
                 # Refresh access token before each batch to prevent 401 errors
                 # during long-running atlas jobs
@@ -668,7 +671,7 @@ class PrintReportRunner(SimpleToolRunner):
 
                 batch_results = await asyncio.gather(*tasks)
                 rendered_pages.extend(batch_results)
-                logger.info(f"Rendered batch {i // ATLAS_BATCH_SIZE + 1}")
+                logger.info(f"Rendered batch {i // settings.print.atlas_batch_size + 1}")
 
             # Generate output file
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

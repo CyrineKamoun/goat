@@ -73,6 +73,17 @@ def calculate_class_breaks(
 
     min_val, max_val, mean_val, std_dev = stats_result
 
+    if num_breaks <= 0:
+        return ClassBreaksResult(
+            attribute=attribute,
+            method=method.value,
+            breaks=[],
+            min=float(min_val) if min_val is not None else None,
+            max=float(max_val) if max_val is not None else None,
+            mean=float(mean_val) if mean_val is not None else None,
+            std_dev=float(std_dev) if std_dev is not None else None,
+        )
+
     # Calculate breaks based on method
     if method == ClassBreakMethod.quantile:
         breaks = _calculate_quantile_breaks(

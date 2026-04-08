@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Autocomplete, Box, Button, Checkbox, Chip, Divider, FormControlLabel, Paper, Stack, TextField, Typography, useTheme } from "@mui/material";
+import { Autocomplete, Button, Checkbox, Chip, Divider, FormControlLabel, Paper, Stack, TextField, Typography, useTheme } from "@mui/material";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,6 +15,8 @@ import type { FormatNumberTypes, WidgetConfigSchema } from "@/lib/validations/wi
 import {
   formatNumberTypes,
   pieLayoutTypes,
+  pieChartTypes,
+  labelSizeTypes,
   tableQueryModeTypes,
   tableModeTypes,
   widgetSchemaMap,
@@ -26,6 +28,7 @@ import type { SelectorItem } from "@/types/map/common";
 import useLayerFields from "@/hooks/map/CommonHooks";
 import { useLayerByGeomType, useLayerDatasetId } from "@/hooks/map/ToolsHooks";
 
+import CollapsibleConfigCard from "@/components/builder/widgets/common/CollapsibleConfigCard";
 import WidgetColorPicker from "@/components/builder/widgets/common/WidgetColorPicker";
 import CategoryColorConfig from "@/components/builder/widgets/data/CategoryColorConfig";
 import CategoryOrderConfig from "@/components/builder/widgets/data/CategoryOrderConfig";
@@ -223,6 +226,7 @@ export const WidgetData = ({ sectionLabel, config, onChange }: WidgetConfigProps
   const schema = widgetSchemaMap[config.type];
   const { projectId } = useParams();
   const [formulaBuilderOpen, setFormulaBuilderOpen] = useState(false);
+  const [expandedMetricIndex, setExpandedMetricIndex] = useState<number | null>(null);
   const { filteredLayers } = useLayerByGeomType(["feature", "table"], undefined, projectId as string);
 
   const hasLayerProjectIdDef = useMemo(() => {
@@ -630,78 +634,72 @@ export const WidgetData = ({ sectionLabel, config, onChange }: WidgetConfigProps
                   {groupedValueColumns.map((metric, index) => {
                     const isPrimaryRow = index === 0;
                     const canRemove = groupedValueColumns.length > 1;
+                    const isExpanded = expandedMetricIndex === index;
+
+                    // Build summary for collapsed state
+                    const methodLabel = metric.operation_type || "";
+                    const fieldLabel = metric.operation_value || "";
+                    const summary = [methodLabel, fieldLabel].filter(Boolean).join(" · ");
 
                     return (
-                    <Box
-                      key={`metric-${index}`}
-                      sx={{
-                        p: 2,
-                        border: "1px solid",
-                        borderColor: "divider",
-                        borderRadius: 1,
-                      }}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          {t("value_column", { defaultValue: "Value column" })} {index + 1}
-                        </Typography>
-                        <Button
-                          size="small"
-                          color="error"
-                          variant="text"
-                          disabled={!canRemove}
-                          onClick={() => {
-                            if (!canRemove) return;
+                      <CollapsibleConfigCard
+                        key={`metric-${index}`}
+                        title={`${t("value_column", { defaultValue: "Value column" })} ${index + 1}`}
+                        summary={summary}
+                        expanded={isExpanded}
+                        onToggle={() => setExpandedMetricIndex(isExpanded ? null : index)}
+                        onRemove={() => {
+                          if (!canRemove) return;
 
-                            if (isPrimaryRow) {
-                              const [nextPrimary, ...remaining] = additionalMetrics;
-                              onChange({
-                                ...config,
-                                setup: {
-                                  ...(config.setup as any),
-                                  operation_type: nextPrimary?.operation_type,
-                                  operation_value: nextPrimary?.operation_value,
-                                  additional_metrics: remaining,
-                                },
-                              } as WidgetConfigSchema);
-                              return;
-                            }
-
-                            const nextMetrics = additionalMetrics.filter((_, metricIndex) => metricIndex !== index - 1);
-                            handleSetupChange("additional_metrics", nextMetrics);
-                          }}>
-                          {t("remove", { defaultValue: "Remove" })}
-                        </Button>
-                      </Stack>
-                      <StatisticSelector
-                        layerProjectId={selectedLayer.value as number}
-                        hasGroupBy={false}
-                        value={{
-                          method: metric.operation_type as any,
-                          value: metric.operation_value,
-                        }}
-                        onChange={(nextValue) => {
                           if (isPrimaryRow) {
+                            const [nextPrimary, ...remaining] = additionalMetrics;
                             onChange({
                               ...config,
                               setup: {
                                 ...(config.setup as any),
-                                operation_type: nextValue.method,
-                                operation_value: nextValue.value,
+                                operation_type: nextPrimary?.operation_type,
+                                operation_value: nextPrimary?.operation_value,
+                                additional_metrics: remaining,
                               },
                             } as WidgetConfigSchema);
-                            return;
+                          } else {
+                            const nextMetrics = additionalMetrics.filter(
+                              (_, metricIndex) => metricIndex !== index - 1
+                            );
+                            handleSetupChange("additional_metrics", nextMetrics);
                           }
-
-                          const nextMetrics = [...additionalMetrics];
-                          nextMetrics[index - 1] = {
-                            ...nextMetrics[index - 1],
-                            operation_type: nextValue.method,
-                            operation_value: nextValue.value,
-                          };
-                          handleSetupChange("additional_metrics", nextMetrics);
+                          setExpandedMetricIndex(null);
                         }}
-                      />
-                    </Box>
+                        canRemove={canRemove}>
+                        <StatisticSelector
+                          layerProjectId={selectedLayer.value as number}
+                          hasGroupBy={false}
+                          value={{
+                            method: metric.operation_type as any,
+                            value: metric.operation_value,
+                          }}
+                          onChange={(nextValue) => {
+                            if (isPrimaryRow) {
+                              onChange({
+                                ...config,
+                                setup: {
+                                  ...(config.setup as any),
+                                  operation_type: nextValue.method,
+                                  operation_value: nextValue.value,
+                                },
+                              } as WidgetConfigSchema);
+                            } else {
+                              const nextMetrics = [...additionalMetrics];
+                              nextMetrics[index - 1] = {
+                                ...nextMetrics[index - 1],
+                                operation_type: nextValue.method,
+                                operation_value: nextValue.value,
+                              };
+                              handleSetupChange("additional_metrics", nextMetrics);
+                            }
+                          }}
+                        />
+                      </CollapsibleConfigCard>
                     );
                   })}
                 </Stack>
@@ -1296,6 +1294,14 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
     return hasNestedSchemaPath(schema, "options.layout") && config.type === widgetTypes.Enum.pie_chart;
   }, [schema, config.type]);
 
+  const hasPieChartTypeDef = useMemo(() => {
+    return hasNestedSchemaPath(schema, "options.chart_type") && config.type === widgetTypes.Enum.pie_chart;
+  }, [schema, config.type]);
+
+  const hasLabelSizeDef = useMemo(() => {
+    return hasNestedSchemaPath(schema, "options.label_size") && config.type === widgetTypes.Enum.pie_chart;
+  }, [schema, config.type]);
+
   const hasDisplayFieldLabelDef = useMemo(() => {
     return hasNestedSchemaPath(schema, "options.display_field_label");
   }, [schema]);
@@ -1319,7 +1325,13 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
   const showSimpleColorPicker = hasColorDef && (!supportsAttributeStylingToggle || !isAttributeStylingEnabled);
   const valueColorScale = (config as any)?.options?.value_color_scale || "quantile";
   const styleAttributeSource = (config as any)?.options?.style_attribute_source || "statistics";
-  const pieLayout = (config as any)?.options?.layout || pieLayoutTypes.Values.center_active;
+  const currentChartType = (config as any)?.options?.chart_type || "donut";
+  const isFullPieType = currentChartType === pieChartTypes.Values.pie;
+  const rawPieLayout = (config as any)?.options?.layout || pieLayoutTypes.Values.center_active;
+  // Full pie can't use center_active — fall back to legend (matches Pie.tsx effectiveLayout logic)
+  const pieLayout = isFullPieType && rawPieLayout === pieLayoutTypes.Values.center_active
+    ? pieLayoutTypes.Values.legend
+    : rawPieLayout;
 
   const valueColorScaleOptions = useMemo(
     () => [
@@ -1353,17 +1365,52 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
   }, [styleAttributeSourceOptions, styleAttributeSource]);
 
   const pieLayoutOptions = useMemo(
-    () => [
-      { value: pieLayoutTypes.Values.center_active, label: t("pie_layout_center_active") },
-      { value: pieLayoutTypes.Values.all_labels_outside, label: t("pie_layout_all_labels_outside") },
-      { value: pieLayoutTypes.Values.legend, label: t("pie_layout_legend") },
-    ],
-    [t]
+    () => {
+      const allOptions = [
+        { value: pieLayoutTypes.Values.center_active, label: t("pie_layout_center_active") },
+        { value: pieLayoutTypes.Values.all_labels_outside, label: t("pie_layout_all_labels_outside") },
+        { value: pieLayoutTypes.Values.legend, label: t("pie_layout_legend") },
+      ];
+      // Full pie has no hole, so center_active is not applicable
+      if (isFullPieType) {
+        return allOptions.filter((o) => o.value !== pieLayoutTypes.Values.center_active);
+      }
+      return allOptions;
+    },
+    [t, isFullPieType]
   );
 
   const selectedPieLayout = useMemo(() => {
     return pieLayoutOptions.find((option) => option.value === pieLayout);
   }, [pieLayoutOptions, pieLayout]);
+
+  const pieChartTypeOptions = useMemo(
+    () => [
+      { value: pieChartTypes.Values.donut, label: t("pie_chart_type_donut") },
+      { value: pieChartTypes.Values.pie, label: t("pie_chart_type_pie") },
+      { value: pieChartTypes.Values.half_donut, label: t("pie_chart_type_half_donut") },
+    ],
+    [t]
+  );
+
+  const selectedPieChartType = useMemo(() => {
+    const chartType = (config as any)?.options?.chart_type || "donut";
+    return pieChartTypeOptions.find((option) => option.value === chartType);
+  }, [pieChartTypeOptions, config]);
+
+  const labelSizeOptions = useMemo(
+    () => [
+      { value: labelSizeTypes.Values.sm, label: t("label_size_sm") },
+      { value: labelSizeTypes.Values.md, label: t("label_size_md") },
+      { value: labelSizeTypes.Values.lg, label: t("label_size_lg") },
+    ],
+    [t]
+  );
+
+  const selectedLabelSize = useMemo(() => {
+    const labelSizeVal = (config as any)?.options?.label_size || "md";
+    return labelSizeOptions.find((option) => option.value === labelSizeVal);
+  }, [labelSizeOptions, config]);
 
   const histogramXAxisTickValues = useMemo(() => {
     const values = (config as any)?.options?.x_axis_ticks;
@@ -1508,6 +1555,8 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
       hasColorRangeDef ||
       hasCustomOrderDef ||
       hasContextLabelDef ||
+      hasPieChartTypeDef ||
+      hasLabelSizeDef ||
       hasPieLayoutDef ||
       hasDisplayFieldLabelDef ||
       hasHistogramNumBinsDef ||
@@ -1521,6 +1570,8 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
     hasColorRangeDef,
     hasCustomOrderDef,
     hasContextLabelDef,
+    hasPieChartTypeDef,
+    hasLabelSizeDef,
     hasPieLayoutDef,
     hasDisplayFieldLabelDef,
     hasHistogramNumBinsDef,
@@ -1679,6 +1730,28 @@ export const WidgetStyle = ({ active = true, sectionLabel, config, onChange }: W
                     label={t("highlight_color")}
                     color={normalizedHighlightColor}
                     onChange={(color) => handleOptionChange("highlight_color", color)}
+                  />
+                )}
+
+                {hasPieChartTypeDef && (
+                  <Selector
+                    selectedItems={selectedPieChartType}
+                    setSelectedItems={(item: SelectorItem) => {
+                      handleOptionChange("chart_type", item?.value);
+                    }}
+                    items={pieChartTypeOptions}
+                    label={t("pie_chart_type")}
+                  />
+                )}
+
+                {hasLabelSizeDef && (
+                  <Selector
+                    selectedItems={selectedLabelSize}
+                    setSelectedItems={(item: SelectorItem) => {
+                      handleOptionChange("label_size", item?.value);
+                    }}
+                    items={labelSizeOptions}
+                    label={t("label_size")}
                   />
                 )}
 

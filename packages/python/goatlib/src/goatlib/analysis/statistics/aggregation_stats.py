@@ -203,12 +203,24 @@ def calculate_aggregation_stats(
     total_items = total_groups_result[0] if total_groups_result else 0
 
     # Build result items
+    # For expression operations, preserve the raw value (may be string or number).
+    # For standard operations, cast to float.
+    def _cast_value(val: Any) -> float | str:
+        if val is None:
+            return 0.0
+        if operation == StatisticsOperation.expression:
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return str(val)
+        return float(val)
+
     if has_secondary:
         items = [
             AggregationStatsItem(
                 grouped_value=row[0],
                 grouped_secondary_value=row[1],
-                operation_value=float(row[2]) if row[2] is not None else 0.0,
+                operation_value=_cast_value(row[2]),
             )
             for row in data_result
         ]
@@ -217,7 +229,7 @@ def calculate_aggregation_stats(
             AggregationStatsItem(
                 grouped_value=row[0],
                 grouped_secondary_value=None,
-                operation_value=float(row[1]) if row[1] is not None else 0.0,
+                operation_value=_cast_value(row[1]),
             )
             for row in data_result
         ]

@@ -142,7 +142,7 @@ async def get_layer_info(
 # Common query parameters
 async def limit_query(
     limit: Annotated[
-        int, Query(description="Maximum number of features to return", ge=1, le=100000)
+        int, Query(description="Maximum number of features to return", ge=1, le=10000)
     ] = 10,
 ) -> int:
     """Limit dependency."""

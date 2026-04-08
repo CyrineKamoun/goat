@@ -5,6 +5,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Divider,
   FormControlLabel,
@@ -35,7 +36,6 @@ import {
 } from "@/lib/api/reportLayouts";
 import { useLayerQueryables } from "@/lib/api/layers";
 import { useProjectInitialViewState } from "@/lib/api/projects";
-import { ATLAS_MAX_PAGES } from "@/lib/print/atlas-utils";
 import { PAGE_SIZES, type PageSize } from "@/lib/print/units";
 import type { Project, ProjectLayer } from "@/lib/validations/project";
 import type {
@@ -48,6 +48,7 @@ import type {
 import type { SelectorItem } from "@/types/map/common";
 
 import { useAtlasFeatures } from "@/hooks/reports/useAtlasFeatures";
+import { usePrintConfig } from "@/hooks/reports/usePrintConfig";
 import { type ExportFormat, useExportReport } from "@/hooks/useExportReport";
 
 import MoreMenu from "@/components/common/PopperMenu";
@@ -122,6 +123,8 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
   const [atlasSortOrder, setAtlasSortOrder] = useState<"asc" | "desc">("asc");
   const [atlasFileNameTemplate, setAtlasFileNameTemplate] = useState<string>("");
   const [customTemplateInput, setCustomTemplateInput] = useState<string>("");
+  const [atlasFilterToCurrentFeature, setAtlasFilterToCurrentFeature] = useState(false);
+  const [atlasHiddenCoverageLayer, setAtlasHiddenCoverageLayer] = useState(false);
 
   // Modal states
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -224,6 +227,8 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
         setOrientation(report.config.page.orientation);
         setSnapToGuides(report.config.page.snapToGuides ?? false);
         setShowRulers(report.config.page.showRulers ?? false);
+        setDpi(report.config.page.dpi ?? 300);
+        setExportFormat(report.config.page.export_format ?? "pdf");
         // Atlas settings loading
         const atlas = report.config.atlas;
         setAtlasEnabled(atlas?.enabled ?? false);
@@ -231,10 +236,14 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
           setAtlasLayerId(atlas.coverage.layer_project_id);
           setAtlasSortBy(atlas.coverage.sort_by ?? "");
           setAtlasSortOrder(atlas.coverage.sort_order ?? "asc");
+          setAtlasFilterToCurrentFeature(atlas.coverage.filter_to_current_feature ?? false);
+          setAtlasHiddenCoverageLayer(atlas.coverage.hidden_coverage_layer ?? false);
         } else {
           setAtlasLayerId(null);
           setAtlasSortBy("");
           setAtlasSortOrder("asc");
+          setAtlasFilterToCurrentFeature(false);
+          setAtlasHiddenCoverageLayer(false);
         }
         // Page label
         const pageLabel = atlas?.page_label;
@@ -466,6 +475,8 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
     // Reset dependent fields
     setAtlasSortBy("");
     setAtlasPageName("");
+    setAtlasFilterToCurrentFeature(false);
+    setAtlasHiddenCoverageLayer(false);
     if (layerId) {
       const coverage: AtlasFeatureCoverage = {
         type: "feature",
@@ -485,6 +496,8 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
       layer_project_id: atlasLayerId,
       sort_by: sortBy || undefined,
       sort_order: atlasSortOrder,
+      filter_to_current_feature: atlasFilterToCurrentFeature,
+      hidden_coverage_layer: atlasHiddenCoverageLayer,
     };
     handleAtlasSettingChange({ coverage });
   };
@@ -497,6 +510,36 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
       layer_project_id: atlasLayerId,
       sort_by: atlasSortBy || undefined,
       sort_order: order,
+      filter_to_current_feature: atlasFilterToCurrentFeature,
+      hidden_coverage_layer: atlasHiddenCoverageLayer,
+    };
+    handleAtlasSettingChange({ coverage });
+  };
+
+  const handleAtlasFilterToCurrentFeatureChange = (checked: boolean) => {
+    setAtlasFilterToCurrentFeature(checked);
+    if (!atlasLayerId) return;
+    const coverage: AtlasFeatureCoverage = {
+      type: "feature",
+      layer_project_id: atlasLayerId,
+      sort_by: atlasSortBy || undefined,
+      sort_order: atlasSortOrder,
+      filter_to_current_feature: checked,
+      hidden_coverage_layer: atlasHiddenCoverageLayer,
+    };
+    handleAtlasSettingChange({ coverage });
+  };
+
+  const handleAtlasHiddenCoverageLayerChange = (checked: boolean) => {
+    setAtlasHiddenCoverageLayer(checked);
+    if (!atlasLayerId) return;
+    const coverage: AtlasFeatureCoverage = {
+      type: "feature",
+      layer_project_id: atlasLayerId,
+      sort_by: atlasSortBy || undefined,
+      sort_order: atlasSortOrder,
+      filter_to_current_feature: atlasFilterToCurrentFeature,
+      hidden_coverage_layer: checked,
     };
     handleAtlasSettingChange({ coverage });
   };
@@ -620,11 +663,15 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
   // Print hook (server-side PDF generation via Playwright)
   const { isBusy: isPrinting, exportReport } = useExportReport();
 
+  // Print config (atlas limits from backend)
+  const { atlasMaxPages } = usePrintConfig();
+
   // Get atlas info for print job and UI display
   const { totalPages: atlasTotalPages, wasTruncated: atlasWasTruncated, totalFeatureCount: atlasTotalFeatureCount } =
     useAtlasFeatures({
       atlasConfig: selectedReport?.config?.atlas,
       projectLayers,
+      atlasMaxPages,
     });
 
   // Example preview for the active template
@@ -839,7 +886,9 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                       selectedItems={dpiItems.find((item) => item.value === dpi)}
                       setSelectedItems={(item: SelectorItem | SelectorItem[] | undefined) => {
                         if (item && !Array.isArray(item)) {
-                          setDpi(item.value as number);
+                          const newDpi = item.value as number;
+                          setDpi(newDpi);
+                          handleSettingChange({ dpi: newDpi });
                         }
                       }}
                       items={dpiItems}
@@ -852,7 +901,9 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                       selectedItems={exportFormatItems.find((item) => item.value === exportFormat)}
                       setSelectedItems={(item: SelectorItem | SelectorItem[] | undefined) => {
                         if (item && !Array.isArray(item)) {
-                          setExportFormat(item.value as string);
+                          const newFormat = item.value as string;
+                          setExportFormat(newFormat);
+                          handleSettingChange({ export_format: newFormat as "pdf" | "png" | "jpeg" });
                         }
                       }}
                       items={exportFormatItems}
@@ -970,6 +1021,32 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                           disabled={!selectedReport || isSaving}
                         />
 
+                        {/* Coverage layer rendering options */}
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={atlasFilterToCurrentFeature}
+                              onChange={(e) => handleAtlasFilterToCurrentFeatureChange(e.target.checked)}
+                              disabled={!selectedReport || isSaving || atlasHiddenCoverageLayer}
+                            />
+                          }
+                          label={<Typography variant="body2">{t("atlas_filter_to_current_feature")}</Typography>}
+                          sx={{ ml: 0 }}
+                        />
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={atlasHiddenCoverageLayer}
+                              onChange={(e) => handleAtlasHiddenCoverageLayerChange(e.target.checked)}
+                              disabled={!selectedReport || isSaving}
+                            />
+                          }
+                          label={<Typography variant="body2">{t("atlas_hidden_coverage_layer")}</Typography>}
+                          sx={{ ml: 0 }}
+                        />
+
                         {/* Output File Name Template - only for image formats */}
                         {exportFormat !== "pdf" && (
                           <Stack spacing={1.5}>
@@ -1017,7 +1094,7 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                       <Alert severity="warning" sx={{ py: 0, "& .MuiAlert-message": { py: 0.5 } }}>
                         <Typography variant="caption">
                           {t("atlas_page_limit_warning", {
-                            max: ATLAS_MAX_PAGES,
+                            max: atlasMaxPages,
                             count: atlasTotalFeatureCount,
                           })}
                           {" "}

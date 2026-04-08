@@ -47,6 +47,7 @@ const WidgetTab = () => {
           dataTypes.enum.filter,
           dataTypes.enum.table,
           dataTypes.enum.numbers,
+          dataTypes.enum.rich_text,
           // dataTypes.enum.feature_list, //Todo
         ] as WidgetTypes[],
       },
@@ -65,6 +66,7 @@ const WidgetTab = () => {
           elementTypes.enum.divider,
           elementTypes.enum.image,
           elementTypes.enum.tabs,
+          elementTypes.enum.links,
         ] as WidgetTypes[],
       },
     ],

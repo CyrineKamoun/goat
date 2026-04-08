@@ -18,6 +18,7 @@ export const iconMap: IconMap = {
   [dataTypes.enum.table]: ICON_NAME.TABLE,
   [dataTypes.enum.numbers]: ICON_NAME.NUMBER,
   [dataTypes.enum.feature_list]: ICON_NAME.LIST,
+  [dataTypes.enum.rich_text]: ICON_NAME.FONT,
 
   // chartTypes
   [chartTypes.enum.categories_chart]: ICON_NAME.HORIZONTAL_BAR_CHART,
@@ -29,4 +30,5 @@ export const iconMap: IconMap = {
   [elementTypes.enum.divider]: ICON_NAME.DIVIDER,
   [elementTypes.enum.image]: ICON_NAME.IMAGE,
   [elementTypes.enum.tabs]: ICON_NAME.LIST,
+  [elementTypes.enum.links]: ICON_NAME.LINK,
 };

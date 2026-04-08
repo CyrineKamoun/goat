@@ -170,8 +170,10 @@ class LayerExportRunner(SimpleToolRunner):
         ).fetchall()
         return [row[0] for row in result]
 
-    def _get_exportable_columns(self: Self, table_name: str) -> list[str]:
-        """Get column names that can be exported to OGR formats.
+    def _get_exportable_columns(
+        self: Self, table_name: str
+    ) -> list[tuple[str, str]]:
+        """Get column names and types that can be exported to OGR formats.
 
         Excludes STRUCT and other complex types not supported by GDAL/OGR.
 
@@ -179,7 +181,7 @@ class LayerExportRunner(SimpleToolRunner):
             table_name: Full qualified table name (lake.schema.table)
 
         Returns:
-            List of column names safe for OGR export
+            List of (column_name, data_type) tuples safe for OGR export
         """
         # Get columns with their types
         result = self.duckdb_con.execute(
@@ -187,12 +189,12 @@ class LayerExportRunner(SimpleToolRunner):
             f"WHERE table_schema || '.' || table_name = '{table_name.replace('lake.', '')}'"
         ).fetchall()
 
-        # Filter out STRUCT, MAP, and other complex types not supported by OGR
-        unsupported_prefixes = ("STRUCT", "MAP", "UNION")
+        # Filter out complex/binary types not supported by OGR
+        unsupported_prefixes = ("STRUCT", "MAP", "UNION", "LIST", "ARRAY", "BLOB", "BIT")
         exportable = []
         for col_name, col_type in result:
             if not col_type.upper().startswith(unsupported_prefixes):
-                exportable.append(col_name)
+                exportable.append((col_name, col_type.upper()))
             else:
                 logger.debug(
                     "Excluding column '%s' with unsupported type '%s' from export",
@@ -201,6 +203,25 @@ class LayerExportRunner(SimpleToolRunner):
                 )
 
         return exportable
+
+    @staticmethod
+    def _cast_column_expr(col: str, col_type: str) -> str:
+        """Return a SQL expression that casts unsupported OGR types.
+
+        Args:
+            col: Column name
+            col_type: Uppercase DuckDB data type
+
+        Returns:
+            SQL column expression, with CAST if needed
+        """
+        if col_type.startswith("DECIMAL") or col_type.startswith("NUMERIC"):
+            return f'CAST("{col}" AS DOUBLE) AS "{col}"'
+        if col_type in ("HUGEINT", "UHUGEINT"):
+            return f'CAST("{col}" AS BIGINT) AS "{col}"'
+        if col_type in ("UUID", "INTERVAL") or col_type.startswith("JSON"):
+            return f'CAST("{col}" AS VARCHAR) AS "{col}"'
+        return f'"{col}"'
 
     def _convert_cql2_to_sql(
         self: Self, query: str | dict[str, Any] | None, table_name: str
@@ -284,7 +305,7 @@ class LayerExportRunner(SimpleToolRunner):
         # be interpreted incorrectly, causing coordinate swapping issues
         source_crs = "EPSG:4326"
         column_exprs = []
-        for col in exportable_columns:
+        for col, col_type in exportable_columns:
             if col == "geometry" and crs and has_geometry:
                 # Transform geometry from source CRS to target CRS
                 # always_xy ensures lon/lat (x/y) ordering regardless of CRS definition
@@ -292,7 +313,7 @@ class LayerExportRunner(SimpleToolRunner):
                     f"ST_Transform(\"geometry\", '{source_crs}', '{crs}', always_xy := true) AS \"geometry\""
                 )
             else:
-                column_exprs.append(f'"{col}"')
+                column_exprs.append(self._cast_column_expr(col, col_type))
         columns_sql = ", ".join(column_exprs)
 
         # Convert CQL2 filter to SQL if needed
@@ -313,7 +334,7 @@ class LayerExportRunner(SimpleToolRunner):
         if output_format == "CSV":
             # For CSV, convert geometry to WKT string for readability
             csv_column_exprs = []
-            for col in exportable_columns:
+            for col, col_type in exportable_columns:
                 if col == "geometry" and has_geometry:
                     if crs:
                         # Transform and convert to WKT
@@ -324,7 +345,7 @@ class LayerExportRunner(SimpleToolRunner):
                     else:
                         csv_column_exprs.append('ST_AsText("geometry") AS "geometry"')
                 else:
-                    csv_column_exprs.append(f'"{col}"')
+                    csv_column_exprs.append(self._cast_column_expr(col, col_type))
             csv_columns_sql = ", ".join(csv_column_exprs)
 
             # Use native DuckDB CSV export
@@ -339,7 +360,7 @@ class LayerExportRunner(SimpleToolRunner):
             # For XLSX, convert geometry to WKT string since GDAL XLSX driver
             # doesn't support geometry columns directly
             xlsx_column_exprs = []
-            for col in exportable_columns:
+            for col, col_type in exportable_columns:
                 if col == "geometry" and has_geometry:
                     if crs:
                         # Transform and convert to WKT
@@ -350,7 +371,7 @@ class LayerExportRunner(SimpleToolRunner):
                     else:
                         xlsx_column_exprs.append('ST_AsText("geometry") AS "geometry"')
                 else:
-                    xlsx_column_exprs.append(f'"{col}"')
+                    xlsx_column_exprs.append(self._cast_column_expr(col, col_type))
             xlsx_columns_sql = ", ".join(xlsx_column_exprs)
 
             # Use DuckDB's COPY TO with GDAL XLSX driver

@@ -68,7 +68,7 @@ TASK_REGISTRY: tuple[TaskDefinition, ...] = (
         module_path="goatlib.tasks.generate_thumbnails",
         params_class_name="ThumbnailTaskParams",
         windmill_path="f/goat/tasks/generate_thumbnails",
-        schedule="0 */10 * * * *",  # Every 10 minutes (Windmill uses 6-field cron)
+        schedule="0 */15 * * * *",  # Every 15 minutes (Windmill uses 6-field cron)
         worker_tag="print",  # Uses print worker with Playwright
     ),
     TaskDefinition(

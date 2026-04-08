@@ -14,6 +14,7 @@ def test_2sfca_schema_validation():
     # Valid standard 2SFCA parameters
     opportunity = Opportunity2SFCA(
         input_path="opportunities.gpkg",
+        capacity_type="field",
         capacity_field="beds",
         max_cost=20,
     )
@@ -34,6 +35,7 @@ def test_2sfca_schema_validation():
     # Valid Enhanced 2SFCA parameters
     enhanced_opportunity = Opportunity2SFCA(
         input_path="hospitals.gpkg",
+        capacity_type="field",
         capacity_field="beds",
         max_cost=30,
         sensitivity=500000,  # Only visible when e2sfca/m2sfca
@@ -91,7 +93,8 @@ def test_2sfca_opportunity_standardization():
     # Test opportunity processing components
     opportunity = Opportunity2SFCA(
         input_path="test_opportunities",
-        capacity_field="capacity", 
+        capacity_type="field",
+        capacity_field="capacity",
         max_cost=20,
     )
     

@@ -197,7 +197,19 @@ const ToolNode: React.FC<ToolNodeProps> = ({ id, data, selected }) => {
     return missing;
   }, [process, data.config, t]);
 
-  const hasWarning = missingLayerInputs.length > 0 || missingConfig.length > 0;
+  // For heatmap opportunity tools, check that at least one opportunity is connected
+  const isHeatmapOpportunityTool =
+    data.processId === "heatmap_gravity" ||
+    data.processId === "heatmap_closest_average" ||
+    data.processId === "heatmap_2sfca";
+  const missingOpportunities = useMemo(() => {
+    if (!isHeatmapOpportunityTool) return false;
+    const incomingEdges = edges.filter((e) => e.target === id);
+    const oppHandles = ["opportunity_layer_1_id", "opportunity_layer_2_id", "opportunity_layer_3_id"];
+    return !incomingEdges.some((e) => e.targetHandle && oppHandles.includes(e.targetHandle));
+  }, [isHeatmapOpportunityTool, edges, id]);
+
+  const hasWarning = missingLayerInputs.length > 0 || missingConfig.length > 0 || missingOpportunities;
 
   // Get display parameters (non-layer, non-hidden parameters with values)
   const displayParams = useMemo(() => {
@@ -381,8 +393,12 @@ const ToolNode: React.FC<ToolNodeProps> = ({ id, data, selected }) => {
       parts.push(t("missing_required_config") + ": " + missingConfig.map((c) => c.label).join(", "));
     }
 
+    if (missingOpportunities) {
+      parts.push(t("missing_layer_connections") + ": " + t("opportunities"));
+    }
+
     return parts.join(". ");
-  }, [missingLayerInputs, missingConfig, t]);
+  }, [missingLayerInputs, missingConfig, missingOpportunities, t]);
 
   const ToolIconComponent = toolIconMap[data.processId as TOOL_ICON_NAME];
 

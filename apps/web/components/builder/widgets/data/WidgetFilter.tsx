@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Box } from "@mui/material";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMap } from "react-map-gl/maplibre";
 
 import { useDatasetCollectionItems } from "@/lib/api/layers";
@@ -16,7 +16,7 @@ import { WidgetStatusContainer } from "@/components/builder/widgets/common/Widge
 import CheckboxFilter from "@/components/builder/widgets/data/CheckboxFilter";
 import ChipsFilter from "@/components/builder/widgets/data/ChipsFilter";
 import RangeFilter from "@/components/builder/widgets/data/RangeFilter";
-import SelectorLayerValue from "@/components/map/panels/common/SelectorLayerValue";
+import AutocompleteLayerValue from "@/components/builder/widgets/data/AutocompleteLayerValue";
 
 // Deep compare helper
 const areFiltersEqual = (a: TemporaryFilter | undefined, b: TemporaryFilter) => {
@@ -45,6 +45,9 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
 
   // Local range state (for range filter)
   const [selectedRange, setSelectedRange] = useState<[number, number] | null>(null);
+
+  // Track previous selection to only zoom when the user actually changes the selection
+  const prevSelectedValuesRef = useRef(selectedValues);
 
   const existingFilter = useAppSelector((state) =>
     state.map.temporaryFilters.find((filter) => filter.id === id)
@@ -301,11 +304,20 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
       additional_targets: buildAdditionalTargets(normalizedValues),
     };
 
-    // Zoom to selection if enabled and we have geometry data
-    if (geometryData?.features?.length && rawConfig?.options?.zoom_to_selection && map) {
-      zoomToFeatureCollection(map, geometryData as GeoJSON.FeatureCollection, {
-        duration: 200,
-      });
+    // Zoom to selection if enabled and we have geometry data,
+    // but only when the user actually changed their selection (not on unrelated re-renders).
+    // Only update the ref after a successful zoom so we retry when geometryData arrives late.
+    const selectionChanged =
+      JSON.stringify(prevSelectedValuesRef.current) !== JSON.stringify(selectedValues);
+    if (selectionChanged && rawConfig?.options?.zoom_to_selection) {
+      if (geometryData?.features?.length && map) {
+        zoomToFeatureCollection(map, geometryData as GeoJSON.FeatureCollection, {
+          duration: 200,
+        });
+        prevSelectedValuesRef.current = selectedValues;
+      }
+    } else if (!rawConfig?.options?.zoom_to_selection) {
+      prevSelectedValuesRef.current = selectedValues;
     }
 
     if (!areFiltersEqual(existingFilter, newFilter)) {
@@ -389,8 +401,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
       {layer &&
         rawConfig?.setup.column_name &&
         rawConfig?.setup.layout === filterLayoutTypes.Values.select && (
-          <SelectorLayerValue
-            clearable
+          <AutocompleteLayerValue
             selectedValues={selectedValues as any}
             onSelectedValuesChange={(values: string[] | string | null) => {
               if (values === null || (Array.isArray(values) && values.length === 0)) {
@@ -426,6 +437,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
             cqlFilter={crossFilterCql}
             color={rawConfig?.options?.color}
             labelMap={rawConfig?.options?.label_map}
+            showAllOption={rawConfig?.setup.show_all_option}
           />
         )}
       {layer &&

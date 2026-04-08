@@ -60,8 +60,8 @@ const NumericColorScale = (props: NumericColorScaleProps) => {
 
   function onApply() {
     const cleanedLegends: ColorLegends = {};
-    Object.entries(labels).forEach(([color, label]) => {
-      if (label) cleanedLegends[color] = label;
+    Object.entries(labels).forEach(([key, label]) => {
+      if (label) cleanedLegends[key] = label;
     });
     props.onColorLegendsChange?.(Object.keys(cleanedLegends).length > 0 ? cleanedLegends : undefined);
     props.onCancel?.();
@@ -155,10 +155,10 @@ const NumericColorScale = (props: NumericColorScaleProps) => {
                   />
                 </Stack>
                 <InputBase
-                  value={labels[colorMapValue[1]] || ""}
+                  value={labels[String(index)] || labels[colorMapValue[1]] || ""}
                   placeholder={t("legend_label")}
                   onChange={(e) => {
-                    setLabels((prev) => ({ ...prev, [colorMapValue[1]]: e.target.value }));
+                    setLabels((prev) => ({ ...prev, [String(index)]: e.target.value }));
                   }}
                   sx={{
                     fontSize: 11,

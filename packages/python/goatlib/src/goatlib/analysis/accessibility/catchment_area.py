@@ -1430,9 +1430,16 @@ class CatchmentAreaTool(AnalysisTool):
                 select_cols += ", "
 
             # Export with geometry converted to proper GEOMETRY type
-            query = f"""
-                SELECT {select_cols}ST_GeomFromText(geometry) AS geometry
-                FROM gdf_table
+            query = f"""(
+                WITH src AS (
+                        SELECT {select_cols}ST_GeomFromText(geometry) AS geom
+                        FROM gdf_table
+                    )
+                    SELECT {select_cols}CASE
+                            WHEN NOT ST_IsValid(geom) THEN ST_CollectionExtract(ST_MakeValid(geom), 3)
+                            ELSE geom
+                        END AS geometry
+                    FROM src)
             """
             write_optimized_parquet(
                 con,
@@ -1476,9 +1483,37 @@ class CatchmentAreaTool(AnalysisTool):
                 if select_cols:
                     select_cols += ", "
 
+                # Detect if coordinates are in EPSG:3857 (Web Mercator)
+                # by checking if any coordinate exceeds WGS84 bounds
+                is_3857 = False
+                try:
+                    check = con.execute(
+                        f"""SELECT ST_XMin(ST_GeomFromText(geometry)) AS xmin
+                            FROM '{temp_path}'
+                            WHERE geometry IS NOT NULL AND geometry != ''
+                            LIMIT 1"""
+                    ).fetchone()
+                    if check and (abs(check[0]) > 180):
+                        is_3857 = True
+                        logger.info("Detected EPSG:3857 coordinates, will transform to EPSG:4326")
+                except Exception:
+                    pass
+
+                if is_3857:
+                    geom_expr = "ST_Transform(ST_GeomFromText(geometry), 'EPSG:3857', 'OGC:CRS84')"
+                else:
+                    geom_expr = "ST_GeomFromText(geometry)"
+
                 query = f"""
-                    SELECT {select_cols}ST_GeomFromText(geometry) AS geometry
-                    FROM '{temp_path}'
+                     (WITH src AS (
+                        SELECT {select_cols}{geom_expr} AS geom
+                        FROM '{temp_path}'
+                    )
+                    SELECT {select_cols}CASE
+                            WHEN NOT ST_IsValid(geom) THEN ST_CollectionExtract(ST_MakeValid(geom))
+                            ELSE geom
+                        END AS geometry
+                    FROM src)
                 """
                 write_optimized_parquet(
                     con,

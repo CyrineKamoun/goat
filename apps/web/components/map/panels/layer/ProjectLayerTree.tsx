@@ -5,17 +5,19 @@ import {
   Badge,
   Box,
   Button,
+  Checkbox,
   IconButton,
   ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
   Stack,
+  Switch,
   Tooltip,
   Typography,
   useTheme,
 } from "@mui/material";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMap } from "react-map-gl/maplibre";
 import { toast } from "react-toastify";
@@ -63,7 +65,9 @@ import ProjectLayerRenameModal from "@/components/modals/ProjectLayerRename";
 import type { BaseTreeItem } from "./DraggableTreeView";
 import { DraggableTreeView } from "./DraggableTreeView";
 import { LayerIcon } from "./legend/LayerIcon";
+import { MaskedImageIcon } from "@/components/map/panels/style/other/MaskedImageIcon";
 import { LayerLegendPanel } from "./legend/LayerLegend";
+import { getLegendColorMap, getLegendMarkerMap } from "@/lib/utils/map/legend";
 
 // Extended tree item interface to include project layer data
 interface ProjectTreeItem extends BaseTreeItem {
@@ -323,6 +327,22 @@ interface ProjectLayerTreeProps {
   isLoading?: boolean;
   viewMode?: "edit" | "view";
   hideActions?: boolean;
+  // New configurable props for dashboard widget
+  toggleStyle?: "eye" | "checkbox" | "switch";
+  togglePosition?: "left" | "right";
+  moreOptionsStyle?: "compact" | "direct_actions";
+  allowedActions?: {
+    style?: boolean;
+    viewData?: boolean;
+    properties?: boolean;
+    zoomTo?: boolean;
+  };
+  /** Layer IDs that should show download action (view mode only) */
+  downloadableLayers?: number[];
+  /** Hide attribute/field name headings in legend */
+  hideLegendHeading?: boolean;
+  /** Custom group icons keyed by group ID */
+  groupIcons?: Record<string, { url: string; source?: string }>;
 }
 
 export const ProjectLayerTree = ({
@@ -338,10 +358,19 @@ export const ProjectLayerTree = ({
   isLoading,
   viewMode = "edit",
   hideActions = false,
+  toggleStyle = "eye",
+  togglePosition = "right",
+  moreOptionsStyle = "compact",
+  allowedActions,
+  downloadableLayers,
+  hideLegendHeading,
+  groupIcons,
 }: ProjectLayerTreeProps) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
   const { map } = useMap();
+  const mapRef = useRef(map);
+  mapRef.current = map;
   const dispatch = useAppDispatch();
   // Only subscribe to currentZoom in view mode to avoid re-renders during map interaction in edit mode
   const currentZoom = useAppSelector((state) => (viewMode === "view" ? state.map.currentZoom : undefined));
@@ -442,14 +471,20 @@ export const ProjectLayerTree = ({
     // Update local UI state optimistically - create deep copies to avoid read-only errors
     const newItems = items.map((i) => {
       if (i.data.id === node.id && i.data.type === node.type) {
+        const newVisibility = !currentVisibility;
         const updatedData = {
           ...i.data,
           properties: {
             ...i.data.properties,
-            visibility: !currentVisibility,
+            visibility: newVisibility,
           },
         };
-        return { ...i, data: updatedData };
+        return {
+          ...i,
+          data: updatedData,
+          // Collapse legend when hiding, expand when showing
+          collapsed: !newVisibility,
+        };
       }
       return i;
     });
@@ -586,6 +621,27 @@ export const ProjectLayerTree = ({
       menuOptions = filterMenuForViewMode(menuOptions);
     }
 
+    // Filter menu options based on allowedActions
+    if (allowedActions) {
+      menuOptions = menuOptions.filter((item) => {
+        if (item.id === MapLayerActions.STYLE && allowedActions.style === false) return false;
+        if (item.id === ContentActions.TABLE && allowedActions.viewData === false) return false;
+        if (item.id === MapLayerActions.PROPERTIES && allowedActions.properties === false) return false;
+        if (item.id === MapLayerActions.ZOOM_TO && allowedActions.zoomTo === false) return false;
+        return true;
+      });
+    }
+
+    // Filter download action based on downloadableLayers
+    if (downloadableLayers && node.type === "layer") {
+      menuOptions = menuOptions.filter((item) => {
+        if (item.id === ContentActions.DOWNLOAD) {
+          return downloadableLayers.includes(node.id);
+        }
+        return true;
+      });
+    }
+
     const hasFilter = node.query?.cql?.["args"]?.length;
     const isFilterActive = activeLayerId === node.id && activeRightPanel === MapSidebarItemID.FILTER;
 
@@ -643,71 +699,123 @@ export const ProjectLayerTree = ({
           </Tooltip>
         )}
 
-        {/* Visibility - Don't show for table layers or when hideActions is true */}
-        {!hideActions && node.layer_type !== "table" && (
-          <Tooltip title={nodeVisibility ? t("hide") : t("show")} placement="top">
-            <IconButton size="small" onClick={(e) => handleVisibilityToggle(node, e)} sx={{ px: 0.5 }}>
-              <Icon
-                iconName={!nodeVisibility ? ICON_NAME.EYE_SLASH : ICON_NAME.EYE}
-                style={{ fontSize: "15px" }}
-              />
-            </IconButton>
-          </Tooltip>
-        )}
-
-        {/* More Menu - Show if we have menu options and hideActions is false */}
+        {/* Actions: direct buttons or compact three-dot menu */}
         {!hideActions && menuOptions.length > 0 && (
-          <MoreMenu
-            menuItems={menuOptions}
-            disablePortal={false}
-            menuButton={
-              <Tooltip title={t("more_options")} placement="top">
-                <IconButton size="small" sx={{ px: 0.5 }}>
-                  <Icon iconName={ICON_NAME.MORE_VERT} style={{ fontSize: "15px" }} />
-                </IconButton>
-              </Tooltip>
-            }
-            onSelect={async (menuItem: PopperMenuItem) => {
-              // Handle Zoom To for both layers and groups
-              if (menuItem.id === MapLayerActions.ZOOM_TO) {
-                if (map) {
-                  if (node.type === "layer") {
-                    // For layers, use smart zoom with filter support
-                    const target = castNodeToProjectLayer(node);
-                    await zoomToProjectLayer(map, target);
-                  } else if (node.extent) {
-                    // For groups, use stored extent
-                    zoomToLayer(map, node.extent);
+          moreOptionsStyle === "direct_actions" ? (
+            <>
+              {menuOptions.map((opt) => (
+                opt.icon && (
+                  <Tooltip key={opt.id} title={opt.label} placement="top">
+                    <IconButton
+                      size="small"
+                      sx={{ p: 0.25 }}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const handleAction = async () => {
+                          if (opt.id === MapLayerActions.ZOOM_TO) {
+                            const currentMap = mapRef.current;
+                            if (currentMap) {
+                              if (node.type === "layer") {
+                                const target = castNodeToProjectLayer(node);
+                                await zoomToProjectLayer(currentMap, target);
+                              } else if (node.extent) {
+                                zoomToLayer(currentMap, node.extent);
+                              }
+                            }
+                          } else if (node.type === "layer") {
+                            const target = castNodeToProjectLayer(node);
+                            if (opt.id === MapLayerActions.PROPERTIES) handleProperties(target);
+                            else if (opt.id === MapLayerActions.STYLE) handleStyle(target);
+                            else if (opt.id === MapLayerActions.DUPLICATE) handleDuplicate(target);
+                            else openMoreMenu(opt, target);
+                          }
+                        };
+                        await handleAction();
+                      }}>
+                      <Icon iconName={opt.icon} style={{ fontSize: "13px" }} htmlColor={opt.color} />
+                    </IconButton>
+                  </Tooltip>
+                )
+              ))}
+            </>
+          ) : (
+            <MoreMenu
+              menuItems={menuOptions}
+              disablePortal={false}
+              menuButton={
+                <Tooltip title={t("more_options")} placement="top">
+                  <IconButton size="small" sx={{ px: 0.5 }}>
+                    <Icon iconName={ICON_NAME.MORE_VERT} style={{ fontSize: "15px" }} />
+                  </IconButton>
+                </Tooltip>
+              }
+              onSelect={async (menuItem: PopperMenuItem) => {
+                if (menuItem.id === MapLayerActions.ZOOM_TO) {
+                  const currentMap = mapRef.current;
+                  if (currentMap) {
+                    if (node.type === "layer") {
+                      const target = castNodeToProjectLayer(node);
+                      await zoomToProjectLayer(currentMap, target);
+                    } else if (node.extent) {
+                      zoomToLayer(currentMap, node.extent);
+                    }
+                  }
+                  return;
+                }
+                if (node.type === "layer") {
+                  const target = castNodeToProjectLayer(node);
+                  if (menuItem.id === MapLayerActions.PROPERTIES) {
+                    handleProperties(target);
+                  } else if (menuItem.id === MapLayerActions.STYLE) {
+                    handleStyle(target);
+                  } else if (menuItem.id === MapLayerActions.DUPLICATE) {
+                    handleDuplicate(target);
+                  } else {
+                    openMoreMenu(menuItem, target);
+                  }
+                } else {
+                  if (menuItem.id === MapLayerActions.RENAME && node.type === "group") {
+                    setGroupModal({ open: true, mode: "rename", group: node });
+                  } else if (menuItem.id === ContentActions.DELETE && node.type === "group") {
+                    setGroupModal({ open: true, mode: "delete", group: node });
+                  } else {
+                    const groupAsLayer = castNodeToProjectLayer(node);
+                    openMoreMenu(menuItem, groupAsLayer);
                   }
                 }
-                return;
-              }
-              // Handle layer-specific actions
-              if (node.type === "layer") {
-                const target = castNodeToProjectLayer(node);
-                if (menuItem.id === MapLayerActions.PROPERTIES) {
-                  handleProperties(target);
-                } else if (menuItem.id === MapLayerActions.STYLE) {
-                  handleStyle(target);
-                } else if (menuItem.id === MapLayerActions.DUPLICATE) {
-                  handleDuplicate(target);
-                } else {
-                  openMoreMenu(menuItem, target);
-                }
-              } else {
-                // Handle group-specific actions (rename, delete)
-                if (menuItem.id === MapLayerActions.RENAME && node.type === "group") {
-                  setGroupModal({ open: true, mode: "rename", group: node });
-                } else if (menuItem.id === ContentActions.DELETE && node.type === "group") {
-                  setGroupModal({ open: true, mode: "delete", group: node });
-                } else {
-                  // Cast group node to ProjectLayer format for compatibility with existing modals
-                  const groupAsLayer = castNodeToProjectLayer(node);
-                  openMoreMenu(menuItem, groupAsLayer);
-                }
-              }
-            }}
-          />
+              }}
+            />
+          )
+        )}
+
+        {/* Visibility toggle - very right when position is "right" */}
+        {togglePosition !== "left" && !hideActions && node.layer_type !== "table" && (
+          <>
+            {toggleStyle === "checkbox" ? (
+              <Checkbox
+                size="small"
+                checked={nodeVisibility}
+                onChange={(e) => handleVisibilityToggle(node, e as unknown as React.MouseEvent)}
+                sx={{ p: 0.5 }}
+              />
+            ) : toggleStyle === "switch" ? (
+              <Switch
+                size="small"
+                checked={nodeVisibility}
+                onChange={(e) => handleVisibilityToggle(node, e as unknown as React.MouseEvent)}
+                sx={{ transform: "scale(0.75)", mx: -0.5 }}
+              />
+            ) : (
+              <Tooltip title={nodeVisibility ? t("hide") : t("show")} placement="top">
+                <IconButton size="small" onClick={(e) => handleVisibilityToggle(node, e)} sx={{ px: 0.5 }}>
+                  <Icon
+                    iconName={!nodeVisibility ? ICON_NAME.EYE_SLASH : ICON_NAME.EYE}
+                    style={{ fontSize: "15px" }}
+                  />
+                </IconButton>
+              </Tooltip>
+            )}
+          </>
         )}
       </Stack>
     );
@@ -735,19 +843,24 @@ export const ProjectLayerTree = ({
         const shouldShowLegend = viewMode === "view" ? node.properties?.legend?.show !== false : true;
         const legendCaption = shouldShowLegend ? node.properties?.legend?.caption : undefined;
 
+        const customIcon = groupIcons?.[`group_icon_${node.id}`];
         return {
           ...item,
-          icon: (
+          icon: customIcon?.url ? (
+            <MaskedImageIcon
+              imageUrl={customIcon.url}
+              dimension="16px"
+              applyMask={customIcon.source === "library"}
+              imgColor={theme.palette.text.secondary}
+            />
+          ) : (
             <Icon
               iconName={ICON_NAME.LAYERS}
               style={{ fontSize: "1rem", color: theme.palette.text.secondary }}
             />
           ),
-          // Pass visibility to DraggableTreeView for row styling
           isVisible: nodeVisibility,
-          // Make groups non-selectable
           isSelectable: false,
-          // Add legend caption
           labelInfo: legendCaption,
         };
       }
@@ -795,18 +908,70 @@ export const ProjectLayerTree = ({
             rasterStyle.color_map.length > 0);
 
         if (hasRasterLegend && isVisible) {
-          legendNode = <LayerLegendPanel properties={props} geometryType="raster" />;
+          legendNode = <LayerLegendPanel properties={props} geometryType="raster" hideHeading={hideLegendHeading} />;
         }
       }
       // 4. Complex Legend - Only show legend if layer is visible
       else if (hasComplexLegend) {
-        if (isVisible) {
+        // Check if legend panel will actually have content to show
+        const colorMap = getLegendColorMap(props, "color");
+        const strokeMap = getLegendColorMap(props, "stroke_color");
+        const markerMap = getLegendMarkerMap(props);
+        const hasLegendContent = colorMap.length > 1 || strokeMap.length > 1 || markerMap.length > 1;
+
+        if (isVisible && hasLegendContent) {
           // Show legend content for visible layers
           // TODO: Add collapse/expand functionality to LayerLegendPanel component
-          legendNode = <LayerLegendPanel properties={props} geometryType={geomType} />;
-        } else {
+          legendNode = <LayerLegendPanel properties={props} geometryType={geomType} hideHeading={hideLegendHeading} />;
+        } else if (!isVisible) {
           // If not visible, don't show anything and make it non-selectable
           isSelectable = false;
+        }
+
+        // Fallback icon when legend panel has no content (e.g. fill/stroke disabled)
+        if (!hasLegendContent) {
+          if (props.marker_field && props.custom_marker) {
+            // Attribute-based markers with no colors: generic location marker icon
+            iconNode = (
+              <Icon
+                iconName={ICON_NAME.LOCATION_MARKER}
+                style={{ fontSize: "1rem", color: theme.palette.text.secondary }}
+              />
+            );
+          } else {
+            const baseColor = props.color
+              ? Array.isArray(props.color) && props.color.length >= 3
+                ? rgbToHex(props.color as [number, number, number])
+                : Array.isArray(props.color)
+                  ? `rgb(${props.color.join(",")})`
+                  : props.color
+              : "#ccc";
+            const strokeColor = props.stroke_color
+              ? Array.isArray(props.stroke_color) && props.stroke_color.length >= 3
+                ? rgbToHex(props.stroke_color as [number, number, number])
+                : Array.isArray(props.stroke_color)
+                  ? `rgb(${props.stroke_color.join(",")})`
+                  : props.stroke_color
+              : undefined;
+            // When fill is disabled and custom marker is active, use black to match map behavior
+            const iconColor = props.filled === false && props.custom_marker ? "#000000" : baseColor;
+            iconNode = (
+              <LayerIcon
+                type={geomType}
+                color={iconColor}
+                strokeColor={props.stroked !== false ? strokeColor : undefined}
+                filled={props.filled !== false}
+                iconUrl={
+                  !props.marker_field && props.custom_marker && props.marker?.url ? props.marker.url : undefined
+                }
+                iconSource={
+                  !props.marker_field && props.custom_marker && props.marker?.source
+                    ? props.marker.source
+                    : "library"
+                }
+              />
+            );
+          }
         }
       }
       // 5. Simple Feature (Geometry Preview) - for layers without complex legends
@@ -825,10 +990,12 @@ export const ProjectLayerTree = ({
               ? `rgb(${props.stroke_color.join(",")})`
               : props.stroke_color
           : undefined;
+        // When fill is disabled and custom marker is active, use black to match map behavior
+        const iconColor = props.filled === false && props.custom_marker ? "#000000" : baseColor;
         iconNode = (
           <LayerIcon
             type={geomType} // Use geometry type for vector preview
-            color={baseColor}
+            color={iconColor}
             strokeColor={props.stroked !== false ? strokeColor : undefined}
             filled={props.filled !== false}
             iconUrl={
@@ -849,15 +1016,13 @@ export const ProjectLayerTree = ({
       return {
         ...item,
         icon: iconNode,
-        legendContent: legendNode,
+        legendContent: shouldShowLegend ? legendNode : undefined,
         isSelectable,
-        // Pass visibility to DraggableTreeView for row styling
         isVisible,
-        // Add legend caption
         labelInfo: legendCaption,
       };
     });
-  }, [items, theme, currentZoom, viewMode]);
+  }, [items, theme, currentZoom, viewMode, hideLegendHeading, groupIcons]);
 
   // --- RENDER ---
   if (isLoading && items.length === 0) {
@@ -966,6 +1131,37 @@ export const ProjectLayerTree = ({
             }
           }}
           renderActions={(item) => <RenderRowActions item={item} />}
+          renderPrefix={togglePosition === "left" ? (item) => {
+            const node = item.data as ProjectLayerTreeNode;
+            if (hideActions || node.layer_type === "table") return null;
+            const nodeVisibility = node.properties?.visibility ?? true;
+            return (
+              <Box onClick={(e) => e.stopPropagation()} sx={{ display: "flex", alignItems: "center" }}>
+                {toggleStyle === "checkbox" ? (
+                  <Checkbox
+                    size="small"
+                    checked={nodeVisibility}
+                    onChange={(e) => handleVisibilityToggle(node, e as unknown as React.MouseEvent)}
+                    sx={{ p: 0.25 }}
+                  />
+                ) : toggleStyle === "switch" ? (
+                  <Switch
+                    size="small"
+                    checked={nodeVisibility}
+                    onChange={(e) => handleVisibilityToggle(node, e as unknown as React.MouseEvent)}
+                    sx={{ transform: "scale(0.75)", mx: -0.5 }}
+                  />
+                ) : (
+                  <IconButton size="small" onClick={(e) => handleVisibilityToggle(node, e)} sx={{ p: 0.25 }}>
+                    <Icon
+                      iconName={!nodeVisibility ? ICON_NAME.EYE_SLASH : ICON_NAME.EYE}
+                      style={{ fontSize: "15px" }}
+                    />
+                  </IconButton>
+                )}
+              </Box>
+            );
+          } : undefined}
           enableSelection={isEditMode}
           selectedIds={treeSelectedIds}
           onSelect={handleNodeClick}

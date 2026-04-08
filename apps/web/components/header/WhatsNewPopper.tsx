@@ -28,19 +28,19 @@ type ReleaseNote = {
 };
 
 const releaseNotesEnglish: ReleaseNote = {
-  title: 'GOAT 2.3.0 "Tarn" is here',
-  date: "January 13, 2026",
+  title: 'GOAT 2.4.0 "Toggenburg" is here',
+  date: "March 9, 2026",
   thumbnail:
-    "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/6964f6ab66d9b7fec644a6b5_blogpost_cover-p-1600.webp",
-  url: "https://www.plan4better.de/en/post/goat-2-3-0-tarn-is-here",
+    "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/69a80eca7103ae1f77222324_workflows_cover.webp",
+  url: "https://www.plan4better.de/en/post/goat-2-4-0-toggenburg-is-here",
 };
 
 const releaseNotesGerman: ReleaseNote = {
-  title: 'GOAT 2.3.0 „Tarn" ist da',
-  date: "13. Januar 2026",
+  title: 'GOAT 2.4.0 „Toggenburg" ist da',
+  date: "9. März 2026",
   thumbnail:
-    "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/6964f6ab66d9b7fec644a6b5_blogpost_cover-p-1600.webp",
-  url: "https://www.plan4better.de/de/post/goat-2-3-0-tarn-ist-da",
+    "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/69a80eca7103ae1f77222324_workflows_cover.webp",
+  url: "https://www.plan4better.de/de/post/goat-2-4-0-toggenburg-is-here",
 };
 
 export default function WhatsNewPopper() {

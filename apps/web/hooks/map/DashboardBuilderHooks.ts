@@ -18,7 +18,7 @@ interface UseLayerFiltersParams {
  * Returns a combined CQL filter from temporary filters in the store,
  * merging per-layer filters and additional target filters for the specified layer.
  */
-function useTemporaryFilters({ layerId }: UseLayerFiltersParams) {
+export function useTemporaryFilters({ layerId }: UseLayerFiltersParams) {
   const { temporaryFilters } = useAppSelector((state) => state.map);
 
   return useMemo(() => {
@@ -44,6 +44,7 @@ interface ChartWidgetResult<TConfig, TQueryParams> {
   config?: TConfig;
   queryParams?: TQueryParams;
   baseQueryParams?: TQueryParams; // Query params without cross_filter (for highlight mode)
+  cqlFilter?: string; // Stringified CQL filter (cross-filter + base filter + viewport), available even when querySchema fails
   projectId: string;
   layerId?: string; // The layer UUID for API calls
   layerProjectId?: number; // The layer_project_id from config
@@ -165,5 +166,60 @@ export function useChartWidget<TConfig, TQueryParams>(
 
   const layerProjectId = (config as any)?.setup?.layer_project_id as number | undefined;
 
-  return { config, queryParams, baseQueryParams, projectId, layerId, layerProjectId, hasActiveFilters };
+  // Build CQL filter string independently of querySchema validation,
+  // so widgets (e.g. table in records mode) can use it even when querySchema fails.
+  const buildCqlFilter = useCallback((): string | undefined => {
+    if (!config) return undefined;
+
+    let cqlQuery = layerBaseFilter ? JSON.parse(JSON.stringify(layerBaseFilter)) : undefined;
+
+    if ((config as any).options?.cross_filter && tempFilters) {
+      const crossFilter = JSON.parse(JSON.stringify(tempFilters));
+      if (cqlQuery) {
+        cqlQuery = { op: "and", args: [cqlQuery, crossFilter] };
+      } else {
+        cqlQuery = crossFilter;
+      }
+    }
+
+    if ((config as any).options?.filter_by_viewport && map) {
+      const extentRaw = getMapExtentCQL(map);
+      if (extentRaw) {
+        const extent = JSON.parse(extentRaw);
+        if (cqlQuery) {
+          if (cqlQuery.op === "and" && cqlQuery.args) {
+            cqlQuery.args.push(extent);
+          } else {
+            cqlQuery = { op: "and", args: [cqlQuery, extent] };
+          }
+        } else {
+          cqlQuery = extent;
+        }
+      }
+    }
+
+    return cqlQuery ? JSON.stringify(cqlQuery) : undefined;
+  }, [config, map, tempFilters, layerBaseFilter]);
+
+  const [cqlFilter, setCqlFilter] = useState<string | undefined>(() => buildCqlFilter());
+
+  useEffect(() => {
+    setCqlFilter(buildCqlFilter());
+  }, [buildCqlFilter]);
+
+  // Update cqlFilter on map moves (same as queryParams)
+  useEffect(() => {
+    if (!map || !(config as any)?.options?.filter_by_viewport) return;
+
+    const onMoveEnd = () => {
+      setCqlFilter(buildCqlFilter());
+    };
+
+    map.on("moveend", onMoveEnd);
+    return () => {
+      map.off("moveend", onMoveEnd);
+    };
+  }, [map, config, buildCqlFilter]);
+
+  return { config, queryParams, baseQueryParams, cqlFilter, projectId, layerId, layerProjectId, hasActiveFilters };
 }

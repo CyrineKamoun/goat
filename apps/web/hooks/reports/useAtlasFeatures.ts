@@ -7,7 +7,7 @@
 import { useMemo } from "react";
 
 import { useDatasetCollectionItems } from "@/lib/api/layers";
-import { ATLAS_MAX_PAGES, generateFeaturePages } from "@/lib/print/atlas-utils";
+import { generateFeaturePages } from "@/lib/print/atlas-utils";
 import type { AtlasPage, AtlasResult } from "@/lib/print/atlas-utils";
 import type { ProjectLayer } from "@/lib/validations/project";
 import type { AtlasConfig, AtlasFeatureCoverage } from "@/lib/validations/reportLayout";
@@ -19,6 +19,8 @@ export interface UseAtlasFeaturesOptions {
   projectLayers?: ProjectLayer[];
   /** Current atlas page index (0-based) */
   currentPageIndex?: number;
+  /** Maximum number of atlas pages (from backend config) */
+  atlasMaxPages: number;
 }
 
 export interface UseAtlasFeaturesResult {
@@ -69,6 +71,7 @@ export function useAtlasFeatures({
   atlasConfig,
   projectLayers,
   currentPageIndex = 0,
+  atlasMaxPages,
 }: UseAtlasFeaturesOptions): UseAtlasFeaturesResult {
   // Find the coverage layer from project layers
   const coverageLayer = useMemo(() => {
@@ -89,7 +92,7 @@ export function useAtlasFeatures({
     const layerCqlFilter = coverageLayer.query?.cql;
 
     return {
-      limit: 10000, // Fetch all features for atlas
+      limit: atlasMaxPages,
       offset: 0,
       ...(layerCqlFilter ? { filter: JSON.stringify(layerCqlFilter) } : {}),
     };
@@ -127,7 +130,7 @@ export function useAtlasFeatures({
     const labelTemplate = atlasConfig.page_label?.template || "Page {page_number} of {total_pages}";
 
     // Enforce max page limit
-    const effectiveFeatures = features.slice(0, ATLAS_MAX_PAGES);
+    const effectiveFeatures = features.slice(0, atlasMaxPages);
     return generateFeaturePages(featureCoverage, effectiveFeatures, labelTemplate);
   }, [atlasConfig, features]);
 
@@ -147,7 +150,7 @@ export function useAtlasFeatures({
     totalPages: atlasResult?.totalPages ?? 0,
     coverageLayer,
     features,
-    wasTruncated: features.length > ATLAS_MAX_PAGES,
-    totalFeatureCount: features.length,
+    wasTruncated: (data?.numberMatched ?? 0) > atlasMaxPages,
+    totalFeatureCount: data?.numberMatched ?? 0,
   };
 }

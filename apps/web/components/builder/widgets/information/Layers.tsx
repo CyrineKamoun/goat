@@ -1,6 +1,8 @@
-import { Box } from "@mui/material";
+import { Box, InputAdornment, TextField } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
 import { useParams } from "next/navigation";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 
 import { updateProjectLayerTree, useProjectLayerGroups, useProjectLayers } from "@/lib/api/projects";
@@ -14,8 +16,10 @@ import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { ProjectLayerTree } from "@/components/map/panels/layer/ProjectLayerTree";
+import TabsLayerLayout from "@/components/builder/widgets/information/TabsLayerLayout";
 
 interface LayerInformationProps {
+  widgetId: string;
   config: LayerInformationSchema;
   projectLayers: ProjectLayer[];
   projectLayerGroups: ProjectLayerGroup[];
@@ -23,51 +27,86 @@ interface LayerInformationProps {
 }
 
 export const LayerInformationWidget = ({
+  widgetId,
+  config: configProp,
   projectLayers: _publishedProjectLayers,
   projectLayerGroups: _publishedProjectLayerGroups,
   viewOnly,
 }: LayerInformationProps) => {
+  const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const { projectId } = useParams() as { projectId: string };
   const { mutate: mutateProjectLayers } = useFilteredProjectLayers(projectId);
-  // Only subscribe to currentZoom in viewOnly mode to avoid re-renders during map interaction
-  const currentZoom = useAppSelector((state) => (viewOnly ? state.map.currentZoom : undefined));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const outOfZoomBehaviorRaw = ((configProp.options as Record<string, any>)?.out_of_zoom_behavior) ?? "hide";
+  // Only subscribe to currentZoom when we need it for filtering (hide mode)
+  const currentZoom = useAppSelector((state) =>
+    viewOnly && outOfZoomBehaviorRaw === "hide" ? state.map.currentZoom : undefined
+  );
+  const [searchText, setSearchText] = useState("");
 
-  // Get Redux state for viewOnly mode
+  // In edit mode, read the latest config from Redux for instant updates — but ONLY for THIS widget
+  const selectedBuilderItem = useAppSelector((state) =>
+    !viewOnly ? state.map.selectedBuilderItem : undefined
+  );
+  const config =
+    selectedBuilderItem?.type === "widget" &&
+    selectedBuilderItem.id === widgetId &&
+    selectedBuilderItem.config?.type === "layers"
+      ? (selectedBuilderItem.config as LayerInformationSchema)
+      : configProp;
+
   const reduxProjectLayers = useAppSelector((state) => state.layers.projectLayers);
   const reduxProjectLayerGroups = useAppSelector((state) => state.layers.projectLayerGroups);
 
-  // Use useProjectLayers and useProjectLayerGroups for edit mode (when not viewOnly)
   const { layers: editProjectLayers } = useProjectLayers(viewOnly ? undefined : projectId);
   const { layerGroups: editProjectLayerGroups, mutate: mutateProjectLayerGroups } = useProjectLayerGroups(
     viewOnly ? undefined : projectId
   );
 
-  // Determine which data to use based on viewOnly mode
-  const groupsToUse = viewOnly ? reduxProjectLayerGroups : editProjectLayerGroups || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const opts = config.options as Record<string, any> | undefined;
+  const excludedLayers: number[] = opts?.excluded_layers ?? [];
+  const legendHiddenLayers: number[] = opts?.legend_hidden_layers ?? [];
+  const downloadableLayers: number[] = opts?.downloadable_layers ?? [];
 
-  // Filter layers based on zoom level (only in viewOnly mode)
+  const outOfZoomBehavior = opts?.out_of_zoom_behavior ?? "hide";
+
   const filteredLayers = useMemo(() => {
     const layersToUse = viewOnly ? reduxProjectLayers : editProjectLayers || [];
     return layersToUse.filter((layer) => {
       if (layer.layer_id && SYSTEM_LAYERS_IDS.includes(layer.layer_id)) return false;
-      // Only apply zoom filtering in viewOnly mode
-      if (viewOnly && currentZoom !== undefined) {
+      // Excluded by checkbox in config
+      if (excludedLayers.includes(layer.id)) return false;
+      // Hidden from legend by "Show in legend" toggle
+      if (legendHiddenLayers.includes(layer.id)) return false;
+      // Hide layers outside zoom range (only when behavior is "hide")
+      if (viewOnly && outOfZoomBehavior === "hide" && currentZoom !== undefined) {
         const minZoom = layer.properties?.min_zoom;
         const maxZoom = layer.properties?.max_zoom;
-        if (minZoom && maxZoom) {
+        if (minZoom !== undefined && maxZoom !== undefined) {
           return currentZoom >= minZoom && currentZoom <= maxZoom;
         }
       }
+      if (searchText) {
+        return layer.name?.toLowerCase().includes(searchText.toLowerCase());
+      }
       return true;
     });
-  }, [viewOnly, reduxProjectLayers, editProjectLayers, currentZoom]);
+  }, [viewOnly, reduxProjectLayers, editProjectLayers, currentZoom, searchText, excludedLayers, legendHiddenLayers, outOfZoomBehavior]);
 
-  // Unified tree update handler for view mode
-  const handleTreeUpdate = async (updatePayload: ProjectLayerTreeUpdate) => {
+  // Filter out groups that have no visible layers
+  const allGroups = viewOnly ? reduxProjectLayerGroups : editProjectLayerGroups || [];
+  const filteredGroups = useMemo(() => {
+    const visibleLayerGroupIds = new Set(
+      filteredLayers.map((l) => l.layer_project_group_id).filter(Boolean)
+    );
+    return allGroups.filter((g) => visibleLayerGroupIds.has(g.id));
+  }, [allGroups, filteredLayers]);
+
+  const handleTreeUpdate = useCallback(async (updatePayload: ProjectLayerTreeUpdate) => {
     try {
       if (viewOnly) {
-        // For view-only mode, update local Redux state with proper property merging
         updatePayload.items.forEach((item) => {
           if (item.type === "layer" && item.properties) {
             const existingLayer = reduxProjectLayers.find((l) => l.id === item.id);
@@ -79,7 +118,6 @@ export const LayerInformationWidget = ({
                     properties: {
                       ...existingLayer.properties,
                       ...item.properties,
-                      // Ensure legend properties are properly merged
                       legend: item.properties.legend
                         ? { ...existingLayer.properties?.legend, ...item.properties.legend }
                         : existingLayer.properties?.legend,
@@ -106,7 +144,6 @@ export const LayerInformationWidget = ({
           }
         });
       } else {
-        // For edit mode, do optimistic updates first, then sync with server
         if (editProjectLayers) {
           const updatedLayers = editProjectLayers.map((layer) => {
             const updateItem = updatePayload.items.find(
@@ -117,7 +154,6 @@ export const LayerInformationWidget = ({
                 ...layer,
                 order: updateItem.order,
                 layer_project_group_id: updateItem.parent_id || null,
-                // Update properties if provided (includes legend.collapsed, visibility, etc.)
                 properties: updateItem.properties
                   ? { ...layer.properties, ...updateItem.properties }
                   : layer.properties,
@@ -138,7 +174,6 @@ export const LayerInformationWidget = ({
                 ...group,
                 order: updateItem.order,
                 parent_id: updateItem.parent_id || null,
-                // Deep merge properties to preserve existing properties while updating new ones
                 properties: updateItem.properties
                   ? { ...group.properties, ...updateItem.properties }
                   : group.properties,
@@ -149,30 +184,81 @@ export const LayerInformationWidget = ({
           mutateProjectLayerGroups(updatedGroups, false);
         }
 
-        // Then sync with server using the batch update endpoint (same as DataProjectLayout)
         await updateProjectLayerTree(projectId, updatePayload);
       }
     } catch (error) {
       console.error("LayerInformationWidget - Error updating tree:", error);
       toast.error("Failed to update tree");
-      // Revert optimistic updates on error
       if (!viewOnly) {
         mutateProjectLayers();
         mutateProjectLayerGroups();
       }
     }
-  };
+  }, [viewOnly, reduxProjectLayers, reduxProjectLayerGroups, editProjectLayers, editProjectLayerGroups, dispatch, projectId, mutateProjectLayers, mutateProjectLayerGroups]);
+
+  const options = config.options;
+  const layoutStyle = options?.layout_style || "tree";
 
   return (
     <Box>
-      <ProjectLayerTree
-        projectId={projectId}
-        projectLayers={filteredLayers}
-        projectLayerGroups={groupsToUse}
-        viewMode="view"
-        isLoading={false}
-        onTreeUpdate={handleTreeUpdate}
-      />
+      {/* Search bar */}
+      {options?.show_search && (
+        <Box sx={{ px: 1, pb: 1 }}>
+          <TextField
+            size="small"
+            fullWidth
+            placeholder={t("search_layers")}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 18, color: "text.disabled" }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": { height: 32 },
+              "& .MuiOutlinedInput-input": { fontSize: 13 },
+            }}
+          />
+        </Box>
+      )}
+
+      {layoutStyle === "tabs" ? (
+        <TabsLayerLayout
+          projectId={projectId}
+          projectLayers={filteredLayers}
+          projectLayerGroups={filteredGroups}
+          config={config}
+          onTreeUpdate={handleTreeUpdate}
+          viewOnly={viewOnly}
+          downloadableLayers={downloadableLayers}
+          hideLegendHeading={!!opts?.hide_legend_heading}
+          groupIcons={opts as Record<string, { url: string; source?: string }> | undefined}
+        />
+      ) : (
+        <ProjectLayerTree
+          projectId={projectId}
+          projectLayers={filteredLayers}
+          projectLayerGroups={filteredGroups}
+          viewMode="view"
+          isLoading={false}
+          onTreeUpdate={handleTreeUpdate}
+          toggleStyle={options?.toggle_style}
+          togglePosition={options?.toggle_position}
+          moreOptionsStyle={options?.more_options_style}
+          allowedActions={{
+            style: options?.show_style_action ?? true,
+            viewData: options?.show_view_data_action ?? true,
+            properties: options?.show_properties_action ?? true,
+            zoomTo: options?.show_zoom_to_action ?? true,
+          }}
+          downloadableLayers={downloadableLayers}
+          hideLegendHeading={!!opts?.hide_legend_heading}
+          groupIcons={opts as Record<string, { url: string; source?: string }> | undefined}
+        />
+      )}
     </Box>
   );
 };

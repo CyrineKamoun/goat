@@ -12,16 +12,68 @@ interface LayerLegendPanelProps {
   geometryType: string; // "point", "line", "polygon"
   /** Optional sx overrides for legend item label text */
   itemTypographySx?: Record<string, unknown>;
+  /** Optional sx overrides for section heading text (field names) */
+  headingTypographySx?: Record<string, unknown>;
   /** Whether text labels are inline-editable */
   editable?: boolean;
   /** Text overrides keyed by "item_{index}" */
   textOverrides?: Record<string, string>;
   /** Save callback for text overrides */
   onTextSave?: (key: string, text: string) => void;
+  /** Compact mode: render items inline in a flow layout (for print legends) */
+  compact?: boolean;
+  /** Hide the attribute/field name headings while keeping color values */
+  hideHeading?: boolean;
 }
 
-export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, editable, textOverrides, onTextSave }: LayerLegendPanelProps) => {
+export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, headingTypographySx, editable, textOverrides, onTextSave, compact, hideHeading }: LayerLegendPanelProps) => {
   const { t } = useTranslation("common");
+
+  // Container sx for sections — compact indents items under layer name
+  const sectionSx = {
+    pb: compact ? 0.5 : 1,
+    pt: compact ? 0.25 : 0.5,
+    ...(!compact && { pr: 2 }),
+    ...(compact && { pl: 1.5 }),
+  };
+
+  // Editable heading helper
+  const renderHeading = (defaultText: string, overrideKey: string) => {
+    if (hideHeading) return null;
+    const displayText = editable && textOverrides?.[overrideKey] != null ? textOverrides[overrideKey] : defaultText;
+    // Hide heading entirely when user has cleared the text
+    if (editable && textOverrides?.[overrideKey] != null && !displayText.trim()) {
+      return null;
+    }
+    const handleBlur = (e: React.FocusEvent<HTMLSpanElement>) => {
+      const newText = e.currentTarget.textContent ?? "";
+      if (newText !== displayText) {
+        onTextSave?.(overrideKey, newText);
+      }
+    };
+    return (
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        className={editable ? "legend-editable-text" : undefined}
+        sx={{
+          display: "block",
+          mb: 0.5,
+          ...headingTypographySx,
+          ...(editable && {
+            cursor: "text",
+            outline: "none",
+            "&:hover": { backgroundColor: "rgba(0,0,0,0.04)" },
+            "&:focus": { backgroundColor: "rgba(0,0,0,0.08)" },
+          }),
+        }}
+        contentEditable={editable}
+        suppressContentEditableWarning
+        onBlur={editable ? handleBlur : undefined}>
+        {displayText}
+      </Typography>
+    );
+  };
 
   // Check if this is a raster layer with styling
   const rasterProperties = properties as RasterLayerProperties;
@@ -55,13 +107,20 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, e
     };
 
     return (
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 0.5 }}>
-        <Box sx={{ width: 20, display: "flex", justifyContent: "center" }}>{iconNode}</Box>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={compact ? 0.5 : 1}
+        sx={{ py: compact ? 0 : 0.5 }}>
+        <Box sx={{ width: 20, height: 20, display: "flex", justifyContent: "center", alignItems: "center", flexShrink: 0 }}>
+          {iconNode}
+        </Box>
         <Typography
           variant="caption"
           className={editable ? "legend-editable-text" : undefined}
           sx={{
             lineHeight: 1.2,
+            wordBreak: "break-word",
             ...itemTypographySx,
             ...(editable && {
               cursor: "text",
@@ -91,10 +150,8 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, e
   // A. Custom Markers with matching color field - show colored markers only
   if (markerMap.length > 1 && geometryType === "point" && hasMatchingFields) {
     return (
-      <Box sx={{ pb: 1, pr: 2, pt: 0.5 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-          {markerFieldName || "Legend"}
-        </Typography>
+      <Box sx={sectionSx}>
+        {renderHeading(markerFieldName || "Legend", "heading")}
         {markerMap.map((item, index) => (
           <React.Fragment key={`${item.marker}-${item.value?.join(",") || index}`}>
             {renderRow(
@@ -115,11 +172,9 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, e
   // B. Custom Markers WITHOUT matching color field - show both sections
   if (markerMap.length > 1 && geometryType === "point" && !hasMatchingFields) {
     return (
-      <Box sx={{ pb: 1, pr: 2, pt: 0.5 }}>
+      <Box sx={sectionSx}>
         {/* Icons section */}
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-          {markerFieldName ? t("icons_based_on", { field: markerFieldName }) : t("icons")}
-        </Typography>
+        {renderHeading(markerFieldName ? t("icons_based_on", { field: markerFieldName }) : t("icons"), "heading_marker")}
         {markerMap.map((item, index) => (
           <React.Fragment key={`${item.marker}-${item.value?.join(",") || index}`}>
             {renderRow(
@@ -137,9 +192,7 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, e
         {/* Fill color section if it exists */}
         {colorMap.length > 1 && (
           <>
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2, mb: 0.5 }}>
-              {t("fill_color_based_on", { field: colorFieldName || t("color") })}
-            </Typography>
+            {renderHeading(t("fill_color_based_on", { field: colorFieldName || t("color") }), "heading_color")}
             {colorMap.map((item, index) => (
               <React.Fragment key={`${item.color}-${item.value?.join(",") || index}`}>
                 {renderRow(item.label || item.value?.join(", ") || "Other", <LayerIcon type="point" color={item.color} />)}
@@ -155,11 +208,9 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, e
   if (markerMap.length === 1 && geometryType === "point" && colorMap.length > 1) {
     const singleMarker = markerMap[0];
     return (
-      <Box sx={{ pb: 1, pr: 2, pt: 0.5 }}>
+      <Box sx={sectionSx}>
         {/* Show the icon in each color instead of circles */}
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-          {colorFieldName || "Legend"}
-        </Typography>
+        {renderHeading(colorFieldName || "Legend", "heading")}
         {colorMap.map((item, index) => (
           <React.Fragment key={`${item.color}-${item.value?.join(",") || index}`}>
             {renderRow(
@@ -169,6 +220,28 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, e
                 iconUrl={singleMarker.marker || ""}
                 color={item.color}
                 iconSource={singleMarker.source}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </Box>
+    );
+  }
+
+  // C2. Multiple markers only (no fill/stroke colors) - show markers without color section
+  if (markerMap.length > 1 && geometryType === "point" && colorMap.length <= 1 && strokeMap.length <= 1) {
+    return (
+      <Box sx={sectionSx}>
+        {renderHeading(markerFieldName ? t("icons_based_on", { field: markerFieldName }) : t("icons"), "heading_marker")}
+        {markerMap.map((item, index) => (
+          <React.Fragment key={`${item.marker}-${item.value?.join(",") || index}`}>
+            {renderRow(
+              item.value?.join(", ") || "Other",
+              <LayerIcon
+                type="point"
+                iconUrl={item.marker || ""}
+                color={item.color || undefined}
+                iconSource={item.source}
               />
             )}
           </React.Fragment>
@@ -195,11 +268,9 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, e
     // If both fill and stroke are attribute-based on different fields, show both sections
     if (hasDifferentStrokeField && strokeMap.length > 1) {
       return (
-        <Box sx={{ pb: 1, pr: 2, pt: 0.5 }}>
+        <Box sx={sectionSx}>
           {/* Fill color section */}
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-            {t("fill_color_based_on", { field: colorFieldName || t("color") })}
-          </Typography>
+          {renderHeading(t("fill_color_based_on", { field: colorFieldName || t("color") }), "heading_color")}
           {colorMap.map((item, index) => (
             <React.Fragment key={`fill-${item.color}-${item.value?.join(",") || index}`}>
               {renderRow(
@@ -210,9 +281,7 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, e
           ))}
 
           {/* Stroke color section */}
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2, mb: 0.5 }}>
-            {t("stroke_color_based_on", { field: strokeColorFieldName })}
-          </Typography>
+          {renderHeading(t("stroke_color_based_on", { field: strokeColorFieldName }), "heading_stroke")}
           {strokeMap.map((item, index) => (
             <React.Fragment key={`stroke-${item.color}-${item.value?.join(",") || index}`}>
               {renderRow(
@@ -228,10 +297,8 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, e
     // Otherwise, show fill color with stroke (classified if same field, static otherwise)
     const sameFieldStroke = strokeMap.length > 1;
     return (
-      <Box sx={{ pb: 1, pr: 2, pt: 0.5 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-          {colorFieldName || "Legend"}
-        </Typography>
+      <Box sx={sectionSx}>
+        {renderHeading(colorFieldName || "Legend", "heading")}
         {colorMap.map((item, index) => (
           <React.Fragment key={`${item.color}-${item.value?.join(",") || index}`}>
             {renderRow(
@@ -258,10 +325,8 @@ export const LayerLegendPanel = ({ properties, geometryType, itemTypographySx, e
         : (properties.color as string)
       : undefined;
     return (
-      <Box sx={{ pb: 1, pr: 2, pt: 0.5 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-          {(properties.stroke_color_field as { name?: string })?.name || "Legend"}
-        </Typography>
+      <Box sx={sectionSx}>
+        {renderHeading((properties.stroke_color_field as { name?: string })?.name || "Legend", "heading")}
         {strokeMap.map((item, index) => (
           <React.Fragment key={`${item.color}-${item.value?.join(",") || index}`}>
             {renderRow(

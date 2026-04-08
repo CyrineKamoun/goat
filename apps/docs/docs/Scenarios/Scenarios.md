@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 7
 ---
 
 
@@ -21,7 +21,7 @@ Only **geographical layers** can be modified in scenarios. Tables and rasters ca
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Click on <code>Scenarios</code> <img src={require('/img/icons/compass-drafting.png').default} alt="Scenarios" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>.</div>
+  <div class="content">Click on <code>Scenarios</code> <img src={require('/img/icons/compass.png').default} alt="Scenarios" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>.</div>
 </div>
 
 <div class="step">
@@ -95,7 +95,7 @@ Create multiple scenarios to test different configurations:
 
 - **Select**: Click a scenario to view its changes
 - **Modify**: Use the options menu <img src={require('/img/icons/3dots.png').default} alt="Options" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> to rename, delete, or edit
-- **Track changes**: Modified layers show <img src={require('/img/icons/compass-drafting.png').default} alt="Scenario indicator" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> with a number
+- **Track changes**: Modified layers show <img src={require('/img/icons/compass.png').default} alt="Scenario indicator" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> with a number
 - **Deselect**: Click the active scenario again to return to the original map
 
 ## 3. Street Network - Edges

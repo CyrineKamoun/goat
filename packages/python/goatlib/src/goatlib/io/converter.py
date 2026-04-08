@@ -753,23 +753,31 @@ class IOConverter:
     # Helper methods
     # ------------------------------------------------------------------
     def _extract_supported_from_zip(self: Self, zip_path: str) -> Iterator[Path]:
-        """Extract supported files from a ZIP archive."""
+        """Extract all files from a ZIP archive, then yield supported ones.
+
+        Extracts everything first so that companion/sidecar files (e.g. .dbf,
+        .shx, .prj for shapefiles) are available when GDAL opens the main file.
+        """
         tmp_dir = Path(tempfile.mkdtemp(prefix="goatlib_zip_"))
         try:
             with zipfile.ZipFile(zip_path) as z:
-                members = z.namelist()
-                supported = [m for m in members if Path(m).suffix.lower() in ALL_EXTS]
-
-                if not supported:
-                    raise ValueError(f"No supported files found in {zip_path}")
-
-                for m in supported:
+                # Extract all files into a flat directory
+                for m in z.namelist():
                     if m.endswith("/"):
                         continue
                     dest = tmp_dir / Path(m).name
                     with z.open(m) as src, open(dest, "wb") as dst:
                         dst.write(src.read())
-                    yield dest
+
+            # Yield only the files with supported extensions
+            supported = [
+                f for f in tmp_dir.iterdir()
+                if f.suffix.lower() in ALL_EXTS
+            ]
+            if not supported:
+                raise ValueError(f"No supported files found in {zip_path}")
+
+            yield from supported
         except Exception:
             shutil.rmtree(tmp_dir, ignore_errors=True)
             raise

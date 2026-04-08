@@ -23,7 +23,7 @@ Nur **geografische Layer** können in Szenarien modifiziert werden. Tabellen und
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Klicken Sie auf <code>Szenarien</code> <img src={require('/img/icons/compass-drafting.png').default} alt="Szenarien" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>.</div>
+  <div class="content">Klicken Sie auf <code>Szenarien</code> <img src={require('/img/icons/compass.png').default} alt="Szenarien" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>.</div>
 </div>
 
 <div class="step">
@@ -94,7 +94,7 @@ Erstellen Sie mehrere Szenarien, um verschiedene Konfigurationen zu testen:
 
 - **Auswählen**: Klicken Sie auf ein Szenario, um dessen Änderungen anzuzeigen
 - **Modifizieren**: Verwenden Sie das Optionsmenü <img src={require('/img/icons/3dots.png').default} alt="Optionen" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>, um umzubenennen, zu löschen oder zu bearbeiten
-- **Änderungen verfolgen**: Modifizierte Layer zeigen <img src={require('/img/icons/compass-drafting.png').default} alt="Szenario-Indikator" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> mit einer Zahl
+- **Änderungen verfolgen**: Modifizierte Layer zeigen <img src={require('/img/icons/compass.png').default} alt="Szenario-Indikator" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> mit einer Zahl
 - **Abwählen**: Klicken Sie erneut auf das aktive Szenario, um zur ursprünglichen Karte zurückzukehren
 
 

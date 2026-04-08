@@ -12,9 +12,11 @@ to avoid code duplication in Windmill scripts.
 import json
 import logging
 import uuid as uuid_module
-from typing import Any, Self
+from enum import Enum
+from typing import Any, Literal, Self
 
 import asyncpg
+from pydantic import BaseModel, Field, model_validator
 
 from goatlib.tools.style import get_default_style
 
@@ -46,6 +48,59 @@ def normalize_geometry_type(geom_type: str | None) -> str | None:
         return "polygon"
 
     return None
+
+
+class FeatureGeometryType(str, Enum):
+    """Feature layer geometry types. Mirrors core.db.models.layer.FeatureGeometryType."""
+
+    point = "point"
+    line = "line"
+    polygon = "polygon"
+
+
+class LayerRecord(BaseModel):
+    """Pydantic model mirroring customer.layer constraints.
+
+    Validates data before INSERT to catch issues early instead of
+    writing broken records to the database.
+    """
+
+    id: uuid_module.UUID
+    user_id: uuid_module.UUID
+    folder_id: uuid_module.UUID
+    name: str = Field(min_length=1)
+    type: Literal["feature", "raster", "table"]
+    feature_layer_type: Literal["standard", "tool", "street_network"] | None = None
+    feature_layer_geometry_type: FeatureGeometryType | None = None
+    extent_wkt: str | None = None
+    attribute_mapping: dict[str, Any] | None = None
+    size: int = 0
+    properties: dict[str, Any] | None = None
+    other_properties: dict[str, Any] | None = None
+    thumbnail_url: str | None = None
+    tool_type: str | None = None
+    job_id: uuid_module.UUID | None = None
+
+    @model_validator(mode="after")
+    def feature_layer_requires_geometry(self: Self) -> Self:
+        """Feature layers must have a geometry type."""
+        if self.type == "feature" and self.feature_layer_geometry_type is None:
+            raise ValueError(
+                "Feature layers require feature_layer_geometry_type "
+                "(point, line, or polygon)"
+            )
+        return self
+
+
+class LayerProjectRecord(BaseModel):
+    """Pydantic model mirroring customer.layer_project constraints."""
+
+    layer_id: uuid_module.UUID
+    project_id: uuid_module.UUID
+    name: str = Field(min_length=1, max_length=255)
+    order: int = 0
+    properties: dict[str, Any] | None = None
+    other_properties: dict[str, Any] | None = None
 
 
 class ToolDatabaseService:
@@ -132,6 +187,25 @@ class ToolDatabaseService:
         # Normalize geometry type (POINT -> point, LINESTRING -> line, etc.)
         normalized_geom = normalize_geometry_type(geometry_type)
 
+        # Validate all fields through the Pydantic model before touching the DB
+        record = LayerRecord(
+            id=uuid_module.UUID(layer_id),
+            user_id=uuid_module.UUID(user_id),
+            folder_id=uuid_module.UUID(folder_id),
+            name=name,
+            type=layer_type,
+            feature_layer_type=feature_layer_type,
+            feature_layer_geometry_type=normalized_geom,
+            extent_wkt=extent_wkt,
+            attribute_mapping=attribute_mapping,
+            size=size,
+            properties=properties,
+            other_properties=other_properties,
+            thumbnail_url=thumbnail_url,
+            tool_type=tool_type,
+            job_id=uuid_module.UUID(job_id) if job_id else None,
+        )
+
         # Generate default style if no properties provided
         if properties is None and normalized_geom:
             properties = get_default_style(normalized_geom)
@@ -140,9 +214,6 @@ class ToolDatabaseService:
         attr_mapping_json = json.dumps(attribute_mapping) if attribute_mapping else None
         properties_json = json.dumps(properties) if properties else None
         other_props_json = json.dumps(other_properties) if other_properties else None
-
-        # Convert job_id string to UUID if provided
-        job_id_uuid = uuid_module.UUID(job_id) if job_id else None
 
         await self.pool.execute(
             f"""
@@ -161,21 +232,23 @@ class ToolDatabaseService:
                 NOW(), NOW()
             )
             """,
-            uuid_module.UUID(layer_id),
-            uuid_module.UUID(user_id),
-            uuid_module.UUID(folder_id),
-            name,
-            layer_type,
-            feature_layer_type,
-            normalized_geom,
-            extent_wkt,
+            record.id,
+            record.user_id,
+            record.folder_id,
+            record.name,
+            record.type,
+            record.feature_layer_type,
+            record.feature_layer_geometry_type.value
+            if record.feature_layer_geometry_type
+            else None,
+            record.extent_wkt,
             attr_mapping_json,
-            size,
+            record.size,
             properties_json,
             other_props_json,
-            thumbnail_url,
-            tool_type,
-            job_id_uuid,
+            record.thumbnail_url,
+            record.tool_type,
+            record.job_id,
         )
         logger.info(
             f"Created layer: {layer_id} ({name}) in folder {folder_id} "
@@ -206,6 +279,15 @@ class ToolDatabaseService:
         Returns:
             layer_project_id: The ID of the created link record
         """
+        # Validate through Pydantic model before touching the DB
+        record = LayerProjectRecord(
+            layer_id=uuid_module.UUID(layer_id),
+            project_id=uuid_module.UUID(project_id),
+            name=name,
+            properties=properties,
+            other_properties=other_properties,
+        )
+
         properties_json = json.dumps(properties) if properties else None
         other_props_json = json.dumps(other_properties) if other_properties else None
 
@@ -220,9 +302,9 @@ class ToolDatabaseService:
             VALUES ($1, $2, $3, 0, $4::jsonb, $5::jsonb, NOW(), NOW())
             RETURNING id
             """,
-            uuid_module.UUID(layer_id),
-            uuid_module.UUID(project_id),
-            name,
+            record.layer_id,
+            record.project_id,
+            record.name,
             properties_json,
             other_props_json,
         )

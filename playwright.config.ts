@@ -15,7 +15,7 @@ const DEFAULT_EXPECT_TIMEOUT = process.env.CI ? 15000 : 50000;
 // So, it should me much higher than sum of expect and navigation timeouts as there can be many async expects and navigations in a single test
 const DEFAULT_TEST_TIMEOUT = process.env.CI ? 60000 : 120000;
 
-const headless = !!process.env.CI || !!process.env.PLAYWRIGHT_HEADLESS;
+const headless = !!process.env.CI || !!process.env.PLAYWRIGHT_HEADLESS || !process.env.DISPLAY;
 
 export default defineConfig({
   fullyParallel: true,
@@ -26,7 +26,7 @@ export default defineConfig({
   maxFailures: headless ? 10 : undefined,
   reporter: [
     [process.env.CI ? "github" : "list"],
-    ["@deploysentinel/playwright"],
+    ...(process.env.DEPLOY_SENTINEL ? [["@deploysentinel/playwright" as const]] : []),
     ["html", { outputFolder: "./test-results/reports/playwright-html-report", open: "never" }],
     ["junit", { outputFile: "./test-results/reports/results.xml" }],
   ],

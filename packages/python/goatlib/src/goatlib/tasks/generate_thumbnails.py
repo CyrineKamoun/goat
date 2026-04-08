@@ -20,8 +20,8 @@ The task:
 7. Deletes old thumbnails from S3
 
 Usage:
-    # As Windmill scheduled task (every 10 minutes):
-    # Configured in registry with schedule="*/10 * * * *"
+    # As Windmill scheduled task (every 15 minutes):
+    # Configured in registry with schedule="*/15 * * * *"
 
     # Manual execution:
     from goatlib.tasks.generate_thumbnails import ThumbnailTaskParams, main
@@ -125,7 +125,7 @@ class ThumbnailTaskParams(BaseModel):
         description="Fetch all items regardless of updated_at (ignores hours_lookback)",
     )
     dry_run: bool = Field(
-        default=True,
+        default=False,
         description="Test mode: only test DB connection and fetch items without generating thumbnails",
     )
 

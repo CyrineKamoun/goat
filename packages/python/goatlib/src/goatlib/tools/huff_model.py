@@ -270,11 +270,17 @@ class HuffModelToolRunner(BaseToolRunner[HuffModelToolParams]):
             project_id=params.project_id,
         )
 
+        # Auto-resolve od_matrix_path from routing_mode if not provided
+        od_matrix_path = params.od_matrix_path
+        if not od_matrix_path:
+            od_matrix_path = f"{self.settings.od_matrix_base_path}/{params.routing_mode.value}/"
+
         # Build analysis params
         analysis_params = HuffmodelParams(
             **params.model_dump(
                 exclude={
                     "output_path",
+                    "od_matrix_path",
                     "user_id",
                     "folder_id",
                     "project_id",
@@ -294,6 +300,7 @@ class HuffModelToolRunner(BaseToolRunner[HuffModelToolParams]):
             demand_path=str(demand_path),
             opportunity_path=str(opportunity_path),
             reference_area_path=str(reference_area_path),
+            od_matrix_path=od_matrix_path,
             output_path=str(output_path),
         )
 

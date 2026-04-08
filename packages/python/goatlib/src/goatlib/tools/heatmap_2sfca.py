@@ -110,6 +110,58 @@ class Heatmap2SFCAToolParams(ScenarioSelectorMixin, ToolInputBase, Heatmap2SFCAP
     )
     output_path: str | None = None  # type: ignore[assignment]
 
+    # Numbered opportunity layer inputs for workflow canvas handles (up to 3)
+    # These generate input handles on the workflow node; workflow_runner.py
+    # maps them to the `opportunities` list before tool execution.
+    opportunity_layer_1_id: str | None = Field(
+        None,
+        description="First opportunity layer (connected from workflow)",
+        json_schema_extra=ui_field(
+            section="opportunities",
+            field_order=1,
+            widget="layer-selector",
+            label_key="opportunity_layer_1",
+            hidden=True,
+        ),
+    )
+    opportunity_layer_1_filter: dict[str, Any] | None = Field(
+        None,
+        description="CQL2-JSON filter for first opportunity layer",
+        json_schema_extra=ui_field(section="opportunities", field_order=2, hidden=True),
+    )
+    opportunity_layer_2_id: str | None = Field(
+        None,
+        description="Second opportunity layer (connected from workflow)",
+        json_schema_extra=ui_field(
+            section="opportunities",
+            field_order=3,
+            widget="layer-selector",
+            label_key="opportunity_layer_2",
+            hidden=True,
+        ),
+    )
+    opportunity_layer_2_filter: dict[str, Any] | None = Field(
+        None,
+        description="CQL2-JSON filter for second opportunity layer",
+        json_schema_extra=ui_field(section="opportunities", field_order=4, hidden=True),
+    )
+    opportunity_layer_3_id: str | None = Field(
+        None,
+        description="Third opportunity layer (connected from workflow)",
+        json_schema_extra=ui_field(
+            section="opportunities",
+            field_order=5,
+            widget="layer-selector",
+            label_key="opportunity_layer_3",
+            hidden=True,
+        ),
+    )
+    opportunity_layer_3_filter: dict[str, Any] | None = Field(
+        None,
+        description="CQL2-JSON filter for third opportunity layer",
+        json_schema_extra=ui_field(section="opportunities", field_order=6, hidden=True),
+    )
+
     # Override result_layer_name with tool-specific defaults
     result_layer_name: str | None = Field(
         default=get_default_layer_name("heatmap_2sfca", "en"),
@@ -179,21 +231,27 @@ class Heatmap2SFCAToolRunner(BaseToolRunner[Heatmap2SFCAToolParams]):
         resolved_opportunities = self.resolve_layer_paths(
             params.opportunities, params.user_id, "input_path"
         )
-        
+
         # Resolve demand layer ID to parquet path
         demand_path = self.export_layer_to_parquet(
-            params.demand_layer_id, 
+            params.demand_layer_id,
             user_id=params.user_id,
             cql_filter=params.demand_layer_filter,
             scenario_id=params.scenario_id,
             project_id=params.project_id,
         )
 
+        # Auto-resolve od_matrix_path from routing_mode if not provided
+        od_matrix_path = params.od_matrix_path
+        if not od_matrix_path:
+            od_matrix_path = f"{self.settings.od_matrix_base_path}/{params.routing_mode.value}/"
+
         # Build analysis params
         analysis_params = Heatmap2SFCAParams(
             **params.model_dump(
                 exclude={
                     "output_path",
+                    "od_matrix_path",
                     "user_id",
                     "folder_id",
                     "project_id",
@@ -203,10 +261,18 @@ class Heatmap2SFCAToolRunner(BaseToolRunner[Heatmap2SFCAToolParams]):
                     "demand_path",
                     "demand_layer_id",
                     "demand_layer_filter",
+                    # Exclude workflow-only numbered input fields
+                    "opportunity_layer_1_id",
+                    "opportunity_layer_1_filter",
+                    "opportunity_layer_2_id",
+                    "opportunity_layer_2_filter",
+                    "opportunity_layer_3_id",
+                    "opportunity_layer_3_filter",
                 }
             ),
             opportunities=resolved_opportunities,
             demand_path=demand_path,
+            od_matrix_path=od_matrix_path,
             output_path=str(output_path),
         )
 

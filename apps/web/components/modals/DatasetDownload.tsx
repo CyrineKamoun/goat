@@ -11,7 +11,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 
@@ -21,12 +21,12 @@ import { useUserProfile } from "@/lib/api/users";
 import { setRunningJobIds } from "@/lib/store/jobs/slice";
 import type { FeatureDataExchangeType } from "@/lib/validations/common";
 import {
-  featureDataExchangeCRS,
   featureDataExchangeType,
   tableDataExchangeType,
 } from "@/lib/validations/common";
 import type { DatasetDownloadRequest, Layer } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
+import { getSuggestedCRS } from "@/lib/utils/map/crs-suggestions";
 
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
@@ -64,15 +64,20 @@ const DatasetDownloadModal: React.FC<DownloadDatasetDialogProps> = ({
   const isCatalogNotOwned =
     !isPublicMode && inCatalog && layerOwnerId && userProfile?.id && layerOwnerId !== userProfile.id;
 
+  // Compute CRS suggestions based on the layer extent
+  const crsSuggestions = useMemo(() => {
+    if (!isSpatialLayer) return [];
+    const extent = (dataset as { extent?: string }).extent;
+    return getSuggestedCRS(extent || "");
+  }, [isSpatialLayer, dataset]);
+
   const [dataDownloadType, setDataDownloadType] = useState<FeatureDataExchangeType>(
     isSpatialLayer ? featureDataExchangeType.Enum.gpkg : tableDataExchangeType.Enum.csv
   );
 
   const [isBusy, setIsBusy] = useState(false);
 
-  const [dataCrs, setDataCrs] = useState<string | null>(
-    isSpatialLayer ? featureDataExchangeCRS.Enum["4326"] : null
-  );
+  const [dataCrs, setDataCrs] = useState<string | null>(isSpatialLayer ? "4326" : null);
 
   const handleDownload = async () => {
     try {
@@ -127,6 +132,13 @@ const DatasetDownloadModal: React.FC<DownloadDatasetDialogProps> = ({
     }
   };
 
+  // Order: global first, then UTM, then regional
+  const orderedCrs = [
+    ...crsSuggestions.filter((s) => s.group === "global"),
+    ...crsSuggestions.filter((s) => s.group === "utm"),
+    ...crsSuggestions.filter((s) => s.group === "regional"),
+  ];
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <DialogTitle>{`${t("download")} "${dataset.name}"`}</DialogTitle>
@@ -174,9 +186,9 @@ const DatasetDownloadModal: React.FC<DownloadDatasetDialogProps> = ({
                   id="download-crs-select"
                   value={dataCrs}
                   onChange={(e) => setDataCrs(e.target.value as string)}>
-                  {featureDataExchangeCRS.options.map((type: string) => (
-                    <MenuItem key={type} value={type}>
-                      {t(`${type}`)}
+                  {orderedCrs.map((crs) => (
+                    <MenuItem key={crs.code} value={crs.code}>
+                      {crs.label}
                     </MenuItem>
                   ))}
                 </Select>

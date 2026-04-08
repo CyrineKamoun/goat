@@ -56,7 +56,7 @@ export const featureLayerType = z.enum(["standard", "tool", "street_network"]);
 export const tableDataExchangeType = z.enum(["csv", "xlsx"]);
 export const featureDataExchangeType = z.enum(["csv", "xlsx", "geojson", "gpkg", "kml", "shp", "parquet"]);
 
-export const featureDataExchangeCRS = z.enum(["4326", "3857", "4258"]);
+export const featureDataExchangeCRS = z.string().regex(/^\d{4,5}$/);
 
 export const featureLayerGeometryType = z.enum(["point", "line", "polygon"]);
 
@@ -65,6 +65,26 @@ export const imageryDataType = z.enum(["xyz", "wms", "wmts", "cog"]);
 export const dataType = z.union([vectorDataType, imageryDataType]);
 export const sortTypes = z.enum(["asc", "desc"]);
 export const statisticOperationEnum = z.enum(["count", "sum", "mean", "median", "min", "max", "expression"]);
+
+export const formatNumberTypes = z.enum([
+  "none", // 1000
+  "decimal_max", // All decimals (up to 3)
+  "integer", // 1000 (no commas)
+  "grouping", // 1,000
+  "grouping_2d", // 12,345.67
+  "signed_2d", // +12,345.67
+  "compact", // 1k
+  "compact_1d", // 12.3k
+  "decimal_2", // 1.23
+  "decimal_3", // 1.234
+  "currency_usd", // $12,345.67
+  "currency_eur", // €12,345.67
+  "percent", // 1%
+  "percent_1d", // 1.0%
+  "percent_2d", // 1.00%
+]);
+
+export type FormatNumberTypes = z.infer<typeof formatNumberTypes>;
 
 export type SortType = z.infer<typeof sortTypes>;
 export type StatisticOperation = z.infer<typeof statisticOperationEnum>;
