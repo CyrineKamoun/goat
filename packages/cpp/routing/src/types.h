@@ -113,6 +113,42 @@ namespace routing
         std::vector<int> cutoffs;
     };
 
+    struct MatrixConfig
+    {
+        std::vector<Point3857> origins;
+        std::vector<Point3857> destinations;
+        RoutingMode mode;
+        CostType cost_type;
+        double max_cost;       // budget: minutes (time) or meters (distance)
+        double speed_km_h;
+        std::string edge_dir;
+        std::string output_path;   // parquet output
+
+        // PT settings (only used when mode == PublicTransport)
+        std::string timetable_path;
+        int64_t departure_time = 0;    // unix minutes since epoch
+        int max_transfers = 5;
+        int departure_window = 0;
+        std::vector<std::string> transit_modes;
+        RoutingMode access_mode = RoutingMode::Walking;
+        RoutingMode egress_mode = RoutingMode::Walking;
+        double access_speed_km_h = 0.0;
+        double egress_speed_km_h = 0.0;
+    };
+
+    struct MatrixEntry
+    {
+        int32_t origin_id;
+        int32_t destination_id;
+        double cost;  // minutes or meters, +inf if unreachable
+    };
+
+    struct MatrixResult
+    {
+        std::vector<MatrixEntry> entries;
+        std::vector<double> destination_min_cost; // per destination: best cost from any origin
+    };
+
     struct AdjEntry
     {
         int32_t target;

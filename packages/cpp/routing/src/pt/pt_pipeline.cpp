@@ -40,14 +40,18 @@ namespace routing::pt
         }
     } // namespace
 
-    ReachabilityField run_pt_pipeline(RequestConfig const &cfg,
-                                      duckdb::Connection &con)
+    // Core PT pipeline logic. When extra_points is non-empty, snaps them
+    // onto the combined network and returns their node IDs.
+    PtPipelineResult run_pt_pipeline_impl(
+        RequestConfig const &cfg,
+        duckdb::Connection &con,
+        std::vector<Point3857> const &extra_points)
     {
         // 1. Load timetable
         auto tt = nigiri::timetable::read(
             std::filesystem::path{cfg.timetable_path});
 
-        // 2. Access leg: street network + Dijkstra + stop snapping → RAPTOR seeds
+        // 2. Access leg
         auto access = compute_access(cfg, con, *tt);
 
         // 3. RAPTOR transit search
@@ -58,11 +62,24 @@ namespace routing::pt
 
         if (egress_edges.empty())
         {
-            return kernel::make_reachability_field(
-                std::move(access.costs), std::move(access.net));
+            // No reachable stops — snap extra points onto the access network.
+            std::vector<int32_t> extra_ids;
+            if (!extra_points.empty())
+            {
+                RequestConfig walk_cfg = cfg;
+                walk_cfg.mode = cfg.egress_mode;
+                if (cfg.egress_speed_km_h > 0.0)
+                    walk_cfg.speed_km_h = cfg.egress_speed_km_h;
+                extra_ids = kernel::snap_origins(
+                    access.net, extra_points, walk_cfg);
+            }
+            return {
+                kernel::make_reachability_field(
+                    std::move(access.costs), std::move(access.net)),
+                std::move(extra_ids)};
         }
 
-        // 5. Build combined network (access + egress edges, deduplicated)
+        // 5. Build combined network
         auto combined_edges = merge_edge_sets(
             std::move(egress_edges), access.raw_edges);
 
@@ -74,8 +91,7 @@ namespace routing::pt
 
         auto combined_net = kernel::build_sub_network(combined_edges);
 
-        // 6. Snap origins and stops onto the combined network.
-        //    Origins use access mode config; stops use egress mode config.
+        // 6. Snap origins, stops, and extra destination points.
         RequestConfig access_snap_cfg = cfg;
         access_snap_cfg.mode = cfg.access_mode;
         if (cfg.access_speed_km_h > 0.0)
@@ -106,6 +122,12 @@ namespace routing::pt
             for (size_t j = 0; j < snapped.size(); ++j)
                 stop_nodes[reachable_indices[j]] = snapped[j];
         }
+
+        // Snap extra destination points onto the combined network.
+        std::vector<int32_t> extra_ids;
+        if (!extra_points.empty())
+            extra_ids = kernel::snap_origins(
+                combined_net, extra_points, walk_cfg);
 
         std::vector<int32_t> valid_starts;
         for (auto s : start_nodes)
@@ -172,9 +194,25 @@ namespace routing::pt
         auto egress_costs = compute_egress_costs(
             combined_net, stop_nodes, transit_costs, cfg);
 
-        // 9. Merge: per-node cost = min(access walk, transit + egress walk)
-        return merge_fields(
-            std::move(access_costs), egress_costs, std::move(combined_net));
+        // 9. Merge
+        return {
+            merge_fields(
+                std::move(access_costs), egress_costs, std::move(combined_net)),
+            std::move(extra_ids)};
+    }
+
+    ReachabilityField run_pt_pipeline(RequestConfig const &cfg,
+                                      duckdb::Connection &con)
+    {
+        return run_pt_pipeline_impl(cfg, con, {}).field;
+    }
+
+    PtPipelineResult run_pt_pipeline_with_destinations(
+        RequestConfig const &cfg,
+        duckdb::Connection &con,
+        std::vector<Point3857> const &extra_points)
+    {
+        return run_pt_pipeline_impl(cfg, con, extra_points);
     }
 
 } // namespace routing::pt

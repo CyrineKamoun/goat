@@ -1251,6 +1251,8 @@
   "orientation": "Ausrichtung",
   "origin": "Startpunkt",
   "origin_destination": "Quell-Ziel-Beziehungen",
+  "travel_cost_matrix": "Reisekostenmatrix (Beta)",
+  "travel_cost_matrix_description": "Berechnung von Reisekosten zwischen Start- und Zielpunktebenen (viele-zu-viele).",
   "origin_destination_description": "Die Quell-Ziel-Beziehungen werden in verschiedenen Bereichen wie der Verkehrsplanung und Stadtplanung verwendet, um Bewegungen oder Flüsse zwischen verschiedenen Orten zu untersuchen.",
   "origin_destination_header": "Quell-Ziel-Beziehungen",
   "origin_field": "Feld Quelle",

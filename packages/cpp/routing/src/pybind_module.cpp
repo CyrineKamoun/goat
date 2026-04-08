@@ -79,6 +79,27 @@ PYBIND11_MODULE(_routing, m)
         .def_readwrite("grid_snap_distance", &routing::RequestConfig::grid_snap_distance)
         .def_readwrite("cutoffs", &routing::RequestConfig::cutoffs);
 
+    py::class_<routing::MatrixConfig>(m, "MatrixConfig")
+        .def(py::init<>())
+        .def_readwrite("origins", &routing::MatrixConfig::origins)
+        .def_readwrite("destinations", &routing::MatrixConfig::destinations)
+        .def_readwrite("mode", &routing::MatrixConfig::mode)
+        .def_readwrite("cost_type", &routing::MatrixConfig::cost_type)
+        .def_readwrite("max_cost", &routing::MatrixConfig::max_cost)
+        .def_readwrite("speed_km_h", &routing::MatrixConfig::speed_km_h)
+        .def_readwrite("edge_dir", &routing::MatrixConfig::edge_dir)
+        .def_readwrite("output_path", &routing::MatrixConfig::output_path)
+        // PT settings
+        .def_readwrite("timetable_path", &routing::MatrixConfig::timetable_path)
+        .def_readwrite("departure_time", &routing::MatrixConfig::departure_time)
+        .def_readwrite("max_transfers", &routing::MatrixConfig::max_transfers)
+        .def_readwrite("departure_window", &routing::MatrixConfig::departure_window)
+        .def_readwrite("transit_modes", &routing::MatrixConfig::transit_modes)
+        .def_readwrite("access_mode", &routing::MatrixConfig::access_mode)
+        .def_readwrite("egress_mode", &routing::MatrixConfig::egress_mode)
+        .def_readwrite("access_speed_km_h", &routing::MatrixConfig::access_speed_km_h)
+        .def_readwrite("egress_speed_km_h", &routing::MatrixConfig::egress_speed_km_h);
+
     m.def("compute_catchment",
           [elapsed_ms](routing::RequestConfig const &config)
           {
@@ -91,4 +112,9 @@ PYBIND11_MODULE(_routing, m)
           },
           py::arg("config"),
           "Run the full routing pipeline and dispatch output by RequestConfig.output_format");
+
+    m.def("compute_travel_cost_matrix",
+          &routing::compute_travel_cost_matrix,
+          py::arg("config"),
+          "Compute many-to-many travel cost matrix between origins and destinations");
 }

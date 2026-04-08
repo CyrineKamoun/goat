@@ -40,4 +40,9 @@ namespace routing
     // Runs the full GeoJSON pipeline with step-level timings.
     CatchmentStepBenchmark benchmark_catchment_steps(RequestConfig const &cfg);
 
+    // Compute many-to-many travel cost matrix.
+    // Writes a parquet file to cfg.output_path with columns:
+    //   origin_id (INT), destination_id (INT), cost (DOUBLE)
+    void compute_travel_cost_matrix(MatrixConfig const &cfg);
+
 } // namespace routing

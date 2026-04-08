@@ -13,7 +13,11 @@
 #include "pt/pt_pipeline.h"
 
 #include <chrono>
+#include <cmath>
 #include <duckdb.hpp>
+#include <filesystem>
+#include <limits>
+#include <sstream>
 #include <stdexcept>
 
 namespace routing
@@ -21,6 +25,33 @@ namespace routing
 
     namespace
     {
+        // Build a RequestConfig from a MatrixConfig for reusing
+        // edge loading, cost computation, and snapping infrastructure.
+        RequestConfig matrix_to_request_config(
+            MatrixConfig const &cfg,
+            std::vector<Point3857> const &starting_points)
+        {
+            RequestConfig rcfg;
+            rcfg.mode = cfg.mode;
+            rcfg.cost_type = cfg.cost_type;
+            rcfg.max_cost = cfg.max_cost;
+            rcfg.speed_km_h = cfg.speed_km_h;
+            rcfg.edge_dir = cfg.edge_dir;
+            rcfg.starting_points = starting_points;
+            rcfg.steps = 1; // unused by matrix, but required by validation
+            // PT fields
+            rcfg.timetable_path = cfg.timetable_path;
+            rcfg.departure_time = cfg.departure_time;
+            rcfg.max_transfers = cfg.max_transfers;
+            rcfg.departure_window = cfg.departure_window;
+            rcfg.transit_modes = cfg.transit_modes;
+            rcfg.access_mode = cfg.access_mode;
+            rcfg.egress_mode = cfg.egress_mode;
+            rcfg.access_speed_km_h = cfg.access_speed_km_h;
+            rcfg.egress_speed_km_h = cfg.egress_speed_km_h;
+            return rcfg;
+        }
+
         struct PreparedNetwork
         {
             SubNetwork net;
@@ -287,6 +318,150 @@ namespace routing
         bm.start_count = static_cast<int32_t>(valid_starts.size());
         bm.payload_bytes = payload.size();
         return bm;
+    }
+
+    void compute_travel_cost_matrix(MatrixConfig const &cfg)
+    {
+        if (cfg.origins.empty())
+            throw std::runtime_error("At least one origin is required");
+        if (cfg.destinations.empty())
+            throw std::runtime_error("At least one destination is required");
+        if (cfg.edge_dir.empty())
+            throw std::runtime_error("edge_dir is required");
+        if (cfg.output_path.empty())
+            throw std::runtime_error("output_path is required");
+
+        size_t n_origins = cfg.origins.size();
+        size_t n_dests = cfg.destinations.size();
+
+        duckdb::DuckDB db(nullptr);
+        duckdb::Connection con(db);
+        ensure_required_extensions_loaded(con);
+
+        std::vector<double> matrix(n_origins * n_dests,
+                                    std::numeric_limits<double>::quiet_NaN());
+
+        // Helper: read destination costs from a cost array into the matrix row.
+        auto read_dest_costs = [&](size_t oi,
+                                    std::vector<double> const &costs,
+                                    std::vector<int32_t> const &dest_nodes)
+        {
+            for (size_t di = 0; di < n_dests; ++di)
+            {
+                int32_t node = dest_nodes[di];
+                if (node < 0 || node >= static_cast<int32_t>(costs.size()))
+                    continue;
+                double cost = costs[node];
+                if (std::isfinite(cost) && cost <= cfg.max_cost)
+                    matrix[oi * n_dests + di] = cost;
+            }
+        };
+
+        if (cfg.mode == RoutingMode::PublicTransport)
+        {
+            // PT: run the full pipeline per origin. Destinations are snapped
+            // onto the combined network inside the PT pipeline.
+            for (size_t oi = 0; oi < n_origins; ++oi)
+            {
+                auto rcfg = matrix_to_request_config(
+                    cfg, {cfg.origins[oi]});
+                input::validate(rcfg);
+
+                auto pt_result = pt::run_pt_pipeline_with_destinations(
+                    rcfg, con, cfg.destinations);
+
+                read_dest_costs(oi, pt_result.field.costs,
+                                pt_result.extra_node_ids);
+            }
+        }
+        else
+        {
+            // Street network: single network, Dijkstra per origin.
+            std::vector<Point3857> all_points;
+            all_points.reserve(n_origins + n_dests);
+            all_points.insert(all_points.end(),
+                              cfg.origins.begin(), cfg.origins.end());
+            all_points.insert(all_points.end(),
+                              cfg.destinations.begin(), cfg.destinations.end());
+
+            auto rcfg = matrix_to_request_config(cfg, all_points);
+
+            auto classes = input::valid_classes(cfg.mode);
+            double buffer_m = input::buffer_distance(rcfg);
+            auto edges = data::load_edges(con, cfg.edge_dir, all_points,
+                                           buffer_m, classes, cfg.mode);
+            if (edges.empty())
+                throw std::runtime_error(
+                    "No edges loaded. Check edge_dir and coverage.");
+
+            kernel::compute_costs(edges, rcfg);
+            auto net = kernel::build_sub_network(edges);
+
+            auto origin_nodes = kernel::snap_origins(net, cfg.origins, rcfg);
+            auto dest_nodes = kernel::snap_origins(net, cfg.destinations, rcfg);
+
+            bool use_distance = (cfg.cost_type == CostType::Distance);
+            auto adj = kernel::build_adjacency_list(net);
+
+            for (size_t oi = 0; oi < n_origins; ++oi)
+            {
+                int32_t start = origin_nodes[oi];
+                if (start < 0)
+                    continue;
+
+                std::vector<int32_t> starts = {start};
+                auto costs = kernel::dijkstra(
+                    adj, starts, cfg.max_cost, use_distance);
+
+                read_dest_costs(oi, costs, dest_nodes);
+            }
+        }
+
+        // Write results to parquet via DuckDB.
+        // All O×D pairs are emitted; unreachable pairs have cost = NULL.
+        namespace fs = std::filesystem;
+        fs::path out_path(cfg.output_path);
+        if (!out_path.parent_path().empty())
+            fs::create_directories(out_path.parent_path());
+
+        {
+            std::ostringstream values;
+            bool first = true;
+            for (size_t oi = 0; oi < n_origins; ++oi)
+            {
+                for (size_t di = 0; di < n_dests; ++di)
+                {
+                    if (!first) values << ",";
+                    first = false;
+                    double c = matrix[oi * n_dests + di];
+                    values << "(" << oi << "," << di << ",";
+                    if (std::isnan(c))
+                        values << "NULL";
+                    else
+                        values << c;
+                    values << ")";
+                }
+            }
+
+            if (first)
+            {
+                // No pairs at all — write empty parquet.
+                values << "(NULL::INTEGER, NULL::INTEGER, NULL::DOUBLE)";
+            }
+
+            std::ostringstream sql;
+            sql << "COPY (SELECT * FROM (VALUES " << values.str()
+                << ") AS t(origin_id, destination_id, cost)";
+            if (first)
+                sql << " WHERE FALSE";
+            sql << ") TO '" << cfg.output_path
+                << "' (FORMAT PARQUET, COMPRESSION ZSTD)";
+
+            auto result = con.Query(sql.str());
+            if (result->HasError())
+                throw std::runtime_error(
+                    "Travel cost matrix parquet export failed: " + result->GetError());
+        }
     }
 
 } // namespace routing
