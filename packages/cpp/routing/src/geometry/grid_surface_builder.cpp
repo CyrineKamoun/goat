@@ -200,7 +200,7 @@ CostGrid build_cost_grid(ReachabilityField const &field,
                                                     : (5.0 * 1000.0 / 3600.0);
 
     // 7. Fill grid — for each cell, find nearest sample point
-    static constexpr double kMaxSnapDist = 300.0; // meters in web mercator
+    static constexpr double kMaxSnapDist = 200.0; // meters in web mercator
     double const kNoData = std::numeric_limits<int32_t>::max();
 
     std::vector<double> surface(

@@ -8,6 +8,8 @@
 #include <limits>
 #include <memory>
 #include <numeric>
+#include <queue>
+#include <utility>
 #include <vector>
 
 namespace routing::kernel
@@ -50,6 +52,31 @@ namespace routing::kernel
             double best_d2 = std::numeric_limits<double>::infinity();
             nearest_recursive(root_, query, best_index, best_d2);
             return {best_index, std::sqrt(best_d2)};
+        }
+
+        // Returns up to k nearest {node_index, euclidean_distance} pairs,
+        // sorted by distance (closest first).
+        std::vector<std::pair<int32_t, double>> k_nearest(
+            Point3857 const &query, int k) const
+        {
+            if (root_ < 0 || k <= 0)
+                return {};
+
+            // Max-heap: largest distance on top so we can evict it
+            using Entry = std::pair<double, int32_t>; // {dist², index}
+            std::priority_queue<Entry> heap;
+            knn_recursive(root_, query, k, heap);
+
+            std::vector<std::pair<int32_t, double>> result;
+            result.reserve(heap.size());
+            while (!heap.empty())
+            {
+                auto [d2, idx] = heap.top();
+                heap.pop();
+                result.push_back({idx, std::sqrt(d2)});
+            }
+            std::reverse(result.begin(), result.end()); // closest first
+            return result;
         }
 
       private:
@@ -100,6 +127,41 @@ namespace routing::kernel
             nearest_recursive(near_child, query, best_index, best_d2);
             if ((diff * diff) < best_d2)
                 nearest_recursive(far_child, query, best_index, best_d2);
+        }
+
+        void knn_recursive(int32_t node_id,
+                            Point3857 const &query,
+                            int k,
+                            std::priority_queue<std::pair<double, int32_t>> &heap) const
+        {
+            if (node_id < 0)
+                return;
+
+            KdTreeNode const &node = nodes_[node_id];
+            Point3857 const &candidate = points_[node.point_index];
+            double d2 = sq_dist(query, candidate);
+
+            if (static_cast<int>(heap.size()) < k)
+            {
+                heap.push({d2, node.point_index});
+            }
+            else if (d2 < heap.top().first)
+            {
+                heap.pop();
+                heap.push({d2, node.point_index});
+            }
+
+            double diff = (node.axis == 0) ? (query.x - candidate.x)
+                                           : (query.y - candidate.y);
+            int32_t near_child = (diff < 0.0) ? node.left : node.right;
+            int32_t far_child  = (diff < 0.0) ? node.right : node.left;
+
+            knn_recursive(near_child, query, k, heap);
+            double worst_d2 = (static_cast<int>(heap.size()) < k)
+                                  ? std::numeric_limits<double>::infinity()
+                                  : heap.top().first;
+            if ((diff * diff) < worst_d2)
+                knn_recursive(far_child, query, k, heap);
         }
 
         std::vector<Point3857> const &points_;

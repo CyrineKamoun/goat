@@ -43,7 +43,8 @@ namespace routing::pt
 
         kernel::compute_costs(edges, access_cfg);
         auto net = kernel::build_sub_network(edges);
-        auto start_nodes = kernel::snap_origins(net, cfg.starting_points, access_cfg);
+        auto start_nodes = kernel::snap_origins(
+            net, cfg.starting_points, access_cfg);
 
         std::vector<int32_t> valid_starts;
         for (auto s : start_nodes)

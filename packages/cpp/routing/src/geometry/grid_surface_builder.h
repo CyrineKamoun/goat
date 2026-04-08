@@ -19,6 +19,18 @@ namespace routing::geometry
         double step_y;  // web mercator units per pixel row
     };
 
+    // Return a grid zoom level appropriate for the routing mode.
+    // Higher zoom → finer grid (more pixels per meter).
+    inline int grid_zoom_for_mode(RoutingMode mode)
+    {
+        switch (mode)
+        {
+        case RoutingMode::PublicTransport: return 9;
+        case RoutingMode::Walking:         return 13;
+        default:                           return 11; // Bicycle, Pedelec, Car
+        }
+    }
+
     // Build a rasterized cost surface from the reachability field.
     // 1. Collect node coordinates + costs from the field.
     // 2. Interpolate additional points along edge geometries.

@@ -81,7 +81,8 @@ namespace routing::pt
         auto combined_net = kernel::build_sub_network(combined_edges);
 
         // 6. Access Dijkstra on combined network
-        auto start_nodes = kernel::snap_origins(combined_net, cfg.starting_points, cfg);
+        auto start_nodes = kernel::snap_origins(
+            combined_net, cfg.starting_points, cfg);
         std::vector<int32_t> valid_starts;
         for (auto s : start_nodes)
             if (s >= 0)
