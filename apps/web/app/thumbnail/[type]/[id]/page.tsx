@@ -251,7 +251,6 @@ export default function ThumbnailPage() {
           style={{ width: THUMBNAIL_WIDTH, height: THUMBNAIL_HEIGHT }}
           attributionControl={false}
           logoPosition="bottom-left"
-          // @ts-expect-error preserveDrawingBuffer is a valid MapLibre option not in react-map-gl types
           preserveDrawingBuffer // Required for screenshot
           onLoad={handleMapLoad}
           interactive={false} // Disable interactivity for thumbnails
