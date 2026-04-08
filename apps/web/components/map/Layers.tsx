@@ -37,10 +37,14 @@ const Layers = (props: LayersProps) => {
   const temporaryFilters = useAppSelector((state) => state.map.temporaryFilters);
   const mapMode = useAppSelector((state) => state.map.mapMode);
 
+  // Exclude CustomLayerInterface from LayerProps since our layers are always standard style layers.
+  // This avoids TS errors when spreading the style spec onto <MapLayer> with minzoom/maxzoom.
+  type StandardLayerProps = Exclude<LayerProps, { type: "custom" }>;
+
   const splitLayerFilter = (style: LayerProps) => {
     const styleWithFilter = style as LayerProps & { filter?: unknown };
     const { filter, ...layerStyleSpec } = styleWithFilter;
-    return { filter, layerStyleSpec: layerStyleSpec as LayerProps };
+    return { filter, layerStyleSpec: layerStyleSpec as StandardLayerProps };
   };
 
   const getMapLayerFilter = (filter: unknown): FilterSpecification | undefined => {

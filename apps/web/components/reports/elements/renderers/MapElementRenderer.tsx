@@ -431,6 +431,7 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
             onLoad={handleMapLoad}
             onIdle={handleMapIdle}
             interactive={isNavigationMode}
+            // @ts-expect-error preserveDrawingBuffer is a valid MapLibre option not in react-map-gl types
             preserveDrawingBuffer={true}>
             {visibleLayers.length > 0 && <Layers layers={visibleLayers} />}
           </Map>
