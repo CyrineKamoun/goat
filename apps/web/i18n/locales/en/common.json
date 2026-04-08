@@ -1885,6 +1885,7 @@
   "zoom_to": "Zoom to",
   "zoom_to_feature": "Zoom to feature",
   "zoom_to_selection": "Zoom to selection",
+  "filter_by_map_click": "Filter by map click",
   "zoom_to_starting_point": "Zoom to starting point",
   "zoom_behavior": "Zoom Behavior",
   "zoom_visibility": "Zoom Visibility",

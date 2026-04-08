@@ -343,6 +343,8 @@ interface ProjectLayerTreeProps {
   hideLegendHeading?: boolean;
   /** Custom group icons keyed by group ID */
   groupIcons?: Record<string, { url: string; source?: string }>;
+  /** Whether to dim layers that are outside the current zoom range (default: true for backward compat) */
+  dimOutOfZoom?: boolean;
 }
 
 export const ProjectLayerTree = ({
@@ -365,6 +367,7 @@ export const ProjectLayerTree = ({
   downloadableLayers,
   hideLegendHeading,
   groupIcons,
+  dimOutOfZoom = true,
 }: ProjectLayerTreeProps) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
@@ -372,8 +375,8 @@ export const ProjectLayerTree = ({
   const mapRef = useRef(map);
   mapRef.current = map;
   const dispatch = useAppDispatch();
-  // Only subscribe to currentZoom in view mode to avoid re-renders during map interaction in edit mode
-  const currentZoom = useAppSelector((state) => (viewMode === "view" ? state.map.currentZoom : undefined));
+  // Only subscribe to currentZoom when dimming is enabled and in view mode
+  const currentZoom = useAppSelector((state) => (dimOutOfZoom && viewMode === "view" ? state.map.currentZoom : undefined));
 
   const [items, setItems] = useState<ProjectTreeItem[]>([]);
   const [groupModal, setGroupModal] = useState<{

@@ -21,6 +21,7 @@ interface TabsLayerLayoutProps {
   downloadableLayers?: number[];
   hideLegendHeading?: boolean;
   groupIcons?: Record<string, { url: string; source?: string }>;
+  dimOutOfZoom?: boolean;
 }
 
 const TabsLayerLayout = ({
@@ -32,6 +33,7 @@ const TabsLayerLayout = ({
   downloadableLayers,
   hideLegendHeading,
   groupIcons,
+  dimOutOfZoom,
 }: TabsLayerLayoutProps) => {
   const { t } = useTranslation("common");
   const options = config.options;
@@ -131,6 +133,7 @@ const TabsLayerLayout = ({
         downloadableLayers={downloadableLayers}
         hideLegendHeading={hideLegendHeading}
         groupIcons={groupIcons}
+        dimOutOfZoom={dimOutOfZoom}
       />
     </Box>
   );

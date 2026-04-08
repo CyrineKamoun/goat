@@ -10,7 +10,7 @@ import type { ViewStateChangeEvent } from "react-map-gl/maplibre";
 import { v4 } from "uuid";
 
 import { PATTERN_IMAGES } from "@/lib/constants/pattern-images";
-import { setCurrentZoom, setHighlightedFeature, setPopupInfo } from "@/lib/store/map/slice";
+import { setClickedFeatureForFilter, setCurrentZoom, setHighlightedFeature, setPopupInfo } from "@/lib/store/map/slice";
 import { addOrUpdateMarkerImages, addPatternImages } from "@/lib/transformers/map-image";
 import { applyMapLanguage } from "@/hooks/map/MapHooks";
 import { formatNumber } from "@/lib/utils/format-number";
@@ -92,6 +92,7 @@ const MapViewer: React.FC<MapProps> = ({
   const highlightedFeature = useAppSelector((state) => state.map.highlightedFeature);
   const popupInfo = useAppSelector((state) => state.map.popupInfo);
   const popupEditor = useAppSelector((state) => state.map.popupEditor);
+  const mapMode = useAppSelector((state) => state.map.mapMode);
 
   const _selectedScenarioEditLayer = useAppSelector((state) => state.map.selectedScenarioLayer);
   const selectedScenarioEditLayer = useMemo(() => {
@@ -222,6 +223,16 @@ const MapViewer: React.FC<MapProps> = ({
             onClose: handlePopoverClose,
           })
         );
+        // Dispatch clicked feature for filter widgets (dashboard modes only)
+        if (mapMode === "builder" || mapMode === "public") {
+          dispatch(
+            setClickedFeatureForFilter({
+              layerProjectId: interactiveLayer.id as number,
+              properties: interactiveFeature.properties,
+              timestamp: Date.now(),
+            })
+          );
+        }
       } else {
         // No interactive features were found in the click stack.
         dispatch(setHighlightedFeature(undefined));

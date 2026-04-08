@@ -274,6 +274,8 @@ export const filterDataConfigSchema = dataConfigSchema.extend({
       target_layers: z.array(filterTargetLayerSchema).optional(),
       // Cross-filter options: when enabled, filter shows only values that exist in currently filtered data
       cross_filter_options: z.boolean().optional().default(true),
+      // Allow clicking map features to populate this filter
+      filter_by_map_click: z.boolean().optional().default(false),
     })
     .default({}),
 });
