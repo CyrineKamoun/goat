@@ -54,6 +54,15 @@ export type TemporaryFilter = {
   filter: object;
   // Additional layers to apply the same filter values to (with different column names)
   additional_targets?: TemporaryFilterTarget[];
+  // When true, this filter is NOT applied to the source layer's tiles (keeps all features visible/clickable)
+  excludeFromSourceLayer?: boolean;
+};
+
+export type ClickedFeatureForFilter = {
+  layerProjectId: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  properties: Record<string, any>;
+  timestamp: number;
 };
 
 export type MapMode = "data" | "builder" | "reports" | "workflows" | "public";
@@ -85,6 +94,7 @@ export interface MapState {
   currentZoom: number | undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   temporaryFilters: TemporaryFilter[]; // Temporary filters for the map,
+  clickedFeatureForFilter: ClickedFeatureForFilter | undefined;
   collapsedPanels: Record<string, boolean>;
   // Measurement state
   activeMeasureTool: MeasureToolType | undefined;
@@ -114,6 +124,7 @@ const initialState = {
   geocoderResult: null,
   selectedBuilderItem: undefined,
   temporaryFilters: [] as TemporaryFilter[],
+  clickedFeatureForFilter: undefined,
   collapsedPanels: {},
   activeMeasureTool: undefined,
   measurements: [] as Measurement[],
@@ -225,6 +236,9 @@ const mapSlice = createSlice({
     removeTemporaryFilter: (state, action: PayloadAction<string>) => {
       state.temporaryFilters = state.temporaryFilters.filter((f) => f.id !== action.payload);
     },
+    setClickedFeatureForFilter: (state, action: PayloadAction<ClickedFeatureForFilter | undefined>) => {
+      state.clickedFeatureForFilter = action.payload;
+    },
     setCollapsedPanels: (state, action: PayloadAction<Record<string, boolean>>) => {
       state.collapsedPanels = {
         ...state.collapsedPanels,
@@ -291,6 +305,7 @@ export const {
   addTemporaryFilter,
   updateTemporaryFilter,
   removeTemporaryFilter,
+  setClickedFeatureForFilter,
   setCollapsedPanels,
   setActiveMeasureTool,
   addMeasurement,

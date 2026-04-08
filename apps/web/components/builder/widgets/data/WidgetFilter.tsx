@@ -359,6 +359,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
       layer_id: layer.id,
       filter: filterObject,
       additional_targets: buildAdditionalTargets(normalizedValues),
+      excludeFromSourceLayer: !!rawConfig?.options?.filter_by_map_click,
     };
 
     // Zoom to selection if enabled and we have geometry data,
@@ -370,6 +371,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
       if (geometryData?.features?.length && map) {
         zoomToFeatureCollection(map, geometryData as GeoJSON.FeatureCollection, {
           duration: 200,
+          maxZoom: 14,
         });
         prevSelectedValuesRef.current = selectedValues;
       }
@@ -393,6 +395,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
     isRangeLayout,
     layer,
     map,
+    rawConfig?.options?.filter_by_map_click,
     rawConfig?.options?.zoom_to_selection,
     rawConfig.setup.column_name,
     selectedValues,

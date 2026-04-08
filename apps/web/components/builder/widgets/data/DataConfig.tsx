@@ -567,25 +567,27 @@ export const WidgetFilterLayout = ({
                 }
                 label={<Typography variant="body2">{t("zoom_to_selection")}</Typography>}
               />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    size="small"
-                    color="primary"
-                    checked={!!config.options?.filter_by_map_click}
-                    onChange={(e) => {
-                      onChange({
-                        ...config,
-                        options: {
-                          ...config.options,
-                          filter_by_map_click: e.target.checked,
-                        },
-                      });
-                    }}
-                  />
-                }
-                label={<Typography variant="body2">{t("filter_by_map_click")}</Typography>}
-              />
+              {selectedLayout?.value !== filterLayoutTypes.Values.range && (
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      color="primary"
+                      checked={!!config.options?.filter_by_map_click}
+                      onChange={(e) => {
+                        onChange({
+                          ...config,
+                          options: {
+                            ...config.options,
+                            filter_by_map_click: e.target.checked,
+                          },
+                        });
+                      }}
+                    />
+                  }
+                  label={<Typography variant="body2">{t("filter_by_map_click")}</Typography>}
+                />
+              )}
             </Stack>
           </>
         }

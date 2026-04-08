@@ -134,6 +134,8 @@ const MapViewer: React.FC<MapProps> = ({
 
   const handleMapClick = (e: MapLayerMouseEvent) => {
     const { features } = e;
+    // Track whether the popup block already highlighted a feature
+    let didHighlight = false;
 
     if (features && features.length > 0 && isGetInfoActive) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -159,6 +161,7 @@ const MapViewer: React.FC<MapProps> = ({
 
       if (interactiveFeature && interactiveLayer) {
         dispatch(setHighlightedFeature(interactiveFeature));
+        didHighlight = true;
 
         const layerName = interactiveLayer.name;
         let lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
@@ -223,16 +226,6 @@ const MapViewer: React.FC<MapProps> = ({
             onClose: handlePopoverClose,
           })
         );
-        // Dispatch clicked feature for filter widgets (dashboard modes only)
-        if (mapMode === "builder" || mapMode === "public") {
-          dispatch(
-            setClickedFeatureForFilter({
-              layerProjectId: interactiveLayer.id as number,
-              properties: interactiveFeature.properties,
-              timestamp: Date.now(),
-            })
-          );
-        }
       } else {
         // No interactive features were found in the click stack.
         dispatch(setHighlightedFeature(undefined));
@@ -242,6 +235,28 @@ const MapViewer: React.FC<MapProps> = ({
       // No features clicked or get info tool is not active.
       dispatch(setHighlightedFeature(undefined));
       dispatch(setPopupInfo(undefined));
+    }
+
+    // Click-to-filter: dispatch clicked feature independently of popup interaction settings.
+    // This finds the topmost feature from ANY layer (regardless of interaction type).
+    if (features && features.length > 0 && (mapMode === "builder" || mapMode === "public")) {
+      for (const feature of features) {
+        const matchedLayer = layers?.find((l) => l.id.toString() === feature.layer.id);
+        if (matchedLayer) {
+          // Only highlight if the popup block didn't already handle it
+          if (!didHighlight) {
+            dispatch(setHighlightedFeature(feature));
+          }
+          dispatch(
+            setClickedFeatureForFilter({
+              layerProjectId: matchedLayer.id as number,
+              properties: feature.properties,
+              timestamp: Date.now(),
+            })
+          );
+          break;
+        }
+      }
     }
 
     if (onClick) {
