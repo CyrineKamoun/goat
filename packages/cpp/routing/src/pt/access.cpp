@@ -18,7 +18,6 @@ namespace routing::pt
         duckdb::Connection &con,
         nigiri::timetable const &tt)
     {
-        // Build access config
         RequestConfig access_cfg = cfg;
         access_cfg.mode = cfg.access_mode;
         if (cfg.access_speed_km_h > 0.0)
@@ -38,11 +37,12 @@ namespace routing::pt
             throw std::runtime_error(
                 "PT pipeline: no street edges loaded for access leg.");
 
-        // Keep a copy of raw edges before remapping for later network merging
         auto raw_edges = edges;
 
         kernel::compute_costs(edges, access_cfg);
         auto net = kernel::build_sub_network(edges);
+
+        // Snap user origins onto the network.
         auto start_nodes = kernel::snap_origins(
             net, cfg.starting_points, access_cfg);
 
@@ -55,20 +55,59 @@ namespace routing::pt
             throw std::runtime_error(
                 "PT pipeline: starting point(s) disconnected from street network.");
 
-        // Access Dijkstra bounded by access_budget
+        // Snap timetable stops onto the network (same as origins).
+        // Pre-filter to stops within the access network extent to avoid
+        // passing thousands of distant stops through snap_origins.
+        auto all_stop_coords = get_stop_coords_3857(tt);
+
+        double net_min_x = cfg.starting_points[0].x;
+        double net_max_x = net_min_x;
+        double net_min_y = cfg.starting_points[0].y;
+        double net_max_y = net_min_y;
+        for (auto const &p : cfg.starting_points)
+        {
+            net_min_x = std::min(net_min_x, p.x);
+            net_max_x = std::max(net_max_x, p.x);
+            net_min_y = std::min(net_min_y, p.y);
+            net_max_y = std::max(net_max_y, p.y);
+        }
+        net_min_x -= buffer_m;
+        net_min_y -= buffer_m;
+        net_max_x += buffer_m;
+        net_max_y += buffer_m;
+
+        std::vector<Point3857> nearby_stop_coords;
+        std::vector<size_t> nearby_stop_indices;
+        for (size_t i = 0; i < all_stop_coords.size(); ++i)
+        {
+            auto const &p = all_stop_coords[i];
+            if (p.x >= net_min_x && p.x <= net_max_x &&
+                p.y >= net_min_y && p.y <= net_max_y)
+            {
+                nearby_stop_coords.push_back(p);
+                nearby_stop_indices.push_back(i);
+            }
+        }
+
+        std::vector<int32_t> snapped(all_stop_coords.size(), -1);
+        if (!nearby_stop_coords.empty())
+        {
+            auto nearby_snapped = kernel::snap_origins(
+                net, nearby_stop_coords, access_cfg, kMaxStopSnapDistanceMeters);
+            for (size_t j = 0; j < nearby_snapped.size(); ++j)
+                snapped[nearby_stop_indices[j]] = nearby_snapped[j];
+        }
+
+        // Access Dijkstra — covers both user origins and stop nodes.
         auto adj = kernel::build_adjacency_list(net);
         auto costs = kernel::dijkstra(
             adj, valid_starts, access_budget, /*use_distance=*/false);
 
-        // Snap timetable stops to the street network
-        auto stop_nodes = snap_stops_to_network(
-            tt, net, kMaxStopSnapDistanceMeters);
-
         // Build seed stops: transit stops reachable within the access budget
         std::vector<nigiri::routing::offset> seeds;
-        for (auto i = 0U; i < stop_nodes.size(); ++i)
+        for (size_t i = 0; i < snapped.size(); ++i)
         {
-            int32_t node = stop_nodes[i];
+            int32_t node = snapped[i];
             if (node < 0 || node >= net.node_count)
                 continue;
             double access_min = costs[node];
@@ -76,7 +115,7 @@ namespace routing::pt
                 continue;
 
             seeds.push_back(nigiri::routing::offset{
-                nigiri::location_idx_t{i},
+                nigiri::location_idx_t{static_cast<unsigned>(i)},
                 nigiri::duration_t{static_cast<int16_t>(
                     static_cast<int>(access_min))},
                 0U
@@ -87,7 +126,7 @@ namespace routing::pt
             std::move(net),
             std::move(costs),
             std::move(seeds),
-            std::move(stop_nodes),
+            std::move(snapped),
             std::move(raw_edges)};
     }
 

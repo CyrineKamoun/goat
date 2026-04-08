@@ -1,11 +1,11 @@
 #include "snap.h"
-#include "dijkstra.h"
 #include "kdtree.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <unordered_set>
 #include <vector>
 
@@ -14,7 +14,6 @@ namespace routing::kernel
 
     static constexpr double kCarConnectorSpeedKmH = 80.0 * 0.7;
     static constexpr double kDefaultMaxSnapDistance = 500.0;
-    static constexpr int kSnapCandidates = 2;
 
     namespace
     {
@@ -88,8 +87,8 @@ namespace routing::kernel
         return node_edges;
     }
 
-    // Find the top N snap candidates for a single origin, on distinct edges.
-    std::vector<SnapCandidate> find_snap_candidates(
+    // Find the nearest snap candidate for a single origin (closest edge projection).
+    SnapCandidate find_best_snap(
         Point3857 const &origin,
         KdTree2D const &tree,
         std::vector<std::vector<size_t>> const &node_edges,
@@ -102,15 +101,17 @@ namespace routing::kernel
         auto nearest_nodes = tree.k_nearest(origin, k_nearest_nodes);
 
         std::unordered_set<size_t> checked_edges;
-        std::vector<SnapCandidate> candidates;
+        SnapCandidate best{};
+        best.proj.dist = std::numeric_limits<double>::infinity();
 
         for (auto const &[node_idx, node_dist] : nearest_nodes)
         {
             if (node_idx < 0 || static_cast<size_t>(node_idx) >= base_node_count)
                 continue;
+            // Early exit: if the nearest node is already far beyond our best
+            // candidate there's no point checking further nodes.
             if (node_dist > max_snap_distance * 2.0 &&
-                !candidates.empty() &&
-                candidates.front().proj.dist < max_snap_distance)
+                best.proj.dist < max_snap_distance)
                 break;
 
             for (size_t ei : node_edges[static_cast<size_t>(node_idx)])
@@ -124,84 +125,12 @@ namespace routing::kernel
                 auto const &tgt = net.node_coords[net.target[ei]];
                 auto proj = project_onto_segment(origin, src, tgt);
 
-                if (proj.dist <= max_snap_distance)
-                    candidates.push_back({ei, proj});
+                if (proj.dist < best.proj.dist)
+                    best = {ei, proj};
             }
         }
 
-        std::sort(candidates.begin(), candidates.end(),
-                  [](SnapCandidate const &a, SnapCandidate const &b)
-                  { return a.proj.dist < b.proj.dist; });
-        if (static_cast<int>(candidates.size()) > kSnapCandidates)
-            candidates.resize(kSnapCandidates);
-
-        return candidates;
-    }
-
-    // Run a trial multi-source Dijkstra for a batch of snap candidates.
-    // Temporarily extends the base adjacency list with connector + split edges
-    // for each origin. Returns total reachable node count.
-    int32_t trial_dijkstra_batch(
-        std::vector<std::vector<AdjEntry>> const &base_adj,
-        std::vector<SnapCandidate> const &batch,
-        SubNetwork const &net,
-        RequestConfig const &cfg,
-        double budget)
-    {
-        int32_t const n_base = static_cast<int32_t>(base_adj.size());
-        // Each origin needs 2 synthetic nodes (proj + origin)
-        int32_t const n_extra = static_cast<int32_t>(batch.size()) * 2;
-
-        std::vector<std::vector<AdjEntry>> adj(n_base + n_extra);
-        for (int32_t i = 0; i < n_base; ++i)
-            adj[i] = base_adj[i];
-
-        std::vector<int32_t> starts;
-        starts.reserve(batch.size());
-
-        for (size_t b = 0; b < batch.size(); ++b)
-        {
-            auto const &cand = batch[b];
-            int32_t proj_node = n_base + static_cast<int32_t>(b) * 2;
-            int32_t origin_node = proj_node + 1;
-
-            // Connector: origin ↔ proj
-            double snap_cost = connector_cost(cand.proj.dist, cfg);
-            adj[origin_node].push_back({proj_node, snap_cost});
-            adj[proj_node].push_back({origin_node, snap_cost});
-
-            // Split edge
-            size_t ei = cand.edge_idx;
-            int32_t src = net.source[ei];
-            int32_t tgt = net.target[ei];
-            double fwd = net.cost[ei];
-            double rev = net.reverse_cost[ei];
-            double frac = cand.proj.frac;
-
-            if (fwd >= 0.0 && fwd < 99999.0)
-            {
-                adj[proj_node].push_back({tgt, fwd * (1.0 - frac)});
-                adj[tgt].push_back({proj_node, fwd * (1.0 - frac)});
-                adj[src].push_back({proj_node, fwd * frac});
-                adj[proj_node].push_back({tgt, rev * (1.0 - frac)});
-            }
-            if (rev >= 0.0 && rev < 99999.0)
-            {
-                adj[proj_node].push_back({src, rev * frac});
-                adj[src].push_back({proj_node, rev * frac});
-            }
-
-            starts.push_back(origin_node);
-        }
-
-        bool use_distance = (cfg.cost_mode == CostMode::Distance);
-        auto costs = dijkstra(adj, starts, budget, use_distance);
-
-        int32_t count = 0;
-        for (auto c : costs)
-            if (std::isfinite(c) && c <= budget)
-                ++count;
-        return count;
+        return best;
     }
 
     // Inject a snap candidate into the network permanently.
@@ -212,6 +141,8 @@ namespace routing::kernel
         int32_t src_node = net.source[edge_idx];
         int32_t tgt_node = net.target[edge_idx];
         double frac = cand.proj.frac;
+        // Copy (not reference) — push_back below may reallocate the vector.
+        Edge const orig = net.edges[edge_idx];
 
         int32_t proj_node = net.node_count++;
         net.node_coords.push_back(cand.proj.point);
@@ -231,9 +162,13 @@ namespace routing::kernel
         connector.id = -1;
         connector.source = origin_node;
         connector.target = proj_node;
+        connector.length_m = cand.proj.dist;
         connector.length_3857 = cand.proj.dist;
         connector.cost = snap_cost;
         connector.reverse_cost = snap_cost;
+        connector.class_ = orig.class_;
+        connector.maxspeed_forward = orig.maxspeed_forward;
+        connector.maxspeed_backward = orig.maxspeed_backward;
         connector.source_coord = origin;
         connector.target_coord = cand.proj.point;
         connector.geometry = {origin, cand.proj.point};
@@ -264,9 +199,16 @@ namespace routing::kernel
         to_tgt.id = -2;
         to_tgt.source = proj_node;
         to_tgt.target = tgt_node;
+        to_tgt.length_m = orig.length_m * (1.0 - frac);
         to_tgt.length_3857 = dist_to_tgt;
         to_tgt.cost = fwd_cost * (1.0 - frac);
         to_tgt.reverse_cost = rev_cost * (1.0 - frac);
+        to_tgt.impedance_slope = orig.impedance_slope;
+        to_tgt.impedance_slope_reverse = orig.impedance_slope_reverse;
+        to_tgt.impedance_surface = orig.impedance_surface;
+        to_tgt.maxspeed_forward = orig.maxspeed_forward;
+        to_tgt.maxspeed_backward = orig.maxspeed_backward;
+        to_tgt.class_ = orig.class_;
         to_tgt.source_coord = cand.proj.point;
         to_tgt.target_coord = tgt_coord;
         to_tgt.geometry = {cand.proj.point, tgt_coord};
@@ -283,9 +225,16 @@ namespace routing::kernel
         to_src.id = -3;
         to_src.source = proj_node;
         to_src.target = src_node;
+        to_src.length_m = orig.length_m * frac;
         to_src.length_3857 = dist_to_src;
         to_src.cost = rev_cost * frac;
         to_src.reverse_cost = fwd_cost * frac;
+        to_src.impedance_slope = orig.impedance_slope;
+        to_src.impedance_slope_reverse = orig.impedance_slope_reverse;
+        to_src.impedance_surface = orig.impedance_surface;
+        to_src.maxspeed_forward = orig.maxspeed_forward;
+        to_src.maxspeed_backward = orig.maxspeed_backward;
+        to_src.class_ = orig.class_;
         to_src.source_coord = cand.proj.point;
         to_src.target_coord = src_coord;
         to_src.geometry = {cand.proj.point, src_coord};
@@ -317,77 +266,101 @@ namespace routing::kernel
         size_t const base_node_count = net.node_coords.size();
         size_t const base_edge_count = net.source.size();
 
-        KdTree2D tree(net.node_coords);
-        auto node_edges = build_node_edge_index(net, base_node_count);
+        net.node_coords.reserve(base_node_count + origins.size() * 2);
 
-        // Find candidates for all origins (1st and 2nd best per origin)
-        std::vector<std::vector<SnapCandidate>> all_candidates(origins.size());
-        bool any_has_second = false;
+        // For many origins a shared full-network tree + edge index is cheaper
+        // than repeating the bbox filter + tree build per origin.
+        static constexpr size_t kPerOriginThreshold = 100;
+        bool const use_shared_tree = origins.size() > kPerOriginThreshold;
+
+        // Shared structures (built once when use_shared_tree is true).
+        std::unique_ptr<KdTree2D> shared_tree;
+        std::vector<std::vector<size_t>> shared_node_edges;
+
+        if (use_shared_tree)
+        {
+            shared_tree = std::make_unique<KdTree2D>(net.node_coords);
+            shared_node_edges = build_node_edge_index(net, base_node_count);
+        }
 
         for (size_t i = 0; i < origins.size(); ++i)
         {
-            all_candidates[i] = find_snap_candidates(
-                origins[i], tree, node_edges, net,
-                base_node_count, base_edge_count,
-                max_snap_distance, k_nearest_nodes);
-            if (all_candidates[i].size() > 1)
-                any_has_second = true;
-        }
+            auto const &origin = origins[i];
 
-        // If no origin has a 2nd candidate, skip the trial entirely
-        if (!any_has_second)
-        {
-            for (size_t i = 0; i < origins.size(); ++i)
+            if (use_shared_tree)
             {
-                if (all_candidates[i].empty())
+                auto best = find_best_snap(
+                    origin, *shared_tree, shared_node_edges, net,
+                    base_node_count, base_edge_count,
+                    max_snap_distance, k_nearest_nodes);
+
+                if (!std::isfinite(best.proj.dist) ||
+                    best.proj.dist > max_snap_distance)
                     start_nodes.push_back(-1);
                 else
                     start_nodes.push_back(
-                        inject_snap(net, all_candidates[i][0], origins[i], cfg));
-            }
-            return start_nodes;
-        }
-
-        // Build two batches: batch 0 = all 1st-best, batch 1 = all 2nd-best
-        // Origins with only 1 candidate use that candidate in both batches.
-        std::vector<SnapCandidate> batch_a, batch_b;
-        std::vector<size_t> valid_indices; // origins that have at least 1 candidate
-
-        for (size_t i = 0; i < origins.size(); ++i)
-        {
-            if (all_candidates[i].empty())
+                        inject_snap(net, best, origin, cfg));
                 continue;
-            valid_indices.push_back(i);
-            batch_a.push_back(all_candidates[i][0]);
-            batch_b.push_back(all_candidates[i].size() > 1
-                                  ? all_candidates[i][1]
-                                  : all_candidates[i][0]);
-        }
+            }
 
-        // Two trial Dijkstras
-        auto base_adj = build_adjacency_list(net);
-        double const budget = cfg.cost_budget();
+            // Per-origin bbox: only nodes within snap distance matter.
+            double const bmin_x = origin.x - max_snap_distance;
+            double const bmax_x = origin.x + max_snap_distance;
+            double const bmin_y = origin.y - max_snap_distance;
+            double const bmax_y = origin.y + max_snap_distance;
 
-        int32_t reach_a = trial_dijkstra_batch(base_adj, batch_a, net, cfg, budget);
-        int32_t reach_b = trial_dijkstra_batch(base_adj, batch_b, net, cfg, budget);
+            std::vector<Point3857> local_coords;
+            std::vector<int32_t> local_to_global;
 
-        // Pick the batch with more reachable nodes
-        bool use_b = (reach_b > reach_a);
+            for (size_t n = 0; n < base_node_count; ++n)
+            {
+                auto const &c = net.node_coords[n];
+                if (c.x >= bmin_x && c.x <= bmax_x &&
+                    c.y >= bmin_y && c.y <= bmax_y)
+                {
+                    local_to_global.push_back(static_cast<int32_t>(n));
+                    local_coords.push_back(c);
+                }
+            }
 
-        // Inject the winning candidates
-        net.node_coords.reserve(base_node_count + origins.size() * 2);
-        size_t vi = 0;
-        for (size_t i = 0; i < origins.size(); ++i)
-        {
-            if (all_candidates[i].empty())
+            if (local_coords.empty())
             {
                 start_nodes.push_back(-1);
                 continue;
             }
 
-            auto const &chosen = use_b ? batch_b[vi] : batch_a[vi];
-            ++vi;
-            start_nodes.push_back(inject_snap(net, chosen, origins[i], cfg));
+            // Build small KD-tree + edge index over only the nearby nodes.
+            KdTree2D tree(local_coords);
+
+            std::vector<int32_t> global_to_local(base_node_count, -1);
+            for (size_t j = 0; j < local_to_global.size(); ++j)
+                global_to_local[local_to_global[j]] = static_cast<int32_t>(j);
+
+            size_t local_count = local_coords.size();
+            std::vector<std::vector<size_t>> local_node_edges(local_count);
+            for (size_t e = 0; e < base_edge_count; ++e)
+            {
+                auto s = net.source[e];
+                auto t = net.target[e];
+                if (s >= 0 && static_cast<size_t>(s) < base_node_count &&
+                    global_to_local[s] >= 0)
+                    local_node_edges[global_to_local[s]].push_back(e);
+                if (t >= 0 && static_cast<size_t>(t) < base_node_count &&
+                    global_to_local[t] >= 0)
+                    local_node_edges[global_to_local[t]].push_back(e);
+            }
+
+            auto best = find_best_snap(
+                origin, tree, local_node_edges, net,
+                local_count, base_edge_count,
+                max_snap_distance, k_nearest_nodes);
+
+            if (!std::isfinite(best.proj.dist) ||
+                best.proj.dist > max_snap_distance)
+                start_nodes.push_back(-1);
+            else
+                start_nodes.push_back(
+                    inject_snap(net, best, origin, cfg));
         }
 
         return start_nodes;

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <unordered_map>
 #include <vector>
 
 namespace routing::geometry
@@ -188,19 +189,51 @@ CostGrid build_cost_grid(ReachabilityField const &field,
     double split_dist = std::min(step_x, step_y);
     split_edges(field, split_dist, points);
 
-    // 5. Build KD-tree from all sample points
+    // 5. Deduplicate sample points per pixel cell (keep cheapest).
+    //    This matches the Python filter_nodes() behaviour and prevents
+    //    cost inversions between neighbouring grid cells.
+    {
+        std::unordered_map<int64_t, size_t> best_per_pixel;
+        best_per_pixel.reserve(points.size());
+        for (size_t i = 0; i < points.size(); ++i)
+        {
+            int64_t px = static_cast<int64_t>(
+                std::round(merc_x_to_pixel(points[i].x, zoom)));
+            int64_t py = static_cast<int64_t>(
+                std::round(merc_y_to_pixel(points[i].y, zoom)));
+            int64_t key = py * 1'000'000LL + px;
+            auto it = best_per_pixel.find(key);
+            if (it == best_per_pixel.end())
+            {
+                best_per_pixel[key] = i;
+            }
+            else if (points[i].cost < points[it->second].cost)
+            {
+                it->second = i;
+            }
+        }
+        std::vector<SamplePoint> deduped;
+        deduped.reserve(best_per_pixel.size());
+        for (auto const &[_, idx] : best_per_pixel)
+            deduped.push_back(points[idx]);
+        points = std::move(deduped);
+    }
+
+    // 6. Build KD-tree from deduplicated sample points
     std::vector<Point3857> kd_coords(points.size());
     for (size_t i = 0; i < points.size(); ++i)
         kd_coords[i] = {points[i].x, points[i].y};
 
     kernel::KdTree2D tree(kd_coords);
 
-    // 6. Walking speed for off-network cost
+    // 7. Walking speed for off-network cost
     double speed_m_per_s = (cfg.speed_km_h > 0.0) ? (cfg.speed_km_h * 1000.0 / 3600.0)
                                                     : (5.0 * 1000.0 / 3600.0);
 
-    // 7. Fill grid — for each cell, find nearest sample point
-    static constexpr double kMaxSnapDist = 200.0; // meters in web mercator
+    // 8. Fill grid — for each cell, find nearest sample point.
+    //    Snap distance scales with grid resolution: finer grids (walking)
+    //    use a tighter radius, coarser grids (PT) need more reach.
+    double const kMaxSnapDist = std::max(200.0, std::max(step_x, step_y) * 8.0);
     double const kNoData = std::numeric_limits<int32_t>::max();
 
     std::vector<double> surface(
@@ -222,7 +255,7 @@ CostGrid build_cost_grid(ReachabilityField const &field,
             double walk_cost = (cfg.cost_mode == CostMode::Distance)
                                    ? dist
                                    : (dist / speed_m_per_s) / 60.0; // minutes
-            double total = base_cost + walk_cost;
+            double total = std::round(base_cost + walk_cost);
             if (total <= budget)
             {
                 surface[static_cast<size_t>(row) * width_px + col] = total;

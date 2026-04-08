@@ -96,4 +96,5 @@ PYBIND11_MODULE(_routing, m)
           },
           py::arg("config"),
           "Run the full routing pipeline and dispatch output by RequestConfig.output_format");
+
 }

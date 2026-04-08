@@ -22,8 +22,6 @@ namespace routing::pt
 
     namespace
     {
-        // Merge two raw edge sets, deduplicating by edge ID.
-        // Egress edges take priority; access edges fill gaps.
         std::vector<Edge> merge_edge_sets(
             std::vector<Edge> egress_edges,
             std::vector<Edge> const &access_edges)
@@ -40,7 +38,7 @@ namespace routing::pt
             }
             return egress_edges;
         }
-    }
+    } // namespace
 
     ReachabilityField run_pt_pipeline(RequestConfig const &cfg,
                                       duckdb::Connection &con)
@@ -52,9 +50,7 @@ namespace routing::pt
         // 2. Access leg: street network + Dijkstra + stop snapping → RAPTOR seeds
         auto access = compute_access(cfg, con, *tt);
 
-        // 3. RAPTOR one-to-all transit search
-        //    When departure_window > 0, sweeps every minute in the window
-        //    and keeps the best arrival per destination.
+        // 3. RAPTOR transit search
         auto transit_costs = run_raptor(*tt, access.seeds, cfg);
 
         // 4. Egress leg: load street network around reachable stops
@@ -62,7 +58,6 @@ namespace routing::pt
 
         if (egress_edges.empty())
         {
-            // No reachable stops or no egress edges — return access-only field
             return kernel::make_reachability_field(
                 std::move(access.costs), std::move(access.net));
         }
@@ -71,7 +66,6 @@ namespace routing::pt
         auto combined_edges = merge_edge_sets(
             std::move(egress_edges), access.raw_edges);
 
-        // Cost the combined edges for the egress/walking mode
         RequestConfig walk_cfg = cfg;
         walk_cfg.mode = cfg.egress_mode;
         if (cfg.egress_speed_km_h > 0.0)
@@ -80,9 +74,39 @@ namespace routing::pt
 
         auto combined_net = kernel::build_sub_network(combined_edges);
 
-        // 6. Access Dijkstra on combined network
+        // 6. Snap origins and stops onto the combined network.
+        //    Origins use access mode config; stops use egress mode config.
+        RequestConfig access_snap_cfg = cfg;
+        access_snap_cfg.mode = cfg.access_mode;
+        if (cfg.access_speed_km_h > 0.0)
+            access_snap_cfg.speed_km_h = cfg.access_speed_km_h;
         auto start_nodes = kernel::snap_origins(
-            combined_net, cfg.starting_points, cfg);
+            combined_net, cfg.starting_points, access_snap_cfg);
+
+        // Only snap stops that RAPTOR actually reached.
+        auto all_stop_coords = get_stop_coords_3857(*tt);
+        std::vector<Point3857> reachable_coords;
+        std::vector<size_t> reachable_indices;
+        for (size_t i = 0; i < transit_costs.size(); ++i)
+        {
+            if (transit_costs[i].has_value() &&
+                *transit_costs[i] < cfg.max_traveltime)
+            {
+                reachable_coords.push_back(all_stop_coords[i]);
+                reachable_indices.push_back(i);
+            }
+        }
+
+        std::vector<int32_t> stop_nodes(all_stop_coords.size(), -1);
+        if (!reachable_coords.empty())
+        {
+            auto snapped = kernel::snap_origins(
+                combined_net, reachable_coords, walk_cfg,
+                kMaxStopSnapDistanceMeters);
+            for (size_t j = 0; j < snapped.size(); ++j)
+                stop_nodes[reachable_indices[j]] = snapped[j];
+        }
+
         std::vector<int32_t> valid_starts;
         for (auto s : start_nodes)
             if (s >= 0)
@@ -91,6 +115,7 @@ namespace routing::pt
         double const access_budget =
             (cfg.access_max_time > 0.0) ? cfg.access_max_time : cfg.max_traveltime;
 
+        // 7. Access Dijkstra on combined network
         std::vector<double> access_costs;
         if (cfg.access_mode != cfg.egress_mode ||
             (cfg.access_speed_km_h > 0.0 &&
@@ -127,13 +152,11 @@ namespace routing::pt
                 adj, valid_starts, access_budget, /*use_distance=*/false);
         }
 
-        // 7. Egress Dijkstra on combined network
-        auto stop_nodes = snap_stops_to_network(
-            *tt, combined_net, kMaxStopSnapDistanceMeters);
+        // 8. Egress Dijkstra on combined network
         auto egress_costs = compute_egress_costs(
             combined_net, stop_nodes, transit_costs, cfg);
 
-        // 8. Merge: per-node cost = min(access walk, transit + egress walk)
+        // 9. Merge: per-node cost = min(access walk, transit + egress walk)
         return merge_fields(
             std::move(access_costs), egress_costs, std::move(combined_net));
     }

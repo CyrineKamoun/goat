@@ -179,15 +179,9 @@ std::string build_grid_contour_geojson(ReachabilityField const &field,
                << "ST_GeomFromText('" << features[i].multipolygon_wkt << "'))";
     }
 
-    // Simplification tolerance in degrees, scaled to grid resolution.
-    // step_x is in web mercator meters; divide by ~111320 to approximate
-    // degrees, then use 0.5× that as the tolerance.
-    double const kSimplifyTolerance = (grid.step_x / 111320.0) * 0.5;
-
     std::ostringstream sql;
     sql << "WITH raw_input(step_cost, geom) AS (VALUES " << values.str() << "), "
-        << "raw AS (SELECT step_cost, "
-        << "  ST_Simplify(ST_MakeValid(geom), " << kSimplifyTolerance << ") AS geom "
+        << "raw AS (SELECT step_cost, ST_MakeValid(geom) AS geom "
         << "  FROM raw_input) ";
 
     if (cfg.polygon_difference)

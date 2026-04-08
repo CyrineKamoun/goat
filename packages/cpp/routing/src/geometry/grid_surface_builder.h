@@ -25,9 +25,8 @@ namespace routing::geometry
     {
         switch (mode)
         {
-        case RoutingMode::PublicTransport: return 9;
-        case RoutingMode::Walking:         return 13;
-        default:                           return 11; // Bicycle, Pedelec, Car
+        case RoutingMode::Walking: return 13;
+        default:                  return 11; // Bicycle, Pedelec, Car, PublicTransport
         }
     }
 
