@@ -43,13 +43,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ===== STAGE 3: Python environment ====
 FROM linux-base AS python-base
 # Install debian dependencies including GDAL for building Python bindings
-RUN apt-get update && apt-get install --no-install-recommends -y build-essential gettext libgdal-dev
+RUN apt-get update && apt-get install --no-install-recommends -y build-essential cmake gettext libgdal-dev
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:0.9.2 /uv /usr/local/bin/uv
 
 # Create virtual environment and install dependencies
 COPY apps/geoapi /app/apps/geoapi
 COPY packages/python/goatlib /app/packages/python/goatlib
+COPY packages/cpp/routing /app/packages/cpp/routing
 COPY pyproject.toml uv.lock /app/
 
 WORKDIR /app
