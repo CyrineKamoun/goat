@@ -48,7 +48,7 @@ namespace routing::pt
         auto access_classes = input::valid_classes(cfg.access_mode);
 
         auto edges = data::load_edges(
-            con, cfg.edge_dir, cfg.starting_points,
+            con, cfg.edge_dir, cfg.node_dir, cfg.starting_points,
             buffer_m, access_classes, cfg.access_mode);
 
         if (edges.empty())

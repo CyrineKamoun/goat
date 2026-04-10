@@ -76,7 +76,7 @@ namespace routing
         int steps;
         double speed_km_h;
         std::string edge_dir;
-        std::string node_dir;        // explicit node dir (empty = infer from edge_dir)
+        std::string node_dir;
         std::string timetable_path;  // nigiri binary (PT mode)
         std::string output_path;
         CatchmentType catchment_type = CatchmentType::Network;

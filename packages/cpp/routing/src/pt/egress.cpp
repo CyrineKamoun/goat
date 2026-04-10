@@ -67,7 +67,7 @@ namespace routing::pt
         auto egress_classes = input::valid_classes(cfg.egress_mode);
 
         return data::load_edges(
-            con, cfg.edge_dir, stop_coords,
+            con, cfg.edge_dir, cfg.node_dir, stop_coords,
             buffer_m, egress_classes, cfg.egress_mode);
     }
 
