@@ -69,21 +69,6 @@ namespace routing::data
         return rel.str();
     }
 
-    static std::string infer_node_dir(std::string const &edge_dir)
-    {
-        // Common layout: <cache>/street_network/hive -> <cache>/street_network_nodes
-        auto marker = std::string("/street_network/hive");
-        auto pos = edge_dir.rfind(marker);
-        if (pos != std::string::npos)
-        {
-            return edge_dir.substr(0, pos) + "/street_network_nodes";
-        }
-
-        namespace fs = std::filesystem;
-        fs::path candidate = fs::path(edge_dir).parent_path() / "street_network_nodes";
-        return candidate.string();
-    }
-
     static std::string node_scan_relation(std::string const &node_dir)
     {
         std::string escaped = sql_escape(node_dir);
@@ -123,6 +108,7 @@ namespace routing::data
     std::vector<Edge> load_edges_with_benchmark(
         duckdb::Connection &con,
         std::string const &edge_dir,
+        std::string const &node_dir,
         std::vector<Point3857> const &starting_points,
         double buffer_meters,
         std::vector<std::string> const &valid_classes,
@@ -155,7 +141,6 @@ namespace routing::data
         std::vector<Edge> edges;
 
         std::string parquet_scan = parquet_scan_relation(edge_dir);
-        std::string node_dir = infer_node_dir(edge_dir);
         if (!std::filesystem::exists(node_dir))
         {
             throw std::runtime_error(
@@ -418,6 +403,7 @@ namespace routing::data
 
     std::vector<Edge> load_edges(duckdb::Connection &con,
                                  std::string const &edge_dir,
+                                 std::string const &node_dir,
                                  std::vector<Point3857> const &starting_points,
                                  double buffer_meters,
                                  std::vector<std::string> const &valid_classes,
@@ -427,6 +413,7 @@ namespace routing::data
         return load_edges_with_benchmark(
             con,
             edge_dir,
+            node_dir,
             starting_points,
             buffer_meters,
             valid_classes,

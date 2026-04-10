@@ -28,6 +28,7 @@ namespace routing::data
     // Computes H3 cell filters from starting points + buffer distance.
     std::vector<Edge> load_edges(duckdb::Connection &con,
                                  std::string const &edge_dir,
+                                 std::string const &node_dir,
                                  std::vector<Point3857> const &starting_points,
                                  double buffer_meters,
                                  std::vector<std::string> const &valid_classes,
@@ -37,6 +38,7 @@ namespace routing::data
     std::vector<Edge> load_edges_with_benchmark(
         duckdb::Connection &con,
         std::string const &edge_dir,
+        std::string const &node_dir,
         std::vector<Point3857> const &starting_points,
         double buffer_meters,
         std::vector<std::string> const &valid_classes,

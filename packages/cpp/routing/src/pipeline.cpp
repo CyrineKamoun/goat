@@ -110,7 +110,7 @@ namespace routing
                                               std::vector<std::string> const &classes)
         {
             double buffer_m = input::buffer_distance(cfg);
-            auto edges = data::load_edges(con, cfg.edge_dir, cfg.starting_points,
+            auto edges = data::load_edges(con, cfg.edge_dir, cfg.node_dir, cfg.starting_points,
                                           buffer_m, classes, cfg.mode);
             if (edges.empty())
             {
@@ -242,6 +242,7 @@ namespace routing
         auto edges = data::load_edges_with_benchmark(
             con,
             cfg.edge_dir,
+            cfg.node_dir,
             cfg.starting_points,
             buffer_m,
             classes,
@@ -388,7 +389,7 @@ namespace routing
 
             auto classes = input::valid_classes(cfg.mode);
             double buffer_m = input::buffer_distance(rcfg);
-            auto edges = data::load_edges(con, cfg.edge_dir, all_points,
+            auto edges = data::load_edges(con, cfg.edge_dir, cfg.node_dir, all_points,
                                            buffer_m, classes, cfg.mode);
             if (edges.empty())
                 throw std::runtime_error(

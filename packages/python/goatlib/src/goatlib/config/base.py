@@ -29,8 +29,10 @@ class RoutingSettings(BaseSettingsModel):
     # GOAT Routing service
     goat_routing_url: str = "http://localhost:8200/api/v2/routing"
 
-    # Local C++ routing backend (used for active mobility + car catchments)
-    street_network_dir: str = "/app/apps/routing/cache/street_network/hive"
+    # Local C++ routing backend paths
+    street_network_edges_base_path: str = "/app/data/street_network/edges"
+    street_network_nodes_base_path: str = "/app/data/street_network/nodes"
+    pt_network_base_path: str = "/app/data/pt_network"
 
     # R5 service
     r5_url: str = "http://localhost:7070"

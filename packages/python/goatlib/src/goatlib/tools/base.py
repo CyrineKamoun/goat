@@ -100,6 +100,11 @@ class ToolSettings:
     # OD matrix / travel time matrices
     od_matrix_base_path: str = "/app/data/traveltime_matrices"
 
+    # Local C++ routing backend paths
+    street_network_edges_base_path: str = "/app/data/street_network/edges"
+    street_network_nodes_base_path: str = "/app/data/street_network/nodes"
+    pt_network_base_path: str = "/app/data/pt_network"
+
     # S3 settings (shared for DuckLake and uploads)
     s3_provider: str = "hetzner"  # hetzner, aws, minio
     s3_endpoint_url: str | None = None
@@ -261,6 +266,15 @@ class ToolSettings:
             tiles_data_dir=cls._get_secret("TILES_DATA_DIR", "/app/data/tiles"),
             od_matrix_base_path=cls._get_secret(
                 "OD_MATRIX_BASE_PATH", "/app/data/traveltime_matrices"
+            ),
+            street_network_edges_base_path=cls._get_secret(
+                "STREET_NETWORK_EDGES_BASE_PATH", "/app/data/street_network/edges"
+            ),
+            street_network_nodes_base_path=cls._get_secret(
+                "STREET_NETWORK_NODES_BASE_PATH", "/app/data/street_network/nodes"
+            ),
+            pt_network_base_path=cls._get_secret(
+                "PT_NETWORK_BASE_PATH", "/app/data/pt_network"
             ),
             s3_provider=cls._get_secret("S3_PROVIDER", "hetzner").lower(),
             s3_endpoint_url=cls._get_secret("S3_ENDPOINT_URL", ""),

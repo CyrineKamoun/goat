@@ -26,10 +26,6 @@ logger = logging.getLogger(__name__)
 
 WEB_MERCATOR_RADIUS_M = 6378137.0
 
-DEFAULT_ROUTING_EDGE_DIR = "/app/apps/routing/cache/street_network/hive"
-DEFAULT_ROUTING_TIMETABLE_PATH = "/app/data/gtfs/latest_de.bin"
-
-
 class TravelCostMatrixTool(AnalysisTool):
     """Compute many-to-many travel costs via the local C++ routing package.
 
@@ -47,12 +43,9 @@ class TravelCostMatrixTool(AnalysisTool):
 
     def __init__(self: Self) -> None:
         super().__init__()
-        self._edge_dir = getattr(
-            settings.routing, "street_network_dir", DEFAULT_ROUTING_EDGE_DIR
-        )
-        self._timetable_path = getattr(
-            settings.routing, "pt_timetable_path", DEFAULT_ROUTING_TIMETABLE_PATH
-        )
+        self._edge_dir = settings.routing.street_network_edges_base_path
+        self._node_dir = settings.routing.street_network_nodes_base_path
+        self._timetable_path = settings.routing.pt_network_base_path
 
     @staticmethod
     def _get_routing_module() -> Any:
@@ -137,6 +130,7 @@ class TravelCostMatrixTool(AnalysisTool):
         cfg.max_cost = params.max_cost
         cfg.speed_km_h = params.speed
         cfg.edge_dir = self._edge_dir
+        cfg.node_dir = self._node_dir
         cfg.output_path = params.output_path
 
         if params.routing_mode == RoutingMode.pt:
