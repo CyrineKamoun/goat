@@ -7,7 +7,7 @@ sidebar_position: 1
 Die **Layouts** in GOAT ermöglichen es Ihnen, professionelle Kartenberichte zu erstellen und diese als PDF- oder PNG-Dateien zu exportieren. Sie können benutzerdefinierte Layouts mit Karten, Texten und anderen Elementen entwerfen und sowohl einseitige als auch mehrseitige Berichte erstellen.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/layouts/layouts_interface.png').default} alt="Layouts-Oberfläche Übersicht in GOAT" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/layouts/layouts_interface.webp').default} alt="Layouts-Oberfläche Übersicht in GOAT" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div>
 
 ## Einstellungsbereich

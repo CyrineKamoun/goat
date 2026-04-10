@@ -343,6 +343,8 @@ interface ProjectLayerTreeProps {
   hideLegendHeading?: boolean;
   /** Custom group icons keyed by group ID */
   groupIcons?: Record<string, { url: string; source?: string }>;
+  /** Whether to dim layers that are outside the current zoom range (default: true for backward compat) */
+  dimOutOfZoom?: boolean;
 }
 
 export const ProjectLayerTree = ({
@@ -365,6 +367,7 @@ export const ProjectLayerTree = ({
   downloadableLayers,
   hideLegendHeading,
   groupIcons,
+  dimOutOfZoom = true,
 }: ProjectLayerTreeProps) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
@@ -372,8 +375,8 @@ export const ProjectLayerTree = ({
   const mapRef = useRef(map);
   mapRef.current = map;
   const dispatch = useAppDispatch();
-  // Only subscribe to currentZoom in view mode to avoid re-renders during map interaction in edit mode
-  const currentZoom = useAppSelector((state) => (viewMode === "view" ? state.map.currentZoom : undefined));
+  // Only subscribe to currentZoom when dimming is enabled and in view mode
+  const currentZoom = useAppSelector((state) => (dimOutOfZoom && viewMode === "view" ? state.map.currentZoom : undefined));
 
   const [items, setItems] = useState<ProjectTreeItem[]>([]);
   const [groupModal, setGroupModal] = useState<{
@@ -447,7 +450,27 @@ export const ProjectLayerTree = ({
   }, [projectLayers, projectLayerGroups]);
 
   useEffect(() => {
-    if (treeData) setItems(formatApiDataForDnd(treeData));
+    if (treeData) {
+      setItems((prevItems) => {
+        const newItems = formatApiDataForDnd(treeData);
+        if (prevItems.length === 0) return newItems;
+        // For items that already existed, preserve their collapsed state.
+        // Newly appearing layer items (e.g. inside a group that was just toggled visible)
+        // are expanded so their legends are immediately visible.
+        const prevById = new Map(prevItems.map((item) => [item.id, item]));
+        return newItems.map((item) => {
+          const prev = prevById.get(item.id);
+          if (prev) {
+            return { ...item, collapsed: prev.collapsed };
+          }
+          // New layer items: expand legend so attribute-based styling is shown
+          if (!item.isGroup) {
+            return { ...item, collapsed: false };
+          }
+          return item;
+        });
+      });
+    }
   }, [treeData]);
 
   const treeSelectedIds = useMemo(() => {

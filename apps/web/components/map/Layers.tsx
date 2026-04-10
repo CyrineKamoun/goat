@@ -11,9 +11,15 @@ import {
   getSymbolStyleSpec,
   transformToMapboxLayerStyleSpec,
 } from "@/lib/transformers/layer";
+import { addOrUpdateMarkerImages } from "@/lib/transformers/map-image";
 import { generateCOGColorFunction } from "@/lib/utils/map/cog-styling";
 import { getLayerKey } from "@/lib/utils/map/layer";
-import type { FeatureLayerProperties, Layer, RasterLayerProperties } from "@/lib/validations/layer";
+import type {
+  FeatureLayerPointProperties,
+  FeatureLayerProperties,
+  Layer,
+  RasterLayerProperties,
+} from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
 import { type ScenarioFeatures, scenarioEditTypeEnum } from "@/lib/validations/scenario";
 
@@ -31,10 +37,14 @@ const Layers = (props: LayersProps) => {
   const temporaryFilters = useAppSelector((state) => state.map.temporaryFilters);
   const mapMode = useAppSelector((state) => state.map.mapMode);
 
+  // Exclude CustomLayerInterface from LayerProps since our layers are always standard style layers.
+  // This avoids TS errors when spreading the style spec onto <MapLayer> with minzoom/maxzoom.
+  type StandardLayerProps = Exclude<LayerProps, { type: "custom" }>;
+
   const splitLayerFilter = (style: LayerProps) => {
     const styleWithFilter = style as LayerProps & { filter?: unknown };
     const { filter, ...layerStyleSpec } = styleWithFilter;
-    return { filter, layerStyleSpec: layerStyleSpec as LayerProps };
+    return { filter, layerStyleSpec: layerStyleSpec as StandardLayerProps };
   };
 
   const getMapLayerFilter = (filter: unknown): FilterSpecification | undefined => {
@@ -83,8 +93,9 @@ const Layers = (props: LayersProps) => {
 
     if (mapMode !== "data" && temporaryFilters.length > 0) {
       // Primary layer filters (filter.layer_id matches this layer)
+      // Skip filters with excludeFromSourceLayer (used by click-to-filter to keep features clickable)
       const primaryFilters = temporaryFilters
-        .filter((filter) => filter.layer_id === layer.id)
+        .filter((filter) => filter.layer_id === layer.id && !filter.excludeFromSourceLayer)
         .map((filter) => filter.filter);
 
       // Additional target filters (from multi-layer attribute filtering)
@@ -137,6 +148,45 @@ const Layers = (props: LayersProps) => {
     });
     return { useDataLayers: dataLayers, systemLayers: sysLayers };
   }, [props.layers]);
+
+  // Ensure marker images are loaded for custom marker layers.
+  // Icons are initially loaded in handleMapLoad, but layers toggled on later
+  // need their images loaded on demand (otherwise MapLibre silently skips them).
+  useEffect(() => {
+    if (!mapRef || !props.layers?.length) return;
+    const map = mapRef.getMap();
+
+    const loadMissingMarkerImages = () => {
+      props.layers?.forEach((layer) => {
+        if (
+          layer.type === "feature" &&
+          layer.feature_layer_geometry_type === "point" &&
+          layer.properties?.["custom_marker"]
+        ) {
+          const pointProperties = layer.properties as FeatureLayerPointProperties;
+          const markers = [pointProperties.marker];
+          pointProperties.marker_mapping?.forEach((markerMap) => {
+            if (markerMap && markerMap[1]) markers.push(markerMap[1]);
+          });
+          const hasMissing = markers.some(
+            (marker) => marker && marker.name && !map.hasImage(`${layer.id}-${marker.name}`)
+          );
+          if (hasMissing) {
+            addOrUpdateMarkerImages(layer.id, pointProperties, mapRef);
+          }
+        }
+      });
+    };
+
+    if (map.isStyleLoaded()) {
+      loadMissingMarkerImages();
+    } else {
+      map.once("styledata", loadMissingMarkerImages);
+      return () => {
+        map.off("styledata", loadMissingMarkerImages);
+      };
+    }
+  }, [props.layers, mapRef]);
 
   // Render in reverse order for correct initial stacking (MapLibre stacks bottom-to-top).
   // Reordering is handled imperatively via map.moveLayer() to avoid cross-Source timing

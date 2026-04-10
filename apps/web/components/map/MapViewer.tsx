@@ -10,7 +10,7 @@ import type { ViewStateChangeEvent } from "react-map-gl/maplibre";
 import { v4 } from "uuid";
 
 import { PATTERN_IMAGES } from "@/lib/constants/pattern-images";
-import { setCurrentZoom, setHighlightedFeature, setPopupInfo } from "@/lib/store/map/slice";
+import { setClickedFeatureForFilter, setCurrentZoom, setHighlightedFeature, setPopupInfo } from "@/lib/store/map/slice";
 import { addOrUpdateMarkerImages, addPatternImages } from "@/lib/transformers/map-image";
 import { applyMapLanguage } from "@/hooks/map/MapHooks";
 import { formatNumber } from "@/lib/utils/format-number";
@@ -92,6 +92,7 @@ const MapViewer: React.FC<MapProps> = ({
   const highlightedFeature = useAppSelector((state) => state.map.highlightedFeature);
   const popupInfo = useAppSelector((state) => state.map.popupInfo);
   const popupEditor = useAppSelector((state) => state.map.popupEditor);
+  const mapMode = useAppSelector((state) => state.map.mapMode);
 
   const _selectedScenarioEditLayer = useAppSelector((state) => state.map.selectedScenarioLayer);
   const selectedScenarioEditLayer = useMemo(() => {
@@ -133,6 +134,8 @@ const MapViewer: React.FC<MapProps> = ({
 
   const handleMapClick = (e: MapLayerMouseEvent) => {
     const { features } = e;
+    // Track whether the popup block already highlighted a feature
+    let didHighlight = false;
 
     if (features && features.length > 0 && isGetInfoActive) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -158,6 +161,7 @@ const MapViewer: React.FC<MapProps> = ({
 
       if (interactiveFeature && interactiveLayer) {
         dispatch(setHighlightedFeature(interactiveFeature));
+        didHighlight = true;
 
         const layerName = interactiveLayer.name;
         let lngLat: [number, number] = [e.lngLat.lng, e.lngLat.lat];
@@ -231,6 +235,28 @@ const MapViewer: React.FC<MapProps> = ({
       // No features clicked or get info tool is not active.
       dispatch(setHighlightedFeature(undefined));
       dispatch(setPopupInfo(undefined));
+    }
+
+    // Click-to-filter: dispatch clicked feature independently of popup interaction settings.
+    // This finds the topmost feature from ANY layer (regardless of interaction type).
+    if (features && features.length > 0 && (mapMode === "builder" || mapMode === "public")) {
+      for (const feature of features) {
+        const matchedLayer = layers?.find((l) => l.id.toString() === feature.layer.id);
+        if (matchedLayer) {
+          // Only highlight if the popup block didn't already handle it
+          if (!didHighlight) {
+            dispatch(setHighlightedFeature(feature));
+          }
+          dispatch(
+            setClickedFeatureForFilter({
+              layerProjectId: matchedLayer.id as number,
+              properties: feature.properties,
+              timestamp: Date.now(),
+            })
+          );
+          break;
+        }
+      }
     }
 
     if (onClick) {

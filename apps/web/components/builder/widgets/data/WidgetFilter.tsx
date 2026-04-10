@@ -46,6 +46,9 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
   // Local range state (for range filter)
   const [selectedRange, setSelectedRange] = useState<[number, number] | null>(null);
 
+  // Flash animation when filter is updated via map click
+  const [isFlashing, setIsFlashing] = useState(false);
+
   // Track previous selection to only zoom when the user actually changes the selection
   const prevSelectedValuesRef = useRef(selectedValues);
 
@@ -56,9 +59,56 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
   // Get all temporary filters (for cross-filtering options)
   const allTemporaryFilters = useAppSelector((state) => state.map.temporaryFilters);
 
+  // Clicked feature for filter-by-map-click
+  const clickedFeatureForFilter = useAppSelector(
+    (state) => state.map.clickedFeatureForFilter
+  );
+
   const layer = useMemo(() => {
     return projectLayers?.find((l) => l.id === rawConfig?.setup?.layer_project_id) ?? null;
   }, [projectLayers, rawConfig?.setup?.layer_project_id]);
+
+  /**
+   * React to map feature clicks: if filter_by_map_click is enabled and the clicked
+   * feature's layer matches this widget's layer, update the selected value(s).
+   */
+  useEffect(() => {
+    if (!clickedFeatureForFilter) return;
+    if (!rawConfig?.options?.filter_by_map_click) return;
+    if (!layer || clickedFeatureForFilter.layerProjectId !== layer.id) return;
+    if (isRangeLayout) return;
+
+    const columnName = rawConfig?.setup?.column_name;
+    if (!columnName) return;
+
+    const rawValue = clickedFeatureForFilter.properties[columnName];
+    if (rawValue == null) return;
+
+    const value = String(rawValue);
+
+    if (rawConfig?.setup?.multiple) {
+      // Toggle: add if not present, remove if present
+      setSelectedValues((prev) => {
+        const arr = Array.isArray(prev) ? prev : prev ? [prev] : [];
+        if (arr.includes(value)) {
+          return arr.filter((v) => v !== value);
+        }
+        return [...arr, value];
+      });
+    } else {
+      setSelectedValues(value);
+    }
+
+    // Trigger flash animation
+    setIsFlashing(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clickedFeatureForFilter?.timestamp]);
+
+  useEffect(() => {
+    if (!isFlashing) return;
+    const timer = setTimeout(() => setIsFlashing(false), 600);
+    return () => clearTimeout(timer);
+  }, [isFlashing]);
 
   /**
    * Build combined CQL filter for cross-filtering options.
@@ -124,11 +174,16 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
         }
 
         // Case 3 (Bidirectional): This filter targets the other filter's layer
-        // Transform the other filter's selection to use this filter's column name
+        // Transform the other filter's selection to use this filter's column name,
+        // but only if the transformation actually changed something (meaning the
+        // other filter uses the expected target column). If unchanged, the filter
+        // is for an unrelated column and should not be applied to this layer.
         const mapping = targetLayerMapping.get(f.layer_id);
         if (mapping) {
           const transformedFilter = transformFilter(f.filter, mapping.targetColumn, mapping.thisColumn);
-          filterArgs.push(transformedFilter);
+          if (JSON.stringify(transformedFilter) !== JSON.stringify(f.filter)) {
+            filterArgs.push(transformedFilter);
+          }
         }
       });
 
@@ -221,6 +276,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
 
       return targetLayers
         .map((target) => {
+          if (!target.column_name) return null;
           const targetLayer = projectLayers.find((l) => l.id === target.layer_project_id);
           if (!targetLayer) return null;
 
@@ -250,6 +306,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
 
       return targetLayers
         .map((target) => {
+          if (!target.column_name) return null;
           const targetLayer = projectLayers.find((l) => l.id === target.layer_project_id);
           if (!targetLayer) return null;
 
@@ -302,6 +359,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
       layer_id: layer.id,
       filter: filterObject,
       additional_targets: buildAdditionalTargets(normalizedValues),
+      excludeFromSourceLayer: !!rawConfig?.options?.filter_by_map_click,
     };
 
     // Zoom to selection if enabled and we have geometry data,
@@ -313,6 +371,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
       if (geometryData?.features?.length && map) {
         zoomToFeatureCollection(map, geometryData as GeoJSON.FeatureCollection, {
           duration: 200,
+          maxZoom: 14,
         });
         prevSelectedValuesRef.current = selectedValues;
       }
@@ -336,6 +395,7 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
     isRangeLayout,
     layer,
     map,
+    rawConfig?.options?.filter_by_map_click,
     rawConfig?.options?.zoom_to_selection,
     rawConfig.setup.column_name,
     selectedValues,
@@ -396,7 +456,15 @@ export const FilterDataWidget = ({ id, config: rawConfig, projectLayers }: Filte
   ]);
 
   return (
-    <Box sx={{ mb: 2 }}>
+    <Box
+      sx={{
+        mb: 2,
+        transition: "background-color 0.3s ease",
+        backgroundColor: isFlashing
+          ? `${rawConfig?.options?.color || "#0e58ff"}18`
+          : "transparent",
+        borderRadius: 1,
+      }}>
       <WidgetStatusContainer isNotConfigured={!layer || !rawConfig?.setup?.column_name} height={100} />
       {layer &&
         rawConfig?.setup.column_name &&
