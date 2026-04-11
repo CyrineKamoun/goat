@@ -550,30 +550,32 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
     ) -> tuple[list[float], list[float]]:
         """Extract lat/lon coordinates from a GeoParquet point layer."""
         con = duckdb.connect()
-        con.execute("INSTALL spatial; LOAD spatial;")
+        try:
+            con.execute("INSTALL spatial; LOAD spatial;")
 
-        # Detect geometry column from parquet schema
-        cols = con.execute(f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}')").fetchall()
-        geom_col = None
-        for col_name, col_type, *_ in cols:
-            if "GEOMETRY" in col_type.upper() or col_name in ("geom", "geometry"):
-                geom_col = col_name
-                break
-        if not geom_col:
-            raise RuntimeError(f"No geometry column found in {parquet_path}")
+            # Detect geometry column from parquet schema
+            cols = con.execute(f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}')").fetchall()
+            geom_col = None
+            for col_name, col_type, *_ in cols:
+                if "GEOMETRY" in col_type.upper() or col_name in ("geom", "geometry"):
+                    geom_col = col_name
+                    break
+            if not geom_col:
+                raise RuntimeError(f"No geometry column found in {parquet_path}")
 
-        result = con.execute(f"""
-            SELECT
-                ST_Y("{geom_col}") as lat,
-                ST_X("{geom_col}") as lon
-            FROM read_parquet('{parquet_path}')
-            WHERE "{geom_col}" IS NOT NULL
-        """).fetchall()
-        con.close()
+            result = con.execute(f"""
+                SELECT
+                    ST_Y("{geom_col}") as lat,
+                    ST_X("{geom_col}") as lon
+                FROM read_parquet('{parquet_path}')
+                WHERE "{geom_col}" IS NOT NULL
+            """).fetchall()
 
-        latitudes = [r[0] for r in result]
-        longitudes = [r[1] for r in result]
-        return latitudes, longitudes
+            latitudes = [r[0] for r in result]
+            longitudes = [r[1] for r in result]
+            return latitudes, longitudes
+        finally:
+            con.close()
 
     def _build_destination_points_parquet(
         self: Self,
@@ -583,29 +585,31 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
     ) -> None:
         """Join min travel cost onto the original destination layer."""
         con = duckdb.connect()
-        con.execute("INSTALL spatial; LOAD spatial;")
+        try:
+            con.execute("INSTALL spatial; LOAD spatial;")
 
-        con.execute(f"""
-            COPY (
-                SELECT
-                    d.* EXCLUDE (_dest_idx),
-                    m.avg_cost as travel_cost
-                FROM (
-                    SELECT *, ROW_NUMBER() OVER () - 1 AS _dest_idx
-                    FROM read_parquet('{dest_layer_parquet}')
-                ) d
-                LEFT JOIN (
+            con.execute(f"""
+                COPY (
                     SELECT
-                        destination_id,
-                        AVG(cost) as avg_cost
-                    FROM read_parquet('{matrix_path}')
-                    WHERE cost IS NOT NULL
-                    GROUP BY destination_id
-                ) m ON d._dest_idx = m.destination_id
-                ORDER BY d._dest_idx
-            ) TO '{output_path}' (FORMAT PARQUET, COMPRESSION ZSTD)
-        """)
-        con.close()
+                        d.* EXCLUDE (_dest_idx),
+                        m.avg_cost as travel_cost
+                    FROM (
+                        SELECT *, ROW_NUMBER() OVER () - 1 AS _dest_idx
+                        FROM read_parquet('{dest_layer_parquet}')
+                    ) d
+                    LEFT JOIN (
+                        SELECT
+                            destination_id,
+                            AVG(cost) as avg_cost
+                        FROM read_parquet('{matrix_path}')
+                        WHERE cost IS NOT NULL
+                        GROUP BY destination_id
+                    ) m ON d._dest_idx = m.destination_id
+                    ORDER BY d._dest_idx
+                ) TO '{output_path}' (FORMAT PARQUET, COMPRESSION ZSTD)
+            """)
+        finally:
+            con.close()
 
     def process(
         self: Self,
@@ -751,6 +755,7 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
             )
             logger.info(f"Destinations table: {table_info_dests['table_name']}")
 
+            # Refresh database pool — connections may have gone stale during analysis
             asyncio.get_event_loop().run_until_complete(self._close_db_service())
 
             # Step 4: Create matrix layer record (table type)
