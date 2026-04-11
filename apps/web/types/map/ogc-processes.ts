@@ -96,6 +96,9 @@ export interface UIFieldMeta {
   widget_options?: Record<string, unknown>;
   enum_icons?: Record<string, string>;
   enum_labels?: Record<string, string>;
+  inline_group?: string;
+  inline_flex?: string;
+  group_label?: string;
 }
 
 /**
@@ -187,6 +190,7 @@ export type InferredInputType =
   | "starting-points" // Starting points selector (map clicks or layer)
   | "field-statistics" // Field statistics selector (operation + field)
   | "scenario" // Scenario selector (x-ui.widget is scenario-selector)
+  | "chips" // Editable chips (x-ui.widget is chips)
   | "unknown"; // Fallback
 
 /**

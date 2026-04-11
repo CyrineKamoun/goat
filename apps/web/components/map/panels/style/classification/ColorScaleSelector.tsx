@@ -31,6 +31,9 @@ const ColorScaleSelector = (props: ColorScaleSelectorProps) => {
                 boxShadow: "rgba(0, 0, 0, 0.16) 0px 6px 12px 0px",
                 width: "235px",
                 maxHeight: "500px",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
               }}>
               {props.activeLayerField.type === "number" &&
                 props.selectedColorScaleMethod !== "ordinal" &&

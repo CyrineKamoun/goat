@@ -1465,7 +1465,7 @@ class CatchmentAreaTool(AnalysisTool):
                         FROM '{temp_path}'
                     )
                     SELECT {select_cols}CASE
-                            WHEN NOT ST_IsValid(geom) THEN ST_CollectionExtract(ST_MakeValid(geom))
+                            WHEN NOT ST_IsValid(geom) THEN ST_MakeValid(geom)
                             ELSE geom
                         END AS geometry
                     FROM src)

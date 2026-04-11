@@ -73,6 +73,9 @@ export function inferInputType(
   if (topLevelUiMeta?.widget === "scenario-selector") {
     return "scenario";
   }
+  if (topLevelUiMeta?.widget === "chips") {
+    return "chips";
+  }
 
   // Get the effective schema (handle anyOf/oneOf for nullable types)
   const effectiveSchema = getEffectiveSchema(schema);

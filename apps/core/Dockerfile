@@ -25,6 +25,7 @@ FROM linux-base AS python-base
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
     build-essential \
+    cmake \
     gettext \
     gdal-bin \
     libgdal-dev \
@@ -37,6 +38,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.2 /uv /usr/local/bin/uv
 # Create virtual environment and install dependencies
 COPY apps/core /app/apps/core
 COPY packages/python/goatlib /app/packages/python/goatlib
+COPY packages/cpp/routing /app/packages/cpp/routing
 COPY pyproject.toml uv.lock /app/
 WORKDIR /app
 

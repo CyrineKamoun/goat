@@ -62,6 +62,7 @@ FROM linux-base AS python-build
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
     build-essential \
+    cmake \
     gdal-bin \
     libgdal-dev \
     libgeos-dev \
@@ -71,8 +72,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:0.9.2 /uv /usr/local/bin/uv
 
-# Copy goatlib and install with all dependencies
+# Copy goatlib + routing package sources and install with all dependencies
 COPY packages/python/goatlib /app/packages/python/goatlib
+COPY packages/cpp/routing /app/packages/cpp/routing
 COPY pyproject.toml uv.lock /app/
 WORKDIR /app
 RUN uv sync --all-extras --frozen --no-dev --no-editable --package=goatlib

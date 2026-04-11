@@ -113,12 +113,28 @@
       "label": "Reisezeitlimit (Min)",
       "description": "Definieren Sie die maximale Reisezeit in Minuten"
     },
+    "limit": {
+      "label": "Limit",
+      "description": "Maximales Reisebudget"
+    },
     "steps": {
-      "label": "Anzahl der Schritte (Steps)",
+      "label": "Anzahl der Schritte",
       "description": "Definieren Sie die Anzahl der Schritte"
     },
+    "step_sizes": {
+      "label": "Schrittgrößen",
+      "description": "Schrittgrößen-Intervalle für das Einzugsgebiet"
+    },
+    "advanced_options": {
+      "label": "Erweiterte Optionen",
+      "description": "Erweiterte Konfigurationsoptionen anzeigen"
+    },
+    "point_grid_layer": {
+      "label": "Punktraster-Layer",
+      "description": "Wählen Sie einen Punkt-Layer als Raster"
+    },
     "speed": {
-      "label": "Reisegeschwindigkeit (Km/h)",
+      "label": "Reisegeschwindigkeit (km/h)",
       "description": "Definieren Sie die Reisegeschwindigkeit"
     },
     "access_mode": {
@@ -133,9 +149,9 @@
       "label": "Form des Einzugsgebiets",
       "description": "Wählen Sie die Form der Einzugsgebietsgeometrie aus."
     },
-    "polygon_difference": {
-      "label": "Differenz zwischen Schritten",
-      "description": "Wenn aktiviert, zeigen Polygone die Differenz zwischen aufeinanderfolgenden Schritten"
+    "steps_style": {
+      "label": "Darstellung der Schritte",
+      "description": "Darstellungsart der Schritte in der Ausgabe"
     },
     "choose_pt_mode": {
       "label": "ÖV-Modi wählen",
@@ -482,7 +498,7 @@
       "description": "Durchzuführende statistische Operation"
     },
     "measure_type": {
-      "label": "Art des Einzugsgebiets",
+      "label": "Berechnen nach",
       "description": "Berechnung des Einzugsgebiets nach Zeit oder Entfernung"
     },
     "max_distance": {
@@ -691,6 +707,14 @@
     }
   },
   "enums": {
+    "cost_type": {
+      "time": "Zeit (Min)",
+      "distance": "Entfernung (m)"
+    },
+    "steps_style": {
+      "separate": "Getrennte Schritte",
+      "cumulative": "Kumulative Schritte"
+    },
     "routing_mode": {
       "walking": "Zu Fuß",
       "bicycle": "Fahrrad",
@@ -792,7 +816,9 @@
     "catchment_area_type": {
       "polygon": "Polygon",
       "network": "Netzwerk",
-      "rectangular_grid": "Sechseckiges Gitter"
+      "hexagonal_grid": "Sechseckiges Gitter",
+      "rectangular_grid": "Sechseckiges Gitter",
+      "point_grid": "Punktraster"
     },
     "aggregation_area_type": {
       "polygon": "Polygon",

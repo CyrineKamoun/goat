@@ -61,6 +61,17 @@ export const CatchmentAreaIcon = (props: SvgIconProps) => (
   </SvgIcon>
 );
 
+export const CatchmentAreaV2Icon = (props: SvgIconProps) => (
+  <SvgIcon viewBox="0 0 48 44" {...props}>
+    <path d="M41 22C41 31.9411 32.9411 40 23 40C13.0589 40 5 31.9411 5 22C5 12.0589 13.0589 4 23 4C32.9411 4 41 12.0589 41 22Z" fill="var(--icon-color-4, #E3E3E3)"/>
+    <path d="M38.0001 22.0003C38.0001 30.2845 31.2843 37.0003 23.0001 37.0003C14.7158 37.0003 8.00007 30.2845 8.00007 22.0003C8.00007 13.716 14.7158 7.00027 23.0001 7.00027C31.2843 7.00027 38.0001 13.716 38.0001 22.0003Z" fill="var(--icon-color-2, #999999)"/>
+    <path d="M32 22C32 26.9706 27.9706 31 23 31C18.0294 31 14 26.9706 14 22C14 17.0294 18.0294 13 23 13C27.9706 13 32 17.0294 32 22Z" fill="var(--icon-color-1, #666666)"/>
+    <path d="M25.9999 21.9997C25.9999 23.6566 24.6568 24.9997 22.9999 24.9997C21.3431 24.9997 19.9999 23.6566 19.9999 21.9997C19.9999 20.3429 21.3431 18.9997 22.9999 18.9997C24.6568 18.9997 25.9999 20.3429 25.9999 21.9997Z" fill="var(--icon-color-3, #BDBDBD)"/>
+    <rect x="23" y="0" width="24" height="12" rx="5" fill="var(--icon-color-1, #666666)"/>
+    <text x="35" y="9" textAnchor="middle" fill="var(--icon-color-4, #E3E3E3)" fontSize="7.5" fontWeight="700" fontFamily="Arial, sans-serif">Beta</text>
+  </SvgIcon>
+);
+
 export const CentroidIcon = (props: SvgIconProps) => (
   <SvgIcon viewBox="0 0 44 44" {...props}>
     <path d="M37 22C37 14.268 30.732 8 23 8C15.268 8 9 14.268 9 22C9 29.732 15.268 36 23 36V38C14.1634 38 7 30.8366 7 22C7 13.1634 14.1634 6 23 6C31.8366 6 39 13.1634 39 22C39 30.8366 31.8366 38 23 38V36C30.732 36 37 29.732 37 22Z" fill="var(--icon-color-3, #BDBDBD)"/>
@@ -218,6 +229,29 @@ export const OevGueteklassenIcon = (props: SvgIconProps) => (
   </SvgIcon>
 );
 
+export const TravelCostMatrixIcon = (props: SvgIconProps) => (
+  <SvgIcon viewBox="0 0 48 44" {...props}>
+    {/* Origin points (left column) */}
+    <circle cx="8" cy="12" r="3.5" fill="var(--icon-color-1, #666666)"/>
+    <circle cx="8" cy="24" r="3.5" fill="var(--icon-color-1, #666666)"/>
+    <circle cx="8" cy="36" r="3.5" fill="var(--icon-color-1, #666666)"/>
+    {/* Destination points (right column) */}
+    <circle cx="32" cy="12" r="3.5" fill="var(--icon-color-3, #BDBDBD)"/>
+    <circle cx="32" cy="24" r="3.5" fill="var(--icon-color-3, #BDBDBD)"/>
+    <circle cx="32" cy="36" r="3.5" fill="var(--icon-color-3, #BDBDBD)"/>
+    {/* Connecting lines (origins to destinations) */}
+    <line x1="11.5" y1="12" x2="28.5" y2="12" stroke="var(--icon-color-2, #999999)" strokeWidth="1.2"/>
+    <line x1="11.5" y1="12" x2="28.5" y2="24" stroke="var(--icon-color-4, #E3E3E3)" strokeWidth="1.2"/>
+    <line x1="11.5" y1="24" x2="28.5" y2="24" stroke="var(--icon-color-2, #999999)" strokeWidth="1.2"/>
+    <line x1="11.5" y1="24" x2="28.5" y2="36" stroke="var(--icon-color-4, #E3E3E3)" strokeWidth="1.2"/>
+    <line x1="11.5" y1="36" x2="28.5" y2="24" stroke="var(--icon-color-4, #E3E3E3)" strokeWidth="1.2"/>
+    <line x1="11.5" y1="36" x2="28.5" y2="36" stroke="var(--icon-color-2, #999999)" strokeWidth="1.2"/>
+    {/* Beta badge */}
+    <rect x="23" y="0" width="24" height="12" rx="5" fill="var(--icon-color-1, #666666)"/>
+    <text x="35" y="9" textAnchor="middle" fill="var(--icon-color-4, #E3E3E3)" fontSize="7.5" fontWeight="700" fontFamily="Arial, sans-serif">Beta</text>
+  </SvgIcon>
+);
+
 export const OriginDestinationIcon = (props: SvgIconProps) => (
   <SvgIcon viewBox="0 0 44 44" {...props}>
     <path d="M16.5376 32.6098L16.0904 33.5042L11.9764 31.4472L12.4236 30.5528L16.5376 32.6098Z" fill="var(--icon-color-1, #666666)"/>
@@ -310,6 +344,7 @@ export enum TOOL_ICON_NAME {
   AGGREGATE_POLYGON = "aggregate_polygon",
   BUFFER = "buffer",
   CATCHMENT_AREA = "catchment_area",
+  CATCHMENT_AREA_V2 = "catchment_area_v2",
   CENTROID = "centroid",
   CLIP = "clip",
   SPATIAL_CLUSTERING = "spatial_clustering",
@@ -328,6 +363,7 @@ export enum TOOL_ICON_NAME {
   JOIN = "join",
   OEV_GUETEKLASSEN = "oev_gueteklassen",
   ORIGIN_DESTINATION = "origin_destination",
+  TRAVEL_COST_MATRIX = "travel_cost_matrix",
   TRIP_COUNT = "trip_count",
   UNION = "union",
 }
@@ -341,6 +377,7 @@ export const toolIconMap: Record<TOOL_ICON_NAME, React.FC<SvgIconProps>> = {
   [TOOL_ICON_NAME.AGGREGATE_POLYGON]: AggregatePolygonsIcon,
   [TOOL_ICON_NAME.BUFFER]: BufferIcon,
   [TOOL_ICON_NAME.CATCHMENT_AREA]: CatchmentAreaIcon,
+  [TOOL_ICON_NAME.CATCHMENT_AREA_V2]: CatchmentAreaV2Icon,
   [TOOL_ICON_NAME.CENTROID]: CentroidIcon,
   [TOOL_ICON_NAME.CLIP]: ClipIcon,
   [TOOL_ICON_NAME.SPATIAL_CLUSTERING]: SpatialClusteringIcon,
@@ -359,6 +396,7 @@ export const toolIconMap: Record<TOOL_ICON_NAME, React.FC<SvgIconProps>> = {
   [TOOL_ICON_NAME.JOIN]: JoinIcon,
   [TOOL_ICON_NAME.OEV_GUETEKLASSEN]: OevGueteklassenIcon,
   [TOOL_ICON_NAME.ORIGIN_DESTINATION]: OriginDestinationIcon,
+  [TOOL_ICON_NAME.TRAVEL_COST_MATRIX]: TravelCostMatrixIcon,
   [TOOL_ICON_NAME.TRIP_COUNT]: TripCountIcon,
   [TOOL_ICON_NAME.UNION]: UnionIcon,
 };

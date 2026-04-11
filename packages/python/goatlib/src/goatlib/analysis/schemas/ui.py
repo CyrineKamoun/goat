@@ -204,6 +204,9 @@ class UIFieldConfig:
     widget_options: dict[str, Any] | None = None
     enum_icons: dict[str, str] | None = None
     enum_labels: dict[str, str] | None = None  # Maps enum values to i18n keys
+    inline_group: str | None = None  # Group key for side-by-side layout
+    inline_flex: str | None = None  # CSS flex value (e.g. "1 0 0" to fill remaining space)
+    group_label: str | None = None  # Sub-header label rendered above this field
 
     def to_dict(self: Self) -> dict[str, Any]:
         """Convert to dictionary for JSON schema x-ui field."""
@@ -248,6 +251,12 @@ class UIFieldConfig:
             result["enum_icons"] = self.enum_icons
         if self.enum_labels:
             result["enum_labels"] = self.enum_labels
+        if self.inline_group:
+            result["inline_group"] = self.inline_group
+        if self.inline_flex:
+            result["inline_flex"] = self.inline_flex
+        if self.group_label:
+            result["group_label"] = self.group_label
 
         return result
 
@@ -273,6 +282,9 @@ def ui_field(
     widget_options: dict[str, Any] | None = None,
     enum_icons: dict[str, str] | None = None,
     enum_labels: dict[str, str] | None = None,
+    inline_group: str | None = None,
+    inline_flex: str | None = None,
+    group_label: str | None = None,
 ) -> dict[str, Any]:
     """Generate json_schema_extra dict for UI field configuration.
 
@@ -300,6 +312,10 @@ def ui_field(
         widget: Custom widget type (e.g., "layer-selector", "color-picker")
         widget_options: Options passed to custom widget
         enum_icons: Mapping of enum values to icon names for enum fields
+        inline_group: Group key for side-by-side layout. Fields with the same
+            inline_group value render on the same row.
+        inline_flex: CSS flex shorthand for the field's container when in an
+            inline group (e.g., "1 0 0" to fill remaining space).
 
     Returns:
         Dict to use as json_schema_extra in Field()
@@ -380,6 +396,9 @@ def ui_field(
         widget_options=widget_options,
         enum_icons=enum_icons,
         enum_labels=enum_labels,
+        inline_group=inline_group,
+        inline_flex=inline_flex,
+        group_label=group_label,
     )
     return {"x-ui": config.to_dict()}
 

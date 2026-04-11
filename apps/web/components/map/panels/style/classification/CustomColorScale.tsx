@@ -378,7 +378,7 @@ const CustomColorScale = (props: CustomColorScaleProps) => {
         />
       )}
       <Box
-        sx={{ py: 3 }}
+        sx={{ py: 3, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}
         onClick={() => {
           setEditingValues(null);
           setEditingColorItem(null);
@@ -420,7 +420,7 @@ const CustomColorScale = (props: CustomColorScaleProps) => {
           )}
         </Box>
 
-        <Box sx={{ maxHeight: "340px", overflowY: "auto" }}>
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
           <SortableWrapper handleDragEnd={handleDragEnd} items={valueMaps}>
             {valueMaps?.map((item: ColorMapItem, index: number) => (
               <SortableItem

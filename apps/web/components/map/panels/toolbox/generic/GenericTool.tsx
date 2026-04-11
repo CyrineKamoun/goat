@@ -27,7 +27,7 @@ import {
   validateInputs,
 } from "@/lib/utils/ogc-utils";
 
-import type { ProcessedSection } from "@/types/map/ogc-processes";
+import type { ProcessedInput, ProcessedSection } from "@/types/map/ogc-processes";
 import type { IndicatorBaseProps } from "@/types/map/toolbox";
 
 import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
@@ -65,6 +65,34 @@ const SECTION_ICON_MAP: Record<string, ICON_NAME> = {
   clock: ICON_NAME.CLOCK,
   save: ICON_NAME.SAVE,
 };
+
+/**
+ * Groups inputs by inline_group for side-by-side rendering.
+ * Consecutive inputs with the same inline_group are collected into arrays.
+ * Ungrouped inputs become single-element arrays.
+ */
+function groupInputsByInlineGroup(inputs: ProcessedInput[]): ProcessedInput[][] {
+  const groups: ProcessedInput[][] = [];
+  let currentGroup: ProcessedInput[] = [];
+  let currentGroupKey: string | undefined = undefined;
+
+  for (const input of inputs) {
+    const groupKey = input.uiMeta?.inline_group;
+    if (groupKey && groupKey === currentGroupKey) {
+      currentGroup.push(input);
+    } else {
+      if (currentGroup.length > 0) {
+        groups.push(currentGroup);
+      }
+      currentGroup = [input];
+      currentGroupKey = groupKey;
+    }
+  }
+  if (currentGroup.length > 0) {
+    groups.push(currentGroup);
+  }
+  return groups;
+}
 
 interface GenericToolProps extends IndicatorBaseProps {
   processId: string;
@@ -118,6 +146,9 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
 
   // Advanced options collapse state (for the settings icon)
   const [advancedCollapsed, setAdvancedCollapsed] = useState<Record<string, boolean>>({});
+
+  // Field validation errors - tracks which fields currently have errors
+  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
 
   // Process inputs into sections
   const sections = useMemo(() => {
@@ -221,6 +252,24 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
               newValues[input.name] = dynamicDefault;
             }
           }
+
+          // Auto-clamp fields whose max_value_from references the changed field
+          const maxValueFrom = input.uiMeta?.widget_options?.max_value_from as
+            | { fields: string[]; max?: number }
+            | undefined;
+
+          if (maxValueFrom) {
+            const fieldNames = maxValueFrom.fields.map((f: string | { field: string }) =>
+              typeof f === "string" ? f : f.field
+            );
+            if (fieldNames.includes(name)) {
+              const currentVal = newValues[input.name] as number | undefined;
+              const newLimit = Math.min(Number(value) || Infinity, maxValueFrom.max ?? Infinity);
+              if (currentVal !== undefined && currentVal > newLimit) {
+                newValues[input.name] = newLimit;
+              }
+            }
+          }
         }
 
         return newValues;
@@ -251,6 +300,14 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
       ...prev,
       [sectionId]: !prev[sectionId],
     }));
+  }, []);
+
+  // Handle field validation state changes
+  const handleFieldValidation = useCallback((fieldName: string, hasError: boolean) => {
+    setFieldErrors((prev) => {
+      if (prev[fieldName] === hasError) return prev;
+      return { ...prev, [fieldName]: hasError };
+    });
   }, []);
 
   // Toggle advanced options collapse
@@ -343,8 +400,13 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
       }
     }
 
+    // Check for any field validation errors
+    if (Object.values(fieldErrors).some((hasError) => hasError)) {
+      return false;
+    }
+
     return true;
-  }, [process, sections, values, defaultValues, layerGeometryValues]);
+  }, [process, sections, values, defaultValues, layerGeometryValues, fieldErrors]);
 
   // Execute the process
   const handleRun = async () => {
@@ -633,28 +695,64 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
                     collapsed={isAdvancedCollapsed}
                     baseOptions={
                       <Stack spacing={2}>
-                        {baseInputs.map((input) => (
-                          <GenericInput
-                            key={input.name}
-                            input={input}
-                            value={effectiveValues[input.name]}
-                            onChange={(value) => handleInputChange(input.name, value)}
-                            onFilterChange={
-                              input.inputType === "layer"
-                                ? (filter) => handleFilterChange(input.name, filter)
-                                : undefined
-                            }
-                            onNestedFiltersChange={
-                              input.inputType === "repeatable-object"
-                                ? (filters) => handleNestedFiltersChange(input.name, filters)
-                                : undefined
-                            }
-                            disabled={isExecuting}
-                            formValues={effectiveValues}
-                            schemaDefs={process.$defs}
-                            processId={processId}
-                          />
-                        ))}
+                        {groupInputsByInlineGroup(baseInputs).map((group) =>
+                          group.length === 1 ? (
+                            <GenericInput
+                              key={group[0].name}
+                              input={group[0]}
+                              value={effectiveValues[group[0].name]}
+                              onChange={(value) => handleInputChange(group[0].name, value)}
+                              onFilterChange={
+                                group[0].inputType === "layer"
+                                  ? (filter) => handleFilterChange(group[0].name, filter)
+                                  : undefined
+                              }
+                              onNestedFiltersChange={
+                                group[0].inputType === "repeatable-object"
+                                  ? (filters) => handleNestedFiltersChange(group[0].name, filters)
+                                  : undefined
+                              }
+                              disabled={isExecuting}
+                              formValues={effectiveValues}
+                              schemaDefs={process.$defs}
+                              processId={processId}
+                              onValidationChange={(hasError) => handleFieldValidation(group[0].name, hasError)}
+                            />
+                          ) : (
+                            <Stack
+                              key={group[0].uiMeta?.inline_group}
+                              direction="row"
+                              spacing={2}
+                              sx={{ width: "100%", alignItems: "flex-start" }}>
+                              {group.map((input) => (
+                                <Box
+                                  key={input.name}
+                                  sx={{ flex: input.uiMeta?.inline_flex ?? "0 1 auto", minWidth: 0 }}>
+                                  <GenericInput
+                                    input={input}
+                                    value={effectiveValues[input.name]}
+                                    onChange={(value) => handleInputChange(input.name, value)}
+                                    onFilterChange={
+                                      input.inputType === "layer"
+                                        ? (filter) => handleFilterChange(input.name, filter)
+                                        : undefined
+                                    }
+                                    onNestedFiltersChange={
+                                      input.inputType === "repeatable-object"
+                                        ? (filters) => handleNestedFiltersChange(input.name, filters)
+                                        : undefined
+                                    }
+                                    disabled={isExecuting}
+                                    formValues={effectiveValues}
+                                    schemaDefs={process.$defs}
+                                    processId={processId}
+                                    onValidationChange={(hasError) => handleFieldValidation(input.name, hasError)}
+                                  />
+                                </Box>
+                              ))}
+                            </Stack>
+                          )
+                        )}
                         {shouldRenderOevStationConfigFallback && (
                           <OevStationConfigInput
                             input={{ name: "station_config", title: "Station configuration" }}
@@ -668,28 +766,64 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
                     advancedOptions={
                       hasAdvancedOptions ? (
                         <Stack spacing={2}>
-                          {advancedInputs.map((input) => (
-                            <GenericInput
-                              key={input.name}
-                              input={input}
-                              value={effectiveValues[input.name]}
-                              onChange={(value) => handleInputChange(input.name, value)}
-                              onFilterChange={
-                                input.inputType === "layer"
-                                  ? (filter) => handleFilterChange(input.name, filter)
-                                  : undefined
-                              }
-                              onNestedFiltersChange={
-                                input.inputType === "repeatable-object"
-                                  ? (filters) => handleNestedFiltersChange(input.name, filters)
-                                  : undefined
-                              }
-                              disabled={isExecuting}
-                              formValues={effectiveValues}
-                              schemaDefs={process.$defs}
-                              processId={processId}
-                            />
-                          ))}
+                          {groupInputsByInlineGroup(advancedInputs).map((group) =>
+                            group.length === 1 ? (
+                              <GenericInput
+                                key={group[0].name}
+                                input={group[0]}
+                                value={effectiveValues[group[0].name]}
+                                onChange={(value) => handleInputChange(group[0].name, value)}
+                                onFilterChange={
+                                  group[0].inputType === "layer"
+                                    ? (filter) => handleFilterChange(group[0].name, filter)
+                                    : undefined
+                                }
+                                onNestedFiltersChange={
+                                  group[0].inputType === "repeatable-object"
+                                    ? (filters) => handleNestedFiltersChange(group[0].name, filters)
+                                    : undefined
+                                }
+                                disabled={isExecuting}
+                                formValues={effectiveValues}
+                                schemaDefs={process.$defs}
+                                processId={processId}
+                                onValidationChange={(hasError) => handleFieldValidation(group[0].name, hasError)}
+                              />
+                            ) : (
+                              <Stack
+                                key={group[0].uiMeta?.inline_group}
+                                direction="row"
+                                spacing={2}
+                                sx={{ width: "100%", alignItems: "flex-start" }}>
+                                {group.map((input) => (
+                                  <Box
+                                    key={input.name}
+                                    sx={{ flex: input.uiMeta?.inline_flex ?? "0 1 auto", minWidth: 0 }}>
+                                    <GenericInput
+                                      input={input}
+                                      value={effectiveValues[input.name]}
+                                      onChange={(value) => handleInputChange(input.name, value)}
+                                      onFilterChange={
+                                        input.inputType === "layer"
+                                          ? (filter) => handleFilterChange(input.name, filter)
+                                          : undefined
+                                      }
+                                      onNestedFiltersChange={
+                                        input.inputType === "repeatable-object"
+                                          ? (filters) => handleNestedFiltersChange(input.name, filters)
+                                          : undefined
+                                      }
+                                      disabled={isExecuting}
+                                      formValues={effectiveValues}
+                                      schemaDefs={process.$defs}
+                                      processId={processId}
+                                      onValidationChange={(hasError) => handleFieldValidation(input.name, hasError)}
+                                    />
+                                  </Box>
+                                ))}
+                              </Stack>
+                            )
+                          )}
                         </Stack>
                       ) : undefined
                     }

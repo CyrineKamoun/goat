@@ -3,12 +3,13 @@
  *
  * Routes to the appropriate input component based on the inferred input type.
  */
-import { Typography } from "@mui/material";
+import { Divider, Stack, Typography } from "@mui/material";
 
 import type { OGCInputSchema, ProcessedInput } from "@/types/map/ogc-processes";
 
 import ArrayInput from "@/components/map/panels/toolbox/generic/inputs/ArrayInput";
 import BooleanInput from "@/components/map/panels/toolbox/generic/inputs/BooleanInput";
+import ChipsInput from "@/components/map/panels/toolbox/generic/inputs/ChipsInput";
 import EnumInput from "@/components/map/panels/toolbox/generic/inputs/EnumInput";
 import FieldInput from "@/components/map/panels/toolbox/generic/inputs/FieldInput";
 import FieldStatisticsInput from "@/components/map/panels/toolbox/generic/inputs/FieldStatisticsInput";
@@ -44,6 +45,8 @@ interface GenericInputProps {
   predictedColumns?: Record<string, Record<string, string>>;
   /** Process ID for tool-specific input overrides */
   processId?: string;
+  /** Callback when field validation state changes */
+  onValidationChange?: (hasError: boolean) => void;
 }
 
 // Stable empty object reference to avoid creating new references on each render
@@ -62,6 +65,7 @@ export default function GenericInput({
   layerDatasetIds,
   predictedColumns,
   processId,
+  onValidationChange,
 }: GenericInputProps) {
   // Ensure formValues is always an object (handles explicit undefined) - use stable reference
   const safeFormValues = formValues && Object.keys(formValues).length > 0 ? formValues : EMPTY_FORM_VALUES;
@@ -70,7 +74,9 @@ export default function GenericInput({
     return <OevStationConfigInput input={input} value={value} onChange={onChange} disabled={disabled} />;
   }
 
-  switch (input.inputType) {
+  const groupLabel = input.uiMeta?.group_label;
+
+  const renderInput = () => { switch (input.inputType) {
     case "layer":
       return (
         <LayerInput
@@ -158,6 +164,8 @@ export default function GenericInput({
           value={value as number | undefined}
           onChange={onChange}
           disabled={disabled}
+          formValues={safeFormValues}
+          onValidationChange={onValidationChange}
         />
       );
 
@@ -188,6 +196,18 @@ export default function GenericInput({
           value={value as string | undefined}
           onChange={onChange}
           disabled={disabled}
+        />
+      );
+
+    case "chips":
+      return (
+        <ChipsInput
+          input={input}
+          value={value as number[] | undefined}
+          onChange={onChange}
+          disabled={disabled}
+          formValues={safeFormValues}
+          onValidationChange={onValidationChange}
         />
       );
 
@@ -235,5 +255,20 @@ export default function GenericInput({
           Unknown input type: {input.title}
         </Typography>
       );
+  }};
+
+  if (groupLabel) {
+    return (
+      <Stack spacing={1}>
+        <Divider>
+          <Typography variant="caption" fontWeight={600} color="text.secondary">
+            {groupLabel}
+          </Typography>
+        </Divider>
+        {renderInput()}
+      </Stack>
+    );
   }
+
+  return renderInput();
 }

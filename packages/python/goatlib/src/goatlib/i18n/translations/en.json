@@ -102,7 +102,7 @@
   },
   "fields": {
     "routing_mode": {
-      "label": "Transport Mode",
+      "label": "Transport mode",
       "description": "Select the transport mode for accessibility analysis"
     },
     "routing_pt_mode": {
@@ -113,12 +113,28 @@
       "label": "Travel time limit (Min)",
       "description": "Define the maximum travel time in minutes"
     },
+    "limit": {
+      "label": "Limit",
+      "description": "Maximum travel budget"
+    },
     "steps": {
-      "label": "Number of breaks (Steps)",
-      "description": "Define the number of breaks"
+      "label": "Number of steps",
+      "description": "Define the number of steps"
+    },
+    "step_sizes": {
+      "label": "Step sizes",
+      "description": "Step size intervals for the catchment area"
+    },
+    "advanced_options": {
+      "label": "Advanced options",
+      "description": "Show advanced configuration options"
+    },
+    "point_grid_layer": {
+      "label": "Point grid layer",
+      "description": "Select a point layer to use as the grid"
     },
     "speed": {
-      "label": "Travel speed (Km/h)",
+      "label": "Travel speed (km/h)",
       "description": "Define the travel speed"
     },
     "access_mode": {
@@ -131,11 +147,11 @@
     },
     "catchment_area_type": {
       "label": "Catchment area shape",
-      "description": "Select the shape of the catchment area geometry."
+      "description": "Select the shape of the catchment area geometry"
     },
-    "polygon_difference": {
-      "label": "Polygon Difference",
-      "description": "If enabled, polygons show the difference between consecutive steps"
+    "steps_style": {
+      "label": "Steps style",
+      "description": "How steps are displayed in the output"
     },
     "choose_pt_mode": {
       "label": "Choose PT Modes",
@@ -458,7 +474,7 @@
       "description": "Statistical operation to perform"
     },
     "measure_type": {
-      "label": "Catchment area type",
+      "label": "Calculate by",
       "description": "Calculate catchment area by time or distance"
     },
     "max_distance": {
@@ -646,7 +662,7 @@
       "description": "Statistics to calculate for matching records"
     },
     "result_layer_name": {
-      "label": "Result Layer Name",
+      "label": "Result layer name",
       "description": "Custom name for the result layer"
     },
     "summary_layer_name": {
@@ -654,7 +670,7 @@
       "description": "Custom name for the cluster summary layer"
     },
     "starting_points_layer_name": {
-      "label": "Starting Points Layer Name",
+      "label": "Starting points layer name",
       "description": "Custom name for the starting points layer"
     },
     "lines_layer_name": {
@@ -671,6 +687,14 @@
     }
   },
   "enums": {
+    "cost_type": {
+      "time": "Time (min)",
+      "distance": "Distance (m)"
+    },
+    "steps_style": {
+      "separate": "Separate steps",
+      "cumulative": "Cumulative steps"
+    },
     "routing_mode": {
       "walking": "Walking",
       "bicycle": "Bicycle",
@@ -772,7 +796,9 @@
     "catchment_area_type": {
       "polygon": "Polygon",
       "network": "Network",
-      "rectangular_grid": "Hexagonal Grid"
+      "hexagonal_grid": "Hexagonal grid",
+      "rectangular_grid": "Hexagonal grid",
+      "point_grid": "Point grid"
     },
     "aggregation_area_type": {
       "polygon": "Polygon",

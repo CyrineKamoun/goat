@@ -118,7 +118,7 @@ const AutocompleteLayerValue = (props: AutocompleteLayerValueProps) => {
           if (reason === "input") {
             setSearchText(newInputValue);
             debouncedSetSearchText(newInputValue);
-          } else if (reason === "reset" || reason === "clear") {
+          } else if (reason === "clear") {
             setSearchText("");
             debouncedSetSearchText("");
           }

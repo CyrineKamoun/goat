@@ -29,6 +29,11 @@ class RoutingSettings(BaseSettingsModel):
     # GOAT Routing service
     goat_routing_url: str = "http://localhost:8200/api/v2/routing"
 
+    # Local C++ routing backend paths
+    street_network_edges_base_path: str = "/app/data/street_network/edges"
+    street_network_nodes_base_path: str = "/app/data/street_network/nodes"
+    pt_network_base_path: str = "/app/data/pt_network"
+
     # R5 service
     r5_url: str = "http://localhost:7070"
     r5_variant_index: int = -1

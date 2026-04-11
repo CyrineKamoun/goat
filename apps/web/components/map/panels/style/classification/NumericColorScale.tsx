@@ -72,7 +72,7 @@ const NumericColorScale = (props: NumericColorScaleProps) => {
   }
 
   return (
-    <Box sx={{ pt: 3, pb: 3, pl: 3, pr: 0 }}>
+    <Box sx={{ pt: 3, pb: 3, pl: 3, pr: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <Box sx={{ pr: 3 }}>
       <Select
         fullWidth
@@ -107,7 +107,7 @@ const NumericColorScale = (props: NumericColorScaleProps) => {
         </Typography>
       </Stack>
       </Box>
-      <Box sx={{ maxHeight: "300px", overflowY: "auto", pt: 2 }}>
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", pt: 2 }}>
         <Stack spacing={1} sx={{ pr: 3 }}>
           {colorMapValues &&
             colorMapValues.map((colorMapValue, index) => (
