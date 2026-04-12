@@ -517,22 +517,11 @@ export default function MapPage({ params: { projectId } }) {
                           padding: mapMode === "builder" ? "20px" : "0",
                           width: "100%",
                           height: "100%",
+                          position: "relative",
                         }}>
                         <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
-                          {mapMode === "builder" && (
-                            <Box
-                              sx={{
-                                position: "absolute",
-                                inset: "20px",
-                              }}>
-                              <PublicProjectLayout
-                                projectLayers={widgetProjectLayers}
-                                project={project}
-                                onProjectUpdate={handleProjectUpdate}
-                              />
-                            </Box>
-                          )}
                           <MapViewer
+                            containerSx={{ zIndex: 0 }}
                             layers={projectLayers}
                             mapRef={mapRef}
                             scenarioFeatures={scenarioFeatures}
@@ -554,6 +543,21 @@ export default function MapPage({ params: { projectId } }) {
                           />
                           <DataPanel projectLayers={allProjectLayersIncludingTables} />
                         </Box>
+                        {mapMode === "builder" && (
+                          <Box
+                            sx={{
+                              position: "absolute",
+                              inset: "20px",
+                              zIndex: 1,
+                              pointerEvents: "none",
+                            }}>
+                            <PublicProjectLayout
+                              projectLayers={widgetProjectLayers}
+                              project={project}
+                              onProjectUpdate={handleProjectUpdate}
+                            />
+                          </Box>
+                        )}
                       </Box>
                     )}
                     {mapMode === "builder" && (

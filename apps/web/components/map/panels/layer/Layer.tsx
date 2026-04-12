@@ -36,6 +36,7 @@ import {
   useProjectScenarioFeatures,
   useProjectScenarios,
 } from "@/lib/api/projects";
+import { useUserProfile } from "@/lib/api/users";
 import { startEditing } from "@/lib/store/featureEditor/slice";
 import { setActiveLayer } from "@/lib/store/layer/slice";
 import {
@@ -296,6 +297,7 @@ const LayerPanel = ({ projectId }: PanelProps) => {
   const { t } = useTranslation("common");
   const { map } = useMap();
   const dispatch = useAppDispatch();
+  const { userProfile } = useUserProfile();
   const [previousRightPanel, setPreviousRightPanel] = useState<MapSidebarItemID | undefined>(undefined);
   const activeLayerId = useAppSelector((state) => state.layers.activeLayerId);
   const activeRightPanel = useAppSelector((state) => state.map.activeRightPanel);
@@ -646,7 +648,7 @@ const LayerPanel = ({ projectId }: PanelProps) => {
                             </Tooltip>
                           )}
                           <MoreMenu
-                            menuItems={getLayerMoreMenuOptions(layer.type, !!layer.charts, layer.in_catalog)}
+                            menuItems={getLayerMoreMenuOptions(layer.type, !!layer.charts, layer.in_catalog, false, layer.user_id === userProfile?.id)}
                             menuButton={
                               <Tooltip title={t("more_options")} arrow placement="top">
                                 <IconButton size="small">

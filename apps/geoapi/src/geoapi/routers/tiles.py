@@ -1,11 +1,13 @@
 """Tiles router for OGC Tiles API endpoints."""
 
+import hashlib
+import json
 import logging
 import time
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path, Query, Request, Response
+from fastapi import APIRouter, HTTPException, Header, Path, Query, Request, Response
 
 from geoapi.dependencies import (
     BBoxDep,
@@ -27,6 +29,31 @@ from geoapi.services.layer_service import layer_service
 from geoapi.services.tile_service import tile_service
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Per-layer version registry for ETag-based caching of dynamic tiles.
+#
+# Each write (feature create/update/delete, column change) bumps the version
+# via bump_layer_version().  The tile endpoint uses get_layer_version() to
+# build a cheap ETag and can return 304 when the browser already has the
+# latest tile.
+#
+# PMTiles are immutable files and keep using max-age=3600 without ETags.
+# ---------------------------------------------------------------------------
+_layer_versions: dict[str, int] = {}
+_version_counter = int(time.time())
+
+
+def bump_layer_version(layer_id: str) -> None:
+    """Increment the version for a layer after a data write."""
+    global _version_counter
+    _version_counter += 1
+    _layer_versions[layer_id.replace("-", "")] = _version_counter
+
+
+def get_layer_version(layer_id: str) -> int:
+    """Return current version for a layer (0 if never bumped)."""
+    return _layer_versions.get(layer_id.replace("-", ""), 0)
 
 router = APIRouter(tags=["Tiles"])
 
@@ -58,6 +85,7 @@ async def get_tile(
     limit: int = Query(default=None, ge=1, le=100000, description="Max features"),
     label: bool = Query(default=False, description="Merge polygon label anchor points into tile response"),
     dynamic: bool = Query(default=False, description="Force dynamic tile generation, bypassing PMTiles"),
+    if_none_match: str | None = Header(default=None, alias="if-none-match"),
 ) -> Response:
     """Get a vector tile for the specified collection and tile coordinates."""
     request_id = str(uuid.uuid4())[:8]
@@ -150,6 +178,28 @@ async def get_tile(
     if not metadata.has_geometry:
         raise HTTPException(status_code=400, detail="Collection has no geometry column")
 
+    # --- ETag check: skip tile generation if client already has current version ---
+    layer_ver = get_layer_version(layer_id)
+    # Include filter/bbox in the ETag so different queries are cached separately
+    etag_seed = f"{layer_id}:{layer_ver}"
+    if cql_filter:
+        etag_seed += f":f={json.dumps(cql_filter, sort_keys=True)}"
+    if bbox:
+        etag_seed += f":b={bbox}"
+    etag = f'W/"{hashlib.md5(etag_seed.encode()).hexdigest()[:16]}"'
+
+    if if_none_match and if_none_match.strip() == etag:
+        elapsed_ms = (time.monotonic() - start_time) * 1000
+        return Response(
+            status_code=304,
+            headers={
+                "ETag": etag,
+                "Cache-Control": "no-cache",
+                "X-Request-ID": request_id,
+                "X-Response-Time": f"{elapsed_ms:.1f}ms",
+            },
+        )
+
     columns = metadata.columns
     geometry_column = metadata.geometry_column or "geometry"
 
@@ -181,6 +231,8 @@ async def get_tile(
         return Response(
             status_code=204,
             headers={
+                "ETag": etag,
+                "Cache-Control": "no-cache",
                 "X-Request-ID": request_id,
                 "X-Response-Time": f"{elapsed_ms:.1f}ms",
             },
@@ -189,7 +241,8 @@ async def get_tile(
     tile_data, is_gzip, source = result
     elapsed_ms = (time.monotonic() - start_time) * 1000
     headers = {
-        "Cache-Control": "public, max-age=3600",
+        "Cache-Control": "no-cache",
+        "ETag": etag,
         "X-Tile-Source": source,
         "X-Request-ID": request_id,
         "X-Response-Time": f"{elapsed_ms:.1f}ms",

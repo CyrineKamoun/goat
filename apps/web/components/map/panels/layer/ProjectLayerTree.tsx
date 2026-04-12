@@ -29,6 +29,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 // ----------------------------------------------------------------------
 // Redux
 import { useProject, useProjectScenarioFeatures } from "@/lib/api/projects";
+import { useUserProfile } from "@/lib/api/users";
 import { startEditing } from "@/lib/store/featureEditor/slice";
 import { setSelectedLayers } from "@/lib/store/layer/slice";
 import { setActiveRightPanel, setDataPanelLayerId, setIsDataPanelOpen } from "@/lib/store/map/slice";
@@ -381,6 +382,7 @@ export const ProjectLayerTree = ({
   const mapRef = useRef(map);
   mapRef.current = map;
   const dispatch = useAppDispatch();
+  const { userProfile } = useUserProfile();
   // Only subscribe to currentZoom when dimming is enabled and in view mode
   const currentZoom = useAppSelector((state) => (dimOutOfZoom && viewMode === "view" ? state.map.currentZoom : undefined));
 
@@ -450,6 +452,7 @@ export const ProjectLayerTree = ({
         properties: layer.properties,
         query: layer.query,
         other_properties: layer.other_properties,
+        user_id: layer.user_id,
       });
     });
 
@@ -647,7 +650,9 @@ export const ProjectLayerTree = ({
       menuOptions = getLayerMoreMenuOptions(
         (node.layer_type as "table" | "feature" | "raster") || "feature",
         !!node.query,
-        false
+        false,
+        false,
+        node.user_id === userProfile?.id,
       );
     }
 

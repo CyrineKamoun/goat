@@ -70,6 +70,7 @@ import { useMap } from "react-map-gl/maplibre";
 import useLayerFields from "@/hooks/map/CommonHooks";
 
 import { useProjectLayers } from "@/lib/api/projects";
+import { useUserProfile } from "@/lib/api/users";
 import ColumnStatsPanel from "@/components/map/panels/ColumnStatsPanel";
 import QuickFilterPopover from "@/components/map/panels/QuickFilterPopover";
 import ConfirmModal from "@/components/modals/Confirm";
@@ -104,6 +105,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   const dispatch = useAppDispatch();
   const { map } = useMap();
   const { projectId } = useParams();
+  const { userProfile } = useUserProfile();
   const { layers: projectLayers, mutate: mutateProjectLayers } = useProjectLayers(projectId as string);
   const activeRightPanel = useAppSelector((state) => state.map.activeRightPanel);
   const editLayerId = useAppSelector((state) => state.featureEditor.activeLayerId);
@@ -624,33 +626,35 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           sx={{ textTransform: "none", whiteSpace: "nowrap" }}>
           {t("add_field", { defaultValue: "Add a field" })}
         </Button>
-        <Button
-          size="small"
-          variant="outlined"
-          color={isEditing ? "error" : "primary"}
-          startIcon={isEditing ? <CloseIcon /> : <EditIcon />}
-          onClick={() => {
-            if (isEditing) {
-              if (pendingCount > 0) {
-                setStopEditConfirmOpen(true);
+        {(isEditing || projectLayer.user_id === userProfile?.id) && (
+          <Button
+            size="small"
+            variant="outlined"
+            color={isEditing ? "error" : "primary"}
+            startIcon={isEditing ? <CloseIcon /> : <EditIcon />}
+            onClick={() => {
+              if (isEditing) {
+                if (pendingCount > 0) {
+                  setStopEditConfirmOpen(true);
+                } else {
+                  dispatch(stopEditing());
+                }
               } else {
-                dispatch(stopEditing());
+                dispatch(startEditing({
+                  layerId,
+                  geometryType: projectLayer.feature_layer_geometry_type as "point" | "line" | "polygon" | null ?? null,
+                }));
               }
-            } else {
-              dispatch(startEditing({
-                layerId,
-                geometryType: projectLayer.feature_layer_geometry_type as "point" | "line" | "polygon" | null ?? null,
-              }));
-            }
-          }}
-          sx={{ textTransform: "none", whiteSpace: "nowrap" }}>
-          {isEditing ? t("stop_editing") : (
-            <>
-              {t("edit_features")}
-              <Chip label="Beta" size="small" sx={{ ml: 1, height: 18, fontSize: "0.65rem", fontWeight: 600 }} />
-            </>
-          )}
-        </Button>
+            }}
+            sx={{ textTransform: "none", whiteSpace: "nowrap" }}>
+            {isEditing ? t("stop_editing") : (
+              <>
+                {t("edit_features")}
+                <Chip label="Beta" size="small" sx={{ ml: 1, height: 18, fontSize: "0.65rem", fontWeight: 600 }} />
+              </>
+            )}
+          </Button>
+        )}
 
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
 

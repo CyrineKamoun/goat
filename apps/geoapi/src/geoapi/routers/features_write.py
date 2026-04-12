@@ -26,6 +26,7 @@ from geoapi.models import (
     FeatureUpdate,
     FeatureWriteResponse,
 )
+from geoapi.routers.tiles import bump_layer_version
 from geoapi.services.feature_write_service import feature_write_service
 from geoapi.services.layer_service import LayerMetadata, _metadata_cache, layer_service
 from geoapi.services.tile_service import tile_service
@@ -60,7 +61,7 @@ async def _get_authorized_metadata(
 
     # Verify ownership: compare user_id from metadata with authenticated user
     user_id_hex = str(user_id).replace("-", "")
-    if metadata.user_id and metadata.user_id != user_id_hex:
+    if not metadata.user_id or metadata.user_id != user_id_hex:
         raise HTTPException(
             status_code=403,
             detail="You do not have permission to modify this layer",
@@ -78,6 +79,9 @@ def _invalidate_caches(layer_id: str) -> None:
     layer_id_clean = layer_id.replace("-", "")
     _metadata_cache.pop(layer_id_clean, None)
     _metadata_cache.pop(layer_id, None)
+
+    # Bump in-memory version so dynamic tile ETags change
+    bump_layer_version(layer_id)
 
     logger.debug("Caches invalidated for layer %s", layer_id)
 
@@ -106,7 +110,9 @@ async def _invalidate_caches_and_pmtiles(layer_info: LayerInfo) -> None:
     tile_service.invalidate_pmtiles_path_cache(layer_info.layer_id)
     tile_service.invalidate_pmtiles_cache(layer_info.schema_name, layer_info.table_name)
 
-    # Update updated_at in core PostgreSQL so clients know the layer changed
+    # Update updated_at in core PostgreSQL so clients know the layer changed.
+    # Both layer and layer_project must be updated because the frontend reads
+    # updated_at from the project layers endpoint (which joins layer_project).
     try:
         pool = layer_service._pool
         if pool:
@@ -116,6 +122,10 @@ async def _invalidate_caches_and_pmtiles(layer_info: LayerInfo) -> None:
                 layer_uuid = f"{layer_uuid[:8]}-{layer_uuid[8:12]}-{layer_uuid[12:16]}-{layer_uuid[16:20]}-{layer_uuid[20:]}"
             await pool.execute(
                 "UPDATE customer.layer SET updated_at = NOW() WHERE id = $1::uuid",
+                layer_uuid,
+            )
+            await pool.execute(
+                "UPDATE customer.layer_project SET updated_at = NOW() WHERE layer_id = $1::uuid",
                 layer_uuid,
             )
             logger.debug("Updated updated_at for layer %s", layer_info.layer_id)

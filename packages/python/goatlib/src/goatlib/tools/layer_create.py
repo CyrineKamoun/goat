@@ -4,6 +4,7 @@ Creates empty layers (with or without geometry) in DuckLake storage.
 Users define a layer name, optional geometry type, and custom field definitions.
 """
 
+import json
 import logging
 from pathlib import Path
 from typing import Any, Literal, Self
@@ -109,18 +110,43 @@ class LayerCreateToolRunner(BaseToolRunner[LayerCreateParams]):
         geometry_type_name: str | None = None
 
         if params.geometry_type is not None:
-            # Geometry layer: use geopandas to produce valid GeoParquet
-            import geopandas as gpd
-
+            # Geometry layer: build GeoParquet directly via PyArrow.
+            # Using geopandas with empty DataFrames loses column types
+            # (empty lists default to float64), so we construct the
+            # Arrow table with an explicit schema instead.
             geometry_type_name = GEOMETRY_TYPE_MAP[params.geometry_type]
 
-            # Create empty GeoDataFrame with proper CRS
-            data = {f.name: pa.array([], type=FIELD_TYPE_MAP[f.type]).to_pylist() for f in params.fields}
-            gdf = gpd.GeoDataFrame(
-                data,
-                geometry=gpd.GeoSeries([], crs="EPSG:4326"),
+            # Build an empty Arrow table with the user fields + geometry
+            geo_field = pa.field(
+                "geometry", pa.binary(),
+                metadata={
+                    b"ARROW:extension:name": b"geoarrow.wkb",
+                    b"ARROW:extension:metadata": b'{"crs":{"type":"GeographicCRS","name":"WGS 84","datum":{"type":"GeodeticReferenceFrame","name":"World Geodetic System 1984","ellipsoid":{"name":"WGS 84","semi_major_axis":6378137,"inverse_flattening":298.257223563}},"coordinate_system":{"type":"ellipsoidal","axis":[{"name":"Geodetic latitude","abbreviation":"Lat","direction":"north","unit":"degree"},{"name":"Geodetic longitude","abbreviation":"Lon","direction":"east","unit":"degree"}]},"id":{"authority":"EPSG","code":4326}}}',
+                },
             )
-            gdf.to_parquet(str(output_path))
+            full_schema = pa.schema(pa_fields + [geo_field])
+            # Add GeoParquet metadata
+            geo_metadata = {
+                "version": "1.1.0",
+                "primary_column": "geometry",
+                "columns": {
+                    "geometry": {
+                        "encoding": "WKB",
+                        "geometry_types": [geometry_type_name],
+                        "crs": None,  # CRS is in the Arrow extension metadata
+                    }
+                },
+            }
+            existing_meta = full_schema.metadata or {}
+            existing_meta[b"geo"] = json.dumps(geo_metadata).encode()
+            full_schema = full_schema.with_metadata(existing_meta)
+
+            empty_arrays = [pa.array([], type=f.type) for f in full_schema]
+            table = pa.table(
+                {f.name: arr for f, arr in zip(full_schema, empty_arrays)},
+                schema=full_schema,
+            )
+            pq.write_table(table, str(output_path))
         else:
             # Table layer: plain Parquet via pyarrow
             schema = pa.schema(pa_fields)
