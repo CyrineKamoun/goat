@@ -251,7 +251,7 @@ export default function ThumbnailPage() {
           style={{ width: THUMBNAIL_WIDTH, height: THUMBNAIL_HEIGHT }}
           attributionControl={false}
           logoPosition="bottom-left"
-          preserveDrawingBuffer // Required for screenshot
+          canvasContextAttributes={{ preserveDrawingBuffer: true }} // Required for screenshot
           onLoad={handleMapLoad}
           interactive={false} // Disable interactivity for thumbnails
         >

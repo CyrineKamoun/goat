@@ -25,6 +25,7 @@ export enum MapSidebarItemID {
   STYLE = "style",
   TOOLBOX = "toolbox",
   SCENARIO = "scenario",
+  FEATURE_EDITOR = "feature_editor",
 }
 
 export type SelectorItem = {

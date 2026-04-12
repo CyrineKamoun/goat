@@ -128,15 +128,15 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
         filtered = filtered.filter((layer) => layer.id !== covLayerId);
       } else if (atlasPage.filterToCurrentFeature && atlasPage.feature) {
         // Filter coverage layer to only show the current feature
+        // Use _rowid virtual property which the CQL evaluator maps to DuckDB's rowid
         const currentFeatureId = atlasPage.feature.id;
         const idFilter = {
           op: "=",
-          args: [{ property: "id" }, currentFeatureId],
+          args: [{ property: "_rowid" }, currentFeatureId],
         };
         filtered = filtered.map((layer) => {
           if (layer.id !== covLayerId) return layer;
           const existingCql = layer.query?.cql;
-          // Combine with existing CQL filter if present
           const combinedCql = existingCql
             ? { op: "and", args: [existingCql, idFilter] }
             : idFilter;
@@ -438,7 +438,7 @@ const MapElementRenderer: React.FC<MapElementRendererProps> = ({
             onLoad={handleMapLoad}
             onIdle={handleMapIdle}
             interactive={isNavigationMode}
-            preserveDrawingBuffer={true}>
+            canvasContextAttributes={{ preserveDrawingBuffer: true }}>
             {visibleLayers.length > 0 && <Layers layers={visibleLayers} />}
           </Map>
         </Box>

@@ -547,7 +547,6 @@ class PMTilesGenerator:
 
         # Get actual columns and their types from the table
         columns_to_exclude: set[str] = set(exclude_columns)
-        has_id_column = False
         try:
             # Use SELECT LIMIT 0 to get column info without fetching data
             # This works better with DuckLake than DESCRIBE
@@ -558,10 +557,6 @@ class PMTilesGenerator:
             for col_info in result:
                 col_name = col_info[0]
                 col_type = col_info[1] if len(col_info) > 1 else ""
-
-                # Check if table has an 'id' column
-                if col_name.lower() == "id":
-                    has_id_column = True
 
                 col_type_lower = str(col_type).lower()
                 # Exclude complex types that GeoJSON/tippecanoe can't handle
@@ -589,15 +584,11 @@ class PMTilesGenerator:
             exclude_clause = f"EXCLUDE({', '.join(sorted(columns_to_exclude))})"
             logger.debug(f"Excluding columns from GeoJSON export: {columns_to_exclude}")
 
-        # If no 'id' column exists, generate one from rowid for feature highlighting
-        id_select = ""
-        if not has_id_column:
-            id_select = "rowid AS id, "
-            logger.debug("Adding synthetic 'id' column from rowid for highlighting")
-
+        # Include rowid+1 as _rowid — tippecanoe will promote it to MVT feature ID.
+        # +1 because MVT feature ID 0 is treated as "unset" by MapLibre.
         sql = f"""
             COPY (
-                SELECT {id_select}* {exclude_clause}
+                SELECT rowid + 1 AS _rowid, * {exclude_clause}
                 FROM {table_name}
             ) TO '{output_path}' WITH (FORMAT GDAL, DRIVER 'GeoJSON')
         """
@@ -659,8 +650,8 @@ class PMTilesGenerator:
             f"-z{max_zoom}",
             "--generate-variable-depth-tile-pyramid",  # Only generate tiles where needed
             "--full-detail=16",
-            # Note: Don't use --use-attribute-for-id as it removes id from properties
-            # The frontend filter uses ["in", "id", ...] which needs properties.id
+            "--use-attribute-for-id=_rowid",  # Promote _rowid to MVT feature ID
+            "--exclude=_rowid",  # Ensure _rowid is removed from properties
         ]
 
         # For label anchor generation, convert polygons to optimal label points

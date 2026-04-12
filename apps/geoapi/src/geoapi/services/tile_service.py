@@ -1082,6 +1082,7 @@ class TileService:
         columns: Optional[list[dict]] = None,
         geometry_column: str = "geometry",
         geometry_type: Optional[str] = None,
+        force_dynamic: bool = False,
     ) -> Optional[tuple[bytes, bool, str]]:
         """Generate MVT tile for a layer.
 
@@ -1102,8 +1103,8 @@ class TileService:
             Tuple of (MVT tile bytes, is_gzip_compressed, source) or None if empty
             source is 'pmtiles' or 'geoparquet'
         """
-        # If CQL filter or bbox is provided, use dynamic GeoParquet generation
-        if cql_filter or bbox:
+        # If CQL filter, bbox, or force_dynamic is set, use dynamic GeoParquet generation
+        if cql_filter or bbox or force_dynamic:
             # Run in thread pool to avoid blocking the event loop
             loop = asyncio.get_event_loop()
             tile_data = await loop.run_in_executor(
@@ -1324,30 +1325,22 @@ class TileService:
             f"'EPSG:4326', 'EPSG:3857', always_xy := true), ST_Extent(bounds.bbox3857))"
         ]
 
-        # Add id field - use actual id if exists, otherwise use DuckLake's rowid
-        if has_id_column:
-            struct_fields.append('"id" := candidates."id"')
-        else:
-            # Use DuckLake's built-in rowid which is stable and globally unique
-            struct_fields.append('"id" := candidates.rowid')
+        # Include rowid+1 as _rowid — promoted to MVT feature ID via ST_AsMVT's feature_id_name.
+        # +1 because MVT feature ID 0 is treated as "unset" by MapLibre.
+        struct_fields.append('"_rowid" := candidates.rowid + 1')
 
+        # Include all property columns (including original 'id' if present)
         for col in prop_cols:
-            # Skip id since we handle it separately above
-            if col != "id":
-                struct_fields.append(f'"{col}" := candidates."{col}"')
+            struct_fields.append(f'"{col}" := candidates."{col}"')
         struct_pack_args = ", ".join(struct_fields)
 
-        # Build MVT query following working pattern:
-        # 1. bounds CTE: compute tile envelope in both projections
-        # 2. candidates CTE: filter data using bbox (no ST_AsMVTGeom here)
-        # 3. Final SELECT: ST_AsMVT with ST_AsMVTGeom inside struct_pack
+        # Build MVT query
         select_clause = f'"{geom_col}"'
         if select_props:
             select_clause += f", {select_props}"
 
-        # Add rowid to select clause if no id column exists (for stable IDs)
-        if not has_id_column:
-            select_clause += ", rowid"
+        # Always include rowid in the candidates CTE
+        select_clause += ", rowid"
 
         # Check if table has bbox column for fast row group pruning
         # Support both legacy scalar columns ($minx, etc.) and GeoParquet 1.1 struct bbox
@@ -1399,7 +1392,10 @@ class TileService:
                 )
                 SELECT ST_AsMVT(
                     struct_pack({struct_pack_args}),
-                    'default'
+                    'default',
+                    4096,
+                    'geometry',
+                    '_rowid'
                 )
                 FROM candidates, bounds
             """
@@ -1419,7 +1415,10 @@ class TileService:
                 )
                 SELECT ST_AsMVT(
                     struct_pack({struct_pack_args}),
-                    'default'
+                    'default',
+                    4096,
+                    'geometry',
+                    '_rowid'
                 )
                 FROM candidates, bounds
             """
@@ -1510,8 +1509,8 @@ class TileService:
             f"struct_pack({struct_pack_args})",
             f"struct_pack({anchor_struct})",
         ).replace(
-            "'default'",
-            "'default_anchor'",
+            "'default',\n                    4096,\n                    'geometry',\n                    '_rowid'",
+            "'default_anchor',\n                    4096,\n                    'geometry',\n                    '_rowid'",
         )
 
         try:

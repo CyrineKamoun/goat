@@ -315,15 +315,15 @@ class TestBuildIdFilter:
     """Tests for build_id_filter function."""
 
     def test_build_id_filter(self):
-        """Test building ID filter."""
-        filters = build_id_filter(["a", "b", "c"])
+        """Test building rowid filter with feature_id = rowid + 1."""
+        filters = build_id_filter(["1", "2", "3"])
 
         assert len(filters.clauses) == 1
-        assert "IN" in filters.clauses[0]
-        assert filters.params == ["a", "b", "c"]
+        assert "rowid IN" in filters.clauses[0]
+        assert filters.params == [0, 1, 2]
 
     def test_build_id_filter_empty(self):
-        """Test building ID filter with empty list."""
+        """Test building rowid filter with empty list."""
         filters = build_id_filter([])
 
         assert len(filters.clauses) == 0

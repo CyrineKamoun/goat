@@ -29,8 +29,9 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 // ----------------------------------------------------------------------
 // Redux
 import { useProject, useProjectScenarioFeatures } from "@/lib/api/projects";
+import { startEditing } from "@/lib/store/featureEditor/slice";
 import { setSelectedLayers } from "@/lib/store/layer/slice";
-import { setActiveRightPanel } from "@/lib/store/map/slice";
+import { setActiveRightPanel, setDataPanelLayerId, setIsDataPanelOpen } from "@/lib/store/map/slice";
 import { rgbToHex } from "@/lib/utils/helpers";
 import { zoomToLayer, zoomToProjectLayer } from "@/lib/utils/map/navigate";
 // API & Store
@@ -55,6 +56,7 @@ import CatalogExplorerModal from "@/components/modals/CatalogExplorer";
 import ContentDialogWrapper from "@/components/modals/ContentDialogWrapper";
 import DatasetExplorerModal from "@/components/modals/DatasetExplorer";
 import DatasetExternalModal from "@/components/modals/DatasetExternal";
+import CreateLayerModal from "@/components/modals/CreateLayer";
 import DatasetUploadModal from "@/components/modals/DatasetUpload";
 import MapLayerChartModal from "@/components/modals/MapLayerChart";
 import ProjectLayerDeleteModal from "@/components/modals/ProjectLayerDelete";
@@ -95,6 +97,7 @@ export const AddLayerButton = ({
     { type: AddLayerSourceType.DatasourceUpload, icon: ICON_NAME.UPLOAD, label: t("dataset_upload") },
     { type: AddLayerSourceType.DataSourceExternal, icon: ICON_NAME.LINK, label: t("dataset_external") },
     { type: AddLayerSourceType.CatalogExplorer, icon: ICON_NAME.GLOBE, label: t("catalog_explorer") },
+    { type: AddLayerSourceType.CreateEmptyLayer, icon: ICON_NAME.PLUS, label: t("create_layer") },
   ];
   return (
     <>
@@ -137,6 +140,9 @@ export const AddLayerButton = ({
       )}
       {addSourceType === AddLayerSourceType.CatalogExplorer && (
         <CatalogExplorerModal open={true} onClose={() => setAddSourceType(null)} projectId={projectId} />
+      )}
+      {addSourceType === AddLayerSourceType.CreateEmptyLayer && (
+        <CreateLayerModal open={true} onClose={() => setAddSourceType(null)} projectId={projectId} />
       )}
     </>
   );
@@ -388,6 +394,7 @@ export const ProjectLayerTree = ({
   const activeLayerId = useAppSelector((state) => state.layers.activeLayerId);
   const activeRightPanel = useAppSelector((state) => state.map.activeRightPanel);
   const selectedLayerIds = useAppSelector((state) => state.layers.selectedLayerIds || []);
+  const mapMode = useAppSelector((state) => state.map.mapMode);
 
   const {
     getLayerMoreMenuOptions,
@@ -556,6 +563,11 @@ export const ProjectLayerTree = ({
       .filter((id) => id !== undefined);
     dispatch(setSelectedLayers(realIds));
 
+    // Always sync data panel layer — if the panel is closed, this is a no-op
+    if (realIds.length === 1) {
+      dispatch(setDataPanelLayerId(realIds[0]));
+    }
+
     if (isEditMode && realIds.length > 0) {
       // Get the first selected layer to determine default panel
       const firstSelectedItem = items.find((i) => {
@@ -642,6 +654,11 @@ export const ProjectLayerTree = ({
     // Filter menu options based on view mode
     if (viewMode === "view") {
       menuOptions = filterMenuForViewMode(menuOptions);
+    }
+
+    // Edit features only available in data (map) mode
+    if (mapMode !== "data") {
+      menuOptions = menuOptions.filter((item) => item.id !== MapLayerActions.EDIT_FEATURES);
     }
 
     // Filter menu options based on allowedActions
@@ -750,7 +767,14 @@ export const ProjectLayerTree = ({
                             if (opt.id === MapLayerActions.PROPERTIES) handleProperties(target);
                             else if (opt.id === MapLayerActions.STYLE) handleStyle(target);
                             else if (opt.id === MapLayerActions.DUPLICATE) handleDuplicate(target);
-                            else openMoreMenu(opt, target);
+                            else if (opt.id === ContentActions.TABLE) {
+                              if (mapMode === "data") {
+                                dispatch(setDataPanelLayerId(target.id));
+                                dispatch(setIsDataPanelOpen(true));
+                              } else {
+                                openMoreMenu(opt, target);
+                              }
+                            } else openMoreMenu(opt, target);
                           }
                         };
                         await handleAction();
@@ -793,6 +817,18 @@ export const ProjectLayerTree = ({
                     handleStyle(target);
                   } else if (menuItem.id === MapLayerActions.DUPLICATE) {
                     handleDuplicate(target);
+                  } else if (menuItem.id === MapLayerActions.EDIT_FEATURES) {
+                    dispatch(startEditing({
+                      layerId: target.layer_id,
+                      geometryType: target.feature_layer_geometry_type ?? null,
+                    }));
+                  } else if (menuItem.id === ContentActions.TABLE) {
+                    if (mapMode === "data") {
+                      dispatch(setDataPanelLayerId(target.id));
+                      dispatch(setIsDataPanelOpen(true));
+                    } else {
+                      openMoreMenu(menuItem, target);
+                    }
                   } else {
                     openMoreMenu(menuItem, target);
                   }

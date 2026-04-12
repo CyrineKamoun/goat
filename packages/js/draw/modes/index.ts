@@ -1,3 +1,6 @@
+// History
+export { DrawHistory } from "./draw-history";
+
 // Drawing modes
 export { default as LineStringMode } from "./line-string";
 export { default as PolygonMode } from "./polygon";

@@ -9,6 +9,7 @@ import { circle } from "@turf/circle";
 import { distance } from "@turf/distance";
 import { point } from "@turf/helpers";
 
+import { DrawHistory } from "./draw-history";
 import { GREAT_CIRCLE_PROPERTY, generateGreatCirclePath } from "./great-circle";
 
 const Constants = MapboxDraw.constants;
@@ -59,6 +60,54 @@ function regenerateCircleFromLine(lineFeature: GeoJSON.Feature): GeoJSON.Feature
 
 const LineStringMode: typeof DrawLineString = { ...DrawLineString };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(LineStringMode as any).onSetup = function (this: any, opts: Record<string, unknown>) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const state = (DrawLineString as any).onSetup.call(this, opts);
+  state._drawHistory = new DrawHistory();
+  state._drawHistory.setVertexCallbacks(
+    () => {
+      const coords = state.line.coordinates;
+      if (!coords || coords.length < 3) return;
+      if (coords.length === 3) {
+        state.line.setCoordinates([coords[coords.length - 1]]);
+        state.currentVertexPosition = 0;
+        return;
+      }
+      state.line.removeCoordinate(String(coords.length - 2));
+      state.currentVertexPosition--;
+    },
+    (coord: [number, number]) => {
+      const coords = state.line.coordinates;
+      if (!coords) return;
+      state.line.addCoordinate(String(coords.length - 1), coord[0], coord[1]);
+      state.currentVertexPosition++;
+    }
+  );
+  state._drawHistory.activate();
+  return state;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(LineStringMode as any).clickAnywhere = function (this: any, state: any, e: any) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (DrawLineString as any).clickAnywhere.call(this, state, e);
+  const coords = state.line.coordinates;
+  if (coords && coords.length >= 2) {
+    const v = coords[coords.length - 2];
+    if (v) state._drawHistory.pushVertex([v[0], v[1]] as [number, number]);
+  }
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+LineStringMode.onStop = function (this: any, state: any) {
+  if (state._drawHistory) {
+    state._drawHistory.deactivate();
+    state._drawHistory.clear();
+  }
+  if (DrawLineString.onStop) DrawLineString.onStop.call(this, state);
+};
+
 LineStringMode.toDisplayFeatures = function (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   this: any,
@@ -69,7 +118,6 @@ LineStringMode.toDisplayFeatures = function (
   const isActiveLine = geojson.properties.id === state.line.id;
   geojson.properties.active = isActiveLine ? Constants.activeStates.ACTIVE : Constants.activeStates.INACTIVE;
 
-  // Handle circle radius line
   const isRadiusLine = geojson.properties?.isRadiusLine || geojson.properties?.user_isRadiusLine;
   const isCircle = geojson.properties?.isCircle || geojson.properties?.user_isCircle;
   if (
@@ -84,7 +132,6 @@ LineStringMode.toDisplayFeatures = function (
     return;
   }
 
-  // Handle great circle
   const isGreatCircle =
     geojson.properties &&
     (geojson.properties[GREAT_CIRCLE_PROPERTY] || geojson.properties[USER_GREAT_CIRCLE_PROPERTY]);
@@ -105,7 +152,6 @@ LineStringMode.toDisplayFeatures = function (
 
   geojson.properties.meta = Constants.meta.FEATURE;
 
-  // Display ALL vertices
   const coords = geojson.geometry.coordinates;
   for (let i = 0; i < coords.length - 1; i++) {
     const isLastVertex = i === coords.length - 2;

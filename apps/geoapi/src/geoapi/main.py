@@ -20,11 +20,13 @@ from starlette.responses import JSONResponse
 from geoapi.config import settings
 from geoapi.ducklake import ducklake_manager
 from geoapi.ducklake_pool import ducklake_pool
+from geoapi.ducklake_write import ducklake_write_manager
 from geoapi.models import HealthCheck
 from geoapi.routers import (
     download_router,
     expressions_router,
     features_router,
+    features_write_router,
     metadata_router,
     tiles_router,
 )
@@ -94,6 +96,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize single DuckLake connection for features/other queries
     ducklake_manager.init(settings)
 
+    # Initialize write-capable DuckLake connection for mutations
+    ducklake_write_manager.init(settings)
+
     # Initialize layer service (PostgreSQL pool for metadata)
     await layer_service.init()
 
@@ -105,6 +110,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Shutting down GeoAPI...")
     await layer_service.close()
     ducklake_pool.close()
+    ducklake_write_manager.close()
     ducklake_manager.close()
     logger.info("GeoAPI shutdown complete")
 
@@ -129,7 +135,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -140,6 +146,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Include routers
 app.include_router(metadata_router)
 app.include_router(features_router)
+app.include_router(features_write_router)
 app.include_router(tiles_router)
 app.include_router(expressions_router)
 app.include_router(download_router)

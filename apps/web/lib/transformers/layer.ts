@@ -296,12 +296,18 @@ export function getHightlightStyleSpec(highlightFeature: MapGeoJSONFeature) {
       return null;
   }
 
+  // Use MVT feature ID (rowid+1) when available, fall back to properties.id for legacy tiles
+  const mvtId = highlightFeature.id;
+  const propsId = highlightFeature.properties?.id;
+  const filter = mvtId != null
+    ? ["==", ["id"], mvtId]
+    : propsId != null
+      ? ["any", ["==", ["get", "id"], propsId], ["==", ["to-string", ["get", "id"]], String(propsId)]]
+      : undefined;
   return {
     type,
     paint,
-    ...(highlightFeature.properties?.id && {
-      filter: ["in", "id", highlightFeature.properties.id],
-    }),
+    ...(filter && { filter }),
   };
 }
 

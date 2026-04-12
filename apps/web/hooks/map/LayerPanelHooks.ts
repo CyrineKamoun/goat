@@ -95,6 +95,13 @@ export const useLayerSettingsMoreMenu = () => {
             ]
           : []),
         {
+          id: MapLayerActions.EDIT_FEATURES,
+          label: t("edit_features"),
+          icon: ICON_NAME.EDITPEN,
+          tag: "Beta",
+          tagTooltip: t("beta_feature_editing_info"),
+        },
+        {
           id: MapLayerActions.DUPLICATE,
           label: t("duplicate"),
           icon: ICON_NAME.COPY,
@@ -139,6 +146,13 @@ export const useLayerSettingsMoreMenu = () => {
               },
             ]
           : []),
+        {
+          id: MapLayerActions.EDIT_FEATURES,
+          label: t("edit_features"),
+          icon: ICON_NAME.EDITPEN,
+          tag: "Beta",
+          tagTooltip: t("beta_feature_editing_info"),
+        },
         {
           id: MapLayerActions.RENAME,
           label: t("rename"),

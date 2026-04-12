@@ -567,3 +567,38 @@ export type RasterLayerProperties = z.infer<typeof rasterLayerPropertiesSchema>;
 
 // Union type for all layer properties
 export type LayerProperties = FeatureLayerProperties | RasterLayerProperties;
+
+// --- Create Empty Layer ---
+
+export const fieldDefinitionSchema = z.object({
+  id: z.string(),
+  name: z
+    .string()
+    .min(1, "Field name is required")
+    .max(255, "Field name too long"),
+  type: z.enum(["string", "number"]),
+});
+
+export const RESERVED_FIELD_NAMES = ["id", "geometry", "geom", "__duckdb_row_id"];
+
+export const createEmptyLayerSchema = z.object({
+  name: z.string().min(1, "Layer name is required"),
+  geometryType: z.enum(["point", "line", "polygon"]).nullable(),
+  fields: z
+    .array(fieldDefinitionSchema)
+    .refine(
+      (fields) => {
+        const names = fields.map((f) => f.name.toLowerCase());
+        return new Set(names).size === names.length;
+      },
+      { message: "Field names must be unique" }
+    )
+    .refine(
+      (fields) =>
+        fields.every((f) => !RESERVED_FIELD_NAMES.includes(f.name.toLowerCase())),
+      { message: "Field name conflicts with a reserved system column" }
+    ),
+});
+
+export type FieldDefinition = z.infer<typeof fieldDefinitionSchema>;
+export type CreateEmptyLayerInput = z.infer<typeof createEmptyLayerSchema>;
