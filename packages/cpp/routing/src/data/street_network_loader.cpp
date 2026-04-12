@@ -1,4 +1,4 @@
-#include "parquet_edge_loader.h"
+#include "street_network_loader.h"
 #include "h3_util.h"
 
 #include <chrono>

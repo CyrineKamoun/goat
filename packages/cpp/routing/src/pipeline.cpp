@@ -1,6 +1,6 @@
 #include "pipeline.h"
 
-#include "data/parquet_edge_loader.h"
+#include "data/street_network_loader.h"
 #include "input/request_config.h"
 #include "input/validation.h"
 #include "kernel/dijkstra.h"

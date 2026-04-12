@@ -1,7 +1,7 @@
 #include "access.h"
 #include "stop_finder.h"
 
-#include "../data/parquet_edge_loader.h"
+#include "../data/street_network_loader.h"
 #include "../kernel/dijkstra.h"
 #include "../kernel/edge_loader.h"
 #include "../kernel/mode_selector.h"
