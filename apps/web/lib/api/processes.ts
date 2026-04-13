@@ -88,7 +88,8 @@ export type JobType =
   | "finalize_layer"
   | "project_export"
   | "project_import"
-  | "layer_create";
+  | "layer_create"
+  | "layer_create_filtered";
 
 /**
  * OGC Job status response

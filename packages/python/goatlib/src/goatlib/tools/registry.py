@@ -560,6 +560,17 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         toolbox_hidden=True,
     ),
     ToolDefinition(
+        name="layer_create_filtered",
+        display_name="Layer Create Filtered",
+        description="Create a new layer from a filtered subset of an existing layer",
+        module_path="goatlib.tools.layer_create_filtered",
+        params_class_name="LayerCreateFilteredParams",
+        windmill_path="f/goat/tools/layer_create_filtered",
+        category="data",
+        keywords=("create", "filter", "layer", "subset"),
+        toolbox_hidden=True,
+    ),
+    ToolDefinition(
         name="custom_sql",
         display_name="Custom SQL",
         description="Execute custom SQL query against workflow layers",

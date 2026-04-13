@@ -1,3 +1,4 @@
+import { LoadingButton } from "@mui/lab";
 import {
   Box,
   Button,
@@ -13,11 +14,13 @@ import {
 } from "@mui/material";
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "react-toastify";
 import { v4 } from "uuid";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { updateProjectLayer } from "@/lib/api/projects";
+import { setRunningJobIds } from "@/lib/store/jobs/slice";
 import { createTheCQLBasedOnExpression, parseCQLQueryToObject } from "@/lib/transformers/filter";
 import { layerType } from "@/lib/validations/common";
 import { type Expression as ExpressionType, FilterType } from "@/lib/validations/filter";
@@ -27,6 +30,8 @@ import type { SelectorItem } from "@/types/map/common";
 
 import useLayerFields from "@/hooks/map/CommonHooks";
 import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
+import { useProcessExecution } from "@/hooks/map/useOgcProcesses";
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import Selector from "@/components/map/panels/common/Selector";
 import Expression from "@/components/map/panels/filter/Expression";
@@ -34,9 +39,13 @@ import Expression from "@/components/map/panels/filter/Expression";
 const FilterPanel = ({ activeLayer, projectId }: { activeLayer: ProjectLayer; projectId: string }) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
+  const dispatch = useAppDispatch();
+  const runningJobIds = useAppSelector((state) => state.jobs.runningJobIds);
   const [previousLayerId, setPreviousLayerId] = useState<string | null>(null);
   const { layerFields } = useLayerFields(activeLayer?.layer_id || "");
   const { layers: projectLayers, mutate: mutateProjectLayers } = useFilteredProjectLayers(projectId);
+  const { execute: executeProcess } = useProcessExecution();
+  const [isSaving, setIsSaving] = useState(false);
 
   // Add filter expression
   const [addExpressionAnchorEl, setAddExpressionAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -175,6 +184,28 @@ const FilterPanel = ({ activeLayer, projectId }: { activeLayer: ProjectLayer; pr
     await updateLayer(null);
   };
 
+  const saveAsNewLayer = async () => {
+    if (!activeLayer?.query?.cql) return;
+    setIsSaving(true);
+    try {
+      const result = await executeProcess("layer_create_filtered", {
+        source_layer_id: activeLayer.layer_id,
+        cql_filter: activeLayer.query.cql,
+        project_id: projectId,
+        result_layer_name: `${activeLayer.name} (${t("filtered")})`,
+        source_properties: activeLayer.properties ?? undefined,
+      });
+      if (result?.jobID) {
+        toast.info(`${t("save_as_new_layer")} - ${t("job_started")}`);
+        dispatch(setRunningJobIds([...runningJobIds, result.jobID]));
+      }
+    } catch {
+      toast.error(t("save_as_new_layer_error"));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       {/* DESCRIPTION */}
@@ -290,6 +321,22 @@ const FilterPanel = ({ activeLayer, projectId }: { activeLayer: ProjectLayer; pr
               {t("common:clear_filter")}
             </Typography>
           </Button>
+          {/* SAVE AS NEW LAYER */}
+          {activeLayer?.query?.cql && expressions?.length > 0 && areAllExpressionsValid && (
+            <>
+              <Divider />
+              <LoadingButton
+                fullWidth
+                size="small"
+                loading={isSaving}
+                startIcon={<Icon iconName={ICON_NAME.SAVE} style={{ fontSize: "15px" }} />}
+                onClick={saveAsNewLayer}>
+                <Typography variant="body2" fontWeight="bold" color="inherit">
+                  {t("save_as_new_layer")}
+                </Typography>
+              </LoadingButton>
+            </>
+          )}
         </Stack>
       )}
     </Box>
