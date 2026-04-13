@@ -43,6 +43,7 @@ import Header from "@/components/header/Header";
 import MapViewer from "@/components/map/MapViewer";
 import DataProjectLayout from "@/components/map/layouts/desktop/DataProjectLayout";
 import PublicProjectLayout from "@/components/map/layouts/desktop/PublicProjectLayout";
+import DataPanel from "@/components/map/panels/DataPanel";
 import { ReportsLayout } from "@/components/reports";
 import WorkflowsLayout from "@/components/workflows/WorkflowsLayout";
 
@@ -511,16 +512,44 @@ export default function MapPage({ params: { projectId } }) {
                     {mapMode !== "reports" && mapMode !== "workflows" && (
                       <Box
                         sx={{
+                          display: "flex",
+                          flexDirection: "column",
                           padding: mapMode === "builder" ? "20px" : "0",
                           width: "100%",
                           height: "100%",
                           position: "relative",
                         }}>
+                        <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
+                          <MapViewer
+                            containerSx={{ zIndex: 0 }}
+                            layers={projectLayers}
+                            mapRef={mapRef}
+                            scenarioFeatures={scenarioFeatures}
+                            maxExtent={project?.max_extent || undefined}
+                            initialViewState={{
+                              zoom: initialView?.zoom ?? 3,
+                              latitude: initialView?.latitude ?? 48.13,
+                              longitude: initialView?.longitude ?? 11.57,
+                              pitch: initialView?.pitch ?? 0,
+                              bearing: initialView?.bearing ?? 0,
+                              fitBoundsOptions: {
+                                minZoom: initialView?.min_zoom ?? 0,
+                                maxZoom: initialView?.max_zoom ?? 24,
+                              },
+                            }}
+                            mapStyle={activeBasemap?.url}
+                            {...(isProjectEditor ? { onMoveEnd: updateViewState } : {})}
+                            isEditor={isProjectEditor}
+                          />
+                          <DataPanel projectLayers={allProjectLayersIncludingTables} />
+                        </Box>
                         {mapMode === "builder" && (
                           <Box
                             sx={{
                               position: "absolute",
                               inset: "20px",
+                              zIndex: 1,
+                              pointerEvents: "none",
                             }}>
                             <PublicProjectLayout
                               projectLayers={widgetProjectLayers}
@@ -529,26 +558,6 @@ export default function MapPage({ params: { projectId } }) {
                             />
                           </Box>
                         )}
-                        <MapViewer
-                          layers={projectLayers}
-                          mapRef={mapRef}
-                          scenarioFeatures={scenarioFeatures}
-                          maxExtent={project?.max_extent || undefined}
-                          initialViewState={{
-                            zoom: initialView?.zoom ?? 3,
-                            latitude: initialView?.latitude ?? 48.13,
-                            longitude: initialView?.longitude ?? 11.57,
-                            pitch: initialView?.pitch ?? 0,
-                            bearing: initialView?.bearing ?? 0,
-                            fitBoundsOptions: {
-                              minZoom: initialView?.min_zoom ?? 0,
-                              maxZoom: initialView?.max_zoom ?? 24,
-                            },
-                          }}
-                          mapStyle={activeBasemap?.url}
-                          {...(isProjectEditor ? { onMoveEnd: updateViewState } : {})}
-                          isEditor={isProjectEditor}
-                        />
                       </Box>
                     )}
                     {mapMode === "builder" && (

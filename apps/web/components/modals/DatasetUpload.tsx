@@ -7,10 +7,19 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
+  MenuItem,
   Stack,
   Step,
   StepLabel,
   Stepper,
+  Switch,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
@@ -33,6 +42,8 @@ import { createLayerFromDatasetSchema, layerMetadataSchema } from "@/lib/validat
 
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
+import { parseTabularPreview, type TabularPreview } from "@/lib/utils/tabular-preview";
+
 import { MuiFileInput } from "@/components/common/FileInput";
 import FolderSelect from "@/components/dashboard/common/FolderSelect";
 
@@ -48,7 +59,6 @@ const DatasetUploadModal: React.FC<DatasetUploadDialogProps> = ({ open, onClose,
   const runningJobIds = useAppSelector((state) => state.jobs.runningJobIds);
 
   const { project } = useProject(projectId);
-  const steps = [t("select_file"), t("destination_and_metadata"), t("confirmation")];
   const { mutate } = useJobs({
     read: false,
   });
@@ -62,6 +72,28 @@ const DatasetUploadModal: React.FC<DatasetUploadDialogProps> = ({ open, onClose,
   const [fileUploadError, setFileUploadError] = useState<string>();
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>();
   const [isBusy, setIsBusy] = useState(false);
+  const [tabularPreview, setTabularPreview] = useState<TabularPreview | null>(null);
+  const [hasHeader, setHasHeader] = useState(true);
+  const [selectedSheet, setSelectedSheet] = useState<string>("");
+
+  const isTabular = useMemo(() => {
+    if (!fileValue) return false;
+    const ext = fileValue.name.split(".").pop()?.toLowerCase();
+    return ext === "csv" || ext === "xlsx" || ext === "xls";
+  }, [fileValue]);
+
+  const steps = useMemo(() => {
+    const base = [t("select_file"), t("destination_and_metadata"), t("confirmation")];
+    if (isTabular) {
+      return [base[0], t("preview_and_configure"), base[1], base[2]];
+    }
+    return base;
+  }, [isTabular, t]);
+
+  const previewStep = isTabular ? 1 : -1;
+  const metadataStep = isTabular ? 2 : 1;
+  const confirmationStep = isTabular ? 3 : 2;
+
   useEffect(() => {
     const homeFolder = folders?.find((folder) => folder.name === "home");
     const projectFolder = folders?.find((folder) => folder.id === project?.folder_id);
@@ -70,6 +102,28 @@ const DatasetUploadModal: React.FC<DatasetUploadDialogProps> = ({ open, onClose,
       setSelectedFolder(preSelectedFolder);
     }
   }, [folders, project?.folder_id]);
+
+  useEffect(() => {
+    if (!fileValue || !isTabular) {
+      setTabularPreview(null);
+      return;
+    }
+    let cancelled = false;
+    parseTabularPreview(fileValue, { hasHeader, sheetName: selectedSheet || undefined })
+      .then((preview) => {
+        if (!cancelled) {
+          setTabularPreview(preview);
+          if (!selectedSheet && preview.sheetNames.length > 0) {
+            setSelectedSheet(preview.sheetNames[0]);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Preview parse error:", err);
+        if (!cancelled) setTabularPreview(null);
+      });
+    return () => { cancelled = true; };
+  }, [fileValue, isTabular, hasHeader, selectedSheet]);
 
   const {
     register,
@@ -125,6 +179,9 @@ const DatasetUploadModal: React.FC<DatasetUploadDialogProps> = ({ open, onClose,
     setActiveStep(0);
     setFileUploadError(undefined);
     setIsBusy(false);
+    setTabularPreview(null);
+    setHasHeader(true);
+    setSelectedSheet("");
     reset();
     onClose?.();
   };
@@ -161,6 +218,8 @@ const DatasetUploadModal: React.FC<DatasetUploadDialogProps> = ({ open, onClose,
         ...getValues(),
         folder_id: selectedFolder?.id,
         s3_key: presigned.fields.key,
+        ...(isTabular && { has_header: hasHeader }),
+        ...(isTabular && selectedSheet && { sheet_name: selectedSheet }),
       });
 
       // Kick off layer creation via OGC API Processes
@@ -220,7 +279,83 @@ const DatasetUploadModal: React.FC<DatasetUploadDialogProps> = ({ open, onClose,
             </Typography>
           </>
         )}
-        {activeStep === 1 && (
+        {activeStep === previewStep && isTabular && (
+          <Stack direction="column" spacing={3}>
+            {/* Sheet selector - only for multi-sheet XLSX */}
+            {tabularPreview && tabularPreview.sheetNames.length > 1 && (
+              <TextField
+                select
+                fullWidth
+                label={t("worksheet")}
+                value={selectedSheet}
+                onChange={(e) => setSelectedSheet(e.target.value)}
+                size="small"
+              >
+                {tabularPreview.sheetNames.map((name) => (
+                  <MenuItem key={name} value={name}>
+                    {name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+
+            {/* Header toggle */}
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={hasHeader}
+                  onChange={(e) => setHasHeader(e.target.checked)}
+                  color="primary"
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="body2" fontWeight="bold">
+                  {t("first_row_is_header")}
+                </Typography>
+              }
+            />
+
+            {/* Data preview table */}
+            {tabularPreview && tabularPreview.headers.length > 0 && (
+              <>
+                <TableContainer sx={{ maxHeight: 280, border: 1, borderColor: "divider", borderRadius: 1 }}>
+                  <Table size="small" stickyHeader>
+                    <TableHead>
+                      <TableRow>
+                        {tabularPreview.headers.map((header, i) => (
+                          <TableCell key={i} sx={{ fontWeight: "bold", whiteSpace: "nowrap" }}>
+                            {header}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {tabularPreview.rows.map((row, ri) => (
+                        <TableRow key={ri}>
+                          {row.map((cell, ci) => (
+                            <TableCell key={ci} sx={{ whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>
+                              <Typography variant="body2">{cell}</Typography>
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                <Typography variant="caption" color="text.secondary">
+                  {t("showing_first_rows", { count: tabularPreview.rows.length, total: tabularPreview.totalRows })}
+                </Typography>
+                {!hasHeader && (
+                  <Typography variant="caption" color="text.secondary">
+                    {t("rename_columns_hint")}
+                  </Typography>
+                )}
+              </>
+            )}
+          </Stack>
+        )}
+        {activeStep === metadataStep && (
           <>
             <Stack direction="column" spacing={4}>
               <FolderSelect
@@ -250,7 +385,7 @@ const DatasetUploadModal: React.FC<DatasetUploadDialogProps> = ({ open, onClose,
             </Stack>
           </>
         )}
-        {activeStep === 2 && (
+        {activeStep === confirmationStep && (
           <Stack direction="column" spacing={4}>
             <Typography variant="caption">{t("review")}</Typography>
             <Typography variant="body2">
@@ -294,7 +429,7 @@ const DatasetUploadModal: React.FC<DatasetUploadDialogProps> = ({ open, onClose,
             <Button
               disabled={
                 (activeStep === 0 && !fileValue) ||
-                (activeStep === 1 && (isValid !== true || selectedFolder === null))
+                (activeStep === metadataStep && (isValid !== true || selectedFolder === null))
               }
               onClick={handleNext}
               variant="outlined"

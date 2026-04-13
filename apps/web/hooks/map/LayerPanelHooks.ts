@@ -27,7 +27,8 @@ export const useLayerSettingsMoreMenu = () => {
     layerType: ProjectLayer["type"],
     viewChart?: boolean,
     _inCatalog?: ProjectLayer["in_catalog"],
-    readOnly?: boolean
+    readOnly?: boolean,
+    canEdit?: boolean,
   ): PopperMenuItem[] {
     if (readOnly) {
       const readOnlyOptions: PopperMenuItem[] = [
@@ -94,6 +95,17 @@ export const useLayerSettingsMoreMenu = () => {
               },
             ]
           : []),
+        ...(canEdit !== false
+          ? [
+              {
+                id: MapLayerActions.EDIT_FEATURES,
+                label: t("edit_features"),
+                icon: ICON_NAME.EDITPEN,
+                tag: "Beta",
+                tagTooltip: t("beta_feature_editing_info"),
+              },
+            ]
+          : []),
         {
           id: MapLayerActions.DUPLICATE,
           label: t("duplicate"),
@@ -136,6 +148,17 @@ export const useLayerSettingsMoreMenu = () => {
                 id: MapLayerActions.CHART,
                 label: t("view_chart"),
                 icon: ICON_NAME.CHART,
+              },
+            ]
+          : []),
+        ...(canEdit !== false
+          ? [
+              {
+                id: MapLayerActions.EDIT_FEATURES,
+                label: t("edit_features"),
+                icon: ICON_NAME.EDITPEN,
+                tag: "Beta",
+                tagTooltip: t("beta_feature_editing_info"),
               },
             ]
           : []),

@@ -84,6 +84,8 @@ class IOConverter:
         target_crs: str | None = None,
         column_mapping: ColumnMapping | None = None,
         timeout: int | None = None,
+        has_header: bool | None = None,
+        sheet_name: str | None = None,
     ) -> DatasetMetadata:
         """
         Convert any vector/tabular dataset to Parquet/GeoParquet.
@@ -95,6 +97,8 @@ class IOConverter:
             target_crs: Target CRS for reprojection
             column_mapping: Dictionary for column renaming
             timeout: Timeout for HTTP requests
+            has_header: Whether first row is a header (True/False/None=auto)
+            sheet_name: Worksheet name for XLSX files (None=first sheet)
 
         Returns:
             DatasetMetadata with conversion results
@@ -120,7 +124,8 @@ class IOConverter:
 
             # Convert single file
             return self._convert_single_file(
-                src_info, out, geometry_col, target_crs, column_mapping
+                src_info, out, geometry_col, target_crs, column_mapping,
+                has_header=has_header, sheet_name=sheet_name,
             )
 
         except Exception as e:
@@ -280,12 +285,14 @@ class IOConverter:
         geometry_col: str | None,
         target_crs: str | None,
         column_mapping: ColumnMapping | None,
+        has_header: bool | None = None,
+        sheet_name: str | None = None,
     ) -> DatasetMetadata:
         """Convert a single file to Parquet/GeoParquet."""
         logger.debug("Analyzing source format: %s", src_info.path)
 
         # Build source reader
-        st_read = self._build_source_reader(src_info)
+        st_read = self._build_source_reader(src_info, has_header=has_header, sheet_name=sheet_name)
 
         # Detect geometry information
         geom_info = self._detect_geometry_info(src_info, st_read, geometry_col)
@@ -294,6 +301,11 @@ class IOConverter:
         query = self._build_conversion_query(
             st_read, geom_info, target_crs, column_mapping
         )
+
+        # Strip empty rows for tabular formats (e.g. Excel files with
+        # cell formatting extending beyond actual data).
+        if self._is_tabular_format(src_info):
+            query = self._wrap_strip_empty_rows(query)
 
         # Validate query returns data
         self._validate_query_returns_data(query)
@@ -313,25 +325,128 @@ class IOConverter:
             out_path, src_info.path, geom_info, target_crs
         )
 
-    def _build_source_reader(self: Self, src_info: SourceInfo) -> str:
+    def _build_source_reader(
+        self: Self,
+        src_info: SourceInfo,
+        has_header: bool | None = None,
+        sheet_name: str | None = None,
+    ) -> str:
         """Build appropriate source reader SQL fragment."""
         if src_info.is_wfs_xml:
             return f"ST_Read('{src_info.path}', allowed_drivers=ARRAY['WFS'])"
-        elif src_info.layer_name:
-            return f"ST_Read('{src_info.path}', layer='{src_info.layer_name}')"
-        elif src_info.path_obj and src_info.path_obj.suffix.lower() in (
+
+        # CSV/TSV/TXT: use read_csv_auto with header param
+        if src_info.path_obj and src_info.path_obj.suffix.lower() in (
             FileFormat.TXT.value,
             FileFormat.CSV.value,
             FileFormat.TSV.value,
         ):
-            return f"read_csv_auto('{src_info.path}', header=True)"
-        elif (
+            header_val = "True" if has_header is not False else "False"
+            return f"read_csv_auto('{src_info.path}', header={header_val})"
+
+        if (
             src_info.path_obj
             and src_info.path_obj.suffix.lower() == FileFormat.PARQUET.value
         ):
             return f"read_parquet('{src_info.path}')"
-        else:
-            return f"ST_Read('{src_info.path}')"
+
+        # XLSX or other ST_Read formats
+        effective_layer = sheet_name or src_info.layer_name
+        is_xlsx = (
+            src_info.path_obj
+            and src_info.path_obj.suffix.lower() == FileFormat.XLSX.value
+        )
+
+        if is_xlsx and has_header is not None:
+            return self._build_xlsx_reader(
+                src_info.path, effective_layer, has_header
+            )
+
+        # Default ST_Read (no explicit header control)
+        if effective_layer:
+            safe_layer = effective_layer.replace("'", "''")
+            return f"ST_Read('{src_info.path}', layer='{safe_layer}')"
+        return f"ST_Read('{src_info.path}')"
+
+    def _build_xlsx_reader(
+        self: Self, path: str, layer: str | None, has_header: bool
+    ) -> str:
+        """Build XLSX reader with reliable header handling.
+
+        GDAL's HEADERS=FORCE open_option is unreliable for non-first sheets.
+        When has_header=True, we read with HEADERS=DISABLE and manually
+        extract column names from the first row via SQL.
+        """
+        safe_layer = layer.replace("'", "''") if layer else None
+        layer_arg = f", layer='{safe_layer}'" if safe_layer else ""
+        base_read = (
+            f"ST_Read('{path}'{layer_arg}, "
+            f"open_options=ARRAY['HEADERS=DISABLE'])"
+        )
+
+        if not has_header:
+            return base_read
+
+        # has_header=True: read first row to get column names, then build
+        # a query that renames columns and skips the header row.
+        first_row = self.con.execute(
+            f"SELECT * FROM {base_read} LIMIT 1"
+        ).fetchone()
+        if not first_row:
+            return base_read
+
+        raw_cols = [
+            c[0]
+            for c in self.con.execute(
+                f"SELECT * FROM {base_read} LIMIT 0"
+            ).description
+        ]
+
+        # Build column aliases: "Field1" AS "actual_name"
+        # Escape double quotes in cell values to prevent SQL injection.
+        aliases = ", ".join(
+            f'"{raw}" AS "{str(val).replace(chr(34), chr(34) + chr(34))}"'
+            for raw, val in zip(raw_cols, first_row)
+        )
+        return (
+            f"(SELECT {aliases} FROM ("
+            f"SELECT *, ROW_NUMBER() OVER () AS __rn "
+            f"FROM {base_read}) WHERE __rn > 1)"
+        )
+
+    @staticmethod
+    def _is_tabular_format(src_info: SourceInfo) -> bool:
+        """Check if source is a tabular format that may have trailing empty rows."""
+        if not src_info.path_obj:
+            return False
+        return src_info.path_obj.suffix.lower() in (
+            FileFormat.XLSX.value,
+            FileFormat.CSV.value,
+            FileFormat.TSV.value,
+            FileFormat.TXT.value,
+        )
+
+    def _wrap_strip_empty_rows(self: Self, query: str) -> str:
+        """Wrap a query to exclude rows where every column is NULL or empty.
+
+        Handles Excel files where cell formatting (e.g. background color)
+        extends the used range far beyond actual data.
+        """
+        try:
+            col_info = self.con.execute(f"SELECT * FROM ({query}) LIMIT 0").description
+            cols = [c[0] for c in col_info]
+        except Exception:
+            return query
+
+        if not cols:
+            return query
+
+        # Build condition: at least one column must be non-null and non-empty
+        conditions = " OR ".join(
+            f'("{col}" IS NOT NULL AND CAST("{col}" AS VARCHAR) != \'\')'
+            for col in cols
+        )
+        return f"SELECT * FROM ({query}) WHERE {conditions}"
 
     def _detect_geometry_info(
         self: Self, src_info: SourceInfo, st_read: str, user_geometry_col: str | None

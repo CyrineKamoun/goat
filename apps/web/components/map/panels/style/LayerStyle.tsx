@@ -236,6 +236,7 @@ const LayerStylePanel = ({ projectId }: { projectId: string }) => {
   );
 
   const markerExists = useMemo(() => {
+    if (!layerProperties) return false;
     return (
       layerProperties["custom_marker"] &&
       (layerProperties["marker"]?.name ||
@@ -248,6 +249,8 @@ const LayerStylePanel = ({ projectId }: { projectId: string }) => {
   const [collapseStrokeWidthOptions, setCollapseStrokeWidthOptions] = useState(true);
   const [collapsedMarkerIconOptions, setCollapsedMarkerIconOptions] = useState(true);
   const [collapseRadiusOptions, setCollapseRadiusOptions] = useState(true);
+
+  if (!activeLayer || !layerProperties) return null;
 
   return (
     <>

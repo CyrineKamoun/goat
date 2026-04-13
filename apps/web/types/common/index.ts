@@ -18,6 +18,7 @@ export enum ContentActions {
 export enum MapLayerActions {
   CHART = "chart",
   DUPLICATE = "duplicate",
+  EDIT_FEATURES = "editFeatures",
   RENAME = "rename",
   ZOOM_TO = "zoomTo",
   PROPERTIES = "properties",
@@ -62,4 +63,5 @@ export enum AddLayerSourceType {
   DatasourceUpload,
   DataSourceExternal,
   CatalogExplorer,
+  CreateEmptyLayer,
 }

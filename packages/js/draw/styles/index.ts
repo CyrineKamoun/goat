@@ -6,16 +6,19 @@ import type { DrawStyle } from "../types";
 /**
  * Default styles - red dashed lines with white-outlined vertices
  */
+// Default color — used when feature doesn't have user properties set
+const DEFAULT_COLOR = "#ef4444";
+
 export const defaultDrawStyles: DrawStyle[] = [
-  // Polygon fill
+  // Polygon fill — uses user__fillColor if set on the feature, else default
   {
     id: "gl-draw-polygon-fill-inactive",
     type: "fill",
     filter: ["all", ["==", "active", "false"], ["==", "$type", "Polygon"], ["!=", "mode", "static"]],
     paint: {
-      "fill-color": "#ef4444",
-      "fill-outline-color": "#ef4444",
-      "fill-opacity": 0.1,
+      "fill-color": ["coalesce", ["get", "user__fillColor"], DEFAULT_COLOR],
+      "fill-outline-color": ["coalesce", ["get", "user__fillColor"], DEFAULT_COLOR],
+      "fill-opacity": ["coalesce", ["get", "user__fillOpacity"], 0.1],
     },
   },
   {
@@ -23,9 +26,9 @@ export const defaultDrawStyles: DrawStyle[] = [
     type: "fill",
     filter: ["all", ["==", "active", "true"], ["==", "$type", "Polygon"]],
     paint: {
-      "fill-color": "#ef4444",
-      "fill-outline-color": "#ef4444",
-      "fill-opacity": 0.15,
+      "fill-color": ["coalesce", ["get", "user__fillColor"], DEFAULT_COLOR],
+      "fill-outline-color": ["coalesce", ["get", "user__fillColor"], DEFAULT_COLOR],
+      "fill-opacity": ["coalesce", ["get", "user__fillOpacity"], 0.15],
     },
   },
   // Polygon stroke
@@ -79,14 +82,14 @@ export const defaultDrawStyles: DrawStyle[] = [
     filter: ["all", ["==", "$type", "Point"], ["==", "meta", "midpoint"]],
     paint: { "circle-radius": 0, "circle-color": "#ef4444", "circle-opacity": 0 },
   },
-  // Point
+  // Point — when _iconImage is set, circle becomes a transparent selection ring around the icon
   {
     id: "gl-draw-point-inactive",
     type: "circle",
     filter: ["all", ["==", "active", "false"], ["==", "$type", "Point"], ["==", "meta", "feature"]],
     paint: {
-      "circle-radius": 5,
-      "circle-color": "#fff",
+      "circle-radius": ["case", ["has", "user__iconImage"], ["max", 8, ["*", ["coalesce", ["get", "user__iconSize"], 0.5], 16]], 5],
+      "circle-color": ["case", ["has", "user__iconImage"], "transparent", "#fff"],
       "circle-stroke-color": "#ef4444",
       "circle-stroke-width": 2,
     },
@@ -96,10 +99,42 @@ export const defaultDrawStyles: DrawStyle[] = [
     type: "circle",
     filter: ["all", ["==", "$type", "Point"], ["==", "meta", "feature"], ["==", "active", "true"]],
     paint: {
-      "circle-radius": 7,
-      "circle-color": "#fff",
+      "circle-radius": ["case", ["has", "user__iconImage"], ["+", ["max", 8, ["*", ["coalesce", ["get", "user__iconSize"], 0.5], 16]], 2], 7],
+      "circle-color": ["case", ["has", "user__iconImage"], "transparent", "#fff"],
       "circle-stroke-color": "#ef4444",
       "circle-stroke-width": 3,
+    },
+  },
+  // Symbol layer for custom marker icons — driven by user properties set on the feature.
+  // Only renders when user__iconImage is set (empty string = no icon rendered).
+  {
+    id: "gl-draw-point-icon-inactive",
+    type: "symbol",
+    filter: ["all", ["==", "active", "false"], ["==", "$type", "Point"], ["==", "meta", "feature"]],
+    layout: {
+      "icon-image": ["coalesce", ["get", "user__iconImage"], ""],
+      "icon-size": ["coalesce", ["get", "user__iconSize"], 0.5],
+      "icon-allow-overlap": true,
+      "icon-anchor": ["coalesce", ["get", "user__iconAnchor"], "center"],
+    },
+    paint: {
+      "icon-opacity": ["coalesce", ["get", "user__iconOpacity"], 1],
+      "icon-color": ["coalesce", ["get", "user__iconColor"], "#000000"],
+    },
+  },
+  {
+    id: "gl-draw-point-icon-active",
+    type: "symbol",
+    filter: ["all", ["==", "active", "true"], ["==", "$type", "Point"], ["==", "meta", "feature"]],
+    layout: {
+      "icon-image": ["coalesce", ["get", "user__iconImage"], ""],
+      "icon-size": ["coalesce", ["get", "user__iconSize"], 0.5],
+      "icon-allow-overlap": true,
+      "icon-anchor": ["coalesce", ["get", "user__iconAnchor"], "center"],
+    },
+    paint: {
+      "icon-opacity": ["coalesce", ["get", "user__iconOpacity"], 1],
+      "icon-color": ["coalesce", ["get", "user__iconColor"], "#000000"],
     },
   },
 ];

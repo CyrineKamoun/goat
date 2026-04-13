@@ -15,6 +15,8 @@ def convert_any(
     dest_dir: str | Path,
     geometry_col: str | None = None,
     target_crs: str | None = None,
+    has_header: bool | None = None,
+    sheet_name: str | None = None,
 ) -> list[tuple[Path, DatasetMetadata]]:
     """
     Convert any supported input to standardized outputs.
@@ -29,6 +31,10 @@ def convert_any(
         Geometry column name
     target_crs : str, optional
         Target CRS for reprojection
+    has_header : bool, optional
+        Whether the first row contains column headers (CSV/XLSX)
+    sheet_name : str, optional
+        Worksheet name for XLSX files (None=first sheet)
 
     Returns
     -------
@@ -48,6 +54,8 @@ def convert_any(
             dest_dir=dest,
             geometry_col=geometry_col,
             target_crs=target_crs,
+            has_header=has_header,
+            sheet_name=sheet_name,
         )
 
     # Single source path
@@ -57,6 +65,8 @@ def convert_any(
         dest_dir=dest,
         geometry_col=geometry_col,
         target_crs=target_crs,
+        has_header=has_header,
+        sheet_name=sheet_name,
     )
 
 
@@ -66,6 +76,8 @@ def _convert_single_source(
     dest_dir: Path,
     geometry_col: str | None,
     target_crs: str | None,
+    has_header: bool | None = None,
+    sheet_name: str | None = None,
 ) -> list[tuple[Path, DatasetMetadata]]:
     """Convert a single source path (which may contain multiple datasets)."""
     logger.info("Discovering input datasets: %s", src_path)
@@ -96,6 +108,8 @@ def _convert_single_source(
                 dest_dir=dest_dir,
                 geometry_col=geometry_col,
                 target_crs=target_crs,
+                has_header=has_header,
+                sheet_name=sheet_name,
             )
             outputs.append((output_path, metadata))
             logger.info("Successfully converted: %s", output_path)
@@ -126,6 +140,8 @@ def _convert_multiple_sources(
     dest_dir: Path,
     geometry_col: str | None,
     target_crs: str | None,
+    has_header: bool | None = None,
+    sheet_name: str | None = None,
 ) -> list[tuple[Path, DatasetMetadata]]:
     """Convert multiple source paths."""
     all_outputs: list[tuple[Path, DatasetMetadata]] = []
@@ -143,6 +159,8 @@ def _convert_multiple_sources(
                 dest_dir=dest_dir,
                 geometry_col=geometry_col,
                 target_crs=target_crs,
+                has_header=has_header,
+                sheet_name=sheet_name,
             )
             all_outputs.extend(outputs)
             logger.info("Successfully processed: %s", src_path)
@@ -165,6 +183,8 @@ def _convert_single_item(
     dest_dir: Path,
     geometry_col: str | None,
     target_crs: str | None,
+    has_header: bool | None = None,
+    sheet_name: str | None = None,
 ) -> tuple[Path, DatasetMetadata]:
     """
     Convert a single discovered item to the appropriate format.
@@ -182,6 +202,8 @@ def _convert_single_item(
             out,
             geometry_col=geometry_col,
             target_crs=target_crs,
+            has_header=has_header,
+            sheet_name=sheet_name,
         )
         return out, meta
 
@@ -206,6 +228,8 @@ def _convert_single_item(
             out,
             geometry_col=geometry_col,
             target_crs=target_crs,
+            has_header=has_header,
+            sheet_name=sheet_name,
         )
         return out, meta
 

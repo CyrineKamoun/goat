@@ -93,6 +93,26 @@ class LayerImportParams(ToolInputBase):
         ),
     )
 
+    # Tabular import options (CSV/XLSX)
+    has_header: bool | None = Field(
+        None,
+        description="Whether the first row contains column headers (True=yes, False=no, None=auto-detect)",
+        json_schema_extra=ui_field(
+            section="source",
+            field_order=3,
+            hidden=True,
+        ),
+    )
+    sheet_name: str | None = Field(
+        None,
+        description="Worksheet name for XLSX files (None=first sheet)",
+        json_schema_extra=ui_field(
+            section="source",
+            field_order=4,
+            hidden=True,
+        ),
+    )
+
     # Layer metadata
     name: str | None = Field(
         None,
@@ -155,7 +175,12 @@ class LayerImportRunner(BaseToolRunner[LayerImportParams]):
         return self._s3_client
 
     def _import_from_s3(
-        self: Self, s3_key: str, temp_dir: Path, output_path: Path
+        self: Self,
+        s3_key: str,
+        temp_dir: Path,
+        output_path: Path,
+        has_header: bool | None = None,
+        sheet_name: str | None = None,
     ) -> DatasetMetadata:
         """Import file from S3 and convert to GeoParquet.
 
@@ -163,6 +188,8 @@ class LayerImportRunner(BaseToolRunner[LayerImportParams]):
             s3_key: S3 object key
             temp_dir: Temporary directory for downloaded file
             output_path: Path for output parquet file
+            has_header: Whether first row contains column headers
+            sheet_name: Worksheet name for XLSX files
 
         Returns:
             Dataset metadata from conversion
@@ -197,6 +224,8 @@ class LayerImportRunner(BaseToolRunner[LayerImportParams]):
             src_path=str(local_file),
             out_path=str(output_path),
             target_crs="EPSG:4326",
+            has_header=has_header,
+            sheet_name=sheet_name,
         )
 
         logger.info(
@@ -297,6 +326,8 @@ class LayerImportRunner(BaseToolRunner[LayerImportParams]):
                 s3_key=params.s3_key,  # type: ignore
                 temp_dir=temp_dir,
                 output_path=output_path,
+                has_header=params.has_header,
+                sheet_name=params.sheet_name,
             )
             # Extract original format from S3 key
             original_ext = os.path.splitext(params.s3_key)[1].lstrip(".")  # type: ignore

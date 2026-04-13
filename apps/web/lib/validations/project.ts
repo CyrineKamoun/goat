@@ -193,6 +193,7 @@ export const projectLayerTreeNodeSchema = z.object({
   properties: z.record(z.any()).nullable().optional(),
   other_properties: z.record(z.any()).nullable().optional(),
   query: z.record(z.any()).nullable().optional(),
+  user_id: z.string().optional(),
 });
 
 export const projectLayerTreeUpdateItemSchema = z.object({

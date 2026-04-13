@@ -100,13 +100,15 @@ const FilterPanel = ({ activeLayer, projectId }: { activeLayer: ProjectLayer; pr
     }
   };
 
-  // Load existing expressions
+  // Load existing expressions — re-sync when CQL changes externally (e.g. quick filter popover)
+  const cqlArgsCount = (activeLayer?.query?.cql as { args?: unknown[] })?.args?.length ?? 0;
   useEffect(() => {
     if (activeLayer?.layer_id !== previousLayerId && activeLayer?.layer_id) {
       setPreviousLayerId(activeLayer?.layer_id);
       setExpressions([]);
     }
-    if (expressions.length) return;
+    // Skip only if local expressions already match the CQL arg count
+    if (expressions.length && expressions.length >= cqlArgsCount) return;
     const existingExpressions = parseCQLQueryToObject(
       activeLayer?.query?.cql as { op: string; args: unknown[] }
     );
@@ -117,7 +119,7 @@ const FilterPanel = ({ activeLayer, projectId }: { activeLayer: ProjectLayer; pr
       }
     }
     setExpressions(existingExpressions);
-  }, [activeLayer, expressions.length, logicalOperators, previousLayerId]);
+  }, [activeLayer, expressions.length, cqlArgsCount, logicalOperators, previousLayerId]);
 
   const validateExpressions = (expressions) => {
     return expressions.every((expression) => {

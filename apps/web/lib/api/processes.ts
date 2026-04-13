@@ -87,7 +87,8 @@ export type JobType =
   | "nearby_station_access"
   | "finalize_layer"
   | "project_export"
-  | "project_import";
+  | "project_import"
+  | "layer_create";
 
 /**
  * OGC Job status response

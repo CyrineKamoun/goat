@@ -81,4 +81,14 @@ TASK_REGISTRY: tuple[TaskDefinition, ...] = (
         schedule=None,  # Run manually
         worker_tag="tools",
     ),
+    TaskDefinition(
+        name="rebuild_edited_pmtiles",
+        display_name="Rebuild Edited PMTiles",
+        description="Rebuild missing PMTiles for layers that were recently edited",
+        module_path="goatlib.tasks.rebuild_edited_pmtiles",
+        params_class_name="RebuildEditedPMTilesParams",
+        windmill_path="f/goat/tasks/rebuild_edited_pmtiles",
+        schedule="0 */5 * * * *",  # Every 5 minutes
+        worker_tag="tools",
+    ),
 )

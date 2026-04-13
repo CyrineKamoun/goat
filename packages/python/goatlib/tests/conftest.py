@@ -69,6 +69,21 @@ def tabular_valid_xlsx(data_root: Path) -> Path:
 
 
 @pytest.fixture(scope="session")
+def tabular_valid_xlsx_multi_sheet(data_root: Path) -> Path:
+    return data_root / "io" / "tabular" / "valid" / "multi_sheet.xlsx"
+
+
+@pytest.fixture(scope="session")
+def tabular_valid_xlsx_no_header(data_root: Path) -> Path:
+    return data_root / "io" / "tabular" / "valid" / "no_header.xlsx"
+
+
+@pytest.fixture(scope="session")
+def tabular_valid_xlsx_colored_empty(data_root: Path) -> Path:
+    return data_root / "io" / "tabular" / "valid" / "colored_empty_rows.xlsx"
+
+
+@pytest.fixture(scope="session")
 def tabular_valid_tsv(data_root: Path) -> Path:
     return data_root / "io" / "tabular" / "valid" / "table.tsv"
 

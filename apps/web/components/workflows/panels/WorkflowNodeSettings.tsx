@@ -1491,14 +1491,17 @@ function ExportNodeSettingsInline({
           {/* Dataset name */}
           <Stack spacing={1} sx={{ mb: 2 }}>
             <Typography variant="body2" color="text.secondary">
-              {t("dataset_name")}
+              {t("dataset_name")} *
             </Typography>
             <TextField
               fullWidth
               size="small"
+              required
               placeholder={t("enter_dataset_name")}
               value={datasetName}
               onChange={handleDatasetNameChange}
+              error={!datasetName.trim()}
+              helperText={!datasetName.trim() ? t("dataset_name_required") : undefined}
               inputProps={{
                 style: { fontSize: "0.875rem" },
               }}
