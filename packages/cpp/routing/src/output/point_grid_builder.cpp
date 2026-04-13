@@ -61,7 +61,8 @@ int64_t materialize_point_grid_features_table(ReachabilityField const &field,
     auto drop_reached = con.Query("DROP TABLE IF EXISTS reached_edges_pg");
     auto create_reached = con.Query(
         "CREATE TEMP TABLE reached_edges_pg ("
-        "edge_id BIGINT, cost DOUBLE, step_cost DOUBLE)");
+        "edge_id BIGINT, cost DOUBLE, step_cost DOUBLE, "
+        "source_cost DOUBLE, target_cost DOUBLE)");
     if (create_reached->HasError())
         throw std::runtime_error("Failed to create reached_edges_pg: " +
                                  create_reached->GetError());
@@ -73,6 +74,8 @@ int64_t materialize_point_grid_features_table(ReachabilityField const &field,
         appender.Append(r.edge_id);
         appender.Append(r.cost);
         appender.Append(r.step_cost);
+        appender.Append(r.source_cost);
+        appender.Append(r.target_cost);
         appender.EndRow();
     }
     appender.Close();
@@ -148,7 +151,7 @@ int64_t materialize_point_grid_features_table(ReachabilityField const &field,
         << "  ) coords ON coords.edge_id = e.id"
         << "), "
         << "reached_lines AS ("
-        << "  SELECT r.edge_id, r.cost, l.geom_3857 "
+        << "  SELECT r.edge_id, r.source_cost, r.target_cost, l.geom_3857 "
         << "  FROM reached_edges_pg r "
         << "  JOIN edge_lines l ON l.edge_id = r.edge_id"
         << "), "
@@ -156,7 +159,8 @@ int64_t materialize_point_grid_features_table(ReachabilityField const &field,
         << "  SELECT "
         << "    gp.id, "
         << "    gp.geom_3857, "
-        << "    rl.cost AS edge_cost, "
+        << "    rl.source_cost + ST_LineLocatePoint(rl.geom_3857, ST_ClosestPoint(rl.geom_3857, gp.geom_3857)) "
+        << "      * (rl.target_cost - rl.source_cost) AS edge_cost, "
         << "    ST_Distance(gp.geom_3857, rl.geom_3857) AS snap_dist "
         << "  FROM grid_points gp "
         << "  CROSS JOIN reached_lines rl "
@@ -168,6 +172,7 @@ int64_t materialize_point_grid_features_table(ReachabilityField const &field,
         << "    geom_3857, "
         << "    MIN(edge_cost + (snap_dist / " << speed_m_s << ") / 60.0) AS total_cost "
         << "  FROM snapped "
+        << "  WHERE edge_cost <= " << cfg.cost_budget() << " "
         << "  GROUP BY id, geom_3857"
         << ") "
         << "SELECT "

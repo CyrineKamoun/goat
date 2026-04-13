@@ -11,8 +11,10 @@ namespace routing::output
 struct ReachedEdgeCost
 {
     int64_t edge_id;
-    double cost;
+    double cost;        // min endpoint cost (for backward compat)
     double step_cost;
+    double source_cost; // cost at source node
+    double target_cost; // cost at target node
 };
 
 // Bucket a raw cost into step_cost according to RequestConfig.steps.

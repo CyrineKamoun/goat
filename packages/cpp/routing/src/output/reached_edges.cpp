@@ -62,18 +62,20 @@ std::vector<ReachedEdgeCost> collect_reached_edges(ReachabilityField const &fiel
             continue;
         }
 
-        double cost = use_min_endpoint_cost ? std::min(source_cost, target_cost)
-                                            : target_cost;
-        if (!std::isfinite(cost) || cost > cfg.cost_budget())
+        // Include edge if at least one endpoint is within budget
+        double min_cost = std::min(source_cost, target_cost);
+        if (min_cost > cfg.cost_budget())
         {
             continue;
         }
+        double cost = use_min_endpoint_cost ? min_cost : target_cost;
 
         int64_t edge_id = net.edges[i].id;
         auto it = best_by_id.find(edge_id);
         if (it == best_by_id.end() || cost < it->second.cost)
         {
-            best_by_id[edge_id] = {edge_id, cost, compute_step_cost(cost, cfg)};
+            best_by_id[edge_id] = {edge_id, cost, compute_step_cost(cost, cfg),
+                                   source_cost, target_cost};
         }
     }
 
