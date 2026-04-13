@@ -32,7 +32,7 @@ class RoutingSettings(BaseSettingsModel):
     # Local C++ routing backend paths
     street_network_edges_base_path: str = "/app/data/street_network/edges"
     street_network_nodes_base_path: str = "/app/data/street_network/nodes"
-    pt_network_base_path: str = "/app/data/pt_network"
+    pt_network_base_path: str = "/app/data/pt_network/latest_de.bin"
 
     # R5 service
     r5_url: str = "http://localhost:7070"

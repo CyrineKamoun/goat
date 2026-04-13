@@ -3,7 +3,7 @@
 namespace routing::input
 {
 
-    static constexpr double kCarBufferSpeedKmH = 80.0;
+    static constexpr double kCarBufferSpeedKmH = 60.0;
 
     std::vector<std::string> valid_classes(RoutingMode mode)
     {

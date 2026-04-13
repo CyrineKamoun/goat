@@ -103,7 +103,7 @@ class ToolSettings:
     # Local C++ routing backend paths
     street_network_edges_base_path: str = "/app/data/street_network/edges"
     street_network_nodes_base_path: str = "/app/data/street_network/nodes"
-    pt_network_base_path: str = "/app/data/pt_network"
+    pt_network_base_path: str = "/app/data/pt_network/latest_de.bin"
 
     # S3 settings (shared for DuckLake and uploads)
     s3_provider: str = "hetzner"  # hetzner, aws, minio
@@ -274,7 +274,7 @@ class ToolSettings:
                 "STREET_NETWORK_NODES_BASE_PATH", "/app/data/street_network/nodes"
             ),
             pt_network_base_path=cls._get_secret(
-                "PT_NETWORK_BASE_PATH", "/app/data/pt_network"
+                "PT_NETWORK_BASE_PATH", "/app/data/pt_network/latest_de.bin"
             ),
             s3_provider=cls._get_secret("S3_PROVIDER", "hetzner").lower(),
             s3_endpoint_url=cls._get_secret("S3_ENDPOINT_URL", ""),

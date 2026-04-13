@@ -12,7 +12,7 @@
 namespace routing::kernel
 {
 
-    static constexpr double kCarConnectorSpeedKmH = 80.0 * 0.7;
+    static constexpr double kCarConnectorSpeedKmH = 60.0 * 0.7;
     static constexpr double kDefaultMaxSnapDistance = 500.0;
 
     namespace
