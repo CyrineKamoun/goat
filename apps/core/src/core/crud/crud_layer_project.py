@@ -251,19 +251,30 @@ class CRUDLayerProject(CRUDLayerBase):
 
             # Check if layer with same name and ID already exists in project. Then the layer should be duplicated with a new name.
             layer_name = layer.name
+            # Find existing project-layer link to copy style from (if duplicating within same project)
+            existing_link = None
             if layer_projects != []:
+                for lp in layer_projects:
+                    if lp[0].layer_id == layer.id:
+                        existing_link = lp[0]
+                        break
                 if layer.name in [
                     layer_project[0].name for layer_project in layer_projects
                 ]:
                     layer_name = "Copy from " + layer.name
+
+            # Copy properties from the existing project-layer link (preserves user's style)
+            # rather than from the base layer (which would reset to default style)
+            properties = existing_link.properties if existing_link else layer.properties
+            other_properties = existing_link.other_properties if existing_link else layer.other_properties
 
             # Create layer project link
             layer_project = LayerProjectLink(
                 project_id=project_id,
                 layer_id=layer.id,
                 name=layer_name,
-                properties=layer.properties,
-                other_properties=layer.other_properties,
+                properties=properties,
+                other_properties=other_properties,
             )
 
             # Add to database
