@@ -57,7 +57,9 @@ int64_t materialize_network_features_table(ReachabilityField const &field,
     auto create_reached = con.Query(
         "CREATE TEMP TABLE reached_edges ("
         "edge_id BIGINT, "
-        "step_cost DOUBLE"
+        "step_cost DOUBLE, "
+        "source_cost DOUBLE, "
+        "target_cost DOUBLE"
         ")");
     if (create_reached->HasError())
     {
@@ -71,41 +73,65 @@ int64_t materialize_network_features_table(ReachabilityField const &field,
         appender.BeginRow();
         appender.Append(r.edge_id);
         appender.Append(r.step_cost);
+        appender.Append(r.source_cost);
+        appender.Append(r.target_cost);
         appender.EndRow();
     }
     appender.Close();
 
+    double budget = cfg.cost_budget();
+
     std::ostringstream create_sql;
     create_sql << "CREATE TEMP TABLE " << kNetworkFeaturesTempTable << " AS "
-               << "WITH line_parts AS ("
+               << "WITH edge_geoms AS ("
                << "  SELECT "
                << "    r.edge_id, "
                << "    r.step_cost, "
-               << "    e.source_x, e.source_y, e.target_x, e.target_y, "
-               << "    string_agg("
-               << "      CAST(pt[1] AS VARCHAR) || ' ' || CAST(pt[2] AS VARCHAR), "
-               << "      ',' ORDER BY ord"
-               << "    ) AS coords_text "
+               << "    r.source_cost, "
+               << "    r.target_cost, "
+               << "    ST_GeomFromText("
+               << "      CASE "
+               << "        WHEN coords.coords_text IS NOT NULL AND length(coords.coords_text) > 0 "
+               << "          THEN 'LINESTRING(' || coords.coords_text || ')' "
+               << "        ELSE 'LINESTRING(' || "
+               << "          CAST(e.source_x AS VARCHAR) || ' ' || CAST(e.source_y AS VARCHAR) || ',' || "
+               << "          CAST(e.target_x AS VARCHAR) || ' ' || CAST(e.target_y AS VARCHAR) || ')' "
+               << "      END"
+               << "    ) AS geom_3857 "
                << "  FROM reached_edges r "
                << "  JOIN " << kLoadedEdgesTempTable << " e ON e.id = r.edge_id "
-               << "  LEFT JOIN UNNEST(e.coordinates_3857) WITH ORDINALITY AS t(pt, ord) ON TRUE "
-               << "  GROUP BY r.edge_id, r.step_cost, e.source_x, e.source_y, e.target_x, e.target_y"
+               << "  LEFT JOIN ("
+               << "    SELECT "
+               << "      id AS edge_id, "
+               << "      string_agg(CAST(pt[1] AS VARCHAR) || ' ' || CAST(pt[2] AS VARCHAR), ',' ORDER BY ord) AS coords_text "
+               << "    FROM " << kLoadedEdgesTempTable << " "
+               << "    LEFT JOIN UNNEST(coordinates_3857) WITH ORDINALITY AS t(pt, ord) ON TRUE "
+               << "    GROUP BY 1"
+               << "  ) coords ON coords.edge_id = e.id"
+               << "), "
+               << "clipped AS ("
+               << "  SELECT "
+               << "    edge_id, "
+               << "    step_cost, "
+               << "    CASE "
+               << "      WHEN source_cost <= " << budget << " AND target_cost <= " << budget
+               << "        THEN geom_3857 "
+               << "      WHEN source_cost <= " << budget << " AND target_cost > " << budget
+               << "        THEN ST_LineSubstring(geom_3857, 0.0, "
+               << "          GREATEST(0.001, LEAST(1.0, (" << budget << " - source_cost) / NULLIF(target_cost - source_cost, 0.0))))"
+               << "      WHEN source_cost > " << budget << " AND target_cost <= " << budget
+               << "        THEN ST_LineSubstring(geom_3857, "
+               << "          GREATEST(0.0, LEAST(0.999, 1.0 - (" << budget << " - target_cost) / NULLIF(source_cost - target_cost, 0.0))), 1.0)"
+               << "      ELSE NULL "
+               << "    END AS geom_3857 "
+               << "  FROM edge_geoms"
                << ") "
                << "SELECT "
                << "  edge_id, "
                << "  step_cost, "
-               << "  ST_Transform("
-               << "    ST_GeomFromText("
-               << "      CASE "
-               << "        WHEN coords_text IS NOT NULL AND length(coords_text) > 0 THEN 'LINESTRING(' || coords_text || ')' "
-               << "        ELSE 'LINESTRING(' || "
-               << "          CAST(source_x AS VARCHAR) || ' ' || CAST(source_y AS VARCHAR) || ',' || "
-               << "          CAST(target_x AS VARCHAR) || ' ' || CAST(target_y AS VARCHAR) || ')' "
-               << "      END"
-               << "    ), "
-               << "    'EPSG:3857', 'OGC:CRS84'"
-               << "  ) AS geometry "
-               << "FROM line_parts";
+               << "  ST_Transform(geom_3857, 'EPSG:3857', 'OGC:CRS84') AS geometry "
+               << "FROM clipped "
+               << "WHERE ST_Length(geom_3857) > 0";
 
     auto create_features = con.Query(create_sql.str());
     if (create_features->HasError())

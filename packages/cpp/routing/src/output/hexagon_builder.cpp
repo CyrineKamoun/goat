@@ -59,7 +59,9 @@ int64_t materialize_hexagon_features_table(ReachabilityField const &field,
     auto create_reached = con.Query(
         "CREATE TEMP TABLE reached_edges ("
         "edge_id BIGINT, "
-        "cost DOUBLE"
+        "cost DOUBLE, "
+        "source_cost DOUBLE, "
+        "target_cost DOUBLE"
         ")");
     if (create_reached->HasError())
     {
@@ -73,6 +75,8 @@ int64_t materialize_hexagon_features_table(ReachabilityField const &field,
         appender.BeginRow();
         appender.Append(r.edge_id);
         appender.Append(r.cost);
+        appender.Append(r.source_cost);
+        appender.Append(r.target_cost);
         appender.EndRow();
     }
     appender.Close();
@@ -130,14 +134,14 @@ int64_t materialize_hexagon_features_table(ReachabilityField const &field,
                << "), "
                << "sampled_points AS ("
                << "  SELECT "
-               << "    r.cost, "
+               << "    r.source_cost + ST_LineLocatePoint(l.geom_3857, (d).geom) * (r.target_cost - r.source_cost) AS cost, "
                << "    ST_Transform((d).geom, 'EPSG:3857', 'OGC:CRS84') AS p_wgs84 "
                << "  FROM reached_edges r "
                << "  JOIN edge_lines l ON l.edge_id = r.edge_id "
                << "  CROSS JOIN UNNEST(ST_Dump(ST_Points(l.geom_3857))) AS t(d)"
                << "  UNION ALL "
                << "  SELECT "
-               << "    r.cost, "
+               << "    r.source_cost + ST_LineLocatePoint(l.geom_3857, (d).geom) * (r.target_cost - r.source_cost) AS cost, "
                << "    ST_Transform((d).geom, 'EPSG:3857', 'OGC:CRS84') AS p_wgs84 "
                << "  FROM reached_edges r "
                << "  JOIN edge_lines l ON l.edge_id = r.edge_id "
@@ -157,6 +161,7 @@ int64_t materialize_hexagon_features_table(ReachabilityField const &field,
                << "    ) AS cell, "
                << "    min(cost) AS min_cost "
                << "  FROM sampled_points "
+               << "  WHERE cost <= " << cfg.cost_budget() << " "
                << "  GROUP BY 1"
                << "), "
                << "enriched AS ("
