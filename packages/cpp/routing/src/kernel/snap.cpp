@@ -12,7 +12,7 @@
 namespace routing::kernel
 {
 
-    static constexpr double kCarConnectorSpeedKmH = 60.0 * 0.7;
+    static constexpr double kCarConnectorSpeedKmH = 60.0 * 0.75;
     static constexpr double kDefaultMaxSnapDistance = 500.0;
 
     namespace
@@ -156,7 +156,6 @@ namespace routing::kernel
         net.cost.push_back(snap_cost);
         net.reverse_cost.push_back(snap_cost);
         net.length_3857.push_back(cand.proj.dist);
-        net.geom.address.push_back(0);
 
         Edge connector{};
         connector.id = -1;
@@ -171,7 +170,7 @@ namespace routing::kernel
         connector.maxspeed_backward = orig.maxspeed_backward;
         connector.source_coord = origin;
         connector.target_coord = cand.proj.point;
-        connector.geometry = {origin, cand.proj.point};
+        // geometry removed from Edge struct — connector geom not needed
         net.edges.push_back(std::move(connector));
 
         double fwd_cost = net.cost[edge_idx];
@@ -193,7 +192,6 @@ namespace routing::kernel
         net.cost.push_back(fwd_cost * (1.0 - frac));
         net.reverse_cost.push_back(rev_cost * (1.0 - frac));
         net.length_3857.push_back(dist_to_tgt);
-        net.geom.address.push_back(0);
 
         Edge to_tgt{};
         to_tgt.id = -2;
@@ -211,7 +209,7 @@ namespace routing::kernel
         to_tgt.class_ = orig.class_;
         to_tgt.source_coord = cand.proj.point;
         to_tgt.target_coord = tgt_coord;
-        to_tgt.geometry = {cand.proj.point, tgt_coord};
+        // geometry removed from Edge struct
         net.edges.push_back(std::move(to_tgt));
 
         net.source.push_back(proj_node);
@@ -219,7 +217,6 @@ namespace routing::kernel
         net.cost.push_back(rev_cost * frac);
         net.reverse_cost.push_back(fwd_cost * frac);
         net.length_3857.push_back(dist_to_src);
-        net.geom.address.push_back(0);
 
         Edge to_src{};
         to_src.id = -3;
@@ -237,7 +234,7 @@ namespace routing::kernel
         to_src.class_ = orig.class_;
         to_src.source_coord = cand.proj.point;
         to_src.target_coord = src_coord;
-        to_src.geometry = {cand.proj.point, src_coord};
+        // geometry removed from Edge struct
         net.edges.push_back(std::move(to_src));
 
         return origin_node;

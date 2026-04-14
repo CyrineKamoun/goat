@@ -6,7 +6,7 @@ namespace routing::kernel
 {
 
     static constexpr double kBicycleFootwaySpeed = 5.0 / 3.6; // m/s
-    static constexpr double kCarSpeedFactor = 0.7;
+    static constexpr double kCarSpeedFactor = 0.75;
     static constexpr double kOneWayCost = 99999.0;
 
     static bool is_footway(std::string const &cls)
