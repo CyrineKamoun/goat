@@ -187,6 +187,13 @@ export function getLegendColorMap(
     colorMap.push({ value: null, color: hex });
   }
 
+  // 3. Append "No data" entry when a visible no-data color is configured
+  const noDataColor = properties[`${type}_no_data`] as string | undefined;
+  if (noDataColor && noDataColor !== "transparent" && properties[`${type}_field`]) {
+    const noDataLabel = colorLegends?.["no_data"] || "No data";
+    colorMap.push({ value: null, color: noDataColor, label: noDataLabel });
+  }
+
   return colorMap;
 }
 

@@ -42,6 +42,8 @@ export function getMapboxStyleColor(data: ProjectLayer | Layer, type: "color" | 
   const fieldName = data.properties[`${type}_field`]?.name;
   const colorScale = data.properties[`${type}_scale`];
   const colorMaps = data.properties[`${type}_range`]?.color_map;
+  const rawNoData = data.properties[`${type}_no_data`] as string | undefined;
+  const noDataColor = rawNoData === "transparent" ? "rgba(0,0,0,0)" : rawNoData;
   if (colorMaps && fieldName && Array.isArray(colorMaps) && colorScale === "ordinal") {
     const valuesAndColors = [] as string[];
     const seenValues = new Set<string>();
@@ -64,7 +66,11 @@ export function getMapboxStyleColor(data: ProjectLayer | Layer, type: "color" | 
     }
     // Use to-string to ensure string comparison — MapLibre match only supports
     // integer numeric labels, so string matching is needed for float/decimal values.
-    return ["match", ["to-string", ["get", fieldName]], ...valuesAndColors, "#AAAAAA"];
+    const matchExpr = ["match", ["to-string", ["get", fieldName]], ...valuesAndColors, "#AAAAAA"];
+    if (noDataColor) {
+      return ["case", ["==", ["get", fieldName], null], noDataColor, matchExpr];
+    }
+    return matchExpr;
   }
 
   if (
@@ -103,6 +109,9 @@ export function getMapboxStyleColor(data: ProjectLayer | Layer, type: "color" | 
       }
     });
     const config = ["step", ["get", fieldName], ...colorSteps];
+    if (noDataColor) {
+      return ["case", ["==", ["get", fieldName], null], noDataColor, config];
+    }
     return config;
   }
   const breakValues = data.properties[`${type}_scale_breaks`];
@@ -133,6 +142,9 @@ export function getMapboxStyleColor(data: ProjectLayer | Layer, type: "color" | 
     })
     .flat();
   const config = ["step", ["get", fieldName], ...colorSteps];
+  if (noDataColor) {
+    return ["case", ["==", ["get", fieldName], null], noDataColor, config];
+  }
   return config;
 }
 

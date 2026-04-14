@@ -22,6 +22,7 @@ const ColorScaleSelector = (props: ColorScaleSelectorProps) => {
         open={open}
         placement="bottom"
         arrow={false}
+        disablePortal={false}
         isClickAwayEnabled={isClickAwayEnabled}
         onClose={() => setOpen(false)}
         content={
