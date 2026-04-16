@@ -141,7 +141,13 @@ int64_t materialize_polygon_features_table(ReachabilityField const &field,
         throw std::runtime_error("Failed to create reached_nodes: " +
                                  create_nodes->GetError());
 
+    // Downsample interior nodes for concave hull performance.
+    // Boundary nodes (cost near a step threshold) are always kept.
+    static constexpr int32_t kDownsampleFactor = 5;
+
     int64_t reached_node_count = 0;
+    int32_t sample_counter = 0;
+    auto const step_thresholds = make_step_costs(cfg);
     {
         duckdb::Appender nodes_appender(con, "reached_nodes");
         for (int32_t nid = 0; nid < field.node_count; ++nid)
@@ -152,6 +158,20 @@ int64_t materialize_polygon_features_table(ReachabilityField const &field,
             if (!field.network ||
                 static_cast<std::size_t>(nid) >= field.network->node_coords.size())
                 continue;
+
+            bool is_boundary = false;
+            for (double sc : step_thresholds)
+            {
+                if (std::abs(cost - sc) < sc * 0.1)
+                {
+                    is_boundary = true;
+                    break;
+                }
+            }
+
+            if (!is_boundary && (sample_counter++ % kDownsampleFactor) != 0)
+                continue;
+
             auto const &coord = field.network->node_coords[static_cast<std::size_t>(nid)];
             nodes_appender.BeginRow();
             nodes_appender.Append(nid);
