@@ -157,21 +157,22 @@ namespace routing
         double cost;
     };
 
-    struct GeomStore
+    // Lightweight per-edge info retained after compaction for output phase.
+    struct EdgeInfo
     {
-        std::vector<int32_t> address;
-        std::vector<Point3857> coords;
+        int64_t id;
+        int32_t h3_3;
+        std::vector<Point3857> geometry; // populated for jsolines only
     };
 
     struct SubNetwork
     {
-        std::vector<Edge> edges;
+        std::vector<EdgeInfo> edges;
         std::vector<int32_t> source;
         std::vector<int32_t> target;
         std::vector<double> cost;
         std::vector<double> reverse_cost;
         std::vector<double> length_3857;
-        GeomStore geom;
         std::vector<Point3857> node_coords;
         int32_t node_count;
     };

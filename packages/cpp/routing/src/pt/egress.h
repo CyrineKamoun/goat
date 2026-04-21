@@ -27,6 +27,7 @@ namespace routing::pt
     // min(max_traveltime - transit_cost, egress_max_time).
     std::vector<double> compute_egress_costs(
         SubNetwork const &net,
+        std::vector<Edge> &reusable_edges,
         std::vector<int32_t> const &stop_nodes,
         std::vector<std::optional<double>> const &transit_costs,
         RequestConfig const &cfg);

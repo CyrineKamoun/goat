@@ -66,13 +66,17 @@ namespace routing::pt
         double const buffer_m = max_remaining_min * (egress_speed * 1000.0 / 60.0);
         auto egress_classes = input::valid_classes(cfg.egress_mode);
 
+        bool load_geom = (cfg.catchment_type == CatchmentType::Network) ||
+                         (cfg.catchment_type == CatchmentType::Polygon &&
+                          cfg.egress_mode != RoutingMode::Car);
         return data::load_edges(
             con, cfg.edge_dir, cfg.node_dir, stop_coords,
-            buffer_m, egress_classes, cfg.egress_mode);
+            buffer_m, egress_classes, cfg.egress_mode, load_geom);
     }
 
     std::vector<double> compute_egress_costs(
         SubNetwork const &net,
+        std::vector<Edge> &reusable_edges,
         std::vector<int32_t> const &stop_nodes,
         std::vector<std::optional<double>> const &transit_costs,
         RequestConfig const &cfg)
@@ -131,21 +135,22 @@ namespace routing::pt
             (cfg.egress_speed_km_h > 0.0 &&
              cfg.egress_speed_km_h != cfg.speed_km_h);
 
-        if (needs_recompute && !net.edges.empty())
+        if (needs_recompute && !reusable_edges.empty())
         {
             RequestConfig egress_cfg = cfg;
             egress_cfg.mode = cfg.egress_mode;
             if (cfg.egress_speed_km_h > 0.0)
                 egress_cfg.speed_km_h = cfg.egress_speed_km_h;
 
-            auto egress_edges = net.edges;
-            kernel::compute_costs(egress_edges, egress_cfg);
+            // Recompute costs in-place — no copy needed. compute_costs
+            // only reads length_m/class_/impedance and overwrites cost/reverse_cost.
+            kernel::compute_costs(reusable_edges, egress_cfg);
 
             std::vector<std::vector<AdjEntry>> adj(net.node_count);
-            for (size_t i = 0; i < net.source.size() && i < egress_edges.size(); ++i)
+            for (size_t i = 0; i < net.source.size() && i < reusable_edges.size(); ++i)
             {
-                double const c  = egress_edges[i].cost;
-                double const rc = egress_edges[i].reverse_cost;
+                double const c  = reusable_edges[i].cost;
+                double const rc = reusable_edges[i].reverse_cost;
                 if (c >= 0.0 && c < 99999.0)
                     adj[net.source[i]].push_back({net.target[i], c});
                 if (rc >= 0.0 && rc < 99999.0)

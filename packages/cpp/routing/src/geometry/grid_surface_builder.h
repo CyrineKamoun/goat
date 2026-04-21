@@ -20,25 +20,18 @@ namespace routing::geometry
     };
 
     // Return a grid zoom level appropriate for the routing mode.
-    // Higher zoom → finer grid (more pixels per meter).
     inline int grid_zoom_for_mode(RoutingMode mode)
     {
         switch (mode)
         {
         case RoutingMode::Walking: return 13;
-        default:                  return 11; // Bicycle, Pedelec, Car, PublicTransport
+        default:                  return 11;
         }
     }
 
     // Build a rasterized cost surface from the reachability field.
-    // 1. Collect node coordinates + costs from the field.
-    // 2. Interpolate additional points along edge geometries.
-    // 3. Project all points onto a regular grid (zoom-dependent resolution).
-    // 4. KD-tree nearest-neighbor lookup fills each grid cell.
-    //
-    // The zoom parameter controls resolution (higher = finer).
-    // Walking speed (m/s) is used to add off-network cost for grid cells
-    // that don't fall exactly on a network node/edge.
+    // Uses Edge::geometry (populated for active mobility) for accurate
+    // interpolation along road curves.
     CostGrid build_cost_grid(ReachabilityField const &field,
                              RequestConfig const &cfg,
                              int zoom = 10);

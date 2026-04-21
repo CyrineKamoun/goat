@@ -7,13 +7,15 @@
 #include "stop_finder.h"
 
 #include "../kernel/dijkstra.h"
-#include "../kernel/edge_loader.h"
+#include "../kernel/graph_builder.h"
 #include "../kernel/mode_selector.h"
 #include "../kernel/reachability_field.h"
 #include "../kernel/snap.h"
 
 #include <nigiri/timetable.h>
 
+#include <chrono>
+#include <cstdio>
 #include <filesystem>
 #include <unordered_set>
 
@@ -24,17 +26,17 @@ namespace routing::pt
     {
         std::vector<Edge> merge_edge_sets(
             std::vector<Edge> egress_edges,
-            std::vector<Edge> const &access_edges)
+            std::vector<Edge> access_edges)
         {
             std::unordered_set<int64_t> seen;
             seen.reserve(egress_edges.size());
             for (auto const &e : egress_edges)
                 seen.insert(e.id);
 
-            for (auto const &e : access_edges)
+            for (auto &e : access_edges)
             {
                 if (seen.find(e.id) == seen.end())
-                    egress_edges.push_back(e);
+                    egress_edges.push_back(std::move(e));
             }
             return egress_edges;
         }
@@ -47,18 +49,36 @@ namespace routing::pt
         duckdb::Connection &con,
         std::vector<Point3857> const &extra_points)
     {
+        auto t0 = std::chrono::steady_clock::now();
+        auto elapsed = [&]() {
+            auto now = std::chrono::steady_clock::now();
+            double ms = std::chrono::duration<double, std::milli>(now - t0).count();
+            t0 = now;
+            return ms;
+        };
+
         // 1. Load timetable
         auto tt = nigiri::timetable::read(
             std::filesystem::path{cfg.timetable_path});
+        std::fprintf(stderr, "[PT] 1. Load timetable: %.0f ms\n", elapsed());
 
         // 2. Access leg
         auto access = compute_access(cfg, con, *tt);
+        std::fprintf(stderr, "[PT] 2. Access leg (%zu edges, %zu seeds): %.0f ms\n",
+                     access.raw_edges.size(), access.seeds.size(), elapsed());
 
         // 3. RAPTOR transit search
         auto transit_costs = run_raptor(*tt, access.seeds, cfg);
+        size_t reachable_stops = 0;
+        for (auto const &c : transit_costs)
+            if (c.has_value()) ++reachable_stops;
+        std::fprintf(stderr, "[PT] 3. RAPTOR (%zu reachable stops, window=%d): %.0f ms\n",
+                     reachable_stops, cfg.departure_window, elapsed());
 
         // 4. Egress leg: load street network around reachable stops
         auto egress_edges = load_egress_edges(cfg, con, *tt, transit_costs);
+        std::fprintf(stderr, "[PT] 4. Load egress edges (%zu edges): %.0f ms\n",
+                     egress_edges.size(), elapsed());
 
         if (egress_edges.empty())
         {
@@ -81,15 +101,20 @@ namespace routing::pt
 
         // 5. Build combined network
         auto combined_edges = merge_edge_sets(
-            std::move(egress_edges), access.raw_edges);
+            std::move(egress_edges), std::move(access.raw_edges));
 
         RequestConfig walk_cfg = cfg;
         walk_cfg.mode = cfg.egress_mode;
         if (cfg.egress_speed_km_h > 0.0)
             walk_cfg.speed_km_h = cfg.egress_speed_km_h;
-        kernel::compute_costs(combined_edges, walk_cfg);
 
+        kernel::compute_costs(combined_edges, walk_cfg);
         auto combined_net = kernel::build_sub_network(combined_edges);
+        // combined_edges remain usable after build_sub_network: geometry was
+        // std::move'd into EdgeInfo, but compute_costs only reads
+        // length_m/class_/impedance fields which are still intact.
+        std::fprintf(stderr, "[PT] 5. Build combined network (%zu edges, %d nodes): %.0f ms\n",
+                     combined_net.source.size(), combined_net.node_count, elapsed());
 
         // 6. Snap origins, stops, and extra destination points.
         RequestConfig access_snap_cfg = cfg;
@@ -153,6 +178,9 @@ namespace routing::pt
             access_budget = cfg.max_cost;
         }
 
+        std::fprintf(stderr, "[PT] 6. Snap (origins=%zu, stops=%zu): %.0f ms\n",
+                     valid_starts.size(), reachable_coords.size(), elapsed());
+
         // 7. Access Dijkstra on combined network
         std::vector<double> access_costs;
         if (cfg.access_mode != cfg.egress_mode ||
@@ -164,15 +192,14 @@ namespace routing::pt
             if (cfg.access_speed_km_h > 0.0)
                 access_cfg.speed_km_h = cfg.access_speed_km_h;
 
-            auto access_edge_copy = combined_net.edges;
-            kernel::compute_costs(access_edge_copy, access_cfg);
+            kernel::compute_costs(combined_edges, access_cfg);
 
             std::vector<std::vector<AdjEntry>> adj(combined_net.node_count);
             for (size_t i = 0; i < combined_net.source.size() &&
-                               i < access_edge_copy.size(); ++i)
+                               i < combined_edges.size(); ++i)
             {
-                double const c = access_edge_copy[i].cost;
-                double const rc = access_edge_copy[i].reverse_cost;
+                double const c = combined_edges[i].cost;
+                double const rc = combined_edges[i].reverse_cost;
                 if (c >= 0.0 && c < 99999.0)
                     adj[combined_net.source[i]].push_back(
                         {combined_net.target[i], c});
@@ -190,15 +217,20 @@ namespace routing::pt
                 adj, valid_starts, access_budget, /*use_distance=*/false);
         }
 
+        std::fprintf(stderr, "[PT] 7. Access Dijkstra: %.0f ms\n", elapsed());
+
         // 8. Egress Dijkstra on combined network
         auto egress_costs = compute_egress_costs(
-            combined_net, stop_nodes, transit_costs, cfg);
+            combined_net, combined_edges, stop_nodes, transit_costs, cfg);
+        std::fprintf(stderr, "[PT] 8. Egress Dijkstra: %.0f ms\n", elapsed());
 
         // 9. Merge
-        return {
+        auto result = PtPipelineResult{
             merge_fields(
                 std::move(access_costs), egress_costs, std::move(combined_net)),
             std::move(extra_ids)};
+        std::fprintf(stderr, "[PT] 9. Merge: %.0f ms\n", elapsed());
+        return result;
     }
 
     ReachabilityField run_pt_pipeline(RequestConfig const &cfg,

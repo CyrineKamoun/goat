@@ -4,7 +4,7 @@
 #include "input/request_config.h"
 #include "input/validation.h"
 #include "kernel/dijkstra.h"
-#include "kernel/edge_loader.h"
+#include "kernel/graph_builder.h"
 #include "kernel/mode_selector.h"
 #include "kernel/reachability_field.h"
 #include "kernel/snap.h"
@@ -14,6 +14,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <duckdb.hpp>
 #include <filesystem>
 #include <limits>
@@ -37,6 +38,7 @@ namespace routing
             rcfg.max_cost = cfg.max_cost;
             rcfg.speed_km_h = cfg.speed_km_h;
             rcfg.edge_dir = cfg.edge_dir;
+            rcfg.node_dir = cfg.node_dir;
             rcfg.starting_points = starting_points;
             rcfg.steps = 1; // unused by matrix, but required by validation
             // PT fields
@@ -57,14 +59,6 @@ namespace routing
             SubNetwork net;
             std::vector<int32_t> valid_starts;
         };
-
-        double elapsed_ms(std::chrono::steady_clock::time_point const start,
-                          std::chrono::steady_clock::time_point const end)
-        {
-            return std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
-                       end - start)
-                .count();
-        }
 
         void ensure_required_extensions_loaded(duckdb::Connection &con)
         {
@@ -107,11 +101,12 @@ namespace routing
 
         std::vector<Edge> load_filtered_edges(RequestConfig const &cfg,
                                               duckdb::Connection &con,
-                                              std::vector<std::string> const &classes)
+                                              std::vector<std::string> const &classes,
+                                              bool load_geometry = false)
         {
             double buffer_m = input::buffer_distance(cfg);
             auto edges = data::load_edges(con, cfg.edge_dir, cfg.node_dir, cfg.starting_points,
-                                          buffer_m, classes, cfg.mode);
+                                          buffer_m, classes, cfg.mode, load_geometry);
             if (edges.empty())
             {
                 throw std::runtime_error(
@@ -183,142 +178,74 @@ namespace routing
         {
             validate_request(cfg);
 
-            if (cfg.mode == RoutingMode::PublicTransport)
-                return pt::run_pt_pipeline(cfg, con);
+            // Load geometry into C++ when output needs edge polylines:
+            // - Jsolines polygon (non-car) for grid surface interpolation
+            // - Network output for edge clipping + WKT construction
+            // Car polygon (concave hull), hexagon, and point grid use node coords only.
+            bool load_geom = (cfg.catchment_type == CatchmentType::Network) ||
+                             (cfg.catchment_type == CatchmentType::Polygon &&
+                              cfg.mode != RoutingMode::Car);
 
-            auto classes = select_valid_classes(cfg);
-            auto edges = load_filtered_edges(cfg, con, classes);
-            compute_edge_costs(edges, cfg);
-            auto prepared = build_network_and_starts(std::move(edges), cfg);
-            auto costs = run_reachability_dijkstra(prepared.net,
-                                                   prepared.valid_starts,
-                                                   cfg);
-            return kernel::make_reachability_field(std::move(costs),
-                                                   std::move(prepared.net));
+            ReachabilityField field;
+
+            if (cfg.mode == RoutingMode::PublicTransport)
+            {
+                field = pt::run_pt_pipeline(cfg, con);
+            }
+            else
+            {
+                auto classes = select_valid_classes(cfg);
+                auto edges = load_filtered_edges(cfg, con, classes, load_geom);
+                compute_edge_costs(edges, cfg);
+                auto prepared = build_network_and_starts(std::move(edges), cfg);
+                auto costs = run_reachability_dijkstra(prepared.net,
+                                                       prepared.valid_starts,
+                                                       cfg);
+                field = kernel::make_reachability_field(std::move(costs),
+                                                        std::move(prepared.net));
+            }
+
+
+            return field;
         }
     } // namespace
 
     std::string compute_catchment(RequestConfig const &cfg)
     {
+        auto t0 = std::chrono::steady_clock::now();
+        auto elapsed = [&]() {
+            auto now = std::chrono::steady_clock::now();
+            double ms = std::chrono::duration<double, std::milli>(now - t0).count();
+            t0 = now;
+            return ms;
+        };
+
         duckdb::DuckDB db(nullptr);
         duckdb::Connection con(db);
         ensure_required_extensions_loaded(con);
+        std::fprintf(stderr, "[Pipeline] DuckDB init: %.0f ms\n", elapsed());
+
         auto field = build_reachability_field(cfg, con);
+        std::fprintf(stderr, "[Pipeline] Reachability field (%d nodes, %zu edges): %.0f ms\n",
+                     field.node_count,
+                     field.network ? field.network->source.size() : 0,
+                     elapsed());
 
         if (cfg.output_format == OutputFormat::GeoJSON)
         {
-            return dispatch_geojson_output(field, cfg, con);
+            auto result = dispatch_geojson_output(field, cfg, con);
+            std::fprintf(stderr, "[Pipeline] GeoJSON output: %.0f ms\n", elapsed());
+            return result;
         }
 
         if (cfg.output_format == OutputFormat::Parquet)
         {
-            return dispatch_parquet_output(field, cfg, con);
+            auto result = dispatch_parquet_output(field, cfg, con);
+            std::fprintf(stderr, "[Pipeline] Parquet output: %.0f ms\n", elapsed());
+            return result;
         }
 
         return "";
-    }
-
-    CatchmentStepBenchmark benchmark_catchment_steps(RequestConfig const &cfg)
-    {
-        auto t_total_start = std::chrono::steady_clock::now();
-
-        auto t_validate_start = std::chrono::steady_clock::now();
-        input::validate(cfg);
-        auto t_validate_end = std::chrono::steady_clock::now();
-
-        auto t_class_selection_start = t_validate_end;
-        auto classes = input::valid_classes(cfg.mode);
-        auto t_class_selection_end = std::chrono::steady_clock::now();
-
-        auto t_buffer_distance_start = t_class_selection_end;
-        double buffer_m = input::buffer_distance(cfg);
-        auto t_buffer_distance_end = std::chrono::steady_clock::now();
-
-        auto t_read_start = t_buffer_distance_end;
-        data::EdgeLoadBenchmark load_bm;
-        duckdb::DuckDB db(nullptr);
-        duckdb::Connection con(db);
-        ensure_required_extensions_loaded(con);
-        auto edges = data::load_edges_with_benchmark(
-            con,
-            cfg.edge_dir,
-            cfg.node_dir,
-            cfg.starting_points,
-            buffer_m,
-            classes,
-            cfg.mode,
-            load_bm);
-        auto t_read_end = std::chrono::steady_clock::now();
-
-        if (edges.empty())
-            throw std::runtime_error(
-                "No edges loaded. Check edge_dir and H3 cell coverage.");
-
-        size_t edge_count = edges.size();
-
-        auto t_prep_start = t_read_end;
-        auto t_compute_costs_start = t_prep_start;
-        kernel::compute_costs(edges, cfg);
-        auto t_compute_costs_end = std::chrono::steady_clock::now();
-
-        auto t_build_network_start = t_compute_costs_end;
-        auto net = kernel::build_sub_network(edges);
-        auto t_build_network_end = std::chrono::steady_clock::now();
-
-        auto t_snap_start = t_build_network_end;
-        auto start_nodes = kernel::snap_origins(net, cfg.starting_points, cfg);
-
-        std::vector<int32_t> valid_starts;
-        valid_starts.reserve(start_nodes.size());
-        for (auto s : start_nodes)
-        {
-            if (s >= 0)
-                valid_starts.push_back(s);
-        }
-        if (valid_starts.empty())
-            throw std::runtime_error(
-                "Starting point(s) are disconnected from the street network.");
-        auto t_snap_end = std::chrono::steady_clock::now();
-        auto t_prep_end = t_snap_end;
-
-        auto t_routing_start = t_prep_end;
-        bool use_distance = (cfg.cost_type == CostType::Distance);
-        auto t_adjacency_start = t_routing_start;
-        auto adj = kernel::build_adjacency_list(net);
-        auto t_adjacency_end = std::chrono::steady_clock::now();
-        auto t_dijkstra_start = std::chrono::steady_clock::now();
-        auto costs = kernel::dijkstra(adj, valid_starts, cfg.cost_budget(),
-                                      use_distance);
-        auto t_dijkstra_end = std::chrono::steady_clock::now();
-        auto t_routing_end = std::chrono::steady_clock::now();
-
-        auto t_conversion_start = t_routing_end;
-        auto field = kernel::make_reachability_field(std::move(costs), std::move(net));
-        auto payload = output::build_geojson_output(field, cfg, con);
-        auto t_conversion_end = std::chrono::steady_clock::now();
-
-        CatchmentStepBenchmark bm;
-        bm.validation_ms = elapsed_ms(t_validate_start, t_validate_end);
-        bm.class_selection_ms = elapsed_ms(t_class_selection_start, t_class_selection_end);
-        bm.buffer_distance_ms = elapsed_ms(t_buffer_distance_start, t_buffer_distance_end);
-        bm.duckdb_read_ms = load_bm.duckdb_read_ms;
-        bm.transfer_to_cpp_ms = load_bm.transfer_to_cpp_ms;
-        // Keep this as wall time around load_edges to remain backward comparable.
-        bm.network_read_ms = elapsed_ms(t_read_start, t_read_end);
-        bm.compute_costs_ms = elapsed_ms(t_compute_costs_start, t_compute_costs_end);
-        bm.build_network_ms = elapsed_ms(t_build_network_start, t_build_network_end);
-        bm.snap_ms = elapsed_ms(t_snap_start, t_snap_end);
-        bm.adjacency_ms = elapsed_ms(t_adjacency_start, t_adjacency_end);
-        bm.prep_ms = elapsed_ms(t_prep_start, t_prep_end);
-        bm.dijkstra_ms = elapsed_ms(t_dijkstra_start, t_dijkstra_end);
-        bm.routing_ms = elapsed_ms(t_routing_start, t_routing_end);
-        bm.conversion_ms = elapsed_ms(t_conversion_start, t_conversion_end);
-        bm.result_ms = elapsed_ms(t_total_start, t_conversion_end);
-        bm.edge_count = edge_count;
-        bm.node_count = field.node_count;
-        bm.start_count = static_cast<int32_t>(valid_starts.size());
-        bm.payload_bytes = payload.size();
-        return bm;
     }
 
     void compute_travel_cost_matrix(MatrixConfig const &cfg)

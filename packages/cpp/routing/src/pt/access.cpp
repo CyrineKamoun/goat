@@ -3,7 +3,7 @@
 
 #include "../data/street_network_loader.h"
 #include "../kernel/dijkstra.h"
-#include "../kernel/edge_loader.h"
+#include "../kernel/graph_builder.h"
 #include "../kernel/mode_selector.h"
 #include "../kernel/snap.h"
 
@@ -47,18 +47,22 @@ namespace routing::pt
         double buffer_m = input::buffer_distance(access_cfg);
         auto access_classes = input::valid_classes(cfg.access_mode);
 
+        bool load_geom = (cfg.catchment_type == CatchmentType::Network) ||
+                         (cfg.catchment_type == CatchmentType::Polygon &&
+                          cfg.access_mode != RoutingMode::Car);
         auto edges = data::load_edges(
             con, cfg.edge_dir, cfg.node_dir, cfg.starting_points,
-            buffer_m, access_classes, cfg.access_mode);
+            buffer_m, access_classes, cfg.access_mode, load_geom);
 
         if (edges.empty())
             throw std::runtime_error(
                 "PT pipeline: no street edges loaded for access leg.");
 
-        auto raw_edges = edges;
-
         kernel::compute_costs(edges, access_cfg);
         auto net = kernel::build_sub_network(edges);
+        // edges remain usable after build_sub_network: geometry was
+        // std::move'd into EdgeInfo, but compute_costs only reads
+        // length_m/class_/impedance fields which are still intact.
 
         // Snap user origins onto the network.
         auto start_nodes = kernel::snap_origins(
@@ -145,7 +149,7 @@ namespace routing::pt
             std::move(costs),
             std::move(seeds),
             std::move(snapped),
-            std::move(raw_edges)};
+            std::move(edges)};
     }
 
 } // namespace routing::pt

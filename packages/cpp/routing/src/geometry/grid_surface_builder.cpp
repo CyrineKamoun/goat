@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <sstream>
 #include <unordered_map>
 #include <vector>
 
@@ -16,7 +17,6 @@ namespace
 
 static constexpr double kEarthCircumference = 40075016.68557849;
 
-// Web mercator → pixel coordinate conversions (matches Python utils.py)
 double merc_x_to_pixel(double x, int zoom)
 {
     double z_s = static_cast<double>(1 << zoom) * 256.0;
@@ -29,18 +29,6 @@ double merc_y_to_pixel(double y, int zoom)
     return (y - kEarthCircumference / 2.0) / (kEarthCircumference / (-z_s));
 }
 
-double pixel_to_merc_x(double px, int zoom)
-{
-    double z_s = static_cast<double>(1 << zoom) * 256.0;
-    return px * (kEarthCircumference / z_s) - kEarthCircumference / 2.0;
-}
-
-double pixel_to_merc_y(double py, int zoom)
-{
-    double z_s = static_cast<double>(1 << zoom) * 256.0;
-    return py * (kEarthCircumference / (-z_s)) + kEarthCircumference / 2.0;
-}
-
 struct SamplePoint
 {
     double x;  // web mercator
@@ -48,11 +36,15 @@ struct SamplePoint
     double cost;
 };
 
-// Interpolate sample points along edge geometries at the given spacing.
-// Cost is linearly interpolated between source and target costs.
-void split_edges(
+// Query the DuckDB temp table for edge geometries and produce interpolated
+// sample points entirely in SQL, then transfer the flat (x, y, cost) results
+// to C++ in batches.
+// Interpolate sample points along edge geometries stored in C++ Edge structs.
+// Used for active mobility modes where geometry is loaded upfront.
+void split_edges_cpp(
     ReachabilityField const &field,
     double split_distance,
+    double budget,
     std::vector<SamplePoint> &out)
 {
     if (!field.network)
@@ -89,7 +81,6 @@ void split_edges(
             double seg_len = std::sqrt(dx * dx + dy * dy);
             double agg = prev_agg + seg_len;
 
-            // Interpolated points along this segment
             int n_splits = static_cast<int>(std::floor(seg_len / split_distance));
             for (int n = 1; n <= n_splits; ++n)
             {
@@ -99,15 +90,16 @@ void split_edges(
                 double y = geom[g].y + frac_seg * dy;
                 double frac_edge = (prev_agg + d) / total_length;
                 double cost = src_cost + frac_edge * (tgt_cost - src_cost);
-                out.push_back({x, y, cost});
+                if (cost <= budget)
+                    out.push_back({x, y, cost});
             }
 
-            // Intermediate vertex (not the last point of the edge)
             if (g + 2 < geom.size())
             {
                 double frac_edge = agg / total_length;
                 double cost = src_cost + frac_edge * (tgt_cost - src_cost);
-                out.push_back({geom[g + 1].x, geom[g + 1].y, cost});
+                if (cost <= budget)
+                    out.push_back({geom[g + 1].x, geom[g + 1].y, cost});
             }
 
             prev_agg = agg;
@@ -160,9 +152,9 @@ CostGrid build_cost_grid(ReachabilityField const &field,
 
     // 3. Compute pixel dimensions
     double px_bl_x = std::floor(merc_x_to_pixel(min_x, zoom));
-    double px_bl_y = std::floor(merc_y_to_pixel(min_y, zoom)); // bottom-left (larger pixel y)
+    double px_bl_y = std::floor(merc_y_to_pixel(min_y, zoom));
     double px_tr_x = std::floor(merc_x_to_pixel(max_x, zoom));
-    double px_tr_y = std::floor(merc_y_to_pixel(max_y, zoom)); // top-right (smaller pixel y)
+    double px_tr_y = std::floor(merc_y_to_pixel(max_y, zoom));
 
     int32_t width_px = static_cast<int32_t>(px_tr_x - px_bl_x);
     int32_t height_px = static_cast<int32_t>(px_bl_y - px_tr_y);
@@ -170,7 +162,7 @@ CostGrid build_cost_grid(ReachabilityField const &field,
     if (width_px < 2 || height_px < 2)
         return grid;
 
-    // Cap grid size to avoid excessive memory (e.g., 4M cells)
+    // Cap grid size
     static constexpr int64_t kMaxCells = 4'000'000;
     if (static_cast<int64_t>(width_px) * height_px > kMaxCells)
     {
@@ -185,13 +177,11 @@ CostGrid build_cost_grid(ReachabilityField const &field,
     double step_x = merc_width / width_px;
     double step_y = merc_height / height_px;
 
-    // 4. Split edges — interpolate along edge geometries
+    // 4. Split edges — interpolate along actual edge geometries in C++
     double split_dist = std::min(step_x, step_y);
-    split_edges(field, split_dist, points);
+    split_edges_cpp(field, split_dist, budget, points);
 
-    // 5. Deduplicate sample points per pixel cell (keep cheapest).
-    //    This matches the Python filter_nodes() behaviour and prevents
-    //    cost inversions between neighbouring grid cells.
+    // 5. Deduplicate sample points per pixel cell (keep cheapest)
     {
         std::unordered_map<int64_t, size_t> best_per_pixel;
         best_per_pixel.reserve(points.size());
@@ -230,9 +220,7 @@ CostGrid build_cost_grid(ReachabilityField const &field,
     double speed_m_per_s = (cfg.speed_km_h > 0.0) ? (cfg.speed_km_h * 1000.0 / 3600.0)
                                                     : (5.0 * 1000.0 / 3600.0);
 
-    // 8. Fill grid — for each cell, find nearest sample point.
-    //    Snap distance scales with grid resolution: finer grids (walking)
-    //    use a tighter radius, coarser grids (PT) need more reach.
+    // 8. Fill grid
     double const kMaxSnapDist = std::max(200.0, std::max(step_x, step_y) * 8.0);
     double const kNoData = std::numeric_limits<int32_t>::max();
 
@@ -243,7 +231,6 @@ CostGrid build_cost_grid(ReachabilityField const &field,
     {
         for (int32_t col = 0; col < width_px; ++col)
         {
-            // Grid origin is top-left: north is the top (max_y), x grows right
             double gx = min_x + (col + 0.5) * step_x;
             double gy = max_y - (row + 0.5) * step_y;
 
@@ -254,7 +241,7 @@ CostGrid build_cost_grid(ReachabilityField const &field,
             double base_cost = points[idx].cost;
             double walk_cost = (cfg.cost_type == CostType::Distance)
                                    ? dist
-                                   : (dist / speed_m_per_s) / 60.0; // minutes
+                                   : (dist / speed_m_per_s) / 60.0;
             double total = std::round(base_cost + walk_cost);
             if (total <= budget)
             {
@@ -263,7 +250,6 @@ CostGrid build_cost_grid(ReachabilityField const &field,
         }
     }
 
-    // west/north in web mercator for jsolines_processor
     grid.surface = std::move(surface);
     grid.width = width_px;
     grid.height = height_px;

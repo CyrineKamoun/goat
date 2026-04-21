@@ -1,7 +1,6 @@
 #include "hexagon_builder.h"
 
-#include "reached_edges.h"
-
+#include <cmath>
 #include <duckdb.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -11,19 +10,20 @@ namespace routing::output
 
 namespace
 {
-static constexpr char kLoadedEdgesTempTable[] = "routing_loaded_edges_tmp";
 static constexpr char kHexagonFeaturesTempTable[] = "routing_hexagon_features_tmp";
-static constexpr int32_t kHexResolution = 10;
-static constexpr double kHexSampleSpacingMeters = 20.0;
+static constexpr double kSampleSpacingMeters = 20.0;
+
+int32_t hex_resolution_for_mode(RoutingMode mode)
+{
+    return (mode == RoutingMode::Car) ? 8 : 10;
+}
 
 int64_t count_rows(duckdb::Connection &con, std::string const &table)
 {
     auto result = con.Query("SELECT count(*) FROM " + table);
     if (result->HasError())
-    {
         throw std::runtime_error("Failed to count rows in " + table + ": " +
                                  result->GetError());
-    }
     return result->GetValue(0, 0).GetValue<int64_t>();
 }
 
@@ -39,51 +39,83 @@ int64_t materialize_hexagon_features_table(ReachabilityField const &field,
                                            RequestConfig const &cfg,
                                            duckdb::Connection &con)
 {
-    auto reached = collect_reached_edges(field, cfg, true);
+    double budget = cfg.cost_budget();
 
     auto drop_features = con.Query(std::string("DROP TABLE IF EXISTS ") +
                                    kHexagonFeaturesTempTable);
     if (drop_features->HasError())
-    {
         throw std::runtime_error("Failed to drop hexagon features temp table: " +
                                  drop_features->GetError());
-    }
 
-    auto drop_reached = con.Query("DROP TABLE IF EXISTS reached_edges");
-    if (drop_reached->HasError())
+    if (!field.network)
+        return 0;
+
+    auto const &net = *field.network;
+
+    // Build sampled points in C++ from node coords + edge interpolation.
+    // No geometry loading needed — interpolate along straight lines between nodes.
+    con.Query("DROP TABLE IF EXISTS hex_sample_points");
+    con.Query("CREATE TEMP TABLE hex_sample_points (x DOUBLE, y DOUBLE, cost DOUBLE)");
     {
-        throw std::runtime_error("Failed to drop reached_edges temp table: " +
-                                 drop_reached->GetError());
+        duckdb::Appender appender(con, "hex_sample_points");
+
+        // Add node points
+        for (int32_t nid = 0; nid < net.node_count; ++nid)
+        {
+            double cost = field.costs[nid];
+            if (!std::isfinite(cost) || cost > budget)
+                continue;
+            auto const &c = net.node_coords[nid];
+            appender.BeginRow();
+            appender.Append(c.x);
+            appender.Append(c.y);
+            appender.Append(cost);
+            appender.EndRow();
+        }
+
+        // Interpolate along edges using parallel arrays
+        for (size_t i = 0; i < net.source.size(); ++i)
+        {
+            int32_t s = net.source[i];
+            int32_t t = net.target[i];
+            if (s < 0 || t < 0 ||
+                s >= static_cast<int32_t>(field.costs.size()) ||
+                t >= static_cast<int32_t>(field.costs.size()))
+                continue;
+
+            double src_cost = field.costs[s];
+            double tgt_cost = field.costs[t];
+            if (!std::isfinite(src_cost) || !std::isfinite(tgt_cost))
+                continue;
+            if (std::min(src_cost, tgt_cost) > budget)
+                continue;
+
+            double length = net.length_3857[i];
+            if (length <= kSampleSpacingMeters)
+                continue;
+
+            auto const &sc = net.node_coords[s];
+            auto const &tc = net.node_coords[t];
+            double dx = tc.x - sc.x;
+            double dy = tc.y - sc.y;
+
+            int n_splits = static_cast<int>(std::floor(length / kSampleSpacingMeters));
+            for (int n = 1; n < n_splits; ++n)
+            {
+                double frac = static_cast<double>(n) / n_splits;
+                double cost = src_cost + frac * (tgt_cost - src_cost);
+                if (cost > budget)
+                    continue;
+                appender.BeginRow();
+                appender.Append(sc.x + frac * dx);
+                appender.Append(sc.y + frac * dy);
+                appender.Append(cost);
+                appender.EndRow();
+            }
+        }
     }
 
-    auto create_reached = con.Query(
-        "CREATE TEMP TABLE reached_edges ("
-        "edge_id BIGINT, "
-        "cost DOUBLE, "
-        "source_cost DOUBLE, "
-        "target_cost DOUBLE"
-        ")");
-    if (create_reached->HasError())
-    {
-        throw std::runtime_error("Failed to create reached_edges temp table: " +
-                                 create_reached->GetError());
-    }
-
-    duckdb::Appender appender(con, "reached_edges");
-    for (auto const &r : reached)
-    {
-        appender.BeginRow();
-        appender.Append(r.edge_id);
-        appender.Append(r.cost);
-        appender.Append(r.source_cost);
-        appender.Append(r.target_cost);
-        appender.EndRow();
-    }
-    appender.Close();
-
-    // Build the SQL expression that maps min_cost to its step band.
-    // When explicit cutoffs are provided use a CASE expression; otherwise use
-    // the equal-interval ceil formula that was here before.
+    // Build step_cost expression
     std::string step_cost_expr;
     if (!cfg.cutoffs.empty())
     {
@@ -97,7 +129,7 @@ int64_t materialize_hexagon_features_table(ReachabilityField const &field,
     else
     {
         double const step_size = (cfg.steps > 0)
-            ? (cfg.cost_budget() / static_cast<double>(cfg.steps))
+            ? (budget / static_cast<double>(cfg.steps))
             : 0.0;
         if (cfg.steps <= 0 || step_size <= 0.0)
             step_cost_expr = "min_cost";
@@ -109,82 +141,39 @@ int64_t materialize_hexagon_features_table(ReachabilityField const &field,
         }
     }
 
+    int32_t resolution = hex_resolution_for_mode(cfg.mode);
+
     std::ostringstream create_sql;
     create_sql << "CREATE TEMP TABLE " << kHexagonFeaturesTempTable << " AS "
-               << "WITH edge_lines AS ("
-               << "  SELECT "
-               << "    e.id AS edge_id, "
-               << "    ST_GeomFromText("
-               << "      CASE "
-               << "        WHEN coords.coords_text IS NOT NULL AND length(coords.coords_text) > 0 THEN 'LINESTRING(' || coords.coords_text || ')' "
-               << "        ELSE 'LINESTRING(' || "
-               << "          CAST(e.source_x AS VARCHAR) || ' ' || CAST(e.source_y AS VARCHAR) || ',' || "
-               << "          CAST(e.target_x AS VARCHAR) || ' ' || CAST(e.target_y AS VARCHAR) || ')' "
-               << "      END"
-               << "    ) AS geom_3857 "
-               << "  FROM " << kLoadedEdgesTempTable << " e "
-               << "  LEFT JOIN ("
-               << "    SELECT "
-               << "      id AS edge_id, "
-               << "      string_agg(CAST(pt[1] AS VARCHAR) || ' ' || CAST(pt[2] AS VARCHAR), ',' ORDER BY ord) AS coords_text "
-               << "    FROM " << kLoadedEdgesTempTable << " "
-               << "    LEFT JOIN UNNEST(coordinates_3857) WITH ORDINALITY AS t(pt, ord) ON TRUE "
-               << "    GROUP BY 1"
-               << "  ) coords ON coords.edge_id = e.id"
-               << "), "
-               << "sampled_points AS ("
-               << "  SELECT "
-               << "    r.source_cost + ST_LineLocatePoint(l.geom_3857, (d).geom) * (r.target_cost - r.source_cost) AS cost, "
-               << "    ST_Transform((d).geom, 'EPSG:3857', 'OGC:CRS84') AS p_wgs84 "
-               << "  FROM reached_edges r "
-               << "  JOIN edge_lines l ON l.edge_id = r.edge_id "
-               << "  CROSS JOIN UNNEST(ST_Dump(ST_Points(l.geom_3857))) AS t(d)"
-               << "  UNION ALL "
-               << "  SELECT "
-               << "    r.source_cost + ST_LineLocatePoint(l.geom_3857, (d).geom) * (r.target_cost - r.source_cost) AS cost, "
-               << "    ST_Transform((d).geom, 'EPSG:3857', 'OGC:CRS84') AS p_wgs84 "
-               << "  FROM reached_edges r "
-               << "  JOIN edge_lines l ON l.edge_id = r.edge_id "
-               << "  CROSS JOIN UNNEST(ST_Dump(ST_Points(ST_LineInterpolatePoints("
-               << "    l.geom_3857, "
-               << "    GREATEST(0.000001, LEAST(1.0, " << kHexSampleSpacingMeters << " / NULLIF(ST_Length(l.geom_3857), 0.0))), "
-               << "    TRUE"
-               << "  )))) AS t(d) "
-               << "  WHERE ST_Length(l.geom_3857) > " << kHexSampleSpacingMeters
+               << "WITH wgs84 AS ("
+               << "  SELECT ST_X(ST_Transform(ST_Point(x, y), 'EPSG:3857', 'OGC:CRS84')) AS lng, "
+               << "         ST_Y(ST_Transform(ST_Point(x, y), 'EPSG:3857', 'OGC:CRS84')) AS lat, "
+               << "         cost FROM hex_sample_points"
                << "), "
                << "sampled_cells AS ("
                << "  SELECT "
-               << "    h3_latlng_to_cell("
-               << "      ST_Y(p_wgs84), "
-               << "      ST_X(p_wgs84), "
-               << kHexResolution
-               << "    ) AS cell, "
+               << "    h3_latlng_to_cell(lat, lng, " << resolution << ") AS cell, "
                << "    min(cost) AS min_cost "
-               << "  FROM sampled_points "
-               << "  WHERE cost <= " << cfg.cost_budget() << " "
+               << "  FROM wgs84 "
                << "  GROUP BY 1"
                << "), "
                << "enriched AS ("
-               << "  SELECT "
-               << "    cell, "
-               << "    min_cost, "
+               << "  SELECT cell, min_cost, "
                << "    " << step_cost_expr << " AS step_cost "
                << "  FROM sampled_cells"
                << ") "
-               << "SELECT "
-               << "  cell, "
-               << "  " << kHexResolution << " AS resolution, "
-               << "  min_cost, "
-               << "  step_cost, "
+               << "SELECT cell, "
+               << "  " << resolution << " AS resolution, "
+               << "  min_cost, step_cost, "
                << "  ST_GeomFromWKB(h3_cell_to_boundary_wkb(cell)) AS geometry "
                << "FROM enriched";
 
     auto create_features = con.Query(create_sql.str());
     if (create_features->HasError())
-    {
         throw std::runtime_error("Hexagon features materialization failed: " +
                                  create_features->GetError());
-    }
+
+    con.Query("DROP TABLE IF EXISTS hex_sample_points");
 
     return count_rows(con, kHexagonFeaturesTempTable);
 }

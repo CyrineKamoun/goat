@@ -2,7 +2,9 @@
 
 #include "reached_edges.h"
 
+#include <cmath>
 #include <duckdb.hpp>
+#include <iomanip>
 #include <sstream>
 #include <stdexcept>
 
@@ -11,18 +13,130 @@ namespace routing::output
 
 namespace
 {
-static constexpr char kLoadedEdgesTempTable[] = "routing_loaded_edges_tmp";
 static constexpr char kNetworkFeaturesTempTable[] = "routing_network_features_tmp";
 
 int64_t count_rows(duckdb::Connection &con, std::string const &table)
 {
     auto result = con.Query("SELECT count(*) FROM " + table);
     if (result->HasError())
-    {
         throw std::runtime_error("Failed to count rows in " + table + ": " +
                                  result->GetError());
-    }
     return result->GetValue(0, 0).GetValue<int64_t>();
+}
+
+// Clip geometry to budget fraction and build WGS84 WKT linestring.
+// Returns empty string if the edge should be excluded.
+std::string build_clipped_wkt(
+    std::vector<Point3857> const &geom,
+    double source_cost, double target_cost, double budget)
+{
+    if (geom.size() < 2)
+        return "";
+
+    // Compute total length
+    double total_length = 0.0;
+    for (size_t i = 0; i + 1 < geom.size(); ++i)
+    {
+        double dx = geom[i + 1].x - geom[i].x;
+        double dy = geom[i + 1].y - geom[i].y;
+        total_length += std::sqrt(dx * dx + dy * dy);
+    }
+    if (total_length <= 0.0)
+        return "";
+
+    // Determine clip fraction
+    double clip_frac = 1.0;
+    bool needs_clip = false;
+    if (source_cost <= budget && target_cost > budget && target_cost != source_cost)
+    {
+        clip_frac = (budget - source_cost) / (target_cost - source_cost);
+        needs_clip = true;
+    }
+    else if (target_cost <= budget && source_cost > budget && source_cost != target_cost)
+    {
+        // Reverse clip — from the target end
+        clip_frac = 1.0 - (budget - target_cost) / (source_cost - target_cost);
+        needs_clip = true;
+    }
+    else if (source_cost > budget && target_cost > budget)
+    {
+        return "";
+    }
+
+    // Walk along geometry, collect EPSG:3857 points up to clip.
+    // DuckDB handles the final transform to WGS84.
+    double clip_dist = needs_clip ? clip_frac * total_length : total_length;
+    bool clip_from_start = (source_cost <= target_cost) || !needs_clip;
+
+    std::ostringstream wkt;
+    wkt << std::setprecision(2) << "LINESTRING(";
+    bool first = true;
+    double agg = 0.0;
+
+    if (clip_from_start)
+    {
+        // Emit points from start until clip distance
+        wkt << geom[0].x << " " << geom[0].y;
+        first = false;
+
+        for (size_t i = 0; i + 1 < geom.size(); ++i)
+        {
+            double dx = geom[i + 1].x - geom[i].x;
+            double dy = geom[i + 1].y - geom[i].y;
+            double seg_len = std::sqrt(dx * dx + dy * dy);
+
+            if (agg + seg_len >= clip_dist && needs_clip)
+            {
+                // Interpolate clip point
+                double remain = clip_dist - agg;
+                double frac = remain / seg_len;
+                double cx = geom[i].x + frac * dx;
+                double cy = geom[i].y + frac * dy;
+                wkt << "," << cx << " " << cy;
+                break;
+            }
+
+            agg += seg_len;
+            wkt << "," << geom[i + 1].x << " " << geom[i + 1].y;
+        }
+    }
+    else
+    {
+        // Emit points from clip distance to end (reverse direction clip)
+        double start_dist = clip_frac * total_length;
+        bool started = false;
+
+        for (size_t i = 0; i + 1 < geom.size(); ++i)
+        {
+            double dx = geom[i + 1].x - geom[i].x;
+            double dy = geom[i + 1].y - geom[i].y;
+            double seg_len = std::sqrt(dx * dx + dy * dy);
+
+            if (!started && agg + seg_len >= start_dist)
+            {
+                double remain = start_dist - agg;
+                double frac = remain / seg_len;
+                double cx = geom[i].x + frac * dx;
+                double cy = geom[i].y + frac * dy;
+                wkt << cx << " " << cy;
+                first = false;
+                started = true;
+            }
+
+            agg += seg_len;
+
+            if (started)
+            {
+                wkt << "," << geom[i + 1].x << " " << geom[i + 1].y;
+            }
+        }
+    }
+
+    if (first)
+        return ""; // No points emitted
+
+    wkt << ")";
+    return wkt.str();
 }
 
 } // namespace
@@ -37,110 +151,81 @@ int64_t materialize_network_features_table(ReachabilityField const &field,
                                            RequestConfig const &cfg,
                                            duckdb::Connection &con)
 {
-    auto reached = collect_reached_edges(field, cfg, false);
+    if (!field.network)
+        return 0;
 
-    auto drop_features = con.Query(std::string("DROP TABLE IF EXISTS ") +
-                                   kNetworkFeaturesTempTable);
-    if (drop_features->HasError())
-    {
-        throw std::runtime_error("Failed to drop network features temp table: " +
-                                 drop_features->GetError());
-    }
-
-    auto drop_reached = con.Query("DROP TABLE IF EXISTS reached_edges");
-    if (drop_reached->HasError())
-    {
-        throw std::runtime_error("Failed to drop reached_edges temp table: " +
-                                 drop_reached->GetError());
-    }
-
-    auto create_reached = con.Query(
-        "CREATE TEMP TABLE reached_edges ("
-        "edge_id BIGINT, "
-        "step_cost DOUBLE, "
-        "source_cost DOUBLE, "
-        "target_cost DOUBLE"
-        ")");
-    if (create_reached->HasError())
-    {
-        throw std::runtime_error("Failed to create reached_edges temp table: " +
-                                 create_reached->GetError());
-    }
-
-    duckdb::Appender appender(con, "reached_edges");
-    for (auto const &r : reached)
-    {
-        appender.BeginRow();
-        appender.Append(r.edge_id);
-        appender.Append(r.step_cost);
-        appender.Append(r.source_cost);
-        appender.Append(r.target_cost);
-        appender.EndRow();
-    }
-    appender.Close();
-
+    auto const &net = *field.network;
     double budget = cfg.cost_budget();
 
-    std::ostringstream create_sql;
-    create_sql << "CREATE TEMP TABLE " << kNetworkFeaturesTempTable << " AS "
-               << "WITH edge_geoms AS ("
-               << "  SELECT "
-               << "    r.edge_id, "
-               << "    r.step_cost, "
-               << "    r.source_cost, "
-               << "    r.target_cost, "
-               << "    ST_GeomFromText("
-               << "      CASE "
-               << "        WHEN coords.coords_text IS NOT NULL AND length(coords.coords_text) > 0 "
-               << "          THEN 'LINESTRING(' || coords.coords_text || ')' "
-               << "        ELSE 'LINESTRING(' || "
-               << "          CAST(e.source_x AS VARCHAR) || ' ' || CAST(e.source_y AS VARCHAR) || ',' || "
-               << "          CAST(e.target_x AS VARCHAR) || ' ' || CAST(e.target_y AS VARCHAR) || ')' "
-               << "      END"
-               << "    ) AS geom_3857 "
-               << "  FROM reached_edges r "
-               << "  JOIN " << kLoadedEdgesTempTable << " e ON e.id = r.edge_id "
-               << "  LEFT JOIN ("
-               << "    SELECT "
-               << "      id AS edge_id, "
-               << "      string_agg(CAST(pt[1] AS VARCHAR) || ' ' || CAST(pt[2] AS VARCHAR), ',' ORDER BY ord) AS coords_text "
-               << "    FROM " << kLoadedEdgesTempTable << " "
-               << "    LEFT JOIN UNNEST(coordinates_3857) WITH ORDINALITY AS t(pt, ord) ON TRUE "
-               << "    GROUP BY 1"
-               << "  ) coords ON coords.edge_id = e.id"
-               << "), "
-               << "clipped AS ("
-               << "  SELECT "
-               << "    edge_id, "
-               << "    step_cost, "
-               << "    CASE "
-               << "      WHEN source_cost <= " << budget << " AND target_cost <= " << budget
-               << "        THEN geom_3857 "
-               << "      WHEN source_cost <= " << budget << " AND target_cost > " << budget
-               << "        THEN ST_LineSubstring(geom_3857, 0.0, "
-               << "          GREATEST(0.001, LEAST(1.0, (" << budget << " - source_cost) / NULLIF(target_cost - source_cost, 0.0))))"
-               << "      WHEN source_cost > " << budget << " AND target_cost <= " << budget
-               << "        THEN ST_LineSubstring(geom_3857, "
-               << "          GREATEST(0.0, LEAST(0.999, 1.0 - (" << budget << " - target_cost) / NULLIF(source_cost - target_cost, 0.0))), 1.0)"
-               << "      ELSE NULL "
-               << "    END AS geom_3857 "
-               << "  FROM edge_geoms"
-               << ") "
-               << "SELECT "
-               << "  edge_id, "
-               << "  step_cost, "
-               << "  ST_Transform(geom_3857, 'EPSG:3857', 'OGC:CRS84') AS geometry "
-               << "FROM clipped "
-               << "WHERE ST_Length(geom_3857) > 0";
+    con.Query(std::string("DROP TABLE IF EXISTS ") + kNetworkFeaturesTempTable);
+    con.Query(std::string("CREATE TEMP TABLE ") + kNetworkFeaturesTempTable +
+              " (edge_id BIGINT, step_cost DOUBLE, wkt TEXT)");
 
-    auto create_features = con.Query(create_sql.str());
-    if (create_features->HasError())
+    int64_t count = 0;
     {
-        throw std::runtime_error("Network features materialization failed: " +
-                                 create_features->GetError());
+        duckdb::Appender appender(con, kNetworkFeaturesTempTable);
+
+        for (size_t i = 0; i < net.source.size(); ++i)
+        {
+            int32_t s = net.source[i];
+            int32_t t = net.target[i];
+            if (s < 0 || t < 0 ||
+                s >= static_cast<int32_t>(field.costs.size()) ||
+                t >= static_cast<int32_t>(field.costs.size()))
+                continue;
+
+            double sc = field.costs[s];
+            double tc = field.costs[t];
+            if (!std::isfinite(sc) && !std::isfinite(tc))
+                continue;
+            if (std::min(sc, tc) > budget)
+                continue;
+
+            // Use edge geometry if available, else straight line between nodes
+            auto const &geom = net.edges[i].geometry;
+            std::vector<Point3857> const *pts = &geom;
+            std::vector<Point3857> fallback;
+            if (geom.size() < 2)
+            {
+                fallback = {net.node_coords[s], net.node_coords[t]};
+                pts = &fallback;
+            }
+
+            double step_cost = compute_step_cost(std::min(sc, tc), cfg);
+            std::string wkt = build_clipped_wkt(*pts, sc, tc, budget);
+            if (wkt.empty())
+                continue;
+
+            appender.BeginRow();
+            appender.Append(net.edges[i].id);
+            appender.Append(step_cost);
+            appender.Append(duckdb::Value(wkt));
+            appender.EndRow();
+            ++count;
+        }
     }
 
-    return count_rows(con, kNetworkFeaturesTempTable);
+    if (count == 0)
+        return 0;
+
+    // Convert WKT (EPSG:3857) to geometry and transform to WGS84
+    std::string upgrade_sql =
+        std::string("CREATE TEMP TABLE routing_network_geom AS "
+        "SELECT edge_id, step_cost, "
+        "ST_Transform(ST_GeomFromText(wkt), 'EPSG:3857', 'OGC:CRS84') AS geometry "
+        "FROM ") + kNetworkFeaturesTempTable;
+
+    con.Query("DROP TABLE IF EXISTS routing_network_geom");
+    auto result = con.Query(upgrade_sql);
+    if (result->HasError())
+        throw std::runtime_error("Network geometry conversion failed: " +
+                                 result->GetError());
+
+    con.Query(std::string("DROP TABLE ") + kNetworkFeaturesTempTable);
+    con.Query(std::string("ALTER TABLE routing_network_geom RENAME TO ") +
+              kNetworkFeaturesTempTable);
+
+    return count;
 }
 
 } // namespace routing::output

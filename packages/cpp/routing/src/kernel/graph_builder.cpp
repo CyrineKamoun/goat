@@ -1,4 +1,4 @@
-#include "edge_loader.h"
+#include "graph_builder.h"
 
 #include <unordered_map>
 
@@ -10,42 +10,34 @@ namespace routing::kernel
                                  std::vector<int32_t> *start_compact_ids)
     {
         SubNetwork net;
-        net.edges = std::move(edges);
 
         std::unordered_map<int64_t, int32_t> id_map;
-        // Typical road graphs have <= edge_count unique nodes after filtering.
-        id_map.reserve(net.edges.size());
+        id_map.reserve(edges.size());
         int32_t next_id = 0;
 
         auto get_id = [&](int64_t raw, Point3857 const &coord) -> int32_t
         {
             auto [it, inserted] = id_map.try_emplace(raw, next_id);
             if (!inserted)
-            {
                 return it->second;
-            }
-
             int32_t id = next_id++;
             net.node_coords.push_back(coord);
             return id;
         };
 
-        net.source.reserve(net.edges.size());
-        net.target.reserve(net.edges.size());
-        net.cost.reserve(net.edges.size());
-        net.reverse_cost.reserve(net.edges.size());
-        net.length_3857.reserve(net.edges.size());
-        net.node_coords.reserve(net.edges.size());
-        net.geom.address.reserve(net.edges.size() + 1);
-        net.geom.address.push_back(0);
+        size_t n = edges.size();
+        net.edges.reserve(n);
+        net.source.reserve(n);
+        net.target.reserve(n);
+        net.cost.reserve(n);
+        net.reverse_cost.reserve(n);
+        net.length_3857.reserve(n);
+        net.node_coords.reserve(n);
 
-        for (auto &e : net.edges)
+        for (auto &e : edges)
         {
             int32_t s = get_id(e.source, e.source_coord);
             int32_t t = get_id(e.target, e.target_coord);
-
-            e.source = s;
-            e.target = t;
 
             net.source.push_back(s);
             net.target.push_back(t);
@@ -53,10 +45,13 @@ namespace routing::kernel
             net.reverse_cost.push_back(e.reverse_cost);
             net.length_3857.push_back(e.length_3857);
 
-            net.geom.address.push_back(0);
+            // Retain only lightweight info for output phase
+            net.edges.push_back({e.id, e.h3_3, std::move(e.geometry)});
         }
 
         net.node_count = next_id;
+
+        // Input edges are now consumed — caller should not use them after this.
 
         if (start_compact_ids != nullptr)
         {

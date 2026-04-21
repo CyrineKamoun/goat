@@ -1,7 +1,6 @@
 #include "street_network_loader.h"
 #include "h3_util.h"
 
-#include <chrono>
 #include <cstdlib>
 #include <duckdb.hpp>
 #include <filesystem>
@@ -11,18 +10,6 @@
 namespace routing::data
 {
 
-    static constexpr char kLoadedEdgesTempTable[] = "routing_loaded_edges_tmp";
-
-    namespace
-    {
-        double elapsed_ms(std::chrono::steady_clock::time_point const start,
-                          std::chrono::steady_clock::time_point const end)
-        {
-            return std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(
-                       end - start)
-                .count();
-        }
-    } // namespace
 
     static std::string sql_escape(std::string const &s)
     {
@@ -105,7 +92,7 @@ namespace routing::data
         return ss.str();
     }
 
-    std::vector<Edge> load_edges_with_benchmark(
+    std::vector<Edge> load_edges(
         duckdb::Connection &con,
         std::string const &edge_dir,
         std::string const &node_dir,
@@ -113,40 +100,15 @@ namespace routing::data
         double buffer_meters,
         std::vector<std::string> const &valid_classes,
         RoutingMode mode,
-        EdgeLoadBenchmark &benchmark)
+        bool load_geometry)
     {
-        auto t_total_start = std::chrono::steady_clock::now();
-
-        // Verify H3 extension is functional.
-        auto verify_result = con.Query("SELECT h3_latlng_to_cell(48.0, 11.0, 6)");
-        if (verify_result->HasError())
-            throw std::runtime_error(
-                "H3 extension loaded but not functional: " +
-                verify_result->GetError());
-
         auto h3_filter = compute_h3_filter(con, starting_points, buffer_meters);
         auto const &h3_3_cells = h3_filter.h3_3_cells;
         auto const &h3_6_cells = h3_filter.h3_6_cells;
 
-        if (h3_6_cells.empty())
-        {
-            std::ostringstream msg;
-            msg << "H3 filter resolved 0 h3_6 cells (h3_3: "
-                << h3_3_cells.size() << " cells, buffer: "
-                << buffer_meters << "m, points: "
-                << starting_points.size() << ")";
-            throw std::runtime_error(msg.str());
-        }
-
         std::vector<Edge> edges;
 
         std::string parquet_scan = parquet_scan_relation(edge_dir);
-        if (!std::filesystem::exists(node_dir))
-        {
-            throw std::runtime_error(
-                "Node dataset directory not found for geometry reconstruction: " +
-                node_dir);
-        }
         std::string node_scan = node_scan_relation(node_dir);
 
         bool has_node_x_3857 = false;
@@ -206,7 +168,8 @@ namespace routing::data
             << "SELECT e.id, e.source, e.target, e.length_m, e.length_3857, "
             << "class_, impedance_slope, impedance_slope_reverse, "
             << "impedance_surface, maxspeed_forward, maxspeed_backward, "
-            << "h3_3, h3_6, coordinates_3857, "
+            << "h3_3, h3_6, "
+            << (load_geometry ? "coordinates_3857, " : "")
             << "src_nodes.x_3857 AS source_x, "
             << "src_nodes.y_3857 AS source_y, "
             << "dst_nodes.x_3857 AS target_x, "
@@ -229,32 +192,7 @@ namespace routing::data
                 << "(maxspeed_backward IS NOT NULL AND maxspeed_backward <= 50))";
         }
 
-        auto drop_temp = con.Query(std::string("DROP TABLE IF EXISTS ") + kLoadedEdgesTempTable);
-        if (drop_temp->HasError())
-        {
-            throw std::runtime_error("Failed to drop temp loaded-edge table: " +
-                                     drop_temp->GetError());
-        }
-
-        std::string create_temp_sql =
-            std::string("CREATE TEMP TABLE ") + kLoadedEdgesTempTable +
-            " AS " + sql.str();
-
-        auto t_duckdb_start = std::chrono::steady_clock::now();
-        auto create_temp = con.Query(create_temp_sql);
-        if (create_temp->HasError())
-        {
-            throw std::runtime_error("DuckDB temp table materialization failed: " +
-                                     create_temp->GetError());
-        }
-
-        auto result = con.Query(
-            std::string("SELECT id, source, target, length_m, length_3857, ") +
-            "class_, impedance_slope, impedance_slope_reverse, "
-            "impedance_surface, maxspeed_forward, maxspeed_backward, "
-            "h3_3, h3_6, source_x, source_y, target_x, target_y "
-            "FROM " + kLoadedEdgesTempTable);
-        auto t_duckdb_end = std::chrono::steady_clock::now();
+        auto result = con.Query(sql.str());
         if (result->HasError())
         {
             throw std::runtime_error("DuckDB query failed: " +
@@ -262,7 +200,6 @@ namespace routing::data
         }
 
         edges.reserve(result->RowCount());
-        auto t_transfer_start = std::chrono::steady_clock::now();
         while (true)
         {
             auto chunk = result->Fetch();
@@ -303,10 +240,11 @@ namespace routing::data
             chunk->data[10].ToUnifiedFormat(count, speed_back_vec);
             chunk->data[11].ToUnifiedFormat(count, h3_3_vec);
             chunk->data[12].ToUnifiedFormat(count, h3_6_vec);
-            chunk->data[13].ToUnifiedFormat(count, source_x_vec);
-            chunk->data[14].ToUnifiedFormat(count, source_y_vec);
-            chunk->data[15].ToUnifiedFormat(count, target_x_vec);
-            chunk->data[16].ToUnifiedFormat(count, target_y_vec);
+            int col_offset = load_geometry ? 1 : 0;
+            chunk->data[13 + col_offset].ToUnifiedFormat(count, source_x_vec);
+            chunk->data[14 + col_offset].ToUnifiedFormat(count, source_y_vec);
+            chunk->data[15 + col_offset].ToUnifiedFormat(count, target_x_vec);
+            chunk->data[16 + col_offset].ToUnifiedFormat(count, target_y_vec);
 
             auto const *id_data = reinterpret_cast<int64_t const *>(id_vec.data);
             auto const *source_data = reinterpret_cast<int64_t const *>(source_vec.data);
@@ -373,52 +311,34 @@ namespace routing::data
                 e.source_coord = {source_x_data[rid_source_x], source_y_data[rid_source_y]};
                 e.target_coord = {target_x_data[rid_target_x], target_y_data[rid_target_y]};
 
-                if (e.geometry.empty())
+                // Parse geometry for active mobility (column 13 when present)
+                if (load_geometry)
                 {
-                    if (e.source_coord.x != e.target_coord.x ||
-                        e.source_coord.y != e.target_coord.y)
+                    auto geom_val = chunk->GetValue(13, i);
+                    if (!geom_val.IsNull())
                     {
-                        e.geometry = {e.source_coord, e.target_coord};
-                    }
-                    else
-                    {
-                        e.geometry = {e.source_coord};
+                        auto &coord_list = duckdb::ListValue::GetChildren(geom_val);
+                        e.geometry.reserve(coord_list.size());
+                        for (auto &pt_val : coord_list)
+                        {
+                            auto &pt = duckdb::ListValue::GetChildren(pt_val);
+                            if (pt.size() >= 2)
+                                e.geometry.push_back({pt[0].GetValue<double>(),
+                                                      pt[1].GetValue<double>()});
+                        }
                     }
                 }
+                if (e.geometry.size() < 2)
+                    e.geometry = {e.source_coord, e.target_coord};
+
                 e.cost = 0.0;
                 e.reverse_cost = 0.0;
                 edges.push_back(std::move(e));
             }
         }
 
-        auto t_transfer_end = std::chrono::steady_clock::now();
-        auto t_total_end = std::chrono::steady_clock::now();
-
-        benchmark.duckdb_read_ms = elapsed_ms(t_duckdb_start, t_duckdb_end);
-        benchmark.transfer_to_cpp_ms = elapsed_ms(t_transfer_start, t_transfer_end);
-        benchmark.total_ms = elapsed_ms(t_total_start, t_total_end);
-
         return edges;
     }
 
-    std::vector<Edge> load_edges(duckdb::Connection &con,
-                                 std::string const &edge_dir,
-                                 std::string const &node_dir,
-                                 std::vector<Point3857> const &starting_points,
-                                 double buffer_meters,
-                                 std::vector<std::string> const &valid_classes,
-                                 RoutingMode mode)
-    {
-        EdgeLoadBenchmark ignored;
-        return load_edges_with_benchmark(
-            con,
-            edge_dir,
-            node_dir,
-            starting_points,
-            buffer_meters,
-            valid_classes,
-            mode,
-            ignored);
-    }
 
 } // namespace routing::data

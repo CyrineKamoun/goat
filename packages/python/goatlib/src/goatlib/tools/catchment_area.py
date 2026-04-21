@@ -758,8 +758,11 @@ class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
         r5_region_mapping_path = None
 
         if self.settings:
-            # Catchment routing now uses the local routing package for all modes.
-            routing_url = getattr(self.settings, "goat_routing_url", None)
+            # Use R5 URL for PT mode, GOAT routing URL for other modes
+            if params.routing_mode == CatchmentAreaRoutingMode.pt:
+                routing_url = getattr(self.settings, "r5_url", None)
+            else:
+                routing_url = getattr(self.settings, "goat_routing_url", None)
             authorization = getattr(self.settings, "goat_routing_authorization", None)
             r5_region_mapping_path = getattr(
                 self.settings, "r5_region_mapping_path", None

@@ -8,6 +8,8 @@
 #include "../geometry/grid_surface_builder.h"
 #include "../geometry/jsolines_processor.h"
 
+#include <chrono>
+#include <cstdio>
 #include <duckdb.hpp>
 #include <filesystem>
 #include <iomanip>
@@ -45,16 +47,12 @@ void write_network_parquet(ReachabilityField const &field,
 {
     auto const feature_count = materialize_network_features_table(field, cfg, con);
     if (feature_count == 0)
-    {
         throw std::runtime_error("No reachable edges found for parquet export.");
-    }
 
     namespace fs = std::filesystem;
     fs::path out_path(output_path);
     if (!out_path.parent_path().empty())
-    {
         fs::create_directories(out_path.parent_path());
-    }
 
     std::string escaped_path = sql_escape(out_path.string());
 
@@ -70,10 +68,8 @@ void write_network_parquet(ReachabilityField const &field,
 
     auto copy_result = con.Query(sql.str());
     if (copy_result->HasError())
-    {
         throw std::runtime_error("Network parquet export failed: " +
                                  copy_result->GetError());
-    }
 }
 
 void write_hexagonal_grid_parquet(ReachabilityField const &field,
@@ -157,8 +153,18 @@ void write_grid_contour_parquet(ReachabilityField const &field,
                                 duckdb::Connection &con,
                                 std::string const &output_path)
 {
+    auto t0 = std::chrono::steady_clock::now();
+    auto elapsed = [&]() {
+        auto now = std::chrono::steady_clock::now();
+        double ms = std::chrono::duration<double, std::milli>(now - t0).count();
+        t0 = now;
+        return ms;
+    };
+
     int zoom = geometry::grid_zoom_for_mode(cfg.mode);
     auto grid = geometry::build_cost_grid(field, cfg, zoom);
+    std::fprintf(stderr, "[Output] build_cost_grid (%dx%d): %.0f ms\n",
+                 grid.width, grid.height, elapsed());
     if (grid.surface.empty() || grid.width < 2 || grid.height < 2)
         throw std::runtime_error("No reachable area for grid contour parquet export.");
 
@@ -183,6 +189,8 @@ void write_grid_contour_parquet(ReachabilityField const &field,
         grid.surface, grid.width, grid.height,
         grid.west, grid.north, grid.step_x, grid.step_y,
         cutoffs);
+    std::fprintf(stderr, "[Output] jsolines (%zu features): %.0f ms\n",
+                 features.size(), elapsed());
 
     if (features.empty())
         throw std::runtime_error("No reachable polygons for grid contour parquet export.");
@@ -234,6 +242,7 @@ void write_grid_contour_parquet(ReachabilityField const &field,
 
     con.Query("DROP TABLE IF EXISTS routing_grid_polygon_tmp");
     auto create_result = con.Query(sql.str());
+    std::fprintf(stderr, "[Output] DuckDB geom conversion + difference: %.0f ms\n", elapsed());
     if (create_result->HasError())
         throw std::runtime_error("Grid contour temp table failed: " +
                                  create_result->GetError());
@@ -249,6 +258,7 @@ void write_grid_contour_parquet(ReachabilityField const &field,
              << "' (FORMAT PARQUET, COMPRESSION ZSTD)";
 
     auto copy_result = con.Query(copy_sql.str());
+    std::fprintf(stderr, "[Output] COPY to parquet: %.0f ms\n", elapsed());
     if (copy_result->HasError())
         throw std::runtime_error("Grid contour parquet export failed: " +
                                  copy_result->GetError());

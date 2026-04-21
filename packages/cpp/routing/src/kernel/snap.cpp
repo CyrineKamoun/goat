@@ -12,7 +12,7 @@
 namespace routing::kernel
 {
 
-    static constexpr double kCarConnectorSpeedKmH = 60.0 * 0.7;
+    static constexpr double kCarConnectorSpeedKmH = 50.0 * 0.75;
     static constexpr double kDefaultMaxSnapDistance = 500.0;
 
     namespace
@@ -141,8 +141,6 @@ namespace routing::kernel
         int32_t src_node = net.source[edge_idx];
         int32_t tgt_node = net.target[edge_idx];
         double frac = cand.proj.frac;
-        // Copy (not reference) — push_back below may reallocate the vector.
-        Edge const orig = net.edges[edge_idx];
 
         int32_t proj_node = net.node_count++;
         net.node_coords.push_back(cand.proj.point);
@@ -150,29 +148,14 @@ namespace routing::kernel
         int32_t origin_node = net.node_count++;
         net.node_coords.push_back(origin);
 
+        // Connector: origin → projected point on edge
         double snap_cost = connector_cost(cand.proj.dist, cfg);
         net.source.push_back(origin_node);
         net.target.push_back(proj_node);
         net.cost.push_back(snap_cost);
         net.reverse_cost.push_back(snap_cost);
         net.length_3857.push_back(cand.proj.dist);
-        net.geom.address.push_back(0);
-
-        Edge connector{};
-        connector.id = -1;
-        connector.source = origin_node;
-        connector.target = proj_node;
-        connector.length_m = cand.proj.dist;
-        connector.length_3857 = cand.proj.dist;
-        connector.cost = snap_cost;
-        connector.reverse_cost = snap_cost;
-        connector.class_ = orig.class_;
-        connector.maxspeed_forward = orig.maxspeed_forward;
-        connector.maxspeed_backward = orig.maxspeed_backward;
-        connector.source_coord = origin;
-        connector.target_coord = cand.proj.point;
-        connector.geometry = {origin, cand.proj.point};
-        net.edges.push_back(std::move(connector));
+        net.edges.push_back({-1, 0, {}});
 
         double fwd_cost = net.cost[edge_idx];
         double rev_cost = net.reverse_cost[edge_idx];
@@ -188,57 +171,21 @@ namespace routing::kernel
         double dy_s = cand.proj.point.y - src_coord.y;
         double dist_to_src = std::sqrt(dx_s * dx_s + dy_s * dy_s);
 
+        // Split edge: projected point → target
         net.source.push_back(proj_node);
         net.target.push_back(tgt_node);
         net.cost.push_back(fwd_cost * (1.0 - frac));
         net.reverse_cost.push_back(rev_cost * (1.0 - frac));
         net.length_3857.push_back(dist_to_tgt);
-        net.geom.address.push_back(0);
+        net.edges.push_back({-2, 0, {}});
 
-        Edge to_tgt{};
-        to_tgt.id = -2;
-        to_tgt.source = proj_node;
-        to_tgt.target = tgt_node;
-        to_tgt.length_m = orig.length_m * (1.0 - frac);
-        to_tgt.length_3857 = dist_to_tgt;
-        to_tgt.cost = fwd_cost * (1.0 - frac);
-        to_tgt.reverse_cost = rev_cost * (1.0 - frac);
-        to_tgt.impedance_slope = orig.impedance_slope;
-        to_tgt.impedance_slope_reverse = orig.impedance_slope_reverse;
-        to_tgt.impedance_surface = orig.impedance_surface;
-        to_tgt.maxspeed_forward = orig.maxspeed_forward;
-        to_tgt.maxspeed_backward = orig.maxspeed_backward;
-        to_tgt.class_ = orig.class_;
-        to_tgt.source_coord = cand.proj.point;
-        to_tgt.target_coord = tgt_coord;
-        to_tgt.geometry = {cand.proj.point, tgt_coord};
-        net.edges.push_back(std::move(to_tgt));
-
+        // Split edge: projected point → source
         net.source.push_back(proj_node);
         net.target.push_back(src_node);
         net.cost.push_back(rev_cost * frac);
         net.reverse_cost.push_back(fwd_cost * frac);
         net.length_3857.push_back(dist_to_src);
-        net.geom.address.push_back(0);
-
-        Edge to_src{};
-        to_src.id = -3;
-        to_src.source = proj_node;
-        to_src.target = src_node;
-        to_src.length_m = orig.length_m * frac;
-        to_src.length_3857 = dist_to_src;
-        to_src.cost = rev_cost * frac;
-        to_src.reverse_cost = fwd_cost * frac;
-        to_src.impedance_slope = orig.impedance_slope;
-        to_src.impedance_slope_reverse = orig.impedance_slope_reverse;
-        to_src.impedance_surface = orig.impedance_surface;
-        to_src.maxspeed_forward = orig.maxspeed_forward;
-        to_src.maxspeed_backward = orig.maxspeed_backward;
-        to_src.class_ = orig.class_;
-        to_src.source_coord = cand.proj.point;
-        to_src.target_coord = src_coord;
-        to_src.geometry = {cand.proj.point, src_coord};
-        net.edges.push_back(std::move(to_src));
+        net.edges.push_back({-3, 0, {}});
 
         return origin_node;
     }

@@ -126,7 +126,8 @@ std::string build_polygon_geojson(duckdb::Connection &con)
 }
 
 std::string build_grid_contour_geojson(ReachabilityField const &field,
-                                       RequestConfig const &cfg)
+                                       RequestConfig const &cfg,
+                                       duckdb::Connection &con)
 {
     // 1. Build the cost surface grid
     int zoom = geometry::grid_zoom_for_mode(cfg.mode);
@@ -166,9 +167,7 @@ std::string build_grid_contour_geojson(ReachabilityField const &field,
     //    if requested. The jsolines features are cumulative (each cutoff
     //    contains all area up to that cost), so difference = current - previous.
     //    We use DuckDB for the ST_Difference + GeoJSON conversion.
-    duckdb::DuckDB db(nullptr);
-    duckdb::Connection con(db);
-    con.Query("INSTALL spatial; LOAD spatial;");
+    // Use the existing connection (spatial extension already loaded)
 
     std::ostringstream values;
     values << std::setprecision(15);
@@ -251,7 +250,7 @@ std::string build_geojson_output(ReachabilityField const &field,
         // tighter, network-faithful polygons. Car uses concave hull.
         if (cfg.mode != RoutingMode::Car)
         {
-            return build_grid_contour_geojson(field, cfg);
+            return build_grid_contour_geojson(field, cfg, con);
         }
         auto const feature_count = materialize_polygon_features_table(field, cfg, con);
         if (feature_count == 0)
