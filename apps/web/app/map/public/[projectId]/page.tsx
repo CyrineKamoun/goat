@@ -2,6 +2,7 @@
 
 import type { Theme } from "@mui/material";
 import { Box, useMediaQuery, useTheme } from "@mui/material";
+import { ThemeProvider } from "@mui/material/styles";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef } from "react";
 import type { MapRef } from "react-map-gl/maplibre";
@@ -12,12 +13,13 @@ import { usePublicProject } from "@/lib/api/projects";
 import { DrawProvider } from "@/lib/providers/DrawProvider";
 import { MeasureProvider } from "@/lib/providers/MeasureProvider";
 import type { RootState } from "@/lib/store";
-import { selectFilteredProjectLayers } from "@/lib/store/layer/selectors";
+import { selectFilteredProjectLayers, selectProjectLayers } from "@/lib/store/layer/selectors";
 import { setProjectLayerGroups, setProjectLayers } from "@/lib/store/layer/slice";
 import { setMapMode, setProject } from "@/lib/store/map/slice";
 import type { ProjectLayerGroup } from "@/lib/validations/project";
 import { type Project, type ProjectLayer, projectSchema } from "@/lib/validations/project";
 
+import { useBrandedTheme } from "@/hooks/dashboard/useBrandedTheme";
 import { useBasemap } from "@/hooks/map/MapHooks";
 import { useAppDispatch } from "@/hooks/store/ContextHooks";
 
@@ -48,11 +50,10 @@ export default function MapPage({ params: { projectId } }) {
     shallowEqual
   );
 
-  // Include all layers (with tables) for widgets that need to resolve variables
-  const _allProjectLayers = useSelector(
-    (state: RootState) => selectFilteredProjectLayers(state, [], []),
-    shallowEqual
-  );
+  // Include all layers (with tables) for widgets — use unfiltered selector so that
+  // data widgets (filters, numbers, tables, etc.) still work when a layer or its
+  // parent group has visibility toggled off.
+  const _allProjectLayers = useSelector(selectProjectLayers, shallowEqual);
 
   const project = useMemo(() => {
     if (!_project) return undefined;
@@ -73,6 +74,10 @@ export default function MapPage({ params: { projectId } }) {
       dispatch(setMapMode("public"));
     }
   }, [dispatch, project, projectLayers, projectLayerGroups]);
+
+  const primaryColor = project?.builder_config?.settings?.primary_color;
+  const brandedTheme = useBrandedTheme(primaryColor);
+
   const isMobile = useMediaQuery((theme: Theme) => theme.breakpoints.down("md"));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,23 +110,25 @@ export default function MapPage({ params: { projectId } }) {
                     width: "100%",
                     height: "100%",
                   }}>
-                  {isMobile ? (
-                    <MobileProjectLayout
-                      project={project}
-                      projectLayers={_allProjectLayers}
-                      projectLayerGroups={projectLayerGroups}
-                      viewOnly
-                      onProjectUpdate={onProjectUpdate}
-                    />
-                  ) : (
-                    <PublicProjectLayout
-                      project={project}
-                      projectLayers={_allProjectLayers}
-                      projectLayerGroups={projectLayerGroups}
-                      viewOnly
-                      onProjectUpdate={onProjectUpdate}
-                    />
-                  )}
+                  <ThemeProvider theme={brandedTheme}>
+                    {isMobile ? (
+                      <MobileProjectLayout
+                        project={project}
+                        projectLayers={_allProjectLayers}
+                        projectLayerGroups={projectLayerGroups}
+                        viewOnly
+                        onProjectUpdate={onProjectUpdate}
+                      />
+                    ) : (
+                      <PublicProjectLayout
+                        project={project}
+                        projectLayers={_allProjectLayers}
+                        projectLayerGroups={projectLayerGroups}
+                        viewOnly
+                        onProjectUpdate={onProjectUpdate}
+                      />
+                    )}
+                  </ThemeProvider>
                 </Box>
                 <MapViewer
                   layers={_projectLayers}

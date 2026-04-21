@@ -36,5 +36,7 @@ export const DEFAULT_WKT_EXTENT = "POLYGON((-180 -90, -180 90, 180 90, 180 -90, 
 
 export const ASSETS_URL = "https://assets.plan4better.de";
 
+export const MAX_EDITABLE_LAYER_SIZE = 100 * 1024 * 1024; // 100MB
+
 export const THEME_COOKIE_NAME = "client_theme";
 export const LANGUAGE_COOKIE_NAME = "client_language";

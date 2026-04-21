@@ -52,6 +52,7 @@ import {
   useDatasetCollectionItems,
   useLayerQueryables,
 } from "@/lib/api/layers";
+import { MAX_EDITABLE_LAYER_SIZE } from "@/lib/constants";
 import type { GetCollectionItemsQueryParams } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
 
@@ -626,7 +627,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           sx={{ textTransform: "none", whiteSpace: "nowrap" }}>
           {t("add_field", { defaultValue: "Add a field" })}
         </Button>
-        {(isEditing || projectLayer.user_id === userProfile?.id) && (
+        {(isEditing || (projectLayer.user_id === userProfile?.id && (!projectLayer.size || projectLayer.size <= MAX_EDITABLE_LAYER_SIZE))) && (
           <Button
             size="small"
             variant="outlined"

@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { removeTemporaryFilter, setSelectedBuilderItem } from "@/lib/store/map/slice";
-import type { BuilderPanelSchema, BuilderWidgetSchema, Project } from "@/lib/validations/project";
+import type { BuilderPanelSchema, BuilderWidgetSchema, Project, ProjectLayer, ProjectLayerGroup } from "@/lib/validations/project";
 import { builderConfigSchema } from "@/lib/validations/project";
 import { widgetTypesWithoutConfig } from "@/lib/validations/widget";
 
@@ -21,12 +21,24 @@ interface ConfigPanelProps {
   project: Project;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onProjectUpdate?: (key: string, value: any, refresh?: boolean) => void;
+  projectLayers?: ProjectLayer[];
+  projectLayerGroups?: ProjectLayerGroup[];
 }
 
-const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onProjectUpdate }) => {
+const ConfigPanel: React.FC<ConfigPanelProps> = ({
+  project,
+  onProjectUpdate,
+  projectLayers: propProjectLayers,
+  projectLayerGroups: propProjectLayerGroups,
+}) => {
   const dispatch = useAppDispatch();
   const selectedBuilderItem = useAppSelector((state) => state.map.selectedBuilderItem);
   const temporaryFilters = useAppSelector((state) => state.map.temporaryFilters);
+  const reduxProjectLayers = useAppSelector((state) => state.layers.projectLayers);
+  const reduxProjectLayerGroups = useAppSelector((state) => state.layers.projectLayerGroups);
+  // Prefer props (from SWR in editor page) over Redux (only populated in public view)
+  const projectLayers = propProjectLayers ?? reduxProjectLayers;
+  const projectLayerGroups = propProjectLayerGroups ?? reduxProjectLayerGroups;
   const [value, setValue] = useState(0);
   const { t } = useTranslation("common");
   const builderConfig = useMemo(() => {
@@ -209,6 +221,10 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onProjectUpdate }) =
               settings={builderConfig?.settings || {}}
               onChange={handleMapSettingsChange}
               onReset={handleMapSettingsReset}
+              project={project}
+              projectLayers={projectLayers}
+              projectLayerGroups={projectLayerGroups}
+              onProjectUpdate={onProjectUpdate}
             />
           </SidePanelTabPanel>
         </SidePanelStack>

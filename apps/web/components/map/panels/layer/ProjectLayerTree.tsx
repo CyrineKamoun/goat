@@ -30,7 +30,9 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 // Redux
 import { useProject, useProjectScenarioFeatures } from "@/lib/api/projects";
 import { useUserProfile } from "@/lib/api/users";
+import { MAX_EDITABLE_LAYER_SIZE } from "@/lib/constants";
 import { startEditing } from "@/lib/store/featureEditor/slice";
+import { emitInteractionEvent } from "@/lib/store/interaction/slice";
 import { setSelectedLayers } from "@/lib/store/layer/slice";
 import { setActiveRightPanel, setDataPanelLayerId, setIsDataPanelOpen } from "@/lib/store/map/slice";
 import { rgbToHex } from "@/lib/utils/helpers";
@@ -523,6 +525,19 @@ export const ProjectLayerTree = ({
     });
     setItems(newItems);
 
+    // Emit interaction events based on visibility toggle
+    if (node.type === "layer") {
+      dispatch(emitInteractionEvent({
+        type: "visibility_changed",
+        sourceId: node.id,
+        value: !currentVisibility,
+      }));
+    }
+    // When turning a group ON, activate it (switch tab). Turning OFF is just hiding.
+    if (node.type === "group" && !currentVisibility) {
+      dispatch(emitInteractionEvent({ type: "group_activated", sourceId: node.id }));
+    }
+
     try {
       // Create update payload for this visibility change
       const updatePayload = formatDndDataForApi(newItems);
@@ -564,6 +579,20 @@ export const ProjectLayerTree = ({
         return item?.data?.id;
       })
       .filter((id) => id !== undefined);
+
+    // Emit interaction event for group activation (works in all modes)
+    if (realIds.length === 1) {
+      const clickedItem = items.find((i) => i.id === compositeIds[0]);
+      if (clickedItem?.data?.type === "group") {
+        dispatch(emitInteractionEvent({ type: "group_activated", sourceId: realIds[0] }));
+        // Groups should not be selected or open panels — only emit the interaction event
+        return;
+      }
+    }
+
+    // In view mode, only emit interaction events — don't change selection or panels
+    if (!isEditMode) return;
+
     dispatch(setSelectedLayers(realIds));
 
     // Always sync data panel layer — if the panel is closed, this is a no-op
@@ -571,7 +600,7 @@ export const ProjectLayerTree = ({
       dispatch(setDataPanelLayerId(realIds[0]));
     }
 
-    if (isEditMode && realIds.length > 0) {
+    if (realIds.length > 0) {
       // Get the first selected layer to determine default panel
       const firstSelectedItem = items.find((i) => {
         const node = i.data;
@@ -664,6 +693,14 @@ export const ProjectLayerTree = ({
     // Edit features only available in data (map) mode
     if (mapMode !== "data") {
       menuOptions = menuOptions.filter((item) => item.id !== MapLayerActions.EDIT_FEATURES);
+    }
+
+    // Edit features only allowed for layers under 100MB
+    if (node.type === "layer" && node.layer_id) {
+      const layerSize = projectLayers.find((l) => l.layer_id === node.layer_id)?.size;
+      if (layerSize && layerSize > MAX_EDITABLE_LAYER_SIZE) {
+        menuOptions = menuOptions.filter((item) => item.id !== MapLayerActions.EDIT_FEATURES);
+      }
     }
 
     // Filter menu options based on allowedActions
@@ -1098,7 +1135,7 @@ export const ProjectLayerTree = ({
   }
 
   return (
-    <Box sx={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <Box sx={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", pointerEvents: "all" }}>
       {/* 1. Header */}
       {isEditMode && (
         <Box
@@ -1226,7 +1263,7 @@ export const ProjectLayerTree = ({
               </Box>
             );
           } : undefined}
-          enableSelection={isEditMode}
+          enableSelection
           selectedIds={treeSelectedIds}
           onSelect={handleNodeClick}
           onExternalDragStart={

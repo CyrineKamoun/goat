@@ -11,6 +11,7 @@ import {
 import { layerSchema } from "@/lib/validations/layer";
 import { responseSchema } from "@/lib/validations/response";
 import { publicUserSchema } from "@/lib/validations/user";
+import { interactionRuleSchema } from "@/lib/validations/interaction";
 import { configSchemas } from "@/lib/validations/widget";
 
 export const projectRoleEnum = z.enum(["project-owner", "project-viewer", "project-editor"]);
@@ -100,6 +101,7 @@ export const builderConfigSchema = z.object({
     project_info_content: z.string().default(""),
     language: dashboardLanguageEnum.default("auto"),
     font_family: z.string().default("Mulish, sans-serif"),
+    primary_color: z.string().optional(),
   }),
   interface: z.preprocess(
     // Convert empty arrays to `undefined` to trigger the default, todo: remove this when dashboard is completed
@@ -107,6 +109,7 @@ export const builderConfigSchema = z.object({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     z.array(builderPanelSchema).default(basicLayout.interface as any)
   ),
+  interactions: z.array(interactionRuleSchema).default([]),
 });
 
 export const projectSchema = contentMetadataSchema.extend({

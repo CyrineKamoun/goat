@@ -1,4 +1,4 @@
-import { Box, InputBase, MenuItem, Select, Stack, TextField, Typography, useTheme } from "@mui/material";
+import { Box, Divider, InputBase, MenuItem, Select, Stack, TextField, Typography, useTheme } from "@mui/material";
 import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -8,6 +8,7 @@ import { classBreaks } from "@/lib/validations/layer";
 
 import type { ColorLegends, ColorScaleSelectorProps } from "@/types/map/color";
 
+import NoDataRow from "@/components/map/panels/style/classification/NoDataRow";
 import DropdownFooter from "@/components/map/panels/style/other/DropdownFooter";
 
 type NumericColorScaleProps = ColorScaleSelectorProps & {
@@ -107,7 +108,7 @@ const NumericColorScale = (props: NumericColorScaleProps) => {
         </Typography>
       </Stack>
       </Box>
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", pt: 2 }}>
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", pt: 2 }}>
         <Stack spacing={1} sx={{ pr: 3 }}>
           {colorMapValues &&
             colorMapValues.map((colorMapValue, index) => (
@@ -175,6 +176,13 @@ const NumericColorScale = (props: NumericColorScaleProps) => {
                 />
               </Box>
             ))}
+          {/* No data color */}
+          <Divider sx={{ my: 1, borderStyle: "dashed" }} />
+          <NoDataRow
+            noDataColor={props.noDataColor}
+            onNoDataColorChange={props.onNoDataColorChange}
+            setIsClickAwayEnabled={props.setIsClickAwayEnabled}
+          />
         </Stack>
       </Box>
       {hasChanges ? (

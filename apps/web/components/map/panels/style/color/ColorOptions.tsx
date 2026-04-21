@@ -122,6 +122,16 @@ const ColorOptions = ({
                 onStyleChange && onStyleChange(newStyle);
               }}
               intervals={layerStyle?.[`${type}_range`]?.colors.length}
+              noDataColor={layerStyle?.[`${type}_no_data`] as string | undefined}
+              onNoDataColorChange={(color) => {
+                const newStyle = JSON.parse(JSON.stringify(layerStyle)) || {};
+                if (color === undefined) {
+                  delete newStyle[`${type}_no_data`];
+                } else {
+                  newStyle[`${type}_no_data`] = color;
+                }
+                onStyleChange && onStyleChange(newStyle);
+              }}
             />
           )}
           {type === "color" && (

@@ -632,9 +632,9 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
     const cleanProps = (props: Record<string, unknown>) => {
       const clean: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(props)) {
-        if (value !== null && value !== undefined && value !== "") {
-          clean[key] = value;
-        }
+        // Skip internal properties used for MapboxDraw styling
+        if (key.startsWith("_")) continue;
+        clean[key] = value === undefined || value === "" ? null : value;
       }
       return clean;
     };

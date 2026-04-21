@@ -1,6 +1,6 @@
 import type { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import { Box, Button, Chip, InputBase, MenuItem, Select, Stack, Tooltip, Typography, useTheme } from "@mui/material";
+import { Box, Button, Chip, Divider, InputBase, MenuItem, Select, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { v4 } from "uuid";
@@ -14,6 +14,7 @@ import { classBreaks } from "@/lib/validations/layer";
 import type { ColorItem, ColorLegends, ColorMapItem, ColorScaleSelectorProps, ValueItem } from "@/types/map/color";
 
 import { OverflowTypograpy } from "@/components/common/OverflowTypography";
+import NoDataRow from "@/components/map/panels/style/classification/NoDataRow";
 import DropdownFooter from "@/components/map/panels/style/other/DropdownFooter";
 import InputTextField from "@/components/map/panels/style/other/InputTextField";
 import { LayerValueSelectorPopper } from "@/components/map/panels/style/other/LayerValueSelectorPopper";
@@ -420,7 +421,7 @@ const CustomColorScale = (props: CustomColorScaleProps) => {
           )}
         </Box>
 
-        <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain" }}>
           <SortableWrapper handleDragEnd={handleDragEnd} items={valueMaps}>
             {valueMaps?.map((item: ColorMapItem, index: number) => (
               <SortableItem
@@ -557,6 +558,15 @@ const CustomColorScale = (props: CustomColorScaleProps) => {
               </Typography>
             </Button>
           )}
+          {/* No data color */}
+          <Divider sx={{ my: 1, mx: 4, borderStyle: "dashed" }} />
+          <Box sx={{ pl: 4, pr: 3 }}>
+            <NoDataRow
+              noDataColor={props.noDataColor}
+              onNoDataColorChange={props.onNoDataColorChange}
+              setIsClickAwayEnabled={props.setIsClickAwayEnabled}
+            />
+          </Box>
         </Box>
         <Box sx={{ mt: 4 }}>
           <DropdownFooter isValid={isValid} onCancel={onCancel} onApply={onApply} />

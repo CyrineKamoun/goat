@@ -1,9 +1,16 @@
-import { Box, Button, FormControl, MenuItem, Select, Stack, Switch, Typography } from "@mui/material";
-import { useEffect } from "react";
+import { Box, Button, FormControl, Link, MenuItem, Select, Stack, Switch, Typography } from "@mui/material";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import WidgetColorPicker from "@/components/builder/widgets/common/WidgetColorPicker";
 
 import { languages } from "@/i18n/settings";
 
+import type { InteractionRule } from "@/lib/validations/interaction";
+import type { BuilderPanelSchema, Project, ProjectLayer, ProjectLayerGroup } from "@/lib/validations/project";
+import { builderConfigSchema } from "@/lib/validations/project";
+
+import InteractionsModal, { InteractionsEntryButton } from "@/components/builder/InteractionsModal";
 import SettingsGroupHeader from "@/components/builder/widgets/common/SettingsGroupHeader";
 
 /** Google Fonts available for dashboard display */
@@ -24,10 +31,17 @@ const DASHBOARD_FONTS = [
   { label: "Lora", value: "Lora, serif" },
 ];
 
+const GOAT_GREEN = "#2BB381";
+
 interface SettingsTabProps {
   settings: { [key: string]: unknown };
   onChange: (name: string, value: unknown) => void;
   onReset: () => void;
+  project?: Project;
+  projectLayers?: ProjectLayer[];
+  projectLayerGroups?: ProjectLayerGroup[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onProjectUpdate?: (key: string, value: any, refresh?: boolean) => void;
 }
 
 interface SettingGroup {
@@ -36,7 +50,15 @@ interface SettingGroup {
   options: { name: string; label: string }[];
 }
 
-const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onChange, onReset }) => {
+const SettingsTab: React.FC<SettingsTabProps> = ({
+  settings,
+  onChange,
+  onReset,
+  project,
+  projectLayers = [],
+  projectLayerGroups = [],
+  onProjectUpdate,
+}) => {
   const { t } = useTranslation("common");
 
   // Load all Google Fonts for dropdown preview
@@ -50,6 +72,29 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onChange, onReset }
     link.href = `https://fonts.googleapis.com/css2?${families}&display=swap`;
     document.head.appendChild(link);
   }, []);
+
+  const [showInteractionsModal, setShowInteractionsModal] = useState(false);
+
+  const builderConfig = useMemo(() => {
+    const parsed = builderConfigSchema.safeParse(project?.builder_config);
+    return parsed.success ? parsed.data : undefined;
+  }, [project]);
+
+  const interactions = useMemo(
+    () => (builderConfig?.interactions ?? []) as InteractionRule[],
+    [builderConfig]
+  );
+
+  const panels = useMemo(
+    () => (builderConfig?.interface ?? []) as BuilderPanelSchema[],
+    [builderConfig]
+  );
+
+  const handleInteractionsChange = (newInteractions: InteractionRule[]) => {
+    if (!builderConfig) return;
+    const updatedConfig = { ...builderConfig, interactions: newInteractions };
+    onProjectUpdate?.("builder_config", updatedConfig);
+  };
 
   const settingsGroups: SettingGroup[] = [
     {
@@ -109,26 +154,12 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onChange, onReset }
           </Box>
         ))}
         <Box sx={{ mb: 6 }}>
-          <SettingsGroupHeader label={t("general", { defaultValue: "General" })} />
+          <SettingsGroupHeader label={t("branding")} />
           <Stack spacing={2}>
+            {/* Font */}
             <FormControl size="small" fullWidth>
               <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
-                {t("language")}
-              </Typography>
-              <Select
-                value={(settings?.language as string) ?? "auto"}
-                onChange={(e) => onChange("language", e.target.value)}>
-                <MenuItem value="auto">{t("auto_browser_default")}</MenuItem>
-                {languages.map((lng) => (
-                  <MenuItem key={lng} value={lng}>
-                    {lng === "en" ? "English" : lng === "de" ? "Deutsch" : lng}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" fullWidth>
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
-                {t("font", { defaultValue: "Font" })}
+                {t("font")}
               </Typography>
               <Select
                 value={(settings?.font_family as string) || "Mulish, sans-serif"}
@@ -144,8 +175,57 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onChange, onReset }
                 ))}
               </Select>
             </FormControl>
+
+            {/* Primary Color */}
+            <Box>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {t("primary_color")}
+                </Typography>
+                {!!settings?.primary_color && (
+                  <Link
+                    component="button"
+                    variant="caption"
+                    underline="always"
+                    onClick={() => onChange("primary_color", undefined)}
+                    sx={{ cursor: "pointer" }}>
+                    {t("reset")}
+                  </Link>
+                )}
+              </Stack>
+              <WidgetColorPicker
+                color={(settings?.primary_color as string) || GOAT_GREEN}
+                onChange={(color) => onChange("primary_color", color)}
+              />
+            </Box>
+
+            {/* Language */}
+            <FormControl size="small" fullWidth>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
+                {t("language")}
+              </Typography>
+              <Select
+                value={(settings?.language as string) ?? "auto"}
+                onChange={(e) => onChange("language", e.target.value)}>
+                <MenuItem value="auto">{t("auto_browser_default")}</MenuItem>
+                {languages.map((lng) => (
+                  <MenuItem key={lng} value={lng}>
+                    {lng === "en" ? "English" : lng === "de" ? "Deutsch" : lng}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Stack>
         </Box>
+        {project && onProjectUpdate && (
+          <Box sx={{ mb: 6 }}>
+            <SettingsGroupHeader label={t("interactions")} />
+            <InteractionsEntryButton
+              interactionCount={interactions.filter((r) => r.enabled).length}
+              onClick={() => setShowInteractionsModal(true)}
+            />
+          </Box>
+        )}
       </Stack>
       <Stack>
         <Button onClick={onReset} fullWidth size="small" color="error">
@@ -154,6 +234,17 @@ const SettingsTab: React.FC<SettingsTabProps> = ({ settings, onChange, onReset }
           </Typography>
         </Button>
       </Stack>
+      {showInteractionsModal && builderConfig && (
+        <InteractionsModal
+          open={showInteractionsModal}
+          onClose={() => setShowInteractionsModal(false)}
+          interactions={interactions}
+          onChange={handleInteractionsChange}
+          panels={panels}
+          projectLayers={projectLayers}
+          projectLayerGroups={projectLayerGroups}
+        />
+      )}
     </Stack>
   );
 };

@@ -140,6 +140,7 @@ export const colorSchema = z.object({
   color_field: layerFieldType.optional(),
   color_scale: classBreaks.optional().default("quantile"),
   color_scale_breaks: layerClassBreaks.optional(),
+  color_no_data: z.string().optional(),
 });
 
 export const strokeColorSchema = z.object({
@@ -148,6 +149,7 @@ export const strokeColorSchema = z.object({
   stroke_color_field: layerFieldType.optional(),
   stroke_color_scale: classBreaks.optional().default("quantile"),
   stroke_color_scale_breaks: layerClassBreaks.optional(),
+  stroke_color_no_data: z.string().optional(),
 });
 
 export const strokeWidthSchema = z.object({

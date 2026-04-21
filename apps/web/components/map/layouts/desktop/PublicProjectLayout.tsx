@@ -1,10 +1,12 @@
 import { Box } from "@mui/material";
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { v4 } from "uuid";
 
 import { MAPBOX_TOKEN } from "@/lib/constants";
-import { setSelectedLayers } from "@/lib/store/layer/slice";
+import { setSelectedLayers, updateProjectLayer } from "@/lib/store/layer/slice";
+import { useInteractionDispatcher } from "@/hooks/map/useInteractionDispatcher";
+import type { InteractionRule } from "@/lib/validations/interaction";
 import {
   removeTemporaryFilter,
   setActiveRightPanel,
@@ -92,6 +94,36 @@ const PublicProjectLayout = ({
   const collapsedPanels = useAppSelector((state) => state.map.collapsedPanels);
   const builderConfig = project?.builder_config;
   const panels = useMemo(() => builderConfig?.interface ?? [], [builderConfig]);
+
+  // Interaction dispatcher
+  const interactionRules = useMemo(
+    () => (builderConfig?.interactions ?? []) as InteractionRule[],
+    [builderConfig]
+  );
+
+  const handleVisibilitySync = useCallback(
+    (layerId: number, visible: boolean) => {
+      const layer = projectLayers.find((l) => l.id === layerId);
+      if (!layer) return;
+      const currentVisibility = layer.properties?.visibility ?? true;
+      if (currentVisibility === visible) return;
+      dispatch(
+        updateProjectLayer({
+          id: layerId,
+          changes: {
+            properties: { ...layer.properties, visibility: visible },
+          },
+        })
+      );
+    },
+    [projectLayers, dispatch]
+  );
+
+  useInteractionDispatcher({
+    rules: interactionRules,
+    onVisibilitySync: handleVisibilitySync,
+  });
+
   const COLLAPSED_SIZE = 40; // Should match the collapsedSize in Container component
 
   // Initialize collapsed state from panel config once per project load.

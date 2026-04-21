@@ -22,6 +22,8 @@ export type ColorScaleSelectorProps = {
   activeLayerId: string;
   activeLayerField: LayerFieldType;
   intervals: number;
+  noDataColor?: string;
+  onNoDataColorChange?: (color: string | undefined) => void;
 };
 
 // Key is HexColor but as key we can use only string

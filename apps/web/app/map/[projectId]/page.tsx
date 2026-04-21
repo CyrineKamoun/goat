@@ -4,6 +4,7 @@ import type { DragOverEvent, DragStartEvent } from "@dnd-kit/core";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Box, Stack, debounce, useTheme } from "@mui/material";
+import { ThemeProvider } from "@mui/material/styles";
 import "maplibre-gl/dist/maplibre-gl.css";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -31,6 +32,7 @@ import { type BuilderWidgetSchema, builderWidgetSchema, projectSchema } from "@/
 import { widgetSchemaMap } from "@/lib/validations/widget";
 
 import { useAuthZ } from "@/hooks/auth/AuthZ";
+import { useBrandedTheme } from "@/hooks/dashboard/useBrandedTheme";
 import { useJobStatus } from "@/hooks/jobs/JobStatus";
 import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 import { useBasemap } from "@/hooks/map/MapHooks";
@@ -95,6 +97,9 @@ export default function MapPage({ params: { projectId } }) {
       return undefined;
     }
   }, [_project]);
+
+  const primaryColor = project?.builder_config?.settings?.primary_color;
+  const brandedTheme = useBrandedTheme(primaryColor);
 
   // Order layers using tree-aware DFS traversal so the map rendering order
   // matches the visual tree order (layers inside a group inherit the group's position).
@@ -551,17 +556,25 @@ export default function MapPage({ params: { projectId } }) {
                               zIndex: 1,
                               pointerEvents: "none",
                             }}>
-                            <PublicProjectLayout
-                              projectLayers={widgetProjectLayers}
-                              project={project}
-                              onProjectUpdate={handleProjectUpdate}
-                            />
+                            <ThemeProvider theme={brandedTheme}>
+                              <PublicProjectLayout
+                                projectLayers={widgetProjectLayers}
+                                projectLayerGroups={projectLayerGroups}
+                                project={project}
+                                onProjectUpdate={handleProjectUpdate}
+                              />
+                            </ThemeProvider>
                           </Box>
                         )}
                       </Box>
                     )}
                     {mapMode === "builder" && (
-                      <BuilderConfigPanel project={project} onProjectUpdate={handleProjectUpdate} />
+                      <BuilderConfigPanel
+                        project={project}
+                        onProjectUpdate={handleProjectUpdate}
+                        projectLayers={allProjectLayersIncludingTables}
+                        projectLayerGroups={projectLayerGroups}
+                      />
                     )}
 
                     {mapMode === "builder" && (

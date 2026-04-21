@@ -37,6 +37,7 @@ import {
   useProjectScenarios,
 } from "@/lib/api/projects";
 import { useUserProfile } from "@/lib/api/users";
+import { MAX_EDITABLE_LAYER_SIZE } from "@/lib/constants";
 import { startEditing } from "@/lib/store/featureEditor/slice";
 import { setActiveLayer } from "@/lib/store/layer/slice";
 import {
@@ -648,7 +649,7 @@ const LayerPanel = ({ projectId }: PanelProps) => {
                             </Tooltip>
                           )}
                           <MoreMenu
-                            menuItems={getLayerMoreMenuOptions(layer.type, !!layer.charts, layer.in_catalog, false, layer.user_id === userProfile?.id)}
+                            menuItems={getLayerMoreMenuOptions(layer.type, !!layer.charts, layer.in_catalog, false, layer.user_id === userProfile?.id && (!layer.size || layer.size <= MAX_EDITABLE_LAYER_SIZE))}
                             menuButton={
                               <Tooltip title={t("more_options")} arrow placement="top">
                                 <IconButton size="small">

@@ -80,7 +80,8 @@ const CustomTreeItemContent = styled("div", {
   paddingBottom: theme.spacing(0.5),
   border: "1px solid transparent",
   transition: "background-color 0.1s, opacity 0.2s",
-  cursor: !enableSelection || isSelectable === false ? "default" : "pointer", // Updated cursor logic
+  cursor: !enableSelection || isSelectable === false ? "default" : "pointer",
+  pointerEvents: "all", // Ensure tree rows are clickable even when parent has pointerEvents: none
 
   // Apply visibility opacity only to the content part, not actions
   "& .tree-content-area": {
@@ -312,6 +313,14 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
 
   const handleRowClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // For groups: always notify onSelect so interaction events can fire,
+    // even when the group itself isn't "selectable" for highlight purposes
+    if (item.isGroup && onSelect) {
+      onSelect([item.id]);
+      return;
+    }
+
     // Check if item is selectable
     if (!enableSelection || !onSelect || item.isSelectable === false) return;
 

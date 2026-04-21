@@ -4,8 +4,11 @@ import { useTranslation } from "react-i18next";
 
 import { Icon, ICON_NAME } from "@p4b/ui/components/Icon";
 
+import { emitInteractionEvent } from "@/lib/store/interaction/slice";
 import type { ProjectLayer, ProjectLayerGroup, ProjectLayerTreeUpdate } from "@/lib/validations/project";
 import type { LayerInformationSchema } from "@/lib/validations/widget";
+
+import { useAppDispatch } from "@/hooks/store/ContextHooks";
 
 import { MaskedImageIcon } from "@/components/map/panels/style/other/MaskedImageIcon";
 
@@ -36,6 +39,7 @@ const TabsLayerLayout = ({
   dimOutOfZoom,
 }: TabsLayerLayoutProps) => {
   const { t } = useTranslation("common");
+  const dispatch = useAppDispatch();
   const options = config.options;
 
   const topLevelGroups = useMemo(
@@ -86,7 +90,14 @@ const TabsLayerLayout = ({
     <Box>
       <Tabs
         value={activeTab}
-        onChange={(_, newValue) => setActiveTab(newValue)}
+        onChange={(_, newValue) => {
+          setActiveTab(newValue);
+          // Emit interaction event for group activation
+          const group = topLevelGroups[newValue];
+          if (group) {
+            dispatch(emitInteractionEvent({ type: "group_activated", sourceId: group.id }));
+          }
+        }}
         variant="scrollable"
         scrollButtons="auto"
         sx={{ borderBottom: 1, borderColor: "divider", minHeight: 32 }}>

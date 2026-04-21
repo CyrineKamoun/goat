@@ -2,6 +2,7 @@ import { Box, Tabs as MuiTabs, Stack, Tab, Typography, useTheme } from "@mui/mat
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { clearActiveTabOverride } from "@/lib/store/interaction/slice";
 import { setSelectedBuilderItem } from "@/lib/store/map/slice";
 import type { BuilderWidgetSchema, ProjectLayer, ProjectLayerGroup } from "@/lib/validations/project";
 import type { TabItemSchema, TabsContainerSchema, WidgetConfigSchema } from "@/lib/validations/widget";
@@ -175,12 +176,28 @@ const TabsWidget: React.FC<TabsWidgetProps> = ({
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const selectedBuilderItem = useAppSelector((state) => state.map.selectedBuilderItem);
-  const [activeTab, setActiveTab] = useState(0);
-  const useFullWidth = Boolean(config.setup?.full_width);
+  const [localActiveTab, setLocalActiveTab] = useState(0);
+  const tabOverrideId = useAppSelector(
+    (state) => state.interaction.activeTabOverrides[widget.id]
+  );
+
+  // Resolve external tab override to index, fall back to local state
+  const activeTab = useMemo(() => {
+    if (tabOverrideId) {
+      const idx = config.tabs.findIndex((t) => t.id === tabOverrideId);
+      if (idx >= 0) return idx;
+    }
+    return localActiveTab;
+  }, [tabOverrideId, localActiveTab, config.tabs]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
+    setLocalActiveTab(newValue);
+    // Clear external override when user manually clicks a tab
+    if (tabOverrideId) {
+      dispatch(clearActiveTabOverride(widget.id));
+    }
   };
+  const useFullWidth = Boolean(config.setup?.full_width);
 
   const tabs = config.tabs || [];
 
