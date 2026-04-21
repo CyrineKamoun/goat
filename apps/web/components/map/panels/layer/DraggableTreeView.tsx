@@ -364,14 +364,23 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
     }
   };
 
+  // dnd-kit's PointerSensor captures pointerdown and preventDefaults, which
+  // stops the browser from initiating an HTML5 drag. When the consumer wants
+  // HTML5 external drag (e.g., dragging a layer onto the workflow canvas),
+  // skip the dnd-kit listeners on this row so the native drag can fire.
+  const useExternalDrag = !!onExternalDragStart && !item.isGroup;
+
   return (
     <Box sx={{ width: "100%" }}>
       <CustomTreeItemRoot
         ref={!isOverlay ? setNodeRef : null}
-        {...(!isOverlay ? listeners : {})}
-        {...(!isOverlay ? attributes : {})}
-        style={{ touchAction: "none", paddingBottom: isOverlay ? 0 : undefined }}
-        draggable={!!onExternalDragStart && !item.isGroup}
+        {...(!isOverlay && !useExternalDrag ? listeners : {})}
+        {...(!isOverlay && !useExternalDrag ? attributes : {})}
+        style={{
+          touchAction: useExternalDrag ? "auto" : "none",
+          paddingBottom: isOverlay ? 0 : undefined,
+        }}
+        draggable={useExternalDrag}
         onDragStart={handleExternalDragStart}>
         <CustomTreeItemContent
           onClick={handleRowClick}
