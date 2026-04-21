@@ -125,7 +125,9 @@ namespace routing::pt
         auto costs = kernel::dijkstra(
             adj, valid_starts, access_budget, /*use_distance=*/false);
 
-        // Build seed stops: transit stops reachable within the access budget
+        // Build seed stops: transit stops reachable within the access budget.
+        // Add transfer_cost to account for access→transit transition time.
+        double const transfer_penalty = cfg.transfer_cost;
         std::vector<nigiri::routing::offset> seeds;
         for (size_t i = 0; i < snapped.size(); ++i)
         {
@@ -136,10 +138,14 @@ namespace routing::pt
             if (std::isinf(access_min) || access_min >= access_budget)
                 continue;
 
+            double seed_cost = access_min + transfer_penalty;
+            if (seed_cost >= cfg.max_cost)
+                continue;
+
             seeds.push_back(nigiri::routing::offset{
                 nigiri::location_idx_t{static_cast<unsigned>(i)},
                 nigiri::duration_t{static_cast<int16_t>(
-                    static_cast<int>(access_min))},
+                    static_cast<int>(seed_cost))},
                 0U
             });
         }

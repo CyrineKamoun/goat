@@ -86,12 +86,12 @@ namespace routing::pt
             std::vector<int32_t> extra_ids;
             if (!extra_points.empty())
             {
-                RequestConfig walk_cfg = cfg;
-                walk_cfg.mode = cfg.egress_mode;
+                RequestConfig egress_cfg = cfg;
+                egress_cfg.mode = cfg.egress_mode;
                 if (cfg.egress_speed_km_h > 0.0)
-                    walk_cfg.speed_km_h = cfg.egress_speed_km_h;
+                    egress_cfg.speed_km_h = cfg.egress_speed_km_h;
                 extra_ids = kernel::snap_origins(
-                    access.net, extra_points, walk_cfg);
+                    access.net, extra_points, egress_cfg);
             }
             return {
                 kernel::make_reachability_field(
@@ -103,12 +103,12 @@ namespace routing::pt
         auto combined_edges = merge_edge_sets(
             std::move(egress_edges), std::move(access.raw_edges));
 
-        RequestConfig walk_cfg = cfg;
-        walk_cfg.mode = cfg.egress_mode;
+        RequestConfig egress_cfg = cfg;
+        egress_cfg.mode = cfg.egress_mode;
         if (cfg.egress_speed_km_h > 0.0)
-            walk_cfg.speed_km_h = cfg.egress_speed_km_h;
+            egress_cfg.speed_km_h = cfg.egress_speed_km_h;
 
-        kernel::compute_costs(combined_edges, walk_cfg);
+        kernel::compute_costs(combined_edges, egress_cfg);
         auto combined_net = kernel::build_sub_network(combined_edges);
         // combined_edges remain usable after build_sub_network: geometry was
         // std::move'd into EdgeInfo, but compute_costs only reads
@@ -117,12 +117,12 @@ namespace routing::pt
                      combined_net.source.size(), combined_net.node_count, elapsed());
 
         // 6. Snap origins, stops, and extra destination points.
-        RequestConfig access_snap_cfg = cfg;
-        access_snap_cfg.mode = cfg.access_mode;
+        RequestConfig access_cfg = cfg;
+        access_cfg.mode = cfg.access_mode;
         if (cfg.access_speed_km_h > 0.0)
-            access_snap_cfg.speed_km_h = cfg.access_speed_km_h;
+            access_cfg.speed_km_h = cfg.access_speed_km_h;
         auto start_nodes = kernel::snap_origins(
-            combined_net, cfg.starting_points, access_snap_cfg);
+            combined_net, cfg.starting_points, access_cfg);
 
         // Only snap stops that RAPTOR actually reached.
         auto all_stop_coords = get_stop_coords_3857(*tt);
@@ -142,7 +142,7 @@ namespace routing::pt
         if (!reachable_coords.empty())
         {
             auto snapped = kernel::snap_origins(
-                combined_net, reachable_coords, walk_cfg,
+                combined_net, reachable_coords, egress_cfg,
                 kMaxStopSnapDistanceMeters);
             for (size_t j = 0; j < snapped.size(); ++j)
                 stop_nodes[reachable_indices[j]] = snapped[j];
@@ -152,7 +152,7 @@ namespace routing::pt
         std::vector<int32_t> extra_ids;
         if (!extra_points.empty())
             extra_ids = kernel::snap_origins(
-                combined_net, extra_points, walk_cfg);
+                combined_net, extra_points, egress_cfg);
 
         std::vector<int32_t> valid_starts;
         for (auto s : start_nodes)
@@ -187,19 +187,27 @@ namespace routing::pt
             (cfg.access_speed_km_h > 0.0 &&
              cfg.access_speed_km_h != cfg.egress_speed_km_h))
         {
-            RequestConfig access_cfg = cfg;
-            access_cfg.mode = cfg.access_mode;
-            if (cfg.access_speed_km_h > 0.0)
-                access_cfg.speed_km_h = cfg.access_speed_km_h;
-
             kernel::compute_costs(combined_edges, access_cfg);
 
             std::vector<std::vector<AdjEntry>> adj(combined_net.node_count);
-            for (size_t i = 0; i < combined_net.source.size() &&
-                               i < combined_edges.size(); ++i)
+            // Recosted edges from the original load
+            for (size_t i = 0; i < combined_edges.size() &&
+                               i < combined_net.source.size(); ++i)
             {
                 double const c = combined_edges[i].cost;
                 double const rc = combined_edges[i].reverse_cost;
+                if (c >= 0.0 && c < 99999.0)
+                    adj[combined_net.source[i]].push_back(
+                        {combined_net.target[i], c});
+                if (rc >= 0.0 && rc < 99999.0)
+                    adj[combined_net.target[i]].push_back(
+                        {combined_net.source[i], rc});
+            }
+            // Connector edges added by snap (not in combined_edges)
+            for (size_t i = combined_edges.size(); i < combined_net.source.size(); ++i)
+            {
+                double const c = combined_net.cost[i];
+                double const rc = combined_net.reverse_cost[i];
                 if (c >= 0.0 && c < 99999.0)
                     adj[combined_net.source[i]].push_back(
                         {combined_net.target[i], c});

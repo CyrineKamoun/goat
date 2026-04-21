@@ -96,6 +96,7 @@ namespace routing
         double egress_max_cost = 0.0;      // 0 → falls back to max_cost
         double access_speed_km_h = 0.0;    // 0 → falls back to speed_km_h (time cost type only)
         double egress_speed_km_h = 0.0;    // 0 → falls back to speed_km_h (time cost type only)
+        double transfer_cost = 2.0;        // minutes added at access→transit and transit→egress transitions
 
         // PT transit mode filter (empty → all modes allowed)
         std::vector<std::string> transit_modes;

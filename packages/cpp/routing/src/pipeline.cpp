@@ -89,7 +89,7 @@ namespace routing
             }
         }
 
-        void validate_request(RequestConfig const &cfg)
+        void validate_request(RequestConfig &cfg)
         {
             input::validate(cfg);
         }
@@ -173,7 +173,7 @@ namespace routing
         }
 
         ReachabilityField build_reachability_field(
-            RequestConfig const &cfg,
+            RequestConfig &cfg,
             duckdb::Connection &con)
         {
             validate_request(cfg);
@@ -210,8 +210,10 @@ namespace routing
         }
     } // namespace
 
-    std::string compute_catchment(RequestConfig const &cfg)
+    std::string compute_catchment(RequestConfig const &cfg_in)
     {
+        auto cfg = cfg_in; // mutable copy for validation defaults
+
         auto t0 = std::chrono::steady_clock::now();
         auto elapsed = [&]() {
             auto now = std::chrono::steady_clock::now();
