@@ -143,7 +143,7 @@ int64_t materialize_polygon_features_table(ReachabilityField const &field,
 
     // Downsample interior nodes for concave hull performance.
     // Boundary nodes (cost near a step threshold) are always kept.
-    static constexpr int32_t kDownsampleFactor = 5;
+    static constexpr int32_t kDownsampleFactor = 10;
 
     int64_t reached_node_count = 0;
     int32_t sample_counter = 0;
@@ -162,7 +162,7 @@ int64_t materialize_polygon_features_table(ReachabilityField const &field,
             bool is_boundary = false;
             for (double sc : step_thresholds)
             {
-                if (std::abs(cost - sc) < sc * 0.1)
+                if (std::abs(cost - sc) < sc * 0.05)
                 {
                     is_boundary = true;
                     break;

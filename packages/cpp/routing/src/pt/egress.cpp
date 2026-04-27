@@ -96,8 +96,10 @@ namespace routing::pt
             egress_max = cfg.max_cost;
         }
 
-        // Build Dijkstra sources: each reachable stop seeded at its transit cost.
+        // Build Dijkstra sources: each reachable stop seeded at its transit cost
+        // plus the transit→egress transfer penalty.
         // Per-stop egress is capped at min(max_cost - transit, egress_max).
+        double const transfer_penalty = cfg.transfer_cost;
         std::vector<std::pair<int32_t, double>> sources;
         sources.reserve(transit_costs.size());
 
@@ -108,7 +110,7 @@ namespace routing::pt
             int32_t node = (i < stop_nodes.size()) ? stop_nodes[i] : -1;
             if (node < 0 || node >= net.node_count)
                 continue;
-            double const transit_min = *transit_costs[i];
+            double const transit_min = *transit_costs[i] + transfer_penalty;
             double const remaining = std::min(
                 cfg.max_cost - transit_min, egress_max);
             if (remaining <= 0.0)
@@ -147,10 +149,21 @@ namespace routing::pt
             kernel::compute_costs(reusable_edges, egress_cfg);
 
             std::vector<std::vector<AdjEntry>> adj(net.node_count);
-            for (size_t i = 0; i < net.source.size() && i < reusable_edges.size(); ++i)
+            // Recosted edges from the original load
+            for (size_t i = 0; i < reusable_edges.size() && i < net.source.size(); ++i)
             {
                 double const c  = reusable_edges[i].cost;
                 double const rc = reusable_edges[i].reverse_cost;
+                if (c >= 0.0 && c < 99999.0)
+                    adj[net.source[i]].push_back({net.target[i], c});
+                if (rc >= 0.0 && rc < 99999.0)
+                    adj[net.target[i]].push_back({net.source[i], rc});
+            }
+            // Connector edges added by snap (not in reusable_edges)
+            for (size_t i = reusable_edges.size(); i < net.source.size(); ++i)
+            {
+                double const c  = net.cost[i];
+                double const rc = net.reverse_cost[i];
                 if (c >= 0.0 && c < 99999.0)
                     adj[net.source[i]].push_back({net.target[i], c});
                 if (rc >= 0.0 && rc < 99999.0)

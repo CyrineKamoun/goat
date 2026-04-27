@@ -8,6 +8,7 @@
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import { InputAdornment, Stack, TextField, Tooltip } from "@mui/material";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { getEffectiveSchema } from "@/lib/utils/ogc-utils";
 
@@ -26,6 +27,7 @@ interface NumberInputProps {
 }
 
 export default function NumberInput({ input, value, onChange, disabled, formValues = {}, onValidationChange }: NumberInputProps) {
+  const { t } = useTranslation("common");
   const effectiveSchema = useMemo(() => getEffectiveSchema(input.schema), [input.schema]);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,13 +88,13 @@ export default function NumberInput({ input, value, onChange, disabled, formValu
     if (min !== undefined && val < min) return `Value must be at least ${min}`;
     if (max !== undefined && val > max) return `Value must be at most ${max}`;
     if (dynamicMin !== undefined && val < dynamicMin && maxValueFrom) {
-      return maxValueFrom.message;
+      return t(maxValueFrom.message);
     }
     if (dynamicMax !== undefined && val > dynamicMax && maxValueFrom) {
-      return maxValueFrom.message;
+      return t(maxValueFrom.message);
     }
     return null;
-  }, [min, max, dynamicMin, dynamicMax, maxValueFrom]);
+  }, [min, max, dynamicMin, dynamicMax, maxValueFrom, t]);
 
   // Clear error when value becomes valid (e.g. when the referenced field changes)
   useEffect(() => {

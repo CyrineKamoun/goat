@@ -6,7 +6,7 @@
 namespace routing::input
 {
 
-    void validate(RequestConfig const &cfg)
+    void validate(RequestConfig &cfg)
     {
         if (cfg.starting_points.empty())
             throw std::invalid_argument("At least one starting point required");
@@ -88,13 +88,49 @@ namespace routing::input
                 throw std::invalid_argument(
                     "egress speed (or speed_km_h) is required for PublicTransport mode");
 
-            // Time-based access/egress budgets cannot exceed the overall budget.
+            // Apply mode-specific default speeds for access/egress when unset.
+            // This prevents bicycle/pedelec access from falling back to
+            // the main speed_km_h (typically walking speed for PT).
+            auto default_speed_for_mode = [](RoutingMode m) -> double {
+                switch (m)
+                {
+                case RoutingMode::Walking:   return 5.0;
+                case RoutingMode::Bicycle:   return 15.0;
+                case RoutingMode::Pedelec:   return 23.0;
+                default:                     return 0.0;
+                }
+            };
+            if (cfg.access_speed_km_h <= 0.0)
+            {
+                double ds = default_speed_for_mode(cfg.access_mode);
+                if (ds > 0.0)
+                    cfg.access_speed_km_h = ds;
+            }
+            if (cfg.egress_speed_km_h <= 0.0)
+            {
+                double ds = default_speed_for_mode(cfg.egress_mode);
+                if (ds > 0.0)
+                    cfg.egress_speed_km_h = ds;
+            }
+
+            // Apply default access/egress budgets when unset.
+            // Mode-specific overrides can be added here; the base default
+            // is 15 min (time) / 500 m (distance).
+            auto default_max_cost = [](RoutingMode /*mode*/, CostType ct) -> double {
+                return (ct == CostType::Distance) ? 500.0 : 15.0;
+            };
+            if (cfg.access_max_cost <= 0.0)
+                cfg.access_max_cost = default_max_cost(cfg.access_mode, cfg.access_cost_type);
+            if (cfg.egress_max_cost <= 0.0)
+                cfg.egress_max_cost = default_max_cost(cfg.egress_mode, cfg.egress_cost_type);
+
+            // Access/egress budgets cannot exceed the overall budget.
             if (cfg.access_cost_type == CostType::Time &&
-                cfg.access_max_cost > 0.0 && cfg.access_max_cost > cfg.max_cost)
+                cfg.access_max_cost > cfg.max_cost)
                 throw std::invalid_argument(
                     "access_max_cost (time) cannot exceed max_cost");
             if (cfg.egress_cost_type == CostType::Time &&
-                cfg.egress_max_cost > 0.0 && cfg.egress_max_cost > cfg.max_cost)
+                cfg.egress_max_cost > cfg.max_cost)
                 throw std::invalid_argument(
                     "egress_max_cost (time) cannot exceed max_cost");
         }

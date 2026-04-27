@@ -554,9 +554,9 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
         ),
     )
 
-    pt_access_max_cost: int = Field(
-        default=30,
-        description="Access leg budget: minutes (time) or meters (distance).",
+    pt_access_max_cost_time: int = Field(
+        default=15,
+        description="Access leg budget in minutes.",
         json_schema_extra=ui_field(
             section="configuration",
             field_order=22,
@@ -567,7 +567,44 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
                 "$and": [
                     {"routing_mode": "pt"},
                     {"show_advanced": True},
+                    {"pt_access_cost_type": "time"},
                 ]
+            },
+            widget_options={
+                "max_value_from": {
+                    "fields": [
+                        {"field": "max_cost_time_pt"},
+                    ],
+                    "message": "access_budget_exceeds_limit",
+                    "min": 1,
+                },
+            },
+        ),
+    )
+
+    pt_access_max_cost_distance: int = Field(
+        default=500,
+        description="Access leg budget in meters.",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=22,
+            label_key="limit",
+            inline_group="pt_access_cost",
+            inline_flex="1 0 0",
+            visible_when={
+                "$and": [
+                    {"routing_mode": "pt"},
+                    {"show_advanced": True},
+                    {"pt_access_cost_type": "distance"},
+                ]
+            },
+            widget_options={
+                "max_value_from": {
+                    "fields": [],
+                    "message": "access_budget_exceeds_limit",
+                    "min": 50,
+                    "max": 20000,
+                },
             },
         ),
     )
@@ -629,9 +666,9 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
         ),
     )
 
-    pt_egress_max_cost: int = Field(
-        default=30,
-        description="Egress leg budget: minutes (time) or meters (distance).",
+    pt_egress_max_cost_time: int = Field(
+        default=15,
+        description="Egress leg budget in minutes.",
         json_schema_extra=ui_field(
             section="configuration",
             field_order=26,
@@ -642,7 +679,44 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
                 "$and": [
                     {"routing_mode": "pt"},
                     {"show_advanced": True},
+                    {"pt_egress_cost_type": "time"},
                 ]
+            },
+            widget_options={
+                "max_value_from": {
+                    "fields": [
+                        {"field": "max_cost_time_pt"},
+                    ],
+                    "message": "egress_budget_exceeds_limit",
+                    "min": 1,
+                },
+            },
+        ),
+    )
+
+    pt_egress_max_cost_distance: int = Field(
+        default=500,
+        description="Egress leg budget in meters.",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=26,
+            label_key="limit",
+            inline_group="pt_egress_cost",
+            inline_flex="1 0 0",
+            visible_when={
+                "$and": [
+                    {"routing_mode": "pt"},
+                    {"show_advanced": True},
+                    {"pt_egress_cost_type": "distance"},
+                ]
+            },
+            widget_options={
+                "max_value_from": {
+                    "fields": [],
+                    "message": "egress_budget_exceeds_limit",
+                    "min": 50,
+                    "max": 20000,
+                },
             },
         ),
     )
@@ -880,8 +954,16 @@ class CatchmentAreaV2ToolRunner(CatchmentAreaToolRunner):
             egress_mode=params.pt_egress_mode,
             access_cost_type=params.pt_access_cost_type,
             egress_cost_type=params.pt_egress_cost_type,
-            access_max_cost=params.pt_access_max_cost,
-            egress_max_cost=params.pt_egress_max_cost,
+            access_max_cost=(
+                params.pt_access_max_cost_distance
+                if params.pt_access_cost_type == CostType.distance
+                else params.pt_access_max_cost_time
+            ),
+            egress_max_cost=(
+                params.pt_egress_max_cost_distance
+                if params.pt_egress_cost_type == CostType.distance
+                else params.pt_egress_max_cost_time
+            ),
             access_speed=params.pt_access_speed,
             egress_speed=params.pt_egress_speed,
             # Output
