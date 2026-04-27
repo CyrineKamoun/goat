@@ -72,6 +72,7 @@ PYBIND11_MODULE(_routing, m)
         .def_readwrite("egress_max_cost", &routing::RequestConfig::egress_max_cost)
         .def_readwrite("access_speed_km_h", &routing::RequestConfig::access_speed_km_h)
         .def_readwrite("egress_speed_km_h", &routing::RequestConfig::egress_speed_km_h)
+        .def_readwrite("transfer_cost", &routing::RequestConfig::transfer_cost)
         // Transit mode filter, departure window, and explicit cutoffs
         .def_readwrite("transit_modes", &routing::RequestConfig::transit_modes)
         .def_readwrite("departure_window", &routing::RequestConfig::departure_window)

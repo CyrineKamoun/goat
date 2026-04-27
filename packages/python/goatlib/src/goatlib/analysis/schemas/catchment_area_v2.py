@@ -114,8 +114,8 @@ class CatchmentAreaV2Params(BaseModel):
     egress_mode: AccessEgressMode = AccessEgressMode.walk
     access_cost_type: CostType = CostType.time
     egress_cost_type: CostType = CostType.time
-    access_max_cost: float = Field(default=0.0, ge=0.0, description="Access leg budget: minutes (time) or meters (distance). 0 = use max_cost.")
-    egress_max_cost: float = Field(default=0.0, ge=0.0, description="Egress leg budget: minutes (time) or meters (distance). 0 = use max_cost.")
+    access_max_cost: float = Field(default=15.0, ge=0.0, description="Access leg budget: minutes (time) or meters (distance). 0 = default (15 min / 500 m).")
+    egress_max_cost: float = Field(default=15.0, ge=0.0, description="Egress leg budget: minutes (time) or meters (distance). 0 = default (15 min / 500 m).")
     access_speed: float = Field(default=0.0, ge=0.0, description="Access leg speed in km/h (time cost type only, 0 = use speed)")
     egress_speed: float = Field(default=0.0, ge=0.0, description="Egress leg speed in km/h (time cost type only, 0 = use speed)")
 

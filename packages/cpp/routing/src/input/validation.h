@@ -5,6 +5,6 @@
 namespace routing::input
 {
 
-    void validate(RequestConfig const &cfg);
+    void validate(RequestConfig &cfg);
 
 } // namespace routing::input
