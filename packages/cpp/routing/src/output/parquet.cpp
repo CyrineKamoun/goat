@@ -289,7 +289,7 @@ void write_point_grid_parquet(ReachabilityField const &field,
         << "  SELECT "
         << "    CAST(id AS INTEGER) AS id, "
         << "    CAST(ROUND(cost) AS DOUBLE) AS cost, "
-        << "    CAST(ROUND(step_cost) AS INTEGER) AS cost_step, "
+        << "    cost_step, "
         << "    geometry "
         << "  FROM " << point_grid_features_table_name() << " "
         << "  ORDER BY id"
