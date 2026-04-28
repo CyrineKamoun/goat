@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import List, Self, Tuple
+from typing import List, Optional, Self, Tuple
 
 from goatlib.analysis.core.base import AnalysisTool
 from goatlib.analysis.schemas.data_management import (
@@ -179,6 +179,14 @@ class JoinTool(AnalysisTool):
             return f"ST_Contains({target_geom_ref}, {join_geom_ref})"
         elif params.spatial_relationship == SpatialRelationshipType.completely_within:
             return f"ST_Within({target_geom_ref}, {join_geom_ref})"
+        elif params.spatial_relationship == SpatialRelationshipType.touches:
+            return f"ST_Touches({target_geom_ref}, {join_geom_ref})"
+        elif params.spatial_relationship == SpatialRelationshipType.overlaps:
+            return f"ST_Overlaps({target_geom_ref}, {join_geom_ref})"
+        elif params.spatial_relationship == SpatialRelationshipType.covers:
+            return f"ST_Covers({target_geom_ref}, {join_geom_ref})"
+        elif params.spatial_relationship == SpatialRelationshipType.covered_by:
+            return f"ST_CoveredBy({target_geom_ref}, {join_geom_ref})"
         else:
             raise ValueError(
                 f"Unsupported spatial relationship: {params.spatial_relationship}"
@@ -198,9 +206,14 @@ class JoinTool(AnalysisTool):
 
         # Build select clause with prefixed join fields to avoid conflicts
         target_fields = self._get_table_fields(target_table, "target")
-        join_fields = self._get_table_fields(join_table, "join_data", prefix="join_")
+        join_cols = self._filter_join_columns(
+            self._get_raw_field_names(join_table),
+            params.join_fields,
+        )
+        join_fields = [f"join_data.{c} as join_{c}" for c in join_cols]
 
-        select_fields = ", ".join(target_fields + join_fields)
+        # When all join fields are filtered out, the SELECT must still be valid
+        select_fields = ", ".join(target_fields + join_fields) if join_fields else ", ".join(target_fields)
 
         query = f"""
             SELECT {select_fields}
@@ -298,12 +311,21 @@ class JoinTool(AnalysisTool):
         )
 
         target_fields = self._get_table_fields(target_table, "target")
-        join_fields = self._get_table_fields(join_table, "join_data", prefix="join_")
+        # Strip internal row-order column from user-visible columns; ORDER BY
+        # references it directly via join_data.__join_row_order regardless.
+        join_cols_all = [
+            c
+            for c in self._get_raw_field_names(join_table)
+            if c != "__join_row_order"
+        ]
+        join_cols = self._filter_join_columns(join_cols_all, params.join_fields)
+        join_fields = [f"join_data.{c} as join_{c}" for c in join_cols]
 
-        # Filter out the internal __join_row_order field from output
-        join_fields = [f for f in join_fields if "__join_row_order" not in f]
-
-        all_select_fields = ", ".join(target_fields + join_fields)
+        all_select_fields = (
+            ", ".join(target_fields + join_fields)
+            if join_fields
+            else ", ".join(target_fields)
+        )
 
         # Create window function to rank matches
         con.execute(f"""
@@ -371,14 +393,18 @@ class JoinTool(AnalysisTool):
 
         agg_clause = ", ".join(agg_expressions)
 
+        target_select = ", ".join(
+            [f"target.{f}" for f in self._get_raw_field_names(target_table)]
+        )
+
         query = f"""
         CREATE OR REPLACE TEMP TABLE aggregated_joins AS
-        SELECT {', '.join([f'target.{f}' for f in self._get_raw_field_names(target_table)])},
+        SELECT {target_select},
                {agg_clause}
         FROM {target_table} target
         {join_type_sql} {join_table} join_data
         ON {join_condition}
-        GROUP BY {', '.join([f'target.{f}' for f in self._get_raw_field_names(target_table)])}
+        GROUP BY {target_select}
         """
 
         con.execute(query)
@@ -415,14 +441,18 @@ class JoinTool(AnalysisTool):
         join_fields = self._get_raw_field_names(join_table)
         join_count_col = f"join_data.{join_fields[0]}"
 
+        target_select = ", ".join(
+            [f"target.{f}" for f in self._get_raw_field_names(target_table)]
+        )
+
         query = f"""
         CREATE OR REPLACE TEMP TABLE count_joins AS
-        SELECT {', '.join([f'target.{f}' for f in self._get_raw_field_names(target_table)])},
+        SELECT {target_select},
                COUNT({join_count_col}) as {count_col}
         FROM {target_table} target
         {join_type_sql} {join_table} join_data
         ON {join_condition}
-        GROUP BY {', '.join([f'target.{f}' for f in self._get_raw_field_names(target_table)])}
+        GROUP BY {target_select}
         """
 
         con.execute(query)
@@ -432,6 +462,23 @@ class JoinTool(AnalysisTool):
             output_path,
             geometry_column="geometry",
         )
+
+    def _filter_join_columns(
+        self: Self,
+        columns: List[str],
+        join_fields: Optional[List[str]],
+    ) -> List[str]:
+        """Filter join columns by user-selected join_fields.
+
+        Three behaviors:
+          - join_fields is None: returns columns unchanged (all join fields kept).
+          - join_fields is an empty list: returns an empty list (no join fields).
+          - join_fields is a list of names: returns only those columns.
+        """
+        if join_fields is None:
+            return columns
+        keep = set(join_fields)
+        return [c for c in columns if c in keep]
 
     def _get_table_fields(
         self: Self, table_name: str, alias: str, prefix: str = ""

@@ -11,7 +11,7 @@
  */
 import { Box, Typography } from "@mui/material";
 import { useParams } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { LayerFieldType } from "@/lib/validations/layer";
@@ -209,6 +209,18 @@ export default function FieldInput({
     }
     return availableFields.filter((field) => fieldTypeFilter.includes(field.type));
   }, [availableFields, fieldTypeFilter]);
+
+  // Opt-in: when widget_options.default_all is set, multi-select mode is active,
+  // and the value is empty/unset, seed it with every available field name on
+  // first render so the user sees all checkboxes ticked by default. Other
+  // tools without the flag are unaffected.
+  const defaultAll = input.uiMeta?.widget_options?.default_all === true;
+  useEffect(() => {
+    if (!defaultAll || !isMultiSelect || filteredFields.length === 0) return;
+    const isEmpty = value === undefined || value === null || (Array.isArray(value) && value.length === 0);
+    if (!isEmpty) return;
+    onChange(filteredFields.map((f) => f.name));
+  }, [defaultAll, isMultiSelect, filteredFields, value, onChange]);
 
   // Convert value to LayerFieldType format (single select)
   const selectedField = useMemo((): LayerFieldType | undefined => {

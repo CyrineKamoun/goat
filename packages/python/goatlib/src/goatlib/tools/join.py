@@ -267,13 +267,56 @@ class JoinToolParams(ScenarioSelectorMixin, ToolInputBase, BaseModel):
         ),
     )
 
+    # ===== Join Field Selection =====
+
+    add_join_fields: bool = Field(
+        False,
+        description="Add fields from the join layer to the output. If off, no join fields are added (filter-only mode). Auto-enabled when join type is set to LEFT.",
+        json_schema_extra=ui_field(
+            section="join_options",
+            field_order=3,
+            widget="switch",
+            widget_options={
+                "default_by_field": {
+                    "field": "join_type",
+                    "values": {"left": True},
+                }
+            },
+            visible_when={"calculate_statistics": False},
+        ),
+    )
+    join_fields: List[str] = Field(
+        default_factory=list,
+        description="Pick which fields from the join layer to include in the output.",
+        # Explicit `default: []` in the JSON schema so the frontend initializes
+        # the field-selector to an empty array (otherwise Pydantic does not
+        # surface `default_factory` to the generated JSON schema). The
+        # `default_all` widget option then triggers the FieldInput component
+        # to pre-tick every available join-layer field on first render.
+        json_schema_extra={
+            **ui_field(
+                section="join_options",
+                field_order=4,
+                widget="field-selector",
+                widget_options={
+                    "source_layer": "join_layer_id",
+                    "multi": True,
+                    "default_all": True,
+                },
+                visible_when={"add_join_fields": True},
+                optional=True,
+            ),
+            "default": [],
+        },
+    )
+
     # ===== Statistics Configuration (for one-to-one joins) =====
     calculate_statistics: bool = Field(
         False,
         description="Calculate statistics for numeric fields when multiple records match",
         json_schema_extra=ui_field(
             section="join_options",
-            field_order=3,
+            field_order=5,
             widget="switch",
             visible_when={"join_operation": "one_to_one"},
         ),
@@ -285,7 +328,7 @@ class JoinToolParams(ScenarioSelectorMixin, ToolInputBase, BaseModel):
         description="Field statistics to calculate. Supported statistics: sum, min, max, mean, standard deviation.",
         json_schema_extra=ui_field(
             section="join_options",
-            field_order=4,
+            field_order=6,
             widget="field-statistics-selector",
             widget_options={"source_layer": "join_layer_id"},
             visible_when={
@@ -477,6 +520,12 @@ class JoinToolRunner(BaseToolRunner[JoinToolParams]):
             field_statistics=params.field_statistics
             if params.calculate_statistics
             else None,
+            # Toggle off: no join fields (filter-only mode).
+            # Toggle on: the frontend pre-fills join_fields with every join-layer
+            # column (via the `default_all` widget option), so what is ticked is
+            # what gets emitted. An empty selection therefore means "no fields"
+            # — equivalent to toggling off.
+            join_fields=params.join_fields if params.add_join_fields else [],
         )
 
         tool = self.tool_class()

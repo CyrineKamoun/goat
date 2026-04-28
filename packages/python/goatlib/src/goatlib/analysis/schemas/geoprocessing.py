@@ -471,6 +471,60 @@ class DifferenceParams(BaseModel):
         return POLYGON_TYPES
 
 
+class DisjointParams(BaseModel):
+    """Parameters for performing the disjoint (anti-semi-join) filter.
+
+    Returns features from the input layer that have **no spatial intersection**
+    with any feature in the filter layer. Equivalent to QGIS's "Extract by
+    location: are disjoint from".
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra=ui_sections(
+            SECTION_INPUT,
+            UISection(id="filter_layer", order=2, icon="layers"),
+            SECTION_OUTPUT,
+        )
+    )
+
+    input_path: str = Field(
+        ...,
+        description="Path to the input dataset to filter.",
+        json_schema_extra=ui_field(
+            section="input",
+            field_order=1,
+            widget="layer-selector",
+        ),
+    )
+    overlay_path: str = Field(
+        ...,
+        description="Path to the filter dataset. Input features that intersect any feature in this layer will be excluded.",
+        json_schema_extra=ui_field(
+            section="filter_layer",
+            field_order=1,
+            widget="layer-selector",
+        ),
+    )
+    output_path: Optional[str] = Field(
+        None,
+        description="Destination file path for output. If not provided, will be auto-generated.",
+        json_schema_extra=ui_field(section="output", field_order=99, hidden=True),
+    )
+    output_crs: Optional[str] = Field(
+        None,
+        description="Target coordinate reference system for the output geometry.",
+        json_schema_extra=ui_field(section="output", field_order=2, hidden=True),
+    )
+
+    @property
+    def accepted_input_geometry_types(self: Self) -> List[GeometryType]:
+        return ALL_GEOMETRY_TYPES
+
+    @property
+    def accepted_overlay_geometry_types(self: Self) -> List[GeometryType]:
+        return ALL_GEOMETRY_TYPES
+
+
 class DissolveParams(BaseModel):
     """Parameters for performing dissolve (auflösen) operation.
 

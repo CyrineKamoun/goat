@@ -685,6 +685,14 @@
       "label": "Name der Ergebnislayer",
       "description": "Benutzerdefinierter Name für die Ergebnis-Layer"
     },
+    "add_join_fields": {
+      "label": "Verknüpfungsfelder hinzufügen",
+      "description": "Felder der Verknüpfungsebene zur Ausgabe hinzufügen. Wenn deaktiviert, werden keine Verknüpfungsfelder hinzugefügt."
+    },
+    "join_fields": {
+      "label": "Verknüpfungsfelder",
+      "description": "Wählen Sie, welche Felder der Verknüpfungsebene in die Ausgabe übernommen werden."
+    },
     "summary_layer_name": {
       "label": "Name der Zusammenfassungsebene",
       "description": "Benutzerdefinierter Name für die Cluster-Zusammenfassungsebene"
@@ -762,7 +770,11 @@
       "within_distance": "In einer Entfernung von",
       "identical_to": "Identisch mit",
       "completely_contains": "Enthält vollständig",
-      "completely_within": "Vollständig innerhalb von"
+      "completely_within": "Vollständig innerhalb von",
+      "touches": "Berührt",
+      "overlaps": "Überlappt",
+      "covers": "Bedeckend",
+      "covered_by": "Bedeckt"
     },
     "join_operation_type": {
       "one_to_one": "Eins zu Eins",
@@ -860,6 +872,10 @@
     "difference": {
       "title": "Radieren",
       "description": "Entfernt Bereiche des Eingabe-Layers, die sich mit dem Überlagerungs-Layer überschneiden. Nur die Teile außerhalb der Überlagerung werden beibehalten."
+    },
+    "disjoint": {
+      "title": "Disjunkt",
+      "description": "Filtert die Eingabe-Objekte auf jene, die sich räumlich nicht mit Objekten des Überlagerungs-Layers schneiden."
     },
     "origin_destination": {
       "title": "Quell-Ziel-Beziehungen",
@@ -968,6 +984,7 @@
     "clip": "Ausschneiden",
     "centroid": "Mittelpunkt",
     "difference": "Radieren",
+    "disjoint": "Disjunkt",
     "dissolve": "Zusammenführen",
     "intersection": "Überschneiden",
     "union": "Vereinigen",

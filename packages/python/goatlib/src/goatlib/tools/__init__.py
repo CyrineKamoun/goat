@@ -38,6 +38,7 @@ from goatlib.tools.clip import ClipToolParams, ClipToolRunner
 from goatlib.tools.codegen import generate_windmill_script, python_type_to_str
 from goatlib.tools.db import ToolDatabaseService
 from goatlib.tools.difference import DifferenceToolParams, DifferenceToolRunner
+from goatlib.tools.disjoint import DisjointToolParams, DisjointToolRunner
 from goatlib.tools.dissolve import DissolveToolParams, DissolveToolRunner
 from goatlib.tools.finalize_layer import (
     FinalizeLayerOutput,
@@ -105,6 +106,8 @@ __all__ = [
     "UnionToolRunner",
     "DifferenceToolParams",
     "DifferenceToolRunner",
+    "DisjointToolParams",
+    "DisjointToolRunner",
     "OriginDestinationToolParams",
     "OriginDestinationToolRunner",
     "LayerImportParams",
