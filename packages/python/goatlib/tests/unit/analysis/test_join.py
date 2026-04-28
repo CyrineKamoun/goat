@@ -22,6 +22,21 @@ TEST_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "vector"
 RESULT_DIR = Path(__file__).parent.parent.parent / "result"
 
 
+def _all_join_fields(join_path: str) -> list[str]:
+    """Return every column name in the given parquet, used for ``join_fields``.
+
+    ``JoinParams.join_fields`` no longer treats ``None`` as "keep all"; callers
+    must pass an explicit column list. This helper introspects the fixture so
+    tests stay readable without hardcoding column names.
+    """
+    con = duckdb.connect()
+    con.execute("INSTALL spatial; LOAD spatial;")
+    rows = con.execute(
+        f"DESCRIBE SELECT * FROM read_parquet('{join_path}')"
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
 @pytest.fixture(autouse=True)
 def ensure_result_dir() -> None:
     """Ensure the result directory exists."""
@@ -53,6 +68,7 @@ class TestAttributeJoin:
             multiple_matching_records=MultipleMatchingRecordsType.first_record,
             join_type=JoinType.left,
             sort_configuration=None,  # Should use default row order
+            join_fields=_all_join_fields(join_path),
         )
 
         tool = JoinTool()
@@ -108,6 +124,7 @@ class TestAttributeJoin:
                 field="min_salary",
                 sort_order=SortOrder.descending,
             ),
+            join_fields=_all_join_fields(join_path),
         )
 
         tool = JoinTool()
@@ -148,6 +165,7 @@ class TestAttributeJoin:
             ],
             join_operation=JoinOperationType.one_to_many,
             join_type=JoinType.left,
+            join_fields=_all_join_fields(join_path),
         )
 
         tool = JoinTool()
@@ -195,6 +213,7 @@ class TestAttributeJoin:
             multiple_matching_records=MultipleMatchingRecordsType.first_record,
             join_type=JoinType.inner,  # Only keep matching
             sort_configuration=None,
+            join_fields=_all_join_fields(join_path),
         )
 
         tool = JoinTool()
@@ -344,6 +363,7 @@ class TestSpatialJoin:
             multiple_matching_records=MultipleMatchingRecordsType.first_record,
             join_type=JoinType.left,
             sort_configuration=None,
+            join_fields=_all_join_fields(join_path),
         )
 
         tool = JoinTool()
@@ -383,6 +403,7 @@ class TestSpatialJoin:
             multiple_matching_records=MultipleMatchingRecordsType.first_record,
             join_type=JoinType.left,
             sort_configuration=None,
+            join_fields=_all_join_fields(join_path),
         )
 
         tool = JoinTool()
@@ -422,6 +443,7 @@ class TestSpatialJoin:
             multiple_matching_records=MultipleMatchingRecordsType.first_record,
             join_type=JoinType.left,
             sort_configuration=None,
+            join_fields=_all_join_fields(join_path),
         )
 
         tool = JoinTool()
@@ -466,6 +488,7 @@ class TestCombinedJoin:
             multiple_matching_records=MultipleMatchingRecordsType.first_record,
             join_type=JoinType.left,
             sort_configuration=None,
+            join_fields=_all_join_fields(join_path),
         )
 
         tool = JoinTool()
@@ -600,6 +623,7 @@ class TestEdgeCases:
             multiple_matching_records=MultipleMatchingRecordsType.first_record,
             join_type=JoinType.left,
             sort_configuration=None,
+            join_fields=_all_join_fields(join_path),
         )
 
         tool = JoinTool()
@@ -644,6 +668,7 @@ class TestEdgeCases:
             multiple_matching_records=MultipleMatchingRecordsType.first_record,
             join_type=JoinType.inner,
             sort_configuration=None,
+            join_fields=_all_join_fields(join_path),
         )
 
         tool = JoinTool()

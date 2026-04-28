@@ -24,14 +24,31 @@ from goatlib.analysis.schemas.data_management import (
 )
 
 
+def _all_join_fields(join_path: str) -> list[str]:
+    """Return every column name in the given parquet, used for ``join_fields``.
+
+    ``JoinParams.join_fields`` no longer treats ``None`` as "keep all"; callers
+    must pass an explicit column list to retain the previous "all kept" behavior.
+    """
+    import duckdb
+
+    con = duckdb.connect()
+    con.execute("INSTALL spatial; LOAD spatial;")
+    rows = con.execute(
+        f"DESCRIBE SELECT * FROM read_parquet('{join_path}')"
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
 def test_one_to_many_join() -> bool:
     """Test one-to-many join (products with multiple reviews)."""
     test_data_dir = Path(__file__).parent.parent.parent / "data" / "vector"
     output_path = "/tmp/test_one_to_many.parquet"
 
+    join_path = str(test_data_dir / "reviews.parquet")
     params = JoinParams(
         target_path=str(test_data_dir / "products.parquet"),
-        join_path=str(test_data_dir / "reviews.parquet"),
+        join_path=join_path,
         output_path=output_path,
         use_spatial_relationship=False,
         use_attribute_relationship=True,
@@ -40,6 +57,7 @@ def test_one_to_many_join() -> bool:
         ],
         join_operation=JoinOperationType.one_to_many,
         join_type=JoinType.inner,
+        join_fields=_all_join_fields(join_path),
     )
 
     print("🧪 Testing one-to-many join...")
@@ -132,9 +150,10 @@ def test_multiple_field_join() -> bool:
     test_data_dir = Path(__file__).parent.parent.parent / "data" / "vector"
     output_path = "/tmp/test_multi_field.parquet"
 
+    join_path = str(test_data_dir / "salary_bands.parquet")
     params = JoinParams(
         target_path=str(test_data_dir / "employees.parquet"),
-        join_path=str(test_data_dir / "salary_bands.parquet"),
+        join_path=join_path,
         output_path=output_path,
         use_spatial_relationship=False,
         use_attribute_relationship=True,
@@ -148,6 +167,7 @@ def test_multiple_field_join() -> bool:
             field="min_salary", sort_order=SortOrder.ascending
         ),
         join_type=JoinType.inner,
+        join_fields=_all_join_fields(join_path),
     )
 
     print("🧪 Testing multiple field join...")
@@ -176,11 +196,13 @@ def test_multiple_field_join() -> bool:
 def test_inner_vs_left_join() -> bool:
     """Test difference between inner and left joins."""
     test_data_dir = Path(__file__).parent.parent.parent / "data" / "vector"
+    join_path = str(test_data_dir / "categories.parquet")
+    join_field_list = _all_join_fields(join_path)
 
     # Inner join
     inner_params = JoinParams(
         target_path=str(test_data_dir / "customers.parquet"),
-        join_path=str(test_data_dir / "categories.parquet"),
+        join_path=join_path,
         output_path="/tmp/test_inner.parquet",
         use_spatial_relationship=False,
         use_attribute_relationship=True,
@@ -195,12 +217,13 @@ def test_inner_vs_left_join() -> bool:
             field="category_name", sort_order=SortOrder.ascending
         ),
         join_type=JoinType.inner,
+        join_fields=join_field_list,
     )
 
     # Left join
     left_params = JoinParams(
         target_path=str(test_data_dir / "customers.parquet"),
-        join_path=str(test_data_dir / "categories.parquet"),
+        join_path=join_path,
         output_path="/tmp/test_left.parquet",
         use_spatial_relationship=False,
         use_attribute_relationship=True,
@@ -215,6 +238,7 @@ def test_inner_vs_left_join() -> bool:
             field="category_name", sort_order=SortOrder.ascending
         ),
         join_type=JoinType.left,
+        join_fields=join_field_list,
     )
 
     print("🧪 Testing inner vs left join...")
@@ -251,9 +275,10 @@ def test_spatial_intersects_join() -> bool:
     test_data_dir = Path(__file__).parent.parent.parent / "data" / "vector"
     output_path = "/tmp/test_spatial_intersects.parquet"
 
+    join_path = str(test_data_dir / "districts.parquet")
     params = JoinParams(
         target_path=str(test_data_dir / "poi_points.parquet"),
-        join_path=str(test_data_dir / "districts.parquet"),
+        join_path=join_path,
         output_path=output_path,
         use_spatial_relationship=True,
         use_attribute_relationship=False,
@@ -264,6 +289,7 @@ def test_spatial_intersects_join() -> bool:
             field="district_name", sort_order=SortOrder.ascending
         ),
         join_type=JoinType.left,
+        join_fields=_all_join_fields(join_path),
     )
 
     print("🧪 Testing spatial intersects join (POI in districts)...")
@@ -302,9 +328,10 @@ def test_spatial_distance_join() -> bool:
     test_data_dir = Path(__file__).parent.parent.parent / "data" / "vector"
     output_path = "/tmp/test_spatial_distance.parquet"
 
+    join_path = str(test_data_dir / "bus_stops.parquet")
     params = JoinParams(
         target_path=str(test_data_dir / "schools.parquet"),
-        join_path=str(test_data_dir / "bus_stops.parquet"),
+        join_path=join_path,
         output_path=output_path,
         use_spatial_relationship=True,
         use_attribute_relationship=False,
@@ -313,6 +340,7 @@ def test_spatial_distance_join() -> bool:
         distance_units="meters",  # Note: our test data uses unit coordinates
         join_operation=JoinOperationType.one_to_many,
         join_type=JoinType.inner,
+        join_fields=_all_join_fields(join_path),
     )
 
     print("🧪 Testing spatial distance join (schools near bus stops)...")
@@ -385,9 +413,10 @@ def test_combined_spatial_and_attribute_join() -> bool:
     prep_con.execute("COPY test_zones TO '/tmp/test_zones.parquet' (FORMAT PARQUET)")
     prep_con.close()
 
+    join_path = "/tmp/test_zones.parquet"
     params = JoinParams(
         target_path="/tmp/test_buildings.parquet",
-        join_path="/tmp/test_zones.parquet",
+        join_path=join_path,
         output_path=output_path,
         use_spatial_relationship=True,
         use_attribute_relationship=True,
@@ -401,6 +430,7 @@ def test_combined_spatial_and_attribute_join() -> bool:
             field="zone_name", sort_order=SortOrder.ascending
         ),
         join_type=JoinType.inner,
+        join_fields=_all_join_fields(join_path),
     )
 
     print("🧪 Testing combined spatial and attribute join...")
@@ -434,15 +464,17 @@ def test_line_polygon_intersection() -> bool:
     test_data_dir = Path(__file__).parent.parent.parent / "data" / "vector"
     output_path = "/tmp/test_line_polygon.parquet"
 
+    join_path = str(test_data_dir / "land_zones.parquet")
     params = JoinParams(
         target_path=str(test_data_dir / "roads.parquet"),
-        join_path=str(test_data_dir / "land_zones.parquet"),
+        join_path=join_path,
         output_path=output_path,
         use_spatial_relationship=True,
         use_attribute_relationship=False,
         spatial_relationship=SpatialRelationshipType.intersects,
         join_operation=JoinOperationType.one_to_many,
         join_type=JoinType.inner,
+        join_fields=_all_join_fields(join_path),
     )
 
     print("🧪 Testing line-polygon intersection join (roads through zones)...")
@@ -494,16 +526,20 @@ def test_empty_results() -> bool:
         "COPY remote_points TO '/tmp/remote_points.parquet' (FORMAT PARQUET)"
     )
 
+    districts_path = str(test_data_dir / "districts.parquet")
+    districts_fields = _all_join_fields(districts_path)
+
     # Test spatial join with no matches
     params_no_matches = JoinParams(
         target_path="/tmp/remote_points.parquet",
-        join_path=str(test_data_dir / "districts.parquet"),
+        join_path=districts_path,
         output_path="/tmp/test_no_matches.parquet",
         use_spatial_relationship=True,
         use_attribute_relationship=False,
         spatial_relationship=SpatialRelationshipType.intersects,
         join_operation=JoinOperationType.one_to_one,
         join_type=JoinType.inner,
+        join_fields=districts_fields,
     )
 
     tool = JoinTool()
@@ -522,13 +558,14 @@ def test_empty_results() -> bool:
     # Test 2: Left join with no matches (should preserve target records)
     params_left_no_matches = JoinParams(
         target_path="/tmp/remote_points.parquet",
-        join_path=str(test_data_dir / "districts.parquet"),
+        join_path=districts_path,
         output_path="/tmp/test_left_no_matches.parquet",
         use_spatial_relationship=True,
         use_attribute_relationship=False,
         spatial_relationship=SpatialRelationshipType.intersects,
         join_operation=JoinOperationType.one_to_one,
         join_type=JoinType.left,
+        join_fields=districts_fields,
     )
 
     tool2 = JoinTool()  # Create new tool instance
@@ -557,9 +594,12 @@ def test_empty_results() -> bool:
         "COPY empty_products TO '/tmp/empty_products.parquet' (FORMAT PARQUET)"
     )
 
+    reviews_path = str(test_data_dir / "reviews.parquet")
+    reviews_fields = _all_join_fields(reviews_path)
+
     params_empty_target = JoinParams(
         target_path="/tmp/empty_products.parquet",
-        join_path=str(test_data_dir / "reviews.parquet"),
+        join_path=reviews_path,
         output_path="/tmp/test_empty_target.parquet",
         use_spatial_relationship=False,
         use_attribute_relationship=True,
@@ -568,6 +608,7 @@ def test_empty_results() -> bool:
         ],
         join_operation=JoinOperationType.one_to_many,
         join_type=JoinType.left,
+        join_fields=reviews_fields,
     )
 
     tool3 = JoinTool()  # Create new tool instance
@@ -603,6 +644,7 @@ def test_empty_results() -> bool:
         ],
         join_operation=JoinOperationType.one_to_many,
         join_type=JoinType.left,
+        join_fields=_all_join_fields("/tmp/empty_reviews.parquet"),
     )
 
     tool4 = JoinTool()  # Create new tool instance
@@ -634,7 +676,7 @@ def test_empty_results() -> bool:
 
     params_attr_no_match = JoinParams(
         target_path="/tmp/products_no_match.parquet",
-        join_path=str(test_data_dir / "reviews.parquet"),
+        join_path=reviews_path,
         output_path="/tmp/test_attr_no_match.parquet",
         use_spatial_relationship=False,
         use_attribute_relationship=True,
@@ -643,6 +685,7 @@ def test_empty_results() -> bool:
         ],
         join_operation=JoinOperationType.one_to_many,
         join_type=JoinType.inner,
+        join_fields=reviews_fields,
     )
 
     tool5 = JoinTool()  # Create new tool instance

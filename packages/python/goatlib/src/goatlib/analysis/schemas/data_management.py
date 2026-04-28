@@ -177,9 +177,9 @@ class JoinParams(BaseModel):
     join_fields: Optional[List[str]] = Field(
         None,
         description="List of field names from the join layer to add to the output. "
-        "If None, all join fields are added (current behavior). "
-        "If an empty list, no join fields are added (filter-only / semi-join behavior). "
-        "If a list of names, only those join fields are added.",
+        "Only listed fields are kept. ``None`` or an empty list means no join "
+        "fields are added (filter-only / semi-join behavior). To keep every "
+        "join field, pass the explicit list of all column names.",
     )
 
     # Output configuration

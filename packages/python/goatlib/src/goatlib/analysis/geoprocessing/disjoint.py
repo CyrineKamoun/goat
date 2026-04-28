@@ -14,12 +14,7 @@ class DisjointTool(AnalysisTool):
     """Tool for filtering an input layer to features that are disjoint from a filter layer.
 
     Returns input features that have NO spatial intersection with any feature in the
-    filter layer. Implemented as an anti-semi-join (`WHERE NOT EXISTS (... ST_Intersects ...)`)
-    so the result is correct regardless of how many features the filter layer contains.
-
-    Equivalent to:
-    - QGIS: "Extract by location" with predicate "are disjoint from"
-    - PostGIS: `WHERE NOT EXISTS (SELECT 1 FROM filter WHERE ST_Intersects(input.geom, filter.geom))`
+    filter layer. 
     """
 
     def _run_implementation(

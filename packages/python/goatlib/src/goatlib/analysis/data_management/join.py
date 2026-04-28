@@ -436,8 +436,6 @@ class JoinTool(AnalysisTool):
                     break
 
         # Use a specific join column for counting.
-        # COUNT(join_col) returns 0 for unmatched LEFT JOIN rows,
-        # unlike COUNT(*) which returns 1 for the phantom target row.
         join_fields = self._get_raw_field_names(join_table)
         join_count_col = f"join_data.{join_fields[0]}"
 
@@ -469,14 +467,9 @@ class JoinTool(AnalysisTool):
         join_fields: Optional[List[str]],
     ) -> List[str]:
         """Filter join columns by user-selected join_fields.
-
-        Three behaviors:
-          - join_fields is None: returns columns unchanged (all join fields kept).
-          - join_fields is an empty list: returns an empty list (no join fields).
-          - join_fields is a list of names: returns only those columns.
         """
-        if join_fields is None:
-            return columns
+        if not join_fields:
+            return []
         keep = set(join_fields)
         return [c for c in columns if c in keep]
 

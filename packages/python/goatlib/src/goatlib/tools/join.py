@@ -1,7 +1,6 @@
 """Join tool for Windmill.
 
 Performs spatial and attribute-based joins between datasets using DuckDB Spatial.
-Matches ArcGIS Join Features tool functionality.
 """
 
 import logging
@@ -210,7 +209,6 @@ class JoinToolParams(ScenarioSelectorMixin, ToolInputBase, BaseModel):
     )
 
     # ===== Attribute Relationship Settings =====
-    # Support for multiple attribute field pairs (like ArcGIS)
     attribute_relationships: Optional[List[AttributeRelationship]] = Field(
         None,
         description="Attribute relationships. Target field and join field must contain matching values.",
@@ -288,11 +286,6 @@ class JoinToolParams(ScenarioSelectorMixin, ToolInputBase, BaseModel):
     join_fields: List[str] = Field(
         default_factory=list,
         description="Pick which fields from the join layer to include in the output.",
-        # Explicit `default: []` in the JSON schema so the frontend initializes
-        # the field-selector to an empty array (otherwise Pydantic does not
-        # surface `default_factory` to the generated JSON schema). The
-        # `default_all` widget option then triggers the FieldInput component
-        # to pre-tick every available join-layer field on first render.
         json_schema_extra={
             **ui_field(
                 section="join_options",
@@ -520,11 +513,6 @@ class JoinToolRunner(BaseToolRunner[JoinToolParams]):
             field_statistics=params.field_statistics
             if params.calculate_statistics
             else None,
-            # Toggle off: no join fields (filter-only mode).
-            # Toggle on: the frontend pre-fills join_fields with every join-layer
-            # column (via the `default_all` widget option), so what is ticked is
-            # what gets emitted. An empty selection therefore means "no fields"
-            # — equivalent to toggling off.
             join_fields=params.join_fields if params.add_join_fields else [],
         )
 
