@@ -26,7 +26,6 @@ class SpatialRelationshipType(StrEnum):
     covered_by = "covered_by"
 
 
-
 class JoinOperationType(StrEnum):
     """Join operation types determining how multiple matches are handled"""
 
@@ -177,9 +176,10 @@ class JoinParams(BaseModel):
     join_fields: Optional[List[str]] = Field(
         None,
         description="List of field names from the join layer to add to the output. "
-        "Only listed fields are kept. ``None`` or an empty list means no join "
-        "fields are added (filter-only / semi-join behavior). To keep every "
-        "join field, pass the explicit list of all column names.",
+        "``None`` (default, not specified) keeps every join column — i.e. a "
+        "regular join. An explicit empty list ``[]`` keeps no join columns "
+        "(filter-only / semi-join behavior). A non-empty list keeps only the "
+        "listed columns.",
     )
 
     # Output configuration

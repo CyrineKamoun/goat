@@ -213,7 +213,7 @@ class JoinTool(AnalysisTool):
         join_fields = [f"join_data.{c} as join_{c}" for c in join_cols]
 
         # When all join fields are filtered out, the SELECT must still be valid
-        select_fields = ", ".join(target_fields + join_fields) if join_fields else ", ".join(target_fields)
+        select_fields = ", ".join(target_fields + join_fields)
 
         query = f"""
             SELECT {select_fields}
@@ -314,18 +314,12 @@ class JoinTool(AnalysisTool):
         # Strip internal row-order column from user-visible columns; ORDER BY
         # references it directly via join_data.__join_row_order regardless.
         join_cols_all = [
-            c
-            for c in self._get_raw_field_names(join_table)
-            if c != "__join_row_order"
+            c for c in self._get_raw_field_names(join_table) if c != "__join_row_order"
         ]
         join_cols = self._filter_join_columns(join_cols_all, params.join_fields)
         join_fields = [f"join_data.{c} as join_{c}" for c in join_cols]
 
-        all_select_fields = (
-            ", ".join(target_fields + join_fields)
-            if join_fields
-            else ", ".join(target_fields)
-        )
+        all_select_fields = ", ".join(target_fields + join_fields)
 
         # Create window function to rank matches
         con.execute(f"""
@@ -467,7 +461,12 @@ class JoinTool(AnalysisTool):
         join_fields: Optional[List[str]],
     ) -> List[str]:
         """Filter join columns by user-selected join_fields.
+
+        ``None`` means "not specified" → keep every column (real join).
+        ``[]`` is an explicit "keep none" → filter-only / semi-join.
         """
+        if join_fields is None:
+            return list(columns)
         if not join_fields:
             return []
         keep = set(join_fields)

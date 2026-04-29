@@ -23,11 +23,12 @@ RESULT_DIR = Path(__file__).parent.parent.parent / "result"
 
 
 def _all_join_fields(join_path: str) -> list[str]:
-    """Return every column name in the given parquet, used for ``join_fields``.
+    """Return every column name in the given parquet.
 
-    ``JoinParams.join_fields`` no longer treats ``None`` as "keep all"; callers
-    must pass an explicit column list. This helper introspects the fixture so
-    tests stay readable without hardcoding column names.
+    ``JoinParams.join_fields`` is tri-state: ``None`` keeps every column (real
+    join), ``[]`` keeps none (filter-only / semi-join), and a non-empty list
+    keeps only the listed columns. This helper is used by tests that want to
+    pin the explicit column list rather than rely on the ``None`` default.
     """
     con = duckdb.connect()
     con.execute("INSTALL spatial; LOAD spatial;")
@@ -735,3 +736,92 @@ class TestEdgeCases:
 
         con.close()
         tool.cleanup()
+
+
+class TestJoinFieldsTriState:
+    """``JoinParams.join_fields`` is tri-state: ``None`` keeps all (real join),
+    ``[]`` keeps none (filter-only), and a list keeps only listed columns."""
+
+    def _base_params(
+        self, join_fields: list[str] | None, output_name: str
+    ) -> JoinParams:
+        target_path = str(TEST_DATA_DIR / "employees.parquet")
+        join_path = str(TEST_DATA_DIR / "salary_bands.parquet")
+        return JoinParams(
+            target_path=target_path,
+            join_path=join_path,
+            output_path=str(RESULT_DIR / output_name),
+            use_spatial_relationship=False,
+            use_attribute_relationship=True,
+            attribute_relationships=[
+                AttributeRelationship(
+                    target_field="department", join_field="department"
+                ),
+                AttributeRelationship(target_field="level", join_field="level"),
+            ],
+            join_operation=JoinOperationType.one_to_one,
+            multiple_matching_records=MultipleMatchingRecordsType.first_record,
+            join_type=JoinType.left,
+            sort_configuration=None,
+            join_fields=join_fields,
+        )
+
+    def test_none_keeps_all_join_columns(self) -> None:
+        """``join_fields=None`` (default) preserves the pre-PR real-join behavior."""
+        join_path = str(TEST_DATA_DIR / "salary_bands.parquet")
+        params = self._base_params(None, "join_fields_none.parquet")
+
+        results = JoinTool().run(params)
+        result_path, _ = results[0]
+
+        con = duckdb.connect()
+        con.execute("INSTALL spatial; LOAD spatial;")
+        cols = [
+            r[0]
+            for r in con.execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{result_path}')"
+            ).fetchall()
+        ]
+
+        # Every join column should appear, prefixed with ``join_``.
+        for c in _all_join_fields(join_path):
+            assert f"join_{c}" in cols, f"expected join_{c} in {cols}"
+
+    def test_empty_list_keeps_no_join_columns(self) -> None:
+        """``join_fields=[]`` is filter-only / semi-join: no join_* columns."""
+        params = self._base_params([], "join_fields_empty.parquet")
+
+        results = JoinTool().run(params)
+        result_path, _ = results[0]
+
+        con = duckdb.connect()
+        con.execute("INSTALL spatial; LOAD spatial;")
+        cols = [
+            r[0]
+            for r in con.execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{result_path}')"
+            ).fetchall()
+        ]
+
+        assert not any(c.startswith("join_") for c in cols), (
+            f"unexpected join_* columns in filter-only output: {cols}"
+        )
+
+    def test_subset_keeps_only_listed_join_columns(self) -> None:
+        """A non-empty list keeps only the listed columns (prefixed)."""
+        params = self._base_params(["min_salary"], "join_fields_subset.parquet")
+
+        results = JoinTool().run(params)
+        result_path, _ = results[0]
+
+        con = duckdb.connect()
+        con.execute("INSTALL spatial; LOAD spatial;")
+        cols = [
+            r[0]
+            for r in con.execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{result_path}')"
+            ).fetchall()
+        ]
+
+        join_cols = [c for c in cols if c.startswith("join_")]
+        assert join_cols == ["join_min_salary"], join_cols
