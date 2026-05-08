@@ -179,6 +179,32 @@ class ProjectImportRunner(SimpleToolRunner):
 
         return config_copy
 
+    def _remap_layer_other_properties(
+        self: Self,
+        other_properties: dict[str, Any] | None,
+        id_map: dict[str, str],
+    ) -> dict[str, Any] | None:
+        """Remap the workflow_export stamp's workflow_id via id_map.
+
+        Layers persisted by a 'Save as Dataset' node carry an
+        ``other_properties.workflow_export`` stamp that finalize_layer's
+        overwrite-on-rerun lookup matches against. The workflow row itself
+        gets a new UUID on import, so without remapping the stamp the
+        first post-import run misses and creates a duplicate layer
+        instead of replacing the imported one.
+        """
+        if not other_properties:
+            return other_properties
+        stamp = other_properties.get("workflow_export")
+        if not isinstance(stamp, dict):
+            return other_properties
+        old_wf_id = stamp.get("workflow_id")
+        if not old_wf_id or old_wf_id not in id_map:
+            return other_properties
+        remapped = json.loads(json.dumps(other_properties))
+        remapped["workflow_export"]["workflow_id"] = id_map[old_wf_id]
+        return remapped
+
     def _remap_report_config(
         self: Self, config: dict[str, Any], id_map: dict[str, str]
     ) -> dict[str, Any]:
@@ -466,6 +492,10 @@ class ProjectImportRunner(SimpleToolRunner):
                         with open(link_path) as f:
                             link_data = json.load(f)
 
+                    remapped_other_properties = self._remap_layer_other_properties(
+                        layer_meta.other_properties, id_map
+                    )
+
                     await conn.execute(
                         f"""
                         INSERT INTO {schema}.layer
@@ -496,7 +526,7 @@ class ProjectImportRunner(SimpleToolRunner):
                         layer_meta.data_type,
                         layer_meta.url,
                         layer_meta.properties,
-                        layer_meta.other_properties,
+                        remapped_other_properties,
                         layer_meta.attribute_mapping,
                         layer_meta.upload_reference_system,
                         layer_meta.upload_file_type,
