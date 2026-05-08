@@ -1,5 +1,6 @@
 #include "geojson.h"
 
+#include "grid_contour_common.h"
 #include "hexagon_builder.h"
 #include "network_builder.h"
 #include "point_grid_builder.h"
@@ -125,75 +126,52 @@ std::string build_polygon_geojson(duckdb::Connection &con)
     return run_single_value_query(con, sql.str(), "Polygon GeoJSON export failed: ");
 }
 
-std::string build_grid_contour_geojson(ReachabilityField const &field,
-                                       RequestConfig const &cfg,
-                                       duckdb::Connection &con)
+} // namespace
+
+std::string build_grid_contour_geojson_from_features(
+    std::vector<TaggedFeature> const &all_features,
+    RequestConfig const &cfg,
+    duckdb::Connection &con)
 {
-    // 1. Build the cost surface grid
-    int zoom = geometry::grid_zoom_for_mode(cfg.mode);
-    auto grid = geometry::build_cost_grid(field, cfg, zoom);
-    if (grid.surface.empty() || grid.width < 2 || grid.height < 2)
+    if (all_features.empty())
         return empty_feature_collection();
 
-    // 2. Build cutoff list
-    std::vector<double> cutoffs;
-    if (!cfg.cutoffs.empty())
-    {
-        cutoffs.reserve(cfg.cutoffs.size());
-        for (int c : cfg.cutoffs)
-            cutoffs.push_back(static_cast<double>(c));
-    }
-    else if (cfg.steps > 0)
-    {
-        double step_size = cfg.cost_budget() / static_cast<double>(cfg.steps);
-        for (int i = 1; i <= cfg.steps; ++i)
-            cutoffs.push_back(step_size * static_cast<double>(i));
-    }
-    else
-    {
-        cutoffs.push_back(cfg.cost_budget());
-    }
-
-    // 3. Run marching squares
-    auto features = geometry::build_jsolines_wkt(
-        grid.surface, grid.width, grid.height,
-        grid.west, grid.north, grid.step_x, grid.step_y,
-        cutoffs);
-
-    if (features.empty())
-        return empty_feature_collection();
-
-    // 4. Convert WKT multipolygons to GeoJSON, applying polygon_difference
-    //    if requested. The jsolines features are cumulative (each cutoff
-    //    contains all area up to that cost), so difference = current - previous.
-    //    We use DuckDB for the ST_Difference + GeoJSON conversion.
-    // Use the existing connection (spatial extension already loaded)
-
+    // VALUES list keyed by (origin_idx, cluster_idx, step_cost). Both
+    // indices participate in the band-difference JOIN below.
     std::ostringstream values;
     values << std::setprecision(15);
-    for (size_t i = 0; i < features.size(); ++i)
+    for (size_t i = 0; i < all_features.size(); ++i)
     {
         if (i > 0) values << ",";
-        values << "(" << features[i].step_cost << ", "
-               << "ST_GeomFromText('" << features[i].multipolygon_wkt << "'))";
+        values << "(" << all_features[i].origin_idx << ", "
+               << all_features[i].cluster_idx << ", "
+               << all_features[i].step_cost << ", "
+               << "ST_GeomFromText('" << all_features[i].multipolygon_wkt << "'))";
     }
 
     std::ostringstream sql;
-    sql << "WITH raw_input(step_cost, geom) AS (VALUES " << values.str() << "), "
-        << "raw AS (SELECT step_cost, ST_MakeValid(geom) AS geom "
+    sql << "WITH raw_input(origin_idx, cluster_idx, step_cost, geom) AS (VALUES "
+        << values.str() << "), "
+        << "raw AS (SELECT origin_idx, cluster_idx, step_cost, ST_MakeValid(geom) AS geom "
         << "  FROM raw_input) ";
 
     if (cfg.polygon_difference)
     {
         sql << ", bands AS ("
-            << "  SELECT r.step_cost, "
+            << "  SELECT r.origin_idx, r.cluster_idx, r.step_cost, "
             << "    CASE WHEN p.geom IS NULL THEN r.geom "
             << "         ELSE ST_MakeValid(ST_Difference("
             << "           ST_MakeValid(r.geom), ST_MakeValid(p.geom))) END AS geom "
             << "  FROM raw r "
-            << "  LEFT JOIN raw p ON p.step_cost = ("
-            << "    SELECT MAX(x.step_cost) FROM raw x WHERE x.step_cost < r.step_cost"
-            << "  )"
+            << "  LEFT JOIN raw p "
+            << "    ON p.origin_idx = r.origin_idx "
+            << "   AND p.cluster_idx = r.cluster_idx "
+            << "   AND p.step_cost = ("
+            << "     SELECT MAX(x.step_cost) FROM raw x "
+            << "      WHERE x.origin_idx = r.origin_idx "
+            << "        AND x.cluster_idx = r.cluster_idx "
+            << "        AND x.step_cost < r.step_cost"
+            << "   )"
             << ") ";
     }
 
@@ -208,7 +186,7 @@ std::string build_grid_contour_geojson(ReachabilityField const &field,
         << "    'properties', json_object('step_cost', step_cost)"
         << "  ) AS feature "
         << "  FROM ("
-        << "    SELECT step_cost, "
+        << "    SELECT origin_idx, cluster_idx, step_cost, "
         << "      CASE WHEN ST_GeometryType(geom) IN ('POLYGON', 'MULTIPOLYGON') THEN geom "
         << "           WHEN ST_GeometryType(geom) = 'GEOMETRYCOLLECTION' "
         << "             THEN ST_CollectionExtract(geom, 3) "
@@ -216,7 +194,7 @@ std::string build_grid_contour_geojson(ReachabilityField const &field,
         << "    FROM " << (cfg.polygon_difference ? "bands" : "raw")
         << "  ) sub "
         << "  WHERE geom IS NOT NULL AND NOT ST_IsEmpty(geom) "
-        << "  ORDER BY step_cost"
+        << "  ORDER BY origin_idx, cluster_idx, step_cost"
         << ") t";
 
     auto result = con.Query(sql.str());
@@ -227,12 +205,33 @@ std::string build_grid_contour_geojson(ReachabilityField const &field,
     return result->GetValue(0, 0).GetValue<std::string>();
 }
 
+namespace
+{
+
+std::string build_grid_contour_geojson(
+    std::vector<ReachabilityField> const &fields,
+    RequestConfig const &cfg,
+    duckdb::Connection &con)
+{
+    auto const cutoffs = compute_step_cutoffs(cfg);
+    int const zoom = geometry::grid_zoom_for_mode(cfg.mode);
+    std::vector<TaggedFeature> all_features;
+    for (size_t oi = 0; oi < fields.size(); ++oi)
+        append_field_grid_features(all_features, fields[oi],
+                                   static_cast<int32_t>(oi), zoom, cutoffs, cfg);
+    return build_grid_contour_geojson_from_features(all_features, cfg, con);
+}
+
 } // namespace
 
-std::string build_geojson_output(ReachabilityField const &field,
+std::string build_geojson_output(std::vector<ReachabilityField> const &fields,
                                  RequestConfig const &cfg,
                                  duckdb::Connection &con)
 {
+    if (fields.empty())
+        return empty_feature_collection();
+    auto const &field = fields[0]; // non-polygon branches use a single field
+
     switch (cfg.catchment_type)
     {
     case CatchmentType::Network:
@@ -250,9 +249,9 @@ std::string build_geojson_output(ReachabilityField const &field,
         // tighter, network-faithful polygons. Car uses concave hull.
         if (cfg.mode != RoutingMode::Car)
         {
-            return build_grid_contour_geojson(field, cfg, con);
+            return build_grid_contour_geojson(fields, cfg, con);
         }
-        auto const feature_count = materialize_polygon_features_table(field, cfg, con);
+        auto const feature_count = materialize_polygon_features_table(fields, cfg, con);
         if (feature_count == 0)
         {
             return empty_feature_collection();

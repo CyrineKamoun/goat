@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace duckdb
 {
@@ -15,8 +16,9 @@ namespace routing::output
 
 std::string const &polygon_features_table_name();
 
-int64_t materialize_polygon_features_table(ReachabilityField const &field,
-                                           RequestConfig const &cfg,
-                                           duckdb::Connection &con);
+int64_t materialize_polygon_features_table(
+    std::vector<ReachabilityField> const &fields,
+    RequestConfig const &cfg,
+    duckdb::Connection &con);
 
 } // namespace routing::output

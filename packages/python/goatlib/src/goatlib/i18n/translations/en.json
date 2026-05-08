@@ -152,6 +152,10 @@
       "label": "Catchment area shape",
       "description": "Select the shape of the catchment area geometry"
     },
+    "shape_style": {
+      "label": "Shape style",
+      "description": "How polygons are shaped when there are multiple starting points"
+    },
     "steps_style": {
       "label": "Steps style",
       "description": "How steps are displayed in the output"
@@ -750,8 +754,12 @@
       "time": "Time (min)",
       "distance": "Distance (m)"
     },
+    "shape_style": {
+      "combined": "Combined across origins",
+      "separated": "Separated by origin"
+    },
     "steps_style": {
-      "separate": "Separate steps",
+      "separate": "Separated steps",
       "cumulative": "Cumulative steps"
     },
     "routing_mode": {

@@ -32,6 +32,7 @@ from goatlib.analysis.schemas.catchment_area_v2 import (
     PTMode,
     PTTimeWindow,
     RoutingMode,
+    ShapeStyle,
     Weekday,
 )
 from goatlib.analysis.schemas.ui import (
@@ -107,6 +108,11 @@ SECTION_SCENARIO = UISection(
 STEPS_STYLE_LABELS: dict[str, str] = {
     "separate": "enums.steps_style.separate",
     "cumulative": "enums.steps_style.cumulative",
+}
+
+SHAPE_STYLE_LABELS: dict[str, str] = {
+    "combined": "enums.shape_style.combined",
+    "separated": "enums.shape_style.separated",
 }
 
 COST_TYPE_LABELS: dict[str, str] = {
@@ -857,12 +863,30 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
         ),
     )
 
+    shape_style: ShapeStyle = Field(
+        default=ShapeStyle.combined,
+        description="How polygons are shaped when there are multiple starting points.",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=16,
+            label_key="shape_style",
+            enum_labels=SHAPE_STYLE_LABELS,
+            visible_when={
+                "$and": [
+                    {"show_advanced": True},
+                    {"catchment_area_type": "polygon"},
+                    {"routing_mode": {"$in": ["walking", "bicycle", "pedelec"]}},
+                ]
+            },
+        ),
+    )
+
     steps_style: StepsStyle = Field(
         default=StepsStyle.separate,
         description="How steps are displayed in the output.",
         json_schema_extra=ui_field(
             section="configuration",
-            field_order=16,
+            field_order=17,
             label_key="steps_style",
             enum_labels=STEPS_STYLE_LABELS,
             visible_when={
@@ -893,7 +917,7 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
         description="CQL2-JSON filter for point grid layer.",
         json_schema_extra=ui_field(
             section="configuration",
-            field_order=17,
+            field_order=18,
             hidden=True,
         ),
     )
@@ -903,7 +927,7 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
         description="Output file format.",
         json_schema_extra=ui_field(
             section="configuration",
-            field_order=18,
+            field_order=19,
             hidden=True,
         ),
     )
@@ -921,6 +945,23 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
                 raise ValueError("Car distance must be ≤ 100000 meters.")
         elif self.max_cost_distance > 20000:
             raise ValueError("Active mobility distance must be ≤ 20000 meters.")
+        return self
+
+    @model_validator(mode="after")
+    def validate_shape_style(self: Self) -> Self:
+        if self.shape_style != ShapeStyle.separated:
+            return self
+        if self.catchment_area_type != CatchmentType.polygon:
+            raise ValueError(
+                "shape_style=separated requires catchment_area_type=polygon."
+            )
+        if self.routing_mode in (
+            CatchmentAreaRoutingMode.pt,
+            CatchmentAreaRoutingMode.car,
+        ):
+            raise ValueError(
+                "shape_style=separated is only supported for active mobility modes."
+            )
         return self
 
     def resolve_max_cost(self: Self) -> float:
@@ -1077,6 +1118,7 @@ class CatchmentAreaV2ToolRunner(CatchmentAreaToolRunner):
             # Output
             catchment_type=params.catchment_area_type,
             polygon_difference=params.steps_style == StepsStyle.separate,
+            shape_style=params.shape_style,
             output_format=params.output_format,
             output_path=str(output_path),
         )

@@ -58,6 +58,11 @@ class Weekday(StrEnum):
     sunday = "sunday"
 
 
+class ShapeStyle(StrEnum):
+    combined = "combined"
+    separated = "separated"
+
+
 class PTTimeWindow(BaseModel):
     """Time window for PT departure sweep."""
 
@@ -108,6 +113,7 @@ class CatchmentAreaV2Params(BaseModel):
     output_format: OutputFormat = OutputFormat.parquet
     output_path: str
     polygon_difference: bool = True
+    shape_style: ShapeStyle = ShapeStyle.combined
 
     # PT settings
     transit_modes: list[PTMode] | None = None

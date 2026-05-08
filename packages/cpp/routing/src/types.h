@@ -66,6 +66,11 @@ namespace routing
         Parquet,
     };
 
+    enum class ShapeStyle : uint8_t
+    {
+        Combined,
+        Separated,
+    };
 
     struct RequestConfig
     {
@@ -81,6 +86,7 @@ namespace routing
         std::string output_path;
         CatchmentType catchment_type = CatchmentType::Network;
         OutputFormat output_format = OutputFormat::GeoJSON;
+        ShapeStyle shape_style = ShapeStyle::Combined;
         bool polygon_difference;
         int64_t departure_time = 0;  // unix minutes since epoch (PT mode)
         int max_transfers = 5;       // RAPTOR transfer limit (PT mode)

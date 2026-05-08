@@ -152,6 +152,10 @@
       "label": "Form des Einzugsgebiets",
       "description": "Wählen Sie die Form der Einzugsgebietsgeometrie aus."
     },
+    "shape_style": {
+      "label": "Form der Geometrien",
+      "description": "Form der Polygone bei mehreren Startpunkten"
+    },
     "steps_style": {
       "label": "Darstellung der Schritte",
       "description": "Darstellungsart der Schritte in der Ausgabe"
@@ -769,6 +773,10 @@
     "cost_type": {
       "time": "Zeit (Min)",
       "distance": "Entfernung (m)"
+    },
+    "shape_style": {
+      "combined": "Zusammengefasst über Startpunkte",
+      "separated": "Getrennt nach Startpunkt"
     },
     "steps_style": {
       "separate": "Getrennte Schritte",

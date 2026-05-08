@@ -118,123 +118,45 @@ std::string const &polygon_features_table_name()
     return table_name;
 }
 
-int64_t materialize_polygon_features_table(ReachabilityField const &field,
-                                           RequestConfig const &cfg,
-                                           duckdb::Connection &con)
+int64_t materialize_polygon_features_table(
+    std::vector<ReachabilityField> const &fields,
+    RequestConfig const &cfg,
+    duckdb::Connection &con)
 {
+    if (fields.empty())
+        return 0;
+
     auto drop_features = con.Query(std::string("DROP TABLE IF EXISTS ") +
                                    kPolygonFeaturesTempTable);
     if (drop_features->HasError())
         throw std::runtime_error("Failed to drop polygon features temp table: " +
                                  drop_features->GetError());
 
-    // reached_nodes: one row per reachable node, keyed by node_id for joining.
+    // reached_nodes: one row per reachable node per origin.
     auto drop_nodes = con.Query("DROP TABLE IF EXISTS reached_nodes");
     if (drop_nodes->HasError())
         throw std::runtime_error("Failed to drop reached_nodes: " +
                                  drop_nodes->GetError());
     auto create_nodes = con.Query(
         "CREATE TEMP TABLE reached_nodes ("
-        "  node_id INTEGER, cost DOUBLE, x DOUBLE, y DOUBLE"
+        "  origin_idx INTEGER, node_id INTEGER, cost DOUBLE, x DOUBLE, y DOUBLE"
         ")");
     if (create_nodes->HasError())
         throw std::runtime_error("Failed to create reached_nodes: " +
                                  create_nodes->GetError());
 
-    // Downsample interior nodes for concave hull performance.
-    // Only applied for large networks; small catchments keep all nodes.
-    // Boundary nodes (cost near a step threshold) are always kept.
-    static constexpr int32_t kDownsampleThreshold = 50000;
-    static constexpr int32_t kDownsampleFactor = 10;
-
-    // First pass: count reachable nodes to decide whether to downsample.
-    int64_t total_reachable = 0;
-    for (int32_t nid = 0; nid < field.node_count; ++nid)
-    {
-        double const cost = field.costs[static_cast<std::size_t>(nid)];
-        if (std::isfinite(cost) && cost >= 0.0 && cost <= cfg.cost_budget())
-            ++total_reachable;
-    }
-    bool const downsample = total_reachable > kDownsampleThreshold;
-
-    int64_t reached_node_count = 0;
-    int32_t sample_counter = 0;
-    auto const step_thresholds = make_step_costs(cfg);
-    {
-        duckdb::Appender nodes_appender(con, "reached_nodes");
-        for (int32_t nid = 0; nid < field.node_count; ++nid)
-        {
-            double const cost = field.costs[static_cast<std::size_t>(nid)];
-            if (!std::isfinite(cost) || cost < 0.0 || cost > cfg.cost_budget())
-                continue;
-            if (!field.network ||
-                static_cast<std::size_t>(nid) >= field.network->node_coords.size())
-                continue;
-
-            if (downsample)
-            {
-                bool is_boundary = false;
-                for (double sc : step_thresholds)
-                {
-                    if (std::abs(cost - sc) < sc * 0.1)
-                    {
-                        is_boundary = true;
-                        break;
-                    }
-                }
-
-                if (!is_boundary && (sample_counter++ % kDownsampleFactor) != 0)
-                    continue;
-            }
-
-            auto const &coord = field.network->node_coords[static_cast<std::size_t>(nid)];
-            nodes_appender.BeginRow();
-            nodes_appender.Append(nid);
-            nodes_appender.Append(cost);
-            nodes_appender.Append(coord.x);
-            nodes_appender.Append(coord.y);
-            nodes_appender.EndRow();
-            ++reached_node_count;
-        }
-    }
-
-    if (reached_node_count == 0)
-        return 0;
-
-    // node_step_components: component ID per (step, node).
-    // Components are computed independently at each step threshold so that two
-    // origins connected only within a later step budget are correctly separated
-    // at earlier steps.
+    // node_step_components: component ID per (origin, step, node).
     auto drop_comp = con.Query("DROP TABLE IF EXISTS node_step_components");
     if (drop_comp->HasError())
         throw std::runtime_error("Failed to drop node_step_components: " +
                                  drop_comp->GetError());
     auto create_comp = con.Query(
         "CREATE TEMP TABLE node_step_components ("
-        "  step_cost DOUBLE, node_id INTEGER, component_id INTEGER"
+        "  origin_idx INTEGER, step_cost DOUBLE, node_id INTEGER, component_id INTEGER"
         ")");
     if (create_comp->HasError())
         throw std::runtime_error("Failed to create node_step_components: " +
                                  create_comp->GetError());
-
-    auto const step_costs = make_step_costs(cfg);
-    {
-        duckdb::Appender comp_appender(con, "node_step_components");
-        for (double const step : step_costs)
-        {
-            auto const comps = compute_node_components(field, step);
-            for (int32_t nid = 0; nid < field.node_count; ++nid)
-            {
-                if (comps[static_cast<std::size_t>(nid)] < 0)
-                    continue;
-                comp_appender.BeginRow();
-                comp_appender.Append(step);
-                comp_appender.Append(nid);
-                comp_appender.Append(comps[static_cast<std::size_t>(nid)]);
-                comp_appender.EndRow();
-            }
-        }
-    }
 
     // polygon_steps: still needed for the prev-step subquery in difference mode.
     auto drop_steps = con.Query("DROP TABLE IF EXISTS polygon_steps");
@@ -246,6 +168,14 @@ int64_t materialize_polygon_features_table(ReachabilityField const &field,
     if (create_steps->HasError())
         throw std::runtime_error("Failed to create polygon_steps: " +
                                  create_steps->GetError());
+
+    // Downsample interior nodes for concave hull performance.
+    // Only applied for large networks; small catchments keep all nodes.
+    // Boundary nodes (cost near a step threshold) are always kept.
+    static constexpr int32_t kDownsampleThreshold = 50000;
+    static constexpr int32_t kDownsampleFactor = 10;
+    auto const step_costs = make_step_costs(cfg);
+
     {
         duckdb::Appender steps_appender(con, "polygon_steps");
         for (double const step : step_costs)
@@ -256,21 +186,107 @@ int64_t materialize_polygon_features_table(ReachabilityField const &field,
         }
     }
 
-    // One concave hull per (step_cost, component_id).
-    // component_id is step-local: two origins share a component only if they are
-    // graph-connected within *that step's* travel budget.
+    int64_t total_reached_across_fields = 0;
+    int64_t reached_node_total = 0;
+
+    {
+        duckdb::Appender nodes_appender(con, "reached_nodes");
+        for (size_t oi = 0; oi < fields.size(); ++oi)
+        {
+            auto const &field = fields[oi];
+
+            int64_t total_reachable = 0;
+            for (int32_t nid = 0; nid < field.node_count; ++nid)
+            {
+                double const cost = field.costs[static_cast<std::size_t>(nid)];
+                if (std::isfinite(cost) && cost >= 0.0 && cost <= cfg.cost_budget())
+                    ++total_reachable;
+            }
+            bool const downsample = total_reachable > kDownsampleThreshold;
+            int32_t sample_counter = 0;
+
+            for (int32_t nid = 0; nid < field.node_count; ++nid)
+            {
+                double const cost = field.costs[static_cast<std::size_t>(nid)];
+                if (!std::isfinite(cost) || cost < 0.0 || cost > cfg.cost_budget())
+                    continue;
+                if (!field.network ||
+                    static_cast<std::size_t>(nid) >= field.network->node_coords.size())
+                    continue;
+
+                if (downsample)
+                {
+                    bool is_boundary = false;
+                    for (double sc : step_costs)
+                    {
+                        if (std::abs(cost - sc) < sc * 0.1)
+                        {
+                            is_boundary = true;
+                            break;
+                        }
+                    }
+                    if (!is_boundary && (sample_counter++ % kDownsampleFactor) != 0)
+                        continue;
+                }
+
+                auto const &coord = field.network->node_coords[static_cast<std::size_t>(nid)];
+                nodes_appender.BeginRow();
+                nodes_appender.Append(static_cast<int32_t>(oi));
+                nodes_appender.Append(nid);
+                nodes_appender.Append(cost);
+                nodes_appender.Append(coord.x);
+                nodes_appender.Append(coord.y);
+                nodes_appender.EndRow();
+                ++reached_node_total;
+            }
+
+            total_reached_across_fields += total_reachable;
+        }
+    }
+
+    if (reached_node_total == 0)
+        return 0;
+
+    {
+        duckdb::Appender comp_appender(con, "node_step_components");
+        for (size_t oi = 0; oi < fields.size(); ++oi)
+        {
+            auto const &field = fields[oi];
+            for (double const step : step_costs)
+            {
+                auto const comps = compute_node_components(field, step);
+                for (int32_t nid = 0; nid < field.node_count; ++nid)
+                {
+                    if (comps[static_cast<std::size_t>(nid)] < 0)
+                        continue;
+                    comp_appender.BeginRow();
+                    comp_appender.Append(static_cast<int32_t>(oi));
+                    comp_appender.Append(step);
+                    comp_appender.Append(nid);
+                    comp_appender.Append(comps[static_cast<std::size_t>(nid)]);
+                    comp_appender.EndRow();
+                }
+            }
+        }
+    }
+
+    // One concave hull per (origin_idx, step_cost, component_id).
+    // component_id is step-local AND origin-local: two reached nodes share a
+    // component only if they are graph-connected within that step's budget
+    // FROM the same origin's Dijkstra.
     // Adaptive ratio: smoother for small catchments, tighter for large ones.
-    double ratio = (total_reachable < 10000) ? 0.5
-                 : (total_reachable < 50000) ? 0.3
+    double ratio = (total_reached_across_fields < 10000) ? 0.5
+                 : (total_reached_across_fields < 50000) ? 0.3
                  : kConcaveHullRatio;
     std::string const hull_ratio = std::to_string(ratio);
     std::string const hulls_per_component_cte =
         "hulls_per_component AS ("
-        "  SELECT c.step_cost, c.component_id,"
+        "  SELECT c.origin_idx, c.step_cost, c.component_id,"
         "         ST_ConcaveHull(ST_Union_Agg(ST_Point(n.x, n.y)), " + hull_ratio + ", false) AS geom"
         "  FROM node_step_components c"
-        "  JOIN reached_nodes n ON n.node_id = c.node_id"
-        "  GROUP BY c.step_cost, c.component_id"
+        "  JOIN reached_nodes n"
+        "    ON n.origin_idx = c.origin_idx AND n.node_id = c.node_id"
+        "  GROUP BY c.origin_idx, c.step_cost, c.component_id"
         "  HAVING count(*) >= 3"
         "), ";
 
@@ -278,34 +294,36 @@ int64_t materialize_polygon_features_table(ReachabilityField const &field,
     if (cfg.polygon_difference)
     {
         // For each component at step k, subtract the *total* coverage at step k-1
-        // (all components unioned). This correctly handles the case where two
-        // components that were separate at step k-1 merge into one at step k.
+        // (all components for the SAME origin unioned). Two components that were
+        // separate at step k-1 and merged at step k are still handled correctly.
         create_sql =
             std::string("CREATE TEMP TABLE ") + kPolygonFeaturesTempTable + " AS "
             "WITH " + hulls_per_component_cte +
             "total_hulls AS ("
-            "  SELECT step_cost, ST_MakeValid(ST_Union_Agg(geom)) AS geom"
+            "  SELECT origin_idx, step_cost, ST_MakeValid(ST_Union_Agg(geom)) AS geom"
             "  FROM hulls_per_component"
             "  WHERE geom IS NOT NULL"
-            "  GROUP BY step_cost"
+            "  GROUP BY origin_idx, step_cost"
             "), bands_per_component AS ("
-            "  SELECT c.step_cost, c.component_id,"
+            "  SELECT c.origin_idx, c.step_cost, c.component_id,"
             "         ST_MakeValid("
             "           CASE WHEN p.geom IS NULL THEN c.geom"
             "                ELSE ST_Difference(c.geom, p.geom) END"
             "         ) AS geom"
             "  FROM hulls_per_component c"
-            "  LEFT JOIN total_hulls p ON p.step_cost = ("
-            "    SELECT max(x.step_cost) FROM polygon_steps x WHERE x.step_cost < c.step_cost"
-            "  )"
+            "  LEFT JOIN total_hulls p"
+            "    ON p.origin_idx = c.origin_idx"
+            "   AND p.step_cost = ("
+            "     SELECT max(x.step_cost) FROM polygon_steps x WHERE x.step_cost < c.step_cost"
+            "   )"
             "), hulls AS ("
-            "  SELECT step_cost, ST_MakeValid(ST_Union_Agg(geom)) AS geom"
+            "  SELECT origin_idx, step_cost, ST_MakeValid(ST_Union_Agg(geom)) AS geom"
             "  FROM bands_per_component"
             "  WHERE geom IS NOT NULL"
             "    AND ST_GeometryType(geom) IN ('POLYGON', 'MULTIPOLYGON')"
-            "  GROUP BY step_cost"
+            "  GROUP BY origin_idx, step_cost"
             "), normalized AS ("
-            "  SELECT step_cost,"
+            "  SELECT origin_idx, step_cost,"
             "         CASE"
             "           WHEN ST_GeometryType(geom) IN ('POLYGON', 'MULTIPOLYGON') THEN geom"
             "           ELSE NULL"
@@ -317,7 +335,7 @@ int64_t materialize_polygon_features_table(ReachabilityField const &field,
             "  ST_Transform(geom, 'EPSG:3857', 'OGC:CRS84') AS geometry "
             "FROM normalized "
             "WHERE geom IS NOT NULL "
-            "ORDER BY step_cost";
+            "ORDER BY origin_idx, step_cost";
     }
     else
     {
@@ -325,12 +343,12 @@ int64_t materialize_polygon_features_table(ReachabilityField const &field,
             std::string("CREATE TEMP TABLE ") + kPolygonFeaturesTempTable + " AS "
             "WITH " + hulls_per_component_cte +
             "hulls AS ("
-            "  SELECT step_cost, ST_MakeValid(ST_Union_Agg(geom)) AS geom"
+            "  SELECT origin_idx, step_cost, ST_MakeValid(ST_Union_Agg(geom)) AS geom"
             "  FROM hulls_per_component"
             "  WHERE geom IS NOT NULL"
-            "  GROUP BY step_cost"
+            "  GROUP BY origin_idx, step_cost"
             "), normalized AS ("
-            "  SELECT step_cost,"
+            "  SELECT origin_idx, step_cost,"
             "         CASE"
             "           WHEN ST_GeometryType(geom) IN ('POLYGON', 'MULTIPOLYGON') THEN geom"
             "           ELSE NULL"
@@ -342,7 +360,7 @@ int64_t materialize_polygon_features_table(ReachabilityField const &field,
             "  ST_Transform(geom, 'EPSG:3857', 'OGC:CRS84') AS geometry "
             "FROM normalized "
             "WHERE geom IS NOT NULL "
-            "ORDER BY step_cost";
+            "ORDER BY origin_idx, step_cost";
     }
 
     auto create_features = con.Query(create_sql);

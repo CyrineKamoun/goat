@@ -20,6 +20,7 @@ from goatlib.analysis.schemas.catchment_area_v2 import (
     CostType,
     OutputFormat,
     RoutingMode,
+    ShapeStyle,
 )
 from goatlib.config.settings import settings
 from goatlib.models.io import DatasetMetadata
@@ -156,6 +157,11 @@ class CatchmentAreaToolV2(AnalysisTool):
             else routing.OutputFormat.Parquet
         )
         cfg.polygon_difference = params.polygon_difference
+        cfg.shape_style = (
+            routing.ShapeStyle.Separated
+            if params.shape_style == ShapeStyle.separated
+            else routing.ShapeStyle.Combined
+        )
 
         if params.cutoffs:
             cfg.cutoffs = list(params.cutoffs)

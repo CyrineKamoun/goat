@@ -12,6 +12,19 @@ namespace routing::input
     {
         if (cfg.starting_points.empty())
             throw std::invalid_argument("At least one starting point required");
+        if (cfg.shape_style == ShapeStyle::Separated &&
+            cfg.catchment_type != CatchmentType::Polygon)
+        {
+            throw std::invalid_argument(
+                "shape_style=separated requires catchment_type=polygon");
+        }
+        if (cfg.shape_style == ShapeStyle::Separated &&
+            (cfg.mode == RoutingMode::PublicTransport ||
+             cfg.mode == RoutingMode::Car))
+        {
+            throw std::invalid_argument(
+                "shape_style=separated is only supported for active mobility modes");
+        }
         if (cfg.max_cost <= 0)
             throw std::invalid_argument("max_cost must be positive");
         if (!cfg.cutoffs.empty())
