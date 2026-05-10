@@ -27,16 +27,6 @@ if settings.SENTRY_DSN and settings.ENVIRONMENT:
         traces_sample_rate=1.0 if settings.ENVIRONMENT == "prod" else 0.1,
     )
 
-# Must run BEFORE `app = FastAPI(...)` below. FastAPIInstrumentor's
-# `.instrument()` monkey-patches `fastapi.FastAPI` so future instances
-# get auto-instrumented; existing instances aren't retroactively wrapped.
-# If we called this inside `lifespan` (after app construction), the patch
-# would land but the running `app` would already be a vanilla FastAPI
-# and HTTP metrics + spans would never be emitted.
-# Env-var-gated — no-op when OTEL_ENABLED is unset/false.
-setup_observability(service_name="core")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print("Starting up...")
@@ -53,6 +43,12 @@ app = FastAPI(
     openapi_url=f"{settings.API_V2_STR}/openapi.json",
     lifespan=lifespan,
 )
+
+# Attach OTel auto-instrumentation directly to this app. Module-top
+# placement (not inside lifespan) so middleware is installed before the
+# first request arrives. Env-var-gated — no-op when OTEL_ENABLED is
+# unset/false, so other GOAT operators see no behavior change.
+setup_observability(service_name="core", fastapi_app=app)
 
 
 @app.exception_handler(ValueError)

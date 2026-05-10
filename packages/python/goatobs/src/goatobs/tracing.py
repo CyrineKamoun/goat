@@ -72,8 +72,17 @@ def setup_tracing(
     service_name: str,
     environment: str,
     otlp_endpoint: str | None,
+    fastapi_app: object | None = None,
 ) -> None:
-    """Configure global OTel TracerProvider + processors + exporters."""
+    """Configure global OTel TracerProvider + processors + exporters.
+
+    If `fastapi_app` is provided, FastAPI auto-instrumentation is attached
+    directly to that app instance via `instrument_app`. This is the
+    preferred form because `FastAPIInstrumentor().instrument()` only
+    monkey-patches `fastapi.FastAPI` — services that do
+    `from fastapi import FastAPI` (the standard idiom) bind the original
+    class in their module namespace at import time, so the patch never
+    reaches the app they construct."""
     resource = Resource.create(
         {
             "service.name": service_name,
@@ -104,9 +113,19 @@ def setup_tracing(
 
     otel_trace.set_tracer_provider(provider)
 
-    # Auto-instrument supported libraries. Each instrumentor no-ops
-    # when its target library isn't imported in the running process.
-    FastAPIInstrumentor().instrument()
+    # Library auto-instrumentation. SQLAlchemy / HTTPX / asyncpg all
+    # patch their own classes' methods so any existing instance is
+    # transparently instrumented — fine to call here unconditionally.
     SQLAlchemyInstrumentor().instrument()
     HTTPXClientInstrumentor().instrument()
     AsyncPGInstrumentor().instrument()
+
+    # FastAPI is different: `.instrument()` monkey-patches
+    # `fastapi.FastAPI`, which doesn't help if the caller did
+    # `from fastapi import FastAPI` (the standard form) — in that case
+    # their local `FastAPI` name is bound to the original class. Use
+    # `instrument_app` against the specific app instance instead.
+    if fastapi_app is not None:
+        FastAPIInstrumentor.instrument_app(fastapi_app)
+    else:
+        FastAPIInstrumentor().instrument()

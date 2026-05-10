@@ -27,8 +27,18 @@ def _is_truthy(val: str | None) -> bool:
     return val is not None and val.lower() in ("true", "1", "yes")
 
 
-def setup_observability(*, service_name: str) -> None:
-    """Bootstrap structlog + OTel tracing + OTel metrics if OTEL_ENABLED."""
+def setup_observability(
+    *,
+    service_name: str,
+    fastapi_app: object | None = None,
+) -> None:
+    """Bootstrap structlog + OTel tracing + OTel metrics if OTEL_ENABLED.
+
+    Pass `fastapi_app` (your FastAPI instance) so HTTP server
+    instrumentation attaches to the actual app — without it,
+    FastAPIInstrumentor falls back to class-level monkey-patching,
+    which doesn't reach apps already constructed via
+    `from fastapi import FastAPI; app = FastAPI(...)`."""
     if not _is_truthy(os.environ.get("OTEL_ENABLED")):
         return
 
@@ -64,4 +74,5 @@ def setup_observability(*, service_name: str) -> None:
         service_name=service_name,
         environment=environment,
         otlp_endpoint=otlp_endpoint,
+        fastapi_app=fastapi_app,
     )
