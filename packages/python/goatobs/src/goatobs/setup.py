@@ -48,12 +48,19 @@ def setup_observability(*, service_name: str) -> None:
         environment=environment,
         json_output=json_output,
     )
-    setup_tracing(
+    # Order matters: setup_metrics must run BEFORE setup_tracing because
+    # setup_tracing calls FastAPIInstrumentor().instrument(), which
+    # acquires a meter from the global MeterProvider at instrument time.
+    # If the global meter provider hasn't been set yet, the instrumentor
+    # captures a no-op meter and HTTP RED metrics get silently dropped
+    # (traces still work because the tracer provider IS set inside
+    # setup_tracing before instrumentation).
+    setup_metrics(
         service_name=service_name,
         environment=environment,
         otlp_endpoint=otlp_endpoint,
     )
-    setup_metrics(
+    setup_tracing(
         service_name=service_name,
         environment=environment,
         otlp_endpoint=otlp_endpoint,
