@@ -83,6 +83,7 @@ jobs:
             core:
                 - 'apps/core/**'
                 - 'packages/python/goatlib/**'
+                - 'packages/python/goatobs/**'
                 - 'pyproject.toml'
                 - 'uv.lock'
 
