@@ -27,13 +27,18 @@ if settings.SENTRY_DSN and settings.ENVIRONMENT:
         traces_sample_rate=1.0 if settings.ENVIRONMENT == "prod" else 0.1,
     )
 
+# Must run BEFORE `app = FastAPI(...)` below. FastAPIInstrumentor's
+# `.instrument()` monkey-patches `fastapi.FastAPI` so future instances
+# get auto-instrumented; existing instances aren't retroactively wrapped.
+# If we called this inside `lifespan` (after app construction), the patch
+# would land but the running `app` would already be a vanilla FastAPI
+# and HTTP metrics + spans would never be emitted.
+# Env-var-gated — no-op when OTEL_ENABLED is unset/false.
+setup_observability(service_name="core")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # Optional, env-var-gated. No-op when OTEL_ENABLED is unset/false,
-    # so other GOAT operators see no behavior change.
-    setup_observability(service_name="core")
-
     print("Starting up...")
     session_manager.init(settings.ASYNC_SQLALCHEMY_DATABASE_URI)
     yield
