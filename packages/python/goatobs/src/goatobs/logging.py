@@ -1,15 +1,26 @@
 """structlog setup for GOAT services.
 
-`setup_logging(service_name, environment, json_output)` configures the
-standard library logging + structlog so:
+`setup_logging(service_name, environment, json_output)` wires up both
+structlog AND the standard library `logging` module to share the same
+processor chain, so every log line — whether emitted via
+`structlog.get_logger().info(...)` or via `logging.getLogger("uvicorn").info(...)`
+or by a third-party library that uses stdlib logging — runs through the
+same processors and lands on stdout as one JSON line.
 
-  * Every log record gets `service`, `environment`, `time`, `level`.
-  * If a contextvar user is bound, `user_id`, `email`, `realm` are injected.
-  * If we're inside an OTel span, `trace_id` and `span_id` are injected.
-  * Exception logs include the formatted traceback as a string field
-    (multi-line preserved — Loki indexes it).
-  * Output: JSON to stdout when json_output=True (production / deployed);
-    colored text when False (local dev).
+What ends up on each record:
+
+  * `service`, `environment`, `time`, `level` (always)
+  * `user_id`, `email`, `realm` when a contextvar user is bound (added by
+    the auth-context middleware)
+  * `trace_id`, `span_id` when we're inside an OTel span (so logs and
+    traces are joinable in Grafana / Tempo)
+  * Formatted traceback as a string for exception logs
+
+The stdlib bridge is what makes this useful in practice: FastAPI,
+uvicorn, SQLAlchemy, asyncpg etc. all log via stdlib, never via
+structlog. Without the bridge, our processors only ran for the handful
+of explicit `structlog.get_logger()` calls — every other log line was
+plain-text uvicorn-style output with no user / trace context.
 """
 import logging
 import sys
@@ -59,28 +70,80 @@ def setup_logging(
     environment: str,
     json_output: bool,
 ) -> None:
-    """Configure structlog for the running process.
+    """Configure structlog AND stdlib logging through a shared processor chain.
 
     Idempotent: calling twice replaces the prior config (useful in tests).
     """
-    processors: list[Any] = [
+    # Shared processors run on EVERY log record — both structlog-native
+    # and foreign (stdlib) records — before the final renderer. Order
+    # matters: contextvars and span-context look at the live state at
+    # log-record time, so they go before service/user/trace processors
+    # that read those vars.
+    shared_processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", key="time", utc=True),
         _add_service_fields(service_name, environment),
         _add_user_context,
         _add_trace_context,
-        structlog.processors.format_exc_info,
     ]
 
-    if json_output:
-        processors.append(structlog.processors.JSONRenderer())
-    else:
-        processors.append(structlog.dev.ConsoleRenderer(colors=True))
+    renderer: Any = (
+        structlog.processors.JSONRenderer()
+        if json_output
+        else structlog.dev.ConsoleRenderer(colors=False)
+    )
 
+    # structlog → stdlib bridge: structlog runs shared_processors, then
+    # `wrap_for_formatter` hands the prepared event_dict over to stdlib's
+    # ProcessorFormatter (configured below) for final rendering.
     structlog.configure(
-        processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
+        processors=shared_processors + [
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
+        wrapper_class=structlog.stdlib.BoundLogger,
+        logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=False,
     )
+
+    # stdlib formatter: applies shared_processors to foreign records (so
+    # uvicorn/FastAPI/SQLAlchemy logs get user+trace context too) and the
+    # renderer to everything. `remove_processors_meta` strips the
+    # internal `_record`/`_from_structlog` keys structlog uses to thread
+    # records through.
+    formatter = structlog.stdlib.ProcessorFormatter(
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.processors.format_exc_info,
+            renderer,
+        ],
+        foreign_pre_chain=shared_processors,
+    )
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(formatter)
+
+    # Replace any handlers on the root logger so we own the format. Set
+    # level to INFO; raise to WARNING in prod if signal volume is a
+    # problem (this isn't currently a knob via env var — add one if
+    # services need it).
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
+
+    # Uvicorn installs its own handlers on its loggers during startup,
+    # which would bypass ours. Clearing their handlers + propagate=True
+    # routes everything they emit through the root handler we just set.
+    # FastAPI / SQLAlchemy don't install their own — they propagate by
+    # default — but listing them here makes the intent explicit.
+    for name in (
+        "uvicorn",
+        "uvicorn.access",
+        "uvicorn.error",
+        "fastapi",
+        "sqlalchemy.engine",
+    ):
+        lg = logging.getLogger(name)
+        lg.handlers.clear()
+        lg.propagate = True
