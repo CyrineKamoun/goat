@@ -29,12 +29,16 @@ the rest from publishing.
 """
 
 import asyncio
+import datetime as dt
 import logging
+import os
 import sys
 import time
 from typing import Any, Awaitable, Callable
 
+import asyncpg
 from opentelemetry import metrics as otel_metrics
+from opentelemetry.metrics import CallbackOptions, Observation
 from opentelemetry.sdk.metrics import MeterProvider
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -118,6 +122,30 @@ Q_USER_PROJECTS = "user_projects"
 # one error-counter bucket too. If the query fails, both gauges stop updating
 # together, which is the cardinality we want for alerting.
 Q_USER_LAYERS = "user_layers"
+# Windmill query names — emit cumulative job counters/sums from the
+# Windmill database (separate DB on the same Postgres cluster).
+Q_WM_USER_ORG = "user_org_map"
+Q_WM_JOBS = "windmill_jobs"
+Q_WM_RUNNING = "windmill_running"
+
+# Env var holding the Windmill DSN. Sourced from the windmill-secret in
+# Kubernetes — mounted on the CronJob via valueFrom.secretKeyRef. Holds
+# `postgres://windmill:<pw>@goat-db-rw.postgres.svc.cluster.local:5432/windmill?sslmode=disable`
+WINDMILL_DSN_ENV = "WINDMILL_DATABASE_URL"
+
+# Module-level observation cache used by sync ObservableCounter callbacks.
+# Populated in `snapshot()` BEFORE we register the observable instruments;
+# the OTel SDK invokes the callbacks at export time (via force_flush) and
+# they return whatever's in this cache. Empty dict = nothing to emit, which
+# the SDK treats as the metric being absent (correct behavior if Windmill is
+# unreachable — the goat-side state metrics still publish independently).
+_OBSERVATIONS: dict[str, list[Observation]] = {}
+
+# Tool name extraction: `runnable_path` looks like "f/goat/tools/clip" or
+# "f/goat/tasks/rebuild_edited_pmtiles". We take the LAST path segment
+# as the `tool` label. The script filters out scheduled tasks at SQL
+# level (`trigger_kind IS NULL`), so the `tasks/` paths shouldn't appear
+# in the emitted metrics anyway.
 
 
 def _build_meter() -> otel_metrics.Meter:
@@ -422,6 +450,317 @@ async def snapshot_user_layers(
 
 
 # ----------------------------------------------------------------------------
+# Windmill metrics — cross-DB (goat user_id ↔ Windmill args.user_id UUID join)
+# ----------------------------------------------------------------------------
+#
+# Windmill stores every user-triggered job's GOAT user UUID in
+# `v2_job.args -> 'user_id'`. We use that to attribute jobs back to GOAT
+# orgs without needing fragile email-string matching.
+#
+# Implementation flow (all driven from `snapshot()` below):
+#  1. Open a second async connection to the Windmill DB.
+#  2. Fetch a user_uuid → (org_id, org_name) dict from the GOAT DB
+#     (using the same ORG_DISAMBIG_CTE so the org_name labels match
+#     what other goat_* metrics emit).
+#  3. Run aggregation queries against Windmill, post-process each row
+#     to attach the org labels via the dict.
+#  4. Stash the resulting Observation lists in `_OBSERVATIONS`.
+#  5. Register ObservableGauge instruments whose callbacks just read
+#     from the cache. `force_flush()` then collects and exports.
+#
+# Why ObservableGauge (not Counter):
+# `goat_jobs_count` and friends represent activity in the LAST cron
+# window (5 minutes), not cumulative-since-forever. Dashboards integrate
+# with `sum_over_time(goat_jobs_count[$__range])`. Counters would have
+# been wrong because Windmill's 30-day retention drops old jobs from
+# `v2_job_completed`, so a counter sourced from that table would appear
+# to reset/decrease — which `rate()` / `increase()` interpret as a real
+# counter reset and double-count after the boundary. Per-window gauges
+# don't have this failure mode.
+
+
+async def _connect_windmill() -> asyncpg.Connection:
+    """Open a read-only-style asyncpg connection to the Windmill DB.
+
+    Reads `WINDMILL_DATABASE_URL` from the env. Strips the `?sslmode=…`
+    query string because asyncpg doesn't accept it as a DSN parameter
+    (it has its own `ssl=` kwarg). The connection is short-lived: opened
+    in `snapshot()`, used to run a handful of aggregations, closed at
+    the end of the function.
+    """
+    dsn = os.environ.get(WINDMILL_DSN_ENV)
+    if not dsn:
+        raise RuntimeError(
+            f"{WINDMILL_DSN_ENV} env var not set — required for Windmill metrics. "
+            "Mount it on the CronJob from windmill-secret."
+        )
+    # Drop the query string (sslmode etc.) — asyncpg parses DSN itself.
+    dsn = dsn.split("?", 1)[0]
+    return await asyncpg.connect(dsn=dsn, timeout=10)
+
+
+async def _fetch_user_org_map(
+    db: AsyncSession,
+) -> dict[str, tuple[str, str]]:
+    """Build `dict[user_uuid_str → (org_id_str, org_name_str)]`.
+
+    Used as a Python-side lookup table when post-processing Windmill rows:
+    each Windmill job has `args.user_id` (a UUID), we resolve that to the
+    user's organization via GOAT's `accounts.user.organization_id`, and
+    emit the org_id/org_name labels on the metric.
+
+    Reuses `ORG_DISAMBIG_CTE` so the `org_name` values match what other
+    `goat_*` metrics emit — including any "Test (alice@…)" disambig
+    suffix on colliding names.
+
+    Returns empty dict on query failure (caller decides what to do —
+    typically: log + skip Windmill metrics, since they can't be
+    org-attributed without this map).
+    """
+    accounts = settings.ACCOUNTS_SCHEMA
+    query = text(
+        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        + f"""
+        SELECT
+            u.id::text AS user_id,
+            o.id::text AS org_id,
+            do_.display_name AS org_name
+        FROM {accounts}."user" u
+        JOIN {accounts}.organization o ON o.id = u.organization_id
+        JOIN disambig_orgs do_ ON do_.id = o.id
+        """
+    )
+    result = await db.execute(query)
+    return {
+        row.user_id: (row.org_id, row.org_name)
+        for row in result.all()
+    }
+
+
+def _tool_from_path(runnable_path: str | None) -> str:
+    """Extract the tool name from a Windmill `runnable_path`.
+
+    Inputs look like `f/goat/tools/clip` or `f/goat/tasks/rebuild_edited_pmtiles`
+    — we just take the last `/`-segment. Empty / None gets a sentinel
+    "(unknown)" so the metric never emits an empty `tool` label.
+    """
+    if not runnable_path:
+        return "(unknown)"
+    return runnable_path.rsplit("/", 1)[-1]
+
+
+def _cron_aligned_window(
+    cadence_minutes: int = 5,
+) -> tuple[dt.datetime, dt.datetime]:
+    """Compute the cron-aligned [window_start, window_end) for this run.
+
+    The CronJob schedule is `*/5 * * * *` — fires at minutes 0, 5, 10, …
+    of every hour. We round `now()` DOWN to the nearest 5-minute mark
+    and query the previous 5-minute slot ending at that mark.
+
+    Why: this makes the query window deterministic regardless of when
+    the pod actually starts. A pod that fires 8s late and another that
+    fires 14s late both query the SAME 5-minute window, so consecutive
+    runs neither overlap nor leave drift-induced gaps. The only failure
+    mode is a fully-skipped run, which loses that 5-min window's data
+    (no automatic catch-up). For a usage dashboard this is acceptable;
+    if it ever bites, the fix is a watermark — see commit history /
+    spec for the rejected `usage_snapshot_watermark` table design.
+
+    Returns timezone-aware UTC timestamps.
+    """
+    now = dt.datetime.now(dt.timezone.utc)
+    cutoff = now.replace(
+        second=0,
+        microsecond=0,
+        minute=(now.minute // cadence_minutes) * cadence_minutes,
+    )
+    return cutoff - dt.timedelta(minutes=cadence_minutes), cutoff
+
+
+async def fetch_windmill_completed_jobs(
+    wm_conn: asyncpg.Connection,
+    user_to_org: dict[str, tuple[str, str]],
+) -> tuple[int, int, int]:
+    """Emit per-period (5-minute window) gauge values for user-triggered
+    Windmill jobs that completed in the last cron-aligned slot.
+
+    SCHEDULED tasks (`trigger_kind IS NOT NULL`, e.g. the windmill
+    `rebuild_edited_pmtiles` cron) are intentionally EXCLUDED — they
+    dwarf user activity by ~12× in volume and aren't usage data. If we
+    ever need a "scheduled jobs" view (operational monitoring), it goes
+    under a separate metric family (e.g. `goat_scheduled_jobs_count`).
+
+    Window is cron-aligned (see `_cron_aligned_window`): drift-immune
+    against pod start-time variance, no overlap between consecutive
+    runs. The metric is a GAUGE — Mimir accumulates the stream of
+    per-period samples and the dashboard integrates via
+    `sum_over_time(goat_jobs_count[$__range])`.
+    """
+    window_start, window_end = _cron_aligned_window()
+    rows = await wm_conn.fetch(
+        """
+        SELECT
+            (j.args->>'user_id')                          AS user_id,
+            j.runnable_path                               AS path,
+            c.status::text                                AS status,
+            COUNT(*)::bigint                              AS n,
+            COALESCE(SUM(c.duration_ms), 0)::bigint       AS duration_ms_sum,
+            COALESCE(SUM(octet_length(c.result::text)), 0)::bigint
+                                                          AS output_bytes_sum
+        FROM v2_job_completed c
+        JOIN v2_job j ON j.id = c.id
+        -- Cron-aligned per-period window (see _cron_aligned_window docstring).
+        WHERE c.started_at >= $1
+          AND c.started_at <  $2
+          -- User-triggered only. Scheduled tasks (trigger_kind='schedule',
+          -- 'webhook', etc.) are NOT usage data and are emitted under a
+          -- separate metric family if we ever need them.
+          AND j.trigger_kind IS NULL
+        GROUP BY j.args->>'user_id', j.runnable_path, c.status
+        """,
+        window_start, window_end,
+    )
+
+    jobs: list[Observation] = []
+    durations: list[Observation] = []
+    output_bytes: list[Observation] = []
+
+    for row in rows:
+        tool = _tool_from_path(row["path"])
+        user_id = row["user_id"]
+
+        # Resolve user_id → org. If a user has been deleted from goat but
+        # still has jobs in Windmill's 30-day retention window, fall back
+        # to "(unknown)" so the row is still counted in totals.
+        org_id, org_name = user_to_org.get(user_id, ("(unknown)", "(unknown)"))
+
+        attrs = {
+            "org_id": org_id,
+            "org_name": org_name,
+            "tool": tool,
+        }
+
+        # Status is its own label on the count metric (so panels can
+        # do "Top failing tools" via status="failure"), but duration
+        # and output-bytes are unconditional sums (don't break out by
+        # status — failure jobs contributed to time/bytes consumed too).
+        jobs.append(Observation(int(row["n"]),
+                                  attributes={**attrs, "status": row["status"]}))
+        durations.append(Observation(int(row["duration_ms_sum"]) / 1000.0,
+                                       attributes=attrs))
+        output_bytes.append(Observation(int(row["output_bytes_sum"]),
+                                          attributes=attrs))
+
+    _OBSERVATIONS["jobs_count"] = jobs
+    _OBSERVATIONS["jobs_duration_seconds"] = durations
+    _OBSERVATIONS["jobs_output_bytes"] = output_bytes
+    return len(jobs), len(durations), len(output_bytes)
+
+
+async def fetch_windmill_running_jobs(
+    wm_conn: asyncpg.Connection,
+    user_to_org: dict[str, tuple[str, str]],
+) -> int:
+    """Populate the running-jobs gauge observations.
+
+    Looks at v2_job_queue (jobs that haven't completed yet) — joined to
+    v2_job for args/path labels. Same `trigger_kind IS NULL` filter as
+    completed jobs: scheduled tasks aren't usage data. Returns the number
+    of distinct (org, tool) buckets observed.
+    """
+    rows = await wm_conn.fetch(
+        """
+        SELECT
+            (j.args->>'user_id')          AS user_id,
+            j.runnable_path               AS path,
+            COUNT(*)::bigint              AS n
+        FROM v2_job_queue q
+        JOIN v2_job j ON j.id = q.id
+        WHERE j.trigger_kind IS NULL
+        GROUP BY j.args->>'user_id', j.runnable_path
+        """
+    )
+
+    running: list[Observation] = []
+    for row in rows:
+        tool = _tool_from_path(row["path"])
+        org_id, org_name = user_to_org.get(
+            row["user_id"], ("(unknown)", "(unknown)")
+        )
+        running.append(
+            Observation(
+                int(row["n"]),
+                attributes={
+                    "org_id": org_id,
+                    "org_name": org_name,
+                    "tool": tool,
+                },
+            )
+        )
+    _OBSERVATIONS["jobs_running"] = running
+    return len(running)
+
+
+# Sync ObservableGauge callbacks — invoked by the OTel SDK at export time.
+# They read the pre-populated cache; the real work happened in
+# `fetch_windmill_*` above. All four metrics are GAUGES (not counters)
+# because their value represents a count over the last 5-minute window,
+# not a cumulative all-time total.
+
+def _cb_jobs_count(_options: CallbackOptions):
+    return _OBSERVATIONS.get("jobs_count", [])
+
+
+def _cb_jobs_duration_seconds(_options: CallbackOptions):
+    return _OBSERVATIONS.get("jobs_duration_seconds", [])
+
+
+def _cb_jobs_output_bytes(_options: CallbackOptions):
+    return _OBSERVATIONS.get("jobs_output_bytes", [])
+
+
+def _cb_jobs_running(_options: CallbackOptions):
+    return _OBSERVATIONS.get("jobs_running", [])
+
+
+def _register_windmill_observables(meter: otel_metrics.Meter) -> None:
+    """Register 4 ObservableGauges for Windmill-derived metrics. Must be
+    called AFTER `_OBSERVATIONS` is populated by `fetch_windmill_*`.
+
+    All four are gauges of a per-period rolling window (5 minutes,
+    matching the cron cadence). The dashboard uses `sum_over_time(...)`
+    to compute totals over arbitrary ranges — Mimir stores the sample
+    stream and that integrates cleanly across CronJob restarts and
+    Windmill's 30-day retention boundary (because we're not relying on
+    Windmill to remember anything past 30d — we have the history in
+    Mimir).
+    """
+    meter.create_observable_gauge(
+        "goat_jobs_count",
+        callbacks=[_cb_jobs_count],
+        description="Count of user-triggered Windmill jobs that completed in the last 5 minutes, by org × tool × status.",
+    )
+    meter.create_observable_gauge(
+        "goat_jobs_duration_seconds",
+        callbacks=[_cb_jobs_duration_seconds],
+        unit="s",
+        description="SUM of job durations (seconds) for Windmill jobs completed in the last 5 minutes.",
+    )
+    meter.create_observable_gauge(
+        "goat_jobs_output_bytes",
+        callbacks=[_cb_jobs_output_bytes],
+        unit="By",
+        description="SUM of octet_length(result::text) over Windmill jobs completed in the last 5 minutes.",
+    )
+    meter.create_observable_gauge(
+        "goat_jobs_running",
+        callbacks=[_cb_jobs_running],
+        description="Currently queued / running user-triggered Windmill jobs by org × tool.",
+    )
+
+
+# ----------------------------------------------------------------------------
 # Orchestration
 # ----------------------------------------------------------------------------
 
@@ -477,6 +816,58 @@ async def _apply_session_safety_limits(db: AsyncSession) -> None:
         logger.exception("failed to apply session safety limits; continuing")
 
 
+async def _run_windmill_block(
+    meter: otel_metrics.Meter, error_counter: Instrument
+) -> bool:
+    """Open a Windmill connection, fetch metrics, register observables.
+
+    Wrapped in its own try/except so a Windmill failure (DB unreachable,
+    schema mismatch, etc.) doesn't kill the rest of the snapshot — we
+    increment the error counter and return False so the caller knows.
+
+    The order matters: we MUST populate `_OBSERVATIONS` before calling
+    `_register_windmill_observables`, because the SDK invokes the
+    callbacks at the next collection cycle (triggered by force_flush
+    after main()). If observables were registered first they'd fire
+    with the empty cache and emit nothing.
+    """
+    wm_conn: asyncpg.Connection | None = None
+    user_to_org: dict[str, tuple[str, str]] = {}
+    try:
+        # 1. Cross-DB join setup: fetch the user_uuid → org map from goat.
+        async with session_manager.session() as goat_db:
+            await _apply_session_safety_limits(goat_db)
+            user_to_org = await _fetch_user_org_map(goat_db)
+            logger.info(
+                "snapshot query %s ok: %d users mapped",
+                Q_WM_USER_ORG, len(user_to_org),
+            )
+
+        # 2. Open Windmill connection.
+        wm_conn = await _connect_windmill()
+
+        # 3. Cumulative-counters query (jobs, duration, output bytes).
+        n_jobs, _, _ = await fetch_windmill_completed_jobs(wm_conn, user_to_org)
+        logger.info("snapshot query %s ok: %d series", Q_WM_JOBS, n_jobs)
+
+        # 4. Running-jobs gauge.
+        n_running = await fetch_windmill_running_jobs(wm_conn, user_to_org)
+        logger.info("snapshot query %s ok: %d series", Q_WM_RUNNING, n_running)
+
+        # 5. Register the ObservableCounters / Gauge now that the cache
+        # is populated. Force-flush in main() then triggers the callbacks.
+        _register_windmill_observables(meter)
+        return True
+
+    except Exception:
+        logger.exception("Windmill metrics block failed")
+        error_counter.add(1, attributes={"query_name": Q_WM_JOBS})
+        return False
+    finally:
+        if wm_conn is not None:
+            await wm_conn.close()
+
+
 async def snapshot() -> bool:
     """Run a full snapshot pass. Returns True iff every query succeeded."""
     meter = _build_meter()
@@ -527,6 +918,15 @@ async def snapshot() -> bool:
                     error_counter=error_counter,  # type: ignore[arg-type]
                 ),
             ]
+
+        # Windmill metrics (separate DB, separate connection). Done
+        # AFTER the goat queries within the same try/finally so the
+        # `session_manager` is still initialized — _run_windmill_block
+        # opens its own session to fetch the user→org map. The Windmill
+        # work has its own try/except so a Windmill failure (DB
+        # unreachable, etc.) doesn't invalidate the goat-side results.
+        windmill_ok = await _run_windmill_block(meter, error_counter)
+        results.append(windmill_ok)
     finally:
         await session_manager.close()
 
@@ -540,34 +940,6 @@ async def snapshot() -> bool:
             len(results) - sum(results),
             len(results),
         )
-
-    # TODO(usage-snapshot): Windmill cross-DB metrics. The dashboard expects
-    # counter-typed series goat_jobs_total / goat_jobs_duration_seconds_total /
-    # goat_jobs_output_bytes_total (labels: org_id, org_name, tool, status) plus
-    # a goat_jobs_running gauge. Source tables in the Windmill Postgres DB:
-    #   - `completed_job` (a.k.a. history of finished runs) -- has columns
-    #     `started_at`, `duration_ms`, `success`, `canceled`, `created_by`,
-    #     `script_path`, `result` (JSONB; output-bytes lives here if at all).
-    #     This is the source for the *_total counters.
-    #   - `queue` -- currently-queued/running jobs; source for goat_jobs_running.
-    #   - There may also be a `job` view that unions both -- prefer the
-    #     explicit tables for predictable behaviour.
-    # Implementation notes:
-    #   1. A second async engine pointed at the Windmill Postgres -- same
-    #      cluster as GOAT but different database (`windmill`), so the URL
-    #      is the same host:port but `?database=windmill`.
-    #   2. Use ObservableCounter so the OTel SDK emits a cumulative absolute
-    #      value (queried from `completed_job` at observation time) rather
-    #      than per-run deltas -- otherwise each fresh CronJob process looks
-    #      like a counter reset to Prometheus and rate()/increase() misbehave.
-    #      The ObservableCounter callback can run sync against a tiny psycopg
-    #      connection -- no need to drag asyncio through the callback.
-    #   3. `tool` label: map from Windmill's `script_path` (e.g.
-    #      "f/goat/buffer") to the dashboard's tool taxonomy.
-    #   4. `org_id` / `org_name` label: join `completed_job.created_by`
-    #      against GOAT's `accounts.user` to find the user's organization.
-    #      This means the Windmill DB connection alone isn't sufficient --
-    #      the script needs both DBs visible. Tracked in spec section 4.3.
 
     return all_ok
 
