@@ -21,10 +21,26 @@ from typing import Any
 
 from opentelemetry import trace as otel_trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
+# Library auto-instrumentors are optional: each one transitively
+# `import`s its target library (sqlalchemy / httpx / asyncpg) at module
+# load. Services that don't depend on a given library would crash at
+# import here. Guard each one so goatobs imports cleanly regardless of
+# which subset of libraries the service uses.
+try:
+    from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
+except ImportError:  # pragma: no cover - depends on service deps
+    AsyncPGInstrumentor = None  # type: ignore[assignment,misc]
+try:
+    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+except ImportError:  # pragma: no cover
+    HTTPXClientInstrumentor = None  # type: ignore[assignment,misc]
+try:
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+except ImportError:  # pragma: no cover
+    SQLAlchemyInstrumentor = None  # type: ignore[assignment,misc]
+
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, Span, TracerProvider
 from opentelemetry.sdk.trace.export import (
@@ -116,10 +132,15 @@ def setup_tracing(
     # patch their own classes' methods so any existing instance is
     # transparently instrumented — fine to call here unconditionally.
     # Pass tracer_provider explicitly so they emit through the provider
-    # we just configured, not whatever global default exists.
-    SQLAlchemyInstrumentor().instrument(tracer_provider=provider, meter_provider=meter_provider)
-    HTTPXClientInstrumentor().instrument(tracer_provider=provider, meter_provider=meter_provider)
-    AsyncPGInstrumentor().instrument(tracer_provider=provider)
+    # we just configured, not whatever global default exists. Skip when
+    # the target library isn't installed in this service (e.g. geoapi
+    # uses DuckDB, not SQLAlchemy).
+    if SQLAlchemyInstrumentor is not None:
+        SQLAlchemyInstrumentor().instrument(tracer_provider=provider, meter_provider=meter_provider)
+    if HTTPXClientInstrumentor is not None:
+        HTTPXClientInstrumentor().instrument(tracer_provider=provider, meter_provider=meter_provider)
+    if AsyncPGInstrumentor is not None:
+        AsyncPGInstrumentor().instrument(tracer_provider=provider)
 
     # FastAPI is different: `.instrument()` monkey-patches
     # `fastapi.FastAPI`, which doesn't help if the caller did
