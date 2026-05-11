@@ -61,8 +61,6 @@ const ProjectLayerRenameModal: React.FC<ProjectLayerRenameDialogProps> = ({
         // Invalidate dataset layers cache
         mutate(`${LAYERS_API_BASE_URL}`);
         toast.success(t("rename_layer_success"));
-      } else {
-        toast.success(t("layer_renamed_successfully"));
       }
 
       // Always refresh project layers after rename

@@ -21,7 +21,11 @@ export type NodeStatus = z.infer<typeof nodeStatusSchema>;
 export const datasetNodeDataSchema = z.object({
   type: z.literal("dataset"),
   label: z.string(),
-  // Layer reference - use layerId as the main identifier
+  // Project-scoped reference. When the node was created from a project layer, this is the
+  // canonical lookup key used to render the current (live) name and survive renames.
+  // Absent when the dataset was added directly from the dataset/catalog explorer.
+  projectLayerId: z.number().int().optional(),
+  // Layer reference - use layerId as the main identifier for API calls (tiles/features/fields)
   layerId: z.string().uuid().optional(), // Layer UUID - main identifier
   layerName: z.string().optional(),
   geometryType: z.string().optional(), // "point", "line", "polygon", etc.

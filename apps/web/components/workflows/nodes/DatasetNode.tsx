@@ -9,6 +9,7 @@ import {
 import { Box, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { Handle, type NodeProps, NodeToolbar, Position } from "@xyflow/react";
+import { useParams } from "next/navigation";
 import React, { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
@@ -17,6 +18,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { useDatasetCollectionItems } from "@/lib/api/layers";
+import { useProjectLayers } from "@/lib/api/projects";
 import type { AppDispatch } from "@/lib/store";
 import { selectNodes } from "@/lib/store/workflow/selectors";
 import { addNode, removeNodes } from "@/lib/store/workflow/slice";
@@ -117,12 +119,31 @@ const DatasetNode: React.FC<DatasetNodeProps> = ({ id, data, selected }) => {
   const { t } = useTranslation("common");
   const dispatch = useDispatch<AppDispatch>();
   const nodes = useSelector(selectNodes);
+  const { projectId } = useParams() as { projectId?: string };
 
   // Get execution status - dataset nodes are "completed" when any execution is active
   const { isExecuting: hasAnyExecution } = useWorkflowExecutionContext();
 
   // Get layer fields for CQL generation
   const { layerFields } = useLayerFields(data.layerId || "", undefined);
+
+  // Live-lookup the display name from the project layers SWR cache so layer renames
+  // propagate without having to update every workflow node.
+  // - Primary key: projectLayerId (set for nodes added from "from project")
+  // - Fallback: match by dataset UUID (older nodes that pre-date projectLayerId)
+  // - Final fallback: the snapshotted label (e.g. dataset-explorer nodes not in the project)
+  const { layers: projectLayers } = useProjectLayers(projectId);
+  const displayName = useMemo(() => {
+    if (!data.layerId) return t("no_dataset");
+    const byProjectLayerId =
+      data.projectLayerId != null
+        ? projectLayers?.find((pl) => pl.id === data.projectLayerId)
+        : undefined;
+    const byLayerId = byProjectLayerId
+      ? undefined
+      : projectLayers?.find((pl) => pl.layer_id === data.layerId);
+    return byProjectLayerId?.name ?? byLayerId?.name ?? data.label;
+  }, [data.layerId, data.projectLayerId, data.label, projectLayers, t]);
 
   // Build CQL filter from node's workflow filter
   const cqlFilter = useMemo(() => {
@@ -246,7 +267,7 @@ const DatasetNode: React.FC<DatasetNodeProps> = ({ id, data, selected }) => {
             )}
           </NodeIconWrapper>
           <Typography variant="caption" fontWeight={700} sx={{ wordBreak: "break-word" }}>
-            {data.layerId ? data.label : t("no_dataset")}
+            {displayName}
           </Typography>
         </NodeHeader>
 
