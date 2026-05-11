@@ -148,21 +148,29 @@ def setup_logging(
         lg.handlers.clear()
         lg.propagate = True
 
-    # Uvicorn applies `logging.config.dictConfig(uvicorn.config.LOGGING_CONFIG)`
-    # in its `Server.serve()` startup path, which would WIPE OUT the
-    # handlers we just installed on the root logger and replace them with
-    # uvicorn's defaults (the colored `INFO 10.0.0.1:... "GET ..."` plain-
-    # text format). Set LOGGING_CONFIG to an empty-but-valid dict here so
-    # dictConfig is a no-op when uvicorn calls it. Works for both direct
-    # `uvicorn` invocation and `fastapi run` (which delegates to uvicorn).
+    # Both uvicorn and `fastapi run` apply a dictConfig to logging on
+    # startup, which would WIPE OUT the handlers we just installed on the
+    # root logger and replace them with uvicorn's defaults (the colored
+    # `INFO 10.0.0.1:... "GET ..."` plain-text format). Neutralise both
+    # entry points so dictConfig becomes a no-op:
+    #
+    # - `uvicorn.config.LOGGING_CONFIG` is the default uvicorn reads when
+    #   `log_config` isn't passed explicitly to `uvicorn.run()`. Setting
+    #   it to an empty-but-valid dict handles `uvicorn` CLI / programmatic
+    #   `uvicorn.run()` calls.
+    # - `fastapi_cli.cli.get_uvicorn_log_config()` is what `fastapi run`
+    #   passes explicitly as `log_config=` — bypassing the module-level
+    #   var entirely. Overriding it here handles the `fastapi run` path.
+    _noop_log_config = {"version": 1, "disable_existing_loggers": False}
     try:
         import uvicorn.config
 
-        uvicorn.config.LOGGING_CONFIG = {
-            "version": 1,
-            "disable_existing_loggers": False,
-        }
+        uvicorn.config.LOGGING_CONFIG = _noop_log_config
     except ImportError:
-        # uvicorn not installed in this environment (e.g. unit tests) —
-        # nothing to override.
+        pass
+    try:
+        import fastapi_cli.cli
+
+        fastapi_cli.cli.get_uvicorn_log_config = lambda: _noop_log_config
+    except (ImportError, AttributeError):
         pass

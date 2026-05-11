@@ -78,3 +78,51 @@ def test_exception_is_serialised(capsys):
     assert line["level"] == "error"
     assert "exception" in line
     assert "ValueError: boom" in line["exception"]
+
+
+def test_stdlib_logger_emits_json_too(capsys):
+    """Foreign records via stdlib logging.getLogger() must go through the
+    same JSON renderer as structlog calls — otherwise uvicorn / FastAPI /
+    library logs end up as plain text in pod stdout, missing user/trace
+    context. Regression test for the stdlib-to-structlog bridge."""
+    setup_logging(service_name="testsvc", environment="test", json_output=True)
+
+    logging.getLogger("uvicorn.access").info("GET /api/foo")
+
+    [line] = _captured_lines(capsys)
+    assert line["event"] == "GET /api/foo"
+    assert line["service"] == "testsvc"
+    assert line["environment"] == "test"
+    assert line["level"] == "info"
+
+
+def test_setup_logging_neutralises_uvicorn_log_config():
+    """`uvicorn.run()` (without explicit log_config kwarg) calls
+    `dictConfig(uvicorn.config.LOGGING_CONFIG)` at startup, which would
+    wipe out our root handlers and replace them with uvicorn's plain-text
+    defaults. setup_logging overrides the module-level LOGGING_CONFIG to
+    a minimal no-op dict so dictConfig is harmless when uvicorn invokes
+    it. Regression test — if this guarantee disappears, pod logs go
+    back to uvicorn-style plain text."""
+    import uvicorn.config
+
+    setup_logging(service_name="testsvc", environment="test", json_output=True)
+
+    cfg = uvicorn.config.LOGGING_CONFIG
+    assert cfg == {"version": 1, "disable_existing_loggers": False}
+
+
+def test_setup_logging_neutralises_fastapi_cli_log_config():
+    """`fastapi run ...` (the production entrypoint for goat services)
+    doesn't read uvicorn.config.LOGGING_CONFIG — it builds its own log
+    config via `fastapi_cli.cli.get_uvicorn_log_config()` and passes it
+    explicitly as `log_config=` to `uvicorn.run()`. setup_logging
+    monkey-patches that function so it returns the same no-op dict.
+    Regression test — if this disappears, `fastapi run`'s default
+    formatter wins and access logs end up plain text."""
+    import fastapi_cli.cli
+
+    setup_logging(service_name="testsvc", environment="test", json_output=True)
+
+    cfg = fastapi_cli.cli.get_uvicorn_log_config()
+    assert cfg == {"version": 1, "disable_existing_loggers": False}
