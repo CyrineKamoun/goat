@@ -58,11 +58,12 @@ Instrument = Any
 
 logger = logging.getLogger(__name__)
 
-# Sentinel used for the ``feature_layer_type`` label on non-feature layers.
-# Mimir/Prometheus dislikes empty-string labels (they round-trip as "missing"
-# in PromQL), so we use a stable "-" placeholder that's easy to filter out
-# in dashboard queries.
-NO_FEATURE_LAYER_TYPE = "-"
+# Sentinel used for label values that are NULL in the DB but where
+# Prometheus/Mimir dislikes empty-string labels (they round-trip as
+# "missing" in PromQL). Applied to feature_subtype, geometry, and
+# data_type on layers that don't have them (e.g. type=raster has no
+# feature_subtype, type=table has no geometry/data_type).
+MISSING_DIM = "-"
 
 # Reusable SQL CTE that adds disambiguating suffix to org names that
 # collide. Org names ARE NOT unique in the goat schema (e.g. multiple
@@ -115,6 +116,7 @@ ORG_DISAMBIG_CTE = """
 # Keep stable: dashboards and alerts may key off these names.
 Q_LAYERS = "layers"
 Q_LAYER_BYTES = "layer_bytes"
+Q_LAYER_SIZE_DIST = "layer_size_distribution"
 Q_PROJECTS = "projects"
 Q_USERS = "users"
 Q_USER_PROJECTS = "user_projects"
@@ -176,6 +178,14 @@ def _make_instruments(meter: otel_metrics.Meter) -> dict[str, object]:
             description="Total bytes of layer storage per org (SUM(layer.size)).",
             unit="By",
         ),
+        "layer_size_distribution": meter.create_gauge(
+            "goat_layer_size_distribution",
+            description=(
+                "Count of layers per org x type x size_bucket. "
+                "Only internal layers (layer.size IS NOT NULL) — external "
+                "wms/wmts/xyz/mvt/wfs layers fall into 'n/a (external)'."
+            ),
+        ),
         "projects_total": meter.create_gauge(
             "goat_projects_total",
             description="Number of projects per org.",
@@ -232,6 +242,22 @@ async def snapshot_layers(
     """
     accounts = settings.ACCOUNTS_SCHEMA
     customer = settings.CUSTOMER_SCHEMA
+    # Five dimensions on top of org:
+    #   * `type`             feature / raster / table
+    #   * `feature_subtype`  standard / tool / street_network / "-"
+    #                        (originally called `feature_layer_type` —
+    #                        renamed because its dashboard label was
+    #                        mislabelled as "geometry")
+    #   * `geometry`         point / line / polygon / "-"
+    #                        (the actual geometry — source column is
+    #                        `feature_layer_geometry_type`)
+    #   * `source`           internal (locally-stored) / external
+    #                        (hosted elsewhere as wms/wmts/xyz/mvt/wfs).
+    #                        Derived: data_type IS NULL OR data_type='cog'
+    #                        is internal; everything else external.
+    #   * `data_type`        wms / wmts / xyz / cog / mvt / wfs / "-"
+    #                        Raw enum from the DB so panels can filter
+    #                        "external by protocol".
     query = text(
         ORG_DISAMBIG_CTE.format(accounts=accounts)
         + f"""
@@ -239,16 +265,23 @@ async def snapshot_layers(
             o.id::text AS org_id,
             do_.display_name AS org_name,
             l.type AS type,
-            COALESCE(l.feature_layer_type, :no_flt) AS feature_layer_type,
+            COALESCE(l.feature_layer_type, :sentinel)          AS feature_subtype,
+            COALESCE(l.feature_layer_geometry_type, :sentinel) AS geometry,
+            CASE WHEN l.data_type IS NULL OR l.data_type = 'cog'
+                 THEN 'internal' ELSE 'external' END           AS source,
+            COALESCE(l.data_type, :sentinel)                   AS data_type,
             count(*) AS n
         FROM {customer}.layer l
         JOIN {accounts}."user" u ON u.id = l.user_id
         JOIN {accounts}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
-        GROUP BY o.id, do_.display_name, l.type, l.feature_layer_type
+        GROUP BY
+            o.id, do_.display_name,
+            l.type, l.feature_layer_type, l.feature_layer_geometry_type,
+            l.data_type
         """
     )
-    result = await db.execute(query, {"no_flt": NO_FEATURE_LAYER_TYPE})
+    result = await db.execute(query, {"sentinel": MISSING_DIM})
     rows = result.all()
     for row in rows:
         gauge.set(
@@ -257,7 +290,10 @@ async def snapshot_layers(
                 "org_id": row.org_id,
                 "org_name": row.org_name,
                 "type": row.type,
-                "feature_layer_type": row.feature_layer_type,
+                "feature_subtype": row.feature_subtype,
+                "geometry": row.geometry,
+                "source": row.source,
+                "data_type": row.data_type,
             },
         )
     return len(rows)
@@ -289,6 +325,63 @@ async def snapshot_layer_bytes(
         gauge.set(
             row.bytes,
             attributes={"org_id": row.org_id, "org_name": row.org_name},
+        )
+    return len(rows)
+
+
+async def snapshot_layer_size_distribution(
+    db: AsyncSession, gauge: Instrument
+) -> int:
+    """Emit ``goat_layer_size_distribution`` per (org, type, size_bucket).
+
+    Buckets every layer into a size class so the dashboard can render
+    "how many layers fall in each size class" as a histogram. External
+    layers (wms/wmts/xyz/mvt/wfs) have ``size IS NULL`` because they're
+    just a URL — they get their own ``n/a (external)`` bucket so they
+    stay visible in the chart but don't pollute the storage view.
+
+    The buckets are chosen to match orders of magnitude (1 MiB, 10 MiB,
+    100 MiB, 1 GiB). If real-world data is concentrated in one bucket
+    we can re-cut later — buckets ARE part of the metric label so
+    changing them produces new series, but the old ones go stale within
+    the 5-min Prometheus staleness window.
+    """
+    accounts = settings.ACCOUNTS_SCHEMA
+    customer = settings.CUSTOMER_SCHEMA
+    query = text(
+        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        + f"""
+        SELECT
+            o.id::text AS org_id,
+            do_.display_name AS org_name,
+            l.type AS type,
+            CASE
+                WHEN l.size IS NULL              THEN 'n/a (external)'
+                WHEN l.size < 1048576            THEN '< 1 MiB'
+                WHEN l.size < 10485760           THEN '1–10 MiB'
+                WHEN l.size < 104857600          THEN '10–100 MiB'
+                WHEN l.size < 1073741824         THEN '100 MiB – 1 GiB'
+                ELSE                                  '> 1 GiB'
+            END AS size_bucket,
+            count(*) AS n
+        FROM {customer}.layer l
+        JOIN {accounts}."user" u ON u.id = l.user_id
+        JOIN {accounts}.organization o ON o.id = u.organization_id
+        JOIN disambig_orgs do_ ON do_.id = o.id
+        GROUP BY o.id, do_.display_name, l.type, size_bucket
+        """
+    )
+    result = await db.execute(query)
+    rows = result.all()
+    for row in rows:
+        gauge.set(
+            row.n,
+            attributes={
+                "org_id": row.org_id,
+                "org_name": row.org_name,
+                "type": row.type,
+                "size_bucket": row.size_bucket,
+            },
         )
     return len(rows)
 
@@ -419,6 +512,13 @@ async def snapshot_user_layers(
 
     Both share the same join shape, so we issue a single query that returns
     both columns and write to two gauges. Keeps user-scoped data in one place.
+
+    Mirrors the org-scoped `snapshot_layers` breakdown — same `type`,
+    `feature_subtype`, `geometry`, `source`, `data_type` labels — so the
+    Layers tab's composition panels keep working when scoped to a single
+    user. Cardinality stays bounded because each user typically has
+    a handful of unique (type, subtype, geometry, source, data_type)
+    tuples, not the cross-product.
     """
     accounts = settings.ACCOUNTS_SCHEMA
     customer = settings.CUSTOMER_SCHEMA
@@ -429,6 +529,12 @@ async def snapshot_user_layers(
             u.email AS user_email,
             o.id::text AS org_id,
             do_.display_name AS org_name,
+            l.type AS type,
+            COALESCE(l.feature_layer_type, :sentinel)          AS feature_subtype,
+            COALESCE(l.feature_layer_geometry_type, :sentinel) AS geometry,
+            CASE WHEN l.data_type IS NULL OR l.data_type = 'cog'
+                 THEN 'internal' ELSE 'external' END           AS source,
+            COALESCE(l.data_type, :sentinel)                   AS data_type,
             count(l.id) AS n,
             COALESCE(SUM(l.size), 0)::bigint AS bytes
         FROM {accounts}."user" u
@@ -436,16 +542,24 @@ async def snapshot_user_layers(
         JOIN {customer}.layer l ON l.user_id = u.id
         JOIN disambig_orgs do_ ON do_.id = o.id
         WHERE u.email IS NOT NULL
-        GROUP BY u.email, o.id, do_.display_name
+        GROUP BY
+            u.email, o.id, do_.display_name,
+            l.type, l.feature_layer_type, l.feature_layer_geometry_type,
+            l.data_type
         """
     )
-    result = await db.execute(query)
+    result = await db.execute(query, {"sentinel": MISSING_DIM})
     rows = result.all()
     for row in rows:
         attrs = {
             "user_email": row.user_email,
             "org_id": row.org_id,
             "org_name": row.org_name,
+            "type": row.type,
+            "feature_subtype": row.feature_subtype,
+            "geometry": row.geometry,
+            "source": row.source,
+            "data_type": row.data_type,
         }
         layers_gauge.set(row.n, attributes=attrs)
         bytes_gauge.set(row.bytes, attributes=attrs)
@@ -504,13 +618,13 @@ async def _connect_windmill() -> asyncpg.Connection:
 
 async def _fetch_user_org_map(
     db: AsyncSession,
-) -> dict[str, tuple[str, str]]:
-    """Build `dict[user_uuid_str → (org_id_str, org_name_str)]`.
+) -> dict[str, tuple[str, str, str]]:
+    """Build `dict[user_uuid_str → (org_id_str, org_name_str, email_str)]`.
 
     Used as a Python-side lookup table when post-processing Windmill rows:
     each Windmill job has `args.user_id` (a UUID), we resolve that to the
-    user's organization via GOAT's `accounts.user.organization_id`, and
-    emit the org_id/org_name labels on the metric.
+    user's org + email, and emit org_id/org_name/user_email labels on
+    the metric.
 
     Reuses `ORG_DISAMBIG_CTE` so the `org_name` values match what other
     `goat_*` metrics emit — including any "Test (alice@…)" disambig
@@ -527,7 +641,8 @@ async def _fetch_user_org_map(
         SELECT
             u.id::text AS user_id,
             o.id::text AS org_id,
-            do_.display_name AS org_name
+            do_.display_name AS org_name,
+            COALESCE(u.email, '(unknown)') AS email
         FROM {accounts}."user" u
         JOIN {accounts}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
@@ -535,7 +650,7 @@ async def _fetch_user_org_map(
     )
     result = await db.execute(query)
     return {
-        row.user_id: (row.org_id, row.org_name)
+        row.user_id: (row.org_id, row.org_name, row.email)
         for row in result.all()
     }
 
@@ -583,7 +698,7 @@ def _cron_aligned_window(
 
 async def fetch_windmill_completed_jobs(
     wm_conn: asyncpg.Connection,
-    user_to_org: dict[str, tuple[str, str]],
+    user_to_org: dict[str, tuple[str, str, str]],
 ) -> tuple[int, int, int]:
     """Emit per-period (5-minute window) gauge values for user-triggered
     Windmill jobs that completed in the last cron-aligned slot.
@@ -633,14 +748,17 @@ async def fetch_windmill_completed_jobs(
         tool = _tool_from_path(row["path"])
         user_id = row["user_id"]
 
-        # Resolve user_id → org. If a user has been deleted from goat but
-        # still has jobs in Windmill's 30-day retention window, fall back
-        # to "(unknown)" so the row is still counted in totals.
-        org_id, org_name = user_to_org.get(user_id, ("(unknown)", "(unknown)"))
+        # Resolve user_id → org/email. If a user has been deleted from
+        # goat but still has jobs in Windmill's 30-day retention window,
+        # fall back to "(unknown)" so the row is still counted.
+        org_id, org_name, user_email = user_to_org.get(
+            user_id, ("(unknown)", "(unknown)", "(unknown)")
+        )
 
         attrs = {
             "org_id": org_id,
             "org_name": org_name,
+            "user_email": user_email,
             "tool": tool,
         }
 
@@ -663,7 +781,7 @@ async def fetch_windmill_completed_jobs(
 
 async def fetch_windmill_running_jobs(
     wm_conn: asyncpg.Connection,
-    user_to_org: dict[str, tuple[str, str]],
+    user_to_org: dict[str, tuple[str, str, str]],
 ) -> int:
     """Populate the running-jobs gauge observations.
 
@@ -688,8 +806,8 @@ async def fetch_windmill_running_jobs(
     running: list[Observation] = []
     for row in rows:
         tool = _tool_from_path(row["path"])
-        org_id, org_name = user_to_org.get(
-            row["user_id"], ("(unknown)", "(unknown)")
+        org_id, org_name, user_email = user_to_org.get(
+            row["user_id"], ("(unknown)", "(unknown)", "(unknown)")
         )
         running.append(
             Observation(
@@ -697,6 +815,7 @@ async def fetch_windmill_running_jobs(
                 attributes={
                     "org_id": org_id,
                     "org_name": org_name,
+                    "user_email": user_email,
                     "tool": tool,
                 },
             )
@@ -835,7 +954,7 @@ async def _run_windmill_block(
     with the empty cache and emit nothing.
     """
     wm_conn: asyncpg.Connection | None = None
-    user_to_org: dict[str, tuple[str, str]] = {}
+    user_to_org: dict[str, tuple[str, str, str]] = {}
     try:
         # 1. Cross-DB join setup: fetch the user_uuid → org map from goat.
         async with session_manager.session() as goat_db:
@@ -891,6 +1010,13 @@ async def snapshot() -> bool:
                     name=Q_LAYER_BYTES,
                     fn=lambda: snapshot_layer_bytes(
                         db, instr["layer_bytes_total"]  # type: ignore[arg-type]
+                    ),
+                    error_counter=error_counter,  # type: ignore[arg-type]
+                ),
+                await _run_query(
+                    name=Q_LAYER_SIZE_DIST,
+                    fn=lambda: snapshot_layer_size_distribution(
+                        db, instr["layer_size_distribution"]  # type: ignore[arg-type]
                     ),
                     error_counter=error_counter,  # type: ignore[arg-type]
                 ),
