@@ -234,6 +234,15 @@ export const markerSchema = z.object({
   marker_offset: z.array(z.number().min(-5).max(5)).optional().default([0, 0]),
 });
 
+export const clusterSchema = z.object({
+  enabled: z.boolean().default(false),
+  radius: z.number().min(1).max(100).default(50),
+  min_points: z.number().min(2).max(20).default(3),
+  max_zoom: z.number().min(0).max(20).default(14),
+  color: z.array(z.number().min(0).max(255)).length(3).default([40, 56, 178]),
+  text_color: z.array(z.number().min(0).max(255)).length(3).default([255, 255, 255]),
+});
+
 export const layerInteractionContentType = z.enum(["field_list", "image"]);
 
 export const attributeSchema = z.object({
@@ -296,7 +305,10 @@ export const featureLayerBasePropertiesSchema = z
 export const featureLayerPointPropertiesSchema = featureLayerBasePropertiesSchema
   .merge(strokeColorSchema)
   .merge(radiusSchema)
-  .merge(markerSchema);
+  .merge(markerSchema)
+  .extend({
+    cluster: clusterSchema.optional(),
+  });
 
 export const featureLayerLinePropertiesSchema =
   featureLayerBasePropertiesSchema.merge(lineStyleSchema);

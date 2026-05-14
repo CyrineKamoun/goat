@@ -108,6 +108,25 @@ const MapViewer: React.FC<MapProps> = ({
   );
   const interactiveLayerIds = useMemo(() => {
     const ids = layers?.map((layer) => layer.id.toString()) || [];
+    // For point layers with clustering enabled, include the cluster
+    // sub-layer ids so MapLibre returns them in click events (needed for
+    // cluster expand-on-click; layer-id convention from Layers.tsx).
+    // Non-existent ids are silently ignored by MapLibre, so adding all
+    // four covers both circle-cluster and marker-cluster modes.
+    layers?.forEach((l) => {
+      if (
+        l.type === "feature" &&
+        l.feature_layer_geometry_type === "point" &&
+        (l.properties as { cluster?: { enabled?: boolean } } | undefined)?.cluster?.enabled
+      ) {
+        ids.push(
+          `${l.id}-cluster-bubble`,
+          `${l.id}-cluster-count`,
+          `${l.id}-cluster-icon`,
+          `${l.id}-cluster-badge`,
+        );
+      }
+    });
     if (pendingFeaturesExist) {
       ids.push("pending-features-fill", "pending-features-line", "pending-features-circle", "pending-features-symbol");
     }
@@ -148,6 +167,41 @@ const MapViewer: React.FC<MapProps> = ({
 
   const handleMapClick = (e: MapLayerMouseEvent) => {
     const { features } = e;
+
+    // Cluster click: zoom to the cluster's expansion zoom.
+    // Layer-id convention from Layers.tsx: cluster layers contain `-cluster-`
+    // (bubble / count / icon / badge).
+    const clusterFeature = features?.find(
+      (f) =>
+        typeof f.layer.id === "string" &&
+        f.layer.id.includes("-cluster-") &&
+        f.properties?.cluster_id != null,
+    );
+    if (clusterFeature && mapRef?.current) {
+      const map = mapRef.current.getMap();
+      const sourceId = clusterFeature.layer.source;
+      const source = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+      const clusterId = clusterFeature.properties?.cluster_id;
+      if (source && clusterId != null && "getClusterExpansionZoom" in source) {
+        source
+          .getClusterExpansionZoom(clusterId)
+          .then((zoom: number) => {
+            const geom = clusterFeature.geometry;
+            if (geom?.type === "Point") {
+              map.easeTo({
+                center: geom.coordinates as [number, number],
+                zoom,
+                duration: 500,
+              });
+            }
+          })
+          .catch(() => {
+            // Cluster source may have been torn down between click and resolve; ignore.
+          });
+      }
+      return;
+    }
+
     // Track whether the popup block already highlighted a feature
     let didHighlight = false;
 

@@ -27,6 +27,7 @@ import AccordionWrapper from "@/components/common/AccordionWrapper";
 import FormLabelHelper from "@/components/common/FormLabelHelper";
 import SectionHeader from "@/components/map/panels/common/SectionHeader";
 import SliderInput from "@/components/map/panels/common/SliderInput";
+import ClusteringSection from "@/components/map/panels/style/clustering/ClusteringSection";
 import ColorOptions from "@/components/map/panels/style/color/ColorOptions";
 import GeneralOptions from "@/components/map/panels/style/general/GeneralOptions";
 import InteractionOptions from "@/components/map/panels/style/interaction/InteractionOptions";
@@ -579,6 +580,14 @@ const LayerStylePanel = ({ projectId }: { projectId: string }) => {
 
                       {activeLayer.feature_layer_geometry_type === "line" && (
                         <LineStyleSection
+                          layerProperties={layerProperties}
+                          onStyleChange={(newStyle) => updateLayerStyle(newStyle)}
+                        />
+                      )}
+
+                      {/* {CLUSTERING} */}
+                      {activeLayer.feature_layer_geometry_type === "point" && (
+                        <ClusteringSection
                           layerProperties={layerProperties}
                           onStyleChange={(newStyle) => updateLayerStyle(newStyle)}
                         />
