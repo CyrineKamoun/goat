@@ -46,6 +46,20 @@ export interface MapPopoverInfoProps {
    * Applied after kind-aware formatting (so area units are preserved).
    */
   fieldDecorators?: Record<string, { prefix?: string; suffix?: string; format?: FormatNumberTypes }>;
+  /**
+   * Snapshot of the clicked feature's full unfiltered properties, taken
+   * at click time. Used by `MapFeaturePopover` for {{token}} substitution
+   * so the popup stays bound to the originally-clicked feature even when
+   * unrelated UI changes (e.g. switching the selected layer in the panel)
+   * mutate the reactive `highlightedFeature` state.
+   */
+  featureProperties?: Record<string, unknown>;
+  /**
+   * How the popup was opened. Used by the active-feature pulse layer to
+   * decide between a pulsing ring (click) and a static dot (hover) —
+   * hover popups are transient and the pulse animation reads too loud.
+   */
+  triggeredBy?: "click" | "hover";
   onClose: () => void;
 }
 

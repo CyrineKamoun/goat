@@ -30,7 +30,7 @@ import SliderInput from "@/components/map/panels/common/SliderInput";
 import ClusteringSection from "@/components/map/panels/style/clustering/ClusteringSection";
 import ColorOptions from "@/components/map/panels/style/color/ColorOptions";
 import GeneralOptions from "@/components/map/panels/style/general/GeneralOptions";
-import InteractionOptions from "@/components/map/panels/style/interaction/InteractionOptions";
+import PopupSection from "@/components/map/panels/style/popup/PopupSection";
 import LabelOptions from "@/components/map/panels/style/label/LabelOptions";
 import { LegendOptions } from "@/components/map/panels/style/legend/LegendOptions";
 import LineStyleSection from "@/components/map/panels/style/line/LineStyleSection";
@@ -750,7 +750,7 @@ const LayerStylePanel = ({ projectId }: { projectId: string }) => {
                   flexDirection: "column",
                 }}>
                 {activeLayer && (
-                  <InteractionOptions
+                  <PopupSection
                     layer={activeLayer}
                     onStyleChange={async (newStyle) => {
                       updateLayerStyle(newStyle);

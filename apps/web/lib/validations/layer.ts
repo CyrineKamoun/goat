@@ -245,11 +245,24 @@ export const clusterSchema = z.object({
 
 export const layerInteractionContentType = z.enum(["field_list", "image"]);
 
+// Composable number formatting — mirrors the `display_config` shape used by
+// FieldEditor for layer schema fields, so the popup editor can speak the
+// same vocabulary. Added alongside the legacy `format` preset enum (which
+// the original interaction popup still uses); the popup-v2 renderer prefers
+// `format_config` when present and falls back to `format`.
+export const attributeFormatConfig = z.object({
+  decimals: z.union([z.literal("auto"), z.number().int().min(0).max(10)]).optional(),
+  thousands_separator: z.boolean().optional(),
+  abbreviate: z.boolean().optional(),
+  always_show_sign: z.boolean().optional(),
+});
+
 export const attributeSchema = z.object({
   name: z.string(),
   label: z.string().optional(),
   type: z.enum(["string", "number", "boolean"]),
   format: formatNumberTypes.optional(),
+  format_config: attributeFormatConfig.optional(),
   prefix: z.string().optional(),
   suffix: z.string().optional(),
 });
@@ -289,12 +302,124 @@ export const layerLegend = z.object({
   collapsed: z.boolean().optional().default(false),
 });
 
+// Popup v2 — new customizable popup schema. Lives alongside `interaction`
+// for back-compat; renderer prefers `popup` when present.
+export const popupTextBlock = z.object({
+  id: z
+    .string()
+    .uuid()
+    .default(() => v4()),
+  type: z.literal("text"),
+  html: z.string().default(""),
+});
+
+export const popupFieldListBlock = z.object({
+  id: z
+    .string()
+    .uuid()
+    .default(() => v4()),
+  type: z.literal("fieldList"),
+  layout: z.enum(["table", "list"]).default("table"),
+  attributes: z.array(attributeSchema).default([]),
+  collapse_after: z.number().int().min(1).max(50).nullable().default(null),
+});
+
+export const popupImageBlock = z.object({
+  id: z
+    .string()
+    .uuid()
+    .default(() => v4()),
+  type: z.literal("image"),
+  source: z.enum(["field", "static"]).default("field"),
+  field: z.string().optional(),
+  url: z.string().optional(),
+  sizing: z.enum(["fit", "fixed", "aspect"]).default("fixed"),
+  height: z.number().min(40).max(400).default(140),
+  aspect: z.enum(["16/9", "4/3", "3/2", "1/1", "2/3"]).default("16/9"),
+});
+
+export const popupButtonBlock = z.object({
+  id: z
+    .string()
+    .uuid()
+    .default(() => v4()),
+  type: z.literal("button"),
+  label: z.string().default("Open"),
+  url_template: z.string().default(""),
+  style: z.enum(["link", "outlined", "filled"]).default("link"),
+  color: z.string().optional(),
+});
+
+export const popupBadgeBlock = z.object({
+  id: z
+    .string()
+    .uuid()
+    .default(() => v4()),
+  type: z.literal("badge"),
+  field: z.string().min(1),
+  // "single" → one color for every value (read from `color`).
+  // "per_value" → colors derived from `palette` (value → hex).
+  mode: z.enum(["single", "per_value"]).default("single"),
+  color: z.string().optional(),
+  palette: z.record(z.string()).default({}),
+  labels: z.record(z.string()).optional(),
+  full_width: z.boolean().default(false),
+});
+
+export const popupDividerBlock = z.object({
+  id: z
+    .string()
+    .uuid()
+    .default(() => v4()),
+  type: z.literal("divider"),
+  thickness: z.number().int().min(1).max(8).default(1),
+  color: z.string().optional(),
+});
+
+export const popupBlock = z.discriminatedUnion("type", [
+  popupTextBlock,
+  popupFieldListBlock,
+  popupImageBlock,
+  popupButtonBlock,
+  popupBadgeBlock,
+  popupDividerBlock,
+]);
+
+export const popupAnchor = z.enum(["top_left", "top_right", "bottom_left", "bottom_right"]);
+
+export const popupProperties = z.object({
+  enabled: z.boolean().default(true),
+  // "click_and_hover" opens the popup on hover (transient) AND on click
+  // (pinned). Once a popup is active on any layer, triggers from OTHER
+  // layers are suppressed by the runtime until the popup closes.
+  trigger: z.enum(["click", "hover", "click_and_hover"]).default("click"),
+  mode: z.enum(["simple", "html"]).default("simple"),
+  blocks: z.array(popupBlock).default([]),
+  html: z.string().default(""),
+  show_layer_header: z.boolean().default(true),
+  position: z.enum(["in_place", "fixed"]).default("in_place"),
+  anchor: popupAnchor.default("top_right"),
+  highlight_active_feature: z.boolean().default(true),
+});
+
+export type PopupBlock = z.infer<typeof popupBlock>;
+export type PopupTextBlock = z.infer<typeof popupTextBlock>;
+export type PopupFieldListBlock = z.infer<typeof popupFieldListBlock>;
+export type AttributeFormatConfig = z.infer<typeof attributeFormatConfig>;
+export type Attribute = z.infer<typeof attributeSchema>;
+export type PopupImageBlock = z.infer<typeof popupImageBlock>;
+export type PopupButtonBlock = z.infer<typeof popupButtonBlock>;
+export type PopupBadgeBlock = z.infer<typeof popupBadgeBlock>;
+export type PopupDividerBlock = z.infer<typeof popupDividerBlock>;
+export type PopupProperties = z.infer<typeof popupProperties>;
+
 export const featureLayerBasePropertiesSchema = z
   .object({
     filled: z.boolean().default(true),
     stroked: z.boolean().default(true),
     text_label: TextLabelSchema.optional(),
     interaction: interactionProperties.optional().default({}),
+    popup: popupProperties.optional(), // NEW: undefined = legacy renderer
     legend: layerLegend.optional().default({}),
   })
   .merge(layerPropertiesBaseSchema)

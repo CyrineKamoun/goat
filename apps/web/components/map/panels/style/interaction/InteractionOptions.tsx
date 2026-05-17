@@ -1,3 +1,7 @@
+// DEPRECATED — replaced by PopupSection at
+// apps/web/components/map/panels/style/popup/PopupSection.tsx.
+// Kept for reference / rollback only. Schedule for removal once v2
+// lazy-on-read migration ships.
 import type { DragEndEvent } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import {

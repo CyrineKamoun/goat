@@ -65,6 +65,19 @@ export type ClickedFeatureForFilter = {
   timestamp: number;
 };
 
+/**
+ * Ephemeral preview state for the popup live-editor. When set, MapViewer auto-pins
+ * a `MapFeaturePopover` to the sample feature so the user can see edits in real time
+ * while configuring the Popup section.
+ */
+export interface PopupPreview {
+  layerId: string;
+  feature: {
+    properties: Record<string, unknown>;
+    geometry: { type: string; coordinates: number[] | number[][] | number[][][] };
+  };
+}
+
 export type MapMode = "data" | "builder" | "reports" | "workflows" | "public";
 
 export interface MapState {
@@ -82,6 +95,7 @@ export interface MapState {
   highlightedFeature: MapGeoJSONFeature | undefined;
   popupInfo: MapPopoverInfoProps | undefined;
   popupEditor: MapPopoverEditorProps | undefined;
+  popupPreview: PopupPreview | null;
   mapMode: MapMode;
   userLocation:
     | {
@@ -122,6 +136,7 @@ const initialState = {
   selectedScenarioLayer: undefined,
   popupInfo: undefined,
   popupEditor: undefined,
+  popupPreview: null,
   highlightedFeature: undefined,
   mapMode: "data",
   userLocation: undefined,
@@ -209,6 +224,9 @@ const mapSlice = createSlice({
     },
     setPopupEditor: (state, action) => {
       state.popupEditor = action.payload;
+    },
+    setPopupPreview: (state, action: PayloadAction<PopupPreview | null>) => {
+      state.popupPreview = action.payload;
     },
     setHighlightedFeature: (state, action) => {
       state.highlightedFeature = action.payload;
@@ -326,6 +344,7 @@ export const {
   setSelectedScenarioLayer,
   setPopupInfo,
   setPopupEditor,
+  setPopupPreview,
   setHighlightedFeature,
   setMapMode,
   setUserLocation,

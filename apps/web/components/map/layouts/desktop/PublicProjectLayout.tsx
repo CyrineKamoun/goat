@@ -34,6 +34,7 @@ import { useLayerStyleChange } from "@/hooks/map/LayerStyleHooks";
 import { useBasemap } from "@/hooks/map/MapHooks";
 import { useCustomBasemapMutations } from "@/hooks/map/useCustomBasemapMutations";
 import { useMeasureTool } from "@/hooks/map/useMeasureTool";
+import { MapFixedPopupSlot } from "@/components/map/popover/MapFixedPopupSlot";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import AddSectionButton from "@/components/builder/AddSectionButton";
@@ -240,6 +241,28 @@ const PublicProjectLayout = ({
     return { left: leftSpace, right: rightSpace, top: topSpace, bottom: bottomSpace };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leftPanels, rightPanels, topPanels, bottomPanels, collapsedPanels]);
+
+  // Width occupied by the secondary right overlay (measure results +
+  // editor-side panel) that PublicProjectLayout stacks on top of the
+  // builder right panel. Used to size the fixed-popup host so it
+  // doesn't sit behind these panels. Only counts panels that are
+  // actually visible — a measure button enabled but not opened
+  // contributes nothing.
+  const measureVisible =
+    measureTool.measureOpen || measureTool.measurements.length > 0;
+  const editorRightWidth = useMemo(() => {
+    const MEASURE_PANEL_WIDTH = 320;
+    const STYLE_PANEL_WIDTH = 320;
+    const DEFAULT_PANEL_WIDTH = 400;
+    const widths: number[] = [];
+    if (measureVisible) widths.push(MEASURE_PANEL_WIDTH);
+    if (activeRightComponent) {
+      widths.push(activeRight === MapSidebarItemID.STYLE ? STYLE_PANEL_WIDTH : DEFAULT_PANEL_WIDTH);
+    }
+    if (widths.length === 0) return 0;
+    // 16px gap between adjacent panels (matches the overlay's `gap: 2`).
+    return widths.reduce((a, b) => a + b, 0) + 16 * (widths.length - 1);
+  }, [measureVisible, activeRightComponent, activeRight]);
 
   const panelsWithPosition: BuilderPanelSchemaWithPosition[] = useMemo(() => {
     return panels.map((panel, index) => {
@@ -782,6 +805,28 @@ const PublicProjectLayout = ({
               </Box>
             );
           })}
+          {/* Host for fixed-anchor feature popups. Sized to the visible
+              map content area inside this layout's panel chrome.
+              PopupFixedHost positions its content to one of this Box's 4
+              corners, so the popup respects the layout's panels without
+              any global state. Rendered inside the inner flex container
+              (position: relative) so the absolute offsets resolve
+              against the map-content area, not the viewport. */}
+          <Box
+            sx={{
+              position: "absolute",
+              top: getOccupiedSpace.top + 16,
+              bottom: getOccupiedSpace.bottom + 16,
+              left: getOccupiedSpace.left + 16,
+              right:
+                getOccupiedSpace.right +
+                16 +
+                (editorRightWidth ? editorRightWidth + 16 : 0),
+              pointerEvents: "none",
+              zIndex: (theme) => theme.zIndex.drawer + 2,
+            }}>
+            <MapFixedPopupSlot layers={projectLayers} />
+          </Box>
         </Box>
       </Box>
       <CustomBasemapDialog
