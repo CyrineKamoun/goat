@@ -703,6 +703,8 @@
   "folder_name": "Ordnername",
   "folder_rule": "Ordnername muss weniger als 30 Zeichen lang sein",
   "font": "Schriftart",
+  "font_url": "Schriftdatei-URL (woff2)",
+  "custom_font": "Eigene…",
   "font_color": "Schriftfarbe",
   "font_family": "Schriftart",
   "font_size": "Schriftgröße",

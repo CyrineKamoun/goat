@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Mulish } from "next/font/google";
 import { cookies } from "next/headers";
 import "react-toastify/dist/ReactToastify.css";
+import "@p4b/ui/assets/fonts/index.css";
 
 import { fallbackLng } from "@/i18n/settings";
 

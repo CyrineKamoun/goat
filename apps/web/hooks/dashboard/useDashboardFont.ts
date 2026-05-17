@@ -16,26 +16,27 @@ function extractFontName(fontFamily: string): string {
   return first.replace(/^['"]|['"]$/g, "");
 }
 
-/**
- * Loads a Google Font by injecting a <link> into <head>.
- * Mulish is already loaded by next/font so it's skipped.
- */
-function loadGoogleFont(fontName: string) {
-  if (fontName === "Mulish") return; // Already loaded by next/font
-
-  const id = `google-font-${fontName.replace(/\s+/g, "-").toLowerCase()}`;
-  if (document.getElementById(id)) return; // Already loaded
-
-  const link = document.createElement("link");
-  link.id = id;
-  link.rel = "stylesheet";
-  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName)}:wght@300;400;500;600;700&display=swap`;
-  document.head.appendChild(link);
+function injectFontFace(id: string, fontName: string, url: string) {
+  const css = `@font-face{font-family:"${fontName}";src:url("${url}") format("woff2");font-display:swap;}`;
+  const existing = document.getElementById(id) as HTMLStyleElement | null;
+  if (existing) {
+    if (existing.textContent !== css) existing.textContent = css;
+    return;
+  }
+  const style = document.createElement("style");
+  style.id = id;
+  style.textContent = css;
+  document.head.appendChild(style);
 }
 
 /**
- * Hook that reads the dashboard font setting from the project config,
- * loads the Google Font if needed, and returns the CSS font-family value.
+ * Hook that reads the dashboard font setting from the project config and
+ * returns the CSS font-family value.
+ *
+ * Preset Google Fonts are bundled with the app (see packages/js/ui/assets/fonts)
+ * and imported globally, so they don't need to be loaded on demand. When the
+ * project specifies a custom font_url, this hook injects an @font-face rule
+ * pointing at it.
  *
  * Accepts an optional project prop (used in the builder where the project
  * lives in component props rather than the Redux store).
@@ -44,11 +45,13 @@ export function useDashboardFont(projectProp?: Project): string {
   const storeProject = useAppSelector(selectProject);
   const project = projectProp ?? storeProject;
   const fontFamily = project?.builder_config?.settings?.font_family || DEFAULT_DASHBOARD_FONT;
+  const fontUrl = project?.builder_config?.settings?.font_url;
   const fontName = extractFontName(fontFamily);
+  const customUrl = fontUrl && fontUrl.trim() ? fontUrl.trim() : null;
 
   useEffect(() => {
-    loadGoogleFont(fontName);
-  }, [fontName]);
+    if (customUrl) injectFontFace("dashboard-font-custom", fontName, customUrl);
+  }, [fontName, customUrl]);
 
   return fontFamily;
 }

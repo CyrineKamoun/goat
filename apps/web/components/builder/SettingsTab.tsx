@@ -1,5 +1,5 @@
 import { Box, Button, FormControl, Link, MenuItem, Select, Stack, Switch, TextField, Typography } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { BASEMAPS } from "@/lib/constants/basemaps";
@@ -63,18 +63,6 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
   onProjectUpdate,
 }) => {
   const { t } = useTranslation("common");
-
-  // Load all Google Fonts for dropdown preview
-  useEffect(() => {
-    const id = "dashboard-font-preview";
-    if (document.getElementById(id)) return;
-    const families = DASHBOARD_FONTS.map((f) => `family=${encodeURIComponent(f.label)}:wght@400;700`).join("&");
-    const link = document.createElement("link");
-    link.id = id;
-    link.rel = "stylesheet";
-    link.href = `https://fonts.googleapis.com/css2?${families}&display=swap`;
-    document.head.appendChild(link);
-  }, []);
 
   const [showInteractionsModal, setShowInteractionsModal] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -183,24 +171,68 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
           <SettingsGroupHeader label={t("branding")} />
           <Stack spacing={2}>
             {/* Font */}
-            <FormControl size="small" fullWidth>
-              <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
-                {t("font")}
-              </Typography>
-              <Select
-                value={(settings?.font_family as string) || "Mulish, sans-serif"}
-                onChange={(e) => onChange("font_family", e.target.value)}
-                renderValue={(selected) => {
-                  const font = DASHBOARD_FONTS.find((f) => f.value === selected);
-                  return font?.label ?? "Mulish";
-                }}>
-                {DASHBOARD_FONTS.map((font) => (
-                  <MenuItem key={font.value} value={font.value}>
-                    <Typography sx={{ fontFamily: font.value }}>{font.label}</Typography>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            {(() => {
+              const CUSTOM_SENTINEL = "__custom__";
+              const fontUrl = settings?.font_url as string | undefined;
+              const isCustom = typeof fontUrl === "string";
+              const selectValue = isCustom
+                ? CUSTOM_SENTINEL
+                : (settings?.font_family as string) || "Mulish, sans-serif";
+              return (
+                <>
+                  <FormControl size="small" fullWidth>
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
+                      {t("font")}
+                    </Typography>
+                    <Select
+                      value={selectValue}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === CUSTOM_SENTINEL) {
+                          onChange("font_url", "");
+                        } else {
+                          onChange("font_url", undefined);
+                          onChange("font_family", value);
+                        }
+                      }}
+                      renderValue={(selected) => {
+                        if (selected === CUSTOM_SENTINEL) return t("custom_font");
+                        const font = DASHBOARD_FONTS.find((f) => f.value === selected);
+                        return font?.label ?? "Mulish";
+                      }}>
+                      {DASHBOARD_FONTS.map((font) => (
+                        <MenuItem key={font.value} value={font.value}>
+                          <Typography sx={{ fontFamily: font.value }}>{font.label}</Typography>
+                        </MenuItem>
+                      ))}
+                      <MenuItem value={CUSTOM_SENTINEL}>
+                        <Typography>{t("custom_font")}</Typography>
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+                  {isCustom && (
+                    <>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        label={t("font_url")}
+                        placeholder="https://example.com/font.woff2"
+                        value={fontUrl ?? ""}
+                        onChange={(e) => onChange("font_url", e.target.value)}
+                      />
+                      <TextField
+                        size="small"
+                        fullWidth
+                        label={t("font_family")}
+                        placeholder="BaWue Sans, sans-serif"
+                        value={(settings?.font_family as string) ?? ""}
+                        onChange={(e) => onChange("font_family", e.target.value)}
+                      />
+                    </>
+                  )}
+                </>
+              );
+            })()}
 
             {/* Primary Color */}
             <Box>

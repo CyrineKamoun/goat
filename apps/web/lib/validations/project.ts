@@ -146,6 +146,7 @@ export const builderConfigSchema = z.object({
       // Branding
       language: dashboardLanguageEnum.default("auto"),
       font_family: z.string().default("Mulish, sans-serif"),
+      font_url: z.string().optional(),
       primary_color: z.string().optional(),
       icon_color: z.string().optional(),
       font_color: z.string().optional(),
