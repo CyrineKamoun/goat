@@ -2130,6 +2130,8 @@
   "enter_info_text": "Enter explanation text...",
   "general": "General",
   "font": "Font",
+  "font_url": "Font file URL (woff2)",
+  "custom_font": "Custom…",
   "variables": "Variables",
   "variable": "variable",
   "add_variable": "Add Variable",

@@ -142,16 +142,35 @@ export const LayerInformationWidget = ({
           }
         });
       } else {
+        // The dashboard widget only edits visibility / legend / expanded state.
+        // Pin `order` and `parent_id` to whatever is currently persisted so
+        // toggling visibility here cannot reorder or reparent layers on the map.
+        const sanitizedItems = updatePayload.items.map((item) => {
+          if (item.type === "layer") {
+            const existing = editProjectLayers?.find((l) => l.id === item.id);
+            return {
+              ...item,
+              order: existing?.order ?? item.order,
+              parent_id: existing?.layer_project_group_id ?? null,
+            };
+          }
+          const existing = editProjectLayerGroups?.find((g) => g.id === item.id);
+          return {
+            ...item,
+            order: existing?.order ?? item.order,
+            parent_id: existing?.parent_id ?? null,
+          };
+        });
+        const sanitizedPayload: ProjectLayerTreeUpdate = { items: sanitizedItems };
+
         if (editProjectLayers) {
           const updatedLayers = editProjectLayers.map((layer) => {
-            const updateItem = updatePayload.items.find(
+            const updateItem = sanitizedItems.find(
               (item) => item.id === layer.id && item.type === "layer"
             );
             if (updateItem) {
               return {
                 ...layer,
-                order: updateItem.order,
-                layer_project_group_id: updateItem.parent_id || null,
                 properties: updateItem.properties
                   ? { ...layer.properties, ...updateItem.properties }
                   : layer.properties,
@@ -164,14 +183,12 @@ export const LayerInformationWidget = ({
 
         if (editProjectLayerGroups) {
           const updatedGroups = editProjectLayerGroups.map((group) => {
-            const updateItem = updatePayload.items.find(
+            const updateItem = sanitizedItems.find(
               (item) => item.id === group.id && item.type === "group"
             );
             if (updateItem) {
               return {
                 ...group,
-                order: updateItem.order,
-                parent_id: updateItem.parent_id || null,
                 properties: updateItem.properties
                   ? { ...group.properties, ...updateItem.properties }
                   : group.properties,
@@ -182,7 +199,7 @@ export const LayerInformationWidget = ({
           mutateProjectLayerGroups(updatedGroups, false);
         }
 
-        await updateProjectLayerTree(projectId, updatePayload);
+        await updateProjectLayerTree(projectId, sanitizedPayload);
       }
     } catch (error) {
       console.error("LayerInformationWidget - Error updating tree:", error);
