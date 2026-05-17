@@ -52,6 +52,19 @@ def sanitize_properties(properties: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _json_column_names(native_column_types: Optional[dict[str, str]]) -> set[str]:
+    if not native_column_types:
+        return set()
+    return {n for n, t in native_column_types.items() if "JSON" in t.upper()}
+
+
+def _parse_json_columns(row_dict: dict[str, Any], json_cols: set[str]) -> None:
+    for k in json_cols:
+        v = row_dict.get(k)
+        if isinstance(v, str):
+            row_dict[k] = json.loads(v)
+
+
 class FeatureService:
     """Service for querying features."""
 
@@ -68,6 +81,7 @@ class FeatureService:
         ids: Optional[list[str]] = None,
         geometry_column: str = "geometry",
         has_geometry: bool = True,
+        native_column_types: Optional[dict[str, str]] = None,
     ) -> tuple[list[dict[str, Any]], int]:
         """Get features from a layer.
 
@@ -152,6 +166,7 @@ class FeatureService:
 
             # Get column names from description
             col_names = [desc[0] for desc in description]
+            json_cols = _json_column_names(native_column_types)
 
             for idx, row in enumerate(result):
                 row_dict = dict(zip(col_names, row))
@@ -168,6 +183,8 @@ class FeatureService:
                 # (+1 because MVT feature ID 0 is "unset" in MapLibre)
                 raw_rowid = row_dict.pop("rowid", None)
                 effective_id = raw_rowid + 1 if raw_rowid is not None else None
+
+                _parse_json_columns(row_dict, json_cols)
 
                 # Sanitize string values to ensure valid UTF-8
                 sanitized_props = sanitize_properties(row_dict)
@@ -194,6 +211,7 @@ class FeatureService:
         geometry_column: str = "geometry",
         has_geometry: bool = True,
         column_names: Optional[list[str]] = None,
+        native_column_types: Optional[dict[str, str]] = None,
     ) -> Optional[dict[str, Any]]:
         """Get a single feature by rowid."""
         table = layer_info.full_table_name
@@ -248,6 +266,8 @@ class FeatureService:
 
             # Remove system columns from properties
             row_dict.pop("bbox", None)
+
+            _parse_json_columns(row_dict, _json_column_names(native_column_types))
 
             sanitized_props = sanitize_properties(row_dict)
 
@@ -319,10 +339,14 @@ class FeatureService:
             ).fetchall()
             geom_col = None
             col_names = []
+            json_cols: set[str] = set()
             for col_name, col_type, *_ in cols:
                 col_names.append(col_name)
-                if "GEOMETRY" in col_type.upper():
+                type_upper = col_type.upper()
+                if "GEOMETRY" in type_upper:
                     geom_col = col_name
+                elif "JSON" in type_upper:
+                    json_cols.add(col_name)
 
             # Build select clause
             if properties:
@@ -375,6 +399,8 @@ class FeatureService:
 
                 # Generate feature ID from row index
                 fid = offset + len(features) + 1
+
+                _parse_json_columns(row_dict, json_cols)
 
                 # Sanitize properties
                 sanitized_props = sanitize_properties(row_dict)

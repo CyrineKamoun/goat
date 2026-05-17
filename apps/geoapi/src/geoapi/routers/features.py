@@ -132,6 +132,7 @@ async def get_features(
         ids=id_list,
         geometry_column=geometry_column,
         has_geometry=has_geometry,
+        native_column_types=metadata.native_column_types,
     )
 
     # Build links
@@ -234,6 +235,7 @@ async def get_feature(
         geometry_column=geometry_column,
         has_geometry=has_geometry,
         column_names=metadata.column_names,
+        native_column_types=metadata.native_column_types,
     )
 
     if not feature:

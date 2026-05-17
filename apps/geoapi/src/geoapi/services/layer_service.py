@@ -551,6 +551,8 @@ class LayerService:
             return "boolean"
         elif any(t in type_lower for t in ["geometry", "geography"]):
             return "geometry"
+        elif "json" in type_lower:
+            return "object"
         elif any(t in type_lower for t in ["timestamp", "date", "time"]):
             return "string"  # ISO format
         else:
