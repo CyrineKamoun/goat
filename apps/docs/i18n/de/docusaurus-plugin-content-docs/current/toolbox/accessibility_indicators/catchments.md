@@ -15,7 +15,9 @@ Einzugsgebiet zeigt **wie weit Menschen innerhalb einer bestimmten Reisezeit ode
 
 ## 1. Erklärung
 
-Einzugsgebiet bietet folgende Funktionen:
+Basierend auf festgelegten Startpunkten, maximaler Reisezeit oder Entfernung und Verkehrsmitteln **visualisiert das Tool die Erreichbarkeit anhand realer Routing-Netzwerke**. Die resultierenden Isochronen können mit räumlichen Datensätzen, wie Bevölkerungs- oder Infrastrukturdaten, verschnitten werden, um die Abdeckung zu bewerten und Erreichbarkeitslücken zu identifizieren.
+
+Einzugsgebiet bietet folgende zusätzliche Funktionen:
 
 **Für alle Routing-Modi:**
 
@@ -26,8 +28,6 @@ Einzugsgebiet bietet folgende Funktionen:
 
 - **Maximale Anzahl an Umstiegen** — begrenzt die Anzahl der ÖV-Verbindungen pro Fahrt.
 - **Zugangs- und Abgangsmodus** — konfiguriert, wie Nutzer zu ÖV-Haltestellen und von diesen weg gelangen (zu Fuß, mit dem Fahrrad oder mit dem Auto).
-
-Basierend auf festgelegten Startpunkten, maximaler Reisezeit oder Entfernung und Verkehrsmitteln **visualisiert das Tool die Erreichbarkeit anhand realer Routing-Netzwerke**. Die resultierenden Isochronen können mit räumlichen Datensätzen — wie Bevölkerungs- oder Infrastrukturdaten — verschnitten werden, um die Abdeckung zu bewerten und Erreichbarkeitslücken zu identifizieren.
 
 :::info
 Die Berechnung ist in bestimmten Regionen verfügbar.
