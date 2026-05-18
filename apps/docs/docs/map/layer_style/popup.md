@@ -7,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 # Popup
 
-**Popups display relevant information when users click on map features.** This keeps your map clean while providing detailed information on demand. By default, popups show all attribute fields, but you can customize which fields appear and how they're labeled.
+**Popups display relevant information when users interact with map features.** They keep your map clean while providing detailed information on demand. You can fully customize what content appears and how it is presented.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
   <img src={require('/img/map/styling/popup.webp').default} alt="Popup displaying feature information" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
@@ -17,37 +17,27 @@ import TabItem from '@theme/TabItem';
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Select your layer and navigate to <code>Layer design</code> <img src={require('/img/icons/styling.png').default} alt="Styling Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> and find the <code>Popup section</code></div>
+  <div class="content">Select your layer and navigate to <code>Layer design</code> <img src={require('/img/icons/styling.png').default} alt="Styling Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>, then open the <code>Popup</code> section and enable the toggle.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Choose your <code>Show</code> option: <code>On click</code> to show popup with selected fields when clicking features, or <code>Never</code> for no popup</div>
+  <div class="content">Set <code>Show popup on</code>: <code>On click</code>, <code>Only on hover</code>, or <code>On click and on hover</code>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Click on <code>+ Add content</code> and select the <strong>attribute fields</strong> you want to display in the popup (you can choose multiple fields)</div>
+  <div class="content">Under <code>Content</code>, click <code>+ Add block</code> to add content blocks. Available block types: <code>Field list</code>, <code>Text</code>, <code>Image</code>, <code>Button</code>, <code>Badge</code>, <code>Divider</code>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">You can <strong>rename the fields and arrange them as</strong>  you want</div>
+  <div class="content">For a <code>Field list</code> block: choose <code>Table</code> or <code>List</code> layout, click <code>+ Add attribute</code> to select which fields to display, and optionally set <code>Collapse after</code> to limit the number of visible rows.</div>
 </div>
-
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/styling/popup_adding.gif').default} alt="Customizing popup fields and labels" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
-</div>
-<p></p>
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Click on <code>Save</code> to <strong>apply your changes</strong></div>
-</div>
-
-<div class="step">
-  <div class="step-number">6</div>
-  <div class="content">You can now click on any feature in your layer <strong>to view the customized popup and verify</strong> that your renamed attributes appear correctly</div>
+  <div class="content">Under <code>Appearance</code>, set the <code>Popup position</code> (<code>In place</code> or <code>Fixed</code>), and toggle <code>Show layer name header</code> and <code>Highlight active feature</code> as needed.</div>
 </div>
 
 ## Best practices
@@ -55,9 +45,4 @@ import TabItem from '@theme/TabItem';
 - **Choose relevant fields** that provide meaningful context to users
 - **Use clear, descriptive names** instead of technical field names
 - **Limit the number of fields** to avoid overwhelming users with information
-- **Test your popups** to ensure the information is useful and well-formatted
-
-:::info Coming soon
-Additional popup customization features are in development.
-:::
-
+- **Use collapse** to keep popups compact when showing many attributes
