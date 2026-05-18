@@ -263,7 +263,9 @@ class AggregatePolygonTool(AnalysisTool):
                 LEFT JOIN total_stats t ON a.area_id = t.area_id
             """)
 
-        logger.info("Polygon aggregation completed with %d output stat columns", len(agg_specs))
+        logger.info(
+            "Polygon aggregation completed with %d output stat columns", len(agg_specs)
+        )
 
     def _get_weighted_statistics_sql(
         self: Self,
@@ -343,8 +345,9 @@ class AggregatePolygonTool(AnalysisTool):
         """
         h3_resolution = params.h3_resolution
 
-        # H3 mode uses unweighted SQL (no area context). Pass empty geometry args.
-        agg_specs = self._build_agg_specs(params, source_geom="", area_geom="", source_prefix="")
+        agg_specs = self._build_agg_specs(
+            params, source_geom="", area_geom="", source_prefix=""
+        )
         total_select = ", ".join(f"{sql} AS {col}" for col, sql in agg_specs)
         h3_cell_expr = (
             f"h3_latlng_to_cell("
@@ -434,20 +437,21 @@ class AggregatePolygonTool(AnalysisTool):
     ) -> List[Tuple[str, str]]:
         """Return [(result_col, sql_expr), ...] — one per FieldStatistic entry.
 
-        Names columns ``{operation}_{field}`` to match the prior polygon runner
-        output (e.g. ``sum_population``). ``result_name`` overrides when set.
-        ``source_geom``/``area_geom`` empty disables weighted SQL (H3 mode).
+        Output columns are named ``{operation}_{field}`` (e.g. ``sum_population``)
+        unless ``result_name`` is set. Pass empty ``source_geom``/``area_geom`` to
+        skip area-weighted SQL (used for H3 mode).
         """
         specs: list[Tuple[str, str]] = []
-        weighted = (
-            params.weighted_by_intersecting_area and source_geom and area_geom
-        )
+        weighted = params.weighted_by_intersecting_area and source_geom and area_geom
         for stat in params.column_statistics:
             field = stat.field or ""
             qualified = f"{source_prefix}{field}" if field else ""
             if weighted and field:
                 sql_expr = self._get_weighted_statistics_sql(
-                    qualified, stat.operation.value, source_geom, area_geom,
+                    qualified,
+                    stat.operation.value,
+                    source_geom,
+                    area_geom,
                 )
             else:
                 sql_expr = self.get_statistics_sql(qualified, stat.operation.value)

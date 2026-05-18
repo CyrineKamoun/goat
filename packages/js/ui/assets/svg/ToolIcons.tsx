@@ -219,17 +219,11 @@ export const JoinIcon = (props: SvgIconProps) => (
 
 export const MergeIcon = (props: SvgIconProps) => (
   <SvgIcon viewBox="0 0 44 44" {...props}>
-    {/* Input layer A (light tone, upper-left) */}
     <rect x="4" y="5" width="14" height="10" rx="1.5" fill="var(--icon-color-3, #BDBDBD)"/>
-    {/* Input layer B (medium tone, upper-right) */}
     <rect x="26" y="5" width="14" height="10" rx="1.5" fill="var(--icon-color-2, #999999)"/>
-    {/* Left converging stem */}
     <path d="M8 16 L14 16 L22 26 L19 26 Z" fill="var(--icon-color-3, #BDBDBD)"/>
-    {/* Right converging stem */}
     <path d="M30 16 L36 16 L25 26 L22 26 Z" fill="var(--icon-color-3, #BDBDBD)"/>
-    {/* Arrowhead pointing down to merged output */}
     <path d="M17 27 L27 27 L22 31.5 Z" fill="var(--icon-color-3, #BDBDBD)"/>
-    {/* Merged output (primary tone) */}
     <rect x="4" y="32" width="36" height="8" rx="1.5" fill="var(--icon-color-1, #666666)"/>
   </SvgIcon>
 );

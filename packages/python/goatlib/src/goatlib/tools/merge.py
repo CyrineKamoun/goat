@@ -1,10 +1,7 @@
-
 """Merge tool for Windmill.
 
 Combines multiple vector layers into a single output layer.
 """
-
-
 
 import logging
 from pathlib import Path
@@ -33,12 +30,10 @@ from goatlib.tools.schemas import (
 logger = logging.getLogger(__name__)
 
 
-
 class MergeToolParams(ScenarioSelectorMixin, ToolInputBase, MergeParams):
     """Parameters for merge tool.
 
-    Inherits merge options from MergeParams, adds layer context from ToolInputBase.
-    input_paths/output_path are not used directly (we use layer IDs instead).
+    Inherits merge options from MergeParams; layer context comes from ToolInputBase.
     """
 
     model_config = ConfigDict(
@@ -76,7 +71,6 @@ class MergeToolParams(ScenarioSelectorMixin, ToolInputBase, MergeParams):
         ),
     )
     output_path: str | None = None
-
     output_crs: str | None = Field(
         None,
         description=(
@@ -101,7 +95,6 @@ class MergeToolParams(ScenarioSelectorMixin, ToolInputBase, MergeParams):
         json_schema_extra=ui_field(section="merge_options", field_order=4),
     )
 
-
     result_layer_name: str | None = Field(
         default=get_default_layer_name("merge", "en"),
         description="Name for the merge result layer.",
@@ -121,7 +114,7 @@ class MergeToolRunner(BaseToolRunner[MergeToolParams]):
     """Merge tool runner for Windmill."""
 
     tool_class = MergeTool
-    output_geometry_type = None  # Depends on input geometry family and options
+    output_geometry_type = None
     default_output_name = get_default_layer_name("merge", "en")
 
     @classmethod
@@ -137,7 +130,6 @@ class MergeToolRunner(BaseToolRunner[MergeToolParams]):
         """
         columns: dict[str, str] = {}
 
-        # Prediction input may arrive as keyed layer IDs or generic input keys.
         ordered_schemas: list[dict[str, str]] = []
         input_paths = params.get("input_paths") or []
         if isinstance(input_paths, list):
@@ -171,7 +163,10 @@ class MergeToolRunner(BaseToolRunner[MergeToolParams]):
             columns["geometry"] = "GEOMETRY"
         return columns
 
-    def process(self: Self, params: MergeToolParams, temp_dir: Path) -> tuple[Path, DatasetMetadata]:
+    def process(
+        self: Self, params: MergeToolParams, temp_dir: Path
+    ) -> tuple[Path, DatasetMetadata]:
+        """Run merge analysis."""
         resolved_items = self.resolve_layer_paths(
             params.input_paths,
             params.user_id,

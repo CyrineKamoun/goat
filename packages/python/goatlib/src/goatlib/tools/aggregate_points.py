@@ -272,7 +272,6 @@ class AggregatePointsToolRunner(BaseToolRunner[AggregatePointsToolParams]):
         if stat_op.value == "count":
             color_field = "count"
         else:
-            # Match runner output: `{field}_{op}` (e.g. ``population_sum``).
             color_field = (
                 f"{stat_field}_{stat_op.value}" if stat_field else stat_op.value
             )

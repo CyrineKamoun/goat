@@ -76,7 +76,6 @@ export default function FieldStatisticsInput({
   const safePredictedColumns =
     predictedColumns && Object.keys(predictedColumns).length > 0 ? predictedColumns : EMPTY_PREDICTED_COLUMNS;
 
-  // Opt-in via widget_options.multi (aggregate sets it; join doesn't).
   const isMultiField = useMemo(() => {
     return input.uiMeta?.widget_options?.multi === true;
   }, [input.uiMeta]);
@@ -125,9 +124,6 @@ export default function FieldStatisticsInput({
     }
   };
 
-  // Expands (operation, [f1, f2, ...]) into N FieldStatistic entries sharing
-  // the same operation. When fields are still empty we emit a placeholder so
-  // the operation persists and the field selector can render.
   const emitMultiChange = (operation: string, fieldNames: string[]) => {
     if (!operation) {
       onChange(null);

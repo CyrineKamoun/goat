@@ -258,7 +258,6 @@ class AggregatePolygonToolRunner(BaseToolRunner[AggregatePolygonToolParams]):
             if operation == "count":
                 continue  # count already added
             elif field:
-                # Match polygon runner: `{op}_{field}` (or result_name override).
                 base_name = result_name if result_name else f"{operation}_{field}"
                 col_name = cls.unique_column_name(columns, base_name)
                 columns[col_name] = "DOUBLE"

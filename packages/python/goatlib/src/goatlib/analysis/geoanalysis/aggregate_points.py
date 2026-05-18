@@ -256,7 +256,9 @@ class AggregatePointsTool(AnalysisTool):
                 LEFT JOIN total_stats t ON a.area_id = t.area_id
             """)
 
-        logger.info("Polygon aggregation completed with %d output stat columns", len(agg_specs))
+        logger.info(
+            "Polygon aggregation completed with %d output stat columns", len(agg_specs)
+        )
 
     def _aggregate_to_h3(
         self: Self,
@@ -273,7 +275,6 @@ class AggregatePointsTool(AnalysisTool):
         """
         h3_resolution = params.h3_resolution
 
-        # H3 mode references source columns unqualified (no table alias).
         agg_specs = self._build_agg_specs(params, source_prefix="")
         total_select = ", ".join(f"{sql} AS {col}" for col, sql in agg_specs)
         h3_cell_expr = (
