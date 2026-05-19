@@ -6,7 +6,7 @@ import centroid from "@turf/centroid";
 import maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Map, type MapGeoJSONFeature, type MapLayerMouseEvent, type MapRef, type ViewState } from "react-map-gl/maplibre";
+import { Map, type MapGeoJSONFeature, type MapLayerMouseEvent, type MapLayerTouchEvent, type MapRef, type ViewState } from "react-map-gl/maplibre";
 import type { ViewStateChangeEvent } from "react-map-gl/maplibre";
 import { v4 } from "uuid";
 
@@ -264,6 +264,12 @@ const MapViewer: React.FC<MapProps> = ({
   // leaves all hover-trigger features.
   const hoverPopupKeyRef = useRef<string | undefined>(undefined);
 
+  // Touch start point — used by the touch-tap fallback below. Maplibre's
+  // own tap-to-click conversion is blocked by MapboxDraw's mode
+  // handlers on touch devices, so we recognize taps ourselves from
+  // touchstart/touchend pairs.
+  const touchStartPointRef = useRef<{ x: number; y: number } | null>(null);
+
   // Resolves the effective popup trigger for a layer. Prefers the new
   // `popup` schema; falls back to the legacy `interaction.type` for
   // layers that haven't been migrated yet. Layers with no popup *and*
@@ -316,7 +322,27 @@ const MapViewer: React.FC<MapProps> = ({
     // click — those tools have their own click handlers and a stray
     // popup would fight the UX.
     if (popupInteractionsBlocked) return;
-    const { features } = e;
+    let features = e.features;
+
+    // Expand the hit-test area when no features are directly under the
+    // reported click point. Two cases this matters for:
+    //  - Touch devices: the synthetic click coordinate is reported as a
+    //    single pixel, but the finger covers many — thin features
+    //    (lines, small points) often fall outside that single pixel.
+    //  - Desktop hairline strokes: the same problem at smaller scale.
+    // Re-querying within a small bounding box recovers the feature
+    // without changing behavior when there's already a direct hit.
+    if ((!features || features.length === 0) && mapRef?.current) {
+      const TAP_BUFFER = 8;
+      const map = mapRef.current.getMap();
+      const bbox: [[number, number], [number, number]] = [
+        [e.point.x - TAP_BUFFER, e.point.y - TAP_BUFFER],
+        [e.point.x + TAP_BUFFER, e.point.y + TAP_BUFFER],
+      ];
+      features = map.queryRenderedFeatures(bbox, {
+        layers: interactiveLayerIds,
+      }) as typeof features;
+    }
 
     // Cluster click: zoom to the cluster's expansion zoom.
     // Layer-id convention from Layers.tsx: cluster layers contain `-cluster-`
@@ -525,6 +551,34 @@ const MapViewer: React.FC<MapProps> = ({
     if (onClick) {
       onClick(e);
     }
+  };
+
+  // Manual tap → click synthesis for touch devices. Maplibre's own
+  // tap-to-click recognizer doesn't fire `click` here because
+  // MapboxDraw's mode handlers preempt the tap on touch (its `onTap`
+  // runs even in idle simple_select), so we recognize taps ourselves
+  // and forward them to `handleMapClick`. Drags/pans (movement above
+  // TAP_TOLERANCE_PX) fall through to maplibre's gesture handling
+  // untouched.
+  const TAP_TOLERANCE_PX = 8;
+  const handleMapTouchStart = (e: MapLayerTouchEvent) => {
+    // Multi-touch is always a gesture (pinch/rotate), never a tap.
+    if (e.points?.length !== 1) {
+      touchStartPointRef.current = null;
+      return;
+    }
+    touchStartPointRef.current = { x: e.point.x, y: e.point.y };
+  };
+  const handleMapTouchEnd = (e: MapLayerTouchEvent) => {
+    const start = touchStartPointRef.current;
+    touchStartPointRef.current = null;
+    if (!start) return;
+    const dx = e.point.x - start.x;
+    const dy = e.point.y - start.y;
+    if (dx * dx + dy * dy > TAP_TOLERANCE_PX * TAP_TOLERANCE_PX) return;
+    // MapTouchEvent has the same `point`, `lngLat`, `features` shape
+    // that `handleMapClick` reads from, so the cast is safe.
+    handleMapClick(e as unknown as MapLayerMouseEvent);
   };
 
   const handleMapOverImmediate = (e: MapLayerMouseEvent) => {
@@ -808,6 +862,8 @@ const MapViewer: React.FC<MapProps> = ({
           attributionControl={false}
           onMoveEnd={onMoveEnd}
           onClick={handleMapClick}
+          onTouchStart={handleMapTouchStart}
+          onTouchEnd={handleMapTouchEnd}
           onMouseMove={handleMapOverImmediate}
           onMove={_onMove}
           maxBounds={maxExtent}

@@ -14,6 +14,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import { MAPBOX_TOKEN } from "@/lib/constants";
 import { DEFAULT_BASEMAP } from "@/lib/constants/basemaps";
 import { setActiveRightPanel, setGeocoderResult } from "@/lib/store/map/slice";
+import type { PopupProperties } from "@/lib/validations/layer";
 import type { CustomBasemap } from "@/lib/validations/project";
 import { projectSchema } from "@/lib/validations/project";
 
@@ -31,14 +32,15 @@ import AttributionControl from "@/components/map/controls/Attribution";
 import { BaseMapSelectorList, BasemapSelectorButton } from "@/components/map/controls/BasemapSelector";
 import { CustomBasemapDialog } from "@/components/map/controls/CustomBasemapDialog";
 import Geocoder from "@/components/map/controls/Geocoder";
-import type { DetailsViewType } from "@/components/map/controls/LayerInfo";
-import { LayerInfo } from "@/components/map/controls/LayerInfo";
 import Scalebar from "@/components/map/controls/Scalebar";
 import { UserLocation } from "@/components/map/controls/UserLocation";
 import { Zoom } from "@/components/map/controls/Zoom";
 import type { PublicProjectLayoutProps } from "@/components/map/layouts/desktop/PublicProjectLayout";
 import PropertiesPanel from "@/components/map/panels/properties/Properties";
+import { buildLayerIcon } from "@/components/map/panels/layer/legend/LayerIcon";
+import { seedPopupFromInteraction } from "@/components/map/panels/style/popup/seedFromLegacy";
 import SimpleLayerStyle from "@/components/map/panels/style/SimpleLayerStyle";
+import { PopupContent } from "@/components/map/popover/MapFeaturePopover";
 
 import "@/styles/swiper.css";
 
@@ -101,17 +103,23 @@ const Puller = styled("div")(({ theme }) => ({
   }),
 }));
 
-// --- InfoHeader (Unchanged) ---
+// --- InfoHeader ---
 interface InfoHeaderProps {
   title: string;
   onClose: () => void;
   iconName?: ICON_NAME;
+  /**
+   * Optional custom icon node — e.g. a `<LayerIcon>` built from the
+   * layer's style so the feature popup's header matches what the
+   * Layers panel shows. Takes precedence over `iconName`.
+   */
+  icon?: React.ReactNode;
 }
-export const InfoHeader: React.FC<InfoHeaderProps> = ({ title, iconName, onClose }) => {
+export const InfoHeader: React.FC<InfoHeaderProps> = ({ title, iconName, icon, onClose }) => {
   return (
     <Stack sx={{ pl: 4, pr: 2, pt: 2 }} direction="row" alignItems="center" justifyContent="space-between">
       <Stack direction="row" spacing={2} alignItems="center" sx={{ width: "90%" }}>
-        {iconName && <Icon iconName={iconName} fontSize="small" />}
+        {icon ? icon : iconName && <Icon iconName={iconName} fontSize="small" />}
         <Typography variant="body1" fontWeight="bold" noWrap>
           {title}
         </Typography>
@@ -150,7 +158,12 @@ const MobileProjectLayout = ({
   // --- State ---
   const [open, setOpen] = useState(false); // Drawer open/closed state
   const [drawerView, setDrawerView] = useState<DrawerView>("default"); // Explicit view state
-  const [layerInfoDetailsView, setLayerInfoDetailsView] = useState<DetailsViewType | undefined>(undefined);
+  // Snapshot of the drawer's open state taken when the user enters a
+  // non-default view (layerInfo / basemapSelector / layerSettings).
+  // `handleCloseView` restores this so closing a special view returns
+  // the drawer to its prior state instead of forcing it to stay open
+  // on the default view.
+  const openBeforeSpecialViewRef = useRef<boolean>(false);
 
   // --- Redux State ---
   const layerInfo = useAppSelector((state) => state.map.popupInfo);
@@ -165,6 +178,39 @@ const MobileProjectLayout = ({
     }
     return null;
   }, [selectedLayerIds, projectLayers]);
+
+  // Resolve the popup config + layer for the currently-clicked feature.
+  // Mirrors the resolution used by `MapViewer` / `MapFixedPopupSlot`:
+  //  - prefer the new `popup` block on the layer
+  //  - fall back to a default seeded from the legacy `interaction`
+  // Layers without either still get a sensible "show all fields"
+  // popup courtesy of seedPopupFromInteraction.
+  const clickedPopupLayer = useMemo(() => {
+    if (!layerInfo?.layerId) return undefined;
+    const target = layerInfo.layerId;
+    return projectLayers.find(
+      (l) =>
+        (l as { layer_id?: string }).layer_id === target ||
+        l.id.toString() === target,
+    );
+  }, [layerInfo?.layerId, projectLayers]);
+  const activePopupConfig = useMemo<PopupProperties | undefined>(() => {
+    if (!clickedPopupLayer) return undefined;
+    const props = clickedPopupLayer.properties as
+      | {
+          popup?: PopupProperties;
+          interaction?: { type?: string; content?: never[] };
+        }
+      | undefined;
+    if (props?.popup) return props.popup;
+    return seedPopupFromInteraction(props?.interaction);
+  }, [clickedPopupLayer]);
+  // Layer-style icon for the popup header (same look as the Layers panel
+  // and the desktop popup).
+  const clickedPopupLayerIcon = useMemo(
+    () => buildLayerIcon(clickedPopupLayer),
+    [clickedPopupLayer],
+  );
 
   // --- Hooks ---
   const { translatedBaseMaps, activeBasemap } = useBasemap(project);
@@ -185,16 +231,22 @@ const MobileProjectLayout = ({
         dispatch(setActiveRightPanel(undefined));
       }
 
+      // Snapshot the drawer state on the first transition from
+      // default into any special view, so we can restore it on close.
+      // Don't overwrite mid-flight (e.g. layerInfo → basemap → close).
+      if (drawerView === "default") {
+        openBeforeSpecialViewRef.current = open;
+      }
       // When a feature is selected, switch to layerInfo view and open drawer
       setDrawerView("layerInfo");
-      setLayerInfoDetailsView(undefined); // Reset details view when feature changes
       setOpen(true);
     } else {
-      // When a feature is deselected (layerInfo becomes null)
-      // If the current view is 'layerInfo', switch back to 'default'
-      // We keep the drawer open, user can swipe down if they want.
+      // When a feature is deselected externally (e.g. user clicks
+      // empty map area → handlePopoverClose), drop back to default
+      // and restore the pre-view open state.
       if (drawerView === "layerInfo") {
         setDrawerView("default");
+        setOpen(openBeforeSpecialViewRef.current);
       }
     }
     // Only react to changes in layerInfo itself
@@ -210,8 +262,10 @@ const MobileProjectLayout = ({
       }
 
       if (activeRightPanel === MapSidebarItemID.PROPERTIES || activeRightPanel === MapSidebarItemID.STYLE) {
+        if (drawerView === "default") {
+          openBeforeSpecialViewRef.current = open;
+        }
         setDrawerView("layerSettings");
-        setLayerInfoDetailsView(undefined);
         setOpen(true);
       }
     }
@@ -226,6 +280,7 @@ const MobileProjectLayout = ({
         dispatch(setActiveRightPanel(undefined));
       }
       setDrawerView("default");
+      setOpen(openBeforeSpecialViewRef.current);
     }
   }, [drawerView, activeLayer, activeRightPanel, dispatch]);
 
@@ -253,10 +308,12 @@ const MobileProjectLayout = ({
       dispatch(setActiveRightPanel(undefined));
     }
 
-    // Reset the view to default
+    // Reset the view to default and restore the drawer's pre-view
+    // open state. If the user tapped a feature / opened basemap from
+    // a closed drawer, the drawer collapses again now; if the default
+    // view was already up, it stays up.
     setDrawerView("default");
-    // Keep the drawer open, allowing user to see default view or swipe down
-    setOpen(true);
+    setOpen(openBeforeSpecialViewRef.current);
   };
 
   // Handles clicks on the BasemapSelectorButton
@@ -271,8 +328,10 @@ const MobileProjectLayout = ({
       dispatch(setActiveRightPanel(undefined));
     }
 
+    if (drawerView === "default") {
+      openBeforeSpecialViewRef.current = open;
+    }
     setDrawerView("basemapSelector");
-    setLayerInfoDetailsView(undefined); // Ensure details view is reset
     setOpen(true);
   };
 
@@ -433,8 +492,15 @@ const MobileProjectLayout = ({
               {currentHeaderInfo && (
                 <InfoHeader
                   title={currentHeaderInfo.title}
-                  iconName={currentHeaderInfo.icon}
-                  onClose={handleCloseView} // Use unified close handler
+                  // For the feature popup view, pass the layer's own
+                  // style icon (same affordance as the desktop popup
+                  // and the Layers panel) instead of the generic
+                  // ICON_NAME so users can recognize the layer at a
+                  // glance. Other drawer views keep using `iconName`.
+                  {...(drawerView === "layerInfo" && clickedPopupLayerIcon
+                    ? { icon: clickedPopupLayerIcon }
+                    : { iconName: currentHeaderInfo.icon })}
+                  onClose={handleCloseView}
                 />
               )}
               {/* Pagination container, visibility controlled by GlobalSwiperStyles */}
@@ -454,13 +520,23 @@ const MobileProjectLayout = ({
             // Attach touch move handler to prevent drawer swipe when scrolling content
             onTouchMove={handleContentTouchMove}>
             {/* Conditional Rendering based on drawerView */}
-            {drawerView === "layerInfo" && layerInfo && (
-              <LayerInfo
-                // Use key to force re-mount when feature changes, ensuring fresh state
+            {drawerView === "layerInfo" && layerInfo && activePopupConfig && (
+              <PopupContent
+                // Force re-mount when the clicked feature changes so the
+                // block list refreshes against the new feature properties.
                 key={highlightedFeature?.id ?? layerInfo.title ?? v4()}
-                {...layerInfo}
-                detailsView={layerInfoDetailsView}
-                setDetailsView={setLayerInfoDetailsView}
+                layerId={layerInfo.layerId ?? ""}
+                popup={activePopupConfig}
+                properties={
+                  (layerInfo.featureProperties ??
+                    highlightedFeature?.properties ??
+                    layerInfo.properties ??
+                    {}) as Record<string, unknown>
+                }
+                // The drawer already owns its scrollable content area,
+                // so neutralize PopupContent's internal scroll/maxHeight
+                // affordance — the surrounding drawer body provides it.
+                sx={{ overflowY: "visible", maxHeight: "none", px: 1.5, py: 1 }}
               />
             )}
 

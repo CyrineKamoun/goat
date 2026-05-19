@@ -79,20 +79,7 @@ function PopoverBody({
   onClose,
   layerIcon,
 }: MapFeaturePopoverProps) {
-  const { i18n } = useTranslation("common");
   const theme = useTheme();
-  const { layerFields } = useLayerFields(layerId);
-  const { byColumn } = useMemo(
-    () =>
-      formatFeatureProperties({
-        properties: properties as Record<string, unknown>,
-        layerFields: layerFields as LayerField[],
-        lang: i18n.language,
-      }),
-    [properties, layerFields, i18n.language],
-  );
-
-  const thumbColor = alpha(theme.palette.text.primary, 0.3);
 
   return (
     <Box
@@ -111,67 +98,133 @@ function PopoverBody({
         maxHeight: "min(420px, 60vh)",
       }}>
       {popup.show_layer_header && (
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          sx={{
-            px: 1.75,
-            py: 1.75,
-            flexShrink: 0,
-            borderBottom: 1,
-            // Note: MUI's `alpha()` replaces (not multiplies) the alpha
-            // channel, so wrapping `divider` (already ~12%) in `alpha`
-            // actually made the line heavier. Use a light gray derived
-            // from text.primary at ~8% opacity for a softer separation
-            // that adapts to light/dark themes.
-            borderColor: alpha(theme.palette.text.primary, 0.08),
-          }}>
-          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
-            {layerIcon !== undefined ? (
-              // Caller supplies a LayerIcon (or any node) that matches the
-              // layer's style — same affordance the Layers panel uses.
-              <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-                {layerIcon}
-              </Box>
-            ) : (
-              <Icon
-                iconName={ICON_NAME.LAYERS}
-                style={{ fontSize: 14 }}
-                htmlColor={alpha(theme.palette.text.primary, 0.5)}
-              />
-            )}
-            <Typography
-              variant="body2"
-              fontWeight={600}
-              sx={{
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}>
-              {layerName}
-            </Typography>
-          </Stack>
-          <IconButton
-            disableRipple
-            size="small"
-            onClick={onClose}
-            sx={{
-              p: 0.5,
-              ml: 1,
-              color: alpha(theme.palette.text.primary, 0.55),
-              "&:hover": {
-                bgcolor: "transparent",
-                color: theme.palette.text.primary,
-              },
-            }}>
-            <Icon iconName={ICON_NAME.XCLOSE} style={{ fontSize: 14 }} />
-          </IconButton>
-        </Stack>
+        <PopupHeader layerName={layerName} layerIcon={layerIcon} onClose={onClose} />
       )}
-      <Stack
-        spacing={1}
+      <PopupContent layerId={layerId} popup={popup} properties={properties} />
+    </Box>
+  );
+}
+
+/**
+ * Standard popup header — layer icon + name + close button. Exported so
+ * the mobile bottom sheet can use it for its "layerInfo" view and
+ * match the desktop popup's chrome 1:1. The icon falls back to a
+ * generic layers glyph when the caller doesn't pass a LayerIcon.
+ */
+export function PopupHeader({
+  layerName,
+  layerIcon,
+  onClose,
+}: {
+  layerName: string;
+  layerIcon?: ReactNode;
+  onClose: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Stack
+      direction="row"
+      alignItems="center"
+      justifyContent="space-between"
+      sx={{
+        px: 1.75,
+        py: 1.75,
+        flexShrink: 0,
+        borderBottom: 1,
+        // Note: MUI's `alpha()` replaces (not multiplies) the alpha
+        // channel, so wrapping `divider` (already ~12%) in `alpha`
+        // actually made the line heavier. Use a light gray derived
+        // from text.primary at ~8% opacity for a softer separation
+        // that adapts to light/dark themes.
+        borderColor: alpha(theme.palette.text.primary, 0.08),
+      }}>
+      <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+        {layerIcon !== undefined ? (
+          // Caller supplies a LayerIcon (or any node) that matches the
+          // layer's style — same affordance the Layers panel uses.
+          <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+            {layerIcon}
+          </Box>
+        ) : (
+          <Icon
+            iconName={ICON_NAME.LAYERS}
+            style={{ fontSize: 14 }}
+            htmlColor={alpha(theme.palette.text.primary, 0.5)}
+          />
+        )}
+        <Typography
+          variant="body2"
+          fontWeight={600}
+          sx={{
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
+          {layerName}
+        </Typography>
+      </Stack>
+      <IconButton
+        disableRipple
+        size="small"
+        onClick={onClose}
         sx={{
+          p: 0.5,
+          ml: 1,
+          color: alpha(theme.palette.text.primary, 0.55),
+          "&:hover": {
+            bgcolor: "transparent",
+            color: theme.palette.text.primary,
+          },
+        }}>
+        <Icon iconName={ICON_NAME.XCLOSE} style={{ fontSize: 14 }} />
+      </IconButton>
+    </Stack>
+  );
+}
+
+/**
+ * Renders the body of a popup — block list (simple mode) or sanitized
+ * HTML (html mode). Extracted from `PopoverBody` so the mobile bottom
+ * sheet (and any other host that already provides its own chrome)
+ * can reuse the same block rendering without duplicating fetching /
+ * formatting / scrolling concerns.
+ *
+ * `sx` overrides the scrollable container's styles. Callers that
+ * already supply their own scroll affordance (e.g. the mobile drawer)
+ * pass `{ overflowY: "visible", maxHeight: "none" }` to keep the host's
+ * scroll behavior.
+ */
+export function PopupContent({
+  layerId,
+  popup,
+  properties,
+  sx,
+}: {
+  layerId: string;
+  popup: PopupProperties;
+  properties: Record<string, unknown>;
+  sx?: import("@mui/material").SxProps<import("@mui/material").Theme>;
+}) {
+  const { i18n } = useTranslation("common");
+  const theme = useTheme();
+  const { layerFields } = useLayerFields(layerId);
+  const { byColumn } = useMemo(
+    () =>
+      formatFeatureProperties({
+        properties,
+        layerFields: layerFields as LayerField[],
+        lang: i18n.language,
+      }),
+    [properties, layerFields, i18n.language],
+  );
+
+  const thumbColor = alpha(theme.palette.text.primary, 0.3);
+
+  return (
+    <Stack
+      spacing={1}
+      sx={[
+        {
           px: 1.25,
           py: 1.5,
           flex: 1,
@@ -204,30 +257,31 @@ function PopoverBody({
           "&::-webkit-scrollbar-thumb:hover": {
             background: alpha(theme.palette.text.primary, 0.45),
           },
-        }}>
-        {popup.mode === "simple" ? (
-          popup.blocks.map((b) => (
-            <PopupBlockRenderer
-              key={b.id}
-              block={b}
-              valuesByColumn={byColumn}
-              rawValues={properties as Record<string, unknown>}
-              layerFields={layerFields as LayerField[]}
-              lang={i18n.language}
-            />
-          ))
-        ) : (
-          <Box
-            sx={{
-              "& p": { m: 0 },
-              "& > *:not(:last-child)": { mb: 1 },
-            }}
-            dangerouslySetInnerHTML={{
-              __html: sanitizePopupHtml(substituteTokens(popup.html, byColumn)),
-            }}
+        },
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}>
+      {popup.mode === "simple" ? (
+        popup.blocks.map((b) => (
+          <PopupBlockRenderer
+            key={b.id}
+            block={b}
+            valuesByColumn={byColumn}
+            rawValues={properties}
+            layerFields={layerFields as LayerField[]}
+            lang={i18n.language}
           />
-        )}
-      </Stack>
-    </Box>
+        ))
+      ) : (
+        <Box
+          sx={{
+            "& p": { m: 0 },
+            "& > *:not(:last-child)": { mb: 1 },
+          }}
+          dangerouslySetInnerHTML={{
+            __html: sanitizePopupHtml(substituteTokens(popup.html, byColumn)),
+          }}
+        />
+      )}
+    </Stack>
   );
 }
