@@ -284,9 +284,21 @@ const LayerStylePanel = ({ projectId }: { projectId: string }) => {
             newStyle[`${updateType}_range`].category = matchingPalette.category;
             newStyle[`${updateType}_range`].type = matchingPalette.type;
           }
-        } else {
-          // Palette changed but the attribute field and its values are unchanged —
-          // remap colors onto the existing value assignments without hitting the API.
+        } else if (currentRange?.type !== "custom") {
+          // Preset → preset (or preset → custom by palette swap): the
+          // user just picked a different palette. The field and its
+          // values are unchanged, so remap the new palette's colors
+          // onto the existing value assignments without hitting the
+          // API.
+          //
+          // We deliberately skip this branch when the incoming range
+          // is `type: "custom"` — that flag means the user just
+          // applied edits via the CustomColorScale popper (added a
+          // row, multi-valued a row, recolored, etc.). Their edits
+          // already live on `newStyle.color_range.color_map`; rebuilding
+          // from `existingColorMap` would erase rows the user added
+          // and revert multi-value selections to the snapshot from
+          // before they opened the popper.
           const newColors = currentRange?.colors ?? [];
           const entryCount = Math.min(existingColorMap.length, newColors.length);
           if (entryCount > 0) {
