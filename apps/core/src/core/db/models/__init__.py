@@ -13,6 +13,7 @@ from .data_store import DataStore
 from .folder import Folder
 from .layer import Layer
 from .organization import Organization
+from .organization_analytics import OrganizationAnalytics
 from .organization_domain import OrganizationDomain
 from .project import Project
 from .report_layout import ReportLayout

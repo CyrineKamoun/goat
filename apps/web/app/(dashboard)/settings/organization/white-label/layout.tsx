@@ -58,9 +58,6 @@ const WhiteLabelLayout = (props: WhiteLabelLayoutProps) => {
   const pathname = usePathname();
   const { t } = useTranslation("common");
 
-  // v1 ships only Custom Domains. Analytics is shown as a disabled tab so
-  // the IA telegraphs what's coming next; flip `disabled: false` (and drop
-  // `tooltip`) when the analytics feature ships.
   const navigation: WhiteLabelTab[] = [
     {
       link: "/domains",
@@ -73,8 +70,6 @@ const WhiteLabelLayout = (props: WhiteLabelLayoutProps) => {
       icon: ICON_NAME.CHART,
       label: t("analytics"),
       current: pathname?.includes("/analytics"),
-      disabled: true,
-      tooltip: t("coming_soon"),
     },
   ];
 

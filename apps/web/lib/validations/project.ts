@@ -264,12 +264,20 @@ export const projectPublicSchemaConfig = z.object({
   layer_groups: z.array(projectLayerGroupSchema).optional().default([]),
 });
 
+export const projectPublicAnalyticsSchema = z.object({
+  provider: z.string(),
+  config: z.record(z.unknown()),
+});
+
 export const projectPublicSchema = z.object({
   created_at: z.string(),
   updated_at: z.string(),
   project_id: z.string(),
   config: projectPublicSchemaConfig,
   custom_domain_id: z.string().uuid().nullable().optional(),
+  tracking_enabled: z.boolean().optional(),
+  tracking_require_consent: z.boolean().optional(),
+  analytics: projectPublicAnalyticsSchema.nullable().optional(),
 });
 
 export const projectLayerTreeNodeSchema = z.object({
