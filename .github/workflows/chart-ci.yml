@@ -11,6 +11,12 @@ on:
     paths:
       - 'charts/goat/**'
 
+# Minimum permissions per CodeQL "actions/missing-workflow-permissions".
+# This workflow only checks out the repo and runs read-only validations
+# (helm lint/template, kubeconform). No writes to anything.
+permissions:
+  contents: read
+
 jobs:
   lint-and-template:
     runs-on: ubuntu-latest
@@ -52,9 +58,15 @@ jobs:
             -f charts/goat/ci/values-bundled.yaml > /tmp/bundled.yaml
           wc -l /tmp/bundled.yaml
 
+      # Skip `CustomResourceDefinition` validation: the cnpg sub-chart ships its
+      # own CRDs and kubeconform doesn't have schemas for them. We rely on the
+      # sub-chart's pinned version (Chart.lock) for CRD correctness; we still
+      # validate every Custom Resource INSTANCE (e.g. `Cluster`) via the
+      # datreeio catalog schema-location URL.
       - name: kubeconform — external-deps
         run: |
           kubeconform -strict -kubernetes-version 1.30.0 \
+            -skip CustomResourceDefinition \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             -summary /tmp/external-deps.yaml
@@ -62,6 +74,7 @@ jobs:
       - name: kubeconform — bundled
         run: |
           kubeconform -strict -kubernetes-version 1.30.0 \
+            -skip CustomResourceDefinition \
             -schema-location default \
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
             -summary /tmp/bundled.yaml
