@@ -1,0 +1,80 @@
+# /home/p4b/goat/.github/workflows/chart-ci.yml
+name: Chart CI
+
+on:
+  pull_request:
+    paths:
+      - 'charts/goat/**'
+      - '.github/workflows/chart-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'charts/goat/**'
+
+# Minimum permissions per CodeQL "actions/missing-workflow-permissions".
+# This workflow only checks out the repo and runs read-only validations
+# (helm lint/template, kubeconform). No writes to anything.
+permissions:
+  contents: read
+
+jobs:
+  lint-and-template:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Install helm-unittest plugin
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v0.4.4
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL -o /tmp/kubeconform.tgz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.4/kubeconform-linux-amd64.tar.gz
+          sudo tar -xz -C /usr/local/bin -f /tmp/kubeconform.tgz kubeconform
+
+      - name: Update dependencies
+        run: helm dependency update charts/goat/
+
+      - name: helm lint
+        run: helm lint --strict charts/goat/
+
+      - name: helm unittest
+        run: helm unittest charts/goat/
+
+      - name: Render external-deps profile
+        run: |
+          helm template ci-ext charts/goat/ \
+            -f charts/goat/ci/values-external-deps.yaml > /tmp/external-deps.yaml
+          wc -l /tmp/external-deps.yaml
+
+      - name: Render bundled profile
+        run: |
+          helm template ci-bun charts/goat/ \
+            -f charts/goat/ci/values-bundled.yaml > /tmp/bundled.yaml
+          wc -l /tmp/bundled.yaml
+
+      # Skip `CustomResourceDefinition` validation: the cnpg sub-chart ships its
+      # own CRDs and kubeconform doesn't have schemas for them. We rely on the
+      # sub-chart's pinned version (Chart.lock) for CRD correctness; we still
+      # validate every Custom Resource INSTANCE (e.g. `Cluster`) via the
+      # datreeio catalog schema-location URL.
+      - name: kubeconform — external-deps
+        run: |
+          kubeconform -strict -kubernetes-version 1.30.0 \
+            -skip CustomResourceDefinition \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -summary /tmp/external-deps.yaml
+
+      - name: kubeconform — bundled
+        run: |
+          kubeconform -strict -kubernetes-version 1.30.0 \
+            -skip CustomResourceDefinition \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            -summary /tmp/bundled.yaml

@@ -1,0 +1,72 @@
+name: Chart Release
+
+on:
+  push:
+    tags:
+      - 'chart-v*'
+
+permissions:
+  contents: write     # for GitHub Release
+  packages: write     # for ghcr.io push
+  id-token: write     # for cosign keyless signing
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.2.4
+
+      - name: Extract chart version from tag
+        id: ver
+        run: |
+          TAG="${GITHUB_REF#refs/tags/chart-v}"
+          echo "version=${TAG}" >> "$GITHUB_OUTPUT"
+          # sanity check: Chart.yaml version must match the tag
+          CHART_VERSION=$(grep '^version:' charts/goat/Chart.yaml | awk '{print $2}')
+          if [ "$CHART_VERSION" != "$TAG" ]; then
+            echo "::error::Chart.yaml version ($CHART_VERSION) does not match tag ($TAG)"
+            exit 1
+          fi
+
+      - name: Update dependencies
+        run: helm dependency update charts/goat/
+
+      - name: Package chart
+        run: helm package charts/goat/ --destination /tmp/
+
+      - name: Log in to ghcr.io
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
+          -u "${{ github.actor }}" --password-stdin
+
+      - name: Push chart to OCI registry
+        id: push
+        run: |
+          OUTPUT=$(helm push /tmp/goat-${{ steps.ver.outputs.version }}.tgz \
+                   oci://ghcr.io/plan4better/charts 2>&1)
+          echo "$OUTPUT"
+          DIGEST=$(echo "$OUTPUT" | grep 'Digest:' | awk '{print $2}')
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Sign chart with cosign (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign sign --yes \
+            ghcr.io/plan4better/charts/goat@${{ steps.push.outputs.digest }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Chart v${{ steps.ver.outputs.version }}
+          files: /tmp/goat-${{ steps.ver.outputs.version }}.tgz
+          generate_release_notes: true

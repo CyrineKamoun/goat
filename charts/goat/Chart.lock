@@ -1,0 +1,9 @@
+dependencies:
+- name: cloudnative-pg
+  repository: https://cloudnative-pg.github.io/charts
+  version: 0.22.1
+- name: redis
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 20.5.0
+digest: sha256:f88adb898b9eebbd79f2314a3248b7c2567269be3bf2c04599883ad8103e5d6b
+generated: "2026-05-23T20:23:06.073318649Z"
