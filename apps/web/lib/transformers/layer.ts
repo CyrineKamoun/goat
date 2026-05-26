@@ -275,6 +275,8 @@ export function transformToMapboxLayerStyleSpec(data: ProjectLayer | Layer) {
       "line-width": getMapboxStyleSize(data, "stroke_width"),
     };
     if (dashArray) paint["line-dasharray"] = dashArray;
+    const offset = lineProperties.stroke_offset;
+    if (offset) paint["line-offset"] = offset;
 
     return {
       type: "line",

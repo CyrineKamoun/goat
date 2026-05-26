@@ -2312,6 +2312,8 @@
   "decoration_spacing": "Pfeilabstand",
   "line_cap": "Linienende",
   "line_join": "Linienverbindung",
+  "line_offset": "Versatz",
+  "line_offset_helper": "Nur visuell — Auswahl und Fangen verwenden weiterhin die Originalgeometrie.",
   "butt": "Stumpf",
   "round": "Rund",
   "square": "Quadratisch",

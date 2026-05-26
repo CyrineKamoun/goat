@@ -2314,6 +2314,8 @@
   "decoration_spacing": "Arrow spacing",
   "line_cap": "Cap",
   "line_join": "Join",
+  "line_offset": "Offset",
+  "line_offset_helper": "Visual shift only — hit-testing and snapping still use the original geometry.",
   "butt": "Butt",
   "round": "Round",
   "square": "Square",

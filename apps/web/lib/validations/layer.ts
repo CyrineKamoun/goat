@@ -173,6 +173,10 @@ export const lineStyleSchema = z.object({
   stroke_dash_density: z.enum(["tight", "normal", "loose"]).default("normal"),
   stroke_cap: z.enum(["butt", "round", "square"]).default("butt"),
   stroke_join: z.enum(["bevel", "round", "miter"]).default("miter"),
+  // Perpendicular pixel offset from the line geometry; positive shifts to
+  // the right of the line direction, negative to the left. Purely visual —
+  // hit-testing/snapping still uses the unshifted geometry.
+  stroke_offset: z.number().min(-50).max(50).catch(0).default(0),
   // "decoration" is the cartography term for repeating symbols along a line.
   // Generic so v2 can add "chevron" / "dot" / "tick" without a migration.
   decoration_type: z.enum(["none", "arrow"]).default("none"),

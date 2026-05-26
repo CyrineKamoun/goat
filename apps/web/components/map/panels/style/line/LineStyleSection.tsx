@@ -50,6 +50,7 @@ const LineStyleSection = ({ layerProperties, onStyleChange }: LineStyleSectionPr
   const decorationAllowOverlap = (lineProps.decoration_allow_overlap ?? true) as boolean;
   const cap = (lineProps.stroke_cap ?? "butt") as StrokeCap;
   const join = (lineProps.stroke_join ?? "miter") as StrokeJoin;
+  const offset = (lineProps.stroke_offset ?? 0) as number;
 
   const arrowDropdown: ArrowDropdownValue =
     decorationType === "none" ? "none" : decorationDirection;
@@ -59,6 +60,7 @@ const LineStyleSection = ({ layerProperties, onStyleChange }: LineStyleSectionPr
   // from props when the active layer or its persisted value changes.
   const [sizeDraft, setSizeDraft] = useState<number>(decorationSize);
   const [spacingDraft, setSpacingDraft] = useState<number>(decorationSpacing);
+  const [offsetDraft, setOffsetDraft] = useState<number>(offset);
 
   useEffect(() => {
     setSizeDraft(decorationSize);
@@ -67,6 +69,10 @@ const LineStyleSection = ({ layerProperties, onStyleChange }: LineStyleSectionPr
   useEffect(() => {
     setSpacingDraft(decorationSpacing);
   }, [decorationSpacing]);
+
+  useEffect(() => {
+    setOffsetDraft(offset);
+  }, [offset]);
 
   const patch = (partial: Partial<FeatureLayerProperties>) => {
     onStyleChange({ ...layerProperties, ...partial } as FeatureLayerProperties);
@@ -250,6 +256,23 @@ const LineStyleSection = ({ layerProperties, onStyleChange }: LineStyleSectionPr
                 <MenuItem value="round">{t("round")}</MenuItem>
                 <MenuItem value="miter">{t("miter")}</MenuItem>
               </Select>
+            </Stack>
+            <Stack spacing={1}>
+              {fieldLabel(t("line_offset"))}
+              <SliderInput
+                value={offsetDraft}
+                isRange={false}
+                min={-50}
+                max={50}
+                step={1}
+                onChange={(v) => setOffsetDraft(v as number)}
+                onChangeCommitted={(v) =>
+                  patch({ stroke_offset: v as number } as Partial<FeatureLayerProperties>)
+                }
+              />
+              <Typography variant="caption" color={theme.palette.text.secondary}>
+                {t("line_offset_helper")}
+              </Typography>
             </Stack>
           </Stack>
         }
