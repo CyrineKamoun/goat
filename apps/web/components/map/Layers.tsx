@@ -644,13 +644,20 @@ const Layers = (props: LayersProps) => {
                 ): FilterSpecification | undefined =>
                   mergeAtlasFilter(mergeEditExclusion(baseFilter));
 
-                const linePlacement =
+                // Only send ?decoration=... when decoration is actually enabled
+                // for the layer — sending it when type === "none" forces dynamic
+                // tile generation on the backend (PMTiles is bypassed if the
+                // request has a decoration param).
+                const lineProps =
                   layer.feature_layer_geometry_type === "line"
-                    ? ((layer.properties as FeatureLayerLineProperties)?.decoration_placement ?? "repeat")
-                    : "repeat";
+                    ? (layer.properties as FeatureLayerLineProperties | undefined)
+                    : undefined;
                 const decorationParam =
-                  linePlacement !== "repeat"
-                    ? (linePlacement as "start" | "end" | "start_and_end" | "center")
+                  lineProps?.decoration_type &&
+                  lineProps.decoration_type !== "none" &&
+                  lineProps.decoration_placement &&
+                  lineProps.decoration_placement !== "repeat"
+                    ? (lineProps.decoration_placement as "start" | "end" | "start_and_end" | "center")
                     : null;
 
                 return (
