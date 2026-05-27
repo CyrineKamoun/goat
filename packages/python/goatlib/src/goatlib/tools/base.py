@@ -117,10 +117,13 @@ class ToolSettings:
     # Schema for customer tables
     customer_schema: str = "customer"
 
-    # Routing settings
-    goat_routing_url: str = "http://localhost:8200/api/v2/routing"
+    # Routing settings (HTTP routing service is retired; in-process routing
+    # uses street_network_*/pt_network_* paths in goatlib.config.base instead).
+    # These fields remain as None for backward compatibility with any unreachable
+    # v1 catchment_area code that may still reference them.
+    goat_routing_url: str | None = None
     goat_routing_authorization: str | None = None
-    r5_url: str = "http://localhost:7070"
+    r5_url: str | None = None
     r5_region_mapping_path: str | None = None
 
     # Geocoding settings
@@ -286,15 +289,6 @@ class ToolSettings:
             or cls._get_secret("S3_REGION", "us-east-1"),
             s3_bucket_name=cls._get_secret("S3_BUCKET_NAME", ""),
             customer_schema=cls._get_secret("CUSTOMER_SCHEMA", "customer"),
-            goat_routing_url=cls._get_secret(
-                "GOAT_ROUTING_URL", "http://goat-dev:8200/api/v2/routing"
-            ),
-            goat_routing_authorization=cls._get_secret("GOAT_ROUTING_AUTHORIZATION", "")
-            or None,
-            r5_url=cls._get_secret("R5_URL", "https://r5.routing.plan4better.de"),
-            r5_region_mapping_path=cls._get_secret(
-                "R5_REGION_MAPPING_PATH", "/app/data/gtfs/r5_region_mapping.parquet"
-            ),
             geocoding_url=cls._get_secret("GEOCODING_URL", "") or None,
             geocoding_authorization=cls._get_secret("GEOCODING_AUTHORIZATION", "")
             or None,

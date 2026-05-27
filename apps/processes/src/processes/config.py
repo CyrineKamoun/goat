@@ -119,16 +119,6 @@ class Settings(BaseSettings):
     # Print worker URL (for PrintReport tool to render pages)
     PRINT_BASE_URL: str = os.getenv("PRINT_BASE_URL", "http://goat-web:3000")
 
-    # Routing settings for catchment area tools
-    GOAT_ROUTING_URL: str = os.getenv(
-        "GOAT_ROUTING_URL", "http://goat-routing:8200/api/v2/routing"
-    )
-    GOAT_ROUTING_AUTHORIZATION: Optional[str] = os.getenv("GOAT_ROUTING_AUTHORIZATION")
-    R5_URL: str = os.getenv("R5_URL", "https://r5.routing.plan4better.de")
-    R5_REGION_MAPPING_PATH: str = os.getenv(
-        "R5_REGION_MAPPING_PATH", "/app/config/r5_region_mapping.json"
-    )
-
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -26,8 +26,10 @@ class RoutingSettings(BaseSettingsModel):
     # Shared authorization for all routing services
     routing_authorization: str | None = None
 
-    # GOAT Routing service
-    goat_routing_url: str = "http://localhost:8200/api/v2/routing"
+    # Retained for backward compatibility with v1 catchment_area code paths that
+    # are no longer reachable from the tool registry but still construct
+    # CatchmentAreaTool() (e.g. legacy tests). New code should not depend on this.
+    goat_routing_url: str | None = None
 
     # Local C++ routing backend paths
     street_network_edges_base_path: str = "/app/data/street_network/edges"
