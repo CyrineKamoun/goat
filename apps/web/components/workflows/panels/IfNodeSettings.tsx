@@ -28,9 +28,14 @@ import { v4 as uuidv4 } from "uuid";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
+import { apiRequestAuth } from "@/lib/api/fetcher";
+import { predictNodeSchema, useWorkflowMetadata } from "@/lib/api/workflows";
+import type { InputSchemaInfo } from "@/lib/api/workflows";
+import { GEOAPI_BASE_URL } from "@/lib/constants";
 import type { AppDispatch, RootState } from "@/lib/store";
 import {
   selectNodes,
+  selectSelectedWorkflowId,
   selectVariables,
 } from "@/lib/store/workflow/selectors";
 import { updateNode } from "@/lib/store/workflow/slice";
@@ -40,18 +45,89 @@ import {
 } from "@/lib/validations/filter";
 import {
   type IfNodeData,
-  type IfSpatialExpression,
   type IfStatisticExpression,
   type WorkflowNode,
   type WorkflowVariable,
 } from "@/lib/validations/workflow";
 
 import type { LayerFieldType } from "@/lib/validations/layer";
+import type { ProjectLayer } from "@/lib/validations/project";
 
 import type { SelectorItem } from "@/types/map/common";
 
 import useLayerFields from "@/hooks/map/CommonHooks";
 import useLogicalExpressionOperations from "@/hooks/map/FilteringHooks";
+
+/** Normalize a workflow-metadata column type (DuckDB SQL flavor) to the
+ *  "string"/"number"/"date"/"boolean"/"object" categories the filter UI
+ *  expects. Matches the normalization used by useLayerFields. */
+const normalizeMetadataType = (raw: string): string => {
+  const t = raw.toUpperCase();
+  if (
+    t.includes("INT") ||
+    t === "DOUBLE" ||
+    t === "FLOAT" ||
+    t === "REAL" ||
+    t.startsWith("DECIMAL") ||
+    t.startsWith("NUMERIC")
+  ) {
+    return "number";
+  }
+  if (t === "BOOLEAN" || t === "BOOL") return "boolean";
+  if (t.includes("DATE") || t.includes("TIME")) return "date";
+  if (t === "GEOMETRY") return "object";
+  return "string";
+};
+
+const HIDDEN_METADATA_FIELDS = new Set([
+  "layer_id",
+  "id",
+  "h3_3",
+  "h3_6",
+  "geom",
+  "geometry",
+]);
+
+const metadataColumnsToLayerFields = (
+  columns: Record<string, string> | null | undefined
+): LayerFieldType[] => {
+  if (!columns) return [];
+  return Object.entries(columns)
+    .filter(([name]) => !HIDDEN_METADATA_FIELDS.has(name))
+    .map(([name, type]) => ({ name, type: normalizeMetadataType(type) }));
+};
+
+/** Fetch a dataset layer's columns from the OGC queryables API. Used by the
+ *  predict-schema walker when the upstream chain starts at a dataset whose
+ *  columns haven't been cached anywhere yet. Mirrors SqlToolSettings. */
+async function fetchLayerColumns(
+  layerUuid: string
+): Promise<Record<string, string>> {
+  try {
+    const response = await apiRequestAuth(
+      `${GEOAPI_BASE_URL}/collections/${layerUuid}/queryables`
+    );
+    if (!response.ok) return {};
+    const data = await response.json();
+    const columns: Record<string, string> = {};
+    for (const [key, value] of Object.entries(data.properties || {})) {
+      const prop = value as { type?: string };
+      columns[key] =
+        prop.type === "integer"
+          ? "BIGINT"
+          : prop.type === "number"
+            ? "DOUBLE"
+            : prop.type === "boolean"
+              ? "BOOLEAN"
+              : prop.type === "geometry"
+                ? "GEOMETRY"
+                : "VARCHAR";
+    }
+    return columns;
+  } catch {
+    return {};
+  }
+}
 
 import FormLabelHelper from "@/components/common/FormLabelHelper";
 import Container from "@/components/map/panels/Container";
@@ -62,22 +138,35 @@ import { useNodeExecutionStatus } from "@/components/workflows/context/WorkflowE
 
 interface IfNodeSettingsProps {
   node: WorkflowNode;
+  projectLayers?: ProjectLayer[];
   onBack: () => void;
 }
 
+/** Resolve a dataset node's `layerId` to a layer UUID. Workflow dataset nodes
+ *  can store either a UUID directly or a numeric project-layer id (same
+ *  ambiguity SqlToolSettings/WorkflowNodeSettings handle). Returns `undefined`
+ *  if a numeric id can't be mapped through the project layers list. */
+const resolveDatasetLayerUuid = (
+  layerIdValue: string,
+  projectLayers: ProjectLayer[]
+): string | undefined => {
+  const isUUID = layerIdValue.includes("-") && layerIdValue.length > 20;
+  if (isUUID) return layerIdValue;
+  const numericId = parseInt(layerIdValue, 10);
+  if (Number.isNaN(numericId)) return undefined;
+  const layer = projectLayers.find((l) => l.id === numericId);
+  return layer?.layer_id;
+};
+
 interface ConditionState {
   op: "and" | "or";
-  expressions: Array<ExpressionType | IfStatisticExpression | IfSpatialExpression>;
+  expressions: Array<ExpressionType | IfStatisticExpression>;
 }
 
-/** Type guards: identify each row variant in the heterogeneous expressions array. */
+/** Type guard: identifies a statistic row variant in the expressions array. */
 const isStatisticRow = (
-  e: ExpressionType | IfStatisticExpression | IfSpatialExpression
+  e: ExpressionType | IfStatisticExpression
 ): e is IfStatisticExpression => (e as IfStatisticExpression).kind === "statistic";
-
-const isSpatialRow = (
-  e: ExpressionType | IfStatisticExpression | IfSpatialExpression
-): e is IfSpatialExpression => (e as IfSpatialExpression).kind === "spatial";
 
 const VARIABLE_REF_REGEX = /^\{\{@([a-zA-Z_][a-zA-Z0-9_]*)\}\}$/;
 
@@ -262,7 +351,7 @@ function ConditionRowHeader({
 
 interface LogicalConditionRowProps {
   expression: ExpressionType;
-  layerId?: string;
+  fields: LayerFieldType[];
   variables: WorkflowVariable[];
   onUpdate: (next: ExpressionType) => void;
   onDelete: (id: string) => void;
@@ -270,17 +359,16 @@ interface LogicalConditionRowProps {
 
 function LogicalConditionRow({
   expression,
-  layerId,
+  fields,
   variables,
   onUpdate,
   onDelete,
 }: LogicalConditionRowProps) {
   const { t } = useTranslation("common");
-  const { layerFields } = useLayerFields(layerId || "");
 
   const selectedField = useMemo(
-    () => (layerFields || []).find((f) => f.name === expression.attribute),
-    [layerFields, expression.attribute]
+    () => fields.find((f) => f.name === expression.attribute),
+    [fields, expression.attribute]
   );
 
   const { logicalExpressionTypes: rawOperators } = useLogicalExpressionOperations(
@@ -316,7 +404,7 @@ function LogicalConditionRow({
 
       <Stack direction="column" spacing={2}>
         <LayerFieldSelector
-          fields={layerFields || []}
+          fields={fields}
           selectedField={selectedField}
           setSelectedField={(field) =>
             onUpdate({
@@ -390,139 +478,12 @@ function LogicalConditionRow({
 }
 
 // --------------------------------------------------------------------------
-// SpatialConditionRow — cross-layer geometric condition.
-//
-// Evaluates a spatial predicate between the if-node's upstream input layer
-// and a comparison layer wired to the node's `comparison_layer_id` handle.
-// The comparison layer is purely a reference for the boolean check — it
-// never flows downstream; only `input_layer_id` propagates to True/False.
-//
-// Reuses the same primitives the other row types use: ConditionRowHeader,
-// Selector, FormLabelHelper, VariableTextField. The 8 spatial relations
-// mirror the predicates supported by goatlib's CQL evaluator.
-// --------------------------------------------------------------------------
-
-const SPATIAL_RELATIONS: { value: NonNullable<IfSpatialExpression["relation"]>; labelKey: string }[] = [
-  { value: "intersects", labelKey: "spatial_intersects" },
-  { value: "within", labelKey: "spatial_within" },
-  { value: "contains", labelKey: "spatial_contains" },
-  { value: "touches", labelKey: "spatial_touches" },
-  { value: "crosses", labelKey: "spatial_crosses" },
-  { value: "overlaps", labelKey: "spatial_overlaps" },
-  { value: "disjoint", labelKey: "spatial_disjoint" },
-  { value: "within_distance", labelKey: "spatial_within_distance" },
-];
-
-interface SpatialConditionRowProps {
-  expression: IfSpatialExpression;
-  comparisonWired: boolean;
-  variables: WorkflowVariable[];
-  onUpdate: (next: IfSpatialExpression) => void;
-  onDelete: (id: string) => void;
-}
-
-function SpatialConditionRow({
-  expression,
-  comparisonWired,
-  variables,
-  onUpdate,
-  onDelete,
-}: SpatialConditionRowProps) {
-  const { t } = useTranslation("common");
-
-  const relationItems: SelectorItem[] = useMemo(
-    () =>
-      SPATIAL_RELATIONS.map((r) => ({
-        value: r.value,
-        label: t(r.labelKey, { defaultValue: r.value }),
-      })),
-    [t]
-  );
-
-  const selectedRelation = useMemo(
-    () => relationItems.find((r) => r.value === expression.relation),
-    [relationItems, expression.relation]
-  );
-
-  const showDistance = expression.relation === "within_distance";
-
-  return (
-    <Stack direction="column">
-      <ConditionRowHeader
-        iconName={ICON_NAME.GLOBE}
-        title={t("spatial_expression", { defaultValue: "Spatial Expression" })}
-        onDelete={() => onDelete(expression.id)}
-      />
-
-      <Stack direction="column" spacing={2}>
-        <Selector
-          selectedItems={selectedRelation}
-          setSelectedItems={(item) => {
-            const r = (item as SelectorItem | undefined)?.value as
-              | NonNullable<IfSpatialExpression["relation"]>
-              | undefined;
-            if (!r) return;
-            onUpdate({
-              ...expression,
-              relation: r,
-              // Drop stale distance when leaving within_distance.
-              distance: r === "within_distance" ? expression.distance : undefined,
-            });
-          }}
-          items={relationItems}
-          label={t("select_operator")}
-        />
-
-        {showDistance && (
-          <Box>
-            <FormLabelHelper
-              label={t("spatial_distance_label", { defaultValue: "Distance (meters)" })}
-              color="inherit"
-            />
-            <VariableTextField
-              value={
-                expression.distance === undefined || expression.distance === null
-                  ? ""
-                  : String(expression.distance)
-              }
-              onChange={(next) => {
-                if (!next) {
-                  onUpdate({ ...expression, distance: undefined });
-                  return;
-                }
-                // Preserve {{@var}} as a string; otherwise coerce to number when valid.
-                const asNum = Number(next);
-                onUpdate({
-                  ...expression,
-                  distance: Number.isFinite(asNum) && !next.includes("{{") ? asNum : next,
-                });
-              }}
-              variables={variables}
-              placeholder={t("spatial_distance_placeholder", { defaultValue: "e.g. 500" })}
-            />
-          </Box>
-        )}
-
-        {!comparisonWired && (
-          <Typography variant="caption" color="warning.main" sx={{ display: "block" }}>
-            {t("comparison_layer_missing", {
-              defaultValue:
-                "Wire a comparison layer to the side handle to use spatial checks.",
-            })}
-          </Typography>
-        )}
-      </Stack>
-    </Stack>
-  );
-}
-
-// --------------------------------------------------------------------------
 // StatisticConditionRow — small inline editor for aggregate-style conditions
 // --------------------------------------------------------------------------
 
 interface StatisticConditionRowProps {
   expression: IfStatisticExpression;
-  layerId?: string;
+  fields: LayerFieldType[];
   variables: WorkflowVariable[];
   onUpdate: (next: IfStatisticExpression) => void;
   onDelete: (id: string) => void;
@@ -551,13 +512,12 @@ const COMPARISON_OPERATORS: { value: ComparisonOperator; labelKey: string }[] = 
 
 function StatisticConditionRow({
   expression,
-  layerId,
+  fields,
   variables,
   onUpdate,
   onDelete,
 }: StatisticConditionRowProps) {
   const { t } = useTranslation("common");
-  const { layerFields } = useLayerFields(layerId || "");
 
   const methodItems: SelectorItem[] = useMemo(
     () =>
@@ -575,10 +535,9 @@ function StatisticConditionRow({
 
   // Numeric fields only for sum/mean/median/min/max; count(*) needs no field.
   const eligibleFields = useMemo<LayerFieldType[]>(() => {
-    if (!layerFields) return [];
-    if (expression.method === "count" || !expression.method) return layerFields;
-    return layerFields.filter((f) => f.type === "number");
-  }, [layerFields, expression.method]);
+    if (expression.method === "count" || !expression.method) return fields;
+    return fields.filter((f) => f.type === "number");
+  }, [fields, expression.method]);
 
   const selectedField = useMemo(
     () => eligibleFields.find((f) => f.name === expression.field),
@@ -664,40 +623,156 @@ function StatisticConditionRow({
 // IfNodeSettings — Conditional node settings panel
 // --------------------------------------------------------------------------
 
-export default function IfNodeSettings({ node, onBack }: IfNodeSettingsProps) {
+export default function IfNodeSettings({
+  node,
+  projectLayers = [],
+  onBack,
+}: IfNodeSettingsProps) {
   const { t } = useTranslation("common");
   const dispatch = useDispatch<AppDispatch>();
   const edges = useEdges();
   const nodes = useSelector((state: RootState) => selectNodes(state));
   const workflowVariables = useSelector(selectVariables);
+  const workflowId = useSelector(selectSelectedWorkflowId);
+  const { metadata: workflowMetadata } = useWorkflowMetadata(workflowId ?? undefined);
   const { status: runtimeStatus } = useNodeExecutionStatus(node.id);
 
   const data = node.data as IfNodeData;
 
-  // Resolve upstream input layer so the LogicalConditionRow / StatisticConditionRow
-  // components know which field list to offer. The "main" input edge is any
-  // incoming edge that isn't explicitly the comparison-layer side handle.
-  const upstreamLayerId = useMemo(() => {
-    const incoming = edges.find(
-      (e) => e.target === node.id && e.targetHandle !== "comparison_layer_id"
-    );
+  // Resolve the upstream source so the field selectors know what to offer.
+  // Dataset → layer UUID (fetched via queryables). Tool → use the workflow
+  // metadata's predicted/executed columns for that node. The dataset's
+  // raw `layerId` can be either a UUID or a numeric project-layer id, so
+  // resolve it through `projectLayers` the same way the other tool panels do.
+  const upstreamSource = useMemo<
+    | { kind: "dataset"; layerId: string }
+    | { kind: "tool"; nodeId: string }
+    | undefined
+  >(() => {
+    const incoming = edges.find((e) => e.target === node.id);
     if (!incoming) return undefined;
     const sourceNode = nodes.find((n) => n.id === incoming.source);
     if (!sourceNode) return undefined;
     const d = sourceNode.data as Record<string, unknown> | undefined;
-    if (d?.type === "dataset" && typeof d.layerId === "string") return d.layerId;
+    if (d?.type === "dataset" && typeof d.layerId === "string") {
+      const uuid = resolveDatasetLayerUuid(d.layerId, projectLayers);
+      if (uuid) return { kind: "dataset", layerId: uuid };
+      return undefined;
+    }
+    if (d?.type === "tool") {
+      return { kind: "tool", nodeId: sourceNode.id };
+    }
     return undefined;
-  }, [edges, node.id, nodes]);
+  }, [edges, node.id, nodes, projectLayers]);
 
-  // True if a comparison layer is wired to the side handle.
-  // The SpatialConditionRow uses this to show a "missing" hint if needed.
-  const isComparisonLayerWired = useMemo(
-    () =>
-      edges.some(
-        (e) => e.target === node.id && e.targetHandle === "comparison_layer_id"
-      ),
-    [edges, node.id]
-  );
+  // Dataset source: fetch fields via the queryables API.
+  const datasetLayerId =
+    upstreamSource?.kind === "dataset" ? upstreamSource.layerId : "";
+  const { layerFields: datasetFields } = useLayerFields(datasetLayerId);
+
+  // Predicted columns for an upstream tool that hasn't executed yet.
+  // Keyed by source node id; mirrors SqlToolSettings/WorkflowNodeSettings —
+  // recursively walks back through the chain calling predictNodeSchema.
+  const [predictedColumns, setPredictedColumns] = useState<
+    Record<string, Record<string, string>>
+  >({});
+  const predictionFetchedRef = useRef<string>("");
+
+  useEffect(() => {
+    if (!workflowId) return;
+    if (upstreamSource?.kind !== "tool") return;
+    const sourceNodeId = upstreamSource.nodeId;
+    // Metadata already has it — no prediction needed.
+    if (workflowMetadata?.nodes[sourceNodeId]?.columns) return;
+
+    const fetchKey = `${workflowId}:${sourceNodeId}`;
+    if (fetchKey === predictionFetchedRef.current) return;
+
+    const resolveNodeColumns = async (
+      nodeId: string,
+      cache: Record<string, Record<string, string>>,
+      visited: Set<string>
+    ): Promise<Record<string, string>> => {
+      if (visited.has(nodeId)) return {};
+      visited.add(nodeId);
+      if (cache[nodeId]) return cache[nodeId];
+
+      if (workflowMetadata?.nodes[nodeId]?.columns) {
+        const cols = workflowMetadata.nodes[nodeId].columns!;
+        cache[nodeId] = cols;
+        return cols;
+      }
+
+      const targetNode = nodes.find((n) => n.id === nodeId);
+      if (!targetNode) return {};
+      const targetData = targetNode.data as Record<string, unknown>;
+
+      if (targetData?.type === "dataset" && targetData.layerId) {
+        const layerIdValue = targetData.layerId as string;
+        const layerUuid = resolveDatasetLayerUuid(layerIdValue, projectLayers);
+        if (!layerUuid) return {};
+        const cols = await fetchLayerColumns(layerUuid);
+        cache[nodeId] = cols;
+        return cols;
+      }
+
+      if (targetData?.type === "tool") {
+        const processId = targetData.processId as string;
+        const config = (targetData.config || {}) as Record<string, unknown>;
+        const inputSchemas: Record<string, InputSchemaInfo> = {};
+        const incomingEdges = edges.filter((e) => e.target === nodeId);
+
+        for (const edge of incomingEdges) {
+          const inputName = edge.targetHandle || "input_layer_id";
+          const sourceColumns = await resolveNodeColumns(
+            edge.source,
+            cache,
+            visited
+          );
+          if (Object.keys(sourceColumns).length > 0) {
+            inputSchemas[inputName] = { columns: sourceColumns };
+          }
+        }
+
+        try {
+          const predicted = await predictNodeSchema(workflowId, {
+            process_id: processId,
+            input_schemas: inputSchemas,
+            params: config,
+          });
+          if (predicted.columns && Object.keys(predicted.columns).length > 0) {
+            cache[nodeId] = predicted.columns;
+            return predicted.columns;
+          }
+        } catch (error) {
+          console.warn(`Failed to predict schema for ${processId}:`, error);
+        }
+      }
+
+      return {};
+    };
+
+    (async () => {
+      const cache: Record<string, Record<string, string>> = {};
+      const cols = await resolveNodeColumns(sourceNodeId, cache, new Set());
+      if (Object.keys(cols).length > 0) {
+        setPredictedColumns((prev) => ({ ...prev, [sourceNodeId]: cols }));
+      }
+      predictionFetchedRef.current = fetchKey;
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflowId, upstreamSource, workflowMetadata]);
+
+  // Combined field list — priority: executed metadata > predicted > queryables (dataset).
+  const upstreamFields = useMemo<LayerFieldType[]>(() => {
+    if (!upstreamSource) return [];
+    if (upstreamSource.kind === "dataset") return datasetFields || [];
+    const metaCols = workflowMetadata?.nodes[upstreamSource.nodeId]?.columns;
+    if (metaCols) return metadataColumnsToLayerFields(metaCols);
+    return metadataColumnsToLayerFields(predictedColumns[upstreamSource.nodeId]);
+  }, [upstreamSource, datasetFields, workflowMetadata, predictedColumns]);
+
+  const hasUpstream = !!upstreamSource;
 
   const [condition, setCondition] = useState<ConditionState>(() => ({
     op: (data.condition?.op as "and" | "or") || "and",
@@ -751,14 +826,12 @@ export default function IfNodeSettings({ node, onBack }: IfNodeSettingsProps) {
   );
 
   const handleAddExpression = useCallback(
-    (kind: "logical" | "statistic" | "spatial") => {
+    (kind: "logical" | "statistic") => {
       setMenuAnchorEl(null);
       // Empty row — the user fills in the row-specific fields.
-      let newRow: ExpressionType | IfStatisticExpression | IfSpatialExpression;
+      let newRow: ExpressionType | IfStatisticExpression;
       if (kind === "statistic") {
         newRow = { id: uuidv4(), kind: "statistic" } as IfStatisticExpression;
-      } else if (kind === "spatial") {
-        newRow = { id: uuidv4(), kind: "spatial" } as IfSpatialExpression;
       } else {
         newRow = {
           id: uuidv4(),
@@ -777,7 +850,7 @@ export default function IfNodeSettings({ node, onBack }: IfNodeSettingsProps) {
   );
 
   const handleExpressionUpdate = useCallback(
-    (updated: ExpressionType | IfStatisticExpression | IfSpatialExpression) => {
+    (updated: ExpressionType | IfStatisticExpression) => {
       saveCondition({
         ...condition,
         expressions: condition.expressions.map((e) => (e.id === updated.id ? updated : e)),
@@ -817,14 +890,6 @@ export default function IfNodeSettings({ node, onBack }: IfNodeSettingsProps) {
           const v = String(e.value ?? "").trim();
           return !!e.method && !!e.operator && v !== "" && (!needsField || !!e.field);
         }
-        if (isSpatialRow(e)) {
-          if (!e.relation) return false;
-          if (e.relation === "within_distance") {
-            const d = e.distance;
-            return d !== undefined && d !== null && String(d).trim() !== "";
-          }
-          return true;
-        }
         const noValueOps = ["is_empty_string", "is_not_empty_string", "is_blank", "is_not_blank"];
         const hasValue = noValueOps.includes(e.expression || "") || !!e.value?.toString();
         return e.attribute && e.expression && hasValue;
@@ -843,11 +908,6 @@ export default function IfNodeSettings({ node, onBack }: IfNodeSettingsProps) {
         kind: "statistic" as const,
         icon: ICON_NAME.CHART,
         label: t("statistic_expression", { defaultValue: "Statistic Expression" }),
-      },
-      {
-        kind: "spatial" as const,
-        icon: ICON_NAME.GLOBE,
-        label: t("spatial_expression", { defaultValue: "Spatial Expression" }),
       },
     ],
     [t]
@@ -919,19 +979,7 @@ export default function IfNodeSettings({ node, onBack }: IfNodeSettingsProps) {
                         <StatisticConditionRow
                           key={expression.id}
                           expression={expression}
-                          layerId={upstreamLayerId}
-                          variables={workflowVariables}
-                          onUpdate={handleExpressionUpdate}
-                          onDelete={handleExpressionDelete}
-                        />
-                      );
-                    }
-                    if (isSpatialRow(expression)) {
-                      return (
-                        <SpatialConditionRow
-                          key={expression.id}
-                          expression={expression}
-                          comparisonWired={isComparisonLayerWired}
+                          fields={upstreamFields}
                           variables={workflowVariables}
                           onUpdate={handleExpressionUpdate}
                           onDelete={handleExpressionDelete}
@@ -942,7 +990,7 @@ export default function IfNodeSettings({ node, onBack }: IfNodeSettingsProps) {
                       <LogicalConditionRow
                         key={expression.id}
                         expression={expression}
-                        layerId={upstreamLayerId}
+                        fields={upstreamFields}
                         variables={workflowVariables}
                         onUpdate={handleExpressionUpdate}
                         onDelete={handleExpressionDelete}
@@ -958,7 +1006,7 @@ export default function IfNodeSettings({ node, onBack }: IfNodeSettingsProps) {
                   fullWidth
                   size="small"
                   variant="outlined"
-                  disabled={!upstreamLayerId || !areAllExpressionsValid}
+                  disabled={!hasUpstream || !areAllExpressionsValid}
                   startIcon={<Icon iconName={ICON_NAME.PLUS} style={{ fontSize: 15 }} />}
                   sx={{ borderRadius: 4, textTransform: "none", fontWeight: "bold" }}>
                   {t("add_expression")}
@@ -995,7 +1043,7 @@ export default function IfNodeSettings({ node, onBack }: IfNodeSettingsProps) {
                 </Button>
               </Stack>
 
-              {!upstreamLayerId && (
+              {!hasUpstream && (
                 <Typography variant="caption" color="warning.main" sx={{ display: "block", mt: 2 }}>
                   {t("connect_dataset_node")}
                 </Typography>

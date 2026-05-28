@@ -118,70 +118,16 @@ def _logical_rows_to_sql_term(
     return f"(MAX(CASE WHEN ({where}) THEN 1 ELSE 0 END) = 1)"
 
 
-_SPATIAL_RELATION_TO_FN = {
-    "intersects": "ST_Intersects",
-    "within": "ST_Within",
-    "contains": "ST_Contains",
-    "touches": "ST_Touches",
-    "crosses": "ST_Crosses",
-    "overlaps": "ST_Overlaps",
-    "disjoint": "ST_Disjoint",
-    "within_distance": "ST_DWithin",
-}
-
-
-def _spatial_row_to_sql_term(
-    row: dict[str, Any],
-    input_ref: str,
-    comparison_ref: str | None,
-) -> str | None:
-    """Convert a spatial row to a scalar-boolean sub-select.
-
-    Cross-joins the input layer's features (alias ``i``) with the comparison
-    layer's features (alias ``c``) and collapses the per-pair predicate to a
-    single boolean via ``BOOL_OR`` — true iff any pair satisfies the relation.
-    ``COALESCE`` falls back to FALSE when either layer is empty so the row is
-    always a well-defined scalar.
-    """
-    if not comparison_ref:
-        return None
-    relation = row.get("relation")
-    if relation not in _SPATIAL_RELATION_TO_FN:
-        return None
-    fn = _SPATIAL_RELATION_TO_FN[relation]
-
-    if relation == "within_distance":
-        distance = row.get("distance")
-        if distance is None:
-            return None
-        try:
-            distance_val = float(distance)
-        except (TypeError, ValueError):
-            return None
-        spatial_expr = f"{fn}(i.geometry, c.geometry, {distance_val})"
-    else:
-        spatial_expr = f"{fn}(i.geometry, c.geometry)"
-
-    return (
-        f"(SELECT COALESCE(BOOL_OR({spatial_expr}), FALSE) "
-        f"FROM {input_ref} i, {comparison_ref} c)"
-    )
-
 
 def _build_simple_condition_sql(
     condition: dict[str, Any] | None,
     column_names: list[str],
-    input_ref: str | None = None,
-    comparison_ref: str | None = None,
 ) -> str | None:
     """Build a single boolean SQL expression for the Conditional node's
     Simple-mode condition. Returns ``None`` if the condition is empty.
 
     The result is meant to be embedded as ``SELECT (<expr>) FROM <input>`` —
-    statistic and logical terms aggregate over ``<input>`` directly, while
-    spatial terms appear as scalar sub-selects that cross-join input with
-    the comparison layer. ``input_ref`` / ``comparison_ref`` are only needed
-    when the condition contains a spatial row.
+    statistic and logical terms aggregate over ``<input>`` directly.
     """
     if not condition:
         return None
@@ -196,7 +142,6 @@ def _build_simple_condition_sql(
 
     logical_rows: list[dict[str, Any]] = []
     statistic_terms: list[str] = []
-    spatial_terms: list[str] = []
     for row in expressions:
         if not isinstance(row, dict):
             continue
@@ -205,12 +150,6 @@ def _build_simple_condition_sql(
             term = _statistic_row_to_sql_term(row)
             if term:
                 statistic_terms.append(term)
-        elif kind == "spatial":
-            if input_ref is None:
-                continue
-            term = _spatial_row_to_sql_term(row, input_ref, comparison_ref)
-            if term:
-                spatial_terms.append(term)
         else:
             logical_rows.append(row)
 
@@ -220,7 +159,6 @@ def _build_simple_condition_sql(
     if logical_term:
         parts.append(logical_term)
     parts.extend(statistic_terms)
-    parts.extend(spatial_terms)
 
     if not parts:
         return None
@@ -348,24 +286,20 @@ def _evaluate_boolean_sql_against_layer(
 def execute_if_node(
     node: dict,
     upstream_layer_id: str | None,
-    comparison_layer_id: str | None,
     user_id: str,
     var_map: dict[str, Any],
 ) -> dict[str, Any]:
     """Evaluate a Conditional (binary if/else) node.
 
-    The caller must pre-resolve both layer ids by inspecting the incoming
-    edges' ``targetHandle``:
-    - the ``input_layer_id`` edge feeds ``upstream_layer_id`` — flows through
-      to whichever branch is active.
-    - the ``comparison_layer_id`` edge feeds ``comparison_layer_id`` —
-      reference layer for Spatial rows only; never propagates downstream.
+    The caller pre-resolves ``upstream_layer_id`` by inspecting the incoming
+    edge into the ``input`` target handle — it flows through to whichever
+    branch is active.
 
     Modes:
     - ``simple``: build a single boolean SQL expression from the rule rows
-      (logical filters + statistic aggregates + spatial cross-layer checks),
-      combined under the top-level AND/OR. TRUE iff the expression evaluates
-      truthy against the upstream layer.
+      (logical filters + statistic aggregates), combined under the top-level
+      AND/OR. TRUE iff the expression evaluates truthy against the upstream
+      layer.
     - ``custom``: take the user's free-text SQL boolean (after substituting
       ``{{@var}}`` references) as the boolean expression directly.
 
@@ -390,20 +324,10 @@ def execute_if_node(
             if upstream_layer_id
             else []
         )
-        input_ref = (
-            _resolve_layer_sql_ref(upstream_layer_id, user_id)
-            if upstream_layer_id
-            else None
-        )
-        comparison_ref = (
-            _resolve_layer_sql_ref(comparison_layer_id, user_id)
-            if comparison_layer_id
-            else None
-        )
         # Resolve {{@variable}} references in the condition rows so values
-        # the user typed (statistic threshold, logical row value, spatial
-        # distance) are substituted with their concrete values — same path
-        # tool inputs use in `build_tool_inputs`.
+        # the user typed (statistic threshold, logical row value) are
+        # substituted with their concrete values — same path tool inputs
+        # use in `build_tool_inputs`.
         raw_condition = data.get("condition")
         condition = raw_condition
         if isinstance(raw_condition, dict) and var_map:
@@ -419,8 +343,6 @@ def execute_if_node(
         boolean_sql = _build_simple_condition_sql(
             condition,
             column_names=column_names,
-            input_ref=input_ref,
-            comparison_ref=comparison_ref,
         )
     else:
         custom_expr = data.get("customExpression") or ""

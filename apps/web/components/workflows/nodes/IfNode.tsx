@@ -113,30 +113,6 @@ const IfNode: React.FC<IfNodeProps> = ({ id, data, selected }) => {
             position={Position.Left}
             id="input"
             selected={selected}
-            style={{ top: "33%" }}
-          />
-        </Tooltip>
-
-        {/* Comparison handle - left edge, lower position. Reference layer for
-            spatial-expression rows; does NOT flow downstream. */}
-        <Tooltip
-          title={t("if_comparison_handle_tooltip", {
-            defaultValue:
-              "Comparison layer (used by spatial rows only; doesn't flow downstream)",
-          })}
-          placement="bottom"
-          arrow>
-          <StyledHandle
-            type="target"
-            position={Position.Left}
-            id="comparison_layer_id"
-            selected={selected}
-            style={{
-              top: "66%",
-              // Visual hint that this handle is a reference, not data-flow.
-              border: "2px dashed var(--mui-palette-text-secondary, #888)",
-              backgroundColor: "transparent",
-            }}
           />
         </Tooltip>
 

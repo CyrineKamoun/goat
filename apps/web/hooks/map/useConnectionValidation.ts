@@ -155,9 +155,8 @@ function getNodeInputType(
     return { dataType: undefined };
   }
 
-  // If/Switch nodes accept any layer on both target handles:
-  //   `input`              — the layer that flows through to True/False
-  //   `comparison_layer_id` — reference layer for spatial-expression rows
+  // If/Switch nodes accept any layer on the `input` target handle —
+  // the layer flows through to True/False.
   if (node.data.type === "if") {
     return { dataType: undefined };
   }

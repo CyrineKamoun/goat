@@ -948,7 +948,7 @@ export default function WorkflowNodeSettings({
 
   // Render If/Switch branching node settings
   if (node.type === "if" && node.data.type === "if") {
-    return <IfNodeSettings node={node} onBack={onBack} />;
+    return <IfNodeSettings node={node} projectLayers={layers} onBack={onBack} />;
   }
 
   // Render tool node settings

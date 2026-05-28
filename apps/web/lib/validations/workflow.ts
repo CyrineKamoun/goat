@@ -138,37 +138,6 @@ export const ifStatisticExpressionSchema = z.object({
 export type IfStatisticExpression = z.infer<typeof ifStatisticExpressionSchema>;
 
 /**
- * A spatial-style condition row inside the Simple-condition builder.
- * Evaluates a geometric relation between the upstream (input) layer and a
- * comparison layer wired to the if-node's `comparison_layer_id` target handle.
- *
- * The schema doesn't carry the comparison layer id — it's resolved at runtime
- * by inspecting the incoming edge whose `targetHandle === "comparison_layer_id"`.
- */
-export const ifSpatialExpressionSchema = z.object({
-  id: z.string(),
-  /** Marker so the evaluator can distinguish from logical / statistic rows. */
-  kind: z.literal("spatial"),
-  /** Geometric relation. Mirrors the predicates supported by cql_evaluator.py. */
-  relation: z
-    .enum([
-      "intersects",
-      "within",
-      "contains",
-      "touches",
-      "crosses",
-      "overlaps",
-      "disjoint",
-      "within_distance",
-    ])
-    .optional(),
-  /** Required only when relation === "within_distance" (meters). */
-  distance: z.union([z.number(), z.string()]).optional(),
-});
-
-export type IfSpatialExpression = z.infer<typeof ifSpatialExpressionSchema>;
-
-/**
  * Data schema for the Conditional (if/else) node. Evaluates a single rule
  * against the connected upstream layer; rows matching the condition flow
  * through the TRUE handle, the rest through FALSE.

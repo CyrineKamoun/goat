@@ -1,5 +1,6 @@
 import type { SvgIconProps } from "@mui/material";
 import SvgIcon from "@mui/material/SvgIcon";
+import CallSplitIcon from "@mui/icons-material/CallSplit";
 
 /**
  * Two-tone tool icons for workflow/toolbox.
@@ -360,6 +361,7 @@ export enum TOOL_ICON_NAME {
   DISSOLVE = "dissolve",
   DIFFERENCE = "difference",
   EXPORT_DATASET = "export_dataset",
+  IF_NODE = "if_node",
   GEOCODING = "geocoding",
   GEOLOCATION = "geolocation",
   HEATMAP_CLOSEST_AVERAGE = "heatmap_closest_average",
@@ -394,6 +396,7 @@ export const toolIconMap: Record<TOOL_ICON_NAME, React.FC<SvgIconProps>> = {
   [TOOL_ICON_NAME.DISSOLVE]: DissolveIcon,
   [TOOL_ICON_NAME.DIFFERENCE]: EraseDifferenceIcon,
   [TOOL_ICON_NAME.EXPORT_DATASET]: ExportDatasetIcon,
+  [TOOL_ICON_NAME.IF_NODE]: CallSplitIcon,
   [TOOL_ICON_NAME.GEOCODING]: GeocodingIcon,
   [TOOL_ICON_NAME.GEOLOCATION]: GeolocationIcon,
   [TOOL_ICON_NAME.HEATMAP_CLOSEST_AVERAGE]: HeatmapClosestAverageIcon,
