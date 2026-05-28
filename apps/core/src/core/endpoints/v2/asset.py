@@ -187,26 +187,28 @@ async def upload_asset(
             detail=f"File too large. Maximum allowed size is {max_size // (1024 * 1024)} MB.",
         )
 
-    # Hash + deduplication (per user + asset_type)
+    # Hash + deduplication (per user + asset_type). Documents are exempt:
+    # users legitimately re-upload the same file (different folders, after delete, versioning).
     content_hash = s3_service.calculate_sha256(file_content)
-    existing = await async_session.execute(
-        select(UploadedAsset)
-        .where(UploadedAsset.content_hash == content_hash)
-        .where(UploadedAsset.user_id == user_id)
-        .where(UploadedAsset.asset_type == asset_type.value)
-    )
-    existing_asset = existing.fetchone()
+    if asset_type != AssetType.DOCUMENT:
+        existing = await async_session.execute(
+            select(UploadedAsset)
+            .where(UploadedAsset.content_hash == content_hash)
+            .where(UploadedAsset.user_id == user_id)
+            .where(UploadedAsset.asset_type == asset_type.value)
+        )
+        existing_asset = existing.fetchone()
 
-    if existing_asset:
-        existing_asset = existing_asset[0]
-        existing_asset.file_name = file.filename
-        existing_asset.display_name = display_name or existing_asset.display_name
-        existing_asset.category = category or existing_asset.category
-        existing_asset.folder_id = folder_id if folder_id is not None else existing_asset.folder_id
-        async_session.add(existing_asset)
-        await async_session.commit()
-        await async_session.refresh(existing_asset)
-        return AssetRead.model_validate(existing_asset)
+        if existing_asset:
+            existing_asset = existing_asset[0]
+            existing_asset.file_name = file.filename
+            existing_asset.display_name = display_name or existing_asset.display_name
+            existing_asset.category = category or existing_asset.category
+            existing_asset.folder_id = folder_id if folder_id is not None else existing_asset.folder_id
+            async_session.add(existing_asset)
+            await async_session.commit()
+            await async_session.refresh(existing_asset)
+            return AssetRead.model_validate(existing_asset)
 
     # Prepare S3 key
     file_extension = mimetypes.guess_extension(actual_mime_type) or ""
