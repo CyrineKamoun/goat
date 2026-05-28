@@ -60,9 +60,9 @@ class MergeToolParams(ScenarioSelectorMixin, ToolInputBase, MergeParams):
     )
 
     input_paths: list[MergeInputLayer] = Field(
-        ...,
-        min_length=2,
-        description="Layers to merge (at least 2).",
+        default_factory=list,
+        min_length=0,
+        description="Layers to merge (at least 2 — set via canvas handles in workflow).",
         json_schema_extra=ui_field(
             section="input",
             field_order=1,
@@ -70,6 +70,40 @@ class MergeToolParams(ScenarioSelectorMixin, ToolInputBase, MergeParams):
             min_items=2,
         ),
     )
+
+    input_path_1: str | None = Field(
+        None,
+        description="First input layer (connected from workflow).",
+        json_schema_extra=ui_field(
+            section="input",
+            field_order=1,
+            widget="layer-selector",
+            label_key="input_path_1",
+            hidden=True,
+        ),
+    )
+    input_path_1_filter: dict[str, Any] | None = Field(
+        None,
+        description="CQL2-JSON filter for the first input layer.",
+        json_schema_extra=ui_field(section="input", field_order=2, hidden=True),
+    )
+    input_path_2: str | None = Field(
+        None,
+        description="Second input layer (connected from workflow).",
+        json_schema_extra=ui_field(
+            section="input",
+            field_order=3,
+            widget="layer-selector",
+            label_key="input_path_2",
+            hidden=True,
+        ),
+    )
+    input_path_2_filter: dict[str, Any] | None = Field(
+        None,
+        description="CQL2-JSON filter for the second input layer.",
+        json_schema_extra=ui_field(section="input", field_order=4, hidden=True),
+    )
+
     output_path: str | None = None
     output_crs: str | None = Field(
         None,

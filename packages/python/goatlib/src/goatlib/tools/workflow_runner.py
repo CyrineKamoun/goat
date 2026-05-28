@@ -595,6 +595,30 @@ def build_tool_inputs(
                 if old_filter in inputs:
                     inputs[new_filter] = inputs.pop(old_filter)
 
+    # For merge: build input_paths list from numbered input_path_N inputs.
+    if process_id == "merge":
+        path_keys = sorted(
+            k
+            for k in list(inputs)
+            if k.startswith("input_path_")
+            and not k.endswith("_filter")
+            and k != "input_paths"
+        )
+        if path_keys:
+            input_paths: list[dict[str, Any]] = []
+            for key in path_keys:
+                layer_id = inputs.pop(key)
+                if not layer_id:
+                    continue
+                filter_key = f"{key}_filter"
+                layer_filter = inputs.pop(filter_key, None)
+                item: dict[str, Any] = {"input_path": layer_id}
+                if layer_filter:
+                    item["input_layer_filter"] = layer_filter
+                input_paths.append(item)
+            if input_paths:
+                inputs["input_paths"] = input_paths
+
     # For heatmap gravity/closest_average: build opportunities list from
     # numbered opportunity_layer_N_id inputs and per-opportunity config keys.
     if process_id in ("heatmap_gravity", "heatmap_closest_average", "heatmap_2sfca"):
