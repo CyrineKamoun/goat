@@ -243,11 +243,14 @@ def _evaluate_boolean_sql_against_layer(
     boolean_sql: str,
     layer_id: str,
     user_id: str,
+    where_clause: str | None = None,
 ) -> bool:
-    """Run ``SELECT (<boolean_sql>) FROM <layer>`` against the upstream layer.
+    """Run ``SELECT (<boolean_sql>) FROM <layer> [WHERE ...]`` against the layer.
 
     Used for both modes — the boolean SQL is a single aggregate expression that
-    collapses the whole layer to one boolean value.
+    collapses the whole layer to one boolean value. When ``where_clause`` is
+    given (from the upstream layer's filter), the condition is evaluated only
+    over the matching rows.
 
     Resolves project layers to ``lake.user_<uid>.t_<lid>`` and temp layers to
     a ``read_parquet(...)`` reference. See `_resolve_layer_sql_ref`.
@@ -267,7 +270,10 @@ def _evaluate_boolean_sql_against_layer(
         )
         try:
             with manager.connection() as con:
-                row = con.execute(f"SELECT ({boolean_sql}) AS r FROM {ref}").fetchone()
+                query = f"SELECT ({boolean_sql}) AS r FROM {ref}"
+                if where_clause:
+                    query += f" WHERE {where_clause}"
+                row = con.execute(query).fetchone()
                 return bool(row[0]) if row is not None else False
         finally:
             try:
@@ -288,12 +294,15 @@ def execute_if_node(
     upstream_layer_id: str | None,
     user_id: str,
     var_map: dict[str, Any],
+    upstream_filter: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Evaluate a Conditional (binary if/else) node.
 
     The caller pre-resolves ``upstream_layer_id`` by inspecting the incoming
     edge into the ``input`` target handle — it flows through to whichever
-    branch is active.
+    branch is active. ``upstream_filter`` carries the CQL2-JSON filter set on
+    the source layer (e.g. a dataset node), so the condition is evaluated over
+    the filtered rows only — the same CQL→WHERE mechanism the tools use.
 
     Modes:
     - ``simple``: build a single boolean SQL expression from the rule rows
@@ -313,17 +322,17 @@ def execute_if_node(
     data = node.get("data", {})
     mode = data.get("mode") or "simple"
 
+    # Fetch column names so the CQL evaluator can validate logical-row field
+    # references (it rejects unknown fields with ValueError, which would
+    # otherwise silently turn the whole rule into False) and so the upstream
+    # filter can be compiled to a WHERE clause.
+    column_names = (
+        _fetch_layer_columns(upstream_layer_id, user_id) if upstream_layer_id else []
+    )
+
     # Build the boolean SQL expression for whichever mode is active.
     boolean_sql: str | None = None
     if mode == "simple":
-        # Fetch column names so the CQL evaluator can validate logical-row
-        # field references (it rejects unknown fields with ValueError, which
-        # would otherwise silently turn the whole rule into False).
-        column_names = (
-            _fetch_layer_columns(upstream_layer_id, user_id)
-            if upstream_layer_id
-            else []
-        )
         # Resolve {{@variable}} references in the condition rows so values
         # the user typed (statistic threshold, logical row value) are
         # substituted with their concrete values — same path tool inputs
@@ -359,12 +368,26 @@ def execute_if_node(
                     "Custom expression variable substitution failed: %s", exc
                 )
 
+    # Compile the upstream layer's filter to a WHERE clause so the condition is
+    # evaluated only over matching rows (same CQL→WHERE helper used above for
+    # the logical rows, and that export_layer_to_parquet uses for the tools).
+    filter_where: str | None = None
+    if upstream_filter and upstream_layer_id:
+        from goatlib.storage import cql_to_where_clause
+
+        try:
+            filter_where = cql_to_where_clause(
+                upstream_filter, column_names, "geometry", inline=True
+            )
+        except Exception as exc:
+            logger.warning("If-node upstream filter compile failed: %s", exc)
+
     # Decide active handle.
     if not boolean_sql or not upstream_layer_id:
         active_handle = IF_FALSE_HANDLE
     else:
         matched = _evaluate_boolean_sql_against_layer(
-            boolean_sql, upstream_layer_id, user_id
+            boolean_sql, upstream_layer_id, user_id, where_clause=filter_where
         )
         active_handle = IF_TRUE_HANDLE if matched else IF_FALSE_HANDLE
 

@@ -572,7 +572,12 @@ def build_tool_inputs(
             else:
                 inputs[target_handle] = layer_id
                 if filter_config:
-                    filter_key = target_handle.replace("_id", "_filter")
+                    base = (
+                        target_handle[:-3]
+                        if target_handle.endswith("_id")
+                        else target_handle
+                    )
+                    filter_key = f"{base}_filter"
                     inputs[filter_key] = filter_config
 
     # For custom_sql: compact sparse numbered inputs so they start at 1.
@@ -851,6 +856,7 @@ def main(
                     None,
                 )
                 upstream_layer_id: str | None = None
+                upstream_filter: dict | None = None
                 if incoming_input:
                     source_node = next(
                         (n for n in nodes if n["id"] == incoming_input["source"]),
@@ -858,11 +864,23 @@ def main(
                     )
                     if source_node is not None:
                         upstream_layer_id = get_input_layer_id(source_node, results)
+                        # Carry the source layer's filter (dataset nodes) so the
+                        # condition is evaluated over the filtered rows.
+                        if source_node.get("data", {}).get("type") == "dataset":
+                            raw_filter = (
+                                source_node.get("data", {}).get("filter") or None
+                            )
+                            upstream_filter = (
+                                convert_filter_to_cql(raw_filter)
+                                if raw_filter
+                                else None
+                            )
                 if_result = execute_if_node(
                     node,
                     upstream_layer_id,
                     params.user_id,
                     if_var_map,
+                    upstream_filter=upstream_filter,
                 )
                 results[node_id] = if_result
                 skipped = mark_skipped_descendants(
