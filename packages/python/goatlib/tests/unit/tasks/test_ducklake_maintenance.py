@@ -34,7 +34,8 @@ class _FakeConn:
     def __init__(self, before_snaps: int, after_snaps: int,
                  before_bytes: int, after_bytes: int,
                  would_expire: int, orphan_paths: list[str],
-                 fs_orphan_paths: list[str] | None = None) -> None:
+                 fs_orphan_paths: list[str] | None = None,
+                 tracked_file_count: int = 100) -> None:
         self.calls: list[str] = []
         self._before_snaps = before_snaps
         self._after_snaps = after_snaps
@@ -43,6 +44,7 @@ class _FakeConn:
         self._would_expire = would_expire
         self._orphan_paths = orphan_paths
         self._fs_orphan_paths = fs_orphan_paths or []
+        self._tracked_file_count = tracked_file_count
         self._snap_calls = 0
         self._bytes_calls = 0
         self._cleanup_calls = 0
@@ -59,6 +61,12 @@ class _FakeConn:
             # First measure → before; second measure → after.
             self._snap_calls += 1
             return (self._before_snaps if self._snap_calls == 1 else self._after_snaps,)
+        if (
+            "count(*) FROM ducklake_table_info('lake')" in last
+            and "sum(" not in last
+        ):
+            # Sanity-guard query: total tracked files.
+            return (self._tracked_file_count,)
         if "ducklake_table_info('lake')" in last:
             self._bytes_calls += 1
             return (self._before_bytes if self._bytes_calls == 1 else self._after_bytes,)
@@ -300,6 +308,70 @@ class TestDeleteOrphans:
         ))
         assert not _has(con.calls, "ducklake_delete_orphaned_files")
         assert out["would_delete_orphans"] == 0
+
+
+# ────────────────────────────────────────────────────────────────────────
+# Sanity guard against catastrophic delete_orphaned_files
+# ────────────────────────────────────────────────────────────────────────
+
+
+class TestOrphanSanityGuard:
+    def test_below_threshold_proceeds(self) -> None:
+        # 5 orphans out of 100 tracked = 5% → below default 10% threshold
+        con = _FakeConn(before_snaps=10, after_snaps=10,
+                        before_bytes=0, after_bytes=0,
+                        would_expire=0, orphan_paths=[],
+                        fs_orphan_paths=["/a", "/b", "/c", "/d", "/e"],
+                        tracked_file_count=100)
+        task = _make_task(con)
+        out = task.run(DuckLakeMaintenanceParams(retention_days=7))
+        # Both the dry-run preview AND the real delete should have run
+        orphan_calls = [c for c in con.calls
+                        if "ducklake_delete_orphaned_files" in c]
+        assert len(orphan_calls) == 2
+        assert orphan_calls[0].endswith("dry_run => true)")
+        assert "dry_run" not in orphan_calls[1]
+        assert out["orphans_deleted"] == 5
+
+    def test_above_threshold_aborts(self) -> None:
+        # 60 orphans out of 100 tracked = 60% → way above default 10%
+        con = _FakeConn(before_snaps=10, after_snaps=10,
+                        before_bytes=0, after_bytes=0,
+                        would_expire=0, orphan_paths=[],
+                        fs_orphan_paths=["/p" + str(i) for i in range(60)],
+                        tracked_file_count=100)
+        task = _make_task(con)
+        with pytest.raises(RuntimeError, match="ABORT delete_orphaned_files"):
+            task.run(DuckLakeMaintenanceParams(retention_days=7))
+        # Preview ran; the destructive call did NOT.
+        orphan_calls = [c for c in con.calls
+                        if "ducklake_delete_orphaned_files" in c]
+        assert len(orphan_calls) == 1
+        assert "dry_run => true" in orphan_calls[0]
+
+    def test_threshold_can_be_relaxed_to_100(self) -> None:
+        # Disabling the guard: orphan_abort_pct=100 accepts any ratio.
+        con = _FakeConn(before_snaps=10, after_snaps=10,
+                        before_bytes=0, after_bytes=0,
+                        would_expire=0, orphan_paths=[],
+                        fs_orphan_paths=["/p" + str(i) for i in range(99)],
+                        tracked_file_count=100)
+        task = _make_task(con)
+        out = task.run(DuckLakeMaintenanceParams(
+            retention_days=7, orphan_abort_pct=100.0
+        ))
+        assert out["orphans_deleted"] == 99
+
+    def test_empty_catalog_doesnt_divide_by_zero(self) -> None:
+        # tracked_file_count=0 → percentage calc must not crash.
+        con = _FakeConn(before_snaps=10, after_snaps=10,
+                        before_bytes=0, after_bytes=0,
+                        would_expire=0, orphan_paths=[],
+                        fs_orphan_paths=[],
+                        tracked_file_count=0)
+        task = _make_task(con)
+        out = task.run(DuckLakeMaintenanceParams(retention_days=7))
+        assert out["orphans_deleted"] == 0
 
 
 # ────────────────────────────────────────────────────────────────────────

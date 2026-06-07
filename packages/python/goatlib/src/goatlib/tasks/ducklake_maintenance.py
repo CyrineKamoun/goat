@@ -82,6 +82,21 @@ class DuckLakeMaintenanceParams(BaseModel):
             "is true."
         ),
     )
+    orphan_abort_pct: float = Field(
+        default=10.0,
+        ge=0.0,
+        le=100.0,
+        description=(
+            "Sanity guard against catastrophic catalog-mismatch failures: "
+            "if delete_orphaned_files's preview would remove more than "
+            "this percentage of all catalog-tracked data files, abort "
+            "instead of deleting. Defaults to 10% — normal operation "
+            "deletes a handful of crash-leftover files at most, so any "
+            "run crossing 10% indicates something is wrong (catalog "
+            "wiped, wrong DATA_PATH attached, etc.). Set to 100 to "
+            "disable the guard."
+        ),
+    )
     dry_run: bool = Field(
         default=False,
         description=(
@@ -233,6 +248,41 @@ class DuckLakeMaintenanceTask:
 
             orphans_deleted = 0
             if params.delete_orphans:
+                # Sanity guard: dry-run preview first to count what WOULD
+                # be removed. If the count exceeds orphan_abort_pct of all
+                # catalog-tracked files, refuse to proceed — this signals
+                # a catastrophic failure (catalog wiped, wrong DATA_PATH,
+                # etc.) rather than normal cleanup of crash leftovers.
+                preview_orphans = con.execute(
+                    "CALL ducklake_delete_orphaned_files('lake', "
+                    "older_than => NOW() - INTERVAL "
+                    f"'{params.orphan_age_days} days', "
+                    "dry_run => true)"
+                ).fetchall()
+                tracked_files_row = con.execute(
+                    "SELECT count(*) FROM ducklake_table_info('lake')"
+                ).fetchone()
+                tracked_file_count = (
+                    int(tracked_files_row[0]) if tracked_files_row else 0
+                )
+                preview_pct = (
+                    100.0 * len(preview_orphans) / tracked_file_count
+                    if tracked_file_count
+                    else 0.0
+                )
+                if preview_pct > params.orphan_abort_pct:
+                    msg = (
+                        f"ABORT delete_orphaned_files: preview would remove "
+                        f"{len(preview_orphans)} files "
+                        f"({preview_pct:.1f}% of {tracked_file_count} "
+                        f"catalog-tracked files), exceeding the safety "
+                        f"threshold of {params.orphan_abort_pct}%. This is "
+                        f"abnormal — investigate before re-running "
+                        f"(catalog corruption? wrong DATA_PATH?)."
+                    )
+                    logger.error(msg)
+                    raise RuntimeError(msg)
+                # Safe to delete: re-run without dry_run to actually remove.
                 # No cleanup_all here: only files older than the mtime window
                 # are eligible, to avoid racing concurrent writes that haven't
                 # yet committed to the catalog.
@@ -243,8 +293,11 @@ class DuckLakeMaintenanceTask:
                 ).fetchall()
                 orphans_deleted = len(orphan_rows)
                 logger.info(
-                    "Deleted %d filesystem-orphan files (catalog-untracked)",
+                    "Deleted %d filesystem-orphan files "
+                    "(catalog-untracked, %.2f%% of %d tracked)",
                     orphans_deleted,
+                    preview_pct,
+                    tracked_file_count,
                 )
 
             after = self._measure(con)
