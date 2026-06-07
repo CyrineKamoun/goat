@@ -28,6 +28,7 @@ Schedule: daily at 04:00 UTC (registry.py)
 """
 
 import logging
+import os
 import sys
 from typing import Any, Self
 
@@ -37,6 +38,22 @@ from goatlib.storage import BaseDuckLakeManager
 from goatlib.tools.base import ToolSettings
 
 logger = logging.getLogger(__name__)
+
+
+def _human_bytes(n: int) -> str:
+    """Render a byte count in the largest reasonable unit (KiB/MiB/GiB/TiB)."""
+    if n < 1024:
+        return f"{n} B"
+    kib = n / 1024
+    if kib < 1024:
+        return f"{kib:.1f} KiB"
+    mib = kib / 1024
+    if mib < 1024:
+        return f"{mib:.1f} MiB"
+    gib = mib / 1024
+    if gib < 1024:
+        return f"{gib:.2f} GiB"
+    return f"{gib / 1024:.2f} TiB"
 
 
 class DuckLakeMaintenanceParams(BaseModel):
@@ -251,7 +268,18 @@ class DuckLakeMaintenanceTask:
                 after_expire["snapshots"],
             )
 
+            # Attach Postgres read-only so we can join the schedule table
+            # with data_file / delete_file to learn how many bytes the
+            # cleanup will actually free (the catalog-tracked metric
+            # tracked_bytes doesn't change because superseded files
+            # aren't counted there).
+            uri = self.settings.ducklake_postgres_uri  # type: ignore[union-attr]
+            con.execute(
+                f"ATTACH IF NOT EXISTS 'postgres:{uri}' AS pg (READ_ONLY)"
+            )
+
             files_deleted = 0
+            cleanup_bytes_freed = 0
             if params.cleanup_files:
                 # Sanity guard: dry-run preview the cleanup to count
                 # scheduled files. Abort if it exceeds cleanup_abort_pct
@@ -285,20 +313,39 @@ class DuckLakeMaintenanceTask:
                     )
                     logger.error(msg)
                     raise RuntimeError(msg)
+                # Sum the byte sizes of files about to be deleted. The
+                # schedule table's data_file_id refers to either a data
+                # file or a delete file — UNION both to catch both.
+                bytes_row = con.execute(
+                    "SELECT COALESCE(SUM(s), 0) FROM ("
+                    " SELECT df.file_size_bytes AS s"
+                    " FROM pg.ducklake.ducklake_files_scheduled_for_deletion fsd"
+                    " JOIN pg.ducklake.ducklake_data_file df"
+                    "   ON fsd.data_file_id = df.data_file_id"
+                    " UNION ALL"
+                    " SELECT del.file_size_bytes AS s"
+                    " FROM pg.ducklake.ducklake_files_scheduled_for_deletion fsd"
+                    " JOIN pg.ducklake.ducklake_delete_file del"
+                    "   ON fsd.data_file_id = del.delete_file_id"
+                    ") t"
+                ).fetchone()
+                cleanup_bytes_freed = int(bytes_row[0]) if bytes_row else 0
                 deleted_rows = con.execute(
                     "CALL ducklake_cleanup_old_files('lake', "
                     "cleanup_all => true)"
                 ).fetchall()
                 files_deleted = len(deleted_rows)
                 logger.info(
-                    "Deleted %d catalog-tracked orphan files "
-                    "(%.2f%% of %d tracked)",
+                    "Deleted %d catalog-tracked orphan files (%s, "
+                    "%.2f%% of %d tracked)",
                     files_deleted,
+                    _human_bytes(cleanup_bytes_freed),
                     preview_pct,
                     tracked_file_count,
                 )
 
             orphans_deleted = 0
+            orphan_bytes_freed = 0
             if params.delete_orphans:
                 # Sanity guard: dry-run preview first to count what WOULD
                 # be removed. If the count exceeds orphan_abort_pct of all
@@ -334,6 +381,16 @@ class DuckLakeMaintenanceTask:
                     )
                     logger.error(msg)
                     raise RuntimeError(msg)
+                # Stat each orphan path on disk to learn its size before
+                # deletion. delete_orphaned_files returns ABSOLUTE paths,
+                # so os.path.getsize works directly. Missing/already-gone
+                # files are ignored (treated as 0 bytes).
+                for row in preview_orphans:
+                    path = row[0] if isinstance(row, tuple) else row
+                    try:
+                        orphan_bytes_freed += os.path.getsize(path)
+                    except OSError:
+                        pass
                 # Safe to delete: re-run without dry_run to actually remove.
                 # No cleanup_all here: only files older than the mtime window
                 # are eligible, to avoid racing concurrent writes that haven't
@@ -345,20 +402,25 @@ class DuckLakeMaintenanceTask:
                 ).fetchall()
                 orphans_deleted = len(orphan_rows)
                 logger.info(
-                    "Deleted %d filesystem-orphan files "
-                    "(catalog-untracked, %.2f%% of %d tracked)",
+                    "Deleted %d filesystem-orphan files (%s, "
+                    "catalog-untracked, %.2f%% of %d tracked)",
                     orphans_deleted,
+                    _human_bytes(orphan_bytes_freed),
                     preview_pct,
                     tracked_file_count,
                 )
 
             after = self._measure(con)
-            bytes_freed = before["tracked_bytes"] - after["tracked_bytes"]
+            tracked_bytes_change = (
+                before["tracked_bytes"] - after["tracked_bytes"]
+            )
+            total_bytes_freed = cleanup_bytes_freed + orphan_bytes_freed
             logger.info(
-                "After: snapshots=%d, tracked_bytes=%.2f MiB (freed %.2f MiB)",
+                "After: snapshots=%d, tracked_bytes=%s "
+                "(actually freed %s on disk)",
                 after["snapshots"],
-                after["tracked_bytes"] / 1024 / 1024,
-                bytes_freed / 1024 / 1024,
+                _human_bytes(after["tracked_bytes"]),
+                _human_bytes(total_bytes_freed),
             )
 
             return {
@@ -370,7 +432,16 @@ class DuckLakeMaintenanceTask:
                 "snapshots_expired": int(expired),
                 "files_deleted": int(files_deleted),
                 "orphans_deleted": int(orphans_deleted),
-                "bytes_freed": int(bytes_freed),
+                # Actual disk space reclaimed (sum of deleted-file sizes),
+                # both raw and human-readable. This is the number most
+                # operators want; tracked_bytes_change reports the change
+                # in catalog-tracked size and is usually 0 because
+                # superseded files were never counted there.
+                "bytes_freed": int(total_bytes_freed),
+                "bytes_freed_human": _human_bytes(total_bytes_freed),
+                "cleanup_bytes_freed": int(cleanup_bytes_freed),
+                "orphan_bytes_freed": int(orphan_bytes_freed),
+                "tracked_bytes_change": int(tracked_bytes_change),
             }
 
     def close(self: Self) -> None:

@@ -35,7 +35,8 @@ class _FakeConn:
                  before_bytes: int, after_bytes: int,
                  would_expire: int, orphan_paths: list[str],
                  fs_orphan_paths: list[str] | None = None,
-                 tracked_file_count: int = 100) -> None:
+                 tracked_file_count: int = 100,
+                 scheduled_total_bytes: int = 0) -> None:
         self.calls: list[str] = []
         self._before_snaps = before_snaps
         self._after_snaps = after_snaps
@@ -45,6 +46,7 @@ class _FakeConn:
         self._orphan_paths = orphan_paths
         self._fs_orphan_paths = fs_orphan_paths or []
         self._tracked_file_count = tracked_file_count
+        self._scheduled_total_bytes = scheduled_total_bytes
         self._snap_calls = 0
         self._bytes_calls = 0
         self._cleanup_calls = 0
@@ -70,6 +72,9 @@ class _FakeConn:
         if "ducklake_table_info('lake')" in last:
             self._bytes_calls += 1
             return (self._before_bytes if self._bytes_calls == 1 else self._after_bytes,)
+        if "ducklake_files_scheduled_for_deletion" in last:
+            # Scheduled-files byte-sum query (joins through data_file + delete_file).
+            return (self._scheduled_total_bytes,)
         return (0,)
 
     def fetchall(self) -> list[tuple[str]]:
@@ -173,9 +178,12 @@ class TestDryRun:
 
 class TestRealRun:
     def test_issues_expire_then_cleanup(self) -> None:
-        con = _FakeConn(before_snaps=200, after_snaps=50,
-                        before_bytes=10_000_000_000, after_bytes=4_000_000_000,
-                        would_expire=0, orphan_paths=["/p1", "/p2", "/p3"])
+        con = _FakeConn(
+            before_snaps=200, after_snaps=50,
+            before_bytes=10_000_000_000, after_bytes=4_000_000_000,
+            would_expire=0, orphan_paths=["/p1", "/p2", "/p3"],
+            scheduled_total_bytes=6_000_000_000,
+        )
         task = _make_task(con)
         out = task.run(DuckLakeMaintenanceParams(retention_days=7))
 
@@ -192,7 +200,13 @@ class TestRealRun:
         assert out["retention_days"] == 7
         assert out["snapshots_expired"] == 150
         assert out["files_deleted"] == 3
+        # bytes_freed = sum of actually-deleted file sizes from the schedule
+        # table (NOT the change in tracked_bytes — that's reported
+        # separately as tracked_bytes_change for diagnostic purposes).
         assert out["bytes_freed"] == 6_000_000_000
+        assert out["cleanup_bytes_freed"] == 6_000_000_000
+        assert out["orphan_bytes_freed"] == 0
+        assert out["tracked_bytes_change"] == 6_000_000_000
 
     def test_retention_days_threaded_into_expire_sql(self) -> None:
         con = _FakeConn(before_snaps=10, after_snaps=5,
@@ -313,6 +327,54 @@ class TestDeleteOrphans:
 # ────────────────────────────────────────────────────────────────────────
 # Sanity guard against catastrophic delete_orphaned_files
 # ────────────────────────────────────────────────────────────────────────
+
+
+class TestBytesFreedReporting:
+    def test_reports_actual_bytes_freed_with_human_string(self) -> None:
+        # 3 catalog-scheduled files summing to 1.5 GiB
+        con = _FakeConn(
+            before_snaps=10, after_snaps=10,
+            before_bytes=0, after_bytes=0,
+            would_expire=0,
+            orphan_paths=["/a.parquet", "/b.parquet", "/c.parquet"],
+            tracked_file_count=100,
+            scheduled_total_bytes=int(1.5 * 1024 * 1024 * 1024),
+        )
+        task = _make_task(con)
+        out = task.run(DuckLakeMaintenanceParams(retention_days=7))
+        assert out["cleanup_bytes_freed"] == int(1.5 * 1024 * 1024 * 1024)
+        # human format renders gibibytes for GiB-scale freeing
+        assert "GiB" in out["bytes_freed_human"]
+        # No filesystem orphans → all freed bytes come from cleanup
+        assert out["orphan_bytes_freed"] == 0
+        assert out["bytes_freed"] == out["cleanup_bytes_freed"]
+
+    def test_kib_mib_formatting(self) -> None:
+        con = _FakeConn(
+            before_snaps=10, after_snaps=10,
+            before_bytes=0, after_bytes=0,
+            would_expire=0,
+            orphan_paths=["/x.parquet"],
+            tracked_file_count=100,
+            scheduled_total_bytes=2048,  # 2 KiB
+        )
+        task = _make_task(con)
+        out = task.run(DuckLakeMaintenanceParams(retention_days=7))
+        assert "KiB" in out["bytes_freed_human"]
+
+    def test_zero_freed_renders_bytes(self) -> None:
+        con = _FakeConn(
+            before_snaps=10, after_snaps=10,
+            before_bytes=0, after_bytes=0,
+            would_expire=0,
+            orphan_paths=[],
+            tracked_file_count=100,
+            scheduled_total_bytes=0,
+        )
+        task = _make_task(con)
+        out = task.run(DuckLakeMaintenanceParams(retention_days=7))
+        assert out["bytes_freed"] == 0
+        assert out["bytes_freed_human"] == "0 B"
 
 
 class TestCleanupSanityGuard:
