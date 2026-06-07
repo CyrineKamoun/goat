@@ -97,6 +97,22 @@ class DuckLakeMaintenanceParams(BaseModel):
             "disable the guard."
         ),
     )
+    cleanup_abort_pct: float = Field(
+        default=90.0,
+        ge=0.0,
+        le=100.0,
+        description=(
+            "Sanity guard against catastrophic catalog-scheduling failures: "
+            "if cleanup_old_files's preview would remove more than this "
+            "percentage of all catalog-tracked data files, abort. Defaults "
+            "to 90% — legitimate scenarios (e.g., a layer_delete batch, "
+            "high-frequency syncers) can schedule lots of files at once, "
+            "so the threshold is high. Anything crossing 90% means a "
+            "bad expire_snapshots (e.g., retention_days=0 expired the "
+            "current snapshot too) or catalog corruption. Set to 100 to "
+            "disable the guard."
+        ),
+    )
     dry_run: bool = Field(
         default=False,
         description=(
@@ -237,13 +253,49 @@ class DuckLakeMaintenanceTask:
 
             files_deleted = 0
             if params.cleanup_files:
+                # Sanity guard: dry-run preview the cleanup to count
+                # scheduled files. Abort if it exceeds cleanup_abort_pct
+                # of the catalog's tracked file count — catches bad
+                # expire_snapshots calls that mass-scheduled current data.
+                preview_cleanup = con.execute(
+                    "CALL ducklake_cleanup_old_files('lake', "
+                    "cleanup_all => true, dry_run => true)"
+                ).fetchall()
+                tracked_files_row = con.execute(
+                    "SELECT count(*) FROM ducklake_table_info('lake')"
+                ).fetchone()
+                tracked_file_count = (
+                    int(tracked_files_row[0]) if tracked_files_row else 0
+                )
+                preview_pct = (
+                    100.0 * len(preview_cleanup) / tracked_file_count
+                    if tracked_file_count
+                    else 0.0
+                )
+                if preview_pct > params.cleanup_abort_pct:
+                    msg = (
+                        f"ABORT cleanup_old_files: preview would remove "
+                        f"{len(preview_cleanup)} files ({preview_pct:.1f}% "
+                        f"of {tracked_file_count} catalog-tracked files), "
+                        f"exceeding the safety threshold of "
+                        f"{params.cleanup_abort_pct}%. This is abnormal — "
+                        f"a bad expire_snapshots (retention=0 expiring the "
+                        f"current snapshot?) or catalog corruption could "
+                        f"cause this. Investigate before re-running."
+                    )
+                    logger.error(msg)
+                    raise RuntimeError(msg)
                 deleted_rows = con.execute(
                     "CALL ducklake_cleanup_old_files('lake', "
                     "cleanup_all => true)"
                 ).fetchall()
                 files_deleted = len(deleted_rows)
                 logger.info(
-                    "Deleted %d catalog-tracked orphan files", files_deleted
+                    "Deleted %d catalog-tracked orphan files "
+                    "(%.2f%% of %d tracked)",
+                    files_deleted,
+                    preview_pct,
+                    tracked_file_count,
                 )
 
             orphans_deleted = 0

@@ -315,6 +315,54 @@ class TestDeleteOrphans:
 # ────────────────────────────────────────────────────────────────────────
 
 
+class TestCleanupSanityGuard:
+    def test_below_threshold_proceeds(self) -> None:
+        # 5 cleanups out of 100 tracked = 5% → below default 90% threshold
+        con = _FakeConn(before_snaps=200, after_snaps=50,
+                        before_bytes=0, after_bytes=0,
+                        would_expire=0,
+                        orphan_paths=["/a", "/b", "/c", "/d", "/e"],
+                        tracked_file_count=100)
+        task = _make_task(con)
+        out = task.run(DuckLakeMaintenanceParams(retention_days=7))
+        # Both preview AND real cleanup_old_files calls happened
+        cleanup_calls = [c for c in con.calls
+                         if "ducklake_cleanup_old_files" in c]
+        assert len(cleanup_calls) == 2
+        assert "dry_run => true" in cleanup_calls[0]
+        assert "dry_run" not in cleanup_calls[1]
+        assert out["files_deleted"] == 5
+
+    def test_above_threshold_aborts(self) -> None:
+        # 95 scheduled vs 100 tracked = 95% → above default 90% threshold
+        con = _FakeConn(before_snaps=200, after_snaps=50,
+                        before_bytes=0, after_bytes=0,
+                        would_expire=0,
+                        orphan_paths=["/p" + str(i) for i in range(95)],
+                        tracked_file_count=100)
+        task = _make_task(con)
+        with pytest.raises(RuntimeError, match="ABORT cleanup_old_files"):
+            task.run(DuckLakeMaintenanceParams(retention_days=7))
+        # The preview happened; the real (no dry_run) cleanup did NOT.
+        cleanup_calls = [c for c in con.calls
+                         if "ducklake_cleanup_old_files" in c]
+        assert len(cleanup_calls) == 1
+        assert "dry_run => true" in cleanup_calls[0]
+
+    def test_threshold_can_be_relaxed_to_100(self) -> None:
+        # Disabling the guard.
+        con = _FakeConn(before_snaps=200, after_snaps=50,
+                        before_bytes=0, after_bytes=0,
+                        would_expire=0,
+                        orphan_paths=["/p" + str(i) for i in range(99)],
+                        tracked_file_count=100)
+        task = _make_task(con)
+        out = task.run(DuckLakeMaintenanceParams(
+            retention_days=7, cleanup_abort_pct=100.0
+        ))
+        assert out["files_deleted"] == 99
+
+
 class TestOrphanSanityGuard:
     def test_below_threshold_proceeds(self) -> None:
         # 5 orphans out of 100 tracked = 5% → below default 10% threshold
