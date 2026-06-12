@@ -521,7 +521,15 @@ function formatSectionLabel(sectionId: string): string {
 }
 
 /**
- * Get default values for all inputs
+ * Get default values for all inputs.
+ *
+ * Two passes:
+ *   1. Schema defaults (`default` from the JSON Schema).
+ *   2. `default_by_field` resolution — fields keyed off another field's value
+ *      (e.g. mode-specific speed defaults) need their initial value derived
+ *      from the source field's *initial* default. The runtime handler in
+ *      handleInputChange only fires on user-driven changes, not on first
+ *      render, so we apply the same lookup here for the load case.
  */
 export function getDefaultValues(process: OGCProcessDescription): Record<string, unknown> {
   const defaults: Record<string, unknown> = {};
@@ -530,6 +538,20 @@ export function getDefaultValues(process: OGCProcessDescription): Record<string,
     const effectiveSchema = getEffectiveSchema(input.schema);
     if (effectiveSchema.default !== undefined) {
       defaults[name] = effectiveSchema.default;
+    }
+  }
+
+  for (const [name, input] of Object.entries(process.inputs)) {
+    const uiMeta = input.schema["x-ui"] as
+      | { widget_options?: { default_by_field?: { field: string; values: Record<string, unknown> } } }
+      | undefined;
+    const defaultByField = uiMeta?.widget_options?.default_by_field;
+    if (!defaultByField) continue;
+    const sourceVal = defaults[defaultByField.field];
+    if (sourceVal === undefined || sourceVal === null) continue;
+    const dynamicDefault = defaultByField.values[String(sourceVal)];
+    if (dynamicDefault !== undefined) {
+      defaults[name] = dynamicDefault;
     }
   }
 

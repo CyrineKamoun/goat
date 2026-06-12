@@ -131,8 +131,13 @@ class TravelCostMatrixTool(AnalysisTool):
             if params.cost_type == CostType.distance
             else routing.CostType.Time
         )
-        cfg.max_cost = params.max_cost
-        cfg.speed_km_h = params.speed
+        # max_cost is the Dijkstra cutoff, not a network-loading bound.
+        # None means "no user-supplied limit" — pass +inf so the engine
+        # computes every reachable O-D pair within the bbox-loaded network.
+        cfg.max_cost = params.max_cost if params.max_cost is not None else math.inf
+        # C++ uses 0.0 as the "not set" sentinel; for routing modes that don't
+        # take a user-supplied speed (PT/Car/flight_distance), params.speed is None.
+        cfg.speed_km_h = params.speed if params.speed is not None else 0.0
         cfg.edge_dir = self._edge_dir
         cfg.node_dir = self._node_dir
         cfg.output_path = params.output_path
@@ -155,10 +160,22 @@ class TravelCostMatrixTool(AnalysisTool):
             )
             cfg.access_max_cost = params.access_max_cost
             cfg.egress_max_cost = params.egress_max_cost
-            if params.access_speed > 0:
-                cfg.access_speed_km_h = params.access_speed
-            if params.egress_speed > 0:
-                cfg.egress_speed_km_h = params.egress_speed
+            # Fall back to mode-specific default when user didn't set the per-leg
+            # speed (e.g. advanced collapsed). Car: no user speed → 0.
+            _PT_LEG_DEFAULTS = {
+                AccessEgressMode.walk: 5.0,
+                AccessEgressMode.bicycle: 15.0,
+                AccessEgressMode.pedelec: 23.0,
+                AccessEgressMode.car: 0.0,
+            }
+            cfg.access_speed_km_h = (
+                params.access_speed if params.access_speed is not None
+                else _PT_LEG_DEFAULTS.get(params.access_mode, 0.0)
+            )
+            cfg.egress_speed_km_h = (
+                params.egress_speed if params.egress_speed is not None
+                else _PT_LEG_DEFAULTS.get(params.egress_mode, 0.0)
+            )
 
             if params.transit_modes:
                 cfg.transit_modes = [m.value for m in params.transit_modes]

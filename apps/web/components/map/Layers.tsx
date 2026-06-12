@@ -8,11 +8,21 @@ import { Layer as MapLayer, Source, useMap } from "react-map-gl/maplibre";
 import { GEOAPI_BASE_URL, SYSTEM_LAYERS_IDS } from "@/lib/constants";
 import { excludes as excludeOp } from "@/lib/transformers/filter";
 import {
+  buildClusterBadgeSpec,
+  buildClusterCirclePaint,
+  buildClusterCountTextSpec,
+  buildClusterMarkerIconColor,
+  buildClusterMarkerIconExpression,
+  buildClusterSourceProps,
+  getClusterGeoJsonUrl,
+  isClusteringEnabled,
+} from "@/lib/transformers/cluster";
+import {
   getHightlightStyleSpec,
   getSymbolStyleSpec,
   transformToMapboxLayerStyleSpec,
 } from "@/lib/transformers/layer";
-import { addOrUpdateMarkerImages } from "@/lib/transformers/map-image";
+import { addOrUpdateMarkerImages, loadImage } from "@/lib/transformers/map-image";
 import { transformToLineDecorationLayers } from "@/lib/transformers/lineStyle";
 import { generateCOGColorFunction } from "@/lib/utils/map/cog-styling";
 import { getLayerKey } from "@/lib/utils/map/layer";
@@ -194,6 +204,17 @@ const Layers = (props: LayersProps) => {
     const query = parts.length > 0 ? `?${parts.join("&")}` : "";
     return `${GEOAPI_BASE_URL}/collections/${layerId}/tiles/WebMercatorQuad/{z}/{x}/{y}${query}`;
   };
+
+  const getClusterDataUrl = (layer: ProjectLayer | Layer): string => {
+    const layerId = String(layer["layer_id"] || layer["id"]);
+    const extendedQuery = getLayerQueryFilter(layer);
+    const filterStr =
+      extendedQuery && Object.keys(extendedQuery).length > 0
+        ? JSON.stringify(extendedQuery)
+        : undefined;
+    return getClusterGeoJsonUrl(GEOAPI_BASE_URL ?? "", layerId, filterStr);
+  };
+
   const { useDataLayers, systemLayers } = useMemo(() => {
     const dataLayers = [] as ProjectLayer[] | Layer[];
     const sysLayers = [] as ProjectLayer[] | Layer[];
@@ -208,6 +229,55 @@ const Layers = (props: LayersProps) => {
     });
     return { useDataLayers: dataLayers, systemLayers: sysLayers };
   }, [props.layers]);
+
+  // Map of icon-image name (`${layer.id}-${marker.name}`) → url+sdf for
+  // lazy loading via styleimagemissing. The eager useEffect below preloads
+  // these, but for cluster symbol layers the eager load can lose the race —
+  // MapLibre's addBucket throws if the image isn't in the atlas at bucket
+  // creation time. styleimagemissing is the official escape hatch.
+  const markerImagesRef = useRef<Record<string, { url: string; sdf: boolean }>>({});
+  useEffect(() => {
+    const map: Record<string, { url: string; sdf: boolean }> = {};
+    props.layers?.forEach((layer) => {
+      if (
+        layer.type === "feature" &&
+        layer.feature_layer_geometry_type === "point" &&
+        layer.properties?.["custom_marker"]
+      ) {
+        const pointProps = layer.properties as FeatureLayerPointProperties;
+        const allMarkers = [
+          pointProps.marker,
+          ...(pointProps.marker_mapping ?? []).map((m) => m[1]),
+        ];
+        allMarkers.forEach((marker) => {
+          if (marker?.url && marker?.name) {
+            map[`${layer.id}-${marker.name}`] = {
+              url: marker.url,
+              sdf: marker.source === "library",
+            };
+          }
+        });
+      }
+    });
+    markerImagesRef.current = map;
+  }, [props.layers]);
+
+  // styleimagemissing: when MapLibre encounters an unknown icon-image,
+  // resolve it lazily from the layer's marker config.
+  useEffect(() => {
+    if (!mapRef) return;
+    const map = mapRef.getMap();
+    const handler = (e: { id: string }) => {
+      const info = markerImagesRef.current[e.id];
+      if (info && !map.hasImage(e.id)) {
+        loadImage(mapRef, info.url, e.id, info.sdf);
+      }
+    };
+    map.on("styleimagemissing", handler);
+    return () => {
+      map.off("styleimagemissing", handler);
+    };
+  }, [mapRef]);
 
   // Ensure marker images are loaded for custom marker layers.
   // Icons are initially loaded in handleMapLoad, but layers toggled on later
@@ -328,6 +398,185 @@ const Layers = (props: LayersProps) => {
         ? reversedDataLayers.map((layer: ProjectLayer | Layer) =>
             (() => {
               if (layer.type === "feature") {
+                if (
+                  layer.feature_layer_geometry_type === "point" &&
+                  isClusteringEnabled(layer)
+                ) {
+                  const pointProps = layer.properties as FeatureLayerPointProperties;
+                  const isCustomMarker = !!pointProps.custom_marker;
+                  const clusterSourceProps = buildClusterSourceProps(layer);
+                  const dataUrl = getClusterDataUrl(layer);
+
+                  const unclusteredFilter: FilterSpecification = ["!", ["has", "point_count"]];
+                  const clusteredFilter: FilterSpecification = ["has", "point_count"];
+
+                  // Pre-build unclustered style + filter using the EXISTING transformer path
+                  const { filter: layerFilter, layerStyleSpec } = splitLayerFilter(
+                    transformToMapboxLayerStyleSpec(layer) as any
+                  );
+                  const mapLayerFilter = getMapLayerFilter(layerFilter);
+                  const { filter: labelFilter, layerStyleSpec: labelStyleSpec } = splitLayerFilter(
+                    getSymbolStyleSpec((layer.properties as FeatureLayerProperties)?.text_label, layer) as any
+                  );
+                  const mapLabelFilter = getMapLayerFilter(labelFilter);
+
+                  // Build edit-exclusion + atlas filter helpers (mirroring the vector branch)
+                  const isEditingThisLayer = editLayerId === (layer as ProjectLayer).layer_id;
+                  const mergeEditExclusion = (
+                    baseFilter: FilterSpecification | undefined,
+                  ): FilterSpecification | undefined => {
+                    if (!isEditingThisLayer || editExcludeIds.length === 0) return baseFilter;
+                    const numericIds = editExcludeIds.map(Number);
+                    const excludeFilter: FilterSpecification = [
+                      "!",
+                      ["in", ["id"], ["literal", numericIds]],
+                    ];
+                    return baseFilter ? (["all", baseFilter, excludeFilter] as FilterSpecification) : excludeFilter;
+                  };
+                  const isAtlasCoverageLayer =
+                    props.atlasFilter !== undefined && props.atlasFilter.layerId === layer.id;
+                  const mergeAtlasFilter = (
+                    baseFilter: FilterSpecification | undefined,
+                  ): FilterSpecification | undefined => {
+                    if (!isAtlasCoverageLayer) return baseFilter;
+                    const featureId = Number(props.atlasFilter!.featureId);
+                    const atlasFilter: FilterSpecification = ["==", ["id"], featureId];
+                    return baseFilter ? (["all", baseFilter, atlasFilter] as FilterSpecification) : atlasFilter;
+                  };
+                  const composeFilters = (
+                    baseFilter: FilterSpecification | undefined,
+                  ): FilterSpecification | undefined => mergeAtlasFilter(mergeEditExclusion(baseFilter));
+
+                  const andUnclustered = (
+                    base: FilterSpecification | undefined,
+                  ): FilterSpecification =>
+                    base ? (["all", base, unclusteredFilter] as FilterSpecification) : unclusteredFilter;
+
+                  // GeoJSON source props (clusterRadius, clusterMaxZoom, clusterMinPoints,
+                  // clusterProperties) are read once at source creation — react-map-gl's
+                  // updateSource only re-sets `data` for geojson sources. Include the
+                  // cluster config in the key so the source is remounted when the user
+                  // changes any of these in the style panel.
+                  const clusterKeySalt = JSON.stringify({
+                    r: pointProps.cluster?.radius,
+                    z: pointProps.cluster?.max_zoom,
+                    p: pointProps.cluster?.min_points,
+                    f: pointProps.marker_field?.name,
+                    n: pointProps.marker_mapping?.length ?? 0,
+                  });
+                  return (
+                    <Source
+                      key={`${layer.id}-cluster-${layer.updated_at || ""}-${clusterKeySalt}`}
+                      type="geojson"
+                      data={dataUrl}
+                      {...clusterSourceProps}
+                    >
+                      {/* Unclustered features: existing paint, plus the !has(point_count) filter */}
+                      {!isCustomMarker && (
+                        <MapLayer
+                          key={getLayerKey(layer)}
+                          id={layer.id.toString()}
+                          minzoom={layer.properties.min_zoom || 0}
+                          maxzoom={layer.properties.max_zoom || 24}
+                          {...(layerStyleSpec as any)}
+                          filter={andUnclustered(composeFilters(mapLayerFilter))}
+                        />
+                      )}
+                      {isCustomMarker && (
+                        <MapLayer
+                          key={getLayerKey(layer)}
+                          id={layer.id.toString()}
+                          minzoom={layer.properties.min_zoom || 0}
+                          maxzoom={layer.properties.max_zoom || 24}
+                          {...(labelStyleSpec as any)}
+                          filter={andUnclustered(composeFilters(mapLabelFilter))}
+                        />
+                      )}
+
+                      {/* Clustered: circle bubble OR marker icon, then count badge.
+                          Each Layer must be a DIRECT child of Source — react-map-gl
+                          uses React.Children.map + cloneElement to inject the source
+                          id, which doesn't traverse fragments. Layer ids differ
+                          between the two branches (-cluster-bubble vs -cluster-icon)
+                          because react-map-gl's render-phase getLayer() will hit the
+                          old layer before its cleanup runs, and asserts on type
+                          mismatch ("layer type changed") if circle→symbol toggles.
+                          All cluster sub-layers inherit the parent layer's visibility
+                          and min/max zoom so the layer's eye-icon toggle hides them. */}
+                      {!isCustomMarker && (
+                        <MapLayer
+                          key={`${layer.id}-cluster-bubble`}
+                          id={`${layer.id}-cluster-bubble`}
+                          type="circle"
+                          minzoom={layer.properties.min_zoom || 0}
+                          maxzoom={layer.properties.max_zoom || 24}
+                          layout={{
+                            visibility: layer.properties.visibility ? "visible" : "none",
+                          }}
+                          paint={buildClusterCirclePaint(layer) as any}
+                          filter={clusteredFilter}
+                        />
+                      )}
+                      {!isCustomMarker && (
+                        <MapLayer
+                          key={`${layer.id}-cluster-count`}
+                          id={`${layer.id}-cluster-count`}
+                          type="symbol"
+                          minzoom={layer.properties.min_zoom || 0}
+                          maxzoom={layer.properties.max_zoom || 24}
+                          layout={{
+                            ...(buildClusterCountTextSpec(layer).layout as any),
+                            visibility: layer.properties.visibility ? "visible" : "none",
+                          }}
+                          paint={buildClusterCountTextSpec(layer).paint as any}
+                          filter={clusteredFilter}
+                        />
+                      )}
+                      {isCustomMarker && (
+                        <MapLayer
+                          key={`${layer.id}-cluster-icon`}
+                          id={`${layer.id}-cluster-icon`}
+                          type="symbol"
+                          minzoom={layer.properties.min_zoom || 0}
+                          maxzoom={layer.properties.max_zoom || 24}
+                          layout={{
+                            visibility: layer.properties.visibility ? "visible" : "none",
+                            "icon-image": buildClusterMarkerIconExpression(layer) as any,
+                            "icon-allow-overlap": true,
+                            "icon-ignore-placement": true,
+                            // Match the unclustered marker size (marker_size/200, see
+                            // getMapboxStyleSize) so the cluster icon and unclustered
+                            // marker visually agree.
+                            "icon-size": (pointProps.marker_size ?? 10) / 200,
+                          }}
+                          paint={{
+                            ...(buildClusterMarkerIconColor(layer)
+                              ? { "icon-color": buildClusterMarkerIconColor(layer) as string }
+                              : {}),
+                            "icon-opacity-transition": { duration: 0, delay: 0 },
+                          }}
+                          filter={clusteredFilter}
+                        />
+                      )}
+                      {isCustomMarker && (
+                        <MapLayer
+                          key={`${layer.id}-cluster-badge`}
+                          id={`${layer.id}-cluster-badge`}
+                          type="symbol"
+                          minzoom={layer.properties.min_zoom || 0}
+                          maxzoom={layer.properties.max_zoom || 24}
+                          layout={{
+                            ...(buildClusterBadgeSpec(layer).layout as any),
+                            visibility: layer.properties.visibility ? "visible" : "none",
+                          }}
+                          paint={buildClusterBadgeSpec(layer).paint as any}
+                          filter={clusteredFilter}
+                        />
+                      )}
+                    </Source>
+                  );
+                }
+
                 const { filter: layerFilter, layerStyleSpec } = splitLayerFilter(
                   transformToMapboxLayerStyleSpec(layer) as any
                 );
@@ -395,13 +644,20 @@ const Layers = (props: LayersProps) => {
                 ): FilterSpecification | undefined =>
                   mergeAtlasFilter(mergeEditExclusion(baseFilter));
 
-                const linePlacement =
+                // Only send ?decoration=... when decoration is actually enabled
+                // for the layer — sending it when type === "none" forces dynamic
+                // tile generation on the backend (PMTiles is bypassed if the
+                // request has a decoration param).
+                const lineProps =
                   layer.feature_layer_geometry_type === "line"
-                    ? ((layer.properties as FeatureLayerLineProperties)?.decoration_placement ?? "repeat")
-                    : "repeat";
+                    ? (layer.properties as FeatureLayerLineProperties | undefined)
+                    : undefined;
                 const decorationParam =
-                  linePlacement !== "repeat"
-                    ? (linePlacement as "start" | "end" | "start_and_end" | "center")
+                  lineProps?.decoration_type &&
+                  lineProps.decoration_type !== "none" &&
+                  lineProps.decoration_placement &&
+                  lineProps.decoration_placement !== "repeat"
+                    ? (lineProps.decoration_placement as "start" | "end" | "start_and_end" | "center")
                     : null;
 
                 return (

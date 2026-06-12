@@ -183,6 +183,12 @@ const ToolsTabContent: React.FC<ToolsTabContentProps> = ({ onDragStart }) => {
     [t]
   );
 
+  // Control items (static)
+  const controlItems: ToolItem[] = useMemo(
+    () => [{ id: "if_node", title: t("if_node", { defaultValue: "If" }) }],
+    [t]
+  );
+
   // Organize tools by category
   const toolsByCategory = useMemo(() => {
     const categories: Record<ToolCategory, ToolItem[]> = {
@@ -234,6 +240,12 @@ const ToolsTabContent: React.FC<ToolsTabContentProps> = ({ onDragStart }) => {
   // Filtered data I/O items
   const filteredDataIoItems = useMemo(() => dataIoItems.filter(matchesSearch), [dataIoItems, matchesSearch]);
 
+  // Filtered control items
+  const filteredControlItems = useMemo(
+    () => controlItems.filter(matchesSearch),
+    [controlItems, matchesSearch]
+  );
+
   // Handle drag start for tools
   const handleToolDragStart = (event: React.DragEvent, toolId: string) => {
     onDragStart(event, "tool", toolId);
@@ -257,7 +269,15 @@ const ToolsTabContent: React.FC<ToolsTabContentProps> = ({ onDragStart }) => {
     onDragStart(event, "export");
   };
 
-  const hasNoResults = filteredDataIoItems.length === 0 && sortedCategories.length === 0;
+  // Handle drag start for If/Switch branching node
+  const handleIfDragStart = (event: React.DragEvent) => {
+    onDragStart(event, "if");
+  };
+
+  const hasNoResults =
+    filteredDataIoItems.length === 0 &&
+    filteredControlItems.length === 0 &&
+    sortedCategories.length === 0;
 
   return (
     <Stack direction="column" height="100%" width="100%">
@@ -321,6 +341,25 @@ const ToolsTabContent: React.FC<ToolsTabContentProps> = ({ onDragStart }) => {
               </Box>
             );
           })}
+
+          {/* Control Section - branching/flow-control nodes (rendered last) */}
+          {filteredControlItems.length > 0 && (
+            <Box sx={{ mb: 4 }}>
+              <SettingsGroupHeader label={t("control")} />
+              <Grid container spacing={4}>
+                {filteredControlItems.map((item) => (
+                  <Grid item xs={4} key={item.id}>
+                    <DraggableToolCard
+                      tool={item}
+                      onDragStart={(event) => {
+                        if (item.id === "if_node") handleIfDragStart(event);
+                      }}
+                    />
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          )}
 
           {hasNoResults && (
             <Box sx={{ textAlign: "center", py: 4 }}>

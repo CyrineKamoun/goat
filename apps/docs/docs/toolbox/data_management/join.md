@@ -2,100 +2,189 @@
 sidebar_position: 1
 ---
 
-# Join
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-This tool allows you to **combine data from two layers based on attribute matching or spatial relationships**. This is essential for spatial analysis, data enrichment, and creating comprehensive datasets.
+# Join Features
+
+This tool allows you to **combine data from two layers based on attribute matching or spatial relationships**. The result is a new layer containing the Target Layer's geometry and attributes, enriched with attributes from the Join Layer.
 
 ## 1. Explanation
 
 Joining is the process of attaching fields from one layer (Join Layer) to another layer (Target Layer).
 
-**GOAT supports three types of joins:**
-1. **Attribute Join:** Matches features based on a common field (e.g., matching "Zip Code" in both layers).
-2. **Spatial Join:** Matches features based on their geometric relationship (e.g., "features that intersect" or "features within a distance").
-3. **Spatial & Attribute Join:** Requires **both** a spatial overlap and a matching attribute to join features.
+**GOAT supports three join methods:**
 
-The result is a new layer containing the Target Layer's geometry and attributes, plus the attributes from the Join Layer.
+- **Attribute** — match features based on a common field (e.g., matching a zip code in both layers).
+- **Spatial** — match features based on their geometric relationship (e.g., features that intersect).
+- **Spatial and Attribute** — requires both a spatial overlap and a matching attribute.
+
+<Tabs>
+<TabItem value="attribute" label="Attribute Join" default className="tabItemBox">
+
+An Attribute Join links two layers by comparing values in a shared field. Every feature in the Target Layer is matched against features in the Join Layer where the field values are equal.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/data_management/join/attribute_join_basic.png').default} alt="Basic Attribute Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+</div>
+
+### Join Type
+
+The `Join Type` controls which features appear in the output:
+
+- **Inner Join** — only features with a match in both layers are kept. Features without a match are dropped.
+- **Left Join** — all features from the Target Layer are kept. Features without a match receive `NULL` for the joined fields.
+
+### One-to-One
+
+When each target feature matches at most one feature in the Join Layer, the result has the same number of rows as the Target Layer.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_one.png').default} alt="One-to-One Join: Inner Join vs Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+</div>
+
+### One-to-Many
+
+When one target feature matches multiple features in the Join Layer, the result contains one row per match — the target geometry is repeated for each matching record.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_many.png').default} alt="One-to-Many Join: Inner Join vs Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+</div>
+
+</TabItem>
+
+<TabItem value="spatial" label="Spatial Join" className="tabItemBox">
+
+A Spatial Join links features based on their geometric relationship — no shared field is needed. Each feature in the Target Layer is matched to features in the Join Layer that satisfy the selected spatial relationship.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/data_management/join/spatial_relationships.png').default} alt="Spatial Relationship Types" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+</div>
+
+**Available spatial relationships:**
+
+| Relationship | Description |
+|---|---|
+| `Intersects` | Target and join features share any geometry (point, line, or area). |
+| `Overlaps` | Features partially overlap but neither is fully inside the other. |
+| `Completely Contains` | Target feature fully contains the join feature. |
+| `Covers` | Target feature fully contains the join feature. |
+| `Disjoint` | Features have no spatial relationship — they do not touch or overlap. |
+| `Touches` | Features share a boundary but do not overlap. |
+| `Within Distance` | Features are within a specified distance of each other. |
+| `Identical To` | Features have exactly the same geometry. |
+| `Completely Within` | Target feature is fully inside the join feature. |
+| `Covered By` | Target feature is covered by the join feature. |
+
+</TabItem>
+
+<TabItem value="spatial_attribute" label="Spatial and Attribute Join" className="tabItemBox">
+
+This method requires **both** a spatial relationship and a matching attribute value to be satisfied. A feature is only joined if it meets both conditions simultaneously. Use this when location alone is not enough — for example, matching buildings that are within a district **and** share the same land-use classification.
+
+In this example, population data is joined to Berlin districts using both conditions. Matching on the `namgem` attribute alone could incorrectly assign population values from a city like Potsdam if the name matches. Adding a spatial condition (`Intersects`) ensures only points that lie inside the correct district and share the same `namgem` value are joined.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/data_management/join/spatial_attribute_join.webp').default} alt="Spatial and Attribute Join Example" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+</div>
+
+</TabItem>
+</Tabs>
 
 ## 2. Example use cases
 
 ### Attribute Join
-- Add population data to zip code areas (matching on zip code).
-- Combine survey data with census tract boundaries (matching on tract ID).
+- Add population data to district areas (matching on district ID).
+- Combine survey results with census boundaries (matching on tract ID).
 
 ### Spatial Join
-- Count the number of schools within each city district (Points inside Polygons).
-- Find the closest fire station to each building.
-- Sum the total length of roads within a park.
+- Count the number of schools within each city district.
+- Find which municipality each point of interest belongs to.
+- Sum the total length of roads within a park boundary.
+
+### Spatial and Attribute Join
+- Match buildings within a flood zone that also share the same building type.
 
 ## 3. How to use the tool?
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Click on <code>Toolbox</code> <img src={require('/img/icons/toolbox.png').default} alt="Options" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>. </div>
+  <div class="content">Click on <code>Toolbox</code> <img src={require('/img/icons/toolbox.png').default} alt="Toolbox" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>. Under <code>Data Management</code>, click on <code>Join Features</code>.</div>
 </div>
+
+### Select Layers
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Under the <code>Data Management</code> menu, click on <code>Join</code>.</div>
+  <div class="content">Select your <code>Target Layer</code> — the main layer whose geometry you want to keep.</div>
 </div>
-
-### Select layers
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Select your <code>Target Layer</code>: The main layer you want to keep.</div>
+  <div class="content">Select your <code>Join Layer</code> — the layer containing the fields you want to add.</div>
 </div>
+
+### Match Method
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Select your <code>Join Layer</code>: The layer containing data you want to add.</div>
+  <div class="content">Under <code>Match Method</code>, enable <code>Attribute Match</code>, <code>Spatial Match</code>, or both.</div>
 </div>
 
-### Choose Join Method
+<Tabs>
+<TabItem value="attribute" label="Attribute" default className="tabItemBox">
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Select the <code>Join Method</code>:</div>
+  <div class="content">Under <code>Attribute Relationship</code>, click <code>+ Add Match Field</code>, then select the <code>Target Field</code> and the <code>Join Field</code> — the shared field used to match features between the two layers.</div>
 </div>
 
-- **Attribute:** Match based on fields.
-- **Spatial:** Match based on location.
-- **Spatial & Attribute:** Match based on both.
+</TabItem>
 
----
+<TabItem value="spatial" label="Spatial" className="tabItemBox">
 
-### Settings (depending on method)
+<div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Under <code>Spatial Match</code>, select the <code>Spatial Relationship</code>. If selecting <code>Within Distance</code>, specify the distance and unit.</div>
+</div>
 
-**If Attribute Join:**
-- Select the **Target Field** (key in matching layer).
-- Select the **Join Field** (key in join layer).
+</TabItem>
 
-**If Spatial Join:**
-- Select the **Spatial Relationship** (e.g., Intersects, Within Distance, Completely Contains).
-- If "Within Distance", specify the search distance and units.
+<TabItem value="spatial_attribute" label="Spatial and Attribute" className="tabItemBox">
 
----
+<div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Configure both <code>Spatial Match</code> (select the spatial relationship) and <code>Attribute Relationship</code> (click <code>+ Add Match Field</code>, then select the matching fields). Both conditions must be met for a feature to be joined.</div>
+</div>
 
-### Join Options (Cardinality)
+</TabItem>
+</Tabs>
+
+### Join Options
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Select the <code>Join Operation</code> (One-to-One or One-to-Many).</div>
+  <div class="content">Select the <code>Join Type</code>: <code>Inner Join</code> (keep only matched features) or <code>Left Join</code> (keep all target features, unmatched get NULL).</div>
 </div>
-
-**One-to-One:**
-If multiple features in the Join Layer match a single feature in the Target Layer, you must choose how to handle them:
-- **First Record:** Takes the first matching record (arbitrary sort).
-- **Calculate Statistics:** Aggregates the matching records (e.g., Sum, Mean, Min, Max).
-- **Count Only:** Just counts how many matches were found.
-
-**One-to-Many:**
-Creates a separate feature in the output for *each* matching feature in the Join Layer (could duplicate target geometry).
-
-### Run
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Click <code>Run</code> to execute the join. Result will be added to the map.</div>
+  <div class="content">Select the <code>Match Handling</code>: <code>One to One</code> or <code>One to Many</code>.</div>
 </div>
+
+
+<div class="step">
+  <div class="step-number">8</div>
+  <div class="content">Optionally, enable <code>Add Join Fields</code> to select which fields from the Join Layer to include in the output, and/or enable <code>Calculate Statistics</code> to compute aggregated values for matched features.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">9</div>
+  <div class="content">Click <code>Run</code> to execute the join. The result layer will be added to the map.</div>
+</div>
+
+:::tip Hint
+
+Calculation time varies by settings. Check the [status bar](../../workspace/home#status-bar) for progress.
+
+:::

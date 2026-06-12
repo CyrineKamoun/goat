@@ -91,4 +91,33 @@ TASK_REGISTRY: tuple[TaskDefinition, ...] = (
         schedule="0 */5 * * * *",  # Every 5 minutes
         worker_tag="tools",
     ),
+    TaskDefinition(
+        name="ducklake_maintenance",
+        display_name="DuckLake Maintenance",
+        description=(
+            "Expire old DuckLake snapshots and reclaim orphaned parquet "
+            "files. Live-layer data is never touched."
+        ),
+        module_path="goatlib.tasks.ducklake_maintenance",
+        params_class_name="DuckLakeMaintenanceParams",
+        windmill_path="f/goat/tasks/ducklake_maintenance",
+        schedule="0 0 0 * * *",  # Daily at 00:00 UTC
+        worker_tag="tools",
+    ),
+    TaskDefinition(
+        name="ducklake_compact",
+        display_name="DuckLake Compaction",
+        description=(
+            "Merge small per-table parquets accumulated from incremental "
+            "INSERTs (e.g., user feature edits). Live-layer data is "
+            "rewritten in place, never lost."
+        ),
+        module_path="goatlib.tasks.ducklake_compact",
+        params_class_name="DuckLakeCompactParams",
+        windmill_path="f/goat/tasks/ducklake_compact",
+        # 30 min after maintenance — gives ducklake_maintenance a clear
+        # window to finish before compaction starts writing.
+        schedule="0 30 0 * * *",
+        worker_tag="tools",
+    ),
 )

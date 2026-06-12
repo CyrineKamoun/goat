@@ -4,8 +4,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
-#include <sstream>
+#include <queue>
 #include <unordered_map>
 #include <vector>
 
@@ -15,30 +16,35 @@ namespace routing::geometry
 namespace
 {
 
-static constexpr double kEarthCircumference = 40075016.68557849;
+constexpr double kEarthCircumference = 40075016.68557849;
+constexpr double kHaloMeters = 200.0;
+
+double mercator_pixel_size(int zoom)
+{
+    double z_s = static_cast<double>(1 << zoom) * 256.0;
+    return kEarthCircumference / z_s;
+}
 
 double merc_x_to_pixel(double x, int zoom)
 {
-    double z_s = static_cast<double>(1 << zoom) * 256.0;
-    return (x + kEarthCircumference / 2.0) / (kEarthCircumference / z_s);
+    return (x + kEarthCircumference / 2.0) / mercator_pixel_size(zoom);
 }
 
 double merc_y_to_pixel(double y, int zoom)
 {
-    double z_s = static_cast<double>(1 << zoom) * 256.0;
-    return (y - kEarthCircumference / 2.0) / (kEarthCircumference / (-z_s));
+    // Pixel y increases downward, mercator y increases upward.
+    return (kEarthCircumference / 2.0 - y) / mercator_pixel_size(zoom);
 }
 
-struct SamplePoint
+// Snap radius used by the kernel when filling cells: cells farther from
+// any sample than this are left as no-data. Linkage distance for clusters
+// is 2× this so two samples that could compete for the same cell never
+// land in different clusters.
+double snap_radius_for_step(double step)
 {
-    double x;  // web mercator
-    double y;
-    double cost;
-};
+    return std::max(kHaloMeters, step * 8.0);
+}
 
-// Query the DuckDB temp table for edge geometries and produce interpolated
-// sample points entirely in SQL, then transfer the flat (x, y, cost) results
-// to C++ in batches.
 // Interpolate sample points along edge geometries stored in C++ Edge structs.
 // Used for active mobility modes where geometry is loaded upfront.
 void split_edges_cpp(
@@ -107,121 +113,176 @@ void split_edges_cpp(
     }
 }
 
-} // namespace
-
-CostGrid build_cost_grid(ReachabilityField const &field,
-                         RequestConfig const &cfg,
-                         int zoom)
+std::vector<SamplePoint> collect_field_samples(
+    ReachabilityField const &field, double split_distance, double budget)
 {
-    CostGrid grid{};
+    std::vector<SamplePoint> samples;
     if (!field.network || field.costs.empty())
-        return grid;
-
+        return samples;
     auto const &net = *field.network;
-    double const budget = cfg.cost_budget();
-
-    // 1. Collect node points with finite costs
-    std::vector<SamplePoint> points;
-    points.reserve(net.node_count);
+    samples.reserve(net.node_count);
     for (int32_t i = 0; i < net.node_count; ++i)
     {
         double cost = field.costs[i];
         if (!std::isfinite(cost) || cost > budget)
             continue;
         auto const &c = net.node_coords[i];
-        points.push_back({c.x, c.y, cost});
+        samples.push_back({c.x, c.y, cost});
+    }
+    split_edges_cpp(field, split_distance, budget, samples);
+    return samples;
+}
+
+} // namespace
+
+std::vector<FieldCluster> cluster_field(
+    ReachabilityField const &field, RequestConfig const &cfg, int zoom)
+{
+    std::vector<FieldCluster> result;
+
+    double const step = mercator_pixel_size(zoom);
+    double const link_distance = 2.0 * snap_radius_for_step(step);
+
+    auto samples = collect_field_samples(field, step, cfg.cost_budget());
+    if (samples.empty())
+        return result;
+
+    // Bin samples into a coarse grid at link_distance. Two samples in
+    // non-adjacent bins are guaranteed > link_distance apart, so no grid
+    // cell can ever see both within snap range.
+    auto pack = [](int32_t bx, int32_t by) -> int64_t {
+        return (static_cast<int64_t>(by) << 32)
+             | (static_cast<int64_t>(static_cast<uint32_t>(bx)));
+    };
+    auto unpack = [](int64_t k) -> std::pair<int32_t, int32_t> {
+        return {static_cast<int32_t>(static_cast<uint32_t>(k & 0xFFFFFFFFULL)),
+                static_cast<int32_t>(k >> 32)};
+    };
+
+    std::unordered_map<int64_t, std::vector<size_t>> bin_to_samples;
+    bin_to_samples.reserve(samples.size() / 4);
+    for (size_t i = 0; i < samples.size(); ++i)
+    {
+        int32_t bx = static_cast<int32_t>(std::floor(samples[i].x / link_distance));
+        int32_t by = static_cast<int32_t>(std::floor(samples[i].y / link_distance));
+        bin_to_samples[pack(bx, by)].push_back(i);
     }
 
-    if (points.empty())
+    // Connected components of bins (8-way neighbors).
+    std::unordered_map<int64_t, int> bin_to_cluster;
+    int n_clusters = 0;
+    for (auto const &kv : bin_to_samples)
+    {
+        auto [seed_it, seeded] = bin_to_cluster.try_emplace(kv.first, n_clusters);
+        if (!seeded) continue;
+        std::queue<int64_t> q;
+        q.push(kv.first);
+        while (!q.empty())
+        {
+            int64_t k = q.front(); q.pop();
+            auto [kx, ky] = unpack(k);
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                {
+                    if (dx == 0 && dy == 0) continue;
+                    int64_t nk = pack(kx + dx, ky + dy);
+                    if (!bin_to_samples.count(nk)) continue;
+                    auto [it, inserted] = bin_to_cluster.try_emplace(nk, n_clusters);
+                    if (inserted) q.push(nk);
+                }
+        }
+        ++n_clusters;
+    }
+
+    // Group samples by cluster, compute per-cluster bbox.
+    result.assign(static_cast<size_t>(n_clusters), FieldCluster{});
+    for (auto &c : result)
+    {
+        c.min_x = c.min_y =  std::numeric_limits<double>::infinity();
+        c.max_x = c.max_y = -std::numeric_limits<double>::infinity();
+    }
+    for (auto const &kv : bin_to_samples)
+    {
+        int ci = bin_to_cluster[kv.first];
+        auto &c = result[ci];
+        for (size_t i : kv.second)
+        {
+            auto const &s = samples[i];
+            c.samples.push_back(s);
+            c.min_x = std::min(c.min_x, s.x); c.max_x = std::max(c.max_x, s.x);
+            c.min_y = std::min(c.min_y, s.y); c.max_y = std::max(c.max_y, s.y);
+        }
+    }
+
+    // Drop empty clusters defensively (shouldn't happen by construction).
+    result.erase(std::remove_if(result.begin(), result.end(),
+        [](FieldCluster const &c) { return c.samples.empty(); }),
+        result.end());
+    return result;
+}
+
+CostGrid build_cost_grid_from_cluster(
+    FieldCluster const &cluster, RequestConfig const &cfg, int zoom)
+{
+    CostGrid grid{};
+    if (cluster.samples.empty())
         return grid;
 
-    // 2. Compute extent in web mercator (padded by 200m)
-    double min_x = points[0].x, max_x = points[0].x;
-    double min_y = points[0].y, max_y = points[0].y;
-    for (auto const &p : points)
-    {
-        min_x = std::min(min_x, p.x);
-        max_x = std::max(max_x, p.x);
-        min_y = std::min(min_y, p.y);
-        max_y = std::max(max_y, p.y);
-    }
-    min_x -= 200.0;
-    min_y -= 200.0;
-    max_x += 200.0;
-    max_y += 200.0;
+    double const budget = cfg.cost_budget();
 
-    // 3. Compute pixel dimensions
-    double px_bl_x = std::floor(merc_x_to_pixel(min_x, zoom));
-    double px_bl_y = std::floor(merc_y_to_pixel(min_y, zoom));
-    double px_tr_x = std::floor(merc_x_to_pixel(max_x, zoom));
-    double px_tr_y = std::floor(merc_y_to_pixel(max_y, zoom));
+    // Pad the tight cluster bbox by the kernel halo so off-network cells
+    // along the edge get a neighbor within snap range.
+    double min_x = cluster.min_x - kHaloMeters;
+    double min_y = cluster.min_y - kHaloMeters;
+    double max_x = cluster.max_x + kHaloMeters;
+    double max_y = cluster.max_y + kHaloMeters;
 
-    int32_t width_px = static_cast<int32_t>(px_tr_x - px_bl_x);
-    int32_t height_px = static_cast<int32_t>(px_bl_y - px_tr_y);
+    double const px_bl_x = std::floor(merc_x_to_pixel(min_x, zoom));
+    double const px_bl_y = std::floor(merc_y_to_pixel(min_y, zoom));
+    double const px_tr_x = std::floor(merc_x_to_pixel(max_x, zoom));
+    double const px_tr_y = std::floor(merc_y_to_pixel(max_y, zoom));
 
+    int32_t const width_px = static_cast<int32_t>(px_tr_x - px_bl_x);
+    int32_t const height_px = static_cast<int32_t>(px_bl_y - px_tr_y);
     if (width_px < 2 || height_px < 2)
         return grid;
 
-    // Cap grid size
-    static constexpr int64_t kMaxCells = 4'000'000;
-    if (static_cast<int64_t>(width_px) * height_px > kMaxCells)
-    {
-        double scale = std::sqrt(static_cast<double>(kMaxCells) /
-                                 (static_cast<double>(width_px) * height_px));
-        width_px = std::max(2, static_cast<int32_t>(width_px * scale));
-        height_px = std::max(2, static_cast<int32_t>(height_px * scale));
-    }
+    double const step_x = (max_x - min_x) / width_px;
+    double const step_y = (max_y - min_y) / height_px;
 
-    double merc_width = max_x - min_x;
-    double merc_height = max_y - min_y;
-    double step_x = merc_width / width_px;
-    double step_y = merc_height / height_px;
-
-    // 4. Split edges — interpolate along actual edge geometries in C++
-    double split_dist = std::min(step_x, step_y);
-    split_edges_cpp(field, split_dist, budget, points);
-
-    // 5. Deduplicate sample points per pixel cell (keep cheapest)
+    // Deduplicate samples per pixel cell (keep cheapest).
+    std::vector<SamplePoint> dedup;
     {
         std::unordered_map<int64_t, size_t> best_per_pixel;
-        best_per_pixel.reserve(points.size());
-        for (size_t i = 0; i < points.size(); ++i)
+        best_per_pixel.reserve(cluster.samples.size());
+        for (size_t i = 0; i < cluster.samples.size(); ++i)
         {
             int64_t px = static_cast<int64_t>(
-                std::round(merc_x_to_pixel(points[i].x, zoom)));
+                std::round(merc_x_to_pixel(cluster.samples[i].x, zoom)));
             int64_t py = static_cast<int64_t>(
-                std::round(merc_y_to_pixel(points[i].y, zoom)));
+                std::round(merc_y_to_pixel(cluster.samples[i].y, zoom)));
             int64_t key = py * 1'000'000LL + px;
             auto it = best_per_pixel.find(key);
             if (it == best_per_pixel.end())
-            {
                 best_per_pixel[key] = i;
-            }
-            else if (points[i].cost < points[it->second].cost)
-            {
+            else if (cluster.samples[i].cost < cluster.samples[it->second].cost)
                 it->second = i;
-            }
         }
-        std::vector<SamplePoint> deduped;
-        deduped.reserve(best_per_pixel.size());
+        dedup.reserve(best_per_pixel.size());
         for (auto const &[_, idx] : best_per_pixel)
-            deduped.push_back(points[idx]);
-        points = std::move(deduped);
+            dedup.push_back(cluster.samples[idx]);
     }
 
-    // 6. Build KD-tree from deduplicated sample points
-    std::vector<Point3857> kd_coords(points.size());
-    for (size_t i = 0; i < points.size(); ++i)
-        kd_coords[i] = {points[i].x, points[i].y};
-
+    // KD-tree over deduplicated samples.
+    std::vector<Point3857> kd_coords(dedup.size());
+    for (size_t i = 0; i < dedup.size(); ++i)
+        kd_coords[i] = {dedup[i].x, dedup[i].y};
     kernel::KdTree2D tree(kd_coords);
 
-    // 7. Walking speed for off-network cost
-    double speed_m_per_s = (cfg.speed_km_h > 0.0) ? (cfg.speed_km_h * 1000.0 / 3600.0)
-                                                    : (5.0 * 1000.0 / 3600.0);
-
-    // 8. Fill grid
-    double const kMaxSnapDist = std::max(200.0, std::max(step_x, step_y) * 8.0);
+    double const speed_m_per_s = (cfg.speed_km_h > 0.0)
+        ? (cfg.speed_km_h * 1000.0 / 3600.0)
+        : (5.0 * 1000.0 / 3600.0);
+    double const max_snap = snap_radius_for_step(std::max(step_x, step_y));
     double const kNoData = std::numeric_limits<int32_t>::max();
 
     std::vector<double> surface(
@@ -234,22 +295,16 @@ CostGrid build_cost_grid(ReachabilityField const &field,
             double gx = min_x + (col + 0.5) * step_x;
             double gy = max_y - (row + 0.5) * step_y;
 
-            // Radius-bounded search: cells far from any sample (empty space
-            // between disjoint multi-point catchments) reject in O(log n)
-            // instead of full-tree O(n) traversal.
-            auto [idx, dist] = tree.nearest_within({gx, gy}, kMaxSnapDist);
-            if (idx < 0)
-                continue;
+            auto [idx, dist] = tree.nearest_within({gx, gy}, max_snap);
+            if (idx < 0) continue;
 
-            double base_cost = points[idx].cost;
+            double base_cost = dedup[idx].cost;
             double walk_cost = (cfg.cost_type == CostType::Distance)
-                                   ? dist
-                                   : (dist / speed_m_per_s) / 60.0;
+                ? dist
+                : (dist / speed_m_per_s) / 60.0;
             double total = std::round(base_cost + walk_cost);
             if (total <= budget)
-            {
                 surface[static_cast<size_t>(row) * width_px + col] = total;
-            }
         }
     }
 
@@ -260,7 +315,6 @@ CostGrid build_cost_grid(ReachabilityField const &field,
     grid.north = max_y;
     grid.step_x = step_x;
     grid.step_y = step_y;
-
     return grid;
 }
 

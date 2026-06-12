@@ -58,6 +58,11 @@ class Weekday(StrEnum):
     sunday = "sunday"
 
 
+class ShapeStyle(StrEnum):
+    combined = "combined"
+    separated = "separated"
+
+
 class PTTimeWindow(BaseModel):
     """Time window for PT departure sweep."""
 
@@ -91,7 +96,12 @@ class CatchmentAreaV2Params(BaseModel):
         default=15.0, gt=0,
         description="Budget: minutes (time) or meters (distance)",
     )
-    speed: float = Field(default=5.0, ge=1.0, le=50.0, description="Travel speed in km/h")
+    speed: float | None = Field(
+        default=None, ge=0.0, le=60.0,
+        description="Travel speed in km/h. None when the routing mode doesn't "
+                    "use a user-supplied speed (PT uses access/egress speeds; "
+                    "Car uses per-edge OSM maxspeed).",
+    )
     steps: int = Field(default=3, ge=1, le=20, description="Number of isochrone steps")
     cutoffs: list[int] | None = Field(
         default=None,
@@ -103,11 +113,12 @@ class CatchmentAreaV2Params(BaseModel):
     output_format: OutputFormat = OutputFormat.parquet
     output_path: str
     polygon_difference: bool = True
+    shape_style: ShapeStyle = ShapeStyle.combined
 
     # PT settings
     transit_modes: list[PTMode] | None = None
     time_window: PTTimeWindow | None = None
-    max_transfers: int = Field(default=5, ge=0, le=10, description="RAPTOR transfer limit")
+    max_transfers: int = Field(default=5, ge=0, le=5, description="RAPTOR transfer limit")
 
     # PT access/egress
     access_mode: AccessEgressMode = AccessEgressMode.walk
@@ -116,8 +127,8 @@ class CatchmentAreaV2Params(BaseModel):
     egress_cost_type: CostType = CostType.time
     access_max_cost: float = Field(default=15.0, ge=0.0, description="Access leg budget: minutes (time) or meters (distance). 0 = default (15 min / 500 m).")
     egress_max_cost: float = Field(default=15.0, ge=0.0, description="Egress leg budget: minutes (time) or meters (distance). 0 = default (15 min / 500 m).")
-    access_speed: float = Field(default=0.0, ge=0.0, description="Access leg speed in km/h (time cost type only, 0 = use speed)")
-    egress_speed: float = Field(default=0.0, ge=0.0, description="Egress leg speed in km/h (time cost type only, 0 = use speed)")
+    access_speed: float | None = Field(default=None, ge=0.0, description="Access leg speed in km/h. None for car access (per-edge OSM maxspeed governs).")
+    egress_speed: float | None = Field(default=None, ge=0.0, description="Egress leg speed in km/h. None for car egress.")
 
     # PointGrid settings
     grid_points_path: str | None = Field(default=None, description="Parquet with grid points (id, x_3857, y_3857)")

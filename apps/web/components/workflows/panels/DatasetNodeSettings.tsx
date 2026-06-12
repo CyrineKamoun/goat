@@ -280,8 +280,9 @@ export default function DatasetNodeSettings({ node, projectLayers = [], onBack }
         }
       }
 
-      // Update node data with selected layer and inherited filter
-      // Use layer_id (the actual layer UUID) as the main identifier
+      // Update node data with selected layer and inherited filter.
+      // - projectLayerId (ProjectLayer.id) is the canonical reference used to render the live name
+      // - layerId (dataset UUID) is kept for tile/feature API calls
       dispatch(
         updateNode({
           id: node.id,
@@ -289,7 +290,8 @@ export default function DatasetNodeSettings({ node, projectLayers = [], onBack }
             data: {
               ...node.data,
               label: layer.name,
-              layerId: layer.layer_id, // Use layer_id (UUID) as main identifier
+              projectLayerId: layer.id,
+              layerId: layer.layer_id,
               layerName: layer.name,
               geometryType: layer.feature_layer_geometry_type || undefined,
               layerType: (layer.type as "feature" | "table" | "raster") || undefined,
@@ -319,7 +321,9 @@ export default function DatasetNodeSettings({ node, projectLayers = [], onBack }
     (layer: Layer) => {
       if (node.type !== "dataset") return;
 
-      // Update node data with selected layer (without adding to project)
+      // Update node data with selected layer (without adding to project).
+      // No projectLayerId because this dataset is not part of the project — name lookup falls
+      // back to the snapshotted label.
       dispatch(
         updateNode({
           id: node.id,
@@ -327,7 +331,7 @@ export default function DatasetNodeSettings({ node, projectLayers = [], onBack }
             data: {
               ...node.data,
               label: layer.name,
-              // Note: For workflow-only layers, we use layerId directly (not layerProjectId)
+              projectLayerId: undefined,
               layerId: layer.id,
               layerName: layer.name,
               geometryType: layer.feature_layer_geometry_type || undefined,

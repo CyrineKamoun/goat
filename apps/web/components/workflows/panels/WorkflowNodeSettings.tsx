@@ -7,7 +7,7 @@
  * For tool nodes, displays the same inputs as GenericTool.
  * For dataset nodes, delegates to DatasetNodeSettings.
  */
-import { CheckCircle as CheckCircleIcon } from "@mui/icons-material";
+import { Block as BlockIcon, CheckCircle as CheckCircleIcon } from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -69,6 +69,7 @@ import { useWorkflowExecutionContext } from "@/components/workflows/context/Work
 import SaveDatasetDialog from "@/components/workflows/dialogs/SaveDatasetDialog";
 import VariableAwareInput from "@/components/workflows/inputs/VariableAwareInput";
 import DatasetNodeSettings from "@/components/workflows/panels/DatasetNodeSettings";
+import IfNodeSettings from "@/components/workflows/panels/IfNodeSettings";
 import SqlToolSettings from "@/components/workflows/panels/SqlToolSettings";
 
 // Map section icons from backend to ICON_NAME
@@ -299,6 +300,23 @@ export default function WorkflowNodeSettings({
   const allInputs = useMemo(() => {
     return sections.flatMap((section) => section.inputs);
   }, [sections]);
+
+  // Repeatable inputs whose items are layers (e.g. merge) — these are filled by
+  // canvas connections, so we don't pad them to min_items in the workflow panel.
+  const layerRepeatableInputNames = useMemo(() => {
+    const names = new Set<string>();
+    if (!process) return names;
+    for (const input of allInputs) {
+      if (input.inputType !== "repeatable-object") continue;
+      const itemsRef = input.schema?.items?.$ref;
+      if (!itemsRef || !process.$defs) continue;
+      const itemSchema = process.$defs[itemsRef.replace("#/$defs/", "")];
+      if (!itemSchema) continue;
+      const fields = processObjectProperties(itemSchema, process.$defs);
+      if (fields.some((f) => f.inputType === "layer")) names.add(input.name);
+    }
+    return names;
+  }, [process, allInputs]);
 
   // Helper to get layer ID from a connected source node
   const getLayerIdFromSourceNode = useCallback(
@@ -945,6 +963,11 @@ export default function WorkflowNodeSettings({
     return <SqlToolSettings node={node} onBack={onBack} />;
   }
 
+  // Render If/Switch branching node settings
+  if (node.type === "if" && node.data.type === "if") {
+    return <IfNodeSettings node={node} projectLayers={layers} onBack={onBack} />;
+  }
+
   // Render tool node settings
   if (node.type === "tool" && node.data.type === "tool") {
     // Loading state
@@ -1001,8 +1024,11 @@ export default function WorkflowNodeSettings({
                 </Typography>
                 <Divider sx={{ mb: 1.5 }} />
                 <Chip
-                  label={nodeStatus ? t(nodeStatus) : t("idle")}
+                  label={nodeStatus ? t(nodeStatus, { defaultValue: nodeStatus }) : t("idle")}
                   size="small"
+                  icon={
+                    nodeStatus === "skipped" ? <BlockIcon sx={{ fontSize: 14 }} /> : undefined
+                  }
                   color={
                     nodeStatus === "completed"
                       ? "primary"
@@ -1043,9 +1069,14 @@ export default function WorkflowNodeSettings({
 
                 // Filter out layer inputs that should come from node connections
                 const workflowHiddenWidgets = ["layer-selector", "starting-points"];
-                const visibleInputs = getVisibleInputs(section.inputs, effectiveValues).filter(
-                  (input) => !workflowHiddenWidgets.includes(input.uiMeta?.widget || "")
-                );
+                const visibleInputs = getVisibleInputs(section.inputs, effectiveValues)
+                  .filter((input) => !workflowHiddenWidgets.includes(input.uiMeta?.widget || ""))
+                  // Repeatable layer inputs come from connections; don't pad to min_items.
+                  .map((input) =>
+                    layerRepeatableInputNames.has(input.name)
+                      ? { ...input, uiMeta: { ...input.uiMeta, min_items: 0 } }
+                      : input
+                  );
                 const sectionEnabled = isSectionEnabled(section, effectiveValues);
 
                 // Skip empty sections

@@ -16,15 +16,33 @@ interface StringInputProps {
   value: string | undefined;
   onChange: (value: string | undefined) => void;
   disabled?: boolean;
+  formValues?: Record<string, unknown>;
 }
 
-export default function StringInput({ input, value, onChange, disabled }: StringInputProps) {
+export default function StringInput({ input, value, onChange, disabled, formValues }: StringInputProps) {
   const effectiveSchema = getEffectiveSchema(input.schema);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = event.target.value === "" ? undefined : event.target.value;
     onChange(newValue);
   };
+
+  const placeholder = (() => {
+    const template = input.uiMeta?.widget_options?.placeholder_template;
+    if (typeof template === "string" && formValues) {
+      let missing = false;
+      const rendered = template.replace(/\{([^}]+)\}/g, (_, key: string) => {
+        const v = formValues[key];
+        if (v === undefined || v === null || v === "") {
+          missing = true;
+          return "";
+        }
+        return String(v);
+      });
+      return missing ? undefined : rendered;
+    }
+    return input.defaultValue !== undefined ? String(input.defaultValue) : undefined;
+  })();
 
   return (
     <Stack>
@@ -39,7 +57,7 @@ export default function StringInput({ input, value, onChange, disabled }: String
           maxLength: effectiveSchema.maxLength,
           pattern: effectiveSchema.pattern,
         }}
-        placeholder={input.defaultValue !== undefined ? String(input.defaultValue) : undefined}
+        placeholder={placeholder}
         fullWidth
       />
     </Stack>

@@ -264,11 +264,15 @@ export default function WorkflowRunner({ workflowId, onBack, onClose }: Workflow
       if (processedJobIdsRef.current.has(job.jobID)) return;
       processedJobIdsRef.current.add(job.jobID);
 
-      const results = job.result?.node_results as Record<string, { duration_ms?: number }> | undefined;
+      const results = job.result?.node_results as
+        | Record<string, { duration_ms?: number; status?: string }>
+        | undefined;
+      const resolveStatus = (nodeId: string): NodeExecutionStatus =>
+        (results?.[nodeId]?.status === "skipped" ? "skipped" : "completed") as NodeExecutionStatus;
       const finalInfo: Record<string, NodeExecutionInfo> = {};
       if (results) {
         Object.entries(results).forEach(([nodeId, result]) => {
-          finalInfo[nodeId] = { status: "completed", durationMs: result.duration_ms };
+          finalInfo[nodeId] = { status: resolveStatus(nodeId), durationMs: result.duration_ms };
         });
       }
 
@@ -277,7 +281,7 @@ export default function WorkflowRunner({ workflowId, onBack, onClose }: Workflow
         isExecuting: false,
         jobId: null,
         nodeStatuses: Object.fromEntries(
-          Object.entries(s.nodeStatuses).map(([id]) => [id, "completed" as NodeExecutionStatus])
+          Object.entries(s.nodeStatuses).map(([id]) => [id, resolveStatus(id)])
         ),
         nodeExecutionInfo: finalInfo,
       }));

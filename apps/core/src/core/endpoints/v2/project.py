@@ -1128,6 +1128,61 @@ async def unassign_custom_domain(
     await async_session.commit()
 
 
+class TrackingTogglePayload(BaseModel):
+    """Body of PUT /project/{project_id}/public/tracking.
+
+    Both fields are optional and updated independently — clients can send
+    either or both. Lets the Share dialog flip each Switch with a single
+    PUT to the same endpoint.
+    """
+
+    enabled: bool | None = None
+    require_consent: bool | None = None
+
+
+@router.put(
+    "/{project_id}/public/tracking",
+    summary="Update analytics tracking settings for a published project",
+    dependencies=[Depends(auth_z)],
+)
+async def set_tracking_settings(
+    project_id: str,
+    payload: TrackingTogglePayload,
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+) -> ProjectPublicRead:
+    """Per-project opt-in toggles for analytics behaviour.
+
+    ``enabled`` controls whether the tracker fires at all; ``require_consent``
+    controls whether the tracker waits for the visitor's consent banner.
+    Both flags are independent project preferences; what's actually injected
+    at view time also depends on the org having an analytics configuration.
+    """
+    if payload.enabled is None and payload.require_consent is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="at least one of 'enabled' or 'require_consent' is required",
+        )
+
+    result = await async_session.execute(
+        select(ProjectPublic).where(ProjectPublic.project_id == UUID(project_id))
+    )
+    project_public = result.scalar_one_or_none()
+    if project_public is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="project is not published",
+        )
+
+    if payload.enabled is not None:
+        project_public.tracking_enabled = payload.enabled
+    if payload.require_consent is not None:
+        project_public.tracking_require_consent = payload.require_consent
+    await async_session.commit()
+    await async_session.refresh(project_public)
+    return ProjectPublicRead(**project_public.model_dump())
+
+
 ##############################################
 ### Layer Group Endpoints
 ##############################################

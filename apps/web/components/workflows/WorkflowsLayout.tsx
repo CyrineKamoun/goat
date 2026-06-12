@@ -29,6 +29,7 @@ import {
 } from "@/lib/store/workflow/slice";
 import { parseCQLQueryToObject } from "@/lib/transformers/filter";
 import type { Project, ProjectLayer, ProjectLayerGroup } from "@/lib/validations/project";
+import { createIfNode } from "@/lib/validations/workflow";
 import type { WorkflowNode } from "@/lib/validations/workflow";
 
 import { useWorkflowExecution } from "@/hooks/workflows/useWorkflowExecution";
@@ -75,6 +76,7 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
   const dragDataRef = useRef<{
     nodeType: string;
     toolId?: string;
+    projectLayerId?: number;
     layerId?: string;
     layerName?: string;
     geometryType?: string;
@@ -194,7 +196,8 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
 
       dragDataRef.current = {
         nodeType: "dataset",
-        layerId: layer.layer_id, // Use the actual layer ID (UUID)
+        projectLayerId: layer.id, // ProjectLayer.id (number) — canonical for live name lookup
+        layerId: layer.layer_id, // Dataset UUID — used for tiles/features/fields API calls
         layerName: layer.name,
         geometryType: layer.feature_layer_geometry_type || undefined,
         layerType: layer.type || undefined,
@@ -248,7 +251,8 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
 
       if (!selectedWorkflowId || !dragDataRef.current || !reactFlowInstance) return;
 
-      const { nodeType, toolId, layerId, layerName, geometryType, layerType, layerCql } = dragDataRef.current;
+      const { nodeType, toolId, projectLayerId, layerId, layerName, geometryType, layerType, layerCql } =
+        dragDataRef.current;
       dragDataRef.current = null;
 
       // Get canvas position from drop coordinates - use screen coordinates directly
@@ -285,6 +289,7 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
               data: {
                 type: "dataset",
                 label: layerName,
+                projectLayerId: projectLayerId,
                 layerId: layerId,
                 layerName: layerName,
                 geometryType: geometryType || undefined,
@@ -339,6 +344,8 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
             },
           })
         );
+      } else if (nodeType === "if") {
+        dispatch(addNode(createIfNode(`if-${uuidv4()}`, position)));
       }
     },
     [selectedWorkflowId, reactFlowInstance, dispatch]

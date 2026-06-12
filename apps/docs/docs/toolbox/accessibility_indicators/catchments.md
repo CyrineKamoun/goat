@@ -15,7 +15,9 @@ Catchment Area shows **how far people can travel within a certain travel time or
 
 ## 1. Explanation
 
-Catchment Area includes the following features:
+Based on specified starting point(s), maximum travel time or distance, and transport mode(s), **Catchment Areas visualize accessibility extent using real-world data.** This provides insights into transport network quality, density, and extensiveness. The catchment area can be intersected with spatial datasets, such as population data, to assess reachable amenities and identify accessibility coverage for inhabitants.
+
+Catchment Area includes the following additional features:
 
 **For all routing modes:**
 
@@ -26,8 +28,6 @@ Catchment Area includes the following features:
 
 - **Maximum number of transfers** — limit how many PT connections a trip can include.
 - **Access and egress mode** — configure how users travel to and from PT stations (walking, cycling, or car).
-
-Based on specified starting point(s), maximum travel time or distance, and transport mode(s), the tool **visualizes accessibility using real-world routing networks**. The resulting isochrones can be intersected with spatial datasets — such as population or amenity data — to assess coverage and identify accessibility gaps.
 
 :::info
 Catchment Area computation is available in specific regions.

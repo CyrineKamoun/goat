@@ -13,6 +13,7 @@ import { COLOR_RANGES } from "@/lib/constants/color";
 import {
   type ClassBreaks,
   type ColorMap,
+  type FeatureLayerPointProperties,
   type FeatureLayerProperties,
   type LayerUniqueValues,
   type MarkerMap,
@@ -27,9 +28,10 @@ import AccordionWrapper from "@/components/common/AccordionWrapper";
 import FormLabelHelper from "@/components/common/FormLabelHelper";
 import SectionHeader from "@/components/map/panels/common/SectionHeader";
 import SliderInput from "@/components/map/panels/common/SliderInput";
+import ClusteringSection from "@/components/map/panels/style/clustering/ClusteringSection";
 import ColorOptions from "@/components/map/panels/style/color/ColorOptions";
 import GeneralOptions from "@/components/map/panels/style/general/GeneralOptions";
-import InteractionOptions from "@/components/map/panels/style/interaction/InteractionOptions";
+import PopupSection from "@/components/map/panels/style/popup/PopupSection";
 import LabelOptions from "@/components/map/panels/style/label/LabelOptions";
 import { LegendOptions } from "@/components/map/panels/style/legend/LegendOptions";
 import LineStyleSection from "@/components/map/panels/style/line/LineStyleSection";
@@ -282,9 +284,21 @@ const LayerStylePanel = ({ projectId }: { projectId: string }) => {
             newStyle[`${updateType}_range`].category = matchingPalette.category;
             newStyle[`${updateType}_range`].type = matchingPalette.type;
           }
-        } else {
-          // Palette changed but the attribute field and its values are unchanged —
-          // remap colors onto the existing value assignments without hitting the API.
+        } else if (currentRange?.type !== "custom") {
+          // Preset → preset (or preset → custom by palette swap): the
+          // user just picked a different palette. The field and its
+          // values are unchanged, so remap the new palette's colors
+          // onto the existing value assignments without hitting the
+          // API.
+          //
+          // We deliberately skip this branch when the incoming range
+          // is `type: "custom"` — that flag means the user just
+          // applied edits via the CustomColorScale popper (added a
+          // row, multi-valued a row, recolored, etc.). Their edits
+          // already live on `newStyle.color_range.color_map`; rebuilding
+          // from `existingColorMap` would erase rows the user added
+          // and revert multi-value selections to the snapshot from
+          // before they opened the popper.
           const newColors = currentRange?.colors ?? [];
           const entryCount = Math.min(existingColorMap.length, newColors.length);
           if (entryCount > 0) {
@@ -584,6 +598,21 @@ const LayerStylePanel = ({ projectId }: { projectId: string }) => {
                         />
                       )}
 
+                      {/* {CLUSTERING}
+                          Only available for point layers ≤ 100k features
+                          (the cap on the bulk-features endpoint used by the
+                          GeoJSON cluster source). Layers that already have
+                          clustering enabled keep the section visible so users
+                          can still toggle it off if the layer has grown. */}
+                      {activeLayer.feature_layer_geometry_type === "point" &&
+                        ((activeLayer.total_count ?? 0) <= 100_000 ||
+                          !!(layerProperties as FeatureLayerPointProperties)?.cluster?.enabled) && (
+                          <ClusteringSection
+                            layerProperties={layerProperties}
+                            onStyleChange={(newStyle) => updateLayerStyle(newStyle)}
+                          />
+                        )}
+
                       {/* {MARKER ICON} */}
                       {activeLayer.feature_layer_geometry_type &&
                         activeLayer.feature_layer_geometry_type === "point" && (
@@ -741,7 +770,7 @@ const LayerStylePanel = ({ projectId }: { projectId: string }) => {
                   flexDirection: "column",
                 }}>
                 {activeLayer && (
-                  <InteractionOptions
+                  <PopupSection
                     layer={activeLayer}
                     onStyleChange={async (newStyle) => {
                       updateLayerStyle(newStyle);

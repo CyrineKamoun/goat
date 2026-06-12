@@ -5,7 +5,11 @@ from pathlib import Path
 import duckdb
 import pytest
 from goatlib.analysis.data_management.merge import MergeTool
-from goatlib.analysis.schemas.data_management import MergeParams
+from goatlib.analysis.schemas.data_management import MergeInputLayer, MergeParams
+
+
+def _layers(*paths: str) -> list[MergeInputLayer]:
+    return [MergeInputLayer(input_path=p) for p in paths]
 
 
 def test_merge_two_point_layers() -> None:
@@ -18,7 +22,7 @@ def test_merge_two_point_layers() -> None:
     output_path = str(result_dir / "unit_merge_two_point_layers.parquet")
 
     params = MergeParams(
-        input_paths=[points_1, points_2],
+        input_paths=_layers(points_1, points_2),
         output_path=output_path,
     )
 
@@ -52,11 +56,11 @@ def test_merge_two_point_layers() -> None:
     ).fetchall()
     assert [v[0] for v in source_values] == [0, 1]
 
-    # Check that conflicting field names are renamed
+    # Same-name columns are merged into one (no _1/_2 suffixes)
     assert "id" in column_names
-    assert "id_1" in column_names
     assert "name" in column_names
-    assert "name_1" in column_names
+    assert "id_1" not in column_names
+    assert "name_1" not in column_names
 
     con.close()
     print(f"✓ Merge test passed. Result has {row_count} features.")
@@ -72,9 +76,9 @@ def test_merge_without_source_field() -> None:
     output_path = str(result_dir / "unit_merge_no_source.parquet")
 
     params = MergeParams(
-        input_paths=[points_1, points_2],
+        input_paths=_layers(points_1, points_2),
         output_path=output_path,
-        add_source_field=False,
+        add_source_column=False,
     )
 
     tool = MergeTool()
@@ -103,7 +107,7 @@ def test_merge_incompatible_geometries_raises_error() -> None:
     output_path = str(result_dir / "unit_merge_should_fail.parquet")
 
     params = MergeParams(
-        input_paths=[points, lines],
+        input_paths=_layers(points, lines),
         output_path=output_path,
         validate_geometry_types=True,
     )
@@ -126,7 +130,7 @@ def test_merge_incompatible_geometries_with_validation_disabled() -> None:
     output_path = str(result_dir / "unit_merge_mixed_geoms.parquet")
 
     params = MergeParams(
-        input_paths=[points, lines],
+        input_paths=_layers(points, lines),
         output_path=output_path,
         validate_geometry_types=False,
     )
@@ -152,7 +156,7 @@ def test_merge_less_than_two_layers_raises_error() -> None:
     points = str(test_data_dir / "merge_points_1.parquet")
 
     with pytest.raises(Exception):  # Pydantic ValidationError
-        MergeParams(input_paths=[points])
+        MergeParams(input_paths=_layers(points))
 
     print("✓ Single layer validation test passed.")
 
@@ -165,7 +169,7 @@ def test_merge_with_auto_output_path() -> None:
     points_2 = str(test_data_dir / "merge_points_2.parquet")
 
     params = MergeParams(
-        input_paths=[points_1, points_2],
+        input_paths=_layers(points_1, points_2),
     )
 
     tool = MergeTool()

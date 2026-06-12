@@ -93,6 +93,9 @@
     "join_options": {
       "label": "Verbindungsoptionen"
     },
+    "merge_options": {
+      "label": "Merge-Optionen"
+    },
     "dissolve_settings": {
       "label": "Auflösungseinstellungen"
     },
@@ -151,6 +154,10 @@
     "catchment_area_type": {
       "label": "Form des Einzugsgebiets",
       "description": "Wählen Sie die Form der Einzugsgebietsgeometrie aus."
+    },
+    "shape_style": {
+      "label": "Form der Geometrien",
+      "description": "Form der Polygone bei mehreren Startpunkten"
     },
     "steps_style": {
       "label": "Darstellung der Schritte",
@@ -770,6 +777,10 @@
       "time": "Zeit (Min)",
       "distance": "Entfernung (m)"
     },
+    "shape_style": {
+      "combined": "Zusammengefasst über Startpunkte",
+      "separated": "Getrennt nach Startpunkt"
+    },
     "steps_style": {
       "separate": "Getrennte Schritte",
       "cumulative": "Kumulative Schritte"
@@ -1007,7 +1018,7 @@
       "description": "Überträgt Attribute zwischen Layern basierend auf räumlichen und Attributbeziehungen. Optional können statistische Daten für die verbundenen Objekte berechnet werden."
     },
     "dissolve": {
-      "title": "Zusammenführen",
+      "title": "Zusammenführen (Dissolve)",
       "description": "Fasst Objekte mit gleichen Attributwerten zusammen. Optional können Statistiken für numerische Felder berechnet werden."
     },
     "catchment_area_v2": {
@@ -1017,6 +1028,10 @@
     "travel_cost_matrix": {
       "title": "Reisezeitmatrix",
       "description": "Berechnet Reisezeiten und Entfernungen zwischen Start- und Zielpunkt-Layern."
+    },
+    "merge": {
+      "title": "Zusammenführen (Merge)",
+      "description": "Parameter für das Merge-Werkzeug. Standardmäßig werden Felder mit gleichem Namen zusammengeführt, während eingabespezifische Felder im Ergebnis erhalten bleiben."
     }
   },
   "groups": {
@@ -1050,6 +1065,7 @@
     "dissolve": "Zusammenführen",
     "intersection": "Überschneiden",
     "union": "Vereinigen",
+    "merge": "Zusammenführen",
     "aggregate_points": "Punkte aggregieren",
     "aggregate_polygon": "Polygone aggregieren",
     "aggregate_polygons": "Polygone aggregieren",

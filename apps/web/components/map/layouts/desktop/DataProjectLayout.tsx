@@ -44,6 +44,7 @@ import { Toolbox as ToolboxCtrl } from "@/components/map/controls/Toolbox";
 import { Zoom } from "@/components/map/controls/Zoom";
 import { MeasureButton, MeasureResultsPanel } from "@/components/map/controls/measure";
 import LayerSettingsPanel from "@/components/map/panels/layer/LayerSettingsPanel";
+import { MapFixedPopupSlot } from "@/components/map/popover/MapFixedPopupSlot";
 import { ProjectLayerTree } from "@/components/map/panels/layer/ProjectLayerTree";
 import Scenario from "@/components/map/panels/scenario/Scenario";
 import Toolbox from "@/components/map/panels/toolbox/CombinedToolbox";
@@ -281,6 +282,22 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
     }
   }, [activeRight, selectedLayerIds, projectLayers, dispatch]);
 
+  // Width occupied by the right-side stack (measure results, feature
+  // editor panel, active right component). Used to size the fixed-popup
+  // host below so it doesn't extend behind the panels.
+  const measureVisible =
+    measureTool.measureOpen || measureTool.measurements.length > 0;
+  const rightStackWidth = useMemo(() => {
+    const FEATURE_EDIT_PANEL_WIDTH = 320;
+    const MEASURE_PANEL_WIDTH = 320;
+    const widths: number[] = [];
+    if (measureVisible) widths.push(MEASURE_PANEL_WIDTH);
+    if (showFeatureEditPanel) widths.push(FEATURE_EDIT_PANEL_WIDTH);
+    if (activeRight) widths.push(panelWidth);
+    if (widths.length === 0) return 0;
+    return widths.reduce((a, b) => a + b, 0) + GAP_SIZE * (widths.length - 1);
+  }, [measureVisible, showFeatureEditPanel, activeRight]);
+
   return (
     <>
       <Box
@@ -408,7 +425,11 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
               }}
             />
           </Stack>
-          <AttributionControl />
+          <AttributionControl
+            extraAttribution={
+              activeBasemap.source === "custom" ? activeBasemap.attribution : null
+            }
+          />
         </Stack>
       </Stack>
       {/* Right panel + measure results — rendered separately when data panel is open so controls can be to the left */}
@@ -437,6 +458,29 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
           </Stack>
         </Box>
       )}
+      {/* Host for fixed-anchor feature popups. Sized to the visible map
+          content area — top: below the app toolbar, bottom: above the
+          data panel, left: past the always-mounted layer tree, right:
+          past whichever right-side panels are open. PopupFixedHost
+          positions its content to one of this Box's 4 corners, so the
+          popup naturally respects the layout's chrome without any
+          global offsets or portals. Same pattern as the top-left
+          controls (Geocoder / ToolboxCtrl / MeasureButton). */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: toolbarHeight + 10,
+          left: panelWidth + GAP_SIZE + 10,
+          right: (rightStackWidth ? rightStackWidth + GAP_SIZE : 0) + 10,
+          bottom: `calc(10px + var(${DATA_PANEL_HEIGHT_VAR}, 0px))`,
+          pointerEvents: "none",
+          // Above layout controls (drawer + 1), so a popup at the top-left
+          // corner correctly stacks on top of the Geocoder/Toolbox/Measure
+          // button column.
+          zIndex: (theme) => theme.zIndex.drawer + 2,
+        }}>
+        <MapFixedPopupSlot layers={projectLayers} />
+      </Box>
       <CustomBasemapDialog
         open={dialogOpen}
         initial={editing}

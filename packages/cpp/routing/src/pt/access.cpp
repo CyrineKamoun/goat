@@ -28,9 +28,15 @@ namespace routing::pt
         {
             if (cfg.access_cost_type == CostType::Distance)
             {
-                // Convert distance (meters) to time (minutes) using access speed.
-                double speed = (cfg.access_speed_km_h > 0.0)
-                                   ? cfg.access_speed_km_h : cfg.speed_km_h;
+                // Convert distance (meters) to time (minutes). Car has no
+                // user speed (per-edge maxspeed governs) so we use the
+                // package-level constant; active modes use the user's speed.
+                double const speed =
+                    (cfg.access_mode == RoutingMode::Car)
+                        ? input::kCarBufferSpeedKmH
+                        : ((cfg.access_speed_km_h > 0.0)
+                               ? cfg.access_speed_km_h
+                               : cfg.speed_km_h);
                 access_budget = cfg.access_max_cost / (speed * 1000.0 / 60.0);
             }
             else

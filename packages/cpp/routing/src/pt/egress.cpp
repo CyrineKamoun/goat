@@ -19,8 +19,15 @@ namespace routing::pt
         nigiri::timetable const &tt,
         std::vector<std::optional<double>> const &transit_costs)
     {
+        // Car has no user-supplied speed (per-edge OSM maxspeed governs the
+        // routing cost); active modes use the user's speed for distance-to-time
+        // conversions and as the off-network walking speed.
         double const egress_speed =
-            (cfg.egress_speed_km_h > 0.0) ? cfg.egress_speed_km_h : cfg.speed_km_h;
+            (cfg.egress_mode == RoutingMode::Car)
+                ? input::kCarBufferSpeedKmH
+                : ((cfg.egress_speed_km_h > 0.0)
+                       ? cfg.egress_speed_km_h
+                       : cfg.speed_km_h);
         double egress_max;
         if (cfg.egress_max_cost > 0.0)
         {
@@ -63,7 +70,16 @@ namespace routing::pt
         if (stop_coords.empty())
             return {};
 
-        double const buffer_m = max_remaining_min * (egress_speed * 1000.0 / 60.0);
+        // Buffer speed mirrors buffer_distance() in request_config.cpp:
+        //   - Car: fixed kCarBufferSpeedKmH (per-edge OSM maxspeed dominates
+        //     routing cost, so user speed is meaningless for sizing the load).
+        //   - Active modes: user egress_speed × kActiveBufferSpeedMultiplier.
+        double const buffer_speed_km_h =
+            (cfg.egress_mode == RoutingMode::Car)
+                ? input::kCarBufferSpeedKmH
+                : egress_speed * input::kActiveBufferSpeedMultiplier;
+        double const buffer_m =
+            max_remaining_min * (buffer_speed_km_h * 1000.0 / 60.0);
         auto egress_classes = input::valid_classes(cfg.egress_mode);
 
         bool load_geom = (cfg.catchment_type == CatchmentType::Network) ||
@@ -82,7 +98,11 @@ namespace routing::pt
         RequestConfig const &cfg)
     {
         double const egress_speed_local =
-            (cfg.egress_speed_km_h > 0.0) ? cfg.egress_speed_km_h : cfg.speed_km_h;
+            (cfg.egress_mode == RoutingMode::Car)
+                ? input::kCarBufferSpeedKmH
+                : ((cfg.egress_speed_km_h > 0.0)
+                       ? cfg.egress_speed_km_h
+                       : cfg.speed_km_h);
         double egress_max;
         if (cfg.egress_max_cost > 0.0)
         {

@@ -1,8 +1,9 @@
 "use client";
 
 import {
-  CheckCircle as CheckCircleIcon,
+  Block as BlockIcon,
   Cancel as CancelIcon,
+  CheckCircle as CheckCircleIcon,
   Delete as DeleteIcon,
   ContentCopy as DuplicateIcon,
   Settings as SettingsIcon,
@@ -505,6 +506,12 @@ const ToolNode: React.FC<ToolNodeProps> = ({ id, data, selected }) => {
               {nodeStatus === "failed" && (
                 <IconStatusBadge status="failed">
                   <CancelIcon sx={{ fontSize: 12 }} />
+                </IconStatusBadge>
+              )}
+              {/* Block badge on icon */}
+              {nodeStatus === "skipped" && (
+                <IconStatusBadge status="skipped">
+                  <BlockIcon sx={{ fontSize: 12 }} />
                 </IconStatusBadge>
               )}
             </NodeIconWrapper>

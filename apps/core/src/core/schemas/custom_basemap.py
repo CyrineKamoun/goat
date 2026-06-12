@@ -55,6 +55,7 @@ class _BaseCustomBasemap(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=1000)
     thumbnail_url: str | None = Field(default=None, max_length=2048)
+    attribution: str | None = Field(default=None, max_length=500)
     created_at: ISODateTimeStr
     updated_at: ISODateTimeStr
 
@@ -67,7 +68,6 @@ class VectorCustomBasemap(_BaseCustomBasemap):
 class RasterCustomBasemap(_BaseCustomBasemap):
     type: Literal["raster"] = "raster"
     url: str = Field(max_length=2048)
-    attribution: str | None = Field(default=None, max_length=500)
 
     @field_validator("url")
     @classmethod

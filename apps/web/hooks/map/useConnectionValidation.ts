@@ -112,6 +112,13 @@ function getNodeOutputType(
     return { dataType: undefined };
   }
 
+  // If/Switch nodes forward the input layer's type to whichever output
+  // handle is taken. Default to vector for connection-validation purposes;
+  // the executor enforces actual type compatibility at runtime.
+  if (node.data.type === "if") {
+    return { dataType: "vector" };
+  }
+
   // Tool nodes - get from process description
   if (node.data.type === "tool") {
     const process = processMap.get(node.data.processId);
@@ -145,6 +152,12 @@ function getNodeInputType(
 
   // Export nodes accept any data (vector or table)
   if (node.data.type === "export") {
+    return { dataType: undefined };
+  }
+
+  // If/Switch nodes accept any layer on the `input` target handle —
+  // the layer flows through to True/False.
+  if (node.data.type === "if") {
     return { dataType: undefined };
   }
 

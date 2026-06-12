@@ -30,7 +30,10 @@ from geoapi.routers import (
     metadata_router,
     tiles_router,
 )
+from geoapi.deps.auth import decode_token
 from geoapi.services.layer_service import layer_service
+from goatlib.auth import JOSEError
+from goatobs import build_auth_context_middleware, setup_observability
 
 # Configure logging
 logging.basicConfig(
@@ -124,6 +127,17 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     lifespan=lifespan,
+)
+
+# OTel auto-instrumentation + structlog. Module-top so middleware is
+# installed before the first request arrives. Env-var-gated — no-op
+# when OTEL_ENABLED is unset/false.
+setup_observability(service_name="geoapi", fastapi_app=app)
+
+# Bind user_id/email/realm onto logs, spans, and uvicorn access logs
+# for any request carrying a valid Bearer token.
+app.middleware("http")(
+    build_auth_context_middleware(decode_token, decode_errors=(JOSEError,))
 )
 
 

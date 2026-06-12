@@ -13,6 +13,7 @@ dependencies = [
     "pygeofilter>=0.2.0",
     "sentry-sdk>=2.0.0",
     "goatlib",
+    "goatobs",
     "cachetools",
     "wmill>=1.0.0",
     "python-jose[cryptography]>=3.3.0",

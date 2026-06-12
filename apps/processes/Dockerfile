@@ -32,6 +32,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.2 /uv /usr/local/bin/uv
 # Create virtual environment and install dependencies
 COPY apps/processes /app/apps/processes
 COPY packages/python/goatlib /app/packages/python/goatlib
+COPY packages/python/goatobs /app/packages/python/goatobs
 COPY packages/cpp/routing /app/packages/cpp/routing
 COPY pyproject.toml uv.lock /app/
 
@@ -60,4 +61,3 @@ WORKDIR /app
 EXPOSE 8000
 
 CMD ["fastapi", "run", "apps/processes/src/processes/main.py"]
-

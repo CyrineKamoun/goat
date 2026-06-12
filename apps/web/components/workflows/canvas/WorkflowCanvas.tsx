@@ -66,6 +66,7 @@ import WorkflowVariablesDialog from "../dialogs/WorkflowVariablesDialog";
 import DeletableEdge from "../edges/DeletableEdge";
 import DatasetNode from "../nodes/DatasetNode";
 import ExportNode from "../nodes/ExportNode";
+import IfNode from "../nodes/IfNode";
 import { AnimatedEdgeStyles, BorderAnglePropertyStyles } from "../nodes/shared";
 import TextAnnotationNode from "../nodes/TextAnnotationNode";
 import ToolNode from "../nodes/ToolNode";
@@ -236,6 +237,7 @@ const nodeTypes: NodeTypes = {
   tool: ToolNode,
   export: ExportNode,
   textAnnotation: TextAnnotationNode,
+  if: IfNode,
 };
 
 // Custom edge types for ReactFlow

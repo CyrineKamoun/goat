@@ -51,50 +51,68 @@ export default function NumberInput({ input, value, onChange, disabled, formValu
   const max = effectiveSchema.maximum;
   const hasRange = min !== undefined && max !== undefined;
 
-  // Resolve dynamic max from another field's value
+  // Resolve dynamic max from another field's value (or a literal cap).
+  // Each entry in `fields` can be:
+  //   - a plain string: name of a field whose value is the max
+  //   - { field, when?, message? }: lookup the named field's value, optionally
+  //     gated by a `when` condition; per-entry message overrides top-level
+  //   - { value, when?, message? }: literal cap, optionally gated; used to
+  //     express per-enum-value caps (e.g. mode-specific speed limits)
+  // First matching entry wins. Falls back to top-level `max` if nothing matched.
+  type MaxEntry =
+    | string
+    | { field: string; when?: Record<string, string>; message?: string }
+    | { value: number; when?: Record<string, string>; message?: string };
   const maxValueFrom = input.uiMeta?.widget_options?.max_value_from as
-    | { fields: (string | { field: string; when?: Record<string, string> })[]; message: string; max?: number; min?: number }
+    | { fields: MaxEntry[]; message: string; max?: number; min?: number }
     | undefined;
+
+  const matched = useMemo(() => {
+    if (!maxValueFrom) return undefined as { max: number; message?: string } | undefined;
+    for (const entry of maxValueFrom.fields) {
+      if (typeof entry === "string") {
+        const v = formValues[entry];
+        if (v !== undefined && v !== null) return { max: Number(v) };
+        continue;
+      }
+      if (entry.when) {
+        const ok = Object.entries(entry.when).every(([k, v]) => formValues[k] === v);
+        if (!ok) continue;
+      }
+      if ("value" in entry) {
+        return { max: entry.value, message: entry.message };
+      }
+      const v = formValues[entry.field];
+      if (v !== undefined && v !== null) {
+        return { max: Number(v), message: entry.message };
+      }
+    }
+    return undefined;
+  }, [maxValueFrom, formValues]);
 
   const dynamicMax = useMemo(() => {
     if (!maxValueFrom) return undefined;
-    let resolved: number | undefined;
-    for (const entry of maxValueFrom.fields) {
-      const fieldName = typeof entry === "string" ? entry : entry.field;
-      const when = typeof entry === "string" ? undefined : entry.when;
-
-      if (when) {
-        const match = Object.entries(when).every(([k, v]) => formValues[k] === v);
-        if (!match) continue;
-      }
-
-      const val = formValues[fieldName];
-      if (val !== undefined && val !== null) {
-        resolved = Number(val);
-        break;
-      }
-    }
-    if (maxValueFrom.max !== undefined) {
-      if (resolved === undefined) return maxValueFrom.max;
-      return Math.min(resolved, maxValueFrom.max);
-    }
-    return resolved;
-  }, [maxValueFrom, formValues]);
+    if (matched && maxValueFrom.max !== undefined) return Math.min(matched.max, maxValueFrom.max);
+    if (matched) return matched.max;
+    return maxValueFrom.max;
+  }, [maxValueFrom, matched]);
 
   const dynamicMin = maxValueFrom?.min;
+  const dynamicMessage = matched?.message ?? maxValueFrom?.message;
 
   const validate = useCallback((val: number | undefined): string | null => {
     if (val === undefined) return null;
+    if (Number.isNaN(val)) return t("invalid_number");
     if (min !== undefined && val < min) return `Value must be at least ${min}`;
     if (max !== undefined && val > max) return `Value must be at most ${max}`;
-    if (dynamicMin !== undefined && val < dynamicMin && maxValueFrom) {
-      return t(maxValueFrom.message);
+    if (dynamicMin !== undefined && val < dynamicMin && dynamicMessage) {
+      return t(dynamicMessage);
     }
-    if (dynamicMax !== undefined && val > dynamicMax && maxValueFrom) {
-      return t(maxValueFrom.message);
+    if (dynamicMax !== undefined && val > dynamicMax && dynamicMessage) {
+      return t(dynamicMessage);
     }
     return null;
-  }, [min, max, dynamicMin, dynamicMax, maxValueFrom, t]);
+  }, [min, max, dynamicMin, dynamicMax, dynamicMessage, t]);
 
   // Clear error when value becomes valid (e.g. when the referenced field changes)
   useEffect(() => {
@@ -115,14 +133,37 @@ export default function NumberInput({ input, value, onChange, disabled, formValu
     onChange(newValue);
   };
 
+  // Allow only characters that can form a valid (signed, decimal) number.
+  // Empty string is allowed (means "cleared"). Anything else must match the
+  // pattern below — no letters, no scientific notation, no double signs/dots.
+  const NUMERIC_INPUT_PATTERN = /^-?\d*\.?\d*$/;
   const handleTextChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setDraft(event.target.value);
+    const next = event.target.value;
+    if (next === "" || NUMERIC_INPUT_PATTERN.test(next)) {
+      setDraft(next);
+    }
   };
 
   const commit = () => {
-    const newValue = draft === "" ? (customPlaceholder ? input.defaultValue as number : undefined) : Number(draft);
-    onChange(newValue);
-    const err = validate(newValue);
+    if (draft === "") {
+      const fallback = customPlaceholder ? (input.defaultValue as number | undefined) : undefined;
+      onChange(fallback);
+      const err = validate(fallback);
+      setError(err);
+      onValidationChange?.(err !== null);
+      return;
+    }
+    const parsed = Number(draft);
+    if (Number.isNaN(parsed)) {
+      // Don't propagate NaN to the backend; keep the bad text so the user
+      // can see/fix it, and surface a validation error so submit is blocked.
+      const err = t("invalid_number");
+      setError(err);
+      onValidationChange?.(true);
+      return;
+    }
+    onChange(parsed);
+    const err = validate(parsed);
     setError(err);
     onValidationChange?.(err !== null);
   };
@@ -163,7 +204,7 @@ export default function NumberInput({ input, value, onChange, disabled, formValu
       <FormLabelHelper label={input.title} tooltip={input.description} color="inherit" />
       <TextField
         type="text"
-        inputMode="numeric"
+        inputMode="decimal"
         size="small"
         value={draft}
         onChange={handleTextChange}
@@ -188,7 +229,7 @@ export default function NumberInput({ input, value, onChange, disabled, formValu
         placeholder={
           customPlaceholder !== undefined
             ? t(customPlaceholder)
-            : (input.defaultValue !== undefined ? String(input.defaultValue) : undefined)
+            : (input.defaultValue != null ? String(input.defaultValue) : undefined)
         }
         fullWidth
       />

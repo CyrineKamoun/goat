@@ -223,5 +223,16 @@ class ProjectPublic(DateTimeBase, table=True, extend_existing=True):
         sa_column=Column(Boolean, nullable=False, server_default=text("false")),
         description="Whether visitor analytics tracking is enabled for this published project.",
     )
+    tracking_require_consent: bool = Field(
+        default=True,
+        sa_column=Column(Boolean, nullable=False, server_default=text("true")),
+        description=(
+            "If true, the analytics tracker injects `requireConsent` so no "
+            "events fire until the customer's consent banner calls "
+            "`_paq.push(['rememberConsentGiven'])`. Defaults to true for "
+            "GDPR/TDDDG safety; can be disabled per-project when the dashboard "
+            "runs in a jurisdiction that doesn't require consent."
+        ),
+    )
 
     project: Project = Relationship(back_populates="project_public")

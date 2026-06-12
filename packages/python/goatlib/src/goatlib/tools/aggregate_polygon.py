@@ -13,11 +13,11 @@ from pydantic import Field, field_validator, model_validator
 
 from goatlib.analysis.geoanalysis.aggregate_polygon import AggregatePolygonTool
 from goatlib.analysis.schemas.aggregate import (
+    AggregateColumnStatistic,
     AggregatePolygonParams,
     AggregationAreaType,
     validate_area_type_config,
 )
-from goatlib.analysis.schemas.base import FieldStatistic
 from goatlib.analysis.schemas.ui import (
     SECTION_AREA,
     SECTION_INPUT_AGGREGATE,
@@ -128,15 +128,16 @@ class AggregatePolygonToolParams(
         ),
     )
 
-    column_statistics: List[FieldStatistic] = Field(
+    column_statistics: List[AggregateColumnStatistic] = Field(
         ...,
         description="Statistical operations to perform on the aggregated polygons.",
+        min_length=1,
         json_schema_extra=ui_field(
             section="statistics",
             field_order=1,
             label_key="select_statistics_configuration",
-            widget="field-statistics-selector",
-            widget_options={"source_layer": "source_layer_id"},
+            repeatable=True,
+            min_items=1,
         ),
     )
 
@@ -258,7 +259,7 @@ class AggregatePolygonToolRunner(BaseToolRunner[AggregatePolygonToolParams]):
             if operation == "count":
                 continue  # count already added
             elif field:
-                base_name = result_name if result_name else f"{field}_{operation}"
+                base_name = result_name if result_name else f"{operation}_{field}"
                 col_name = cls.unique_column_name(columns, base_name)
                 columns[col_name] = "DOUBLE"
 

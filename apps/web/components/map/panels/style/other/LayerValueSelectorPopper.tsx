@@ -12,6 +12,7 @@ import {
   ListItemButton,
   ListItemIcon,
   Popper,
+  type PopperPlacementType,
   Stack,
   TextField,
   debounce,
@@ -36,6 +37,11 @@ export function LayerValueSelectorPopper(props: {
   onSelectedValuesChange: (values: string[] | null) => void;
   anchorEl: HTMLElement | null;
   onDone?: () => void;
+  // Optional positioning overrides. The default `placement: "left"` with
+  // `offset: [0, 115]` is tuned for the wide style panel — other callers
+  // (e.g. a popper anchored inside a smaller edit panel) can override.
+  placement?: PopperPlacementType;
+  offset?: [number, number];
 }) {
   const { t } = useTranslation("common");
   const [searchText, setSearchText] = useState("");
@@ -105,12 +111,12 @@ export function LayerValueSelectorPopper(props: {
       anchorEl={props.anchorEl}
       transition
       sx={{ zIndex: 2000, maxWidth: "250px" }}
-      placement="left"
+      placement={props.placement ?? "left"}
       modifiers={[
         {
           name: "offset",
           options: {
-            offset: [0, 115],
+            offset: props.offset ?? [0, 115],
           },
         },
       ]}>

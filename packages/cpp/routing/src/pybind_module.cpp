@@ -41,6 +41,10 @@ PYBIND11_MODULE(_routing, m)
         .value("GeoJSON", routing::OutputFormat::GeoJSON)
         .value("Parquet", routing::OutputFormat::Parquet);
 
+    py::enum_<routing::ShapeStyle>(m, "ShapeStyle")
+        .value("Combined", routing::ShapeStyle::Combined)
+        .value("Separated", routing::ShapeStyle::Separated);
+
     py::class_<routing::Point3857>(m, "Point3857")
         .def(py::init<double, double>())
         .def_readwrite("x", &routing::Point3857::x)
@@ -60,6 +64,7 @@ PYBIND11_MODULE(_routing, m)
         .def_readwrite("output_path", &routing::RequestConfig::output_path)
         .def_readwrite("catchment_type", &routing::RequestConfig::catchment_type)
         .def_readwrite("output_format", &routing::RequestConfig::output_format)
+        .def_readwrite("shape_style", &routing::RequestConfig::shape_style)
         .def_readwrite("polygon_difference", &routing::RequestConfig::polygon_difference)
         .def_readwrite("departure_time", &routing::RequestConfig::departure_time)
         .def_readwrite("max_transfers", &routing::RequestConfig::max_transfers)

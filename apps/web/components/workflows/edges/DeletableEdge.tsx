@@ -3,7 +3,13 @@
 import { Delete as DeleteIcon } from "@mui/icons-material";
 import { IconButton, Stack, Tooltip, useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
-import { BaseEdge, EdgeLabelRenderer, type EdgeProps, getBezierPath, useViewport } from "@xyflow/react";
+import {
+  BaseEdge,
+  EdgeLabelRenderer,
+  type EdgeProps,
+  getBezierPath,
+  useViewport,
+} from "@xyflow/react";
 import React, { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useDispatch } from "react-redux";
@@ -21,6 +27,7 @@ const ToolbarContainer = styled(Stack)(({ theme }) => ({
   gap: theme.spacing(0.5),
   flexDirection: "row",
   alignItems: "center",
+  
   boxShadow: theme.shadows[4],
   border: `1px solid ${theme.palette.divider}`,
 }));
@@ -35,6 +42,7 @@ const ToolbarButton = styled(IconButton)(({ theme }) => ({
 
 const DeletableEdge: React.FC<EdgeProps> = ({
   id,
+  source,
   target,
   sourceX,
   sourceY,
@@ -51,14 +59,14 @@ const DeletableEdge: React.FC<EdgeProps> = ({
   const theme = useTheme();
   const { zoom } = useViewport();
 
-  // Get execution status for the target node
+  const { status: sourceStatus } = useNodeExecutionStatus(source);
   const { status: targetStatus } = useNodeExecutionStatus(target);
 
-  // Determine edge execution state
-  // Edge is running if target node is running (data flowing into it)
-  const isEdgeRunning = targetStatus === "running";
-  // Edge is completed if target node is completed
-  const isEdgeCompleted = targetStatus === "completed";
+  // An edge is "skipped" if either endpoint is skipped — no data flowed
+  // through it. Other states follow the target.
+  const isEdgeSkipped = sourceStatus === "skipped" || targetStatus === "skipped";
+  const isEdgeRunning = !isEdgeSkipped && targetStatus === "running";
+  const isEdgeCompleted = !isEdgeSkipped && targetStatus === "completed";
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -73,20 +81,35 @@ const DeletableEdge: React.FC<EdgeProps> = ({
   const edgeStyle = useMemo(
     () => ({
       ...style,
-      stroke: isEdgeCompleted
-        ? theme.palette.primary.main
-        : isEdgeRunning
-          ? theme.palette.warning.main
-          : selected
-            ? theme.palette.primary.main
-            : style.stroke,
+      stroke: isEdgeSkipped
+        ? theme.palette.text.disabled
+        : isEdgeCompleted
+          ? theme.palette.primary.main
+          : isEdgeRunning
+            ? theme.palette.warning.main
+            : selected
+              ? theme.palette.primary.main
+              : style.stroke,
       strokeWidth: isEdgeRunning || isEdgeCompleted ? 3 : selected ? 3 : (style.strokeWidth as number) || 2,
       // Add dashed pattern for running edges
       ...(isEdgeRunning && {
         strokeDasharray: "8 8",
       }),
+      ...(isEdgeSkipped && {
+        strokeDasharray: "4 6",
+        opacity: 0.5,
+      }),
     }),
-    [style, selected, theme.palette.primary.main, theme.palette.warning.main, isEdgeRunning, isEdgeCompleted]
+    [
+      style,
+      selected,
+      theme.palette.primary.main,
+      theme.palette.warning.main,
+      theme.palette.text.disabled,
+      isEdgeRunning,
+      isEdgeCompleted,
+      isEdgeSkipped,
+    ]
   );
 
   const handleDelete = useCallback(

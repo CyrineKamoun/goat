@@ -117,10 +117,13 @@ class ToolSettings:
     # Schema for customer tables
     customer_schema: str = "customer"
 
-    # Routing settings
-    goat_routing_url: str = "http://localhost:8200/api/v2/routing"
+    # Routing settings (HTTP routing service is retired; in-process routing
+    # uses street_network_*/pt_network_* paths in goatlib.config.base instead).
+    # These fields remain as None for backward compatibility with any unreachable
+    # v1 catchment_area code that may still reference them.
+    goat_routing_url: str | None = None
     goat_routing_authorization: str | None = None
-    r5_url: str = "http://localhost:7070"
+    r5_url: str | None = None
     r5_region_mapping_path: str | None = None
 
     # Geocoding settings
@@ -286,15 +289,6 @@ class ToolSettings:
             or cls._get_secret("S3_REGION", "us-east-1"),
             s3_bucket_name=cls._get_secret("S3_BUCKET_NAME", ""),
             customer_schema=cls._get_secret("CUSTOMER_SCHEMA", "customer"),
-            goat_routing_url=cls._get_secret(
-                "GOAT_ROUTING_URL", "http://goat-dev:8200/api/v2/routing"
-            ),
-            goat_routing_authorization=cls._get_secret("GOAT_ROUTING_AUTHORIZATION", "")
-            or None,
-            r5_url=cls._get_secret("R5_URL", "https://r5.routing.plan4better.de"),
-            r5_region_mapping_path=cls._get_secret(
-                "R5_REGION_MAPPING_PATH", "/app/data/gtfs/r5_region_mapping.parquet"
-            ),
             geocoding_url=cls._get_secret("GEOCODING_URL", "") or None,
             geocoding_authorization=cls._get_secret("GEOCODING_AUTHORIZATION", "")
             or None,
@@ -385,15 +379,51 @@ class SimpleToolRunner:
         # - ZSTD compression: better compression ratio than Snappy
         # - V2 format: enables DELTA_BINARY_PACKED, BYTE_STREAM_SPLIT encodings
         # - Row group size: balances predicate pushdown with parallelism
-        con.execute(
-            f"CALL lake.set_option('parquet_compression', '{PARQUET_COMPRESSION}')"
-        )
-        con.execute(f"CALL lake.set_option('parquet_version', '{PARQUET_VERSION}')")
-        con.execute(
-            f"CALL lake.set_option('parquet_row_group_size', '{PARQUET_ROW_GROUP_SIZE}')"
+        # Read-first to avoid concurrent UPSERTs against the PG metadata catalog,
+        # which trigger serializable-isolation failures (40001) when many workers
+        # connect simultaneously.
+        self._ensure_lake_option(con, "parquet_compression", PARQUET_COMPRESSION)
+        self._ensure_lake_option(con, "parquet_version", PARQUET_VERSION)
+        self._ensure_lake_option(
+            con, "parquet_row_group_size", str(PARQUET_ROW_GROUP_SIZE)
         )
 
         return con
+
+    def _ensure_lake_option(
+        self: Self,
+        con: duckdb.DuckDBPyConnection,
+        key: str,
+        expected_value: str,
+    ) -> None:
+        """Set a DuckLake option only if its current value differs.
+
+        Every `CALL lake.set_option` is an UPSERT against the PostgreSQL
+        `ducklake_metadata` table. When many worker connections issue the same
+        writes simultaneously, they race on serializable isolation
+        (`could not serialize access due to concurrent update`, SQLSTATE 40001).
+        Reading first means steady-state reconnects skip the write entirely.
+        """
+        if self.settings is None:
+            raise RuntimeError("Settings not initialized")
+        schema = self.settings.ducklake_catalog_schema
+        try:
+            rows = con.execute(
+                f"SELECT value FROM __ducklake_metadata_lake.{schema}.ducklake_metadata "  # noqa: S608
+                "WHERE key = ?",
+                [key],
+            ).fetchall()
+        except Exception as e:
+            logger.debug(
+                "Could not read DuckLake option %s, falling back to write: %s",
+                key,
+                e,
+            )
+            rows = None
+
+        if rows and all(row[0] == expected_value for row in rows):
+            return
+        con.execute(f"CALL lake.set_option('{key}', '{expected_value}')")
 
     def _is_retriable_ducklake_error(self: Self, error: Exception) -> bool:
         """Check if a DuckLake error is retriable (connection/transaction issues)."""
@@ -925,17 +955,29 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
         table_name = self.get_layer_table_path(layer_owner_id, layer_id)
         logger.debug(f"Resolved table name for layer {layer_id}: {table_name}")
 
-        # Verify the table exists before attempting to export
+        # Verify the table exists before attempting to export.
+        # Only wrap genuine "table missing" errors — let connection, transaction,
+        # and metadata-catalog failures bubble up unchanged so they're not
+        # misdiagnosed as missing layers.
         try:
             check_result = self.duckdb_con.execute(
                 f"SELECT COUNT(*) FROM {table_name} LIMIT 1"
             ).fetchone()
             logger.debug(f"Table {table_name} exists with data check: {check_result}")
-        except Exception as e:
+        except duckdb.CatalogException as e:
             raise ValueError(
                 f"Cannot access layer {layer_id} - table {table_name} not found. "
                 f"Owner ID: {layer_owner_id}, requested by: {user_id}. Error: {e}"
             ) from e
+        except Exception:
+            logger.exception(
+                "Unexpected error checking layer %s (table %s, owner %s, requester %s)",
+                layer_id,
+                table_name,
+                layer_owner_id,
+                user_id,
+            )
+            raise
 
         temp_file = tempfile.NamedTemporaryFile(
             suffix=".parquet", delete=False, prefix="layer_"

@@ -72,6 +72,31 @@ class AggregationAreaType(StrEnum):
 H3Resolution = Literal[3, 4, 5, 6, 7, 8, 9, 10]
 
 
+class AggregateColumnStatistic(FieldStatistic):
+    """Aggregate column statistic with UI wiring to source_layer_id."""
+
+    field: Optional[str] = Field(
+        None,
+        description="Field name to compute statistics on. Required for all operations except 'count'.",
+        json_schema_extra={
+            "x-ui": {
+                "widget": "field-selector",
+                "widget_options": {"source_layer": "source_layer_id"},
+                "visible_when": {"operation": {"$ne": "count"}},
+            }
+        },
+    )
+    result_name: Optional[str] = Field(
+        None,
+        description="Custom name for the result column. If not provided, defaults to '{field}_{operation}' or 'count' for count operations.",
+        json_schema_extra={
+            "x-ui": {
+                "widget_options": {"placeholder_template": "{field}_{operation}"},
+            }
+        },
+    )
+
+
 class AggregatePointsParams(BaseModel):
     """Parameters for aggregating points onto polygons or H3 grids.
 

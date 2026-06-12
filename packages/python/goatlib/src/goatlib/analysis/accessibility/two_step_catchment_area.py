@@ -276,7 +276,8 @@ class Heatmap2SFCATool(HeatmapToolBase):
                         f"Invalid capacity_expression='{expr}' for geometry type '{geom_type}'. "
                         "Area is only valid for Polygon or MultiPolygon geometries."
                     )
-                return f"ST_Area_Spheroid({wgs84_geom_sql})"
+                # DuckDB ST_*_Spheroid expects (lat, lon); our data is (lon, lat).
+                return f"ST_Area_Spheroid(ST_FlipCoordinates({wgs84_geom_sql}))"
 
             if expr in ("$perimeter", "perimeter"):
                 if "polygon" not in geom_type_lower:
@@ -284,7 +285,7 @@ class Heatmap2SFCATool(HeatmapToolBase):
                         f"Invalid capacity_expression='{expr}' for geometry type '{geom_type}'. "
                         "Perimeter is only valid for Polygon or MultiPolygon geometries."
                     )
-                return f"ST_Perimeter_Spheroid({wgs84_geom_sql})"
+                return f"ST_Perimeter_Spheroid(ST_FlipCoordinates({wgs84_geom_sql}))"
 
             # Custom user expression (use as-is)
             return expr

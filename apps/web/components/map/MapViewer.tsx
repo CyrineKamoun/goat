@@ -2,15 +2,22 @@ import { cogProtocol } from "@geomatico/maplibre-cog-protocol";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import type { Theme } from "@mui/material";
 import { Box, useMediaQuery, useTheme } from "@mui/material";
+import centroid from "@turf/centroid";
 import maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Map, type MapLayerMouseEvent, type MapRef, type ViewState } from "react-map-gl/maplibre";
+import { Map, type MapGeoJSONFeature, type MapLayerMouseEvent, type MapLayerTouchEvent, type MapRef, type ViewState } from "react-map-gl/maplibre";
 import type { ViewStateChangeEvent } from "react-map-gl/maplibre";
 import { v4 } from "uuid";
 
 import { PATTERN_IMAGES } from "@/lib/constants/pattern-images";
-import { setClickedFeatureForFilter, setCurrentZoom, setHighlightedFeature, setPopupInfo } from "@/lib/store/map/slice";
+import {
+  setClickedFeatureForFilter,
+  setCurrentZoom,
+  setHighlightedFeature,
+  setPopupInfo,
+  setPopupPreview,
+} from "@/lib/store/map/slice";
 import { addOrUpdateMarkerImages, addPatternImages } from "@/lib/transformers/map-image";
 import { applyMapLanguage } from "@/hooks/map/MapHooks";
 import createPulsingDot from "@/lib/utils/map/pulsing-dot-image";
@@ -20,7 +27,7 @@ import {
   type FeatureLayerPointProperties,
   type Layer,
   layerInteractionContentType,
-  layerInteractionType,
+  type PopupProperties,
 } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
 import type { ScenarioFeatures } from "@/lib/validations/scenario";
@@ -36,9 +43,13 @@ import UserLocationLayer from "@/components/map/UserLocationLayer";
 import DrawControl from "@/components/map/controls/Draw";
 import FeatureEditToolbar from "@/components/map/controls/FeatureEditToolbar";
 import ConfirmModal from "@/components/modals/Confirm";
-import { MapPopoverInfo } from "@/components/map/controls/LayerInfo";
 import MapPopoverEditor from "@/components/map/controls/PopoverEditor";
 import { MeasureLabels } from "@/components/map/controls/measure";
+import { buildLayerIcon } from "@/components/map/panels/layer/legend/LayerIcon";
+import { seedPopupFromInteraction } from "@/components/map/panels/style/popup/seedFromLegacy";
+import { ActiveFeaturePulseLayer } from "@/components/map/popover/ActiveFeaturePulseLayer";
+import { MapFeaturePopover } from "@/components/map/popover/MapFeaturePopover";
+import { normalizePopup } from "@/components/map/popover/normalizePopup";
 
 maplibregl.addProtocol("cog", cogProtocol);
 
@@ -94,12 +105,94 @@ const MapViewer: React.FC<MapProps> = ({
   const highlightedFeature = useAppSelector((state) => state.map.highlightedFeature);
   const popupInfo = useAppSelector((state) => state.map.popupInfo);
   const popupEditor = useAppSelector((state) => state.map.popupEditor);
+  const popupPreview = useAppSelector((state) => state.map.popupPreview);
   const mapMode = useAppSelector((state) => state.map.mapMode);
 
   const _selectedScenarioEditLayer = useAppSelector((state) => state.map.selectedScenarioLayer);
   const selectedScenarioEditLayer = useMemo(() => {
     return layers?.find((layer) => layer.id === _selectedScenarioEditLayer?.value);
   }, [_selectedScenarioEditLayer, layers]);
+
+  // Look up the layer that owns the currently-clicked feature. `popupInfo.layerId`
+  // is set to `layer_id ?? id` at dispatch time, so we try both: ProjectLayer
+  // stores the dataset id on `layer_id` while plain Layer uses `id`.
+  const clickedPopupLayer = useMemo(() => {
+    if (!popupInfo?.layerId || !layers) return undefined;
+    const target = popupInfo.layerId;
+    return layers.find(
+      (l) =>
+        (l as { layer_id?: string }).layer_id === target ||
+        l.id.toString() === target,
+    );
+  }, [popupInfo?.layerId, layers]);
+
+  // `popup` only exists on feature-layer property variants; non-feature layers
+  // (raster/table/etc) carry differently-shaped properties. Narrow once here so
+  // the JSX stays readable. Layers without an explicit `popup` block fall
+  // through to `seedPopupFromInteraction`, which synthesizes a new-style popup
+  // from the legacy `interaction` config — so every clickable layer renders the
+  // new popup without a migration step. The popup editor seeds the same way.
+  const activePopupConfig = useMemo<PopupProperties | undefined>(() => {
+    if (!clickedPopupLayer) return undefined;
+    const props = clickedPopupLayer.properties as
+      | { popup?: PopupProperties; interaction?: { type?: string; content?: never[] } }
+      | undefined;
+    if (props?.popup) return normalizePopup(props.popup);
+    return normalizePopup(seedPopupFromInteraction(props?.interaction));
+  }, [clickedPopupLayer]);
+
+  // Same lookup pattern as `clickedPopupLayer` above, but for the live-preview
+  // controller (Popup section "Show preview" toggle). `popupPreview.layerId`
+  // is the dataset id; we match against ProjectLayer.layer_id or Layer.id.
+  const previewLayer = useMemo(() => {
+    if (!popupPreview?.layerId || !layers) return undefined;
+    const target = popupPreview.layerId;
+    return layers.find(
+      (l) =>
+        (l as { layer_id?: string }).layer_id === target ||
+        l.id.toString() === target,
+    );
+  }, [popupPreview?.layerId, layers]);
+
+  const previewPopupConfig = useMemo<PopupProperties | undefined>(() => {
+    if (!previewLayer) return undefined;
+    const props = previewLayer.properties as
+      | { popup?: PopupProperties; interaction?: { type?: string; content?: never[] } }
+      | undefined;
+    if (props?.popup) return normalizePopup(props.popup);
+    return normalizePopup(seedPopupFromInteraction(props?.interaction));
+  }, [previewLayer]);
+
+  // Small layer-style icon shown in the popup header. Mirrors the preview
+  // icon the Layers panel renders (see ProjectLayerTree.tsx ~L1134) so
+  // the popup feels consistent with the rest of the UI. Helper lives in
+  // LayerIcon.tsx alongside the component it builds.
+  const clickedPopupLayerIcon = useMemo(
+    () => buildLayerIcon(clickedPopupLayer),
+    [clickedPopupLayer],
+  );
+  const previewLayerIcon = useMemo(
+    () => buildLayerIcon(previewLayer),
+    [previewLayer],
+  );
+
+  // Centroid of the preview feature, used both for the popover anchor and the
+  // active-feature pulse position. `@turf/centroid` handles Point, LineString,
+  // and Polygon geometries uniformly.
+  const previewCentroid = useMemo(() => {
+    if (!popupPreview) return null;
+    try {
+      const c = centroid({
+        type: "Feature",
+        properties: {},
+        geometry: popupPreview.feature.geometry as GeoJSON.Geometry,
+      });
+      const [lng, lat] = c.geometry.coordinates;
+      return { lng, lat };
+    } catch {
+      return null;
+    }
+  }, [popupPreview]);
 
   const featureEditorHandlers = useFeatureEditor(mapRef);
 
@@ -108,6 +201,25 @@ const MapViewer: React.FC<MapProps> = ({
   );
   const interactiveLayerIds = useMemo(() => {
     const ids = layers?.map((layer) => layer.id.toString()) || [];
+    // For point layers with clustering enabled, include the cluster
+    // sub-layer ids so MapLibre returns them in click events (needed for
+    // cluster expand-on-click; layer-id convention from Layers.tsx).
+    // Non-existent ids are silently ignored by MapLibre, so adding all
+    // four covers both circle-cluster and marker-cluster modes.
+    layers?.forEach((l) => {
+      if (
+        l.type === "feature" &&
+        l.feature_layer_geometry_type === "point" &&
+        (l.properties as { cluster?: { enabled?: boolean } } | undefined)?.cluster?.enabled
+      ) {
+        ids.push(
+          `${l.id}-cluster-bubble`,
+          `${l.id}-cluster-count`,
+          `${l.id}-cluster-icon`,
+          `${l.id}-cluster-badge`,
+        );
+      }
+    });
     if (pendingFeaturesExist) {
       ids.push("pending-features-fill", "pending-features-line", "pending-features-circle", "pending-features-symbol");
     }
@@ -144,10 +256,129 @@ const MapViewer: React.FC<MapProps> = ({
   const handlePopoverClose = () => {
     dispatch(setPopupInfo(undefined));
     dispatch(setHighlightedFeature(undefined));
+    hoverPopupKeyRef.current = undefined;
   };
 
+  // Tracks the (layerId-featureId) key of the popup currently shown via
+  // hover trigger. Used to avoid re-dispatching on every mousemove while
+  // still over the same feature, and to clear the popup when the cursor
+  // leaves all hover-trigger features.
+  const hoverPopupKeyRef = useRef<string | undefined>(undefined);
+
+  // Touch start point — used by the touch-tap fallback below. Maplibre's
+  // own tap-to-click conversion is blocked by MapboxDraw's mode
+  // handlers on touch devices, so we recognize taps ourselves from
+  // touchstart/touchend pairs.
+  const touchStartPointRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Resolves the effective popup trigger for a layer. Prefers the new
+  // `popup` schema; falls back to the legacy `interaction.type` for
+  // layers that haven't been migrated yet. Layers with no popup *and*
+  // no interaction config (e.g. layers freshly added from the data
+  // explorer) default to "click" — same behavior as
+  // seedPopupFromInteraction, so the runtime click detection stays in
+  // sync with what the renderer actually shows.
+  type PopupTrigger = "click" | "hover" | "click_and_hover";
+  const getEffectivePopupTrigger = useCallback(
+    (layer: Layer | ProjectLayer | undefined): PopupTrigger | undefined => {
+      const props = (layer?.properties as
+        | {
+            interaction?: { type?: string };
+            popup?: { enabled?: boolean; trigger?: PopupTrigger };
+          }
+        | undefined) ?? {};
+      const popup = props.popup;
+      if (popup) {
+        if (popup.enabled === false) return undefined;
+        if (
+          popup.trigger === "click" ||
+          popup.trigger === "hover" ||
+          popup.trigger === "click_and_hover"
+        ) {
+          return popup.trigger;
+        }
+      }
+      // Legacy fallback: only `click` and `none` are wired in the existing
+      // useInteractionOptions hook, so `hover` here is rare but accepted.
+      if (props.interaction?.type === "click") return "click";
+      if (props.interaction?.type === "hover") return "hover";
+      if (props.interaction?.type === "none") return undefined;
+      // Nothing configured at all → treat as clickable. Matches
+      // seedPopupFromInteraction(undefined), which produces
+      // `{ enabled: true, trigger: "click", ... }`.
+      return "click";
+    },
+    [],
+  );
+
+  // Tools that take over the click/hover space — popup interaction must
+  // step out of the way while any of these is active so we don't fight
+  // the measure/edit/draw UX with stray popups.
+  const activeMeasureTool = useAppSelector((s) => s.map.activeMeasureTool);
+  const editorActiveLayerId = useAppSelector((s) => s.featureEditor.activeLayerId);
+  const popupInteractionsBlocked = Boolean(activeMeasureTool) || Boolean(editorActiveLayerId);
+
   const handleMapClick = (e: MapLayerMouseEvent) => {
-    const { features } = e;
+    // Skip all popup logic while a measure / draw / edit tool owns the
+    // click — those tools have their own click handlers and a stray
+    // popup would fight the UX.
+    if (popupInteractionsBlocked) return;
+    let features = e.features;
+
+    // Expand the hit-test area when no features are directly under the
+    // reported click point. Two cases this matters for:
+    //  - Touch devices: the synthetic click coordinate is reported as a
+    //    single pixel, but the finger covers many — thin features
+    //    (lines, small points) often fall outside that single pixel.
+    //  - Desktop hairline strokes: the same problem at smaller scale.
+    // Re-querying within a small bounding box recovers the feature
+    // without changing behavior when there's already a direct hit.
+    if ((!features || features.length === 0) && mapRef?.current) {
+      const TAP_BUFFER = 8;
+      const map = mapRef.current.getMap();
+      const bbox: [[number, number], [number, number]] = [
+        [e.point.x - TAP_BUFFER, e.point.y - TAP_BUFFER],
+        [e.point.x + TAP_BUFFER, e.point.y + TAP_BUFFER],
+      ];
+      features = map.queryRenderedFeatures(bbox, {
+        layers: interactiveLayerIds,
+      }) as typeof features;
+    }
+
+    // Cluster click: zoom to the cluster's expansion zoom.
+    // Layer-id convention from Layers.tsx: cluster layers contain `-cluster-`
+    // (bubble / count / icon / badge).
+    const clusterFeature = features?.find(
+      (f) =>
+        typeof f.layer.id === "string" &&
+        f.layer.id.includes("-cluster-") &&
+        f.properties?.cluster_id != null,
+    );
+    if (clusterFeature && mapRef?.current) {
+      const map = mapRef.current.getMap();
+      const sourceId = clusterFeature.layer.source;
+      const source = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+      const clusterId = clusterFeature.properties?.cluster_id;
+      if (source && clusterId != null && "getClusterExpansionZoom" in source) {
+        source
+          .getClusterExpansionZoom(clusterId)
+          .then((zoom: number) => {
+            const geom = clusterFeature.geometry;
+            if (geom?.type === "Point") {
+              map.easeTo({
+                center: geom.coordinates as [number, number],
+                zoom,
+                duration: 500,
+              });
+            }
+          })
+          .catch(() => {
+            // Cluster source may have been torn down between click and resolve; ignore.
+          });
+      }
+      return;
+    }
+
     // Track whether the popup block already highlighted a feature
     let didHighlight = false;
 
@@ -156,22 +387,36 @@ const MapViewer: React.FC<MapProps> = ({
       let interactiveFeature = null as any;
       let interactiveLayer: Layer | ProjectLayer | undefined = undefined;
 
-      // Find the first feature that has a click interaction by iterating through them
+      // Find the first feature whose layer should fire a popup on click.
+      // Accepts `click` or `click_and_hover` in the new schema, plus the
+      // legacy `interaction.type === "click"`. Hover-only layers are
+      // skipped here and handled in `handleMapOverImmediate`.
+      const isClickable = (
+        layer: Layer | ProjectLayer | undefined,
+      ): boolean => {
+        const t = getEffectivePopupTrigger(layer);
+        return t === "click" || t === "click_and_hover";
+      };
+      // Once a popup is open for one layer, clicking on another layer's
+      // feature should NOT replace it — the user must close the current
+      // popup first. We still allow the same-layer case to update (e.g.
+      // clicking a different feature in the same layer).
+      const activeLayerId = popupInfo?.layerId;
       for (const feature of features) {
         const layer = layers?.find(
-          (l) =>
-            l.id.toString() === feature.layer.id &&
-            ![layerInteractionType.Enum.none, layerInteractionType.Enum.hover].includes(
-              l.properties.interaction?.type
-            )
+          (l) => l.id.toString() === feature.layer.id && isClickable(l),
         );
-
-        if (layer) {
-          interactiveFeature = feature;
-          interactiveLayer = layer;
-          break; // Found the topmost interactive feature, so we stop.
-        }
+        if (!layer) continue;
+        const layerDatasetId = (
+          (layer as { layer_id?: string }).layer_id ?? layer.id
+        )?.toString();
+        if (activeLayerId && layerDatasetId !== activeLayerId) continue;
+        interactiveFeature = feature;
+        interactiveLayer = layer;
+        break;
       }
+      // A click always supersedes any hover-driven popup state.
+      hoverPopupKeyRef.current = undefined;
 
       if (interactiveFeature && interactiveLayer) {
         dispatch(setHighlightedFeature(interactiveFeature));
@@ -248,6 +493,12 @@ const MapViewer: React.FC<MapProps> = ({
             lngLat,
             properties: primitiveProperties,
             jsonProperties: jsonProperties,
+            // Full unfiltered feature properties — snapshotted here so the
+            // new MapFeaturePopover doesn't read live from highlightedFeature
+            // (which mutates on unrelated UI events like changing the
+            // selected layer in the Layers panel).
+            featureProperties: interactiveFeature.properties as Record<string, unknown>,
+            triggeredBy: "click",
             title: layerName ?? "",
             // ProjectLayer.id is the project-layer-link id, not the
             // underlying dataset id. queryables expects the dataset id,
@@ -303,6 +554,34 @@ const MapViewer: React.FC<MapProps> = ({
     }
   };
 
+  // Manual tap → click synthesis for touch devices. Maplibre's own
+  // tap-to-click recognizer doesn't fire `click` here because
+  // MapboxDraw's mode handlers preempt the tap on touch (its `onTap`
+  // runs even in idle simple_select), so we recognize taps ourselves
+  // and forward them to `handleMapClick`. Drags/pans (movement above
+  // TAP_TOLERANCE_PX) fall through to maplibre's gesture handling
+  // untouched.
+  const TAP_TOLERANCE_PX = 8;
+  const handleMapTouchStart = (e: MapLayerTouchEvent) => {
+    // Multi-touch is always a gesture (pinch/rotate), never a tap.
+    if (e.points?.length !== 1) {
+      touchStartPointRef.current = null;
+      return;
+    }
+    touchStartPointRef.current = { x: e.point.x, y: e.point.y };
+  };
+  const handleMapTouchEnd = (e: MapLayerTouchEvent) => {
+    const start = touchStartPointRef.current;
+    touchStartPointRef.current = null;
+    if (!start) return;
+    const dx = e.point.x - start.x;
+    const dy = e.point.y - start.y;
+    if (dx * dx + dy * dy > TAP_TOLERANCE_PX * TAP_TOLERANCE_PX) return;
+    // MapTouchEvent has the same `point`, `lngLat`, `features` shape
+    // that `handleMapClick` reads from, so the cast is safe.
+    handleMapClick(e as unknown as MapLayerMouseEvent);
+  };
+
   const handleMapOverImmediate = (e: MapLayerMouseEvent) => {
     // Extract features immediately
     const features = e.features;
@@ -317,6 +596,87 @@ const MapViewer: React.FC<MapProps> = ({
       } else {
         map.getCanvas().style.cursor = features?.length ? "pointer" : "";
       }
+    }
+
+    if (!isGetInfoActive) return;
+    // Don't fire hover popups while another tool owns the interaction
+    // (measure / draw / edit) — see the click handler for the same guard.
+    if (popupInteractionsBlocked) return;
+
+    // A click-pinned popup is sticky: subsequent hovers (even within the
+    // same layer) shouldn't move it. User must close it explicitly to
+    // navigate to a different feature.
+    if (popupInfo?.triggeredBy === "click") return;
+
+    // Find the topmost feature whose layer is configured to show the
+    // popup on hover. Accepts `hover` or `click_and_hover`. Once a popup
+    // is open for one layer, hover triggers on OTHER layers are ignored
+    // until that popup closes.
+    const activeLayerId = popupInfo?.layerId;
+    const isHoverable = (
+      layer: Layer | ProjectLayer | undefined,
+    ): boolean => {
+      const t = getEffectivePopupTrigger(layer);
+      return t === "hover" || t === "click_and_hover";
+    };
+    let hoverFeature: MapGeoJSONFeature | undefined;
+    let hoverLayer: Layer | ProjectLayer | undefined;
+    for (const feature of features ?? []) {
+      const layer = layers?.find(
+        (l) => l.id.toString() === feature.layer.id && isHoverable(l),
+      );
+      if (!layer) continue;
+      const layerDatasetId = (
+        (layer as { layer_id?: string }).layer_id ?? layer.id
+      )?.toString();
+      // Block cross-layer hover when another popup is active.
+      if (activeLayerId && layerDatasetId !== activeLayerId) continue;
+      hoverFeature = feature;
+      hoverLayer = layer;
+      break;
+    }
+
+    // Stable key so we only dispatch when the hovered feature changes.
+    const hoverKey =
+      hoverFeature && hoverLayer
+        ? `${hoverLayer.id}:${hoverFeature.id ?? hoverFeature.properties?.id ?? ""}`
+        : undefined;
+
+    if (hoverKey === hoverPopupKeyRef.current) return;
+
+    if (hoverFeature && hoverLayer && hoverKey) {
+      hoverPopupKeyRef.current = hoverKey;
+
+      const featureLngLat: [number, number] =
+        hoverFeature.geometry?.type === "Point" &&
+        Array.isArray((hoverFeature.geometry as GeoJSON.Point).coordinates)
+          ? ((hoverFeature.geometry as GeoJSON.Point).coordinates as [number, number])
+          : [e.lngLat.lng, e.lngLat.lat];
+
+      dispatch(setHighlightedFeature(hoverFeature));
+      dispatch(
+        setPopupInfo({
+          lngLat: featureLngLat,
+          title: hoverLayer.name ?? "",
+          layerId: (
+            (hoverLayer as { layer_id?: string }).layer_id ?? hoverLayer.id
+          )?.toString(),
+          // The new MapFeaturePopover uses featureProperties for token
+          // substitution. `properties` is kept (same payload) so the
+          // legacy renderer still works if it ever picks up a hover.
+          featureProperties: hoverFeature.properties as Record<string, unknown>,
+          properties: hoverFeature.properties as Record<string, string>,
+          triggeredBy: "hover",
+          onClose: handlePopoverClose,
+        }),
+      );
+    } else if (hoverPopupKeyRef.current !== undefined) {
+      // Cursor left all hover-trigger features — close the hover popup.
+      // We only get here if the current popup was hover-originated
+      // (click handler resets the ref).
+      hoverPopupKeyRef.current = undefined;
+      dispatch(setPopupInfo(undefined));
+      dispatch(setHighlightedFeature(undefined));
     }
   };
 
@@ -343,6 +703,38 @@ const MapViewer: React.FC<MapProps> = ({
       const geolocationPulsingDot = createPulsingDot(mapRef.current);
       mapRef.current.addImage("geolocation-pulsing-dot", geolocationPulsingDot, { pixelRatio: 2 });
 
+      // load popup-tinted pulsing dot for the active-feature highlight on the
+      // new MapFeaturePopover. Uses the theme primary color so the pulse
+      // visually matches the popover instead of the user-location blue.
+      mapRef.current.addImage(
+        "popup-active-pulsing-dot",
+        createPulsingDot(mapRef.current, {
+          color: theme.palette.primary.main,
+          innerBorder: false, // crisp edge on dark basemaps
+          size: 100, // larger canvas → bigger blast radius
+          innerRatio: 0.18, // keep the inner dot small (9 internal px)
+          duration: 1800, // slower expansion
+          idleTime: 400, // a touch more breathing room between rings
+        }),
+        { pixelRatio: 2 },
+      );
+
+      // Static (non-pulsing) variant of the popup-active dot. Used for
+      // hover-triggered popups where the pulse animation would be too
+      // attention-grabbing for a transient highlight — same dot
+      // dimensions and color, no expanding ring.
+      mapRef.current.addImage(
+        "popup-active-static-dot",
+        createPulsingDot(mapRef.current, {
+          color: theme.palette.primary.main,
+          innerBorder: false,
+          size: 100,
+          innerRatio: 0.18,
+          staticOnly: true,
+        }),
+        { pixelRatio: 2 },
+      );
+
       // set current zoom (rounded to 1 decimal place for consistency)
       const map = mapRef.current.getMap();
       const zoom = map.getZoom();
@@ -354,7 +746,7 @@ const MapViewer: React.FC<MapProps> = ({
       applyMapLanguage(map, i18n.language);
     }
     onLoad && onLoad();
-  }, [layers, mapRef, onLoad, dispatch, i18n.language]);
+  }, [layers, mapRef, onLoad, dispatch, i18n.language, theme.palette.primary.main]);
 
   // Re-apply label language when locale changes or basemap style reloads
   useEffect(() => {
@@ -447,6 +839,16 @@ const MapViewer: React.FC<MapProps> = ({
           ".measure-label-popup .maplibregl-popup-tip": {
             display: "none",
           },
+          // Feature popup (new): no tip, transparent maplibre wrapper so
+          // the popover's translucent background + backdrop blur show through.
+          ".goat-feature-popup .maplibregl-popup-tip": {
+            display: "none",
+          },
+          ".goat-feature-popup .maplibregl-popup-content": {
+            background: "transparent",
+            boxShadow: "none",
+            padding: 0,
+          },
           ...containerSx,
         }}>
         <Map
@@ -461,6 +863,8 @@ const MapViewer: React.FC<MapProps> = ({
           attributionControl={false}
           onMoveEnd={onMoveEnd}
           onClick={handleMapClick}
+          onTouchStart={handleMapTouchStart}
+          onTouchEnd={handleMapTouchEnd}
           onMouseMove={handleMapOverImmediate}
           onMove={_onMove}
           maxBounds={maxExtent}
@@ -481,7 +885,75 @@ const MapViewer: React.FC<MapProps> = ({
           <UserLocationLayer />
           <ToolboxLayers />
           <MeasureLabels />
-          {!isMobile && popupInfo && <MapPopoverInfo key={highlightedFeature?.id ?? v4()} {...popupInfo} />}
+          {!isMobile && popupInfo && activePopupConfig && (
+            <>
+              {/* Fixed-anchor popups are rendered by the active layout
+                  via <MapFixedPopupSlot>, so they pick up the layout's
+                  toolbar / panel positioning the same way Geocoder /
+                  ToolboxCtrl / MeasureButton do. Only the in-place
+                  variant lives inside <Map>, where it needs useMap to
+                  anchor to feature coordinates. */}
+              {activePopupConfig.layout !== "pinned" && (
+                <MapFeaturePopover
+                  key={highlightedFeature?.id ?? v4()}
+                  layerId={popupInfo.layerId ?? ""}
+                  layerName={popupInfo.title}
+                  popup={activePopupConfig}
+                  properties={
+                    // Prefer the click-time snapshot stored on popupInfo so
+                    // the popup stays bound to the originally-clicked feature.
+                    // Fall back to the live highlightedFeature (e.g. for
+                    // older popupInfo payloads dispatched before this field
+                    // existed) and then to popupInfo.properties as last resort.
+                    (popupInfo.featureProperties ??
+                      highlightedFeature?.properties ??
+                      popupInfo.properties ??
+                      {}) as Record<string, unknown>
+                  }
+                  lngLat={{ lng: popupInfo.lngLat[0], lat: popupInfo.lngLat[1] }}
+                  onClose={popupInfo.onClose}
+                  layerIcon={clickedPopupLayerIcon}
+                />
+              )}
+              <ActiveFeaturePulseLayer
+                lngLat={{ lng: popupInfo.lngLat[0], lat: popupInfo.lngLat[1] }}
+                visible={activePopupConfig.highlight_active_feature}
+                // Pulse for click-triggered popups; static dot for hover.
+                // Hover is transient — the pulse is overkill.
+                pulse={popupInfo.triggeredBy !== "hover"}
+              />
+            </>
+          )}
+          {!isMobile &&
+            popupPreview &&
+            previewLayer &&
+            previewPopupConfig &&
+            previewCentroid &&
+            // Hide the live preview while a real click/hover popup is
+            // showing — they'd visually overlap and the real popup
+            // demonstrates the same styling anyway. Preview returns
+            // automatically when the real popup closes.
+            !popupInfo && (
+              <>
+                {/* Fixed-anchor preview lives in the layout — see comment
+                    on the click-popup branch above. */}
+                {previewPopupConfig.layout !== "pinned" && (
+                  <MapFeaturePopover
+                    layerId={popupPreview.layerId}
+                    layerName={previewLayer.name ?? ""}
+                    popup={previewPopupConfig}
+                    properties={popupPreview.feature.properties}
+                    lngLat={previewCentroid}
+                    onClose={() => dispatch(setPopupPreview(null))}
+                    layerIcon={previewLayerIcon}
+                  />
+                )}
+                <ActiveFeaturePulseLayer
+                  lngLat={previewCentroid}
+                  visible={previewPopupConfig.highlight_active_feature}
+                />
+              </>
+            )}
           {!isMobile && popupEditor && isEditor && (
             <MapPopoverEditor
               key={popupEditor.feature?.id || popupEditor.feature?.properties?.id || v4()}

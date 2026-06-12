@@ -3,7 +3,6 @@
 namespace routing::input
 {
 
-    static constexpr double kCarBufferSpeedKmH = 50.0;
 
     std::vector<std::string> valid_classes(RoutingMode mode)
     {
@@ -39,13 +38,24 @@ namespace routing::input
         if (cfg.cost_type == CostType::Time)
         {
             double speed_km_h;
-            if (cfg.mode == RoutingMode::Car)
+            switch (cfg.mode)
+            {
+            case RoutingMode::Car:
                 speed_km_h = kCarBufferSpeedKmH;
-            else if (cfg.mode == RoutingMode::PublicTransport)
-                speed_km_h = (cfg.access_speed_km_h > 0.0) ? cfg.access_speed_km_h
-                                                            : cfg.speed_km_h;
-            else
-                speed_km_h = cfg.speed_km_h;
+                break;
+            case RoutingMode::Walking:
+            case RoutingMode::Bicycle:
+            case RoutingMode::Pedelec:
+                speed_km_h = cfg.speed_km_h * kActiveBufferSpeedMultiplier;
+                break;
+            case RoutingMode::PublicTransport:
+                // Unreachable: the PT pipeline overrides cfg.mode with the
+                // access (or egress) mode before calling buffer_distance(),
+                // so this case never fires. Kept only for switch
+                // exhaustiveness.
+                speed_km_h = 0.0;
+                break;
+            }
             return cfg.max_cost * (speed_km_h * 1000.0 / 60.0);
         }
         return cfg.max_cost;

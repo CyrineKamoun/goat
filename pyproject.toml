@@ -34,6 +34,7 @@ package = false
 core = { workspace = true }
 geoapi = { workspace = true }
 goatlib = { workspace = true }
+goatobs = { workspace = true }
 processes = { workspace = true }
 
 [tool.uv.workspace]
@@ -42,6 +43,7 @@ members = [
     "apps/core",
     "apps/processes",
     "packages/python/goatlib",
+    "packages/python/goatobs",
 ]
 
 [tool.mypy]

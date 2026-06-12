@@ -1,18 +1,8 @@
 import { Box, Divider, IconButton, Link, Paper, Stack, Tooltip, Typography } from "@mui/material";
-import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Popup } from "react-map-gl/maplibre";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { formatFieldValue } from "@/lib/utils/formatFieldValue";
-import { formatNumber } from "@/lib/utils/format-number";
-import type { FieldKind } from "@/lib/validations/layer";
-import type { MapPopoverInfoProps } from "@/types/map/popover";
-
-import useLayerFields from "@/hooks/map/CommonHooks";
-
-// Assuming this type remains relevant for the popover itself
 import { OverflowTypograpy } from "@/components/common/OverflowTypography";
 
 // --- Helper Components (Row, ViewTableRow) - Keep them here or move to a shared file ---
@@ -256,93 +246,3 @@ export const LayerInfo: React.FC<LayerInfoProps> = ({
   );
 };
 
-export const MapPopoverInfo: React.FC<MapPopoverInfoProps> = ({
-  title,
-  properties,
-  jsonProperties,
-  lngLat,
-  layerId,
-  fieldLabels,
-  fieldOrder,
-  fieldDecorators,
-  onClose,
-}) => {
-  const [detailsView, setDetailsView] = useState<DetailsViewType | undefined>(undefined);
-  const { layerFields, isLoading: layerFieldsLoading } = useLayerFields(layerId || "");
-  const { i18n } = useTranslation("common");
-
-  // Apply per-field formatting (kind + display_config) to property values.
-  // When fieldLabels/fieldOrder are present (field_list interaction), properties
-  // are keyed by column name so we can look up kind and display_config correctly
-  // (e.g. area fields show ha instead of raw m²). Keys are remapped to display
-  // labels at the end.
-  // Returns undefined while layer fields are loading to avoid a flash of raw
-  // column names/values before the field metadata arrives.
-  const formattedProperties = useMemo(() => {
-    if (!properties) return properties;
-    if (!layerId) return properties;
-    if (layerFieldsLoading && layerFields.length === 0) return undefined;
-    if (layerFields.length === 0) return properties;
-    const byName = new Map(layerFields.map((f) => [f.name, f]));
-    const out: Record<string, string> = {};
-    const keys = fieldOrder?.length ? fieldOrder : Object.keys(properties);
-    for (const k of keys) {
-      if (!(k in properties)) continue;
-      const v = properties[k];
-      const f = byName.get(k);
-      const displayKey = fieldLabels?.[k] ?? k;
-      if (!f || v === null || v === undefined || v === "") {
-        out[displayKey] = v == null ? "" : String(v);
-        continue;
-      }
-      const kind: FieldKind =
-        (f.kind as FieldKind) ?? (f.type === "number" ? "number" : "string");
-      // Coerce numeric strings back to a number so kind-aware formatting applies.
-      const numericValue =
-        f.type === "number" && !isNaN(Number(v)) ? Number(v) : v;
-      const decorator = fieldDecorators?.[k];
-      // For plain number fields, a field-list format override takes precedence.
-      // For dimensioned kinds (area, length, perimeter), always use formatFieldValue
-      // so that the configured unit (e.g. ha) is applied. A format override on these
-      // kinds has no effect — unit conversion takes priority.
-      let formatted: string;
-      if (decorator?.format && kind === "number") {
-        formatted = formatNumber(Number(numericValue), decorator.format, i18n.language);
-      } else {
-        formatted = formatFieldValue(numericValue, kind, f.display_config ?? {});
-      }
-      if (decorator?.prefix || decorator?.suffix) {
-        formatted = `${decorator.prefix ?? ""}${formatted}${decorator.suffix ?? ""}`;
-      }
-      out[displayKey] = formatted;
-    }
-    return out;
-  }, [properties, layerId, layerFields, layerFieldsLoading, fieldLabels, fieldOrder, fieldDecorators, i18n.language]);
-
-  return (
-    <Popup
-      onClose={() => {
-        setDetailsView(undefined); // Reset details view when popup closes externally
-        onClose();
-      }}
-      longitude={lngLat[0]}
-      latitude={lngLat[1]}
-      closeButton={false} // The close button is now inside LayerInfo
-      closeOnClick={false} // Keep popup open on map click
-      maxWidth={detailsView ? "500px" : "300px"} // maxWidth still controlled here
-    >
-      <Box>
-        <LayerInfoHeader title={title} onClose={onClose} />
-        <Divider sx={{ mb: 0 }} />
-        <Box sx={{ overflowY: "auto", maxHeight: "280px" }}>
-          <LayerInfo
-            properties={formattedProperties}
-            jsonProperties={jsonProperties}
-            detailsView={detailsView}
-            setDetailsView={setDetailsView}
-          />
-        </Box>
-      </Box>
-    </Popup>
-  );
-};

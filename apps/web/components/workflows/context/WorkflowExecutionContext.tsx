@@ -2,7 +2,7 @@
 
 import React, { type ReactNode, createContext, useContext, useMemo, useRef } from "react";
 
-export type NodeExecutionStatus = "pending" | "running" | "completed" | "failed";
+export type NodeExecutionStatus = "pending" | "running" | "completed" | "failed" | "skipped";
 
 export interface NodeExecutionInfo {
   status: NodeExecutionStatus;

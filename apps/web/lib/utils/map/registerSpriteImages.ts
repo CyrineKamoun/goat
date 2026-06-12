@@ -19,6 +19,7 @@ export const ARROW_SDF_SOURCE_SIZE = 128;
 
 const SPRITES: SpriteSpec[] = [
   { name: "arrow-sdf", url: "/sprites/arrow.svg", sdf: true, size: ARROW_SDF_SOURCE_SIZE },
+  { name: "badge-sdf", url: "/sprites/badge.svg", sdf: true, size: 64 },
 ];
 
 async function loadAndRegister(map: MapLibreMap, spec: SpriteSpec): Promise<void> {

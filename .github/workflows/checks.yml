@@ -15,10 +15,6 @@ on:
         description: "Geoapi changed"
         value: ${{ jobs.checks.outputs.geoapi }}
 
-      routing:
-        description: "Routing changed"
-        value: ${{ jobs.checks.outputs.routing }}
-
       accounts:
         description: "Accounts changed"
         value: ${{ jobs.checks.outputs.accounts }}
@@ -55,7 +51,6 @@ jobs:
       web: ${{ steps.changes.outputs.web }}
       core: ${{ steps.changes.outputs.core }}
       geoapi: ${{ steps.changes.outputs.geoapi }}
-      routing: ${{ steps.changes.outputs.routing }}
       accounts: ${{ steps.changes.outputs.accounts }}
       docs: ${{ steps.changes.outputs.docs }}
       keycloak-theme: ${{ steps.changes.outputs.keycloak-theme }}
@@ -83,18 +78,14 @@ jobs:
             core:
                 - 'apps/core/**'
                 - 'packages/python/goatlib/**'
+                - 'packages/python/goatobs/**'
                 - 'pyproject.toml'
                 - 'uv.lock'
 
             geoapi:
                 - 'apps/geoapi/**'
                 - 'packages/python/goatlib/**'
-                - 'pyproject.toml'
-                - 'uv.lock'
-
-            routing:
-                - 'apps/routing/**'
-                - 'packages/python/goatlib/**'
+                - 'packages/python/goatobs/**'
                 - 'pyproject.toml'
                 - 'uv.lock'
 
@@ -132,6 +123,7 @@ jobs:
             processes:
                 - 'apps/processes/**'
                 - 'packages/python/goatlib/**'
+                - 'packages/python/goatobs/**'
                 - 'pyproject.toml'
                 - 'uv.lock'
 

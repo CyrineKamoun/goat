@@ -330,7 +330,7 @@ class AnalyticsService:
             filter_expr, table_name, geometry_column
         )
 
-        logger.info(
+        logger.debug(
             "Extent query: table=%s, geom_col=%s, where=%s, params=%s",
             table_name,
             geometry_column,

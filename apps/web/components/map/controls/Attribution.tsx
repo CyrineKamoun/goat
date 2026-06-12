@@ -6,7 +6,13 @@ import { useMap } from "react-map-gl/maplibre";
 interface AttributionControlProps {
   compact?: boolean;
   customAttribution?: string | Array<string>;
+  extraAttribution?: string | null;
 }
+
+const DEFAULT_ATTRIBUTIONS = [
+  '<a href="https://www.plan4better.de/en/goat" target="_blank">Made with GOAT</a>',
+  '<a href="https://maplibre.org/" target="_blank">&#169;\tMapLibre</a>',
+];
 
 const Container = styled(Box)(({}) => ({
   padding: "0px 4px",
@@ -18,10 +24,8 @@ const Container = styled(Box)(({}) => ({
 }));
 
 const AttributionControl: React.FC<AttributionControlProps> = ({
-  customAttribution = [
-    '<a href="https://www.plan4better.de/en/goat" target="_blank">Made with GOAT</a>',
-    '<a href="https://maplibre.org/" target="_blank">&#169;	MapLibre</a>',
-  ],
+  customAttribution = DEFAULT_ATTRIBUTIONS,
+  extraAttribution,
 }) => {
   const [attributions, setAttributions] = useState<string[]>([]);
   const { map } = useMap();
@@ -34,6 +38,9 @@ const AttributionControl: React.FC<AttributionControlProps> = ({
       } else {
         attributions.push(customAttribution);
       }
+    }
+    if (extraAttribution) {
+      attributions.push(extraAttribution);
     }
     const sourceCaches = map?.getStyle()?.sources;
     for (const id in sourceCaches) {
@@ -53,7 +60,7 @@ const AttributionControl: React.FC<AttributionControlProps> = ({
       return true;
     });
     setAttributions(attributions);
-  }, [map, customAttribution]);
+  }, [map, customAttribution, extraAttribution]);
 
   // Debounced version of `updateAttributions` using MUI `debounce`
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,7 +69,9 @@ const AttributionControl: React.FC<AttributionControlProps> = ({
   useEffect(() => {
     if (!map) return;
 
-    // Attach debounced update function to map events
+    // Attach debounced update function to map events. Re-bound whenever the
+    // debounced fn identity changes (e.g. extraAttribution swapped) so map
+    // events don't fire a stale closure that drops the new attribution.
     map.on("styledata", debouncedUpdateAttributions);
     map.on("sourcedata", debouncedUpdateAttributions);
     map.on("terrain", debouncedUpdateAttributions);
@@ -78,8 +87,7 @@ const AttributionControl: React.FC<AttributionControlProps> = ({
       // Clear debounced function when component unmounts
       debouncedUpdateAttributions.clear();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map]);
+  }, [map, debouncedUpdateAttributions, updateAttributions]);
 
   return (
     <Container>

@@ -6,6 +6,7 @@ from . import (
     datasets,
     folder,
     layer,
+    organization_analytics,
     organization_domain,
     project,
     report_layout,
@@ -31,6 +32,11 @@ router.include_router(
     organization_domain.router,
     prefix="/organizations/{organization_id}/domains",
     tags=["Organization Domain"],
+)
+router.include_router(
+    organization_analytics.router,
+    prefix="/organizations/{organization_id}/analytics",
+    tags=["Organization Analytics"],
 )
 router.include_router(
     custom_domain_lookup.router,

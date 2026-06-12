@@ -196,6 +196,7 @@ export default function GenericInput({
           value={value as string | undefined}
           onChange={onChange}
           disabled={disabled}
+          formValues={safeFormValues}
         />
       );
 

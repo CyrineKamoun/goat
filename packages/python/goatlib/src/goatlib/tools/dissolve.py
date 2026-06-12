@@ -56,8 +56,6 @@ class DissolveToolParams(
                 id="statistics",
                 order=3,
                 icon="chart",
-                collapsible=True,
-                collapsed=True,
                 depends_on={"input_layer_id": {"$ne": None}},
             ),
             SECTION_RESULT,
@@ -93,15 +91,29 @@ class DissolveToolParams(
         ),
     )
 
+    # Toggle controlling whether statistics are computed (mirrors JoinToolParams).
+    # Persisted in node.data.config so the workflow node restores the user's
+    # choice on refresh, unlike the section-collapse state.
+    calculate_statistics: bool = Field(
+        False,
+        description="Calculate statistics for each dissolved group.",
+        json_schema_extra=ui_field(
+            section="statistics",
+            field_order=1,
+            widget="switch",
+        ),
+    )
+
     # Override field_statistics with proper UI metadata
     field_statistics: Optional[List[FieldStatistic]] = Field(
         None,
         description="Statistics to calculate for each dissolved group.",
         json_schema_extra=ui_field(
             section="statistics",
-            field_order=1,
+            field_order=2,
             widget="field-statistics-selector",
             widget_options={"source_layer": "input_layer_id"},
+            visible_when={"calculate_statistics": True},
         ),
     )
 
@@ -155,8 +167,11 @@ class DissolveToolRunner(BaseToolRunner[DissolveToolParams]):
         count_col = cls.unique_column_name(columns, "count")
         columns[count_col] = "BIGINT"
 
-        # Add statistics columns
-        field_statistics = params.get("field_statistics") or []
+        # Add statistics columns (only when the toggle is on)
+        calculate_statistics = params.get("calculate_statistics", False)
+        field_statistics = (
+            (params.get("field_statistics") or []) if calculate_statistics else []
+        )
         for stat in field_statistics:
             operation = stat.get("operation", "count")
             field = stat.get("field")
@@ -188,7 +203,7 @@ class DissolveToolRunner(BaseToolRunner[DissolveToolParams]):
         """
         # Determine if we have a numeric field to style by
         color_field = None
-        if params.field_statistics:
+        if params.calculate_statistics and params.field_statistics:
             # Use the first statistic for styling
             first_stat = params.field_statistics[0]
             if first_stat.operation.value == "count":
@@ -237,20 +252,24 @@ class DissolveToolRunner(BaseToolRunner[DissolveToolParams]):
         )
         output_path = temp_dir / "output.parquet"
 
+        dumped = params.model_dump(
+            exclude={
+                "input_path",
+                "output_path",
+                "user_id",
+                "folder_id",
+                "project_id",
+                "scenario_id",
+                "output_name",
+                "input_layer_id",
+                "input_layer_filter",
+                "calculate_statistics",
+            }
+        )
+        if not params.calculate_statistics:
+            dumped["field_statistics"] = None
         analysis_params = DissolveParams(
-            **params.model_dump(
-                exclude={
-                    "input_path",
-                    "output_path",
-                    "user_id",
-                    "folder_id",
-                    "project_id",
-                    "scenario_id",
-                    "output_name",
-                    "input_layer_id",
-                    "input_layer_filter",
-                }
-            ),
+            **dumped,
             input_path=str(input_path),
             output_path=str(output_path),
         )

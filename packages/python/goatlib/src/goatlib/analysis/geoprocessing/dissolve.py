@@ -160,10 +160,8 @@ class DissolveTool(AnalysisTool):
                 stats_columns.append(f"{stat_sql} AS {col_name}")
 
         stats_select = ", ".join(stats_columns) if stats_columns else ""
-        if stats_select and select_dissolve_cols:
+        if stats_select:
             stats_select = ", " + stats_select
-        elif stats_select:
-            stats_select = stats_select
 
         # Build the dissolve query
         # Use ST_Union_Agg to merge geometries

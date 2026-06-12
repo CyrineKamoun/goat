@@ -96,6 +96,9 @@
     "join_options": {
       "label": "Join Options"
     },
+    "merge_options": {
+      "label": "Merge Options"
+    },
     "result": {
       "label": "Results"
     },
@@ -151,6 +154,10 @@
     "catchment_area_type": {
       "label": "Catchment area shape",
       "description": "Select the shape of the catchment area geometry"
+    },
+    "shape_style": {
+      "label": "Shape style",
+      "description": "How polygons are shaped when there are multiple starting points"
     },
     "steps_style": {
       "label": "Steps style",
@@ -750,8 +757,12 @@
       "time": "Time (min)",
       "distance": "Distance (m)"
     },
+    "shape_style": {
+      "combined": "Combined across origins",
+      "separated": "Separated by origin"
+    },
     "steps_style": {
-      "separate": "Separate steps",
+      "separate": "Separated steps",
       "cumulative": "Cumulative steps"
     },
     "routing_mode": {
@@ -997,6 +1008,10 @@
     "travel_cost_matrix": {
       "title": "Travel Cost Matrix",
       "description": "Compute travel times and distances between origin and destination point layers."
+    },
+    "merge": {
+      "title": "Merge",
+      "description": "Parameters for merge tool. By default, fields with the same name are mapped together, while fields unique to inputs are retained in the output."
     }
   },
   "groups": {
@@ -1030,6 +1045,7 @@
     "dissolve": "Dissolve",
     "intersection": "Intersection",
     "union": "Union",
+    "merge": "Merge",
     "aggregate_points": "Aggregate Points",
     "aggregate_polygon": "Aggregate Polygons",
     "aggregate_polygons": "Aggregate Polygons",

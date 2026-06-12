@@ -251,15 +251,43 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
     async def get_public_project(
         self, *, async_session: AsyncSession, project_id: UUID
     ) -> ProjectPublicRead | None:
-        project_public = select(ProjectPublic).where(
-            ProjectPublic.project_id == project_id
+        # Local imports to avoid module-level cycles between crud_project,
+        # the analytics model (which imports the organization model), and
+        # the project model.
+        from core.db.models.organization_analytics import OrganizationAnalytics
+        from core.db.models.user import User
+        from core.schemas.project import PublicAnalytics
+
+        result = await async_session.execute(
+            select(ProjectPublic).where(ProjectPublic.project_id == project_id)
         )
-        result = await async_session.execute(project_public)
-        project = result.scalars().first()
-        if not project:
+        project_public = result.scalars().first()
+        if not project_public:
             return None
-        project_public_read = ProjectPublicRead(**project.model_dump())
-        return project_public_read
+
+        # Resolve analytics only when the project owner has opted this
+        # project in AND the owning org has a configuration. A single
+        # JOIN keeps the request a single SQL hop.
+        analytics: PublicAnalytics | None = None
+        if project_public.tracking_enabled:
+            analytics_row = (
+                await async_session.execute(
+                    select(OrganizationAnalytics)
+                    .join(User, User.organization_id == OrganizationAnalytics.organization_id)
+                    .join(Project, Project.user_id == User.id)
+                    .where(Project.id == project_id)
+                )
+            ).scalars().first()
+            if analytics_row is not None:
+                analytics = PublicAnalytics(
+                    provider=analytics_row.provider,
+                    config=analytics_row.config,
+                )
+
+        return ProjectPublicRead(
+            **project_public.model_dump(),
+            analytics=analytics,
+        )
 
     async def publish_project(
         self, *, async_session: AsyncSession, project_id: UUID

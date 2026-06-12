@@ -23,6 +23,9 @@ import { useBrandedTheme } from "@/hooks/dashboard/useBrandedTheme";
 import { useBasemap } from "@/hooks/map/MapHooks";
 import { useAppDispatch } from "@/hooks/store/ContextHooks";
 
+import { AnalyticsTracker } from "@/components/analytics/AnalyticsTracker";
+import type { AnalyticsConfig } from "@/components/analytics/AnalyticsTracker";
+import { ConsentBanner } from "@/components/analytics/ConsentBanner";
 import { LoadingPage } from "@/components/common/LoadingPage";
 import MapViewer from "@/components/map/MapViewer";
 import PublicProjectLayout from "@/components/map/layouts/desktop/PublicProjectLayout";
@@ -90,11 +93,27 @@ export default function MapPage({ params: { projectId } }) {
     }
   };
 
+  const analytics = (sharedProject as { analytics?: AnalyticsConfig | null } | undefined)
+    ?.analytics;
+  const trackingRequireConsent =
+    (sharedProject as { tracking_require_consent?: boolean } | undefined)
+      ?.tracking_require_consent ?? true;
+
   return (
     <>
       {isLoading && <LoadingPage />}
       {!isLoading && !projectError && project && (
-        <MapProvider>
+        <>
+          <AnalyticsTracker
+            analytics={analytics}
+            projectId={projectId}
+            projectName={project.name}
+            requireConsent={trackingRequireConsent}
+          />
+          {analytics && trackingRequireConsent && (
+            <ConsentBanner provider={analytics.provider} />
+          )}
+          <MapProvider>
           <DrawProvider>
             <MeasureProvider>
               <Box
@@ -158,6 +177,7 @@ export default function MapPage({ params: { projectId } }) {
             </MeasureProvider>
           </DrawProvider>
         </MapProvider>
+        </>
       )}
     </>
   );

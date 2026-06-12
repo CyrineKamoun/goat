@@ -632,7 +632,7 @@ class TileService:
         if tile_data:
             cache_tile(cache_layer_id, z, x, y, tile_data, is_gzip)
 
-        logger.info(
+        logger.debug(
             "PMTiles %s tile %d/%d/%d: %d bytes (%.1fms)",
             pmtiles_path.name,
             z,
@@ -766,7 +766,7 @@ class TileService:
             overzoom_ms = (time.monotonic() - overzoom_start) * 1000
 
             if overzoomed:
-                logger.info(
+                logger.debug(
                     "Overzoom %d/%d/%d -> %d/%d/%d: %d bytes parent -> %d bytes (%.1fms)",
                     parent_z,
                     parent_x,
@@ -1155,7 +1155,7 @@ class TileService:
 
         # Unfiltered request - try PMTiles first, fallback to GeoParquet
         if not self._pmtiles_exists(layer_info):
-            logger.info(
+            logger.debug(
                 "No PMTiles for %s, falling back to dynamic tiles",
                 layer_info.table_name,
             )
@@ -1184,7 +1184,7 @@ class TileService:
         result = await self._get_tile_from_pmtiles(layer_info, z, x, y)
         if result is not None:
             tile_data, is_gzip = result
-            logger.info(
+            logger.debug(
                 "Tile (PMTiles): %s z=%d/%d/%d",
                 layer_info.table_name,
                 z,
@@ -1231,7 +1231,7 @@ class TileService:
         Returns:
             MVT tile bytes or None if empty
         """
-        logger.info(
+        logger.debug(
             "Tile (GeoParquet): %s z=%d/%d/%d",
             layer_info.table_name,
             z,

@@ -162,3 +162,37 @@ def test_vector_url_rejects_non_http_scheme() -> None:
     data = {**_base_fields(), "type": "vector", "url": "ftp://example.com/style.json"}
     with pytest.raises(ValidationError, match="http"):
         CUSTOM_BASEMAP_ADAPTER.validate_python(data)
+
+
+def test_vector_custom_basemap_accepts_attribution() -> None:
+    data = {
+        **_base_fields(),
+        "type": "vector",
+        "url": "https://example.com/style.json",
+        "attribution": "© Example Provider",
+    }
+    parsed = CUSTOM_BASEMAP_ADAPTER.validate_python(data)
+    assert parsed.type == "vector"
+    assert parsed.attribution == "© Example Provider"
+
+
+def test_solid_custom_basemap_accepts_attribution() -> None:
+    data = {
+        **_base_fields(),
+        "type": "solid",
+        "color": "#ff8800",
+        "attribution": "© Example",
+    }
+    parsed = CUSTOM_BASEMAP_ADAPTER.validate_python(data)
+    assert parsed.attribution == "© Example"
+
+
+def test_attribution_too_long_rejected() -> None:
+    data = {
+        **_base_fields(),
+        "type": "vector",
+        "url": "https://example.com/style.json",
+        "attribution": "x" * 501,
+    }
+    with pytest.raises(ValidationError):
+        CUSTOM_BASEMAP_ADAPTER.validate_python(data)

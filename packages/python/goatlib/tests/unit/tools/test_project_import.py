@@ -235,6 +235,60 @@ class TestProjectImportRunner:
         # Original not mutated
         assert config["nodes"][0]["data"]["layerId"] == "old-layer-id"
 
+    def test_remap_layer_other_properties_workflow_export(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        """Workflow_export stamp's workflow_id is remapped via id_map.
+
+        Layers persisted by a 'Save as Dataset' node carry a stamp that
+        the overwrite-on-rerun lookup matches against. The workflow row
+        gets a new UUID on import, so the stamp must follow.
+        """
+        old_wf = "old-workflow-id"
+        new_wf = "new-workflow-id"
+        id_map = {old_wf: new_wf}
+        other_properties = {
+            "workflow_export": {
+                "workflow_id": old_wf,
+                "export_node_id": "n_export_1",
+            }
+        }
+
+        result = runner._remap_layer_other_properties(other_properties, id_map)
+
+        assert result is not None
+        assert result["workflow_export"]["workflow_id"] == new_wf
+        assert result["workflow_export"]["export_node_id"] == "n_export_1"
+        # Original not mutated
+        assert other_properties["workflow_export"]["workflow_id"] == old_wf
+
+    def test_remap_layer_other_properties_handles_missing_stamp(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        """Layers without a workflow_export stamp pass through untouched."""
+        assert runner._remap_layer_other_properties(None, {}) is None
+        assert runner._remap_layer_other_properties({}, {}) == {}
+        assert runner._remap_layer_other_properties(
+            {"foo": "bar"}, {"x": "y"}
+        ) == {"foo": "bar"}
+
+    def test_remap_layer_other_properties_orphan_workflow(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        """Stamp pointing to a workflow not in id_map is left as-is.
+
+        Happens when the layer is exported but its source workflow was
+        excluded. Better to leave the stale stamp than guess.
+        """
+        other_properties = {
+            "workflow_export": {
+                "workflow_id": "orphan-wf",
+                "export_node_id": "n1",
+            }
+        }
+        result = runner._remap_layer_other_properties(other_properties, {})
+        assert result == other_properties
+
     def test_remap_report_config(self, runner: ProjectImportRunner) -> None:
         """Replaces old UUIDs with new in config JSON."""
         old_uuid_1 = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"

@@ -9,7 +9,9 @@
 #include "kernel/reachability_field.h"
 #include "kernel/snap.h"
 #include "output/geojson.h"
+#include "output/grid_contour_common.h"
 #include "output/parquet.h"
+#include "geometry/grid_surface_builder.h"
 #include "pt/pt_pipeline.h"
 
 #include <chrono>
@@ -17,6 +19,7 @@
 #include <cstdio>
 #include <duckdb.hpp>
 #include <filesystem>
+#include <functional>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -176,18 +179,18 @@ namespace routing
                                     use_distance);
         }
 
-        std::string dispatch_geojson_output(ReachabilityField const &field,
+        std::string dispatch_geojson_output(std::vector<ReachabilityField> const &fields,
                                             RequestConfig const &cfg,
                                             duckdb::Connection &con)
         {
-            return output::build_geojson_output(field, cfg, con);
+            return output::build_geojson_output(fields, cfg, con);
         }
 
-        std::string dispatch_parquet_output(ReachabilityField const &field,
+        std::string dispatch_parquet_output(std::vector<ReachabilityField> const &fields,
                                             RequestConfig const &cfg,
                                             duckdb::Connection &con)
         {
-            output::write_parquet_output(field, cfg, con);
+            output::write_parquet_output(fields, cfg, con);
             return "";
         }
 
@@ -227,6 +230,70 @@ namespace routing
 
             return field;
         }
+
+        // Streaming path for shape_style=Separated grid contours: produce one
+        // reachability field at a time, build its grid + jsolines features,
+        // discard the field before moving to the next origin. Caps cost-vector
+        // memory at 1× node_count instead of N× node_count.
+        std::string compute_catchment_separated_streaming(
+            RequestConfig &cfg,
+            duckdb::Connection &con,
+            std::function<double()> const &elapsed)
+        {
+            validate_request(cfg);
+            bool const load_geom = true;  // jsolines needs edge geometry
+
+            auto classes = select_valid_classes(cfg);
+            auto edges = load_filtered_edges(cfg, con, classes, load_geom);
+            compute_edge_costs(edges, cfg);
+            auto prepared = build_network_and_starts(std::move(edges), cfg);
+            auto net_ptr = std::make_shared<SubNetwork const>(std::move(prepared.net));
+            bool const use_distance = (cfg.cost_type == CostType::Distance);
+            auto adj = kernel::build_adjacency_list(*net_ptr);
+
+            std::fprintf(stderr,
+                         "[Pipeline] Separated infra (n_origins=%zu, %d nodes, %zu edges): %.0f ms\n",
+                         prepared.valid_starts.size(),
+                         net_ptr->node_count,
+                         net_ptr->source.size(),
+                         elapsed());
+
+            auto const cutoffs = output::compute_step_cutoffs(cfg);
+            int const zoom = geometry::grid_zoom_for_mode(cfg.mode);
+
+            std::vector<output::TaggedFeature> features;
+            for (size_t oi = 0; oi < prepared.valid_starts.size(); ++oi)
+            {
+                auto costs = kernel::dijkstra(adj,
+                                              std::vector<int32_t>{prepared.valid_starts[oi]},
+                                              cfg.cost_budget(), use_distance);
+                ReachabilityField field;
+                field.costs = std::move(costs);
+                field.node_count = net_ptr->node_count;
+                field.network = net_ptr;
+                output::append_field_grid_features(features, field,
+                                                    static_cast<int32_t>(oi),
+                                                    zoom, cutoffs, cfg);
+                // `field` (and its costs vector) destructed here.
+            }
+            std::fprintf(stderr,
+                         "[Pipeline] Streamed %zu origins into %zu contour features: %.0f ms\n",
+                         prepared.valid_starts.size(), features.size(), elapsed());
+
+            if (cfg.output_format == OutputFormat::GeoJSON)
+                return output::build_grid_contour_geojson_from_features(features, cfg, con);
+            output::write_grid_contour_parquet_from_features(features, cfg, con,
+                                                              cfg.output_path);
+            return "";
+        }
+
+        bool wants_separated_streaming(RequestConfig const &cfg)
+        {
+            return cfg.shape_style == ShapeStyle::Separated &&
+                   cfg.catchment_type == CatchmentType::Polygon &&
+                   cfg.mode != RoutingMode::PublicTransport &&
+                   cfg.mode != RoutingMode::Car;
+        }
     } // namespace
 
     std::string compute_catchment(RequestConfig const &cfg_in)
@@ -246,22 +313,33 @@ namespace routing
         ensure_required_extensions_loaded(con);
         std::fprintf(stderr, "[Pipeline] DuckDB init: %.0f ms\n", elapsed());
 
-        auto field = build_reachability_field(cfg, con);
+        if (wants_separated_streaming(cfg))
+        {
+            auto result = compute_catchment_separated_streaming(cfg, con, elapsed);
+            std::fprintf(stderr, "[Pipeline] %s output: %.0f ms\n",
+                         cfg.output_format == OutputFormat::GeoJSON
+                             ? "GeoJSON" : "Parquet",
+                         elapsed());
+            return result;
+        }
+
+        std::vector<ReachabilityField> fields;
+        fields.push_back(build_reachability_field(cfg, con));
         std::fprintf(stderr, "[Pipeline] Reachability field (%d nodes, %zu edges): %.0f ms\n",
-                     field.node_count,
-                     field.network ? field.network->source.size() : 0,
+                     fields[0].node_count,
+                     fields[0].network ? fields[0].network->source.size() : 0,
                      elapsed());
 
         if (cfg.output_format == OutputFormat::GeoJSON)
         {
-            auto result = dispatch_geojson_output(field, cfg, con);
+            auto result = dispatch_geojson_output(fields, cfg, con);
             std::fprintf(stderr, "[Pipeline] GeoJSON output: %.0f ms\n", elapsed());
             return result;
         }
 
         if (cfg.output_format == OutputFormat::Parquet)
         {
-            auto result = dispatch_parquet_output(field, cfg, con);
+            auto result = dispatch_parquet_output(fields, cfg, con);
             std::fprintf(stderr, "[Pipeline] Parquet output: %.0f ms\n", elapsed());
             return result;
         }

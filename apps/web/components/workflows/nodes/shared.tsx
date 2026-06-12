@@ -77,7 +77,7 @@ export const NodeHeader = styled(Box)(({ theme }) => ({
 // Icon wrapper with status-based styling
 export const NodeIconWrapper = styled(Box, {
   shouldForwardProp: (prop) => prop !== "status",
-})<{ status?: "pending" | "running" | "completed" | "failed" }>(({ theme, status }) => {
+})<{ status?: "pending" | "running" | "completed" | "failed" | "skipped" }>(({ theme, status }) => {
   const isDark = theme.palette.mode === "dark";
   
   // Default colors (adapt to theme)
@@ -140,17 +140,22 @@ export const NodeIconWrapper = styled(Box, {
   };
 });
 
-// Small badge on icon corner (completed checkmark or failed cross)
+// Small badge on icon corner (completed checkmark, failed cross, or skipped block)
 export const IconStatusBadge = styled(Box, {
   shouldForwardProp: (prop) => prop !== "status",
-})<{ status?: "completed" | "failed" }>(({ theme, status }) => ({
+})<{ status?: "completed" | "failed" | "skipped" }>(({ theme, status }) => ({
   position: "absolute",
   top: -6,
   right: -6,
   width: 18,
   height: 18,
   borderRadius: "50%",
-  backgroundColor: status === "failed" ? theme.palette.error.main : theme.palette.primary.main,
+  backgroundColor:
+    status === "failed"
+      ? theme.palette.error.main
+      : status === "skipped"
+        ? theme.palette.grey[500]
+        : theme.palette.primary.main,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",

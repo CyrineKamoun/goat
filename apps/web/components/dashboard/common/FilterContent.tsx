@@ -137,24 +137,29 @@ export default function FilterContentMenu(props: FilterContentMenuProps) {
         </Paper>
       }>
       <Tooltip title={t("filter")}>
-        <IconButton
-          onClick={(event) => {
-            event.stopPropagation();
-            setFilterContentMenuOpen(!filterContentMenuOpen);
-          }}
-          disabled={tags.length === 0 && props.type === "project"}
-          sx={{
-            mx: 2,
-            p: 2,
-            borderRadius: 1,
-            ...(layerTypes.length > 0 && {
-              color: theme.palette.primary.main,
-            }),
-          }}>
-          <Badge badgeContent={layerTypes.length} color="primary">
-            <Icon iconName={ICON_NAME.FILTER} fontSize="small" htmlColor="inherit" />
-          </Badge>
-        </IconButton>
+        {/* Wrap in a span so the Tooltip still receives pointer events
+            when the IconButton is `disabled` (disabled buttons don't
+            fire events, which trips MUI's Tooltip warning). */}
+        <span>
+          <IconButton
+            onClick={(event) => {
+              event.stopPropagation();
+              setFilterContentMenuOpen(!filterContentMenuOpen);
+            }}
+            disabled={tags.length === 0 && props.type === "project"}
+            sx={{
+              mx: 2,
+              p: 2,
+              borderRadius: 1,
+              ...(layerTypes.length > 0 && {
+                color: theme.palette.primary.main,
+              }),
+            }}>
+            <Badge badgeContent={layerTypes.length} color="primary">
+              <Icon iconName={ICON_NAME.FILTER} fontSize="small" htmlColor="inherit" />
+            </Badge>
+          </IconButton>
+        </span>
       </Tooltip>
     </ArrowPopper>
   );

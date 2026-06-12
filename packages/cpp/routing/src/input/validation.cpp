@@ -1,5 +1,7 @@
 #include "validation.h"
 
+#include "request_config.h"
+
 #include <algorithm>
 #include <stdexcept>
 
@@ -10,6 +12,19 @@ namespace routing::input
     {
         if (cfg.starting_points.empty())
             throw std::invalid_argument("At least one starting point required");
+        if (cfg.shape_style == ShapeStyle::Separated &&
+            cfg.catchment_type != CatchmentType::Polygon)
+        {
+            throw std::invalid_argument(
+                "shape_style=separated requires catchment_type=polygon");
+        }
+        if (cfg.shape_style == ShapeStyle::Separated &&
+            (cfg.mode == RoutingMode::PublicTransport ||
+             cfg.mode == RoutingMode::Car))
+        {
+            throw std::invalid_argument(
+                "shape_style=separated is only supported for active mobility modes");
+        }
         if (cfg.max_cost <= 0)
             throw std::invalid_argument("max_cost must be positive");
         if (!cfg.cutoffs.empty())
@@ -31,7 +46,12 @@ namespace routing::input
         }
         if (cfg.cost_type == CostType::Time)
         {
-            if (cfg.mode != RoutingMode::Car && cfg.speed_km_h <= 0)
+            // Active-mobility modes need a positive user-supplied speed.
+            // Car uses per-edge OSM maxspeed; PT routing cost is driven by
+            // access/egress speeds, validated separately below.
+            if (cfg.mode != RoutingMode::Car &&
+                cfg.mode != RoutingMode::PublicTransport &&
+                cfg.speed_km_h <= 0)
                 throw std::invalid_argument(
                     "speed_km_h required for active mobility time mode");
             if (cfg.mode == RoutingMode::Walking && cfg.max_cost > 45)
@@ -75,23 +95,12 @@ namespace routing::input
                 throw std::invalid_argument(
                     "PublicTransport max travel time cannot exceed 120 min");
 
-            // Access leg: speed is always required (for time-based Dijkstra).
-            // For distance-based access, speed converts the distance budget to time.
-            double const effective_access_speed =
-                (cfg.access_speed_km_h > 0.0) ? cfg.access_speed_km_h : cfg.speed_km_h;
-            if (effective_access_speed <= 0.0)
-                throw std::invalid_argument(
-                    "access speed (or speed_km_h) is required for PublicTransport mode");
-            double const effective_egress_speed =
-                (cfg.egress_speed_km_h > 0.0) ? cfg.egress_speed_km_h : cfg.speed_km_h;
-            if (effective_egress_speed <= 0.0)
-                throw std::invalid_argument(
-                    "egress speed (or speed_km_h) is required for PublicTransport mode");
-
-            // Apply mode-specific default speeds for access/egress when unset.
-            // This prevents bicycle/pedelec access from falling back to
-            // the main speed_km_h (typically walking speed for PT).
-            auto default_speed_for_mode = [](RoutingMode m) -> double {
+            // Apply mode-specific default speeds for active access/egress when
+            // unset, so e.g. bicycle access doesn't silently fall back to the
+            // main speed_km_h (typically a walking value for PT). Car is
+            // intentionally absent — its routing cost comes from per-edge OSM
+            // maxspeed, so the package doesn't expect a user speed for it.
+            auto default_active_speed = [](RoutingMode m) -> double {
                 switch (m)
                 {
                 case RoutingMode::Walking:   return 5.0;
@@ -102,15 +111,34 @@ namespace routing::input
             };
             if (cfg.access_speed_km_h <= 0.0)
             {
-                double ds = default_speed_for_mode(cfg.access_mode);
+                double ds = default_active_speed(cfg.access_mode);
                 if (ds > 0.0)
                     cfg.access_speed_km_h = ds;
             }
             if (cfg.egress_speed_km_h <= 0.0)
             {
-                double ds = default_speed_for_mode(cfg.egress_mode);
+                double ds = default_active_speed(cfg.egress_mode);
                 if (ds > 0.0)
                     cfg.egress_speed_km_h = ds;
+            }
+
+            // Speed must be available for active access/egress; car doesn't
+            // need one (per-edge OSM maxspeed governs).
+            if (cfg.access_mode != RoutingMode::Car)
+            {
+                double const effective_access_speed =
+                    (cfg.access_speed_km_h > 0.0) ? cfg.access_speed_km_h : cfg.speed_km_h;
+                if (effective_access_speed <= 0.0)
+                    throw std::invalid_argument(
+                        "access speed is required for active-mobility access leg");
+            }
+            if (cfg.egress_mode != RoutingMode::Car)
+            {
+                double const effective_egress_speed =
+                    (cfg.egress_speed_km_h > 0.0) ? cfg.egress_speed_km_h : cfg.speed_km_h;
+                if (effective_egress_speed <= 0.0)
+                    throw std::invalid_argument(
+                        "egress speed is required for active-mobility egress leg");
             }
 
             // Apply default access/egress budgets when unset.

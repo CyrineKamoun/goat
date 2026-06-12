@@ -21,10 +21,12 @@ import {
   MenuList,
   Select,
   Stack,
+  Switch,
   Tab,
   Tabs,
   Tooltip,
   Typography,
+  useTheme,
 } from "@mui/material";
 import type { SelectChangeEvent } from "@mui/material";
 import { formatDistance } from "date-fns";
@@ -43,6 +45,11 @@ import {
   unassignDomainFromProject,
   useOrganizationDomains,
 } from "@/lib/api/customDomains";
+import {
+  setProjectTrackingEnabled,
+  setProjectTrackingRequireConsent,
+  useOrganizationAnalytics,
+} from "@/lib/api/organizationAnalytics";
 import {
   FOLDERS_API_BASE_URL,
   deleteFolderGrant,
@@ -199,14 +206,18 @@ const ShareWithItemsTab: React.FC<ShareWithItemsTabProps> = ({ items, roleOption
 
 const ShareWithPublicTab: React.FC<ShareWithPublicTabProps> = ({ project }) => {
   const { t } = useTranslation("common");
+  const theme = useTheme();
   const { sharedProject, isLoading, mutate } = usePublicProject(project.id);
   const { organization } = useOrganization();
   const { domains: orgDomains, mutate: mutateOrgDomains } = useOrganizationDomains(
     organization?.id
   );
+  const { analytics: orgAnalytics } = useOrganizationAnalytics(organization?.id);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isUnpublishing, setIsUnpublishing] = useState(false);
   const [isCustomUrlBusy, setIsCustomUrlBusy] = useState(false);
+  const [isTrackingBusy, setIsTrackingBusy] = useState(false);
+  const [isConsentBusy, setIsConsentBusy] = useState(false);
   const dateLocale = useDateFnsLocale();
   const baseUrl = window.location.origin;
   const publicUrl = `${baseUrl}/map/public/${project.id}`;
@@ -263,6 +274,37 @@ const ShareWithPublicTab: React.FC<ShareWithPublicTabProps> = ({ project }) => {
       toast.error(message);
     } finally {
       setIsCustomUrlBusy(false);
+    }
+  };
+
+  const handleTrackingToggle = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const next = event.target.checked;
+    setIsTrackingBusy(true);
+    try {
+      await setProjectTrackingEnabled(project.id, next);
+      toast.success(
+        next
+          ? t("share_tracking_enabled_success", "Analytics tracking enabled")
+          : t("share_tracking_disabled_success", "Analytics tracking disabled")
+      );
+      await mutate();
+    } catch {
+      toast.error(t("share_tracking_update_error", "Failed to update tracking"));
+    } finally {
+      setIsTrackingBusy(false);
+    }
+  };
+
+  const handleConsentToggle = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const next = event.target.checked;
+    setIsConsentBusy(true);
+    try {
+      await setProjectTrackingRequireConsent(project.id, next);
+      await mutate();
+    } catch {
+      toast.error(t("share_tracking_update_error", "Failed to update tracking"));
+    } finally {
+      setIsConsentBusy(false);
     }
   };
 
@@ -447,6 +489,69 @@ const ShareWithPublicTab: React.FC<ShareWithPublicTabProps> = ({ project }) => {
                       </Tooltip>
                     )}
                   </Stack>
+                </Stack>
+              )}
+
+              {/* Analytics opt-in. Only renders when the org has an
+                  analytics configuration; otherwise the whole section is
+                  hidden so we don't surface a dead toggle. */}
+              {orgAnalytics && (
+                <Stack spacing={1}>
+                  <Typography variant="body1">
+                    {t("share_analytics_label", "Analytics tracking")}
+                  </Typography>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Switch
+                      checked={Boolean(sharedProject?.tracking_enabled)}
+                      disabled={isTrackingBusy}
+                      onChange={handleTrackingToggle}
+                      inputProps={{ "aria-label": "tracking-toggle" }}
+                    />
+                    <Typography variant="body2" color="text.secondary">
+                      {t(
+                        "share_analytics_helper",
+                        "Use your organization's analytics configuration to track visits to this dashboard."
+                      )}
+                    </Typography>
+                  </Stack>
+
+                  {sharedProject?.tracking_enabled && (
+                    <Stack spacing={0.5}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Switch
+                          checked={sharedProject.tracking_require_consent !== false}
+                          disabled={isConsentBusy}
+                          onChange={handleConsentToggle}
+                          inputProps={{ "aria-label": "consent-toggle" }}
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                          {t(
+                            "share_consent_helper",
+                            "Wait for visitor consent before sending analytics events (recommended in GDPR jurisdictions)."
+                          )}
+                        </Typography>
+                      </Stack>
+                      {sharedProject.tracking_require_consent === false && (
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          alignItems="flex-start"
+                          sx={{ pl: 7 }}>
+                          <Icon
+                            iconName={ICON_NAME.CIRCLEINFO}
+                            htmlColor={theme.palette.warning.main}
+                            style={{ fontSize: 14, marginTop: 3, flexShrink: 0 }}
+                          />
+                          <Typography variant="caption" color="warning.main">
+                            {t(
+                              "share_consent_warning",
+                              "Tracking will fire on every page view without waiting for consent. In Germany and most of the EU this is not compliant with GDPR/TDDDG — only disable if you operate in a jurisdiction that permits cookieless analytics without consent."
+                            )}
+                          </Typography>
+                        </Stack>
+                      )}
+                    </Stack>
+                  )}
                 </Stack>
               )}
             </>

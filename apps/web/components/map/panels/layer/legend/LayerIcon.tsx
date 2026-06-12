@@ -2,6 +2,11 @@ import ImageIcon from "@mui/icons-material/Image";
 import { Box } from "@mui/material";
 import React from "react";
 
+import type { Layer } from "@/lib/validations/layer";
+import type { ProjectLayer } from "@/lib/validations/project";
+import { rgbToHex } from "@/lib/utils/helpers";
+import { getLegendColorMap } from "@/lib/utils/map/legend";
+
 import { MaskedImageIcon } from "@/components/map/panels/style/other/MaskedImageIcon";
 
 interface LayerIconProps {
@@ -80,3 +85,126 @@ export const LayerIcon = ({
     </svg>
   );
 };
+
+/**
+ * Multi-color swatch for layers with attribute-based legends (e.g.
+ * `color_field`, `stroke_color_field`). Renders the legend's color stops
+ * as vertical bands inside a small rounded square — a compact preview
+ * of what the full LayerLegendPanel shows in the Layers panel.
+ */
+function LegendSwatch({ colors }: { colors: string[] }) {
+  const safe = colors.length > 0 ? colors : ["#ccc"];
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        width: 18,
+        height: 18,
+        borderRadius: 0.5,
+        overflow: "hidden",
+        boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
+      }}>
+      {safe.map((c, i) => (
+        <Box key={i} sx={{ flex: 1, bgcolor: c }} />
+      ))}
+    </Box>
+  );
+}
+
+/**
+ * Build a small icon representing a layer's style — the same affordance
+ * the Layers panel renders next to each layer name. Mirrors the branching
+ * logic in `ProjectLayerTree`:
+ *
+ *   1. Tables → a table glyph (skipped here; popups don't open on tables)
+ *   2. Raster → image icon
+ *   3. Complex legend (color_field / stroke_color_field / marker_field)
+ *      → multi-color swatch built from `getLegendColorMap` so the user
+ *      sees that the layer is attribute-styled, not a single color
+ *   4. Simple feature → `<LayerIcon>` with the base color/stroke (point
+ *      dot, line, or polygon rect)
+ *
+ * Returns `undefined` only when the layer is missing or has no
+ * recognizable geometry type, so callers can fall back to a generic icon.
+ */
+export function buildLayerIcon(
+  layer: ProjectLayer | Layer | undefined,
+): React.ReactNode | undefined {
+  if (!layer) return undefined;
+
+  const layerType = (layer as { layer_type?: string }).layer_type;
+  if (layerType === "raster") return <LayerIcon type="raster" />;
+
+  const geomType = (
+    layer as { feature_layer_geometry_type?: string }
+  ).feature_layer_geometry_type;
+  if (!geomType) return undefined;
+
+  const props = (layer.properties as Record<string, unknown>) ?? {};
+
+  const colorToHex = (c: unknown): string | undefined => {
+    if (Array.isArray(c) && c.length >= 3 && typeof c[0] === "number") {
+      return rgbToHex(c as [number, number, number]);
+    }
+    if (typeof c === "string") return c;
+    return undefined;
+  };
+
+  const baseColor = colorToHex(props.color) ?? "#ccc";
+  const strokeColor = colorToHex(props.stroke_color);
+  const filled = props.filled !== false;
+  const stroked = props.stroked !== false;
+  const customMarker = Boolean(props.custom_marker);
+  const marker = props.marker as { url?: string; source?: "custom" | "library" } | undefined;
+  const markerField = props.marker_field;
+
+  // Static custom marker (one glyph for the whole layer, not driven by
+  // `marker_field`): the marker IS the visible affordance on the map, so
+  // it takes precedence over any color-based legend swatch. Without
+  // this short-circuit, a layer styled with custom_marker + color_field
+  // would misleadingly render a fill-color swatch in the popup header
+  // even though the map shows markers.
+  if (customMarker && !markerField && marker?.url) {
+    const iconColor = !filled ? "#000000" : baseColor;
+    return (
+      <LayerIcon
+        type={geomType.toLowerCase()}
+        color={iconColor}
+        filled={filled}
+        iconUrl={marker.url}
+        iconSource={marker.source ?? "library"}
+      />
+    );
+  }
+
+  // Attribute-based styling: pull the legend color stops and render them
+  // as a multi-color swatch. Mirrors what the Layers panel does at
+  // ProjectLayerTree.tsx around L1071-L1085 (LegendPanel for the full
+  // breakdown; we just need a compact preview).
+  const hasComplexLegend = Boolean(
+    props.color_field || props.stroke_color_field || props.marker_field,
+  );
+  if (hasComplexLegend) {
+    const fillStops = getLegendColorMap(props, "color").map((s) => s.color);
+    const strokeStops = getLegendColorMap(props, "stroke_color").map((s) => s.color);
+    const stops = (fillStops.length > 1 ? fillStops : strokeStops).filter(Boolean);
+    if (stops.length > 1) return <LegendSwatch colors={stops} />;
+    // marker_field with no color stops: fall through to the simple-
+    // feature preview below.
+  }
+
+  const iconColor = !filled && customMarker ? "#000000" : baseColor;
+
+  return (
+    <LayerIcon
+      type={geomType.toLowerCase()}
+      color={iconColor}
+      strokeColor={stroked ? strokeColor : undefined}
+      filled={filled}
+      iconUrl={!markerField && customMarker && marker?.url ? marker.url : undefined}
+      iconSource={
+        !markerField && customMarker && marker?.source ? marker.source : "library"
+      }
+    />
+  );
+}

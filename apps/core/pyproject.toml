@@ -49,6 +49,7 @@ dependencies = [
   "boto3==1.38.23",
   "duckdb>=1.4.3",
   "goatlib",
+  "goatobs",
   "dnspython>=2.8.0",
 ]
 

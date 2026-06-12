@@ -29,6 +29,7 @@ type SubmitPayload =
       name: string;
       description: string | null;
       thumbnail_url: string | null;
+      attribution: string | null;
       url: string;
     }
   | {
@@ -36,14 +37,15 @@ type SubmitPayload =
       name: string;
       description: string | null;
       thumbnail_url: string | null;
-      url: string;
       attribution: string | null;
+      url: string;
     }
   | {
       type: "solid";
       name: string;
       description: string | null;
       thumbnail_url: string | null;
+      attribution: string | null;
       color: string;
     };
 
@@ -70,9 +72,7 @@ export function CustomBasemapDialog({ open, initial, onClose, onSubmit, onDelete
   const [url, setUrl] = useState(
     initial && initial.type !== "solid" ? initial.url : ""
   );
-  const [attribution, setAttribution] = useState(
-    initial?.type === "raster" ? initial.attribution ?? "" : ""
-  );
+  const [attribution, setAttribution] = useState(initial?.attribution ?? "");
   const [color, setColor] = useState(
     initial?.type === "solid" ? initial.color : "#888888"
   );
@@ -88,7 +88,7 @@ export function CustomBasemapDialog({ open, initial, onClose, onSubmit, onDelete
     setDescription(initial?.description ?? "");
     setThumbnailUrl(initial?.thumbnail_url ?? "");
     setUrl(initial && initial.type !== "solid" ? initial.url : "");
-    setAttribution(initial?.type === "raster" ? initial.attribution ?? "" : "");
+    setAttribution(initial?.attribution ?? "");
     setColor(initial?.type === "solid" ? initial.color : "#888888");
     setError(null);
   }, [open, initial]);
@@ -116,6 +116,7 @@ export function CustomBasemapDialog({ open, initial, onClose, onSubmit, onDelete
         name: trimmed,
         description: description.trim() || null,
         thumbnail_url: thumbnailUrl.trim() || null,
+        attribution: attribution.trim() || null,
         color,
       };
     } else if (kind === "vector") {
@@ -124,6 +125,7 @@ export function CustomBasemapDialog({ open, initial, onClose, onSubmit, onDelete
         name: trimmed,
         description: description.trim() || null,
         thumbnail_url: thumbnailUrl.trim() || null,
+        attribution: attribution.trim() || null,
         url: url.trim(),
       };
     } else {
@@ -132,8 +134,8 @@ export function CustomBasemapDialog({ open, initial, onClose, onSubmit, onDelete
         name: trimmed,
         description: description.trim() || null,
         thumbnail_url: thumbnailUrl.trim() || null,
-        url: url.trim(),
         attribution: attribution.trim() || null,
+        url: url.trim(),
       };
     }
 
@@ -198,14 +200,12 @@ export function CustomBasemapDialog({ open, initial, onClose, onSubmit, onDelete
                 {t("raster_url_must_contain_placeholders")}
               </Typography>
             )}
-            {kind === "raster" && (
-              <TextFieldInput
-                label={t("attribution")}
-                value={attribution}
-                onChange={setAttribution}
-              />
-            )}
             <TextFieldInput label={t("title")} value={name} onChange={setName} />
+            <TextFieldInput
+              label={t("attribution")}
+              value={attribution}
+              onChange={setAttribution}
+            />
             <TextFieldInput
               label={t("short_description")}
               value={description}
@@ -225,6 +225,11 @@ export function CustomBasemapDialog({ open, initial, onClose, onSubmit, onDelete
           <Stack spacing={2}>
             <WidgetColorPicker label={t("color")} color={color} onChange={setColor} />
             <TextFieldInput label={t("title")} value={name} onChange={setName} />
+            <TextFieldInput
+              label={t("attribution")}
+              value={attribution}
+              onChange={setAttribution}
+            />
             <TextFieldInput
               label={t("short_description")}
               value={description}

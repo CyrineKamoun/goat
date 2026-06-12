@@ -77,28 +77,32 @@ class TravelCostMatrixParams(BaseModel):
     # Routing
     routing_mode: RoutingMode = RoutingMode.walking
     cost_type: CostType = CostType.time
-    max_cost: float = Field(
-        default=30.0, gt=0,
-        description="Budget: minutes (time) or meters (distance). "
-                    "Origin-destination pairs beyond this cost get null.",
+    max_cost: float | None = Field(
+        default=None, gt=0,
+        description="Optional Dijkstra cutoff: minutes (time) or meters "
+                    "(distance). None means unbounded — every reachable O-D "
+                    "pair gets a cost. The C++ matrix loader sizes its own "
+                    "network from the OD bbox, independent of this value.",
     )
-    speed: float = Field(
-        default=5.0, ge=1.0, le=50.0,
-        description="Travel speed in km/h (time cost type only).",
+    speed: float | None = Field(
+        default=None, ge=0.0, le=60.0,
+        description="Travel speed in km/h (time cost type only). None when the "
+                    "mode doesn't use a user-supplied speed (PT uses "
+                    "access/egress speeds; Car uses per-edge OSM maxspeed).",
     )
 
     # PT settings
     transit_modes: list[PTMode] | None = None
     time_window: PTTimeWindow | None = None
-    max_transfers: int = Field(default=5, ge=0, le=10)
+    max_transfers: int = Field(default=5, ge=0, le=5)
     access_mode: AccessEgressMode = AccessEgressMode.walk
     egress_mode: AccessEgressMode = AccessEgressMode.walk
     access_cost_type: CostType = CostType.time
     egress_cost_type: CostType = CostType.time
     access_max_cost: float = Field(default=15.0, ge=0.0, description="Access leg budget: minutes (time) or meters (distance). 0 = default.")
     egress_max_cost: float = Field(default=15.0, ge=0.0, description="Egress leg budget: minutes (time) or meters (distance). 0 = default.")
-    access_speed: float = Field(default=0.0, ge=0.0, description="Access speed km/h (0 = use default)")
-    egress_speed: float = Field(default=0.0, ge=0.0, description="Egress speed km/h (0 = use default)")
+    access_speed: float | None = Field(default=None, ge=0.0, description="Access leg speed in km/h. None for car access.")
+    egress_speed: float | None = Field(default=None, ge=0.0, description="Egress leg speed in km/h. None for car egress.")
 
     # Output
     output_path: str = Field(

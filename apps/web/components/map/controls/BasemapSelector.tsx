@@ -183,10 +183,18 @@ export function BaseMapSelectorList(props: BasemapSelectorListProps) {
   );
 
   return (
-    <Paper sx={{ width: "100%", overflow: "auto" }}>
+    <Paper
+      sx={{
+        width: "100%",
+        maxHeight: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        position: "relative",
+      }}>
       {!props.hideHeader && (
         <>
-          <Box position="absolute" top={5} right={5}>
+          <Box position="absolute" top={5} right={5} sx={{ zIndex: 1 }}>
             <IconButton onClick={() => props.onClick()}>
               <Icon
                 iconName={ICON_NAME.CLOSE}
@@ -198,23 +206,25 @@ export function BaseMapSelectorList(props: BasemapSelectorListProps) {
           <Typography
             variant="body1"
             fontWeight="bold"
-            sx={{ margin: theme.spacing(3) }}>
+            sx={{ margin: theme.spacing(3), flexShrink: 0 }}>
             {t("map_style")}
           </Typography>
         </>
       )}
-      <List sx={{ pt: 0 }}>
-        {styles.map((style, idx) => (
-          <BasemapRow
-            key={style.value}
-            basemap={style}
-            selected={idx === activeIndex}
-            onSelect={() => basemapChange(style.value)}
-            editable={editable}
-            onEdit={onEdit}
-          />
-        ))}
-      </List>
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+        <List sx={{ pt: 0 }}>
+          {styles.map((style, idx) => (
+            <BasemapRow
+              key={style.value}
+              basemap={style}
+              selected={idx === activeIndex}
+              onSelect={() => basemapChange(style.value)}
+              editable={editable}
+              onEdit={onEdit}
+            />
+          ))}
+        </List>
+      </Box>
       {editable && onAdd && (
         <Box
           sx={{
@@ -223,6 +233,7 @@ export function BaseMapSelectorList(props: BasemapSelectorListProps) {
             alignItems: "center",
             px: 2,
             py: 2.5,
+            flexShrink: 0,
             borderTop: (theme) => `1px solid ${theme.palette.divider}`,
           }}>
           <Stack
@@ -289,7 +300,13 @@ export function BasemapSelector(props: BasemapSelectorProps) {
             disablePortal={false}
             popperStyle={{ zIndex: theme.zIndex.modal }}
             content={
-              <Box sx={{ width: 360, pointerEvents: "all" }}>
+              <Box
+                sx={{
+                  width: 360,
+                  maxHeight: "min(calc(100vh - 120px), 560px)",
+                  display: "flex",
+                  pointerEvents: "all",
+                }}>
                 <BaseMapSelectorList
                   styles={props.styles}
                   active={props.active}

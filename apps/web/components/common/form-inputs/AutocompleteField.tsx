@@ -80,19 +80,26 @@ export const RhfAutocompleteField = <
                 </Box>
               )}
               renderOption={(props, option) => {
-                const { key, ...rest } = props as React.HTMLAttributes<HTMLLIElement> & { key: React.Key };
+                // MUI 5.15 puts the option key inside `props`. We pull
+                // it out and apply it as a real React key so spreading
+                // the rest doesn't trip the "key in spread" warning,
+                // and so MUI's internal listbox sees the same key it
+                // emitted. `option.value` is the fallback for any older
+                // MUI build that doesn't emit one.
+                const { key, ...rest } =
+                  props as React.HTMLAttributes<HTMLLIElement> & { key?: React.Key };
                 return (
-                <li {...rest} key={key}>
-                  {option.icon && (
-                    <ListItemIcon
-                      sx={{
-                        minWidth: 35,
-                      }}>
-                      {option.icon}
-                    </ListItemIcon>
-                  )}
-                  <Typography variant="body1">{option.label}</Typography>
-                </li>
+                  <li key={key ?? option.value} {...rest}>
+                    {option.icon && (
+                      <ListItemIcon
+                        sx={{
+                          minWidth: 35,
+                        }}>
+                        {option.icon}
+                      </ListItemIcon>
+                    )}
+                    <Typography variant="body1">{option.label}</Typography>
+                  </li>
                 );
               }}
             />

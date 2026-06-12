@@ -5,11 +5,12 @@ join operations between datasets.
 """
 
 from enum import StrEnum
-from typing import List, Literal, Optional, Self
+from typing import Any, List, Literal, Optional, Self
 
 from pydantic import BaseModel, Field, model_validator
 
 from goatlib.analysis.schemas.base import FieldStatistic
+from goatlib.analysis.schemas.ui import ui_field
 
 
 class SpatialRelationshipType(StrEnum):
@@ -269,13 +270,37 @@ class JoinParams(BaseModel):
         return self
 
 
-class MergeParams(BaseModel):
-    """Parameters for merging multiple vector layers."""
+class MergeInputLayer(BaseModel):
+    """Single merge input layer definition."""
 
-    input_paths: List[str] = Field(
+    input_path: str = Field(
+        ...,
+        description="Layer UUID/path to merge",
+        json_schema_extra=ui_field(
+            section="input",
+            field_order=1,
+            widget="layer-selector",
+        ),
+    )
+    input_layer_filter: dict[str, Any] | None = Field(
+        None,
+        description="Optional CQL2-JSON filter for this input layer",
+        json_schema_extra=ui_field(section="input", field_order=2, hidden=True),
+    )
+
+
+class MergeParams(BaseModel):
+    """Parameters for merging multiple layers/tables.
+
+    By default, fields with the same name are mapped together into one output
+    column, while fields unique to an input are retained and filled with NULL
+    for rows from other inputs.
+    """
+
+    input_paths: List[MergeInputLayer] = Field(
         ...,
         min_length=2,
-        description="List of paths to vector layers to merge. Must be at least 2 layers.",
+        description="List of input layer/table paths to merge. Must be at least 2 inputs.",
     )
 
     output_path: Optional[str] = Field(
@@ -291,10 +316,10 @@ class MergeParams(BaseModel):
         ),
     )
 
-    add_source_field: bool = Field(
+    add_source_column: bool = Field(
         True,
         description=(
-            "If True, adds a 'layer_source' field indicating which input layer "
+            "If True, adds a 'layer_source' column indicating which input layer "
             "each feature came from (0, 1, 2, etc.)."
         ),
     )

@@ -1,4 +1,3 @@
-import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,6 +12,8 @@ from sqlalchemy.exc import IntegrityError
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
 
+from goatobs import setup_observability
+
 import core._dotenv  # noqa: E402, F401, I001
 from core.core.config import settings
 from core.db.session import session_manager
@@ -26,15 +27,10 @@ if settings.SENTRY_DSN and settings.ENVIRONMENT:
         traces_sample_rate=1.0 if settings.ENVIRONMENT == "prod" else 0.1,
     )
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print("Starting up...")
     session_manager.init(settings.ASYNC_SQLALCHEMY_DATABASE_URI)
-    logger = logging.getLogger("uvicorn.access")
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-    logger.addHandler(handler)
     yield
     print("Shutting down...")
     await session_manager.close()
@@ -47,6 +43,12 @@ app = FastAPI(
     openapi_url=f"{settings.API_V2_STR}/openapi.json",
     lifespan=lifespan,
 )
+
+# Attach OTel auto-instrumentation directly to this app. Module-top
+# placement (not inside lifespan) so middleware is installed before the
+# first request arrives. Env-var-gated — no-op when OTEL_ENABLED is
+# unset/false, so other GOAT operators see no behavior change.
+setup_observability(service_name="core", fastapi_app=app)
 
 
 @app.exception_handler(ValueError)
@@ -79,6 +81,14 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+from goatlib.auth import JOSEError  # noqa: E402
+from goatobs import build_auth_context_middleware  # noqa: E402
+from core.deps.auth import decode_token  # noqa: E402
+
+app.middleware("http")(
+    build_auth_context_middleware(decode_token, decode_errors=(JOSEError,))
 )
 
 

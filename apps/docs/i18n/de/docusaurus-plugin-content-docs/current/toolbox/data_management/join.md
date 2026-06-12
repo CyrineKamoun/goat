@@ -2,24 +2,98 @@
 sidebar_position: 1
 ---
 
-# Join
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-Dieses Werkzeug ermöglicht es Ihnen, **Daten aus zwei Layern basierend auf Attributabgleichen oder räumlichen Beziehungen zu kombinieren**. Dies ist wesentlich für räumliche Analysen, Datenanreicherung und die Erstellung umfassender Datensätze.
+# Objekte verbinden
+
+Dieses Werkzeug ermöglicht es Ihnen, **Daten aus zwei Layern basierend auf Attributabgleichen oder räumlichen Beziehungen zu kombinieren**. Das Ergebnis ist ein neuer Layer, der die Geometrie und Attribute des Ziel-Layers enthält, angereichert mit Attributen des Join-Layers.
 
 ## 1. Erklärung
 
-Das Verknüpfen (Join) ist der Prozess des Anhängens von Feldern aus einem Layer (Verknüpfungs-Layer) an einen anderen Layer (Ziel-Layer).
+Das Verknüpfen ist der Prozess des Anhängens von Feldern aus einem Layer (Join-Layer) an einen anderen Layer (Ziel-Layer).
 
-**GOAT unterstützt drei Arten von Verknüpfungen:**
-1. **Attribut-Verknüpfung:** Gleicht Features basierend auf einem gemeinsamen Feld ab (z. B. Abgleich der "Postleitzahl" in beiden Layern).
-2. **Räumliche Verknüpfung:** Gleicht Features basierend auf ihrer geometrischen Beziehung ab (z. B. "Features, die sich schneiden" oder "Features innerhalb einer Entfernung").
-3. **Räumliche & Attribut-Verknüpfung:** Erfordert **sowohl** eine räumliche Überschneidung als auch ein passendes Attribut, um Features zu verknüpfen.
+**GOAT unterstützt drei Verknüpfungsmethoden:**
 
-Das Ergebnis ist ein neuer Layer, der die Geometrie und Attribute des Ziel-Layers sowie die Attribute des Verknüpfungs-Layers enthält.
+- **Attributiv** — Abgleich von Features basierend auf einem gemeinsamen Feld (z. B. Postleitzahl in beiden Layern).
+- **Räumlich** — Abgleich von Features basierend auf ihrer geometrischen Beziehung (z. B. Features, die sich schneiden).
+- **Räumlich und Attributiv** — Erfordert sowohl eine räumliche Überschneidung als auch ein passendes Attribut.
+
+<Tabs>
+<TabItem value="attribute" label="Attribut-Verknüpfung" default className="tabItemBox">
+
+Eine attributive Verknüpfung verbindet zwei Layer durch den Vergleich von Werten in einem gemeinsamen Feld. Jedes Feature im Ziel-Layer wird mit Features im Join-Layer abgeglichen, bei denen die Feldwerte übereinstimmen.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/data_management/join/attribute_join_basic_de.png').default} alt="Einfache attributive Verknüpfung" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+</div>
+
+### Verbindungstyp
+
+Der `Verbindungstyp` bestimmt, welche Features in der Ausgabe erscheinen:
+
+- **Inner Join** — nur Features mit einer Übereinstimmung in beiden Layern werden behalten. Features ohne Übereinstimmung werden entfernt.
+- **Left Join** — alle Features des Ziel-Layers werden behalten. Features ohne Übereinstimmung erhalten `NULL` für die verknüpften Felder.
+
+### Eins zu Eins
+
+Wenn jedes Ziel-Feature höchstens einem Feature im Join-Layer entspricht, enthält das Ergebnis die gleiche Anzahl von Zeilen wie der Ziel-Layer.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_one_de.png').default} alt="Eins-zu-Eins-Verknüpfung: Inner Join vs. Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+</div>
+
+### Eins zu Viele
+
+Wenn ein Ziel-Feature mehreren Features im Join-Layer entspricht, enthält das Ergebnis eine Zeile pro Übereinstimmung — die Ziel-Geometrie wird für jeden passenden Datensatz wiederholt.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_many_de.png').default} alt="Eins-zu-Viele-Verknüpfung: Inner Join vs. Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+</div>
+
+</TabItem>
+
+<TabItem value="spatial" label="Räumliche Verknüpfung" className="tabItemBox">
+
+Eine räumliche Verknüpfung verbindet Features basierend auf ihrer geometrischen Beziehung — kein gemeinsames Feld ist erforderlich. Jedes Feature im Ziel-Layer wird mit Features im Join-Layer abgeglichen, die die ausgewählte räumliche Beziehung erfüllen.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/data_management/join/spatial_relationships_de.png').default} alt="Arten räumlicher Beziehungen" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+</div>
+
+**Verfügbare räumliche Beziehungen:**
+
+| Beziehung | Beschreibung |
+|---|---|
+| `Schneidet` | Ziel- und Join-Features teilen beliebige Geometrie (Punkt, Linie oder Fläche). |
+| `Überlappt` | Features überlappen sich teilweise, keines ist vollständig im anderen enthalten. |
+| `Enthält vollständig` | Ziel-Feature enthält das Join-Feature vollständig. |
+| `Bedeckend` | Ziel-Feature enthält das Join-Feature vollständig. |
+| `Disjunkt` | Features haben keine räumliche Beziehung — sie berühren oder überlappen sich nicht. |
+| `Berührt` | Features teilen eine Grenze, überlappen sich jedoch nicht. |
+| `In einer Entfernung von` | Features liegen innerhalb einer festgelegten Entfernung voneinander. |
+| `Identisch mit` | Features haben exakt dieselbe Geometrie. |
+| `Vollständig innerhalb von` | Ziel-Feature liegt vollständig innerhalb des Join-Features. |
+| `Bedeckt` | Ziel-Feature wird vom Join-Feature bedeckt. |
+
+</TabItem>
+
+<TabItem value="spatial_attribute" label="Räumliche und Attribut-Verknüpfung" className="tabItemBox">
+
+Diese Methode erfordert **sowohl** eine räumliche Beziehung als auch einen übereinstimmenden Attributwert. Ein Feature wird nur verknüpft, wenn beide Bedingungen gleichzeitig erfüllt sind. Verwenden Sie dies, wenn der Standort allein nicht ausreicht — z. B. Gebäude innerhalb eines Bezirks, die zusätzlich dieselbe Nutzungsklassifikation aufweisen.
+
+In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüpft. Ein rein attributiver Abgleich über das Feld `namgem` könnte fälschlicherweise Bevölkerungswerte einer Stadt wie Potsdam zuweisen, wenn der Name übereinstimmt. Durch die zusätzliche räumliche Bedingung (`Schneidet`) wird sichergestellt, dass nur Punkte verknüpft werden, die sich sowohl innerhalb des richtigen Bezirks befinden als auch denselben `namgem`-Wert aufweisen.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/data_management/join/spatial_attribute_join_de.webp').default} alt="Räumliche und Attributive Verknüpfung Beispiel" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+</div>
+
+</TabItem>
+</Tabs>
 
 ## 2. Beispiel-Anwendungsfälle
 
-### Attribut-Verknüpfung
+### Attributive Verknüpfung
 - Bevölkerungsdaten zu Postleitzahl-Gebieten hinzufügen (Abgleich über Postleitzahl).
 - Umfragedaten mit Zensus-Bezirksgrenzen kombinieren (Abgleich über Bezirks-ID).
 
@@ -28,95 +102,89 @@ Das Ergebnis ist ein neuer Layer, der die Geometrie und Attribute des Ziel-Layer
 - Die nächstgelegene Feuerwehrstation zu jedem Gebäude finden.
 - Summierung der Gesamtlänge von Straßen innerhalb eines Parks.
 
+### Räumliche und Attributive Verknüpfung
+- Gebäude innerhalb einer Hochwasserzone abgleichen, die zudem denselben Gebäudetyp aufweisen.
+
 ## 3. Wie verwendet man das Werkzeug?
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Klicken Sie auf <code>Toolbox</code> <img src={require('/img/icons/toolbox.png').default} alt="Options" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>. </div>
-</div>
-
-<div class="step">
-  <div class="step-number">2</div>
-  <div class="content">Unter dem Menü <code>Datenverwaltung</code> klicken Sie auf <code>Join</code>.</div>
+  <div class="content">Klicken Sie auf <code>Toolbox</code> <img src={require('/img/icons/toolbox.png').default} alt="Toolbox" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>. Unter <code>Datenmanagement</code> klicken Sie auf <code>Objekte verbinden</code>.</div>
 </div>
 
 ### Layer auswählen
 
 <div class="step">
-  <div class="step-number">3</div>
-  <div class="content">Wählen Sie Ihren <code>Ziel-Layer</code>: Der Hauptlayer, den Sie behalten möchten.</div>
+  <div class="step-number">2</div>
+  <div class="content">Wählen Sie Ihren <code>Ziel-Layer</code> — den Hauptlayer, dessen Geometrie Sie behalten möchten.</div>
 </div>
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Wählen Sie Ihren <code>Join-Layer</code> — den Layer, der die Felder enthält, die Sie hinzufügen möchten.</div>
+</div>
+
+### Abgleichmethode
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Wählen Sie Ihren <code>Verknüpfungs-Layer</code>: Der Layer, der die Daten enthält, die Sie hinzufügen möchten.</div>
+  <div class="content">Aktivieren Sie unter <code>Zuordnungsmethode</code> die gewünschte Methode: <code>Attribut-Zuordnung</code>, <code>Räumliche Zuordnung</code> oder beide.</div>
 </div>
 
-### Verknüpfungsmethode wählen
+<Tabs>
+<TabItem value="attribute" label="Attributiv" default className="tabItemBox">
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Wählen Sie die <code>Verknüpfungsmethode</code>:</div>
+  <div class="content">Klicken Sie unter <code>Attributbeziehung</code> auf <code>Hinzufügen Zuordnungsfelder</code>, und wählen Sie dann das <code>Ziel-Feld</code> und das <code>Join-Feld</code> — das gemeinsame Feld, das zur Zuordnung von Features zwischen den beiden Layern verwendet wird.</div>
 </div>
 
-- **Attribut:** Abgleich basierend auf Feldern.
-- **Räumlich:** Abgleich basierend auf dem Standort.
-- **Räumlich & Attribut:** Abgleich basierend auf beidem.
+</TabItem>
 
----
+<TabItem value="spatial" label="Räumlich" className="tabItemBox">
 
-### Einstellungen (je nach Methode)
+<div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Wählen Sie unter <code>Räumliche Beziehung</code> die gewünschte räumliche Beziehung aus. Bei Auswahl von <code>In einer Entfernung von</code> geben Sie die Entfernung und die Einheit an.</div>
+</div>
 
-**Bei Attribut-Verknüpfung:**
-- Wählen Sie das **Zielfeld** (Schlüssel im Ziel-Layer).
-- Wählen Sie das **Verknüpfungsfeld** (Schlüssel im Verknüpfungs-Layer).
+</TabItem>
 
-**Bei räumlicher Verknüpfung:**
-- Wählen Sie die **Räumliche Beziehung** (z. B. Schnitt (Intersects), Innerhalb einer Entfernung, Vollständig enthalten).
-- Bei "Innerhalb einer Entfernung" geben Sie die Suchentfernung und Einheiten an.
+<TabItem value="spatial_attribute" label="Räumlich und Attributiv" className="tabItemBox">
 
----
+<div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Konfigurieren Sie sowohl die <code>Räumliche Zuordnung</code> (räumliche Beziehung auswählen) als auch die <code>Attributbeziehung</code> (auf <code>Hinzufügen Zuordnungsfelder</code> klicken und Abgleichfelder auswählen). Beide Bedingungen müssen erfüllt sein, damit ein Feature verknüpft wird.</div>
+</div>
 
-### Verknüpfungsoptionen (Kardinalität)
+</TabItem>
+</Tabs>
+
+### Verknüpfungsoptionen
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Wählen Sie die <code>Verknüpfungsoperation</code> (Eins-zu-Eins oder Eins-zu-Vielen).</div>
+  <div class="content">Wählen Sie den <code>Verbindungstyp</code>: <code>Inner Join</code> (nur übereinstimmende Features behalten) oder <code>Left Join</code> (alle Ziel-Features behalten, nicht übereinstimmende erhalten NULL).</div>
 </div>
-
-**Eins-zu-Eins:**
-Wenn mehrere Features im Verknüpfungs-Layer auf ein einzelnes Feature im Ziel-Layer passen, müssen Sie wählen, wie diese behandelt werden sollen:
-- **Erster Datensatz:** Verwendet den ersten passenden Datensatz (willkürliche Sortierung).
-- **Statistiken berechnen:** Aggregiert die passenden Datensätze (z.B. Summe, Mittelwert, Minimum, Maximum).
-- **Nur zählen:** Zählt lediglich, wie viele Übereinstimmungen gefunden wurden.
-
-**Eins-zu-Vielen:**
-Erstellt für *jedes* passende Feature im Verknüpfungs-Layer ein separates Feature in der Ausgabe (kann Zielgeometrien duplizieren).
-
-### Ausführen
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Klicken Sie auf <code>Ausführen</code>. Das Ergebnis wird der Karte hinzugefügt.</div>
+  <div class="content">Wählen Sie unter <code>Übereinstimmungen</code>: <code>Eins zu Eins</code> oder <code>Eins zu Viele</code>.</div>
 </div>
 
 
+<div class="step">
+  <div class="step-number">8</div>
+  <div class="content">Aktivieren Sie optional <code>Verknüpfungsfelder hinzufügen</code>, um festzulegen, welche Felder aus dem Join-Layer in die Ausgabe aufgenommen werden sollen, und/oder aktivieren Sie <code>Statistiken berechnen</code>, um aggregierte Werte für übereinstimmende Features zu berechnen.</div>
+</div>
 
-### Ergebnisse
-  
-Der resultierende Layer **"Verknüpfung"** wird zu Ihrem Projekt und zu den [Datensätzen](../../workspace/datasets) in Ihrem Workspace hinzugefügt. Dieser Layer enthält alle Informationen vom Ziel-Layer plus einer **zusätzlichen Spalte** mit den Ergebnissen aus der **statistischen Operation**. Sie können die Attribute anzeigen, indem Sie auf ein beliebiges Feature in der Karte klicken.
+<div class="step">
+  <div class="step-number">9</div>
+  <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Verknüpfung durchzuführen. Der Ergebnis-Layer wird der Karte hinzugefügt.</div>
+</div>
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+:::tip Hinweis
 
-  <img src={require('/img/toolbox/data_management/join/result.png').default} alt="Verknüpfungsergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
-
-</div> 
-
-<p></p>
-
-
-:::tip Tipp
-
-Möchten Sie das Erscheinungsbild des Ergebnis-Layers anpassen? Schauen Sie sich das [attributbasierte Styling](../../map/layer_style/style/attribute_based_styling.md) an.
+Die Berechnungszeit variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/home#status-bar) verfolgen.
 
 :::

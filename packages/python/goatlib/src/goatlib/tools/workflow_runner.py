@@ -17,6 +17,8 @@ from typing import Any
 import wmill
 from pydantic import BaseModel, Field
 
+from goatlib.tools.if_node import IF_FALSE_HANDLE, execute_if_node
+
 logger = logging.getLogger(__name__)
 
 # Pattern to strip usernames from Windmill cancellation messages
@@ -33,7 +35,7 @@ class WorkflowNode(BaseModel):
     """A node in the workflow graph."""
 
     id: str
-    type: str  # "dataset", "tool", "export", "textAnnotation"
+    type: str  # "dataset", "tool", "export", "textAnnotation", "if"
     data: dict[str, Any]
 
 
@@ -302,6 +304,7 @@ def get_input_layer_id(
 
     For dataset nodes: use the configured layerId
     For tool nodes: use the temp_layer_id from previous result
+    For if nodes: pass through the temp_layer_id stored when the If executed
     """
     node_type = source_node.get("data", {}).get("type")
     node_id = source_node["id"]
@@ -310,14 +313,86 @@ def get_input_layer_id(
         # Dataset nodes have a configured layer_id
         return source_node.get("data", {}).get("layerId")
 
-    elif node_type == "tool":
-        # Tool nodes - get result from previous execution
+    elif node_type in ("tool", "if"):
+        # Tool/If nodes - get result from previous execution
         prev_result = results.get(node_id)
         if prev_result:
             # Temp mode returns temp_layer_id
             return prev_result.get("temp_layer_id") or prev_result.get("layer_id")
 
     return None
+
+
+def _bfs_downstream(start_node_ids: set[str], edges: list[dict[str, Any]]) -> set[str]:
+    """Collect all node ids reachable downstream from any of ``start_node_ids``.
+
+    Does NOT include the starting ids themselves — only what they fan out into.
+    """
+    if not start_node_ids:
+        return set()
+    # Build adjacency map: source -> list of targets
+    adj: dict[str, list[str]] = {}
+    for e in edges:
+        adj.setdefault(e["source"], []).append(e["target"])
+
+    visited: set[str] = set()
+    frontier: list[str] = []
+    for nid in start_node_ids:
+        for nxt in adj.get(nid, []):
+            if nxt not in visited:
+                visited.add(nxt)
+                frontier.append(nxt)
+    while frontier:
+        nid = frontier.pop()
+        for nxt in adj.get(nid, []):
+            if nxt not in visited:
+                visited.add(nxt)
+                frontier.append(nxt)
+    return visited
+
+
+def mark_skipped_descendants(
+    if_node_id: str,
+    edges: list[dict[str, Any]],
+    active_handle: str,
+    results: dict[str, dict[str, Any]],
+) -> set[str]:
+    """Reachability pass: mark every descendant reached *only* via non-active
+    handles of the given If node as skipped.
+
+    A node reached through any active path (e.g. branches re-converging on the
+    same downstream tool) is NOT skipped — that's why we compute the difference
+    ``inactive_reached - active_reached`` rather than just collecting the
+    inactive subtree.
+
+    Returns the set of node ids newly marked skipped.
+    """
+    # Find the immediate downstream node ids reached via active vs. inactive handles.
+    active_starts: set[str] = set()
+    inactive_starts: set[str] = set()
+    for e in edges:
+        if e["source"] != if_node_id:
+            continue
+        handle = e.get("sourceHandle")
+        target = e["target"]
+        if handle == active_handle:
+            active_starts.add(target)
+        else:
+            inactive_starts.add(target)
+
+    # An immediate child on the active handle is itself active-reached.
+    active_reached = set(active_starts) | _bfs_downstream(active_starts, edges)
+    inactive_reached = set(inactive_starts) | _bfs_downstream(inactive_starts, edges)
+
+    newly_skipped: set[str] = set()
+    for node_id in inactive_reached - active_reached:
+        # Don't overwrite a node that already produced a real result.
+        existing = results.get(node_id)
+        if existing and existing.get("status") == "completed":
+            continue
+        results[node_id] = {"status": "skipped", "skipped_by": if_node_id}
+        newly_skipped.add(node_id)
+    return newly_skipped
 
 
 # Mapping from frontend expression names to CQL2 operators
@@ -450,9 +525,7 @@ def build_tool_inputs(
     # Substitute workflow variables in config values
     if params.variables:
         var_map = {
-            v["name"]: v.get("defaultValue")
-            for v in params.variables
-            if v.get("name")
+            v["name"]: v.get("defaultValue") for v in params.variables if v.get("name")
         }
         if var_map:
             inputs = substitute_variables_in_config(inputs, var_map)
@@ -485,7 +558,9 @@ def build_tool_inputs(
             filter_config = None
             if source_type == "dataset":
                 raw_filter = source_node.get("data", {}).get("filter") or None
-                filter_config = convert_filter_to_cql(raw_filter) if raw_filter else None
+                filter_config = (
+                    convert_filter_to_cql(raw_filter) if raw_filter else None
+                )
 
             # Check if the target field expects an object with a layer_id
             # property (e.g. StartingPointsLayer) rather than a plain string
@@ -506,7 +581,9 @@ def build_tool_inputs(
     process_id = node_data.get("processId")
     if process_id == "custom_sql":
         numbered_keys = sorted(
-            k for k in list(inputs) if k.startswith("input_layer_") and k.endswith("_id")
+            k
+            for k in list(inputs)
+            if k.startswith("input_layer_") and k.endswith("_id")
         )
         for new_idx, key in enumerate(numbered_keys, start=1):
             new_key = f"input_layer_{new_idx}_id"
@@ -517,6 +594,30 @@ def build_tool_inputs(
                 new_filter = new_key.replace("_id", "_filter")
                 if old_filter in inputs:
                     inputs[new_filter] = inputs.pop(old_filter)
+
+    # For merge: build input_paths list from numbered input_path_N inputs.
+    if process_id == "merge":
+        path_keys = sorted(
+            k
+            for k in list(inputs)
+            if k.startswith("input_path_")
+            and not k.endswith("_filter")
+            and k != "input_paths"
+        )
+        if path_keys:
+            input_paths: list[dict[str, Any]] = []
+            for key in path_keys:
+                layer_id = inputs.pop(key)
+                if not layer_id:
+                    continue
+                filter_key = f"{key}_filter"
+                layer_filter = inputs.pop(filter_key, None)
+                item: dict[str, Any] = {"input_path": layer_id}
+                if layer_filter:
+                    item["input_layer_filter"] = layer_filter
+                input_paths.append(item)
+            if input_paths:
+                inputs["input_paths"] = input_paths
 
     # For heatmap gravity/closest_average: build opportunities list from
     # numbered opportunity_layer_N_id inputs and per-opportunity config keys.
@@ -543,7 +644,7 @@ def build_tool_inputs(
                 opp_config: dict[str, Any] = {}
                 for cfg_key in list(inputs):
                     if cfg_key.startswith(prefix):
-                        param_name = cfg_key[len(prefix):]
+                        param_name = cfg_key[len(prefix) :]
                         opp_config[param_name] = inputs.pop(cfg_key)
 
                 opportunity: dict[str, Any] = {
@@ -720,17 +821,72 @@ def main(
     node_jobs: dict[str, str] = {}  # node_id → child job_id
     errors: list[dict] = []
 
+    # Variable map for If-node condition evaluation
+    if_var_map: dict[str, Any] = {
+        v["name"]: v.get("defaultValue") for v in params.variables if v.get("name")
+    }
+
     # Execute each tool node
     # Child jobs have parent_job set automatically, so backend can query
     # Windmill for jobs with parent_job={this_job_id} to track progress
     for node in sorted_nodes:
         node_type = node.get("data", {}).get("type")
+        node_id = node["id"]
 
-        # Skip non-tool nodes (datasets, results, exports)
+        # Honor pre-marked skipped status (set by an upstream If node's
+        # reachability pass).
+        if results.get(node_id, {}).get("status") == "skipped":
+            print(f"[workflow_runner] Skipping node {node_id} (rejected branch)")
+            continue
+
+        # If/Switch branching node: evaluate cases in order, mark the chosen
+        # active handle, and prune unreachable descendants.
+        if node_type == "if":
+            print(f"[workflow_runner] Evaluating If node {node_id}...")
+            try:
+                # Single input edge — the upstream layer flows through to the
+                # active True/False branch.
+                incoming_input = next(
+                    (e for e in edges if e["target"] == node_id),
+                    None,
+                )
+                upstream_layer_id: str | None = None
+                if incoming_input:
+                    source_node = next(
+                        (n for n in nodes if n["id"] == incoming_input["source"]),
+                        None,
+                    )
+                    if source_node is not None:
+                        upstream_layer_id = get_input_layer_id(source_node, results)
+                if_result = execute_if_node(
+                    node,
+                    upstream_layer_id,
+                    params.user_id,
+                    if_var_map,
+                )
+                results[node_id] = if_result
+                skipped = mark_skipped_descendants(
+                    node_id,
+                    edges,
+                    if_result.get("active_handle", IF_FALSE_HANDLE),
+                    results,
+                )
+                if skipped:
+                    print(
+                        f"[workflow_runner] If {node_id} pruned {len(skipped)} "
+                        f"downstream node(s): {sorted(skipped)}"
+                    )
+            except Exception as e:
+                print(f"[workflow_runner] If node {node_id} failed: {e}")
+                logger.error(f"If node {node_id} failed: {e}")
+                errors.append({"node_id": node_id, "error": str(e)})
+                break
+            continue
+
+        # Skip remaining non-tool nodes (datasets, results, exports)
         if node_type != "tool":
             continue
 
-        node_id = node["id"]
         process_id = node.get("data", {}).get("processId")
 
         if not process_id:
@@ -795,6 +951,15 @@ def main(
             export_node_id = export_node["id"]
             export_data = export_node.get("data", {})
             dataset_name = export_data.get("datasetName", "").strip()
+
+            # Honor skipped status from the reachability pass — don't finalize
+            # exports on a rejected branch.
+            if results.get(export_node_id, {}).get("status") == "skipped":
+                print(
+                    f"[workflow_runner] Export node {export_node_id} on rejected "
+                    f"branch, skipping"
+                )
+                continue
 
             if not dataset_name:
                 print(

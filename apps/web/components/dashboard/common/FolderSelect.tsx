@@ -183,17 +183,22 @@ const FolderSelect = ({ folders, selectedFolder, setSelectedFolder }: FolderSele
         );
       }}
       renderOption={(props, option) => {
+        // Strip the `key` MUI puts in `props` before spreading — React
+        // warns when a spread object includes `key`. We use the
+        // folder's stable id as the key instead.
+        const { key: _muiKey, ...rest } =
+          props as React.HTMLAttributes<HTMLLIElement> & { key?: React.Key };
         const groupKey = option.is_owned
           ? GROUP_MY_FOLDERS
           : `${SHARED_PREFIX}${option.shared_from_name ?? ""}`;
         const hidden = !option.is_owned && collapsedGroups.has(groupKey);
         if (hidden) {
-          return <li key={option.id} {...props} style={{ display: "none" }} aria-hidden />;
+          return <li key={option.id} {...rest} style={{ display: "none" }} aria-hidden />;
         }
         return (
           <ListItem
             key={option.id}
-            {...props}
+            {...rest}
             sx={{ pl: option.is_owned ? 2 : 4 }}>
             <ListItemIcon>
               <Icon
