@@ -177,8 +177,6 @@ const MULTI_VALUE_OPERATORS = new Set(["includes", "excludes"]);
 const LOGICAL_OPERATORS_REMOVED = new Set([
   "is",
   "is_not",
-  "is_blank",
-  "is_not_blank",
   "is_empty_string",
   "is_not_empty_string",
   "does_not_contains_the_text",
