@@ -93,7 +93,15 @@ export function synthesizeMapStyle(
 /**
  * Apply label language to a MapLibre map instance by rewriting text-field
  * expressions on all symbol layers to prefer the given locale.
- * Works with OpenMapTiles / MapTiler vector tiles that have name:{lang} fields.
+ *
+ * Fallback chain (first non-empty wins):
+ *   1. name:{locale}  — preferred locale (e.g. name:de)
+ *   2. name:en        — English fallback
+ *   3. name:latin     — Latin-transliterated name (e.g. mobidata-bw's
+ *                       OpenMapTiles only populate this — they leave
+ *                       `name`/`name:en`/`name:de` empty, so without
+ *                       this entry labels render blank on that basemap)
+ *   4. name           — raw native name
  */
 export function applyMapLanguage(map: maplibregl.Map, locale: string) {
   if (!map.isStyleLoaded()) return;
@@ -112,6 +120,7 @@ export function applyMapLanguage(map: maplibregl.Map, locale: string) {
       "coalesce",
       ["get", `name:${locale}`],
       ["get", "name:en"],
+      ["get", "name:latin"],
       ["get", "name"],
     ]);
   }
