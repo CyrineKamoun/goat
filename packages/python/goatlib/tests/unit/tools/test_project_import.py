@@ -461,3 +461,174 @@ class TestProjectImportRunner:
         assert dl_kwargs["Bucket"] == "test-bucket"
         assert dl_kwargs["Key"] == "imports/test-export.zip"
         assert isinstance(dl_kwargs["Filename"], str)
+
+    def test_import_duplicate_layer_links(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        """A 1.1 archive with 2 links to the same layer creates 2 layer_project rows.
+
+        Regression: previously the import iterated the layer index and inserted
+        one layer_project row per layer. The unique dataset must be inserted
+        once, but each link in layer_project_links.json must produce its own
+        layer_project row.
+        """
+        user_id = "00000000-0000-0000-0000-000000000001"
+        folder_id = "00000000-0000-0000-0000-ffffffffffff"
+        layer_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+        with tempfile.TemporaryDirectory() as build_dir:
+            zip_path = Path(build_dir) / "export.zip"
+
+            project_data = {"name": "Dup Project"}
+            layer_meta = {
+                "id": layer_id,
+                "name": "Shared Dataset",
+                "type": "feature",
+                "data_type": None,
+            }
+            layer_index = {"layers": [layer_meta]}
+            layer_project_links = {
+                "links": [
+                    {
+                        "id": 101,
+                        "layer_id": layer_id,
+                        "name": "View A",
+                        "order": 0,
+                    },
+                    {
+                        "id": 102,
+                        "layer_id": layer_id,
+                        "name": "View B",
+                        "order": 1,
+                    },
+                ]
+            }
+
+            checksums: dict[str, str] = {}
+
+            def _cs(b: bytes) -> str:
+                return f"sha256:{hashlib.sha256(b).hexdigest()}"
+
+            project_bytes = json.dumps(project_data, indent=2).encode()
+            checksums["project.json"] = _cs(project_bytes)
+
+            index_bytes = json.dumps(layer_index, indent=2).encode()
+            checksums["layers/index.json"] = _cs(index_bytes)
+
+            meta_bytes = json.dumps(layer_meta, indent=2).encode()
+            checksums[f"layers/{layer_id}/metadata.json"] = _cs(meta_bytes)
+
+            links_bytes = json.dumps(layer_project_links, indent=2).encode()
+            checksums["layer_project_links.json"] = _cs(links_bytes)
+
+            manifest = {
+                "format_version": "1.1",
+                "exported_at": "2025-06-01T00:00:00Z",
+                "project_name": "Dup Project",
+                "checksums": checksums,
+                "layer_count": 1,
+                "internal_layer_count": 1,
+                "external_layer_count": 0,
+                "workflow_count": 0,
+                "report_count": 0,
+            }
+
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("project.json", project_bytes)
+                zf.writestr("layers/index.json", index_bytes)
+                zf.writestr(f"layers/{layer_id}/metadata.json", meta_bytes)
+                zf.writestr(f"layers/{layer_id}/data.parquet", b"FAKE_PARQUET")
+                zf.writestr("layer_project_links.json", links_bytes)
+                zf.writestr(
+                    "manifest.json", json.dumps(manifest, indent=2).encode()
+                )
+
+            zip_bytes = zip_path.read_bytes()
+
+        params = ProjectImportParams(
+            user_id=user_id,
+            s3_key="imports/dup.zip",
+            target_folder_id=folder_id,
+        )
+
+        def mock_download_file(**kwargs: object) -> None:
+            Path(str(kwargs["Filename"])).write_bytes(zip_bytes)
+
+        runner._s3_client.download_file.side_effect = mock_download_file
+        runner._duckdb_con.execute.return_value.fetchall.return_value = [
+            ("id", "INTEGER"),
+            ("name", "VARCHAR"),
+            ("geometry", "GEOMETRY"),
+        ]
+
+        # Track INSERT statements per target table.
+        layer_inserts = 0
+        layer_project_inserts = 0
+        execute_log: list[str] = []
+
+        mock_asyncpg_conn = AsyncMock()
+        mock_asyncpg_conn.set_type_codec = AsyncMock()
+        mock_txn = MagicMock()
+        mock_txn.__aenter__ = AsyncMock(return_value=mock_txn)
+        mock_txn.__aexit__ = AsyncMock(return_value=False)
+        mock_asyncpg_conn.transaction = MagicMock(return_value=mock_txn)
+
+        async def tracking_execute(query: str, *args: object) -> None:
+            nonlocal layer_inserts
+            execute_log.append(query)
+            if "INSERT INTO customer.layer\n" in query or query.lstrip().startswith(
+                "INSERT INTO customer.layer "
+            ):
+                layer_inserts += 1
+            return None
+
+        # asyncpg's INSERT INTO customer.layer query in source is multi-line.
+        # Use a simpler matcher: any insert mentioning customer.layer but not
+        # layer_project or layer_project_group.
+        async def tracking_execute_strict(query: str, *args: object) -> None:
+            execute_log.append(query)
+            return None
+
+        mock_asyncpg_conn.execute = AsyncMock(side_effect=tracking_execute_strict)
+
+        # layer_project insert returns id via fetchval; track those too.
+        next_link_id = [1000]
+
+        async def tracking_fetchval(query: str, *args: object) -> int:
+            nonlocal layer_project_inserts
+            execute_log.append(query)
+            if "INSERT INTO customer.layer_project\n" in query or (
+                "INSERT INTO customer.layer_project " in query
+                and "layer_project_group" not in query
+            ):
+                layer_project_inserts += 1
+            next_link_id[0] += 1
+            return next_link_id[0]
+
+        mock_asyncpg_conn.fetchval = AsyncMock(side_effect=tracking_fetchval)
+
+        with patch("goatlib.tools.project_import.asyncpg") as mock_asyncpg:
+            mock_asyncpg.connect = AsyncMock(return_value=mock_asyncpg_conn)
+            result = runner.run(params)
+
+        # Count actual inserts via execute_log. The trailing whitespace after
+        # the table name disambiguates layer vs layer_project vs
+        # layer_project_group (each followed by a newline + column list).
+        layer_inserts = sum(
+            1 for q in execute_log if "INSERT INTO customer.layer\n" in q
+        )
+        layer_project_inserts = sum(
+            1 for q in execute_log if "INSERT INTO customer.layer_project\n" in q
+        )
+
+        assert result["layer_count"] == 1
+        # Unique dataset inserted once.
+        assert layer_inserts == 1, (
+            f"Expected 1 layer insert, got {layer_inserts}. "
+            f"Queries: {execute_log}"
+        )
+        # Both layer_project links inserted.
+        assert layer_project_inserts == 2, (
+            f"Expected 2 layer_project inserts, got {layer_project_inserts}. "
+            f"Queries: {execute_log}"
+        )

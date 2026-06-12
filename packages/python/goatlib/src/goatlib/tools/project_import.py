@@ -34,6 +34,7 @@ from goatlib.tools.project_schemas import (
     ExportAssetManifest,
     ExportLayerGroupTree,
     ExportLayerIndex,
+    ExportLayerProjectLinks,
     ExportManifest,
     ExportProjectMetadata,
     ExportReportLayout,
@@ -155,6 +156,42 @@ class ProjectImportRunner(SimpleToolRunner):
 
         logger.info("Generated %d ID mappings", len(id_map))
         return id_map
+
+    def _load_layer_project_links(
+        self: Self,
+        archive_dir: Path,
+        layer_index: ExportLayerIndex,
+    ) -> list[dict[str, Any]]:
+        """Load layer_project links from the archive.
+
+        Format 1.1: a single `layer_project_links.json` at the archive root
+        holds all links as a list (multiple links may share `layer_id`),
+        validated against [ExportLayerProjectLinks].
+
+        Format 1.0 fallback: one `layers/{layer_id}/project_link.json` per
+        layer — at most one link per layer, since the path embeds the layer id.
+        If both files exist, the 1.1 file wins (legacy files are ignored).
+        """
+        links_path = archive_dir / "layer_project_links.json"
+        if links_path.exists():
+            with open(links_path) as f:
+                payload = json.load(f)
+            validated = ExportLayerProjectLinks.model_validate(payload)
+            return [lk.model_dump() for lk in validated.links]
+
+        # Format 1.0 fallback. layer_id isn't recorded inside the file because
+        # the directory path embeds it — attach it here so the downstream
+        # insert loop has a uniform schema.
+        legacy_links: list[dict[str, Any]] = []
+        for layer_meta in layer_index.layers:
+            link_path = archive_dir / "layers" / layer_meta.id / "project_link.json"
+            if not link_path.exists():
+                continue
+            with open(link_path) as f:
+                link_data = json.load(f)
+            link_data["layer_id"] = layer_meta.id
+            legacy_links.append(link_data)
+        return legacy_links
 
     def _remap_workflow_config(
         self: Self, config: dict[str, Any], id_map: dict[str, str]
@@ -451,20 +488,21 @@ class ProjectImportRunner(SimpleToolRunner):
                             old_gid, 0
                         )
 
-                # 4. Insert layers and layer_project links
-                layer_project_id_map: dict[int, int] = {}  # old link ID -> new link ID
+                # 4a. Insert one layer row per unique dataset. Skipped layers
+                # (e.g. street_network) are not entered in old_to_new_layer_id,
+                # so 4b's `target_layer_id is None` branch drops their links.
+                old_to_new_layer_id: dict[str, str] = {}
                 for layer_meta in layer_index.layers:
+                    if layer_meta.feature_layer_type == "street_network":
+                        logger.info(
+                            "Skipping system layer in PG insert: %s (%s)",
+                            layer_meta.name,
+                            layer_meta.id,
+                        )
+                        continue
                     old_layer_id = layer_meta.id
                     new_layer_id = id_map.get(old_layer_id, str(uuid4()))
-
-                    # Load project_link
-                    link_path = (
-                        archive_dir / "layers" / old_layer_id / "project_link.json"
-                    )
-                    link_data: dict[str, Any] = {}
-                    if link_path.exists():
-                        with open(link_path) as f:
-                            link_data = json.load(f)
+                    old_to_new_layer_id[old_layer_id] = new_layer_id
 
                     await conn.execute(
                         f"""
@@ -516,7 +554,20 @@ class ProjectImportRunner(SimpleToolRunner):
                         layer_meta.data_category,
                     )
 
-                    # layer_project link
+                # 4b. Insert one layer_project row per exported link.
+                # Format 1.1: links in archive_dir/layer_project_links.json.
+                # Format 1.0 fallback: layers/{layer_id}/project_link.json.
+                layer_project_id_map: dict[int, int] = {}  # old link ID -> new link ID
+                links_to_insert = self._load_layer_project_links(
+                    archive_dir, layer_index
+                )
+                for link_data in links_to_insert:
+                    link_layer_id = link_data["layer_id"]
+                    target_layer_id = old_to_new_layer_id.get(link_layer_id)
+                    if target_layer_id is None:
+                        # Link references a layer that was skipped (e.g. system layer).
+                        continue
+
                     old_group_id = link_data.get(
                         "layer_project_group_id"
                     ) or link_data.get("group_id")
@@ -535,7 +586,7 @@ class ProjectImportRunner(SimpleToolRunner):
                             ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
                         RETURNING id
                         """,
-                        uuid.UUID(new_layer_id),
+                        uuid.UUID(target_layer_id),
                         uuid.UUID(new_project_id),
                         link_data.get("name"),
                         link_data.get("order", 0),
@@ -550,7 +601,7 @@ class ProjectImportRunner(SimpleToolRunner):
                     if old_link_id is not None and new_link_id is not None:
                         layer_project_id_map[int(old_link_id)] = int(new_link_id)
 
-                # 4b. Update builder_config with remapped layer_project IDs
+                # 4c. Update builder_config with remapped layer_project IDs
                 if project_data.builder_config and layer_project_id_map:
                     remapped_config = self._remap_builder_config(
                         project_data.builder_config, layer_project_id_map
