@@ -1871,6 +1871,7 @@
   "source": "Quelle",
   "source_layer": "Quell-Layer",
   "spacing": "Abstand",
+  "spatial_expression": "Räumlicher Ausdruck",
   "spatial_filter_hint": "Navigieren Sie in der Kartenansicht unten und wählen Sie 'Kartenausschnitt', um den Filterbereich festzulegen. Klicken Sie dann auf das Aktualisierungssymbol, um den aktuellen Ausschnitt anzuwenden.",
   "speed": "Geschwindigkeit",
   "sql_placeholder": "SELECT * FROM input_1 WHERE ...",

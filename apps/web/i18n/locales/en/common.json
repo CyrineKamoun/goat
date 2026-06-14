@@ -1794,6 +1794,7 @@
   "sort_order": "Sort Order",
   "source": "Source",
   "spacing": "Spacing",
+  "spatial_expression": "Spatial Expression",
   "spatial_filter_hint": "Navigate the map view below and select 'Map Extent' to set the filter area, then click the refresh icon to apply the current extent.",
   "speed": "Speed",
   "sql_placeholder": "SELECT * FROM input_1 WHERE ...",
