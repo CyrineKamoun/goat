@@ -172,7 +172,7 @@ class HeatmapClosestAverageTool(HeatmapToolBase):
             query = f"""
             CREATE OR REPLACE TEMP TABLE {output_table} AS
             WITH polygons AS (
-                SELECT UNNEST(ST_Dump(ST_Force2D({transform_to_4326}))) AS geom
+                SELECT (UNNEST(ST_Dump(ST_Force2D({transform_to_4326})))).geom AS geom
                 FROM {table_name}
                 WHERE {geom_col} IS NOT NULL
             ),
