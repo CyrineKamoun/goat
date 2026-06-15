@@ -118,6 +118,7 @@ class DataCategory(str, Enum):
     environment = "environment"
     landuse = "landuse"
     places = "places"
+    other = "other"
 
 
 class GeospatialAttributes(SQLModel):
@@ -439,6 +440,20 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
             "Columns with no entry use default config inferred from the "
             "DuckDB type."
         ),
+    )
+    record_jsonb: Dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSONB, nullable=True),
+        description="OGC API Records-style metadata document for this layer",
+    )
+    layer_group_id: UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.layer_group.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        description="Optional grouping link for multi-file catalog datasets",
     )
 
     # Relationships

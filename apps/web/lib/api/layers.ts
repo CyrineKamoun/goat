@@ -5,6 +5,8 @@ import { type Job, PROCESSES_API_BASE_URL, executeProcessAsync } from "@/lib/api
 import { GEOAPI_BASE_URL } from "@/lib/constants";
 import type { PaginatedQueryParams } from "@/lib/validations/common";
 import type {
+  CatalogDatasetGrouped,
+  CatalogLayerSummary,
   ClassBreaks,
   CreateLayerFromDataset,
   CreateRasterLayer,
@@ -24,6 +26,10 @@ import type {
 } from "@/lib/validations/layer";
 
 export const LAYERS_API_BASE_URL = new URL("api/v2/layer", process.env.NEXT_PUBLIC_API_URL).href;
+export const CATALOG_API_BASE_URL = new URL(
+  "api/v2/catalog/records/collections/datasets",
+  process.env.NEXT_PUBLIC_API_URL
+).href;
 export const COLLECTIONS_API_BASE_URL = `${GEOAPI_BASE_URL}/collections`;
 
 export const updateBaseLayerProperties = async (
@@ -38,6 +44,141 @@ export const updateBaseLayerProperties = async (
   if (!response.ok) {
     throw new Error(`Failed to update layer properties for ${layerId}`);
   }
+};
+
+// ---------------------------------------------------------------------------
+// OGC API Records adapters — translate frontend filter/pagination shape
+// to OGC query params, and OGC FeatureCollection responses back to the
+// flat paginated Layer shape consumers already expect.
+// ---------------------------------------------------------------------------
+
+const buildOgcQuery = (
+  payload?: GetDatasetSchema,
+  pagination?: PaginatedQueryParams
+): URLSearchParams => {
+  const qs = new URLSearchParams();
+  if (payload) {
+    if (payload.search) qs.append("q", payload.search);
+    payload.type?.forEach((v) => qs.append("type", v));
+    payload.license?.forEach((v) => qs.append("license", v));
+    payload.data_category?.forEach((v) => qs.append("themes", v));
+    payload.geographical_code?.forEach((v) => qs.append("geographical_code", v));
+    payload.language_code?.forEach((v) => qs.append("language", v));
+    payload.distributor_name?.forEach((v) => qs.append("publisher", v));
+    if (payload.spatial_search) qs.append("bbox", payload.spatial_search);
+  }
+  if (pagination) {
+    const size = pagination.size ?? 10;
+    const page = pagination.page ?? 1;
+    qs.set("limit", String(size));
+    qs.set("offset", String((page - 1) * size));
+    if (pagination.order_by) {
+      const prefix = pagination.order === "ascendent" ? "+" : "-";
+      // Map backend column names to OGC sortable properties.
+      const sortMap: Record<string, string> = {
+        updated_at: "updated",
+        created_at: "created",
+        name: "title",
+        type: "type",
+      };
+      const ogcKey = sortMap[pagination.order_by] ?? pagination.order_by;
+      qs.set("sortby", `${prefix}${ogcKey}`);
+    }
+  }
+  return qs;
+};
+
+const featureDistributions = (feature: Record<string, unknown>): CatalogLayerSummary[] => {
+  const props = (feature.properties as Record<string, unknown>) ?? {};
+  const dists = (props.distributions as Array<Record<string, unknown>>) ?? [];
+  return dists.map((d) => ({
+    id: String(d.layer_id ?? ""),
+    name: String(d.name ?? ""),
+    type: (d.type as string) ?? null,
+    feature_layer_geometry_type: (d.geometry_type as string) ?? null,
+  }));
+};
+
+const featureToLayer = (feature: Record<string, unknown>): Layer => {
+  const props = (feature.properties as Record<string, unknown>) ?? {};
+  const publisher = props.publisher as { name?: string; email?: string } | undefined;
+  const themes = props.themes as Array<{ concepts?: Array<{ id?: string }> }> | undefined;
+  const distributions = featureDistributions(feature);
+  const firstDist = distributions[0] ?? ({} as CatalogLayerSummary);
+  return {
+    id: feature.id as string,
+    name: (props.title as string) ?? "",
+    description: (props.description as string) ?? null,
+    thumbnail_url: (props.thumbnail_url as string) ?? null,
+    type: firstDist.type ?? "feature",
+    feature_layer_geometry_type: firstDist.feature_layer_geometry_type ?? null,
+    data_category: themes?.[0]?.concepts?.[0]?.id ?? null,
+    distributor_name: publisher?.name ?? null,
+    geographical_code: (props.geographical_code as string) ?? null,
+    language_code: (props.language as string) ?? null,
+    license: (props.license as string) ?? null,
+    tags: (props.keywords as string[]) ?? [],
+    other_properties: { ...props, distributions },
+    extent: null,
+    in_catalog: true,
+  } as unknown as Layer;
+};
+
+const featureToGroup = (feature: Record<string, unknown>): CatalogDatasetGrouped => {
+  const props = (feature.properties as Record<string, unknown>) ?? {};
+  const publisher = props.publisher as { name?: string } | undefined;
+  const themes = props.themes as Array<{ concepts?: Array<{ id?: string }> }> | undefined;
+  return {
+    package_id: String(feature.id ?? ""),
+    name: (props.title as string) ?? "",
+    description: (props.description as string) ?? null,
+    data_category: themes?.[0]?.concepts?.[0]?.id ?? null,
+    distributor_name: publisher?.name ?? null,
+    language_code: (props.language as string) ?? null,
+    license: (props.license as string) ?? null,
+    record_jsonb: { properties: props },
+    layers: featureDistributions(feature),
+  };
+};
+
+const ogcItemsFetcher = async ([url, payload, pagination]: [
+  string,
+  GetDatasetSchema | undefined,
+  PaginatedQueryParams | undefined,
+]): Promise<LayerPaginated> => {
+  const qs = buildOgcQuery(payload, pagination);
+  const res = await apiRequestAuth(`${url}?${qs.toString()}`, { method: "GET" });
+  if (!res.ok) {
+    const err: Error & { status?: number } = new Error("Failed to load catalog");
+    err.status = res.status;
+    throw err;
+  }
+  const body = await res.json();
+  const features = (body.features as Array<Record<string, unknown>>) ?? [];
+  const total = (body.numberMatched as number) ?? features.length;
+  const size = pagination?.size ?? 10;
+  const page = pagination?.page ?? 1;
+  return {
+    items: features.map(featureToLayer),
+    total,
+    page,
+    size,
+    pages: size > 0 ? Math.ceil(total / size) : 1,
+  };
+};
+
+const ogcAggregatesFetcher = async ([url, payload]: [
+  string,
+  GetDatasetSchema | undefined,
+]): Promise<DatasetMetadataAggregated> => {
+  const qs = buildOgcQuery(payload);
+  const res = await apiRequestAuth(`${url}?${qs.toString()}`, { method: "GET" });
+  if (!res.ok) {
+    const err: Error & { status?: number } = new Error("Failed to load catalog aggregates");
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
 };
 
 /**
@@ -72,8 +213,8 @@ export const useLayers = (queryParams?: PaginatedQueryParams, payload: GetDatase
 
 export const useCatalogLayers = (queryParams?: PaginatedQueryParams, payload: GetDatasetSchema = {}) => {
   const { data, isLoading, error, mutate, isValidating } = useSWR<LayerPaginated>(
-    [`${LAYERS_API_BASE_URL}/catalog`, queryParams, payload],
-    fetcher
+    [`${CATALOG_API_BASE_URL}/items`, payload, queryParams],
+    ogcItemsFetcher
   );
   return {
     layers: data,
@@ -86,10 +227,64 @@ export const useCatalogLayers = (queryParams?: PaginatedQueryParams, payload: Ge
 
 export const useMetadataAggregated = (payload: GetDatasetSchema = {}) => {
   const { data, isLoading, error, mutate } = useSWR<DatasetMetadataAggregated>(
-    [`${LAYERS_API_BASE_URL}/metadata/aggregate`, null, payload],
-    fetcher
+    [`${CATALOG_API_BASE_URL}/items/aggregates`, payload],
+    ogcAggregatesFetcher
   );
   return { metadata: data, isLoading, isError: error, mutate };
+};
+
+export interface NutsRegion {
+  nuts_id: string;
+  nuts_name: string;
+  level: number;
+  country: string;
+  bbox: [number, number, number, number];
+}
+
+export const useNutsSearch = (query?: string, level?: number, limit = 20) => {
+  const params = new URLSearchParams();
+  if (query && query.trim()) params.set("q", query.trim());
+  if (level !== undefined) params.set("level", String(level));
+  params.set("limit", String(limit));
+  const url = `${new URL("api/v2/catalog/records/nuts", process.env.NEXT_PUBLIC_API_URL).href}?${params.toString()}`;
+  const { data, isLoading, error, mutate } = useSWR<NutsRegion[]>(url, async (u: string) => {
+    const res = await apiRequestAuth(u, { method: "GET" });
+    if (!res.ok) {
+      const err: Error & { status?: number } = new Error("Failed to load NUTS regions");
+      err.status = res.status;
+      throw err;
+    }
+    return res.json();
+  });
+  return { regions: data ?? [], isLoading, isError: error, mutate };
+};
+
+export const useCatalogGroup = (groupId?: string) => {
+  const url = groupId ? `${CATALOG_API_BASE_URL}/items/${groupId}` : null;
+  const { data, isLoading, error, mutate } = useSWR<CatalogDatasetGrouped>(url, async (u: string) => {
+    const res = await apiRequestAuth(u, { method: "GET" });
+    if (!res.ok) {
+      const err: Error & { status?: number } = new Error("Failed to load catalog group");
+      err.status = res.status;
+      throw err;
+    }
+    const feature = await res.json();
+    return featureToGroup(feature);
+  });
+  return { group: data, isLoading, isError: error, mutate };
+};
+
+// `useCatalogDatasetAsLayer` is the only catalog write flow remaining — used by
+// CatalogExplorer modal to add a catalog dataset to a project. The legacy
+// `/layer/catalog/{id}/use` endpoint was removed; the modal needs to be reworked
+// to either (a) directly link the existing customer.layer row into the project,
+// or (b) wait for a replacement OGC-style import flow. Until then this stub
+// prevents the import error and surfaces a clear runtime message.
+export const useCatalogDatasetAsLayer = async (
+  _datasetId: string,
+  _payload: { folder_id: string }
+): Promise<{ status: string; layer: Layer; use_data?: Record<string, unknown> }> => {
+  throw new Error("Catalog dataset import is no longer supported by this endpoint.");
 };
 
 export const useDataset = (datasetId: string) => {
@@ -718,7 +913,7 @@ export const updateColumnDisplayConfig = async (
 export const deleteColumn = async (layerId: string, columnName: string) => {
   const response = await apiRequestAuth(
     `${COLLECTIONS_API_BASE_URL}/${layerId}/columns/${columnName}`,
-    { method: "DELETE" }
+    { method: "DELETE" } 
   );
   if (!response.ok) {
     const error = await response.json();

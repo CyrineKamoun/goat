@@ -27,11 +27,8 @@ from core.endpoints.deps import get_db, get_user_id
 from core.schemas.common import OrderEnum
 from core.schemas.error import HTTPErrorHandler
 from core.schemas.layer import (
-    ICatalogLayerGet,
     ILayerGet,
     ILayerRead,
-    IMetadataAggregate,
-    IMetadataAggregateRead,
     IRasterCreate,
     IRasterLayerRead,
 )
@@ -153,49 +150,6 @@ async def read_layers(
     return layers
 
 
-@router.post(
-    "/catalog",
-    response_model=Page[ILayerRead],
-    response_model_exclude_none=True,
-    status_code=200,
-    summary="Retrieve a list of layers using different filters including a spatial filter. If not filter is specified, all layers will be returned.",
-    dependencies=[Depends(auth_z)],
-)
-async def read_catalog_layers(
-    async_session: AsyncSession = Depends(get_db),
-    page_params: PaginationParams = Depends(),
-    user_id: UUID4 = Depends(get_user_id),
-    obj_in: ICatalogLayerGet = Body(
-        None,
-        description="Layer to get",
-    ),
-    order_by: str = Query(
-        None,
-        description="Specify the column name that should be used to order. You can check the Layer model to see which column names exist.",
-        example="created_at",
-    ),
-    order: OrderEnum = Query(
-        "descendent",
-        description="Specify the order to apply. There are the option ascendent or descendent.",
-        example="descendent",
-    ),
-) -> Page:
-    """This endpoints returns a list of layers based one the specified filters."""
-
-    with HTTPErrorHandler():
-        # Get layers from CRUD
-        layers = await crud_layer.get_layers_with_filter(
-            async_session=async_session,
-            user_id=user_id,
-            params=obj_in,
-            order_by=order_by,
-            order=order,
-            page_params=page_params,
-        )
-
-    return layers
-
-
 @router.put(
     "/{layer_id}",
     response_model=ILayerRead,
@@ -224,26 +178,3 @@ async def update_layer(
     return result
 
 
-@router.post(
-    "/metadata/aggregate",
-    summary="Return the count of layers for different metadata values acting as filters",
-    response_model=IMetadataAggregateRead,
-    status_code=200,
-    dependencies=[Depends(auth_z)],
-)
-async def metadata_aggregate(
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID4 = Depends(get_user_id),
-    obj_in: IMetadataAggregate = Body(
-        None,
-        description="Filter for metadata to aggregate",
-    ),
-) -> IMetadataAggregateRead:
-    """Return the count of layers for different metadata values acting as filters."""
-    with HTTPErrorHandler():
-        result = await crud_layer.metadata_aggregate(
-            async_session=async_session,
-            user_id=user_id,
-            params=obj_in,
-        )
-    return result

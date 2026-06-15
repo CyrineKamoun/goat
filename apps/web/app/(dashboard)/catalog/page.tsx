@@ -1,6 +1,10 @@
 "use client";
 
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Button,
   Container,
@@ -12,35 +16,46 @@ import {
   Stack,
   Typography,
   debounce,
+  useTheme,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import { parseAsArrayOf, parseAsInteger, parseAsString, useQueryState } from "nuqs";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { ICON_NAME } from "@p4b/ui/components/Icon";
+import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { useCatalogLayers, useMetadataAggregated } from "@/lib/api/layers";
 import type { PaginatedQueryParams } from "@/lib/validations/common";
 import type { GetDatasetSchema } from "@/lib/validations/layer";
-import { datasetMetadataAggregated } from "@/lib/validations/layer";
 
 import EmptySection from "@/components/common/EmptySection";
 import CatalogDatasetCard, { METADATA_HEADER_ICONS } from "@/components/dashboard/catalog/CatalogDatasetCard";
 import FilterPanel from "@/components/dashboard/catalog/FilterPanel";
+import SpatialFilterSearch from "@/components/dashboard/catalog/SpatialFilterSearch";
 import ContentSearchBar from "@/components/dashboard/common/ContentSearchbar";
+
+const CATALOG_FILTER_ORDER = [
+  "data_category",
+  "language_code",
+  "distributor_name",
+  "license",
+  "type",
+] as const;
 
 const Catalog = () => {
   const { t } = useTranslation("common");
   const router = useRouter();
+  const theme = useTheme();
   const useQueryStateArray = (key: string) => useQueryState(key, parseAsArrayOf(parseAsString));
   const [typeValue, setTypeValue] = useQueryStateArray("type");
   const [dataCategoryValue, setDataCategoryValue] = useQueryStateArray("data_category");
   const [distributorNameValue, setDistributorNameValue] = useQueryStateArray("distributor_name");
-  const [geographicalCodeValue, setGeographicalCodeValue] = useQueryStateArray("geographical_code");
   const [languageCodeValue, setLanguageCodeValue] = useQueryStateArray("language_code");
   const [licenseValue, setLicenseValue] = useQueryStateArray("license");
   const [searchText, setSearchText] = useQueryState("search", parseAsString);
+  const [bbox, setBbox] = useQueryState("bbox", parseAsString);
+  const [bboxLabel, setBboxLabel] = useQueryState("bbox_label", parseAsString);
 
   const filterOptions = useMemo(
     () => ({
@@ -55,10 +70,6 @@ const Catalog = () => {
       distributor_name: {
         value: distributorNameValue,
         setValue: setDistributorNameValue,
-      },
-      geographical_code: {
-        value: geographicalCodeValue,
-        setValue: setGeographicalCodeValue,
       },
       language_code: {
         value: languageCodeValue,
@@ -76,8 +87,6 @@ const Catalog = () => {
       setDataCategoryValue,
       distributorNameValue,
       setDistributorNameValue,
-      geographicalCodeValue,
-      setGeographicalCodeValue,
       languageCodeValue,
       setLanguageCodeValue,
       licenseValue,
@@ -85,19 +94,16 @@ const Catalog = () => {
     ]
   );
   const datasetSchemaValues = useMemo(() => {
-    const keys = Object.keys(filterOptions);
-    return keys.reduce(
-      (acc, key) => {
-        if (filterOptions[key].value && filterOptions[key].value.length > 0) {
-          acc[key] = filterOptions[key].value;
-        }
-        return acc;
-      },
-      {
-        in_catalog: true,
+    const keys = CATALOG_FILTER_ORDER;
+    const base: GetDatasetSchema = { in_catalog: true };
+    if (bbox) base.spatial_search = bbox;
+    return keys.reduce((acc, key) => {
+      if (filterOptions[key].value && filterOptions[key].value.length > 0) {
+        acc[key] = filterOptions[key].value;
       }
-    );
-  }, [filterOptions]);
+      return acc;
+    }, base);
+  }, [filterOptions, bbox]);
 
   const [queryParamPage, setQueryParamPage] = useQueryState("page", parseAsInteger.withDefault(1));
 
@@ -155,6 +161,22 @@ const Catalog = () => {
     setDatasetSchema(newDatasetSchema);
   }, 500);
 
+  const handleBboxChange = useCallback(
+    (newBbox: string | null, label: string) => {
+      resetPage();
+      setBbox(newBbox);
+      setBboxLabel(label || null);
+      const newDatasetSchema = { ...datasetSchema };
+      if (newBbox) {
+        newDatasetSchema.spatial_search = newBbox;
+      } else {
+        delete newDatasetSchema.spatial_search;
+      }
+      setDatasetSchema(newDatasetSchema);
+    },
+    [datasetSchema, resetPage, setBbox, setBboxLabel]
+  );
+
   return (
     <Container sx={{ py: 10, px: 10 }} maxWidth="xl">
       <Box
@@ -170,7 +192,32 @@ const Catalog = () => {
         <Grid item xs={3}>
           <Paper elevation={3}>
             <Stack sx={{ mt: 0 }}>
-              {Object.keys(datasetMetadataAggregated.shape).map((key, index) => {
+              <Accordion elevation={0} disableGutters defaultExpanded>
+                <AccordionSummary
+                  expandIcon={<ExpandMoreIcon />}
+                  aria-controls="region-panel-content"
+                  id="region-panel-header">
+                  <Stack direction="row" sx={{ py: 0, pl: 1 }} alignItems="center" spacing={4}>
+                    <Icon
+                      sx={{ ml: 2 }}
+                      iconName={ICON_NAME.GLOBE}
+                      fontSize="small"
+                      htmlColor={theme.palette.text.secondary}
+                    />
+                    <Typography variant="body1">{t("region")}</Typography>
+                  </Stack>
+                </AccordionSummary>
+                <Divider sx={{ my: 0, py: 0 }} />
+                <AccordionDetails sx={{ p: 2 }}>
+                  <SpatialFilterSearch
+                    bbox={bbox}
+                    bboxLabel={bboxLabel || ""}
+                    onBboxChange={handleBboxChange}
+                  />
+                </AccordionDetails>
+              </Accordion>
+              <Divider sx={{ py: 0, my: 0 }} />
+              {CATALOG_FILTER_ORDER.map((key, index) => {
                 return (
                   <Stack key={key}>
                     {index !== 0 && <Divider sx={{ py: 0, my: 0 }} />}
@@ -248,8 +295,15 @@ const Catalog = () => {
                   <CatalogDatasetCard
                     key={dataset.id}
                     dataset={dataset}
-                    onClick={(dataset) => {
-                      router.push(`/datasets/${dataset.id}`);
+                    onClick={(selectedDataset) => {
+                      const dists = ((selectedDataset.other_properties as Record<string, unknown> | undefined)
+                        ?.distributions as Array<{ id?: string }> | undefined) ?? [];
+                      if (dists.length > 1) {
+                        router.push(`/datasets/${selectedDataset.id}`);
+                      } else {
+                        const layerId = dists[0]?.id || selectedDataset.id;
+                        router.push(`/datasets/${layerId}`);
+                      }
                     }}
                   />
                 ))}

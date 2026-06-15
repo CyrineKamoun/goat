@@ -593,6 +593,9 @@ export const layerSchema = layerMetadataSchema.extend({
   owned_by: publicUserSchema.optional(),
   updated_at: z.string(),
   created_at: z.string(),
+  // Canonical OGC API Records metadata doc — the catalog/detail UI reads display
+  // metadata (description/themes/language/publisher/links/extent) from here.
+  record_jsonb: z.record(z.unknown()).nullable().optional(),
 });
 
 export const postDatasetSchema = layerSchema.partial();
@@ -723,6 +726,27 @@ export const datasetMetadataAggregated = z.object({
   distributor_name: z.array(datasetMetadataValue),
   license: z.array(datasetMetadataValue),
 });
+
+export const catalogLayerSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string().nullable().optional(),
+  feature_layer_geometry_type: z.string().nullable().optional(),
+});
+export type CatalogLayerSummary = z.infer<typeof catalogLayerSummarySchema>;
+
+export const catalogDatasetGroupedSchema = z.object({
+  package_id: z.string(),
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  data_category: z.string().nullable().optional(),
+  distributor_name: z.string().nullable().optional(),
+  language_code: z.string().nullable().optional(),
+  license: z.string().nullable().optional(),
+  record_jsonb: z.record(z.unknown()).nullable().optional(),
+  layers: z.array(catalogLayerSummarySchema),
+});
+export type CatalogDatasetGrouped = z.infer<typeof catalogDatasetGroupedSchema>;
 
 export type DatasetCollectionItems = z.infer<typeof datasetCollectionItems>;
 export type GetCollectionItemsQueryParams = z.infer<typeof datasetCollectionItemsQueryParams>;

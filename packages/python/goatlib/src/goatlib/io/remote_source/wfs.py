@@ -66,12 +66,20 @@ def from_wfs(
     )
 
 
+_LAYERS_CACHE: dict[str, List[str]] = {}
+
+
 def _fetch_wfs_layers(reader: WFSReader, url: str) -> List[str]:
-    """Fetch available layers from WFS service."""
+    """Fetch available layers from WFS service. Cached per-process by URL."""
+    cached = _LAYERS_CACHE.get(url)
+    if cached is not None:
+        return cached
     try:
-        return reader.get_layers(url)
+        layers = reader.get_layers(url)
     except RuntimeError as e:
         raise RuntimeError(f"Failed to fetch WFS layers from {url}") from e
+    _LAYERS_CACHE[url] = layers
+    return layers
 
 
 def _display_available_layers(layers: List[str]) -> None:
@@ -232,22 +240,39 @@ def _fetch_wfs_to_geojson(
         if out_ds is None:
             raise RuntimeError(f"Failed to create GeoJSON file: {output_path}")
 
+        gdal_errors: list[str] = []
+        gdal.PushErrorHandler(lambda _c, _n, msg: gdal_errors.append(msg))
         try:
-            # Copy layer to GeoJSON
             out_layer = out_ds.CopyLayer(layer, layer_name)
             if out_layer is None:
                 error_msg = gdal.GetLastErrorMsg()
                 raise RuntimeError(
                     f"Failed to copy layer: {error_msg or 'Unknown error'}"
                 )
-
-            # Force write
             out_ds.FlushCache()
-
-            logger.info("Saved WFS data to GeoJSON: %s", output_path)
-
         finally:
-            out_ds = None  # Close output
+            gdal.PopErrorHandler()
+            out_ds = None
+
+        http_err = next(
+            (m for m in gdal_errors if "HTTP error" in m or "error code" in m.lower()),
+            None,
+        )
+        if http_err:
+            raise RuntimeError(f"wfs_server_error: {http_err}")
+
+        verify_ds = ogr.Open(str(output_path), 0)
+        written = (
+            verify_ds.GetLayer(0).GetFeatureCount()
+            if verify_ds and verify_ds.GetLayerCount() > 0
+            else 0
+        )
+        verify_ds = None
+        if feature_count > 0 and written == 0:
+            raise RuntimeError(
+                f"wfs_server_error: 0/{feature_count} features written"
+            )
+        logger.info("Saved WFS data to GeoJSON: %s (%d features)", output_path, written)
 
     finally:
         wfs_ds = None  # Close WFS connection

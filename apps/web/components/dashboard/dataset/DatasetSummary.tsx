@@ -148,7 +148,46 @@ const DatasetSummary: React.FC<DatasetSummaryProps> = ({
     },
   ];
 
-  const hasAnyMetadata = metadataSummaryFields.some(({ field }) => !!dataset[field]);
+  // Catalog layers keep their metadata in record_jsonb (OGC API Records); the flat
+  // columns are a legacy fallback that harvested layers leave empty. Resolve each
+  // display field from record_jsonb.properties first, then the flat column — same
+  // pattern as DatasetGroupOverview, so the detail page matches the catalog cards.
+  const props = (dataset as { record_jsonb?: { properties?: Record<string, unknown> } }).record_jsonb
+    ?.properties;
+  const fromRecord = (field: string): unknown => {
+    if (!props) return undefined;
+    switch (field) {
+      case "data_category":
+        return (props.themes as { concepts?: { id?: string }[] }[] | undefined)?.[0]?.concepts?.[0]?.id;
+      case "language_code":
+        return props.language;
+      case "data_reference_year":
+        return ((props.extent as { temporal?: { interval?: unknown[][] } } | undefined)?.temporal
+          ?.interval)?.[0]?.[0];
+      case "distributor_name":
+        return (props.publisher as { name?: string } | undefined)?.name;
+      case "distributor_email":
+        return (props.publisher as { email?: string } | undefined)?.email;
+      case "distribution_url": {
+        // Prefer the source PACKAGE page (CKAN "via" link, e.g. ckan.govdata.de/dataset/…),
+        // then a resource download (enclosure), then publisher URL.
+        const links = (props.links as { rel?: string; href?: string }[] | undefined) ?? [];
+        return (
+          links.find((l) => l.rel === "via")?.href ??
+          links.find((l) => l.rel === "enclosure")?.href ??
+          (props.publisher as { url?: string } | undefined)?.url
+        );
+      }
+      default:
+        return props[field]; // description, license, geographical_code, lineage, attribution, …
+    }
+  };
+  const getField = (field: string): string => {
+    const v = fromRecord(field);
+    return (v !== undefined && v !== null && v !== "" ? v : dataset[field]) as string;
+  };
+
+  const hasAnyMetadata = metadataSummaryFields.some(({ field }) => !!getField(field));
   const shouldRenderMetadataSection = !hideEmpty || hasAnyMetadata;
 
   return (
@@ -158,17 +197,17 @@ const DatasetSummary: React.FC<DatasetSummaryProps> = ({
           <MetadataSection>
             <Stack spacing={4} sx={{ width: "100%" }}>
               {metadataSummaryFields.map(({ field, heading, noMetadataAvailable, type }) => {
-                if (hideEmpty && !dataset[field]) return null;
+                if (hideEmpty && !getField(field)) return null;
                 return (
                   <Stack key={field} spacing={1}>
                     <Typography variant="caption">{heading}</Typography>
                     <Divider />
-                    {!dataset[field] && (
+                    {!getField(field) && (
                       <Typography variant="body2" sx={{ fontStyle: "italic" }}>
                         {noMetadataAvailable}
                       </Typography>
                     )}
-                    {type === "markdown" && dataset[field] && (
+                    {type === "markdown" && getField(field) && (
                       <ReactMarkdown
                         components={{
                           img: ({ node: _, ...props }) => {
@@ -188,20 +227,20 @@ const DatasetSummary: React.FC<DatasetSummaryProps> = ({
                             </a>
                           ),
                         }}>
-                        {dataset[field]}
+                        {getField(field)}
                       </ReactMarkdown>
                     )}
-                    {type === "email" && dataset[field] && (
-                      <Link href={`mailto:${dataset[field]}`} target="_blank" rel="noopener noreferrer">
-                        {dataset[field]}
+                    {type === "email" && getField(field) && (
+                      <Link href={`mailto:${getField(field)}`} target="_blank" rel="noopener noreferrer">
+                        {getField(field)}
                       </Link>
                     )}
-                    {type === "url" && dataset[field] && (
-                      <Link href={dataset[field]} target="_blank" rel="noopener noreferrer">
-                        {dataset[field]}
+                    {type === "url" && getField(field) && (
+                      <Link href={getField(field)} target="_blank" rel="noopener noreferrer">
+                        {getField(field)}
                       </Link>
                     )}
-                    {type === "text" && dataset[field] && <Typography>{dataset[field]}</Typography>}
+                    {type === "text" && getField(field) && <Typography>{getField(field)}</Typography>}
                   </Stack>
                 );
               })}
@@ -226,7 +265,7 @@ const DatasetSummary: React.FC<DatasetSummaryProps> = ({
                         : key}
                     </Typography>
                     <Typography variant="body2" fontWeight="bold" noWrap>
-                      {getMetadataValueTranslation(key, dataset[key])}
+                      {getMetadataValueTranslation(key, getField(key))}
                     </Typography>
                   </div>
                 </div>

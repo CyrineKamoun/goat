@@ -116,14 +116,11 @@ async def get_layer_info(
     """Extract layer info from collection ID in URL path.
 
     The collection ID is just the layer UUID (with or without hyphens).
-    Schema is looked up from DuckLake catalog with caching.
+    Schema is resolved from DuckLake by layer_id; the table name is derived
+    from the same id. Catalog and user-uploaded layers share this resolution.
 
     If temp=true query param is set, skip DuckLake lookup (for temp layer serving).
-
-    Runs in a thread pool to avoid blocking the async event loop
-    when DuckDB query is needed (cache miss).
     """
-    # For temp layers, return placeholder without DuckLake lookup
     if temp:
         return LayerInfo(
             layer_id=normalize_layer_id(collection_id),
@@ -131,12 +128,20 @@ async def get_layer_info(
             table_name="",
         )
 
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(
-        _layer_info_executor,
-        get_layer_info_sync,
-        collection_id,
-    )
+    layer_id = normalize_layer_id(collection_id)
+
+    loop = asyncio.get_running_loop()
+    try:
+        return await loop.run_in_executor(
+            _layer_info_executor,
+            get_layer_info_sync,
+            layer_id,
+        )
+    except HTTPException:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Collection not found: {collection_id}",
+        )
 
 
 # Common query parameters

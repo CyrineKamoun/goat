@@ -62,6 +62,14 @@ class LayerReadBaseAttributes(BaseModel):
         None, description="List of user IDs the layer is shared with"
     )
     owned_by: Dict[str, Any] | None = Field(None, description="User ID of the owner")
+    record_jsonb: Dict[str, Any] | None = Field(
+        None,
+        description=(
+            "OGC API Records metadata document — the canonical source of catalog "
+            "metadata (title/description/themes/language/publisher/extent). Catalog "
+            "clients should read display metadata from here; the flat columns are legacy."
+        ),
+    )
 
     # Read models must serve whatever is stored: legacy metadata values that
     # the strict write-side checks no longer accept must not fail response

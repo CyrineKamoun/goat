@@ -4,6 +4,7 @@ from . import (
     asset,
     billing,
     custom_domain_lookup,
+    catalog_records,
     datasets,
     folder,
     layer,
@@ -36,6 +37,7 @@ router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
 
 router.include_router(folder.router, prefix="/folder", tags=["Folder"])
 router.include_router(layer.router, prefix="/layer", tags=["Layer"])
+router.include_router(catalog_records.router, prefix="/catalog/records", tags=["Catalog"])
 router.include_router(project.router, prefix="/project", tags=["Project"])
 router.include_router(
     project_layer.router, prefix="/project", tags=["Project Layers"]

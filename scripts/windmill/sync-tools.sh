@@ -62,3 +62,6 @@ echo ""
 echo "============================================================"
 echo "Windmill sync complete!"
 echo "============================================================"
+# NOTE: the data-catalog / harvester scripts now live in the separate
+# `goat-data` repo and deploy to this same Windmill via
+# `goat-data/windmill/sync.py` (run from that repo).

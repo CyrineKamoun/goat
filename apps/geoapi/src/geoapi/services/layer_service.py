@@ -297,6 +297,99 @@ class LayerService:
                     await self._create_pool()
         raise last_error
 
+    async def get_metadata_by_id(self, layer_id: UUID) -> Optional[LayerMetadata]:
+        """Get layer metadata by UUID.
+
+        Args:
+            layer_id: Layer UUID
+
+        Returns:
+            LayerMetadata if found, None otherwise
+        """
+        if not self._pool:
+            raise RuntimeError("LayerService not initialized")
+
+        layer_id_str = str(layer_id).replace("-", "")
+
+        # Check cache first
+        if layer_id_str in _metadata_cache:
+            return _metadata_cache[layer_id_str]
+
+        # Query with retry
+        row = await self._execute_with_retry(
+            """
+            SELECT
+                l.id,
+                l.user_id,
+                l.name,
+                l.feature_layer_geometry_type,
+                ST_XMin(e.e) AS xmin,
+                ST_YMin(e.e) AS ymin,
+                ST_XMax(e.e) AS xmax,
+                ST_YMax(e.e) AS ymax
+            FROM customer.layer l
+            LEFT JOIN LATERAL ST_Envelope(l.extent) e ON TRUE
+            WHERE l.id = $1
+            """,
+            layer_id,
+            fetch_one=True,
+        )
+
+        schema_name: str | None = None
+        table_name: str | None = None
+
+        if not row:
+            return None
+
+        user_id_str = str(row["user_id"]).replace("-", "") if row["user_id"] else None
+
+        # Build LayerInfo for getting columns
+        from geoapi.dependencies import LayerInfo
+
+        if not schema_name:
+            schema_name = f"user_{user_id_str}" if user_id_str else "public"
+        if not table_name:
+            table_name = f"t_{layer_id_str}"
+
+        layer_info = LayerInfo(
+            layer_id=layer_id_str,
+            schema_name=schema_name,
+            table_name=table_name,
+        )
+
+        # Get column information from DuckLake schema
+        columns = await self._get_layer_columns(layer_info)
+
+        # Detect geometry column from columns (None if no geometry)
+        geometry_column = None
+        for col in columns:
+            if col.get("json_type") == "geometry":
+                geometry_column = col["name"]
+                break
+
+        bounds = [
+            row["xmin"] or -180,
+            row["ymin"] or -90,
+            row["xmax"] or 180,
+            row["ymax"] or 90,
+        ]
+
+        metadata = LayerMetadata(
+            layer_id=layer_id_str,
+            name=row["name"],
+            geometry_type=row["feature_layer_geometry_type"],
+            bounds=bounds,
+            columns=columns,
+            user_id=user_id_str,
+            geometry_column=geometry_column,
+        )
+
+        # Cache the metadata
+        _metadata_cache[layer_id_str] = metadata
+        logger.debug("Cached metadata for layer %s", layer_id_str)
+
+        return metadata
+
     async def get_layer_metadata(
         self, layer_info: LayerInfo
     ) -> Optional[LayerMetadata]:

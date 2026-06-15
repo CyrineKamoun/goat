@@ -94,6 +94,9 @@ class Settings(BaseSettings):
     AWS_REGION: str | None = "eu-central-1"
     AWS_S3_ASSETS_BUCKET: str | None = "plan4better-assets"
 
+    # Catalog storage config (local database schema)
+    CATALOG_SCHEMA: str = "datacatalog"
+
     # ------------------------------------------------------------------
     # Assets / thumbnails
     # ------------------------------------------------------------------
