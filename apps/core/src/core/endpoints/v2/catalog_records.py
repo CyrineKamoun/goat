@@ -248,8 +248,17 @@ def _build_filters(
         bbox_params = _parse_bbox_param(bbox)
         if bbox_params:
             bind.update(bbox_params)
+            # `&&` is a cheap bbox-overlap index pre-filter, but two adjacent regions'
+            # bounding rectangles overlap even when neither contains the other (e.g.
+            # Niederbayern's box clips into München). Refine with a real area test: keep
+            # a dataset only when its extent overlaps the selected region by >= 30% of the
+            # SMALLER of the two — so a region-covering dataset (Oberbayern⊇München) and a
+            # dataset within the region both match, but a mere edge sliver is dropped.
+            _env_sql = "ST_MakeEnvelope(:bbox_west, :bbox_south, :bbox_east, :bbox_north, 4326)"
             filters.append(
-                "cl.extent && ST_MakeEnvelope(:bbox_west, :bbox_south, :bbox_east, :bbox_north, 4326)"
+                f"cl.extent && {_env_sql} "
+                f"AND ST_Area(ST_Intersection(cl.extent::geometry, {_env_sql})) "
+                f">= 0.3 * LEAST(ST_Area(cl.extent::geometry), ST_Area({_env_sql}))"
             )
 
     return " AND ".join(filters), bind
