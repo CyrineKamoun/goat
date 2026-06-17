@@ -27,13 +27,10 @@ def upgrade():
     op.execute("CREATE SCHEMA IF NOT EXISTS temporal;")
     op.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
     op.execute("CREATE EXTENSION IF NOT EXISTS postgis_raster;")
-    op.execute("CREATE EXTENSION IF NOT EXISTS h3;")
     op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "btree_gist";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "fuzzystrmatch";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "hstore";')
-    op.execute('CREATE EXTENSION IF NOT EXISTS "citus";')
-    op.execute('CREATE EXTENSION IF NOT EXISTS "citus_columnar";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "postgres_fdw";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "intarray";')
     # Check if accounts.user exists, and create a minimal version if not
