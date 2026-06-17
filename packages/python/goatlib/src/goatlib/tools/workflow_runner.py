@@ -985,26 +985,23 @@ def main(
                 )
                 continue
 
-            # Find the upstream node connected to this export node
-            incoming_edge = next(
-                (e for e in edges if e["target"] == export_node_id), None
-            )
-            if not incoming_edge:
-                print(
-                    f"[workflow_runner] Export node {export_node_id}: no incoming edge, skipping"
-                )
-                continue
-
-            source_node_id = incoming_edge["source"]
-
-            # Verify the source node has a temp result
-            source_result = results.get(source_node_id)
-            if not source_result or not source_result.get("temp_layer_id"):
+            # Pick the first non-empty produced source, else any produced source.
+            produced = [
+                (e["source"], results.get(e["source"]))
+                for e in edges
+                if e["target"] == export_node_id
+                and results.get(e["source"], {}).get("temp_layer_id")
+            ]
+            if not produced:
                 print(
                     f"[workflow_runner] Export node {export_node_id}: "
-                    f"source {source_node_id} has no temp result, skipping"
+                    f"no produced source, skipping"
                 )
                 continue
+            source_node_id, source_result = next(
+                ((sid, r) for sid, r in produced if (r.get("feature_count") or 0) > 0),
+                produced[0],
+            )
 
             print(
                 f"[workflow_runner] Finalizing export node {export_node_id} "
