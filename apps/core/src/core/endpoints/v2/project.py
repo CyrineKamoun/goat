@@ -10,7 +10,6 @@ from fastapi import (
     Query,
     status,
 )
-from fastapi.responses import JSONResponse
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4, BaseModel
@@ -27,7 +26,6 @@ from core.crud.crud_organization_domain import (
 )
 from core.crud.crud_project import project as crud_project
 from core.crud.crud_project_copy import copy_project as copy_project_fn
-from core.crud.crud_scenario import scenario as crud_scenario
 from core.crud.crud_user_project import user_project as crud_user_project
 from core.db.models._link_model import (
     LayerProjectGroup,
@@ -35,13 +33,12 @@ from core.db.models._link_model import (
     UserProjectLink,
     UserTeamLink,
 )
-from core.db.models.user import User
 from core.db.models.organization_domain import CertStatus
 from core.db.models.project import Project, ProjectPublic
-from core.db.models.scenario import Scenario
+from core.db.models.user import User
 from core.db.session import AsyncSession
 from core.deps.auth import auth_z
-from core.endpoints.deps import get_db, get_scenario, get_user_id
+from core.endpoints.deps import get_db, get_user_id
 from core.schemas.common import OrderEnum
 from core.schemas.project import (
     IFeatureStandardProjectRead,
@@ -63,16 +60,6 @@ from core.schemas.project import (
 from core.schemas.project import (
     request_examples as project_request_examples,
 )
-from core.schemas.scenario import (
-    IScenarioCreate,
-    IScenarioFeatureCreate,
-    IScenarioFeatureUpdate,
-    IScenarioUpdate,
-)
-from core.schemas.scenario import (
-    request_examples as scenario_request_examples,
-)
-from core.utils import to_feature_collection
 
 router = APIRouter()
 
@@ -679,286 +666,6 @@ async def delete_layer_from_project(
 
 
 ##############################################
-### Scenario endpoints
-##############################################
-
-
-@router.get(
-    "/{project_id}/scenario",
-    summary="Retrieve a list of scenarios",
-    response_model=Page[Scenario],
-    status_code=200,
-    dependencies=[Depends(auth_z)],
-)
-async def read_scenarios(
-    async_session: AsyncSession = Depends(get_db),
-    page_params: PaginationParams = Depends(),
-    project_id: UUID4 = Path(
-        ...,
-        description="The ID of the project to get",
-        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    ),
-    search: str = Query(None, description="Searches the name of the scenario"),
-    order_by: str = Query(
-        None,
-        description="Specify the column name that should be used to order",
-        example="created_at",
-    ),
-    order: OrderEnum = Query(
-        "descendent",
-        description="Specify the order to apply. There are the option ascendent or descendent.",
-        example="descendent",
-    ),
-) -> Page[Scenario]:
-    """Retrieve a list of scenarios."""
-    query = select(Scenario).where(Scenario.project_id == project_id)
-    scenarios = await crud_scenario.get_multi(
-        db=async_session,
-        query=query,
-        page_params=page_params,
-        search_text={"name": search} if search else {},
-        order_by=order_by,
-        order=order,
-    )
-    assert type(scenarios) is Page
-
-    return scenarios
-
-
-@router.post(
-    "/{project_id}/scenario",
-    summary="Create scenario",
-    status_code=201,
-    response_model=Scenario,
-    response_model_exclude_none=True,
-    dependencies=[Depends(auth_z)],
-)
-async def create_scenario(
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID4 = Depends(get_user_id),
-    project_id: UUID4 = Path(
-        ...,
-        description="The ID of the project to create a scenario",
-        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    ),
-    scenario_in: IScenarioCreate = Body(
-        ...,
-        example=scenario_request_examples["create"],
-        description="Scenario to create",
-    ),
-) -> Scenario:
-    """Create scenario."""
-
-    result = await crud_scenario.create(
-        db=async_session,
-        obj_in=Scenario(
-            **scenario_in.model_dump(exclude_none=True),
-            user_id=user_id,
-            project_id=project_id,
-        ).model_dump(),
-    )
-    assert type(result) is Scenario
-
-    return result
-
-
-@router.put(
-    "/{project_id}/scenario/{scenario_id}",
-    summary="Update scenario",
-    status_code=201,
-    dependencies=[Depends(auth_z)],
-)
-async def update_scenario(
-    async_session: AsyncSession = Depends(get_db),
-    scenario: Scenario = Depends(get_scenario),
-    scenario_in: IScenarioUpdate = Body(
-        ...,
-        example=scenario_request_examples["update"],
-        description="Scenario to update",
-    ),
-) -> Scenario:
-    """Update scenario."""
-
-    result = await crud_scenario.update(
-        db=async_session,
-        db_obj=scenario,
-        obj_in=scenario_in,
-    )
-    assert type(result) is Scenario
-
-    return result
-
-
-@router.delete(
-    "/{project_id}/scenario/{scenario_id}",
-    summary="Delete scenario",
-    status_code=204,
-    dependencies=[Depends(auth_z)],
-)
-async def delete_scenario(
-    async_session: AsyncSession = Depends(get_db),
-    scenario: Scenario = Depends(get_scenario),
-) -> None:
-    """Delete scenario."""
-
-    await crud_scenario.remove(db=async_session, id=scenario.id)
-
-    return None
-
-
-@router.get(
-    "/{project_id}/scenario/{scenario_id}/features",
-    summary="Retrieve a list of scenario features",
-    response_class=JSONResponse,
-    status_code=200,
-    dependencies=[Depends(auth_z)],
-)
-async def read_scenario_features(
-    async_session: AsyncSession = Depends(get_db),
-    scenario: Scenario = Depends(get_scenario),
-) -> Dict[str, Any]:
-    """Retrieve a list of scenario features."""
-
-    if not scenario.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Scenario ID is required"
-        )
-
-    scenario_features = await crud_scenario.get_features(
-        async_session=async_session,
-        scenario_id=scenario.id,
-    )
-
-    fc = to_feature_collection(scenario_features)
-
-    return dict(fc)
-
-
-@router.post(
-    "/{project_id}/layer/{layer_project_id}/scenario/{scenario_id}/features",
-    summary="Create scenario features",
-    response_class=JSONResponse,
-    status_code=201,
-    dependencies=[Depends(auth_z)],
-)
-async def create_scenario_features(
-    async_session: AsyncSession = Depends(get_db),
-    scenario: Scenario = Depends(get_scenario),
-    features: List[IScenarioFeatureCreate] = Body(
-        ...,
-        example=scenario_request_examples["create_scenario_features"],
-        description="Scenario features to create",
-    ),
-) -> Dict[str, Any]:
-    """Create scenario features."""
-
-    fc = await crud_scenario.create_features(
-        async_session=async_session,
-        user_id=scenario.user_id,
-        scenario=scenario,
-        features=features,
-    )
-
-    return dict(fc)
-
-
-@router.put(
-    "/{project_id}/layer/{layer_project_id}/scenario/{scenario_id}/features",
-    summary="Update scenario features",
-    status_code=201,
-    dependencies=[Depends(auth_z)],
-)
-async def update_scenario_feature(
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID4 = Depends(get_user_id),
-    layer_project_id: int = Path(
-        ...,
-        description="Layer Project ID",
-        example="1",
-    ),
-    scenario: Scenario = Depends(get_scenario),
-    features: List[IScenarioFeatureUpdate] = Body(
-        ...,
-        description="Scenario features to update",
-    ),
-) -> None:
-    """Update scenario features."""
-
-    layer_project = await crud_layer_project.get(
-        async_session, id=layer_project_id, extra_fields=[LayerProjectLink.layer]
-    )
-    if layer_project is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Layer project relation not found",
-        )
-    assert type(layer_project) is LayerProjectLink
-
-    for feature in features:
-        await crud_scenario.update_feature(
-            async_session=async_session,
-            user_id=user_id,
-            layer_project=layer_project,
-            scenario=scenario,
-            feature=feature,
-        )
-
-    return None
-
-
-@router.delete(
-    "/{project_id}/layer/{layer_project_id}/scenario/{scenario_id}/features/{feature_id}",
-    summary="Delete scenario feature",
-    status_code=204,
-    dependencies=[Depends(auth_z)],
-)
-async def delete_scenario_features(
-    async_session: AsyncSession = Depends(get_db),
-    user_id: UUID4 = Depends(get_user_id),
-    layer_project_id: int = Path(
-        ...,
-        description="Layer Project ID",
-        example="1",
-    ),
-    scenario: Scenario = Depends(get_scenario),
-    feature_id: str = Path(
-        ...,
-        description="Feature ID to delete",
-    ),
-    h3_3: int | None = Query(
-        None,
-        description="H3 3 resolution",
-        example=5,
-    ),
-    geom: str | None = Query(
-        None,
-        description="Feature geometry as WKT (used when origin table is unavailable)",
-    ),
-) -> None:
-    layer_project = await crud_layer_project.get(
-        async_session, id=layer_project_id, extra_fields=[LayerProjectLink.layer]
-    )
-    if layer_project is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Layer project relation not found",
-        )
-    assert type(layer_project) is LayerProjectLink
-
-    await crud_scenario.delete_feature(
-        async_session=async_session,
-        user_id=user_id,
-        layer_project=layer_project,
-        scenario=scenario,
-        feature_id=feature_id,
-        h3_3=h3_3,
-        geom=geom,
-    )
-
-    return None
-
-
-##############################################
 ### Project public endpoints
 ##############################################
 
@@ -1375,18 +1082,18 @@ async def update_project_layer_tree(
 
         # 3. Update Layers
         if updates_layers:
-            for l in updates_layers:
+            for layer_update in updates_layers:
                 update_values = {
-                    "layer_project_group_id": l["layer_project_group_id"],
-                    "order": l["order"],
+                    "layer_project_group_id": layer_update["layer_project_group_id"],
+                    "order": layer_update["order"],
                 }
                 # Include properties if provided
-                if "properties" in l:
-                    update_values["properties"] = l["properties"]
+                if "properties" in layer_update:
+                    update_values["properties"] = layer_update["properties"]
 
                 await async_session.execute(
                     update(LayerProjectLink)
-                    .where(LayerProjectLink.id == l["id"])
+                    .where(LayerProjectLink.id == layer_update["id"])
                     .where(LayerProjectLink.project_id == project_id)  # Security check
                     .values(**update_values)
                 )

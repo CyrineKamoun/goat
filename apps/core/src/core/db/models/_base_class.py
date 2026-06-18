@@ -31,6 +31,35 @@ class DateTimeBase(SQLModel):
     )
 
 
+class UUIDServerDefaultBase(SQLModel):
+    """Base for models originating from the accounts schema.
+
+    UUID primary key with a server-side ``uuid_generate_v4()`` default and
+    naive ``CURRENT_TIMESTAMP`` ``created_at``/``updated_at`` columns — matching
+    the existing ``accounts.*`` tables (``timestamp without time zone``),
+    unlike core's timezone-aware ``DateTimeBase``.
+    """
+
+    id: UUID | None = Field(
+        default=None,
+        primary_key=True,
+        index=True,
+        nullable=False,
+        sa_type=UUID_PG(as_uuid=True),
+        sa_column_kwargs={"server_default": text("uuid_generate_v4()")},
+    )
+    created_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime,
+        sa_column_kwargs={"server_default": text("CURRENT_TIMESTAMP")},
+    )
+    updated_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime,
+        sa_column_kwargs={"server_default": text("CURRENT_TIMESTAMP")},
+    )
+
+
 class ContentBaseAttributes(SQLModel):
     """Base model for content attributes."""
 
@@ -64,15 +93,3 @@ content_base_example = {
     "description": "Layer description",
     "tags": ["tag1", "tag2"],
 }
-
-
-# TODO: Reevaluate the use of this - it doesn't seem to be used as a parent class for most models
-# @as_declarative()
-# class Base:
-#     id: Any
-#     __name__: str
-#
-#     # Generate __tablename__ automatically
-#     @declared_attr
-#     def __tablename__(cls) -> str:
-#         return cls.__name__.lower()

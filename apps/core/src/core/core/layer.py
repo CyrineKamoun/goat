@@ -1,57 +1,17 @@
 # Standard library imports
 import re
-from enum import Enum
-from typing import Any, Dict, Union
 from uuid import UUID
 
 # Third party imports
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import select
-from sqlmodel import SQLModel
 
 # Local application imports
-from core.core.config import settings
 from core.crud.base import CRUDBase
 from core.db.models._link_model import LayerProjectLink
 from core.db.models.layer import (
-    FeatureType,
     Layer,
-    LayerType,
 )
-
-
-def model_to_dict(model: SQLModel | BaseModel) -> Dict[str, Any]:
-    model_dict = model.model_dump()
-    for key, value in model_dict.items():
-        if isinstance(value, Enum):
-            model_dict[key] = value.value
-    return model_dict
-
-
-def get_user_table(layer: Union[dict, SQLModel, BaseModel]) -> str:
-    """Get the table with the user data based on the layer metadata."""
-
-    # Check if layer is of type dict or SQLModel/BaseModel
-    if isinstance(layer, (SQLModel, BaseModel)):
-        layer = model_to_dict(layer)
-
-    if isinstance(layer, dict):
-        if layer["type"] == LayerType.feature.value:
-            if layer["feature_layer_type"] in (FeatureType.standard, FeatureType.tool):
-                table_prefix = layer["feature_layer_geometry_type"]
-            elif layer["feature_layer_type"] == FeatureType.street_network:
-                table_prefix = (
-                    FeatureType.street_network.value
-                    + "_"
-                    + layer["feature_layer_geometry_type"]
-                )
-        elif layer["type"] == LayerType.table.value:
-            table_prefix = "no_geometry"
-        else:
-            raise ValueError(f"The passed layer type {layer['type']} is not supported.")
-    user_id = layer["user_id"]
-    return f"{settings.USER_DATA_SCHEMA}.{table_prefix}_{str(user_id).replace('-', '')}"
 
 
 class CRUDLayerBase(CRUDBase):

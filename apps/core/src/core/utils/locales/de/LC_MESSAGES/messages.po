@@ -1,0 +1,297 @@
+# German translations for PROJECT.
+# Copyright (C) 2023 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2024-09-24 19:16+0000\n"
+"PO-Revision-Date: 2024-06-05 17:29+0200\n"
+"Last-Translator: \n"
+"Language: de\n"
+"Language-Team: de <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.16.0\n"
+
+#: src/crud/organization.py:126
+msgid "Thank you for signing up for the free demo!"
+msgstr "Danke für die Anmeldung zum kostenlosen Demo!"
+
+#: src/crud/organization.py:127
+msgid ""
+"We are delighted that you are becoming part of the GOAT community! During"
+" your trial period, you will have full access to the GOAT platform"
+msgstr ""
+"Es freut uns sehr, dass Sie Teil der GOAT-Community werden! Während Ihres"
+" Demozeitraums haben Sie vollen Zugriff auf die GOAT-Plattform"
+
+#: src/crud/organization.py:133
+msgid "Welcome to GOAT!"
+msgstr "Willkommen zu GOAT!"
+
+#: src/crud/organization.py:156
+msgid "Organization has been deleted"
+msgstr "Organisation wurde gelöscht"
+
+#: src/crud/organization.py:157
+msgid "Your organization has been deleted."
+msgstr "Ihre Organisation wurde gelöscht."
+
+#: src/crud/organization.py:258 src/crud/organization.py:325
+msgid "User is not part of the organization"
+msgstr "Benutzer ist nicht Teil der Organisation"
+
+#: src/crud/organization.py:271 src/crud/organization.py:334
+#, fuzzy
+msgid "User is not part of the organization or has no role"
+msgstr "Benutzer ist nicht Teil der Organisation"
+
+#: src/crud/organization.py:299
+msgid "You have been removed from the organization"
+msgstr "Sie wurden aus der Organisation entfernt"
+
+#: src/crud/organization.py:300
+msgid "You have been removed from the organization."
+msgstr "Sie wurden aus der Organisation entfernt"
+
+#: src/crud/organization.py:304
+msgid "GOAT - Removed from organization"
+msgstr "GOAT - Aus der Organisation entfernt"
+
+#: src/crud/organization.py:338 src/crud/organization.py:377
+#: src/crud/organization.py:420 src/crud/team.py:136
+msgid "Invalid role"
+msgstr "Ungültige Rolle"
+
+#: src/crud/stripe.py:19
+#, fuzzy
+msgid "Error getting product in Stripe"
+msgstr "Fehler beim Anlegen eines Kunden in Stripe"
+
+#: src/crud/stripe.py:37
+msgid "Error creating customer in Stripe"
+msgstr "Fehler beim Anlegen eines Kunden in Stripe"
+
+#: src/crud/stripe.py:50
+msgid "Could not find a trial product"
+msgstr "Konnte kein Testprodukt finden"
+
+#: src/crud/stripe.py:54
+msgid "Error getting stripe plan default price"
+msgstr "Fehler beim Abrufen des Standardpreises in Stripe"
+
+#: src/crud/stripe.py:76
+msgid "Error creating subscription in Stripe"
+msgstr "Fehler beim Erstellen eines Abonnements in Stripe"
+
+#: src/endpoints/v1/organizations.py:290
+msgid "Organization not found"
+msgstr "Organisation nicht gefunden"
+
+#: src/endpoints/v1/organizations.py:296
+msgid "Invited user already has an organization"
+msgstr "Eingeladener Benutzer hat bereits eine Organisation"
+
+#: src/endpoints/v1/organizations.py:312
+msgid "User has already been invited"
+msgstr "Benutzer wurde bereits eingeladen"
+
+#: src/endpoints/v1/organizations.py:339 src/endpoints/v1/organizations.py:348
+msgid "You have been invited to join an organization"
+msgstr "Sie sind eingeladen worden, einer Organisation beizutreten"
+
+#: src/endpoints/v1/organizations.py:340
+msgid ""
+"You have been invited to join an organization. Click on the button below "
+"to accept the invitation."
+msgstr ""
+"Sie sind eingeladen worden, einer Organisation beizutreten. Klicken Sie "
+"auf die Schaltfläche unten, um die Einladung anzunehmen."
+
+#: src/endpoints/v1/organizations.py:344
+msgid "Join organization"
+msgstr "Organisation beitreten"
+
+#: src/endpoints/v1/webhooks.py:214
+msgid "Your trial is about to end"
+msgstr "Ihr Demozugang neigt sich dem Ende"
+
+#: src/endpoints/v1/webhooks.py:215
+msgid "Please reach out to us to continue using GOAT."
+msgstr "Bitte setzen Sie sich mit uns in Verbindung, um GOAT weiterhin zu nutzen."
+
+#: src/endpoints/v1/webhooks.py:216 src/endpoints/v1/webhooks.py:240
+#: src/templates/email/template.html:170
+msgid "Contact us"
+msgstr "Kontaktiere uns"
+
+#: src/endpoints/v1/webhooks.py:222
+msgid "GOAT - Your trial is about to end"
+msgstr "GOAT - Ihr Demozugang neigt sich dem Ende"
+
+#: src/endpoints/v1/webhooks.py:238
+msgid "Your account is suspended"
+msgstr "Ihr Konto wurde gesperrt"
+
+#: src/endpoints/v1/webhooks.py:239
+msgid "Please reach out to us to reactivate your subscription."
+msgstr "Bitte kontaktieren Sie uns, um Ihr Abonnement zu reaktivieren."
+
+#: src/endpoints/v1/webhooks.py:246
+#, fuzzy
+msgid "GOAT - Your subscription was deleted"
+msgstr "Ihre Organisation wurde gelöscht."
+
+#: src/schemas/plan.py:22
+msgid "goat_starter"
+msgstr "goat_starter"
+
+#: src/schemas/plan.py:23
+msgid "Starter"
+msgstr "Starter"
+
+#: src/schemas/plan.py:24
+msgid ""
+"Ideal for individuals or small teams beginning with GOAT, offering "
+"essential features to explore its core capabilities."
+msgstr ""
+"Ideal für Einzelpersonen oder kleine Teams, die mit GOAT beginnen und die"
+" wesentlichen Funktionen erkunden möchten."
+
+#: src/schemas/plan.py:28
+#, fuzzy
+msgid "For small teams with up to 10 viewers and 3 editors"
+msgstr "Für Organisationen mit bis zu 50 Viewern und 5 Editoren"
+
+#: src/schemas/plan.py:29
+msgid "Integrated and custom data"
+msgstr "Integrierte und benutzerdefinierte Daten"
+
+#: src/schemas/plan.py:30
+msgid "Manage teams"
+msgstr "Teams verwalten"
+
+#: src/schemas/plan.py:31
+msgid "Share and collaborate"
+msgstr "Teilen und zusammenarbeiten"
+
+#: src/schemas/plan.py:32
+msgid "Basic support"
+msgstr "Basis-Support"
+
+#: src/schemas/plan.py:36
+msgid "goat_professional"
+msgstr "goat_professional"
+
+#: src/schemas/plan.py:37
+msgid "Professional"
+msgstr "Professional"
+
+#: src/schemas/plan.py:38
+msgid ""
+"Designed for growing organizations, this plan offers advanced tools for "
+"deeper analysis and enhanced collaboration."
+msgstr ""
+"Entwickelt für wachsende Organisationen, bietet dieser Plan erweiterte "
+"Tools für tiefere Analysen und verbesserte Zusammenarbeit."
+
+#: src/schemas/plan.py:42
+msgid "For organization with up to 50 viewers and 5 editors"
+msgstr "Für Organisationen mit bis zu 50 Viewern und 5 Editoren"
+
+#: src/schemas/plan.py:43
+msgid "Create scenarios"
+msgstr "Szenarien erstellen"
+
+#: src/schemas/plan.py:44
+msgid "Increased usage quota limits"
+msgstr "Erhöhte Nutzungskontingente"
+
+#: src/schemas/plan.py:45
+msgid "Premium support"
+msgstr "Premium-Support"
+
+#: src/schemas/plan.py:49
+msgid "goat_enterprise"
+msgstr "goat_enterprise"
+
+#: src/schemas/plan.py:50
+msgid "Enterprise"
+msgstr "Enterprise"
+
+#: src/schemas/plan.py:51
+msgid ""
+"Tailored for large organizations, this plan provides full-scale "
+"capabilities to manage multiple teams and projects at an enterprise "
+"level."
+msgstr ""
+"Zugeschnitten auf große Organisationen, bietet dieser Plan umfassende "
+"Funktionen zur Verwaltung mehrerer Teams und Projekte auf "
+"Unternehmensebene."
+
+#: src/schemas/plan.py:55
+#, fuzzy
+msgid "For large enterprises with multiple departments"
+msgstr "Für große Unternehmen mit mehreren Abteilungen"
+
+#: src/schemas/plan.py:56
+msgid "Unlimited viewers and editors"
+msgstr "Unbegrenzte Viewer und Editoren"
+
+#: src/schemas/plan.py:57
+msgid "Custom branding and On-premise deployment"
+msgstr "Individuelle Markenanpassung und On-Premise-Bereitstellung"
+
+#: src/schemas/plan.py:58
+msgid "Elite support"
+msgstr "Elite-Support"
+
+#: src/templates/email/template.html:144
+msgid "All Rights Reserved"
+msgstr "All Rights Reserved"
+
+#: src/templates/email/template.html:159
+msgid "Privacy"
+msgstr "Privatsphäre"
+
+#: src/templates/email/template.html:181
+msgid "About us"
+msgstr "Über uns"
+
+#: src/utils/email.py:39
+msgid "Test email"
+msgstr "Test-Email"
+
+#: src/utils/email.py:40
+msgid "This is a test email"
+msgstr "Dies ist eine Test-Email"
+
+#~ msgid "Activate your GOAT demo"
+#~ msgstr "Aktiviere deine GOAT Demo"
+
+#~ msgid "User is owner of the organization"
+#~ msgstr "Benutzer ist Eigentümer der Organisation"
+
+#~ msgid "Organization has no subscription"
+#~ msgstr "Organisation hat kein Abonnement"
+
+#~ msgid "Organization has no available seats"
+#~ msgstr "Organisation hat keine freien Plätze"
+
+#~ msgid "User already has the role"
+#~ msgstr "Benutzer hat bereits die Rolle"
+
+#~ msgid "Invalid role or increase value"
+#~ msgstr "Ungültige Rolle oder erhöhe Wert"
+
+#~ msgid "Invalid role or decrease value"
+#~ msgstr "Ungültige Rolle oder verringere Wert"
+
+#~ msgid "Perform Analytics"
+#~ msgstr "Analysen durchführen"
+

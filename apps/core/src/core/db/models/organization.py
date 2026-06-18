@@ -1,42 +1,179 @@
-from typing import TYPE_CHECKING, List
+from datetime import datetime
+from enum import Enum
+from typing import TYPE_CHECKING, List, Optional
 from uuid import UUID
 
-from sqlalchemy import Column, text
+from pydantic import field_validator
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
-from sqlmodel import Field, Relationship, Text
+from sqlmodel import (
+    Boolean,
+    Column,
+    DateTime,
+    Field,
+    Float,
+    Integer,
+    Relationship,
+    SQLModel,
+    Text,
+    text,
+)
 
 from core.core.config import settings
-from core.db.models._base_class import DateTimeBase
+from core.db.models._base_class import UUIDServerDefaultBase
 
 if TYPE_CHECKING:
     from ._link_model import LayerOrganizationLink, ProjectOrganizationLink
+    from .user import User
 
 
-class Organization(DateTimeBase, table=True):
-    """
-    A stub representation of the Layer model from another repository.
-    """
+class OrganizationUseCaseEnum(str, Enum):
+    site_analysis_and_design_decision_support = (
+        "site_analysis_and_design_decision_support"
+    )
+    market_analysis_and_location_optimization = (
+        "market_analysis_and_location_optimization"
+    )
+    infrastructure_planning_and_design = "infrastructure_planning_and_design"
+    location_based_insights_for_clients = "location_based_insights_for_clients"
+    geographic_studies_and_data_visualization = (
+        "geographic_studies_and_data_visualization"
+    )
+    geospatial_data_management_and_analysis = "geospatial_data_management_and_analysis"
+    site_selection_and_market_analysis = "site_selection_and_market_analysis"
+    network_planning_and_coverage_optimization = (
+        "network_planning_and_coverage_optimization"
+    )
+    route_optimization_and_traffic_management = (
+        "route_optimization_and_traffic_management"
+    )
+    geo_marketing_and_customer_targeting = "geo_marketing_and_customer_targeting"
+    property_valuation_and_market_analysis = "property_valuation_and_market_analysis"
+    other = "other"
+
+
+class OrganizationIndustryEnum(str, Enum):
+    urban_planning = "urban_planning"
+    transportation_planning = "transportation_planning"
+    architecture = "architecture"
+    civil_engineering = "civil_engineering"
+    location_planning = "location_planning"
+    gis_it = "gis_it"
+    telecommunication = "telecommunication"
+    banking_and_finance = "banking_and_finance"
+    consulting = "consulting"
+    archaeology = "archaeology"
+    real_estate = "real_estate"
+    education_research = "education_research"
+    forestry = "forestry"
+    healthcare = "healthcare"
+    government_and_public_services = "government_and_public_services"
+    surveying_and_geodesy = "surveying_and_geodesy"
+    marketing_and_advertising = "marketing_and_advertising"
+    emergency_management = "emergency_management"
+    sports_and_entertainment = "sports_and_entertainment"
+    defense_and_military = "defense_and_military"
+    insurance = "insurance"
+    other = "other"
+
+
+class OrganizationTypeEnum(str, Enum):
+    government = "government"
+    private = "private"
+    non_profit = "non_profit"
+    education = "education"
+    other = "other"
+
+
+class AvailableRegionsEnum(str, Enum):
+    eu = "EU"
+
+
+class PlanTypeEnum(str, Enum):
+    """This enum represents the subscription types."""
+
+    starter = "goat_starter"
+    profesional = "goat_professional"
+    enterprise = "goat_enterprise"
+
+
+class QuotaTypeEnum(str, Enum):
+    storage = "storage"
+    credits = "credits"
+    projects = "projects"
+    editors = "editors"
+    viewers = "viewers"
+
+
+class OrganizationRolesEnum(str, Enum):
+    owner = "organization-owner"
+    admin = "organization-admin"
+    editor = "organization-editor"
+    viewer = "organization-viewer"
+
+
+class OrganizationBase(SQLModel):
+    name: str = Field(sa_column=Column(Text, nullable=False), max_length=255)
+    avatar: str = Field(sa_column=Column(Text, nullable=False))
+    total_storage: float = Field(sa_column=Column(Float, nullable=False))
+    used_storage: Optional[float] = Field(
+        default=0, sa_column=Column(Float, nullable=False, server_default=text("0"))
+    )
+    total_credits: int = Field(sa_column=Column(Integer, nullable=False))
+    used_credits: Optional[int] = Field(
+        default=0, sa_column=Column(Integer, nullable=False, server_default=text("0"))
+    )
+    total_projects: int = Field(sa_column=Column(Integer, nullable=False))
+    used_projects: Optional[int] = Field(
+        default=0, sa_column=Column(Integer, nullable=False, server_default=text("0"))
+    )
+    total_editors: int = Field(sa_column=Column(Integer, nullable=False))
+    used_editors: Optional[int] = Field(
+        default=1, sa_column=Column(Integer, nullable=False, server_default=text("1"))
+    )
+    total_viewers: int = Field(sa_column=Column(Integer, nullable=False))
+    used_viewers: Optional[int] = Field(
+        default=0, sa_column=Column(Integer, nullable=False, server_default=text("0"))
+    )
+    plan_name: PlanTypeEnum = Field(sa_column=Column(Text, nullable=False))
+    plan_renewal_date: datetime | None = Field(default=None, sa_column=Column(DateTime))
+    on_trial: bool = Field(sa_column=Column(Boolean, nullable=False))
+    type: OrganizationTypeEnum = Field(sa_column=Column(Text, nullable=False))
+    size: str | None = Field(sa_column=Column(Text, nullable=True), max_length=255)
+    industry: OrganizationIndustryEnum = Field(sa_column=Column(Text, nullable=False))
+    department: str = Field(sa_column=Column(Text, nullable=False), max_length=255)
+    use_case: OrganizationUseCaseEnum = Field(sa_column=Column(Text, nullable=False))
+    contact_user_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            nullable=False,
+        )
+    )
+    phone_number: str = Field(sa_column=Column(Text, nullable=False), max_length=255)
+    location: str = Field(sa_column=Column(Text, nullable=False), max_length=255)
+    region: AvailableRegionsEnum = Field(sa_column=Column(Text, nullable=False))
+    stripe_id: str | None = Field(sa_column=Column(Text, nullable=True))
+    hubspot_id: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    newsletter_subscribe: bool | None = Field(sa_column=Column(Boolean, nullable=True))
+    suspended: bool = Field(sa_column=Column(Boolean, nullable=False))
+
+    @field_validator(
+        "used_storage", "used_credits", "used_projects", "used_editors", "used_viewers"
+    )
+    @classmethod
+    def validate_min_value(cls, value: float) -> float:
+        if value is not None and value < 0:
+            raise ValueError("Value must be greater than or equal to 0")
+        return value
+
+
+class Organization(UUIDServerDefaultBase, OrganizationBase, table=True):
+    """An organization: container for users, teams, quotas and subscription."""
 
     __tablename__ = "organization"
     __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
 
-    id: UUID | None = Field(
-        sa_column=Column(
-            UUID_PG(as_uuid=True),
-            primary_key=True,
-            nullable=False,
-            server_default=text("uuid_generate_v4()"),
-        ),
-        description="Organization ID",
-    )
-    name: str = Field(
-        sa_column=Column(Text, nullable=False),
-        description="Organization name",
-        max_length=255,
-    )
-    avatar: str | None = Field(sa_column=Column(Text, nullable=True))
-
     # Relationships
+    users: List["User"] = Relationship(back_populates="organization")
     layer_links: List["LayerOrganizationLink"] = Relationship(
         back_populates="organization",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},

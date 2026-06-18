@@ -212,11 +212,8 @@ class GeospatialAttributes(SQLModel):
 
 
 def validate_language_code(v: str | None) -> str | None:
-    if v:
-        try:
-            pycountry.languages.get(alpha_2=v)
-        except KeyError:
-            raise ValueError(f"The passed language {v} is not valid.")
+    if v and pycountry.languages.get(alpha_2=v) is None:
+        raise ValueError(f"The passed language {v} is not valid.")
     return v
 
 
@@ -233,12 +230,9 @@ def validate_geographical_code(v: str | None) -> str | None:
     ]
 
     if v:
-        # Try if country code if not try if any of the continent codes
-        try:
-            pycountry.countries.get(alpha_2=v)
-        except KeyError:
-            if v not in continents:
-                raise ValueError(f"The passed country {v} is not valid.")
+        # Accept either a country code or one of the continent names
+        if pycountry.countries.get(alpha_2=v) is None and v not in continents:
+            raise ValueError(f"The passed country {v} is not valid.")
     return v
 
 

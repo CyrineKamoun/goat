@@ -9,7 +9,6 @@ from pydantic import (
     Field,
     HttpUrl,
     RootModel,
-    ValidationError,
     ValidationInfo,
     field_validator,
 )
@@ -644,7 +643,7 @@ class ILayerExport(CQLQuery):
         try:
             CRS(value)
         except CRSError as e:
-            raise ValidationError(f"Invalid CRS: {e}")
+            raise ValueError(f"Invalid CRS: {e}")
         return value
 
     # Check that projection is EPSG:4326 for KML
@@ -655,7 +654,7 @@ class ILayerExport(CQLQuery):
     ) -> str | None:
         if info.data["file_type"] == FeatureLayerExportType.kml:
             if value != "EPSG:4326":
-                raise ValidationError("KML export only supports EPSG:4326 projection.")
+                raise ValueError("KML export only supports EPSG:4326 projection.")
         return value
 
 
@@ -718,7 +717,7 @@ class LayerGetBase(BaseModel):
             try:
                 wkt.loads(value)
             except Exception as e:
-                raise ValidationError(f"Invalid Geometry: {e}")
+                raise ValueError(f"Invalid Geometry: {e}")
         return value
 
 

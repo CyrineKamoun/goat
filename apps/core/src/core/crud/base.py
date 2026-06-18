@@ -4,36 +4,18 @@ from uuid import UUID
 from fastapi_pagination import Page, Params
 from fastapi_pagination.ext.sqlalchemy import paginate
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import func, or_
+from sqlalchemy import delete, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import RelationshipProperty, selectinload
 from sqlalchemy.sql import Select
+from sqlmodel import SQLModel
 
-from core.db.models import (
-    Folder,
-    Layer,
-    Project,
-    Scenario,
-    Status,
-    SystemSetting,
-    User,
-)
 from core.schemas import OrderEnum
-from core.schemas.folder import FolderCreate, FolderUpdate
-from core.schemas.scenario import IScenarioCreate, IScenarioUpdate
-from core.schemas.system_setting import SystemSettingsCreate, SystemSettingsUpdate
 
-ModelType = TypeVar(
-    "ModelType",
-    bound=Layer | Project | User | Folder | Scenario | Status | SystemSetting,
-)
-CreateSchemaType = TypeVar(
-    "CreateSchemaType", bound=FolderCreate | SystemSettingsCreate | IScenarioCreate
-)
-UpdateSchemaType = TypeVar(
-    "UpdateSchemaType", bound=FolderUpdate | SystemSettingsUpdate | IScenarioUpdate
-)
+ModelType = TypeVar("ModelType", bound=SQLModel)
+CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
+UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
 
 class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
@@ -227,6 +209,59 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     async def delete(self, db: AsyncSession, *, id: int | UUID) -> ModelType:
         return await self.remove(db, id=id)
+
+    async def get_by_key(
+        self, db: AsyncSession, *, key: str, value: Any, extra_fields: List[Any] = []
+    ) -> List[ModelType]:
+        statement = select(self.model).where(getattr(self.model, key) == value)
+        statement = self.extend_statement(statement, extra_fields=extra_fields)
+        result = await db.execute(statement)
+        return list(result.scalars().all())
+
+    async def get_multi_by_key(
+        self,
+        db: AsyncSession,
+        *,
+        key: str,
+        value: Any,
+        skip: int = 0,
+        limit: int = 100,
+        extra_fields: List[Any] = [],
+    ) -> List[ModelType]:
+        statement = (
+            select(self.model)
+            .offset(skip)
+            .limit(limit)
+            .where(getattr(self.model, key) == value)
+        )
+        statement = self.extend_statement(statement, extra_fields=extra_fields)
+        result = await db.execute(statement)
+        return list(result.scalars().all())
+
+    async def get_n_rows(self, db: AsyncSession, *, n: int) -> List[ModelType]:
+        statement = select(self.model).limit(n)
+        result = await db.execute(statement)
+        return list(result.scalars().all())
+
+    async def remove_multi(
+        self, db: AsyncSession, *, ids: int | List[int]
+    ) -> List[int]:
+        if isinstance(ids, int):
+            ids = [ids]
+        statement = delete(self.model).where(self.model.id.in_(ids))
+        await db.execute(statement)
+        await db.commit()
+        return ids
+
+    async def remove_multi_by_key(
+        self, db: AsyncSession, *, key: str, values: Any
+    ) -> List[Any]:
+        if not isinstance(values, list):
+            values = [values]
+        statement = delete(self.model).where(getattr(self.model, key).in_(values))
+        await db.execute(statement)
+        await db.commit()
+        return values
 
     async def count(self, db: AsyncSession) -> int:
         """

@@ -37,7 +37,7 @@ const SettingsLayout = (props: SettingsLayoutProps) => {
   const { t, i18n } = useTranslation("common");
   const { isOrgAdmin, isLoading: isUserProfileLoading } = useAuthZ();
   const navigation = useMemo(() => {
-    // If ACCOUNTS API URL IS NOT set → only show "Account"
+    // If accounts features are disabled → only show "Account"
     if (ACCOUNTS_DISABLED) {
       return [
         {
@@ -49,7 +49,7 @@ const SettingsLayout = (props: SettingsLayoutProps) => {
       ];
     }
 
-    // If ACCOUNTS API URL IS set → show ALL settings
+    // If accounts features are enabled → show ALL settings
     return [
       {
         link: "/settings/account",

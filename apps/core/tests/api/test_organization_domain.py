@@ -2,7 +2,7 @@
 
 These tests exercise the sync DNS check + provisioning trigger logic in
 the user-facing CRUD endpoints. The k8s side is mocked via FakeProvisioner;
-DNS resolution is monkeypatched via ``_resolve_cname``.
+DNS resolution is monkeypatched via ``_resolve``.
 """
 
 from typing import Generator
@@ -13,6 +13,7 @@ from core.deps.provisioner import reset_provisioner, set_provisioner
 from core.services.provisioner import FakeProvisioner
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from tests.utils import fake_dns_resolve
 
 
 @pytest.fixture(autouse=True)
@@ -33,9 +34,9 @@ def fake_provisioner() -> FakeProvisioner:
 @pytest.fixture
 async def seeded_org(db_session: AsyncSession) -> str:
     """Insert a test Organization and return its id as a string."""
-    from core.db.models.organization import Organization
+    from tests.utils import make_organization
 
-    org = Organization(name="test-org-for-domains")
+    org = make_organization(name="test-org-for-domains")
     db_session.add(org)
     await db_session.commit()
     await db_session.refresh(org)
@@ -49,12 +50,9 @@ async def test_create_domain_pending_when_dns_not_set(
     fake_provisioner: FakeProvisioner,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_resolve(domain: str) -> list[str]:
-        return []
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(),
     )
 
     r = await client.post(
@@ -77,12 +75,9 @@ async def test_create_domain_provisions_when_dns_already_set(
     fake_provisioner: FakeProvisioner,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_resolve(domain: str) -> list[str]:
-        return ["cname.goat.plan4better.de."]
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(cname=["cname.goat.plan4better.de."]),
     )
 
     r = await client.post(
@@ -112,23 +107,23 @@ async def test_create_rejects_invalid_hostname(
 
 
 @pytest.mark.asyncio
-async def test_create_rejects_apex_domain(
+async def test_create_accepts_apex_domain(
     client: AsyncClient,
     seeded_org: str,
     fake_provisioner: FakeProvisioner,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Apex domains are supported via the A-record path (no CNAME at apex)."""
+    monkeypatch.setattr(
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(),
+    )
     r = await client.post(
         f"/api/v2/organizations/{seeded_org}/domains/",
         json={"base_domain": "example.com"},  # apex
     )
-    assert r.status_code == 422
-    detail = r.json()["detail"]
-    # Pydantic v2 wraps validator errors; just confirm it's about apex
-    assert (
-        any("apex" in str(e).lower() for e in detail)
-        if isinstance(detail, list)
-        else "apex" in str(detail).lower()
-    )
+    assert r.status_code == 201, r.text
+    assert r.json()["dns_status"] == "pending"
 
 
 @pytest.mark.asyncio
@@ -138,12 +133,9 @@ async def test_create_rejects_duplicate_domain(
     fake_provisioner: FakeProvisioner,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_resolve(domain: str) -> list[str]:
-        return []
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(),
     )
 
     payload = {"base_domain": "duplicate.test.example.com"}
@@ -168,12 +160,9 @@ async def test_list_domains_for_organization(
     fake_provisioner: FakeProvisioner,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_resolve(domain: str) -> list[str]:
-        return []
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(),
     )
 
     for sub in ("a", "b"):
@@ -198,12 +187,9 @@ async def test_get_single_domain(
     fake_provisioner: FakeProvisioner,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_resolve(domain: str) -> list[str]:
-        return []
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(),
     )
 
     r = await client.post(
@@ -236,12 +222,9 @@ async def test_recheck_provisions_when_dns_appears(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # First call: DNS not set -> pending
-    async def no_record(domain: str) -> list[str]:
-        return []
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        no_record,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(),
     )
 
     r = await client.post(
@@ -252,12 +235,9 @@ async def test_recheck_provisions_when_dns_appears(
     assert fake_provisioner.created == []
 
     # Now DNS is configured -> recheck should provision
-    async def with_record(domain: str) -> list[str]:
-        return ["cname.goat.plan4better.de."]
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        with_record,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(cname=["cname.goat.plan4better.de."]),
     )
 
     r = await client.post(
@@ -278,12 +258,9 @@ async def test_delete_calls_teardown_for_active_domain(
     monkeypatch: pytest.MonkeyPatch,
     db_session: AsyncSession,
 ) -> None:
-    async def fake_resolve(domain: str) -> list[str]:
-        return ["cname.goat.plan4better.de."]
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(cname=["cname.goat.plan4better.de."]),
     )
 
     r = await client.post(
@@ -332,12 +309,9 @@ async def _create_active_domain(
 ) -> str:
     """Helper: register a domain, advance it to ACTIVE state, return its id."""
 
-    async def fake_resolve(domain: str) -> list[str]:
-        return ["cname.goat.plan4better.de."]
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(cname=["cname.goat.plan4better.de."]),
     )
 
     r = await client.post(
@@ -427,12 +401,9 @@ async def test_assign_rejects_inactive_domain(
 ) -> None:
     """Domain whose cert_status is not ACTIVE cannot be assigned."""
 
-    async def fake_resolve(domain: str) -> list[str]:
-        return []
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(),
     )
 
     r = await client.post(

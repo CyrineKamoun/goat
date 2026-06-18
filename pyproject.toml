@@ -51,6 +51,12 @@ strict = true
 ignore_missing_imports = true
 exclude = ["venv", ".venv", "alembic"]
 
+# mypy is the Python type gate. Pyright/Pylance type checking is disabled so it
+# does not flood SQLModel/SQLAlchemy code with false positives; it still reports
+# unresolved imports and syntax errors and powers autocomplete/navigation.
+[tool.pyright]
+typeCheckingMode = "off"
+
 [tool.ruff.lint]
 select = ["F", "E", "W", "N", "I", "ANN"]
 ignore = ["E501", "ANN401", "ANN101", "ANN102"]
@@ -61,12 +67,14 @@ per-file-ignores = { "*/__init__.py" = [
     "F401",
     "I001",
     "W291",
+], "**/tests/**" = [
+    "ANN",
 ] }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 addopts = ["--import-mode=importlib", "--log-cli-level=INFO"]
-pythonpath = ["apps/core", "apps/geoapi", "apps/accounts"]
+pythonpath = ["apps/core", "apps/geoapi"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*", "*Tests"]
 python_functions = ["test_*"]

@@ -28,16 +28,12 @@ from core.schemas.common import OrderEnum
 from core.schemas.error import HTTPErrorHandler
 from core.schemas.layer import (
     ICatalogLayerGet,
-    IFeatureStandardLayerRead,
-    IFeatureStreetNetworkLayerRead,
-    IFeatureToolLayerRead,
     ILayerGet,
     ILayerRead,
     IMetadataAggregate,
     IMetadataAggregateRead,
     IRasterCreate,
     IRasterLayerRead,
-    ITableLayerRead,
 )
 from core.schemas.layer import (
     request_examples as layer_request_examples,

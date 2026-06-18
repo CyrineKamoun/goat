@@ -74,11 +74,6 @@
       "dependsOrder": "sequence"
     },
     {
-      "label": "accounts-pre-launch",
-      "dependsOn": ["kill-port-8100", "uv-sync"],
-      "dependsOrder": "sequence"
-    },
-    {
       "label": "routing-pre-launch",
       "dependsOn": ["kill-port-8200", "uv-sync"],
       "dependsOrder": "sequence"

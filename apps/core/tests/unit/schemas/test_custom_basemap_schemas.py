@@ -3,10 +3,8 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from pydantic import TypeAdapter, ValidationError
-
 from core.schemas.custom_basemap import CustomBasemap
-
+from pydantic import TypeAdapter, ValidationError
 
 CUSTOM_BASEMAP_ADAPTER = TypeAdapter(CustomBasemap)
 
@@ -113,7 +111,12 @@ def test_id_is_stored_as_string_for_jsonb_compat() -> None:
 
 def test_invalid_uuid_string_rejected() -> None:
     """A non-UUID id should be rejected by the UUIDStr validator."""
-    data = {**_base_fields(), "id": "not-a-uuid", "type": "vector", "url": "https://example.com/style.json"}
+    data = {
+        **_base_fields(),
+        "id": "not-a-uuid",
+        "type": "vector",
+        "url": "https://example.com/style.json",
+    }
     with pytest.raises(ValidationError):
         CUSTOM_BASEMAP_ADAPTER.validate_python(data)
 

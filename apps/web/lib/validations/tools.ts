@@ -111,7 +111,6 @@ export const catchmentAreaBaseSchema = z.object({
   catchment_area_type: catchmentAreaShapeEnum.default("polygon"),
   starting_points: startingPointSchema,
   polygon_difference: z.boolean().optional(),
-  scenario_id: z.string().optional(),
   street_network: z
     .object({
       edge_layer_project_id: z.number().optional(),
@@ -265,7 +264,6 @@ export const tripCountSchema = z.object({
   time_window: ptTimeWindow,
   reference_area_layer_project_id: z.number(),
   station_config: stationConfigSchema,
-  scenario_id: z.string().optional(),
 });
 
 export const oevGueteklassenSchema = tripCountSchema.extend({
@@ -308,7 +306,6 @@ export const bufferSchema = z.object({
   distance_step: z.number(),
   polygon_union: z.boolean(),
   polygon_difference: z.boolean(),
-  scenario_id: z.string().optional(),
 });
 
 export type PostBuffer = z.infer<typeof bufferSchema>;
@@ -327,7 +324,6 @@ export const aggregatePointSchema = z.object({
     result_name: z.string().optional(),
   }),
   source_group_by_field: z.string().array().optional(),
-  scenario_id: z.string().optional(),
 });
 
 export const aggregatePolygonSchema = aggregatePointSchema.extend({
@@ -359,7 +355,6 @@ export const nearbyStationsSchema = z.object({
   max_traveltime: z.number().min(1).max(15),
   mode: z.array(PTRoutingModes),
   time_window: ptTimeWindow,
-  scenario_id: z.string().optional(),
   street_network: z
     .object({
       edge_layer_project_id: z.number().optional(),
@@ -386,7 +381,6 @@ export const heatmapGravitySchema = z.object({
     })
   ),
   routing_type: HeatmapRoutingTypeEnum,
-  scenario_id: z.string().optional(),
 });
 
 export type PostHeatmapGravity = z.infer<typeof heatmapGravitySchema>;
@@ -401,7 +395,6 @@ export const heatmapClosestAverageSchema = z.object({
     })
   ),
   routing_type: HeatmapRoutingTypeEnum,
-  scenario_id: z.string().optional(),
 });
 
 export type PostHeatmapClosestAverage = z.infer<typeof heatmapClosestAverageSchema>;
@@ -411,7 +404,6 @@ export const heatmapConnectivitySchema = z.object({
   reference_area_layer_project_id: z.number(),
   max_traveltime: z.number().min(1).max(60),
   routing_type: HeatmapRoutingTypeEnum,
-  scenario_id: z.string().optional(),
 });
 
 export type PostHeatmapConnectivity = z.infer<typeof heatmapConnectivitySchema>;

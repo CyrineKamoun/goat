@@ -210,7 +210,6 @@ export const projectSchema = contentMetadataSchema.extend({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     interface: basicLayout.interface as any,
   }),
-  active_scenario_id: z.string().nullable().optional(),
   basemap: z.string().nullable().default("streets"),
   custom_basemaps: z.array(customBasemapSchema).default([]),
   updated_at: z.string().optional(),
@@ -328,7 +327,6 @@ export const postProjectSchema = z.object({
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
   thumbnail_url: z.string().optional(),
-  active_scenario_id: z.string().optional(),
   max_extent: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
   initial_view_state: projectViewStateSchema.optional(),
 });

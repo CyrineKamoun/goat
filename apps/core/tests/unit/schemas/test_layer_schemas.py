@@ -42,7 +42,7 @@ def test_layer_creation():
     assert layer.attribute_accuracy == "High"
     assert layer.completeness == "Complete"
     assert layer.upload_reference_system == 4326
-    assert layer.upload_file_type.value == "geojson"
+    assert layer.upload_file_type == "geojson"
     assert layer.geographical_code == "DE"
     assert layer.language_code == "en"
     assert layer.distributor_name == "Test Distributor"

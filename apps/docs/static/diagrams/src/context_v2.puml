@@ -7,16 +7,12 @@ title Top Level Context Diagram (C4 Model)
 SHOW_PERSON_OUTLINE()
 Person(personAlias, "User", "A user of GOAT application")
 System(goatclient, "Web application", "Allows users to conduct analysis, evaluate scenarios, manage data and visualize (geo)information")
-System_Ext(authentication, "Authentication", "Authenticates users, provides access tokens and manages user accounts.")
-System(authorization, "Authorization", "Authorizes users to access resources such as features and data.")
-System(goatapplication, "GOAT Application", "Contains the functionality of storing and managing data and compute indicators.")
+System_Ext(authentication, "Authentication", "Authenticates users and issues access tokens (Keycloak).")
+System(goatapplication, "GOAT Application", "Authorizes requests and provides the functionality to store, manage and analyze data and compute indicators.")
 
 Rel(personAlias, goatclient, "Uses")
 Rel(goatclient, authentication, "Authenticates")
-Rel(goatclient, authorization, "Requests settings, data and indicators")
-Rel_R(authorization, authentication, "Sends \n & \n Requests token")
-Rel_L(authentication, authorization, "")
-
-Rel(authorization, goatapplication, "Forwards request")
+Rel(goatclient, goatapplication, "Requests settings, data and indicators")
+Rel(goatapplication, authentication, "Verifies token")
 
 @enduml

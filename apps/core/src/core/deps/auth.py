@@ -1,9 +1,8 @@
 from typing import Any, Dict
 
 from core.core.config import settings
-from core.endpoints.deps import get_db
+from core.endpoints.deps import get_current_token_claims, get_db
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import OAuth2PasswordBearer
 from goatlib.auth import JOSEError, KeycloakAuth
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,10 +18,6 @@ _keycloak_auth = KeycloakAuth(
 auth_key = _keycloak_auth.public_key
 ISSUER_URL = _keycloak_auth.issuer_url
 
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V2_STR}/auth/access-token",
-)
-
 
 def decode_token(token: str) -> Dict[str, Any]:
     """
@@ -31,25 +26,46 @@ def decode_token(token: str) -> Dict[str, Any]:
     return _keycloak_auth.decode_token(token)
 
 
-async def auth(token: str = Depends(oauth2_scheme)) -> str:
+def auth(request: Request) -> str:
+    """Raw bearer token for the request, for forwarding to other services.
+
+    Signature-verified when AUTH is enabled; with AUTH disabled the provided
+    bearer token (or the sample token) is used unverified, matching the other
+    dev-mode dependencies.
+    """
+    authorization = request.headers.get("Authorization")
+    if not settings.AUTH:
+        # No verification in dev mode; downstream services running with
+        # AUTH=False ignore the forwarded token.
+        return authorization.partition(" ")[2] if authorization else ""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authorization token",
+        )
+    token = authorization.partition(" ")[2]
     try:
         decode_token(token)
     except JOSEError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
-
     return token
 
 
-def user_token(token: str = Depends(auth)) -> Dict[str, Any]:
-    payload = decode_token(token)
-    return payload
+def user_token(request: Request) -> Dict[str, Any]:
+    """JWT claims for the request.
+
+    Signature-verified when AUTH is enabled; with AUTH disabled the provided
+    bearer token (or the sample token) is used unverified, matching the other
+    dev-mode dependencies.
+    """
+    return get_current_token_claims(request)
 
 
 def is_superuser(
     user_token: Dict[str, Any] = Depends(user_token), throw_error: bool = True
 ) -> bool:
     is_superuser = False
-    if user_token["realm_access"] and user_token["realm_access"]["roles"]:
+    if user_token.get("realm_access", {}).get("roles"):
         is_superuser = "superuser" in user_token["realm_access"]["roles"]
 
     if not is_superuser and throw_error:

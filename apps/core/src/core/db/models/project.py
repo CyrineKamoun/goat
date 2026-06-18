@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     )
 
     from .report_layout import ReportLayout
-    from .scenario import Scenario
     from .workflow import Workflow
 
 
@@ -62,13 +61,6 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
             nullable=False,
         ),
         description="Project folder ID",
-    )
-    active_scenario_id: UUID | None = Field(
-        sa_column=Column(
-            UUID_PG(as_uuid=True),
-            nullable=True,
-        ),
-        description="Active scenario ID",
     )
     layer_order: List[int] | None = Field(
         sa_column=Column(
@@ -121,10 +113,6 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     layer_projects: List["LayerProjectLink"] = Relationship(
-        back_populates="project",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-    scenarios: List["Scenario"] = Relationship(
         back_populates="project",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

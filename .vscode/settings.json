@@ -41,6 +41,11 @@
   "githubPullRequests.experimental.chat": true,
   "githubPullRequests.experimental.notificationsView": true,
   "python.defaultInterpreterPath": ".venv/bin/python",
+  // Pylance type-checking is left off: mypy (configured below + in pyproject) is
+  // the Python type gate. Pylance's "basic" default floods SQLModel/SQLAlchemy
+  // code with false positives; "off" keeps imports, syntax, autocomplete and
+  // navigation while leaving type checking to mypy.
+  "python.analysis.typeCheckingMode": "off",
   "python.testing.pytestEnabled": true,
   "python.testing.unittestEnabled": false,
   "python.testing.pytestArgs": [

@@ -1,5 +1,6 @@
 # Standard library imports
 import asyncio
+import contextlib
 import logging
 
 # Import Env variables
@@ -16,13 +17,10 @@ from core.db.models import User
 from core.endpoints.deps import get_db, session_manager
 from core.main import app
 from httpx import AsyncClient
-from jose import jwt
 from sqlalchemy import text
 
 
 def set_test_mode():
-    settings.RUN_AS_BACKGROUND_TASK = True
-    settings.USER_DATA_SCHEMA = "test_user_data"
     settings.CUSTOMER_SCHEMA = "test_customer1"
     settings.ACCOUNTS_SCHEMA = "test_accounts1"
     settings.MAX_FOLDER_COUNT = 15
@@ -38,7 +36,6 @@ async def client():
     async with AsyncClient(
         app=app,
         base_url="http://test",
-        headers={"Authorization": settings.SAMPLE_AUTHORIZATION},
     ) as ac:
         yield ac
 
@@ -62,7 +59,6 @@ async def session_fixture(event_loop):
     async with session_manager.connect() as connection:
         for schema in [
             settings.CUSTOMER_SCHEMA,
-            settings.USER_DATA_SCHEMA,
             settings.ACCOUNTS_SCHEMA,
         ]:
             await connection.execute(
@@ -98,19 +94,21 @@ async def db_session():
 @pytest.fixture
 async def fixture_create_user(client: AsyncClient, db_session):
     # Get base user_id
-    scheme, _, token = settings.SAMPLE_AUTHORIZATION.partition(" ")
-    user_id = jwt.get_unverified_claims(token)["sub"]
+    user_id = settings.DEFAULT_USER_ID
 
-    # Create a user
-    user = User(
-        id=user_id,
-        firstname="Green",
-        lastname="GOAT",
-        avatar="https://assets.plan4better.de/img/goat_app_subscription_professional.jpg",
-    )
-    db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
+    # Create the default user if a previous test (or JIT provisioning) hasn't
+    user = await db_session.get(User, user_id)
+    if user is None:
+        user = User(
+            id=user_id,
+            email="green.goat@plan4better.de",
+            firstname="Green",
+            lastname="GOAT",
+            avatar="https://assets.plan4better.de/img/goat_app_subscription_professional.jpg",
+        )
+        db_session.add(user)
+        await db_session.commit()
+        await db_session.refresh(user)
 
     # Setup: Create user data schemas
     result = await client.post(f"{settings.API_V2_STR}/user/data-schema")
@@ -118,7 +116,6 @@ async def fixture_create_user(client: AsyncClient, db_session):
     yield user.id
     # Teardown: Delete the user after the test
     await CRUDBase(User).delete(db_session, id=user_id)
-    await client.delete(f"{settings.API_V2_STR}/user/data-schema")
 
 
 @pytest.fixture
@@ -127,8 +124,9 @@ async def fixture_create_folder(client: AsyncClient, fixture_create_user):
     response = await client.post(f"{settings.API_V2_STR}/folder", json={"name": "test"})
     folder = response.json()
     yield folder
-    # Teardown: Delete the folder after the test
-    await client.delete(f"{settings.API_V2_STR}/folder/{folder['id']}")
+    # Teardown: Delete the folder after the test (the test may have deleted it)
+    with contextlib.suppress(Exception):
+        await client.delete(f"{settings.API_V2_STR}/folder/{folder['id']}")
 
 
 @pytest.fixture
@@ -184,10 +182,3 @@ async def fixture_create_folders(client: AsyncClient, fixture_create_user):
     # Teardown: Delete the folders after the test
     for folder in created_folders:
         await client.delete(f"{settings.API_V2_STR}/folder/{folder['id']}")
-
-
-@pytest.fixture(autouse=True)
-def set_testing_config():
-    settings.TESTING = True
-    yield
-    settings.TESTING = False

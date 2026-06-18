@@ -20,7 +20,6 @@ import { DEFAULT_BASEMAP } from "@/lib/constants/basemaps";
 import { setSelectedLayers } from "@/lib/store/layer/slice";
 import { setActiveRightPanel, setGeocoderResult } from "@/lib/store/map/slice";
 import { DATA_PANEL_HEIGHT_VAR } from "@/components/map/panels/DataPanel";
-import { FeatureName } from "@/lib/validations/organization";
 import type { CustomBasemap, Project, ProjectLayerTreeUpdate } from "@/lib/validations/project";
 
 import { MapSidebarItemID } from "@/types/map/common";
@@ -39,14 +38,12 @@ import { CustomBasemapDialog } from "@/components/map/controls/CustomBasemapDial
 import { Fullscren } from "@/components/map/controls/Fullscreen";
 import Geocoder from "@/components/map/controls/Geocoder";
 import Scalebar from "@/components/map/controls/Scalebar";
-import { Scenario as ScenarioCtrl } from "@/components/map/controls/Scenario";
 import { Toolbox as ToolboxCtrl } from "@/components/map/controls/Toolbox";
 import { Zoom } from "@/components/map/controls/Zoom";
 import { MeasureButton, MeasureResultsPanel } from "@/components/map/controls/measure";
 import LayerSettingsPanel from "@/components/map/panels/layer/LayerSettingsPanel";
 import { MapFixedPopupSlot } from "@/components/map/popover/MapFixedPopupSlot";
 import { ProjectLayerTree } from "@/components/map/panels/layer/ProjectLayerTree";
-import Scenario from "@/components/map/panels/scenario/Scenario";
 import Toolbox from "@/components/map/panels/toolbox/CombinedToolbox";
 
 const toolbarHeight = 52;
@@ -96,7 +93,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
   const isDataPanelOpen = useAppSelector((state) => state.map.isDataPanelOpen);
   const mapMode = useAppSelector((state) => state.map.mapMode);
   const dataPanelVisible = mapMode === "data" && isDataPanelOpen;
-  const { isOrgEditor, isAppFeatureEnabled } = useAuthZ();
+  const { isOrgEditor } = useAuthZ();
   const { folders } = useFolders({});
   const projectFolder = useMemo(
     () => (project.folder_id && folders ? folders.find((f) => f.id === project.folder_id) : undefined),
@@ -224,13 +221,6 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
         name: t("tools"),
         component: <Toolbox />,
       },
-      {
-        id: MapSidebarItemID.SCENARIO,
-        icon: ICON_NAME.SCENARIO,
-        name: t("scenario"),
-        component: <Scenario projectId={projectId} />,
-        disabled: !isAppFeatureEnabled(FeatureName.SCENARIO),
-      },
     ],
   };
 
@@ -245,7 +235,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
     }
 
     // B. STANDARD TOOLS
-    return rightSidebar.topItems?.find((item) => item.id === activeRight && !item.disabled)?.component;
+    return rightSidebar.topItems?.find((item) => item.id === activeRight)?.component;
   }, [activeRight, rightSidebar.topItems, projectId, projectLayers]);
 
   // --- INTERACTION LOGIC ---
@@ -253,15 +243,6 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
   const handleToolboxToggle = async (open: boolean) => {
     if (open) {
       dispatch(setActiveRightPanel(MapSidebarItemID.TOOLBOX));
-      dispatch(setSelectedLayers([])); // Clear tree
-    } else {
-      dispatch(setActiveRightPanel(undefined));
-    }
-  };
-
-  const handleScenarioToggle = async (open: boolean) => {
-    if (open) {
-      dispatch(setActiveRightPanel(MapSidebarItemID.SCENARIO));
       dispatch(setSelectedLayers([])); // Clear tree
     } else {
       dispatch(setActiveRightPanel(undefined));
@@ -353,7 +334,6 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
             }}
           />
           {isProjectEditor && <ToolboxCtrl onToggle={handleToolboxToggle} open={activeRight === MapSidebarItemID.TOOLBOX} />}
-          {isProjectEditor && <ScenarioCtrl onToggle={handleScenarioToggle} open={activeRight === MapSidebarItemID.SCENARIO} />}
           <MeasureButton {...measureTool} />
         </Box>
       </Box>

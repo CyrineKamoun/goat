@@ -28,12 +28,8 @@ System_Boundary(a1, "Authentication"){
     ContainerDb(authdb, "Database", "PostgreSQL", "Holds user data and keycloak configuration", $sprite="postgresql")
 }
 
-System_Boundary(s1, "Authorization"){
-    Container(author, "Authorization & Accounts API", "Python and FastAPI", "Manages subscriptions, user access, and features via RBAC.", $sprite="python")
-}
-
 System_Boundary(a2, "GOAT Application"){
-    Container(applicationapi, "GOAT Core API", "Python and FastAPI", "Bundles GOAT-specific analyses and interacts with content metadata.", $sprite="python")
+    Container(applicationapi, "GOAT Core API", "Python and FastAPI", "Authorization gateway (RBAC) plus user, organization and subscription management; bundles GOAT-specific analyses and content metadata.", $sprite="python")
     Container(geoapi, "GEO API", "Python and FastAPI", "Provides geoservices: OGC Features and Vector tiles.", $sprite="python")
     Container(processesapi, "Processes API", "Python and FastAPI", "Provides OGC API Processes interface for analytics.", $sprite="python")
 
@@ -60,6 +56,5 @@ Rel(workflow, goatrouting, "HTTP (Private)")
 Rel(user, c1, "")
 Rel(c1, a1, "")
 Rel(c1, a2, "Uses", "HTTPS")
-Rel(author, a2, "Secures")
 
 @enduml

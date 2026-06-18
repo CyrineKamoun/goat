@@ -25,12 +25,12 @@ export const withOrganization: MiddlewareFactory = (next) => {
       isAccountsDisabled ||
       !process.env.NEXTAUTH_URL ||
       !process.env.NEXTAUTH_SECRET ||
-      !process.env.ACCOUNTS_API_URL
+      !process.env.API_URL
     ) {
       return next(request, _next);
     }
 
-    const USERS_API_BASE_URL = new URL("api/v1/users", process.env.ACCOUNTS_API_URL).href;
+    const USERS_API_BASE_URL = new URL("api/v2/users", process.env.API_URL).href;
 
     const { pathname, origin, basePath } = request.nextUrl;
 

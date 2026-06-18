@@ -614,7 +614,7 @@ const ShareModal: React.FC<ShareProps> = ({ open, onClose, type, content }) => {
   };
 
   const tabItems = useMemo(() => {
-    // If the env variable is NOT set → ONLY show "Public"
+    // If accounts features are disabled → ONLY show "Public"
     if (ACCOUNTS_DISABLED) {
       return [{ label: t("public"), value: "public" }];
     }

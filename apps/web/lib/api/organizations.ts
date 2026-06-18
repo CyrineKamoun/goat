@@ -10,7 +10,7 @@ import type {
   PostOrganization,
 } from "@/lib/validations/organization";
 
-export const ORG_API_BASE_URL = new URL("api/v1/organizations", process.env.NEXT_PUBLIC_ACCOUNTS_API_URL)
+export const ORG_API_BASE_URL = new URL("api/v2/organizations", process.env.NEXT_PUBLIC_API_URL)
   .href;
 
 export const useOrganizationMembers = (organizationId: string, queryParams?: OrganizationMemberQueryParams) => {

@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
-from core.crud.base import CRUDBase
-from core.db.models.system_task import SystemTask
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
+
+from core.crud.base import CRUDBase
+from core.db.models.system_task import SystemTask
 
 
 async def fetch_last_run_timestamp(

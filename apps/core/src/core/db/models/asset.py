@@ -1,7 +1,7 @@
 from enum import Enum
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import BigInteger, Column, Field, ForeignKey, String, Text
 
@@ -90,3 +90,6 @@ class UploadedAsset(DateTimeBase, table=True):
         ),
         description="SHA256 hash of the file content for deduplication.",
     )
+
+
+Index("idx_uploaded_asset_folder_id", UploadedAsset.__table__.c.folder_id)

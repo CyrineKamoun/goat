@@ -8,11 +8,10 @@ from fastapi import FastAPI, Request, status
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from goatobs import setup_observability
 from sqlalchemy.exc import IntegrityError
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
-
-from goatobs import setup_observability
 
 import core._dotenv  # noqa: E402, F401, I001
 from core.core.config import settings
@@ -26,6 +25,7 @@ if settings.SENTRY_DSN and settings.ENVIRONMENT:
         environment=settings.ENVIRONMENT,
         traces_sample_rate=1.0 if settings.ENVIRONMENT == "prod" else 0.1,
     )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -85,6 +85,7 @@ app.add_middleware(
 
 from goatlib.auth import JOSEError  # noqa: E402
 from goatobs import build_auth_context_middleware  # noqa: E402
+
 from core.deps.auth import decode_token  # noqa: E402
 
 app.middleware("http")(

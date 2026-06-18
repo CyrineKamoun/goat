@@ -5,9 +5,8 @@ import type { MapGeoJSONFeature } from "react-map-gl/maplibre";
 import { BASEMAPS } from "@/lib/constants/basemaps";
 import type { UnitPreference } from "@/lib/utils/measurementUnits";
 import type { BuilderPanelSchema, BuilderWidgetSchema, Project } from "@/lib/validations/project";
-import type { Scenario } from "@/lib/validations/scenario";
 
-import type { Basemap, SelectorItem } from "@/types/map/common";
+import type { Basemap } from "@/types/map/common";
 import { MapSidebarItemID } from "@/types/map/common";
 import type { Result } from "@/types/map/controllers";
 import type { MapPopoverEditorProps, MapPopoverInfoProps } from "@/types/map/popover";
@@ -90,8 +89,6 @@ export interface MapState {
   activeRightPanel: MapSidebarItemID | undefined;
   isMapGetInfoActive: boolean;
   mapCursor: string | undefined; // Toolbox features will override this. If undefined, the map will use the default cursor with pointer on hover
-  editingScenario: Scenario | undefined;
-  selectedScenarioLayer: SelectorItem | undefined;
   highlightedFeature: MapGeoJSONFeature | undefined;
   popupInfo: MapPopoverInfoProps | undefined;
   popupEditor: MapPopoverEditorProps | undefined;
@@ -132,8 +129,6 @@ const initialState = {
   activeRightPanel: undefined,
   isMapGetInfoActive: true,
   mapCursor: undefined,
-  editingScenario: undefined,
-  selectedScenarioLayer: undefined,
   popupInfo: undefined,
   popupEditor: undefined,
   popupPreview: null,
@@ -180,10 +175,6 @@ const mapSlice = createSlice({
         state.toolboxStartingPoints = undefined;
         state.mapCursor = undefined;
       }
-      if (state.activeRightPanel === MapSidebarItemID.SCENARIO) {
-        state.editingScenario = undefined;
-        state.selectedScenarioLayer = undefined;
-      }
       state.activeRightPanel = action.payload;
     },
     setMaskLayer: (state, action: PayloadAction<string | undefined>) => {
@@ -209,15 +200,6 @@ const mapSlice = createSlice({
     },
     setMapCursor: (state, action: PayloadAction<string | undefined>) => {
       state.mapCursor = action.payload;
-    },
-    setEditingScenario: (state, action: PayloadAction<Scenario | undefined>) => {
-      state.editingScenario = action.payload;
-      if (action.payload === undefined) {
-        state.selectedScenarioLayer = undefined;
-      }
-    },
-    setSelectedScenarioLayer: (state, action: PayloadAction<SelectorItem | undefined>) => {
-      state.selectedScenarioLayer = action.payload;
     },
     setPopupInfo: (state, action: PayloadAction<MapPopoverInfoProps | undefined>) => {
       state.popupInfo = action.payload;
@@ -340,8 +322,6 @@ export const {
   setToolboxStartingPoints,
   setIsMapGetInfoActive,
   setMapCursor,
-  setEditingScenario,
-  setSelectedScenarioLayer,
   setPopupInfo,
   setPopupEditor,
   setPopupPreview,

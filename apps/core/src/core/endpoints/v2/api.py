@@ -2,21 +2,38 @@ from fastapi import APIRouter
 
 from . import (
     asset,
+    billing,
     custom_domain_lookup,
     datasets,
     folder,
     layer,
     organization_analytics,
     organization_domain,
+    organizations,
     project,
     report_layout,
+    share,
     status,
     system,
+    teams,
     user,
+    users,
+    utils,
+    webhooks,
     workflow,
 )
 
 router = APIRouter()
+
+router.include_router(
+    organizations.router, prefix="/organizations", tags=["Organizations"]
+)
+router.include_router(teams.router, prefix="/teams", tags=["Teams"])
+router.include_router(users.router, prefix="/users", tags=["Users"])
+router.include_router(share.router, prefix="/share", tags=["Share"])
+router.include_router(billing.router, prefix="/billing", tags=["Billing"])
+router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])
+router.include_router(utils.router, prefix="/utils", tags=["Utils"])
 
 router.include_router(user.router, prefix="/user", tags=["User"])
 router.include_router(folder.router, prefix="/folder", tags=["Folder"])

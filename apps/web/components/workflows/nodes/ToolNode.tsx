@@ -167,10 +167,8 @@ const ToolNode: React.FC<ToolNodeProps> = ({ id, data, selected }) => {
       if (uiMeta?.widget === "layer-selector") continue;
       if (uiMeta?.widget === "layer-name-input") continue;
       if (uiMeta?.widget === "starting-points") continue;
-      if (uiMeta?.widget === "scenario-selector") continue;
       if (uiMeta?.section === "output") continue;
       if (uiMeta?.section === "result") continue;
-      if (uiMeta?.section === "scenario") continue;
       if (uiMeta?.section === "starting") continue;
       if (uiMeta?.section === "opportunities") continue;
 
@@ -229,13 +227,11 @@ const ToolNode: React.FC<ToolNodeProps> = ({ id, data, selected }) => {
       if (uiMeta?.widget === "layer-selector") continue;
       if (uiMeta?.widget === "layer-name-input") continue;
       if (uiMeta?.widget === "starting-points") continue;
-      if (uiMeta?.widget === "scenario-selector") continue;
       if (typeof uiMeta?.widget === "string" && uiMeta.widget.includes("layer")) continue;
 
       // Skip layer-related sections
       if (uiMeta?.section === "output") continue;
       if (uiMeta?.section === "result") continue;
-      if (uiMeta?.section === "scenario") continue;
       if (uiMeta?.section === "starting") continue;
       if (uiMeta?.section === "opportunities") continue;
 

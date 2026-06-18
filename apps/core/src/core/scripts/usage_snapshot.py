@@ -37,13 +37,12 @@ import time
 from typing import Any, Awaitable, Callable
 
 import asyncpg
+from goatobs import setup_observability
 from opentelemetry import metrics as otel_metrics
 from opentelemetry.metrics import CallbackOptions, Observation
 from opentelemetry.sdk.metrics import MeterProvider
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from goatobs import setup_observability
 
 from core.core.config import settings
 from core.db.session import session_manager
@@ -229,9 +228,7 @@ def _make_instruments(meter: otel_metrics.Meter) -> dict[str, object]:
 # ----------------------------------------------------------------------------
 
 
-async def snapshot_layers(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_layers(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_layers_total`` per (org, type, feature_layer_type).
 
     "Org" here is the *owning* org: ``layer.user_id -> user.organization_id``.
@@ -299,9 +296,7 @@ async def snapshot_layers(
     return len(rows)
 
 
-async def snapshot_layer_bytes(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_layer_bytes(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_layer_bytes_total`` per org (SUM of ``layer.size`` bytes)."""
     accounts = settings.ACCOUNTS_SCHEMA
     customer = settings.CUSTOMER_SCHEMA
@@ -329,9 +324,7 @@ async def snapshot_layer_bytes(
     return len(rows)
 
 
-async def snapshot_layer_size_distribution(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_layer_size_distribution(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_layer_size_distribution`` per (org, type, size_bucket).
 
     Buckets every layer into a size class so the dashboard can render
@@ -386,9 +379,7 @@ async def snapshot_layer_size_distribution(
     return len(rows)
 
 
-async def snapshot_projects(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_projects(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_projects_total`` per org (owner-of-record interpretation)."""
     accounts = settings.ACCOUNTS_SCHEMA
     customer = settings.CUSTOMER_SCHEMA
@@ -416,9 +407,7 @@ async def snapshot_projects(
     return len(rows)
 
 
-async def snapshot_users(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_users(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_users_total`` per org (DISTINCT user count).
 
     Earlier iteration broke this out by role too, which caused
@@ -461,9 +450,7 @@ async def snapshot_users(
     return len(rows)
 
 
-async def snapshot_user_projects(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_user_projects(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_user_projects_total{user_email, org_id, org_name}``.
 
     Users have a single ``organization_id`` in this schema, so emitting one
@@ -649,10 +636,7 @@ async def _fetch_user_org_map(
         """
     )
     result = await db.execute(query)
-    return {
-        row.user_id: (row.org_id, row.org_name, row.email)
-        for row in result.all()
-    }
+    return {row.user_id: (row.org_id, row.org_name, row.email) for row in result.all()}
 
 
 def _tool_from_path(runnable_path: str | None) -> str:
@@ -737,7 +721,8 @@ async def fetch_windmill_completed_jobs(
           AND j.trigger_kind IS NULL
         GROUP BY j.args->>'user_id', j.runnable_path, c.status
         """,
-        window_start, window_end,
+        window_start,
+        window_end,
     )
 
     jobs: list[Observation] = []
@@ -766,12 +751,13 @@ async def fetch_windmill_completed_jobs(
         # do "Top failing tools" via status="failure"), but duration
         # and output-bytes are unconditional sums (don't break out by
         # status — failure jobs contributed to time/bytes consumed too).
-        jobs.append(Observation(int(row["n"]),
-                                  attributes={**attrs, "status": row["status"]}))
-        durations.append(Observation(int(row["duration_ms_sum"]) / 1000.0,
-                                       attributes=attrs))
-        output_bytes.append(Observation(int(row["output_bytes_sum"]),
-                                          attributes=attrs))
+        jobs.append(
+            Observation(int(row["n"]), attributes={**attrs, "status": row["status"]})
+        )
+        durations.append(
+            Observation(int(row["duration_ms_sum"]) / 1000.0, attributes=attrs)
+        )
+        output_bytes.append(Observation(int(row["output_bytes_sum"]), attributes=attrs))
 
     _OBSERVATIONS["jobs_count"] = jobs
     _OBSERVATIONS["jobs_duration_seconds"] = durations
@@ -830,19 +816,20 @@ async def fetch_windmill_running_jobs(
 # because their value represents a count over the last 5-minute window,
 # not a cumulative all-time total.
 
-def _cb_jobs_count(_options: CallbackOptions):
+
+def _cb_jobs_count(_options: CallbackOptions) -> list[Observation]:
     return _OBSERVATIONS.get("jobs_count", [])
 
 
-def _cb_jobs_duration_seconds(_options: CallbackOptions):
+def _cb_jobs_duration_seconds(_options: CallbackOptions) -> list[Observation]:
     return _OBSERVATIONS.get("jobs_duration_seconds", [])
 
 
-def _cb_jobs_output_bytes(_options: CallbackOptions):
+def _cb_jobs_output_bytes(_options: CallbackOptions) -> list[Observation]:
     return _OBSERVATIONS.get("jobs_output_bytes", [])
 
 
-def _cb_jobs_running(_options: CallbackOptions):
+def _cb_jobs_running(_options: CallbackOptions) -> list[Observation]:
     return _OBSERVATIONS.get("jobs_running", [])
 
 
@@ -931,9 +918,7 @@ async def _apply_session_safety_limits(db: AsyncSession) -> None:
     try:
         await db.execute(text("SET LOCAL statement_timeout = '30s'"))
         await db.execute(text("SET LOCAL lock_timeout = '5s'"))
-        await db.execute(
-            text("SET LOCAL idle_in_transaction_session_timeout = '60s'")
-        )
+        await db.execute(text("SET LOCAL idle_in_transaction_session_timeout = '60s'"))
     except Exception:
         logger.exception("failed to apply session safety limits; continuing")
 
@@ -962,7 +947,8 @@ async def _run_windmill_block(
             user_to_org = await _fetch_user_org_map(goat_db)
             logger.info(
                 "snapshot query %s ok: %d users mapped",
-                Q_WM_USER_ORG, len(user_to_org),
+                Q_WM_USER_ORG,
+                len(user_to_org),
             )
 
         # 2. Open Windmill connection.
@@ -1009,14 +995,16 @@ async def snapshot() -> bool:
                 await _run_query(
                     name=Q_LAYER_BYTES,
                     fn=lambda: snapshot_layer_bytes(
-                        db, instr["layer_bytes_total"]  # type: ignore[arg-type]
+                        db,
+                        instr["layer_bytes_total"],  # type: ignore[arg-type]
                     ),
                     error_counter=error_counter,  # type: ignore[arg-type]
                 ),
                 await _run_query(
                     name=Q_LAYER_SIZE_DIST,
                     fn=lambda: snapshot_layer_size_distribution(
-                        db, instr["layer_size_distribution"]  # type: ignore[arg-type]
+                        db,
+                        instr["layer_size_distribution"],  # type: ignore[arg-type]
                     ),
                     error_counter=error_counter,  # type: ignore[arg-type]
                 ),
@@ -1033,7 +1021,8 @@ async def snapshot() -> bool:
                 await _run_query(
                     name=Q_USER_PROJECTS,
                     fn=lambda: snapshot_user_projects(
-                        db, instr["user_projects_total"]  # type: ignore[arg-type]
+                        db,
+                        instr["user_projects_total"],  # type: ignore[arg-type]
                     ),
                     error_counter=error_counter,  # type: ignore[arg-type]
                 ),

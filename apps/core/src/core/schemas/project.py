@@ -105,7 +105,6 @@ class IProjectRead(ContentBaseAttributes, DateTimeBase):
     id: UUID = Field(..., description="Project ID")
     layer_order: list[int] | None = Field(None, description="Layer order in project")
     thumbnail_url: str | None = Field(description="Project thumbnail URL")
-    active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
     basemap: str | None = Field(None, description="Project basemap")
     custom_basemaps: list[CustomBasemap] = Field(
         default_factory=list, description="Per-project custom basemap library"
@@ -175,23 +174,12 @@ class IProjectBaseUpdate(SQLModel):
     max_extent: list[float] | None = Field(
         None, description="Max extent of the project"
     )
-    active_scenario_id: UUID | None = Field(None, description="Active scenario ID")
     builder_config: dict[str, Any] | None = Field(None, description="Builder config")
     tags: List[str] | None = Field(
         default=None,
         sa_column=Column(ARRAY(Text), nullable=True),
         description="Layer tags",
     )
-
-
-# TODO: Figure out where this is used, refactor
-# class dict(dict):
-#     layout: dict = Field(
-#         {"visibility": "visible"},
-#         description="Layout properties",
-#     )
-#     minzoom: int = Field(2, description="Minimum zoom level", ge=0, le=22)
-#     maxzoom: int = Field(20, description="Maximum zoom level", ge=0, le=22)
 
 
 class LayerProjectIds(BaseModel):

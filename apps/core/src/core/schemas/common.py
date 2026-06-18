@@ -10,6 +10,10 @@ class OrderEnum(str, Enum):
     descendent = "descendent"
 
 
+class Msg(BaseModel):
+    msg: str
+
+
 class ContentIdList(BaseModel):
     ids: List[UUID4]
 
