@@ -1,6 +1,7 @@
 from enum import Enum
 from uuid import UUID
 
+from pydantic import field_serializer
 from sqlalchemy import ForeignKey, text
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import Column, Field, Relationship, SQLModel, Text
@@ -35,6 +36,13 @@ class SystemSettingBase(SQLModel):
     client_theme: ClientThemeType = Field(sa_column=Column(Text, nullable=False))
     preferred_language: LanguageType = Field(sa_column=Column(Text, nullable=False))
     unit: UnitType = Field(sa_column=Column(Text, nullable=False))
+
+    @field_serializer("client_theme", "preferred_language", "unit")
+    def _serialize_enum(self, value: Enum | str) -> str:
+        """Serialize str-enum fields whether the value arrives as an enum member
+        or a raw str from the Text column, avoiding Pydantic's enum-vs-str
+        serializer warning while keeping output identical."""
+        return value.value if isinstance(value, Enum) else value
 
 
 class SystemSetting(SystemSettingBase, DateTimeBase, table=True):

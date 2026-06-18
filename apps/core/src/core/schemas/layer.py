@@ -577,19 +577,19 @@ def get_layer_schema(
         raise ValueError(f"Layer type ({layer_type}) is invalid")
 
 
-class FeatureLayer(
-    RootModel[
-        Annotated[
-            Union[
-                IFeatureStandardLayerRead,
-                IFeatureToolLayerRead,
-                IFeatureStreetNetworkLayerRead,
-            ],
-            Field(discriminator="feature_layer_type"),
-        ]
-    ]
-):
-    pass
+# Nested discriminated union of feature-layer variants (discriminated on
+# feature_layer_type). Kept as an Annotated alias rather than a RootModel so the
+# outer ILayerRead union can still resolve its own "type" discriminator through
+# it — wrapping this in a RootModel hides "type" and forces Pydantic into slow,
+# warning-emitting left-to-right union serialization.
+FeatureLayer = Annotated[
+    Union[
+        IFeatureStandardLayerRead,
+        IFeatureToolLayerRead,
+        IFeatureStreetNetworkLayerRead,
+    ],
+    Field(discriminator="feature_layer_type"),
+]
 
 
 class ILayerRead(

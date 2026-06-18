@@ -3,7 +3,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, List, Optional
 from uuid import UUID
 
-from pydantic import field_validator
+from pydantic import field_serializer, field_validator
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
     Boolean,
@@ -164,6 +164,13 @@ class OrganizationBase(SQLModel):
         if value is not None and value < 0:
             raise ValueError("Value must be greater than or equal to 0")
         return value
+
+    @field_serializer("plan_name", "type", "industry", "use_case", "region")
+    def _serialize_enum(self, value: Enum | str) -> str:
+        """Serialize str-enum fields whether the value arrives as an enum member
+        or a raw str from the Text column, avoiding Pydantic's enum-vs-str
+        serializer warning while keeping output identical."""
+        return value.value if isinstance(value, Enum) else value
 
 
 class Organization(UUIDServerDefaultBase, OrganizationBase, table=True):

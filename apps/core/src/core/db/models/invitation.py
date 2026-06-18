@@ -2,6 +2,7 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
+from pydantic import field_serializer
 from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
@@ -62,3 +63,10 @@ class Invitation(UUIDServerDefaultBase, table=True):
     payload: dict = Field(sa_column=Column(JSONB, nullable=False))
     expires: datetime | None = Field(sa_column=Column(DateTime))
     status: InvitationStatusEnum = Field(sa_column=Column(Text, nullable=False))
+
+    @field_serializer("type", "status")
+    def _serialize_enum(self, value: Enum | str) -> str:
+        """Serialize str-enum fields whether the value arrives as an enum member
+        or a raw str from the Text column, avoiding Pydantic's enum-vs-str
+        serializer warning while keeping output identical."""
+        return value.value if isinstance(value, Enum) else value

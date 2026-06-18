@@ -5,7 +5,13 @@ from uuid import UUID
 import pycountry
 from geoalchemy2 import Geometry, WKBElement
 from geoalchemy2.shape import to_shape
-from pydantic import EmailStr, HttpUrl, computed_field, field_validator
+from pydantic import (
+    EmailStr,
+    HttpUrl,
+    computed_field,
+    field_serializer,
+    field_validator,
+)
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
@@ -528,6 +534,22 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         if value is not None and isinstance(value, WKBElement):
             return str(to_shape(value).wkt)
         return value
+
+    @field_serializer("extent")
+    def _serialize_extent(self, value: str | WKBElement | None) -> str | None:
+        """Serialize extent whether it arrives as WKT (validated) or a raw
+        WKBElement (e.g. direct model_dump of an ORM instance), avoiding the
+        WKBElement-vs-str serializer warning while keeping output identical."""
+        if isinstance(value, WKBElement):
+            return str(to_shape(value).wkt)
+        return value
+
+    @field_serializer("type", "feature_layer_type", "feature_layer_geometry_type")
+    def _serialize_enum(self, value: Enum | str | None) -> str | None:
+        """Serialize str-enum fields whether the value arrives as an enum member
+        or a raw str from the Text column, avoiding the enum-vs-str serializer
+        warning while keeping output identical."""
+        return value.value if isinstance(value, Enum) else value
 
     @field_validator("url", "distribution_url", mode="before")
     @classmethod
