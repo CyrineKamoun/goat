@@ -15,7 +15,10 @@ from typing import Any, Self
 from pydantic import ConfigDict, Field
 
 from goatlib.analysis.geoanalysis.spatial_clustering import ClusteringZones
-from goatlib.analysis.schemas.clustering import ClusteringParams, SizeMethod, ClusterType
+from goatlib.analysis.schemas.clustering import (
+    ClusteringParams,
+    ClusterType,
+)
 from goatlib.analysis.schemas.ui import (
     SECTION_INPUT,
     SECTION_OUTPUT,
@@ -206,7 +209,7 @@ class ZonesClusteringToolRunner(BaseToolRunner[ClusteringZonesToolParams]):
             scenario_id=params.scenario_id,
             project_id=params.project_id,
         )
-        
+
         # Validate feature limit and adapt GA parameters for equal_size clustering
         population_size = 50
         n_generations = 50

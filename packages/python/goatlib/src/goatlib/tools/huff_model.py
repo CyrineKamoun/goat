@@ -27,9 +27,9 @@ from goatlib.analysis.schemas.ui import (
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    get_default_layer_name,
     ScenarioSelectorMixin,
     ToolInputBase,
+    get_default_layer_name,
 )
 from goatlib.tools.style import get_heatmap_style
 
@@ -74,12 +74,12 @@ class HuffModelToolParams(ScenarioSelectorMixin, ToolInputBase, HuffmodelParams)
         None,
         json_schema_extra=ui_field(section="opportunities", hidden=True),
     )  # type: ignore[assignment]
-    
+
     reference_area_path: str | None = Field(
         None,
         json_schema_extra=ui_field(section="configuration", hidden=True),
     )  # type: ignore[assignment]
-    
+
     # Layer IDs for the tool
     demand_layer_id: str = Field(
         ...,
@@ -96,7 +96,7 @@ class HuffModelToolParams(ScenarioSelectorMixin, ToolInputBase, HuffmodelParams)
         description="CQL2-JSON filter to apply to the demand layer",
         json_schema_extra=ui_field(section="demand", field_order=2, hidden=True),
     )
-    
+
     opportunity_layer_id: str = Field(
         ...,
         description="Layer containing opportunity data.",
@@ -112,7 +112,7 @@ class HuffModelToolParams(ScenarioSelectorMixin, ToolInputBase, HuffmodelParams)
         description="CQL2-JSON filter to apply to the opportunity layer",
         json_schema_extra=ui_field(section="opportunities", field_order=2, hidden=True),
     )
-    
+
     reference_area_layer_id: str = Field(
         ...,
         description="Reference area polygon layer.",
@@ -129,7 +129,7 @@ class HuffModelToolParams(ScenarioSelectorMixin, ToolInputBase, HuffmodelParams)
         description="CQL2-JSON filter to apply to the reference area layer",
         json_schema_extra=ui_field(section="configuration", field_order=2, hidden=True),
     )
-    
+
     # Override field selectors to reference the correct layer IDs
     demand_field: str = Field(
         ...,
@@ -146,7 +146,7 @@ class HuffModelToolParams(ScenarioSelectorMixin, ToolInputBase, HuffmodelParams)
             visible_when={"demand_layer_id": {"$ne": None}},
         ),
     )
-    
+
     attractivity: str = Field(
         ...,
         description="Field from the opportunity layer that contains the attractivity value.",
@@ -290,7 +290,7 @@ class HuffModelToolRunner(BaseToolRunner[HuffModelToolParams]):
                     "opportunity_path",
                     "reference_area_path",
                     "demand_layer_id",
-                    "demand_layer_filter", 
+                    "demand_layer_filter",
                     "opportunity_layer_id",
                     "opportunity_layer_filter",
                     "reference_area_layer_id",

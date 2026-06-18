@@ -1,8 +1,5 @@
 """Unit tests for goatobs.context — contextvars + bind_user_context."""
 import asyncio
-import contextvars
-
-import pytest
 
 from goatobs.context import bind_user_context, get_user_context, set_user_context
 

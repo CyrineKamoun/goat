@@ -4,7 +4,6 @@ import logging
 
 import pytest
 import structlog
-
 from goatobs.context import bind_user_context
 from goatobs.logging import setup_logging
 

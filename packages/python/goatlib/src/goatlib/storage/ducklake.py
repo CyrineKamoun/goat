@@ -803,7 +803,7 @@ class DuckLakePool:
         result_container: dict[str, Any] = {}
         error_container: dict[str, Exception] = {}
 
-        def run_query():
+        def run_query() -> None:
             try:
                 if params:
                     cursor = con.execute(query, params)

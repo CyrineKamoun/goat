@@ -5,12 +5,10 @@ expected service.name resource attribute and that bound user context
 appears as span attributes when a span is started.
 """
 import pytest
-from opentelemetry import trace as otel_trace
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-
 from goatobs.context import bind_user_context
 from goatobs.tracing import setup_tracing
+from opentelemetry import trace as otel_trace
+from opentelemetry.sdk.resources import Resource
 
 
 @pytest.fixture(autouse=True)
@@ -30,10 +28,10 @@ def _reset_tracer_provider():
     _ot._TRACER_PROVIDER = None
 
     # Uninstrument all auto-instrumentors so they can be re-instrumented.
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
     from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
     FastAPIInstrumentor().uninstrument()
     SQLAlchemyInstrumentor().uninstrument()

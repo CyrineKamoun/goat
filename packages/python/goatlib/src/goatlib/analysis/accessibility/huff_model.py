@@ -1,15 +1,11 @@
 
 import logging
-import uuid
 from pathlib import Path
 from typing import Self
 
-from goatlib.analysis.accessibility.base import HeatmapToolBase, sanitize_sql_name
+from goatlib.analysis.accessibility.base import HeatmapToolBase
+from goatlib.analysis.schemas.heatmap import HuffmodelParams
 from goatlib.io.parquet import write_optimized_parquet
-
-from goatlib.analysis.schemas.heatmap import (
-    HuffmodelParams
-)
 from goatlib.io.utils import Metadata
 from goatlib.models.io import DatasetMetadata
 
@@ -225,7 +221,7 @@ class HuffmodelTool(HeatmapToolBase):
                 WHERE {geom_col} IS NOT NULL
             ),
             polygons AS (
-                SELECT 
+                SELECT
                     supply_id,
                     attractivity,
                     (UNNEST(ST_Dump(ST_Force2D(geom))).geom) AS geom
@@ -368,19 +364,19 @@ class HuffmodelTool(HeatmapToolBase):
     ) -> str:
         """
         Compute Huff model accessibility using gravity-style pattern.
-        
+
         Uses single JOIN + GROUP BY pattern inspired by _compute_gravity_accessibility:
         - Direct aggregation without window functions
         - Pre-filter by max_cost in WHERE clause
         - Individual column computation with sum expressions
         """
         result_table = "huff_model_final"
-        
+
         # Pre-compute total demand once for efficiency
         total_demand = self.con.execute(
             f"SELECT SUM(demand_value) FROM {demand_table}"
         ).fetchone()[0] or 0
-        
+
         if total_demand == 0:
             raise ValueError("Total demand is zero - cannot compute Huff model")
 
@@ -405,7 +401,7 @@ class HuffmodelTool(HeatmapToolBase):
                     supply_id,
                     attractivity,
                     POW(attractivity, {attractiveness_param}) * POW(min_cost, -{distance_decay}) AS weighted_attr,
-                    SUM(POW(attractivity, {attractiveness_param}) * POW(min_cost, -{distance_decay})) 
+                    SUM(POW(attractivity, {attractiveness_param}) * POW(min_cost, -{distance_decay}))
                         OVER (PARTITION BY orig_id) AS total_weighted_attr
                 FROM origin_supply_min_cost
             ),
@@ -449,7 +445,7 @@ class HuffmodelTool(HeatmapToolBase):
         geometry_col = "geometry"
         columns_result = self.con.execute("PRAGMA table_info(supply_input)").fetchall()
         column_names = [col[1] for col in columns_result]
-        
+
         if "geom" in column_names:
             geometry_col = "geom"
         elif "geometry" in column_names:
@@ -467,7 +463,7 @@ class HuffmodelTool(HeatmapToolBase):
                 o.{geometry_col} AS geometry
             FROM {results_table} r
             INNER JOIN (
-                SELECT 
+                SELECT
                     ROW_NUMBER() OVER () AS supply_id,
                     {geometry_col}
                 FROM supply_input

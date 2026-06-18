@@ -86,8 +86,8 @@ class ClipTool(AnalysisTool):
 
         # Detect input geometry type to filter output appropriately
         input_geom_type = self.con.execute(f"""
-            SELECT ST_GeometryType({input_geom}) 
-            FROM {input_view} 
+            SELECT ST_GeometryType({input_geom})
+            FROM {input_view}
             LIMIT 1
         """).fetchone()[0]
 

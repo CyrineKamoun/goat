@@ -272,7 +272,7 @@ class CatchmentAreaWindmillParams(ToolInputBase):
             field_order=4,
             label_key="speed",
             enum_labels=SPEED_LABELS,
-            visible_when={"routing_mode": {"$in": ["walking", "bicycle", "pedelec"]}, 
+            visible_when={"routing_mode": {"$in": ["walking", "bicycle", "pedelec"]},
                          "measure_type": CatchmentAreaMeasureType.time},
             widget_options={
                 "default_by_field": {
@@ -461,7 +461,7 @@ class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
         """
         return {
             "id": "INTEGER",
-            "cost_step": "INTEGER", 
+            "cost_step": "INTEGER",
             "geometry": "GEOMETRY",
         }
 
@@ -479,7 +479,10 @@ class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
         """
         from goatlib.analysis.schemas.statistics import SortOrder
         from goatlib.analysis.statistics import calculate_unique_values
-        from goatlib.tools.style import get_ordinal_line_style, get_ordinal_polygon_style
+        from goatlib.tools.style import (
+            get_ordinal_line_style,
+            get_ordinal_polygon_style,
+        )
 
         color_field = "cost_step"
 

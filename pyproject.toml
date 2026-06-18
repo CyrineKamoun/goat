@@ -49,7 +49,7 @@ members = [
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
-exclude = ["venv", ".venv", "alembic"]
+exclude = ["venv", ".venv", "alembic", "data"]
 
 # mypy is the Python type gate. Pyright/Pylance type checking is disabled so it
 # does not flood SQLModel/SQLAlchemy code with false positives; it still reports

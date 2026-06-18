@@ -6,12 +6,11 @@ structure but builds CatchmentAreaV2Params with cost_type/max_cost.
 
 import logging
 import tempfile
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Self
 
 import duckdb
-from enum import StrEnum
-
 from pydantic import Field, model_validator
 
 from goatlib.analysis.accessibility import CatchmentAreaToolV2

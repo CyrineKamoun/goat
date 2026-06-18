@@ -30,8 +30,8 @@ from shapely.geometry import shape
 from goatlib.analysis.core.base import AnalysisTool
 from goatlib.analysis.schemas.catchment_area import (
     AccessEgressMode,
-    CatchmentAreaRoutingMode,
     CatchmentAreaMeasureType,
+    CatchmentAreaRoutingMode,
     CatchmentAreaToolParams,
     CatchmentAreaType,
     PTMode,

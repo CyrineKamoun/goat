@@ -27,7 +27,7 @@ class InMemoryNetworkProcessor(AnalysisTool):
             # ... perform operations on the network ...
     """
 
-    def __init__(self, params: InMemoryNetworkParams):
+    def __init__(self, params: InMemoryNetworkParams) -> None:
         """Initializes the processor. Requires network parameters to be valid."""
         super().__init__(db_path=":memory:")
         self.params = params
@@ -238,21 +238,21 @@ class InMemoryNetworkProcessor(AnalysisTool):
         ),
         interpolated_segments AS (
             -- Generate new edges with intermediate nodes
-            SELECT 
+            SELECT
                 edge_id || '_seg_' || CAST(segment_id AS VARCHAR) as edge_id,
-                CASE 
+                CASE
                     WHEN segment_id = 1 THEN CAST(source AS VARCHAR)
                     ELSE 'interp_' || edge_id || '_' || CAST((segment_id - 1) AS VARCHAR)
                 END as source,
-                CASE 
+                CASE
                     WHEN segment_id = num_segments THEN CAST(target AS VARCHAR)
                     ELSE 'interp_' || edge_id || '_' || CAST(segment_id AS VARCHAR)
                 END as target,
                 length_m / num_segments as length_m,
                 cost / num_segments as cost,
                 ST_LineSubstring(
-                    geometry, 
-                    (segment_id - 1.0) / num_segments, 
+                    geometry,
+                    (segment_id - 1.0) / num_segments,
                     segment_id / num_segments
                 ) as geometry
             FROM long_edges
@@ -277,7 +277,7 @@ class InMemoryNetworkProcessor(AnalysisTool):
         # Get interpolation statistics
         stats_query = f"""
         WITH original_stats AS (
-            SELECT 
+            SELECT
                 COUNT(*) as original_edges,
                 COUNT(*) FILTER (WHERE length_m > {max_edge_length}) as long_edges_count
             FROM {source_table}
@@ -286,13 +286,13 @@ class InMemoryNetworkProcessor(AnalysisTool):
             SELECT COUNT(*) as new_edges FROM {interpolated_table}
         ),
         node_stats AS (
-            SELECT 
+            SELECT
                 COUNT(DISTINCT source) + COUNT(DISTINCT target) as total_nodes,
-                COUNT(DISTINCT source) FILTER (WHERE source LIKE 'interp_%') + 
+                COUNT(DISTINCT source) FILTER (WHERE source LIKE 'interp_%') +
                 COUNT(DISTINCT target) FILTER (WHERE target LIKE 'interp_%') as new_nodes
             FROM {interpolated_table}
         )
-        SELECT 
+        SELECT
             o.original_edges,
             o.long_edges_count,
             n.new_edges,

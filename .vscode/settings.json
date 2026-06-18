@@ -81,5 +81,19 @@
     {
       "file": ".github/instructions/commit-messages.instructions.md"
     }
+  ],
+  "sqltools.connections": [
+    {
+      "ssh": "Disabled",
+      "previewLimit": 50,
+      "server": "localhost",
+      "port": 5432,
+      "driver": "PostgreSQL",
+      "name": "goat",
+      "group": "GOAT",
+      "database": "goat",
+      "username": "rds",
+      "password": "database_password"
+    }
   ]
 }

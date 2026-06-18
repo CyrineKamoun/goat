@@ -36,7 +36,6 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-
 _DEFAULT_TIMEOUT_SECONDS = 30
 _DEFAULT_WAIT_MAX_SECONDS = 120
 _DEFAULT_WAIT_INTERVAL_SECONDS = 2

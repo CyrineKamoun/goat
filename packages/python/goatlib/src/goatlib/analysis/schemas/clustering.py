@@ -79,7 +79,7 @@ class ClusteringParams(BaseModel):
         ),
     )
 
-  
+
 
     size_field: str | None = Field(
         default=None,
@@ -154,17 +154,17 @@ class ClusteringParams(BaseModel):
         json_schema_extra=ui_field(
             section="configuration",
             field_order=99,
-            hidden=True,  
+            hidden=True,
         ),
     )
-    
+
     output_summary_path: str = Field(
         ...,
         description="Cluster Summary",
         json_schema_extra=ui_field(
             section="configuration",
             field_order=99,
-            hidden=True,  
+            hidden=True,
         ),
     )
-    
+

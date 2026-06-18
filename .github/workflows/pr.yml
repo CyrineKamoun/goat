@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request_target:
     branches: [main]
+  push:
+    branches: [main]
   merge_group:
   workflow_dispatch:
 
@@ -20,6 +22,8 @@ jobs:
 
   pr-base:
     name: pr-base
+    # PR-only: this posts PR comments and has no meaning on a push to main.
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
     uses: "plan4better/.github/.github/workflows/reusable-pr-base.yml@main"
     permissions:
       contents: none
@@ -33,9 +37,27 @@ jobs:
     uses: ./.github/workflows/lint.yml
     secrets: inherit
     with:
-      web: true
-      python: true
+      web: ${{ needs.file-changes.outputs.web == 'true' }}
+      python: >-
+        ${{ needs.file-changes.outputs.core == 'true'
+        || needs.file-changes.outputs.geoapi == 'true'
+        || needs.file-changes.outputs.processes == 'true' }}
 
+  test:
+    name: test
+    needs: file-changes
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
+    with:
+      web: ${{ needs.file-changes.outputs.web == 'true' }}
+      core: ${{ needs.file-changes.outputs.core == 'true' }}
+      # goatlib is a shared lib; run its suite on any python-package change.
+      goatlib: >-
+        ${{ needs.file-changes.outputs.core == 'true'
+        || needs.file-changes.outputs.geoapi == 'true'
+        || needs.file-changes.outputs.processes == 'true' }}
+      geoapi: ${{ needs.file-changes.outputs.geoapi == 'true' }}
+      processes: ${{ needs.file-changes.outputs.processes == 'true' }}
 
   build-goat:
     name: build
@@ -57,10 +79,14 @@ jobs:
     uses: ./.github/workflows/keycloak-build.yml
 
   required:
-    needs: [lint, build-goat, analyze-goat, build-keycloak]
+    needs: [lint, test, build-goat, analyze-goat, build-keycloak]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: fail if conditional jobs failed
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled')
+      # Fail only on real failures/cancellations. `skipped` is expected and OK:
+      # change-detection legitimately skips jobs for unaffected areas (e.g.
+      # build-goat on a core-only PR). Advisory jobs use continue-on-error so
+      # they report success and never reach here.
+      - name: fail if required jobs failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: exit 1

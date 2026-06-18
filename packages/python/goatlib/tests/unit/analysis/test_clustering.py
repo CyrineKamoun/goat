@@ -5,13 +5,10 @@ from pathlib import Path
 import duckdb
 import numpy as np
 import pytest
-
-
 from goatlib.analysis.geoanalysis.spatial_clustering import (
     ClusteringZones,
 )
 from goatlib.analysis.schemas.clustering import ClusteringParams, ClusterType
-
 
 # Test data and result directories
 TEST_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "analysis"
@@ -37,11 +34,11 @@ def test_clustering_schema_validation():
     assert valid_params.nb_cluster == 3
     assert valid_params.cluster_type == ClusterType.kmean
     assert valid_params.size_method == "count"  # default
-    
+
     # Valid balanced clustering with field weighting
     balanced_params = ClusteringParams(
         input_path="test.gpkg",
-        output_path="result.parquet", 
+        output_path="result.parquet",
         output_summary_path="result_summary.parquet",
         nb_cluster=5,
         cluster_type=ClusterType.equal_size,
@@ -62,25 +59,25 @@ def test_clustering_basic_workflow():
     """Test basic clustering workflow with synthetic data."""
     # Create a temporary in-memory test
     tool = ClusteringZones()
-    
+
     # Create simple test points in a grid pattern
     tool.con.execute("""
         CREATE TEMP TABLE test_points AS
-        SELECT 
+        SELECT
             row_number() OVER () as id,
             ST_Point(x * 100, y * 100) as geometry,
             x * y as weight_field
         FROM (
             SELECT unnest([1, 2, 3, 4, 5, 6]) as x
         ) CROSS JOIN (
-            SELECT unnest([1, 2, 3]) as y  
+            SELECT unnest([1, 2, 3]) as y
         )
     """)
-    
+
     # Test K-means clustering
     temp_dir = RESULT_DIR / "test_clustering_basic"
     temp_dir.mkdir(exist_ok=True)
-    
+
     params = ClusteringParams(
         input_path="test_points",
         output_path=str(temp_dir / "kmeans_result.parquet"),
@@ -88,9 +85,8 @@ def test_clustering_basic_workflow():
         nb_cluster=3,
         cluster_type=ClusterType.kmean,
     )
-    
+
     # Mock the import_input method for this test
-    original_import = tool.import_input
     def mock_import(path, view_name):
         tool.con.execute(f"CREATE OR REPLACE VIEW {view_name} AS SELECT * FROM {path}")
         metadata = type('obj', (object,), {
@@ -99,37 +95,37 @@ def test_clustering_basic_workflow():
         })()
         return metadata, view_name
     tool.import_input = mock_import
-    
+
     # Run clustering
     results = tool._run_implementation(params)
-    
+
     # Verify basic structure
     assert len(results) == 2
     output_path, metadata = results[0]
     summary_path, summary_metadata = results[1]
-    
+
     # Verify files were created
     assert Path(output_path).exists()
     assert Path(summary_path).exists()
-    
+
     # Read and verify results
     points_df = tool.con.execute(f"SELECT * FROM '{output_path}'").df()
     summary_df = tool.con.execute(f"SELECT * FROM '{summary_path}'").df()
-    
+
     # Basic validation
     assert "cluster_id" in points_df.columns
     assert len(points_df) == 18  # 6x3 grid
     assert len(summary_df) == 3   # 3 clusters
     assert "cluster_size" in summary_df.columns
     assert "max_distance" in summary_df.columns
-    
+
     # All points should be assigned to a cluster
     assert points_df["cluster_id"].isna().sum() == 0
-    
+
     # Cluster IDs should be 0, 1, 2
     unique_clusters = sorted(points_df["cluster_id"].unique())
     assert unique_clusters == [0, 1, 2]
-    
+
     print(f"✓ K-means clustering: {len(points_df)} points → {len(summary_df)} clusters")
     print(f"  Cluster sizes: {sorted(summary_df['cluster_size'].values)}")
 
@@ -182,7 +178,7 @@ class TestZonesClustering:
         zone_sizes = df["cluster_size"].values
         size_std = np.std(zone_sizes)
         size_mean = np.mean(zone_sizes)
-        cv = size_std / size_mean  
+        cv = size_std / size_mean
         assert cv < 0.5, f"Zones are not well balanced: CV = {cv:.3f}"
 
 
@@ -227,7 +223,7 @@ class TestZonesClustering:
         unique_clusters = df["cluster_id"].unique()
         assert len(unique_clusters) == 4
 
-        print(f"\nK-means cluster distribution:")
+        print("\nK-means cluster distribution:")
         print(f"  Cluster sizes: {sorted(df['cluster_size'].values)}")
 
     def test_balanced_zones_kita_field_weight(self) -> None:
@@ -274,7 +270,7 @@ class TestZonesClustering:
         assert len(unique_clusters) == 4
 
         # Check that cluster_size reflects the weighted sum (capacity_int), not just point count
-        print(f"\nBalanced zones (field: capacity_int) distribution:")
+        print("\nBalanced zones (field: capacity_int) distribution:")
         print(f"  Cluster sizes (weighted): {sorted(df['cluster_size'].values)}")
 
         # Verify balance on the weighted sizes

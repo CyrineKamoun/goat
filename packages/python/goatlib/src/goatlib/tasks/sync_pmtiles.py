@@ -25,6 +25,8 @@ from typing import TYPE_CHECKING, Self
 from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import duckdb
 
 from goatlib.io.pmtiles import PMTilesConfig, PMTilesGenerator

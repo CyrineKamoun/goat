@@ -4,7 +4,7 @@ Exposes all parameters supported by the C++ RequestConfig.
 """
 
 from enum import StrEnum
-from typing import Any, Self
+from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 

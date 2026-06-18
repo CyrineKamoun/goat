@@ -13,11 +13,14 @@ from typing import AsyncGenerator
 import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from goatlib.auth import JOSEError
+from goatobs import build_auth_context_middleware, setup_observability
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import JSONResponse
 
 from geoapi.config import settings
+from geoapi.deps.auth import decode_token
 from geoapi.ducklake import ducklake_manager
 from geoapi.ducklake_pool import ducklake_pool
 from geoapi.ducklake_write import ducklake_write_manager
@@ -30,10 +33,7 @@ from geoapi.routers import (
     metadata_router,
     tiles_router,
 )
-from geoapi.deps.auth import decode_token
 from geoapi.services.layer_service import layer_service
-from goatlib.auth import JOSEError
-from goatobs import build_auth_context_middleware, setup_observability
 
 # Configure logging
 logging.basicConfig(

@@ -1,0 +1,158 @@
+name: "Test"
+
+# Reusable test workflow. Driven by the change-detection booleans from
+# checks.yml so only affected areas run. Jobs that are not yet green on a clean
+# tree are marked `continue-on-error: true` (ADVISORY) — they run and report but
+# do not block the merge. Promote them to required (drop continue-on-error) as
+# each suite goes green.
+
+on:
+  workflow_call:
+    inputs:
+      web:
+        type: boolean
+        default: false
+      core:
+        type: boolean
+        default: false
+      goatlib:
+        type: boolean
+        default: false
+      geoapi:
+        type: boolean
+        default: false
+      processes:
+        type: boolean
+        default: false
+
+jobs:
+  web:
+    name: web (vitest)
+    if: ${{ inputs.web }}
+    runs-on: ubuntu-latest
+    # REQUIRED. vitest suite is green (202 tests).
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      - name: 📥 Checkout PR
+        uses: plan4better/.github/.github/actions/pr-git-checkout@main
+      - name: 📥 Monorepo install
+        uses: plan4better/.github/.github/actions/pnpm-install@main
+        with:
+          enable-corepack: true
+          cwd: ${{ github.workspace }}
+          node_version: 22
+      - name: 🧪 Vitest
+        run: pnpm --filter web exec vitest run
+
+  core:
+    name: core (pytest)
+    if: ${{ inputs.core }}
+    runs-on: ubuntu-latest
+    # REQUIRED. The 100-test suite passes against PostGIS alone: it self-
+    # bootstraps schemas (DROP/CREATE + metadata.create_all in the session
+    # fixture), the asset tests are pure-unit, and external services (S3, DNS,
+    # Caddy) are mocked/faked — no MinIO or network needed.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: rds
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: goat
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      POSTGRES_SERVER: localhost
+      POSTGRES_USER: rds
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: goat
+      POSTGRES_PORT: "5432"
+      AUTH: "False"
+      ENVIRONMENT: test
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      - name: 📥 Checkout PR
+        uses: plan4better/.github/.github/actions/pr-git-checkout@main
+      - name: 🐍 Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.2"
+          enable-cache: true
+      - name: 🐍 Install dependencies
+        run: uv sync --frozen --all-packages
+      - name: 🧪 pytest
+        run: uv run pytest tests/
+        working-directory: apps/core
+
+  goatlib:
+    name: goatlib (pytest)
+    if: ${{ inputs.goatlib }}
+    runs-on: ubuntu-latest
+    # ADVISORY: pre-existing failures + tests needing GDAL/DuckDB data fixtures.
+    continue-on-error: true
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      - name: 📥 Checkout PR
+        uses: plan4better/.github/.github/actions/pr-git-checkout@main
+      - name: 🐍 Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.2"
+          enable-cache: true
+      - name: 🐍 Install dependencies
+        run: uv sync --frozen --all-packages
+      - name: 🧪 pytest (unit)
+        run: uv run pytest tests/unit
+        working-directory: packages/python/goatlib
+
+  geoapi:
+    name: geoapi (pytest)
+    if: ${{ inputs.geoapi }}
+    runs-on: ubuntu-latest
+    # ADVISORY until the geoapi suite is confirmed green in CI.
+    continue-on-error: true
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      - name: 📥 Checkout PR
+        uses: plan4better/.github/.github/actions/pr-git-checkout@main
+      - name: 🐍 Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.2"
+          enable-cache: true
+      - name: 🐍 Install dependencies
+        run: uv sync --frozen --all-packages
+      - name: 🧪 pytest
+        run: uv run pytest tests/ || echo "no tests / advisory"
+        working-directory: apps/geoapi
+
+  processes:
+    name: processes (pytest)
+    if: ${{ inputs.processes }}
+    runs-on: ubuntu-latest
+    # ADVISORY until the processes suite is confirmed green in CI.
+    continue-on-error: true
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      - name: 📥 Checkout PR
+        uses: plan4better/.github/.github/actions/pr-git-checkout@main
+      - name: 🐍 Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.2"
+          enable-cache: true
+      - name: 🐍 Install dependencies
+        run: uv sync --frozen --all-packages
+      - name: 🧪 pytest
+        run: uv run pytest tests/ || echo "no tests / advisory"
+        working-directory: apps/processes

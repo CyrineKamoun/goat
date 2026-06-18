@@ -57,22 +57,22 @@ class DuckDBCQLEvaluator(Evaluator):
         return f'"{escaped}"'
 
     @handle(ast.Not)
-    def not_(self, node, sub):
+    def not_(self, node, sub) -> str:
         """Handle NOT operator."""
         return f"NOT ({sub})"
 
     @handle(ast.And)
-    def and_(self, node, lhs, rhs):
+    def and_(self, node, lhs, rhs) -> str:
         """Handle AND operator."""
         return f"({lhs} AND {rhs})"
 
     @handle(ast.Or)
-    def or_(self, node, lhs, rhs):
+    def or_(self, node, lhs, rhs) -> str:
         """Handle OR operator."""
         return f"({lhs} OR {rhs})"
 
     @handle(ast.Comparison, subclasses=True)
-    def comparison(self, node, lhs, rhs):
+    def comparison(self, node, lhs, rhs) -> str:
         """Handle comparison operators."""
         op_map = {
             "=": "=",
@@ -116,7 +116,7 @@ class DuckDBCQLEvaluator(Evaluator):
         return f"NOT ({result})" if node.not_ else result
 
     @handle(ast.IsNull)
-    def null(self, node, lhs):
+    def null(self, node, lhs) -> str:
         """Handle IS NULL operator."""
         # lhs may be a list with one element
         if isinstance(lhs, list) and len(lhs) == 1:
@@ -157,14 +157,14 @@ class DuckDBCQLEvaluator(Evaluator):
         return self._quote_identifier(name)
 
     @handle(ast.Arithmetic, subclasses=True)
-    def arithmetic(self, node, lhs, rhs):
+    def arithmetic(self, node, lhs, rhs) -> str:
         """Handle arithmetic operators."""
         op_map = {"+": "+", "-": "-", "*": "*", "/": "/"}
         op = op_map.get(node.op.value, node.op.value)
         return f"({lhs} {op} {rhs})"
 
     @handle(ast.Function)
-    def function(self, node, *arguments):
+    def function(self, node, *arguments) -> str:
         """Handle function calls."""
         args_str = ", ".join(str(arg) for arg in arguments)
         return f"{node.name}({args_str})"
@@ -186,7 +186,7 @@ class DuckDBCQLEvaluator(Evaluator):
         return self._add_param(value)
 
     @handle(bool)
-    def literal_bool(self, value):
+    def literal_bool(self, value) -> str:
         """Handle boolean literals."""
         return "TRUE" if value else "FALSE"
 
@@ -216,7 +216,7 @@ class DuckDBCQLEvaluator(Evaluator):
         return (start, end)
 
     @handle(values.Geometry)
-    def geometry(self, node):
+    def geometry(self, node) -> str:
         """Handle geometry literals.
 
         pygeofilter's Geometry object has a .geometry attribute containing
@@ -237,7 +237,7 @@ class DuckDBCQLEvaluator(Evaluator):
         return f"ST_GeomFromText({self._add_param(str(node))})"
 
     @handle(values.Envelope)
-    def envelope(self, node):
+    def envelope(self, node) -> str:
         """Handle envelope/bbox values."""
         # Create WKT from envelope
         wkt = (
@@ -248,7 +248,7 @@ class DuckDBCQLEvaluator(Evaluator):
 
     # Spatial operators - DuckDB Spatial compatible
     @handle(ast.SpatialComparisonPredicate, subclasses=True)
-    def spatial_operation(self, node, lhs, rhs):
+    def spatial_operation(self, node, lhs, rhs) -> str:
         """Handle spatial comparison operators."""
         op_map = {
             "INTERSECTS": "ST_Intersects",
@@ -265,12 +265,12 @@ class DuckDBCQLEvaluator(Evaluator):
         return f"{func_name}({lhs}, {rhs})"
 
     @handle(ast.Relate)
-    def spatial_pattern(self, node, lhs, rhs):
+    def spatial_pattern(self, node, lhs, rhs) -> str:
         """Handle ST_Relate with pattern."""
         return f"ST_Relate({lhs}, {rhs}, {self._add_param(node.pattern)})"
 
     @handle(ast.SpatialDistancePredicate, subclasses=True)
-    def spatial_distance(self, node, lhs, rhs):
+    def spatial_distance(self, node, lhs, rhs) -> str:
         """Handle distance-based spatial predicates."""
         distance = self._add_param(node.distance)
         if node.op.value.upper() == "DWITHIN":
@@ -280,7 +280,7 @@ class DuckDBCQLEvaluator(Evaluator):
         return f"ST_Distance({lhs}, {rhs}) {node.op.value} {distance}"
 
     @handle(ast.BBox)
-    def bbox(self, node, lhs):
+    def bbox(self, node, lhs) -> str:
         """Handle BBOX predicate."""
         wkt = (
             f"POLYGON(({node.minx} {node.miny}, {node.minx} {node.maxy}, "
@@ -291,7 +291,7 @@ class DuckDBCQLEvaluator(Evaluator):
 
     # Temporal operators
     @handle(ast.TemporalPredicate, subclasses=True)
-    def temporal(self, node, lhs, rhs):
+    def temporal(self, node, lhs, rhs) -> str:
         """Handle temporal predicates."""
         op = node.op.value.upper()
 

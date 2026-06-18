@@ -5,14 +5,14 @@ from typing import Any
 
 import duckdb
 
-from goatlib.analysis.schemas.statistics import ClassBreakMethod
-from goatlib.analysis.statistics.class_breaks import calculate_class_breaks
 from goatlib.analysis.schemas.statistics import (
+    ClassBreakMethod,
     HistogramBin,
     HistogramBreakMethod,
     HistogramResult,
     SortOrder,
 )
+from goatlib.analysis.statistics.class_breaks import calculate_class_breaks
 
 logger = logging.getLogger(__name__)
 

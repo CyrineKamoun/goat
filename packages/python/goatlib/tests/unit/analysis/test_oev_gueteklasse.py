@@ -393,7 +393,7 @@ class TestOevGueteklasseTool:
 
         # Verify geometries are POLYGON and valid (QGIS compatibility)
         geom_check = con.execute(f"""
-            SELECT 
+            SELECT
                 pt_class_label,
                 ST_GeometryType(geometry) as geom_type,
                 ST_IsValid(geometry) as is_valid
