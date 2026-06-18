@@ -452,7 +452,7 @@ RESOURCES_PERMISSIONS = [
         "permissions": ["create-workflow"],
     },
     # ---------------------------------------------------------------
-    # White Label — Custom Domains (managed by goat-core, not accounts)
+    # White Label — Custom Domains
     # ---------------------------------------------------------------
     {
         "url_pattern": "organizations/{organization_id}/domains",

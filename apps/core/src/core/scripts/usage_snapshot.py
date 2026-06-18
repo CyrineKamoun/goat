@@ -72,7 +72,7 @@ MISSING_DIM = "-"
 #
 # Strategy: suffix the name ONLY when it collides, using the owner's
 # full email as the human-readable disambiguator. The owner is the
-# user with the `organization-owner` role (see accounts/src/db/seed_roles.py)
+# user with the `organization-owner` role (see core/db/seed_roles.py)
 # whose own `organization_id` points at this org. If the org has
 # multiple owners we pick MIN(email) deterministically; if it has zero
 # owners we fall back to an 8-char UUID prefix. Output shape:
@@ -90,9 +90,9 @@ ORG_DISAMBIG_CTE = """
             u.organization_id,
             -- Pick a deterministic owner if there are multiple.
             MIN(u.email) AS owner_email
-        FROM {accounts}."user" u
-        JOIN {accounts}.user_role ur ON ur.user_id = u.id
-        JOIN {accounts}.role r ON r.id = ur.role_id
+        FROM {schema}."user" u
+        JOIN {schema}.user_role ur ON ur.user_id = u.id
+        JOIN {schema}.role r ON r.id = ur.role_id
         WHERE r.name = 'organization-owner'
           AND u.email IS NOT NULL
         GROUP BY u.organization_id
@@ -106,7 +106,7 @@ ORG_DISAMBIG_CTE = """
                       || ')'
                  ELSE o.name
             END AS display_name
-        FROM {accounts}.organization o
+        FROM {schema}.organization o
         LEFT JOIN org_owner_emails oe ON oe.organization_id = o.id
     )
 """
@@ -232,13 +232,12 @@ async def snapshot_layers(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_layers_total`` per (org, type, feature_layer_type).
 
     "Org" here is the *owning* org: ``layer.user_id -> user.organization_id``.
-    Sharing links (``accounts.layer_organization``) intentionally do not
+    Sharing links (the ``layer_organization`` table) intentionally do not
     contribute -- otherwise a shared layer would be double-counted across
     every org it's shared into, and the dashboard's "total layers" panel
-    would no longer equal ``count(*) FROM customer.layer``.
+    would no longer equal ``count(*)`` over the ``layer`` table.
     """
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     # Five dimensions on top of org:
     #   * `type`             feature / raster / table
     #   * `feature_subtype`  standard / tool / street_network / "-"
@@ -256,7 +255,7 @@ async def snapshot_layers(db: AsyncSession, gauge: Instrument) -> int:
     #                        Raw enum from the DB so panels can filter
     #                        "external by protocol".
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             o.id::text AS org_id,
@@ -268,9 +267,9 @@ async def snapshot_layers(db: AsyncSession, gauge: Instrument) -> int:
                  THEN 'internal' ELSE 'external' END           AS source,
             COALESCE(l.data_type, :sentinel)                   AS data_type,
             count(*) AS n
-        FROM {customer}.layer l
-        JOIN {accounts}."user" u ON u.id = l.user_id
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}.layer l
+        JOIN {schema}."user" u ON u.id = l.user_id
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         GROUP BY
             o.id, do_.display_name,
@@ -298,18 +297,17 @@ async def snapshot_layers(db: AsyncSession, gauge: Instrument) -> int:
 
 async def snapshot_layer_bytes(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_layer_bytes_total`` per org (SUM of ``layer.size`` bytes)."""
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             o.id::text AS org_id,
             do_.display_name AS org_name,
             COALESCE(SUM(l.size), 0)::bigint AS bytes
-        FROM {customer}.layer l
-        JOIN {accounts}."user" u ON u.id = l.user_id
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}.layer l
+        JOIN {schema}."user" u ON u.id = l.user_id
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         GROUP BY o.id, do_.display_name
         """
@@ -339,10 +337,9 @@ async def snapshot_layer_size_distribution(db: AsyncSession, gauge: Instrument) 
     changing them produces new series, but the old ones go stale within
     the 5-min Prometheus staleness window.
     """
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             o.id::text AS org_id,
@@ -357,9 +354,9 @@ async def snapshot_layer_size_distribution(db: AsyncSession, gauge: Instrument) 
                 ELSE                                  '> 1 GiB'
             END AS size_bucket,
             count(*) AS n
-        FROM {customer}.layer l
-        JOIN {accounts}."user" u ON u.id = l.user_id
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}.layer l
+        JOIN {schema}."user" u ON u.id = l.user_id
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         GROUP BY o.id, do_.display_name, l.type, size_bucket
         """
@@ -381,18 +378,17 @@ async def snapshot_layer_size_distribution(db: AsyncSession, gauge: Instrument) 
 
 async def snapshot_projects(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_projects_total`` per org (owner-of-record interpretation)."""
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             o.id::text AS org_id,
             do_.display_name AS org_name,
             count(*) AS n
-        FROM {customer}.project p
-        JOIN {accounts}."user" u ON u.id = p.user_id
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}.project p
+        JOIN {schema}."user" u ON u.id = p.user_id
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         GROUP BY o.id, do_.display_name
         """
@@ -420,19 +416,19 @@ async def snapshot_users(db: AsyncSession, gauge: Instrument) -> int:
     role to be a GOAT user" semantics — unrole'd ghost rows in the
     ``user`` table are still excluded.
     """
-    accounts = settings.ACCOUNTS_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             o.id::text AS org_id,
             do_.display_name AS org_name,
             count(DISTINCT u.id) AS n
-        FROM {accounts}."user" u
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}."user" u
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         WHERE EXISTS (
-            SELECT 1 FROM {accounts}.user_role ur WHERE ur.user_id = u.id
+            SELECT 1 FROM {schema}.user_role ur WHERE ur.user_id = u.id
         )
         GROUP BY o.id, do_.display_name
         """
@@ -458,19 +454,18 @@ async def snapshot_user_projects(db: AsyncSession, gauge: Instrument) -> int:
     extra org labels keep the dashboard's Organization dropdown working
     when scoped to a specific org.
     """
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             u.email AS user_email,
             o.id::text AS org_id,
             do_.display_name AS org_name,
             count(p.id) AS n
-        FROM {accounts}."user" u
-        JOIN {accounts}.organization o ON o.id = u.organization_id
-        JOIN {customer}.project p ON p.user_id = u.id
+        FROM {schema}."user" u
+        JOIN {schema}.organization o ON o.id = u.organization_id
+        JOIN {schema}.project p ON p.user_id = u.id
         JOIN disambig_orgs do_ ON do_.id = o.id
         WHERE u.email IS NOT NULL
         GROUP BY u.email, o.id, do_.display_name
@@ -507,10 +502,9 @@ async def snapshot_user_layers(
     a handful of unique (type, subtype, geometry, source, data_type)
     tuples, not the cross-product.
     """
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             u.email AS user_email,
@@ -524,9 +518,9 @@ async def snapshot_user_layers(
             COALESCE(l.data_type, :sentinel)                   AS data_type,
             count(l.id) AS n,
             COALESCE(SUM(l.size), 0)::bigint AS bytes
-        FROM {accounts}."user" u
-        JOIN {accounts}.organization o ON o.id = u.organization_id
-        JOIN {customer}.layer l ON l.user_id = u.id
+        FROM {schema}."user" u
+        JOIN {schema}.organization o ON o.id = u.organization_id
+        JOIN {schema}.layer l ON l.user_id = u.id
         JOIN disambig_orgs do_ ON do_.id = o.id
         WHERE u.email IS NOT NULL
         GROUP BY
@@ -621,17 +615,17 @@ async def _fetch_user_org_map(
     typically: log + skip Windmill metrics, since they can't be
     org-attributed without this map).
     """
-    accounts = settings.ACCOUNTS_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             u.id::text AS user_id,
             o.id::text AS org_id,
             do_.display_name AS org_name,
             COALESCE(u.email, '(unknown)') AS email
-        FROM {accounts}."user" u
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}."user" u
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         """
     )

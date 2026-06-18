@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.check_resource(
+CREATE OR REPLACE FUNCTION customer.check_resource(
     requested_resource TEXT,
     requested_path TEXT,
     requested_method TEXT
@@ -19,7 +19,7 @@ BEGIN
 	
 	SELECT *
 	INTO rec_resource
-	FROM accounts.resource
+	FROM customer.resource
 	WHERE path_without_query = url_pattern
     AND requested_method = ANY(method);
 	
@@ -27,7 +27,7 @@ BEGIN
         /* Check if resource matches url-pattern with wildcard */
         SELECT r.*
         INTO rec_resource
-        FROM accounts.resource r
+        FROM customer.resource r
         WHERE requested_resource LIKE r.url_pattern || '/%'
         AND requested_method = ANY(r.method);
     END IF;

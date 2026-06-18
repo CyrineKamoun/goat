@@ -22,8 +22,6 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { ACCOUNTS_DISABLED } from "@/lib/constants";
-
 import { useAuthZ } from "@/hooks/auth/AuthZ";
 
 interface SettingsLayoutProps {
@@ -37,19 +35,6 @@ const SettingsLayout = (props: SettingsLayoutProps) => {
   const { t, i18n } = useTranslation("common");
   const { isOrgAdmin, isLoading: isUserProfileLoading } = useAuthZ();
   const navigation = useMemo(() => {
-    // If accounts features are disabled → only show "Account"
-    if (ACCOUNTS_DISABLED) {
-      return [
-        {
-          link: "/settings/account",
-          icon: ICON_NAME.USER,
-          label: t("account"),
-          current: pathname?.includes("/account"),
-        },
-      ];
-    }
-
-    // If accounts features are enabled → show ALL settings
     return [
       {
         link: "/settings/account",

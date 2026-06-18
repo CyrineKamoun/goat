@@ -12,17 +12,14 @@ const publicPaths = ["/map/public"];
 
 export const withOrganization: MiddlewareFactory = (next) => {
   return async (request: NextRequest, _next) => {
-    // Check if auth/accounts are disabled using server-only env vars (without NEXT_PUBLIC_ prefix)
+    // Check if auth is disabled using a server-only env var (without NEXT_PUBLIC_ prefix)
     // IMPORTANT: NEXT_PUBLIC_* vars are inlined at build time and won't work for runtime checks
-    // in Edge Runtime middleware. Use AUTH_DISABLED and ACCOUNTS_DISABLED (server-only) for runtime configuration.
+    // in Edge Runtime middleware. Use AUTH_DISABLED (server-only) for runtime configuration.
     const authDisabledEnv = process.env.AUTH_DISABLED;
-    const accountsDisabledEnv = process.env.ACCOUNTS_DISABLED;
     const isAuthDisabled = authDisabledEnv && authDisabledEnv.toLowerCase() === "true";
-    const isAccountsDisabled = accountsDisabledEnv && accountsDisabledEnv.toLowerCase() === "true";
 
     if (
       isAuthDisabled ||
-      isAccountsDisabled ||
       !process.env.NEXTAUTH_URL ||
       !process.env.NEXTAUTH_SECRET ||
       !process.env.API_URL

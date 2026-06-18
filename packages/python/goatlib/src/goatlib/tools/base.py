@@ -288,7 +288,10 @@ class ToolSettings:
             s3_region_name=cls._get_secret("S3_REGION_NAME", "")
             or cls._get_secret("S3_REGION", "us-east-1"),
             s3_bucket_name=cls._get_secret("S3_BUCKET_NAME", ""),
-            customer_schema=cls._get_secret("CUSTOMER_SCHEMA", "customer"),
+            # `SCHEMA` is the canonical name (core's single data schema);
+            # `CUSTOMER_SCHEMA` is accepted as a fallback for older deployments.
+            customer_schema=cls._get_secret("SCHEMA", "")
+            or cls._get_secret("CUSTOMER_SCHEMA", "customer"),
             geocoding_url=cls._get_secret("GEOCODING_URL", "") or None,
             geocoding_authorization=cls._get_secret("GEOCODING_AUTHORIZATION", "")
             or None,

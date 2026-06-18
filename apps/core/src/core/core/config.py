@@ -47,8 +47,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Schemas
     # ------------------------------------------------------------------
-    CUSTOMER_SCHEMA: str = "customer"
-    ACCOUNTS_SCHEMA: str = "accounts"
+    SCHEMA: str = "customer"
 
     # ------------------------------------------------------------------
     # Auth / Keycloak

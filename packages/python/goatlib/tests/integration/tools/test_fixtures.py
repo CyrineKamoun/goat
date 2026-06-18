@@ -12,7 +12,6 @@ import uuid
 import pytest
 
 from .conftest import (
-    TEST_ACCOUNTS_SCHEMA,
     TEST_CUSTOMER_SCHEMA,
     TEST_FOLDER_ID,
     TEST_PROJECT_ID,
@@ -57,10 +56,10 @@ class TestPostgresFixtures:
     """Test PostgreSQL fixtures."""
 
     async def test_test_schemas_created(self, tool_settings, test_schemas):
-        """Verify test schemas are created."""
+        """Verify the test schema is created."""
         conn = await get_pg_connection(tool_settings)
         try:
-            # Check customer schema exists
+            # Check the test schema exists
             result = await conn.fetchval(
                 """
                 SELECT EXISTS (
@@ -72,17 +71,17 @@ class TestPostgresFixtures:
             )
             assert result is True, f"Schema {TEST_CUSTOMER_SCHEMA} should exist"
 
-            # Check accounts schema exists
+            # Check the user table exists in it
             result = await conn.fetchval(
                 """
                 SELECT EXISTS (
-                    SELECT 1 FROM information_schema.schemata
-                    WHERE schema_name = $1
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = $1 AND table_name = 'user'
                 )
                 """,
-                TEST_ACCOUNTS_SCHEMA,
+                TEST_CUSTOMER_SCHEMA,
             )
-            assert result is True, f"Schema {TEST_ACCOUNTS_SCHEMA} should exist"
+            assert result is True, f"Table {TEST_CUSTOMER_SCHEMA}.user should exist"
         finally:
             await conn.close()
 
@@ -91,7 +90,7 @@ class TestPostgresFixtures:
         conn = await get_pg_connection(tool_settings)
         try:
             user = await conn.fetchrow(
-                f"SELECT * FROM {TEST_ACCOUNTS_SCHEMA}.user WHERE id = $1",
+                f"SELECT * FROM {TEST_CUSTOMER_SCHEMA}.user WHERE id = $1",
                 uuid.UUID(TEST_USER_ID),
             )
             assert user is not None, "Test user should exist"

@@ -21,7 +21,7 @@ class Resource(UUIDServerDefaultBase, table=True):
     """An API endpoint pattern that the authorization engine gates."""
 
     __tablename__ = "resource"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     url_pattern: str = Field(sa_column=Column(Text, nullable=False))
     method: List[RequestMethodEnum] = Field(

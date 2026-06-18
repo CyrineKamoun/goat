@@ -57,7 +57,7 @@ async def _seed_roles(db) -> dict[str, UUID]:
     for name in needed:
         row = (
             await db.execute(
-                text(f"SELECT id FROM {settings.ACCOUNTS_SCHEMA}.role WHERE name = :n"),
+                text(f"SELECT id FROM {settings.SCHEMA}.role WHERE name = :n"),
                 {"n": name},
             )
         ).first()

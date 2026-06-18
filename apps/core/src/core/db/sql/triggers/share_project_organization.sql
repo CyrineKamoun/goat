@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.share_project_organization()
+CREATE OR REPLACE FUNCTION customer.share_project_organization()
 RETURNS TRIGGER AS $$
 DECLARE
     owner_id UUID;
@@ -23,7 +23,7 @@ BEGIN
         INSERT INTO customer.user_project (project_id, user_id, initial_view_state, updated_at)
         SELECT p.project_id, t.id, initial_view_state, now()
         FROM customer.user_project p
-        JOIN accounts.user t 
+        JOIN customer.user t 
         ON t.organization_id = NEW.organization_id
         WHERE p.project_id = project_id_check
         AND p.user_id = owner_id
@@ -36,7 +36,7 @@ BEGIN
         AND user_id IN (
             SELECT t.id
             FROM customer.user_project p
-            JOIN accounts.user t 
+            JOIN customer.user t 
             ON t.organization_id = OLD.organization_id
             WHERE p.project_id = project_id_check
             AND p.user_id = owner_id
@@ -50,12 +50,12 @@ $$ LANGUAGE plpgsql;
 
 -- Trigger for sharing project when a new project-team link is created
 CREATE OR REPLACE TRIGGER share_project_organization_insert_trigger
-AFTER INSERT ON accounts.project_organization
+AFTER INSERT ON customer.project_organization
 FOR EACH ROW
-EXECUTE FUNCTION accounts.share_project_organization();
+EXECUTE FUNCTION customer.share_project_organization();
 
 -- Trigger for removing the project-user link when a project-team link is deleted
 CREATE OR REPLACE TRIGGER share_project_organization_delete_trigger
-AFTER DELETE ON accounts.project_organization
+AFTER DELETE ON customer.project_organization
 FOR EACH ROW
-EXECUTE FUNCTION accounts.share_project_organization();
+EXECUTE FUNCTION customer.share_project_organization();

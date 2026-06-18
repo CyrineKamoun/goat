@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.check_user(
+CREATE OR REPLACE FUNCTION customer.check_user(
     user_id UUID,
     rec_resource RECORD
 )
@@ -10,7 +10,7 @@ BEGIN
     /*Get user into a record*/
     SELECT u.*
     INTO rec_user
-    FROM accounts.user u
+    FROM customer.user u
     WHERE u.id = user_id; 
 
     /*Check if user exists*/
@@ -21,12 +21,12 @@ BEGIN
     /*Get role into a record*/
     WITH user_role AS (
         SELECT ur.role_id
-        FROM accounts.user_role ur
+        FROM customer.user_role ur
         WHERE ur.user_id = rec_user.id
     )
     SELECT r.* 
     INTO rec_role
-    FROM user_role ur, accounts.role r 
+    FROM user_role ur, customer.role r 
     WHERE ur.role_id = r.id;
 
     /*Check if role exists*/
@@ -38,14 +38,14 @@ BEGIN
     IF EXISTS (
         WITH needed_permissions AS (
             SELECT p.id
-            FROM accounts.permission p
-            JOIN accounts.resource_permission r ON p.id = r.permission_id
+            FROM customer.permission p
+            JOIN customer.resource_permission r ON p.id = r.permission_id
             WHERE r.resource_id = rec_resource.id
         ), 
         user_permissions AS (
             SELECT p.id
-            FROM accounts.permission p
-            JOIN accounts.role_permission r ON p.id = r.permission_id
+            FROM customer.permission p
+            JOIN customer.role_permission r ON p.id = r.permission_id
             WHERE r.role_id = rec_role.id
         )
         SELECT 1

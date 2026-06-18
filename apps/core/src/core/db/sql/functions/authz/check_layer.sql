@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.check_layer(
+CREATE OR REPLACE FUNCTION customer.check_layer(
     resource_id_input     UUID,
     user_id_input         UUID,
     organization_id_input UUID,
@@ -18,11 +18,11 @@ BEGIN
     WITH unified_roles AS (
         SELECT UNNEST(COALESCE(role_ids, ARRAY[]::UUID[])) AS role_ids,
                UNNEST(COALESCE(role_names, ARRAY[]::TEXT[])) AS role_names
-        FROM accounts.get_needed_roles(resource_id_input, 'layer')
+        FROM customer.get_needed_roles(resource_id_input, 'layer')
         UNION ALL
         SELECT UNNEST(COALESCE(role_ids, ARRAY[]::UUID[])),
                UNNEST(COALESCE(role_names, ARRAY[]::TEXT[]))
-        FROM accounts.get_needed_roles(resource_id_input, 'project')
+        FROM customer.get_needed_roles(resource_id_input, 'project')
     )
     SELECT ARRAY_AGG(role_ids), ARRAY_AGG(role_names)
     INTO   needed_role_ids, needed_role_names
@@ -31,7 +31,7 @@ BEGIN
     /* HTTP methods for this resource — used for viewer/editor distinction */
     SELECT method
     INTO resource_method_arr
-    FROM accounts.resource
+    FROM customer.resource
     WHERE id = resource_id_input;
 
     FOR i IN 1..array_length(layer_ids, 1) LOOP
@@ -49,7 +49,7 @@ BEGIN
 
         /* 2. User-level grant */
         IF EXISTS (
-            SELECT 1 FROM accounts.layer_user ul
+            SELECT 1 FROM customer.layer_user ul
             WHERE ul.layer_id = layer_id_loop
               AND ul.user_id  = user_id_input
               AND ul.role_id  = ANY(needed_role_ids)
@@ -60,7 +60,7 @@ BEGIN
 
         /* 3. Organisation-level grant */
         IF EXISTS (
-            SELECT 1 FROM accounts.layer_organization ol
+            SELECT 1 FROM customer.layer_organization ol
             WHERE ol.layer_id       = layer_id_loop
               AND ol.organization_id = organization_id_input
               AND ol.role_id         = ANY(needed_role_ids)
@@ -72,8 +72,8 @@ BEGIN
         /* 4. Team-level grant */
         IF EXISTS (
             SELECT 1
-            FROM accounts.layer_team lt
-            JOIN accounts.user_team t ON lt.team_id = t.team_id
+            FROM customer.layer_team lt
+            JOIN customer.user_team t ON lt.team_id = t.team_id
             WHERE lt.layer_id = layer_id_loop
               AND t.user_id   = user_id_input
               AND lt.role_id  = ANY(needed_role_ids)
@@ -87,7 +87,7 @@ BEGIN
         IF EXISTS (
             SELECT 1
             FROM customer.layer_project pl
-            JOIN accounts.project_user pu ON pl.project_id = pu.project_id
+            JOIN customer.project_user pu ON pl.project_id = pu.project_id
             WHERE pl.layer_id = layer_id_loop
               AND pu.user_id  = user_id_input
               AND pu.role_id  = ANY(needed_role_ids)
@@ -101,7 +101,7 @@ BEGIN
         IF EXISTS (
             SELECT 1
             FROM customer.layer_project pl
-            JOIN accounts.project_organization po ON pl.project_id = po.project_id
+            JOIN customer.project_organization po ON pl.project_id = po.project_id
             WHERE pl.layer_id       = layer_id_loop
               AND po.organization_id = organization_id_input
               AND po.role_id         = ANY(needed_role_ids)
@@ -119,12 +119,12 @@ BEGIN
             ),
             project_team AS (
                 SELECT t.*
-                FROM accounts.project_team t, layer_project l
+                FROM customer.project_team t, layer_project l
                 WHERE t.project_id = l.project_id
                   AND t.role_id    = ANY(needed_role_ids)
             )
             SELECT *
-            FROM accounts.user_team u, project_team t
+            FROM customer.user_team u, project_team t
             WHERE u.team_id = t.team_id
               AND u.user_id = user_id_input
             LIMIT 1
@@ -144,17 +144,17 @@ BEGIN
         SELECT r.name
         INTO   folder_grant_role
         FROM   customer.layer            l
-        JOIN   accounts.resource_grant   rg
+        JOIN   customer.resource_grant   rg
             ON rg.resource_type = 'folder'
            AND rg.resource_id   = l.folder_id
-        JOIN   accounts.role             r  ON r.id = rg.role_id
+        JOIN   customer.role             r  ON r.id = rg.role_id
         WHERE  l.id            = layer_id_loop
           AND  l.folder_id    IS NOT NULL
           AND  (
                (    rg.grantee_type = 'team'
                 AND EXISTS (
                         SELECT 1
-                        FROM   accounts.user_team ut
+                        FROM   customer.user_team ut
                         WHERE  ut.team_id = rg.grantee_id
                           AND  ut.user_id = user_id_input
                     )
@@ -162,7 +162,7 @@ BEGIN
             OR (    rg.grantee_type = 'organization'
                 AND EXISTS (
                         SELECT 1
-                        FROM   accounts."user" u
+                        FROM   customer."user" u
                         WHERE  u.id              = user_id_input
                           AND  u.organization_id = rg.grantee_id
                     )

@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.log_storage_usage()
+CREATE OR REPLACE FUNCTION customer.log_storage_usage()
 RETURNS TRIGGER AS $$
 DECLARE
     organization_id_input UUID;
@@ -7,7 +7,7 @@ BEGIN
     -- Get the organization_id of the user
     SELECT organization_id
     INTO organization_id_input
-    FROM accounts.user
+    FROM customer.user
     WHERE id = COALESCE(NEW.user_id, OLD.user_id);
 
     -- Handle INSERT: Only NEW.SIZE is relevant
@@ -24,7 +24,7 @@ BEGIN
     END IF;
 
     -- Update the organization's used_storage
-    UPDATE accounts.organization o
+    UPDATE customer.organization o
     SET used_storage = used_storage + size_difference
     WHERE o.id = organization_id_input;
 
@@ -41,4 +41,4 @@ CREATE OR REPLACE TRIGGER log_storage_usage_trigger
 AFTER INSERT OR UPDATE OR DELETE
 ON customer.layer
 FOR EACH ROW
-EXECUTE FUNCTION accounts.log_storage_usage();
+EXECUTE FUNCTION customer.log_storage_usage();

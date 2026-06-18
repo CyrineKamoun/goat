@@ -42,7 +42,7 @@ class OrganizationDomain(DateTimeBase, table=True):
     """A custom domain registered by an organization for white-label dashboards."""
 
     __tablename__ = "organization_domain"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: UUID | None = Field(
         sa_column=Column(
@@ -57,7 +57,7 @@ class OrganizationDomain(DateTimeBase, table=True):
         sa_column=Column(
             UUID_PG(as_uuid=True),
             ForeignKey(
-                f"{settings.ACCOUNTS_SCHEMA}.organization.id", ondelete="CASCADE"
+                f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"
             ),
             nullable=False,
             index=True,

@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.check_project(
+CREATE OR REPLACE FUNCTION customer.check_project(
     resource_id_input     UUID,
     user_id_input         UUID,
     organization_id_input UUID,
@@ -17,7 +17,7 @@ BEGIN
     /* Get the needed roles for the project */
     SELECT *
     INTO project_role_ids, project_role_names
-    FROM accounts.get_needed_roles(resource_id_input, 'project');
+    FROM customer.get_needed_roles(resource_id_input, 'project');
 
     IF array_length(project_role_ids, 1) = 0 THEN
         RAISE EXCEPTION 'No roles found for the resource';
@@ -26,7 +26,7 @@ BEGIN
     /* HTTP methods for this resource — used for viewer/editor distinction */
     SELECT method
     INTO resource_method_arr
-    FROM accounts.resource
+    FROM customer.resource
     WHERE id = resource_id_input;
 
     FOR i IN 1..array_length(project_ids, 1) LOOP
@@ -35,7 +35,7 @@ BEGIN
         /* 1. User-level grant */
         IF EXISTS (
             SELECT 1
-            FROM accounts.project_user ul
+            FROM customer.project_user ul
             WHERE ul.project_id = project_id_loop
               AND ul.user_id    = user_id_input
               AND ul.role_id    = ANY(project_role_ids)
@@ -47,7 +47,7 @@ BEGIN
         /* 2. Organisation-level grant */
         IF EXISTS (
             SELECT 1
-            FROM accounts.project_organization ol
+            FROM customer.project_organization ol
             WHERE ol.project_id      = project_id_loop
               AND ol.organization_id = organization_id_input
               AND ol.role_id         = ANY(project_role_ids)
@@ -59,8 +59,8 @@ BEGIN
         /* 3. Team-level grant */
         IF EXISTS (
             SELECT 1
-            FROM accounts.project_team lt
-            JOIN accounts.user_team    t  ON lt.team_id = t.team_id
+            FROM customer.project_team lt
+            JOIN customer.user_team    t  ON lt.team_id = t.team_id
             WHERE lt.project_id = project_id_loop
               AND t.user_id     = user_id_input
               AND lt.role_id    = ANY(project_role_ids)
@@ -81,17 +81,17 @@ BEGIN
         SELECT r.name
         INTO   folder_grant_role
         FROM   customer.project         p
-        JOIN   accounts.resource_grant  rg
+        JOIN   customer.resource_grant  rg
             ON rg.resource_type = 'folder'
            AND rg.resource_id   = p.folder_id
-        JOIN   accounts.role            r  ON r.id = rg.role_id
+        JOIN   customer.role            r  ON r.id = rg.role_id
         WHERE  p.id           = project_id_loop
           AND  p.folder_id   IS NOT NULL
           AND  (
                (    rg.grantee_type = 'team'
                 AND EXISTS (
                         SELECT 1
-                        FROM   accounts.user_team ut
+                        FROM   customer.user_team ut
                         WHERE  ut.team_id = rg.grantee_id
                           AND  ut.user_id = user_id_input
                     )
@@ -99,7 +99,7 @@ BEGIN
             OR (    rg.grantee_type = 'organization'
                 AND EXISTS (
                         SELECT 1
-                        FROM   accounts."user" u
+                        FROM   customer."user" u
                         WHERE  u.id              = user_id_input
                           AND  u.organization_id = rg.grantee_id
                     )

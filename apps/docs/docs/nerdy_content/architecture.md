@@ -56,7 +56,7 @@ The Keycloak Database is a PostgreSQL Database that is used to store the Keycloa
 
 Authorization is a built-in responsibility of the GOAT Core API rather than a separate service. (It was previously a standalone "Accounts" API; that service has been merged into core.) Before any request reaches application logic, core verifies that the user holds the required permissions — and, in SaaS installations, an active subscription — for the requested action, effectively acting as an internal API gateway. The authorization decision is computed in PostgreSQL via the `authorization()` function over the seeded RBAC data (roles, permissions, and resource patterns).
 
-Core also owns the user, organization, team, and subscription data that falls outside Keycloak's scope, stored in the `accounts` schema of the GOAT database and accessed through SQLAlchemy. This data also holds references to content uploaded through the GOAT application, tracking how it is shared across teams and organizations, and — for SaaS installations — the subscription state and quota entitlements. To enrich user details, core communicates with the Keycloak API through the `python-keycloak` library, using the user's token to retrieve details and verify roles.
+Core also owns the user, organization, team, and subscription data that falls outside Keycloak's scope, stored alongside its other metadata in the GOAT database and accessed through SQLAlchemy. This data also holds references to content uploaded through the GOAT application, tracking how it is shared across teams and organizations, and — for SaaS installations — the subscription state and quota entitlements. To enrich user details, core communicates with the Keycloak API through the `python-keycloak` library, using the user's token to retrieve details and verify roles.
 
 ### GOAT Application
 
@@ -75,7 +75,7 @@ The Processes API, developed in Python and FastAPI, implements the OGC API Proce
 Windmill orchestrates and executes background analysis jobs. It reads and writes the Analysis Database and invokes the routing engines as needed to compute travel times and accessibility indicators.
 
 #### Application Database
-A PostgreSQL database with the PostGIS extension. It holds GOAT's base data (network configuration, opportunity datasets, base settings) along with all metadata managed by the Core API — projects, layers, folders, scenarios — and the `accounts` schema (users, organizations, teams, subscriptions). It stores metadata and base data, not user-uploaded layer contents.
+A PostgreSQL database with the PostGIS extension. It holds GOAT's base data (network configuration, opportunity datasets, base settings) along with all metadata managed by the Core API — projects, layers, folders, scenarios, and the user, organization, team, and subscription data. It stores metadata and base data, not user-uploaded layer contents.
 
 #### Analysis Database
 A DuckDB-based analytical database (DuckLake), backed by S3 object storage. It holds the actual user layer data and the results produced by analyses. Keeping high-volume geospatial data here — separate from the relational metadata in PostgreSQL — is the platform's core storage split: metadata in PostgreSQL, data in DuckLake.

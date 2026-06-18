@@ -43,12 +43,12 @@ class DateTimeBase(SQLModel):
 
 
 class UUIDServerDefaultBase(SQLModel):
-    """Base for models originating from the accounts schema.
+    """Base with a UUID primary key and naive timestamps.
 
-    UUID primary key with a server-side ``uuid_generate_v4()`` default and
-    naive ``CURRENT_TIMESTAMP`` ``created_at``/``updated_at`` columns — matching
-    the existing ``accounts.*`` tables (``timestamp without time zone``),
-    unlike core's timezone-aware ``DateTimeBase``.
+    Server-side ``uuid_generate_v4()`` default for the id and naive
+    ``CURRENT_TIMESTAMP`` ``created_at``/``updated_at`` columns
+    (``timestamp without time zone``), unlike the timezone-aware
+    ``DateTimeBase``.
     """
 
     id: UUID | None = Field(
@@ -78,7 +78,7 @@ class ContentBaseAttributes(SQLModel):
         default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.folder.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.folder.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Layer folder ID",

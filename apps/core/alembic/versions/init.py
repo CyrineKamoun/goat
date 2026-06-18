@@ -1,12 +1,11 @@
 """Squashed baseline — full current schema (tables + schemas only).
 
-Collapses the previous core + accounts migration history into a single
-starting point that builds the entire schema from zero, straight from the
-SQLModel metadata.
+A single starting point that builds the entire schema from zero, straight
+from the SQLModel metadata.
 
 Functions, triggers, pg_cron jobs and seed data are NOT created here — they
 are installed separately by ``scripts/initial_data.py`` (``init_functions`` /
-``init_triggers`` / the ``seed_*`` helpers), exactly as before this squash.
+``init_triggers`` / the ``seed_*`` helpers).
 
 Revision ID: init
 Revises:
@@ -16,13 +15,17 @@ from alembic import op
 from sqlmodel import SQLModel
 
 import core.db.models  # noqa: F401  (imports all models -> populates metadata)
+from core.core.config import settings
 
 revision = "init"
 down_revision = None
 branch_labels = None
 depends_on = None
 
-SCHEMAS = ("basic", "customer", "accounts", "temporal")
+# `settings.SCHEMA` is the configurable data schema (default "customer"); the
+# models, SQL functions and triggers all resolve to it, so the baseline must
+# create the same one.
+SCHEMAS = ("basic", settings.SCHEMA, "temporal")
 
 
 def upgrade() -> None:

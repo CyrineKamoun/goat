@@ -149,7 +149,7 @@ class IProjectBaseUpdate(SQLModel):
         default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.folder.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.folder.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Layer folder ID",

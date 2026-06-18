@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.get_needed_roles(
+CREATE OR REPLACE FUNCTION customer.get_needed_roles(
     resource_id_input UUID,
     resource_type_input TEXT
 )
@@ -11,19 +11,19 @@ BEGIN
     RETURN QUERY
     WITH needed_permissions AS (
         SELECT rp.permission_id
-        FROM accounts.resource r
-        JOIN accounts.resource_permission rp  
+        FROM customer.resource r
+        JOIN customer.resource_permission rp  
         ON r.id = rp.resource_id
         WHERE r.id = resource_id_input
     ),
     layer_role_ids AS (
         SELECT rp.role_id
         FROM needed_permissions np
-        JOIN accounts.role_permission rp
+        JOIN customer.role_permission rp
         ON np.permission_id = rp.permission_id
     )
     SELECT ARRAY_AGG(role_id) AS layer_role_ids, ARRAY_AGG(name) AS layer_role_names
-    FROM accounts.role r
+    FROM customer.role r
     JOIN layer_role_ids ri
     ON r.id = ri.role_id
     WHERE r.resource_type = resource_type_input;

@@ -28,9 +28,8 @@ target_metadata = SQLModel.metadata
 # ... etc.
 
 
-# Core now manages both its own `customer` schema and the merged `accounts`
-# schema (accounts service folded into core).
-MANAGED_SCHEMAS = ["customer", "accounts"]
+# Autogenerate only considers tables in the configurable data schema.
+MANAGED_SCHEMAS = [settings.SCHEMA]
 
 
 def include_object(object, name, type_, reflected, compare_to):

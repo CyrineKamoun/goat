@@ -68,11 +68,11 @@ async def create_project(
         initial_view_state=project_in.initial_view_state,
     )
 
-    # Grant the creator project-owner access in accounts.project_user so auth_z can resolve it
+    # Grant the creator project-owner access in project_user so auth_z can resolve it
     await async_session.execute(
         text(
-            f"INSERT INTO {settings.ACCOUNTS_SCHEMA}.project_user (project_id, user_id, role_id) "
-            f"SELECT :project_id, :user_id, r.id FROM {settings.ACCOUNTS_SCHEMA}.role r "
+            f"INSERT INTO {settings.SCHEMA}.project_user (project_id, user_id, role_id) "
+            f"SELECT :project_id, :user_id, r.id FROM {settings.SCHEMA}.role r "
             f"WHERE r.name = 'project-owner' ON CONFLICT DO NOTHING"
         ),
         {"project_id": str(project.id), "user_id": str(user_id)},
@@ -136,26 +136,26 @@ async def read_project(
 
                 -- 2. Direct user grant
                 SELECT r.name, 2
-                FROM {settings.ACCOUNTS_SCHEMA}.project_user pu
-                JOIN {settings.ACCOUNTS_SCHEMA}.role r ON r.id = pu.role_id
+                FROM {settings.SCHEMA}.project_user pu
+                JOIN {settings.SCHEMA}.role r ON r.id = pu.role_id
                 WHERE pu.project_id = :pid AND pu.user_id = :uid
 
                 UNION ALL
 
                 -- 3. Team grant
                 SELECT r.name, 3
-                FROM {settings.ACCOUNTS_SCHEMA}.project_team pt
-                JOIN {settings.ACCOUNTS_SCHEMA}.user_team ut ON ut.team_id = pt.team_id
-                JOIN {settings.ACCOUNTS_SCHEMA}.role r ON r.id = pt.role_id
+                FROM {settings.SCHEMA}.project_team pt
+                JOIN {settings.SCHEMA}.user_team ut ON ut.team_id = pt.team_id
+                JOIN {settings.SCHEMA}.role r ON r.id = pt.role_id
                 WHERE pt.project_id = :pid AND ut.user_id = :uid
 
                 UNION ALL
 
                 -- 4. Organisation grant
                 SELECT r.name, 4
-                FROM {settings.ACCOUNTS_SCHEMA}.project_organization po
-                JOIN {settings.ACCOUNTS_SCHEMA}.role r ON r.id = po.role_id
-                JOIN {settings.ACCOUNTS_SCHEMA}.user u ON u.organization_id = po.organization_id
+                FROM {settings.SCHEMA}.project_organization po
+                JOIN {settings.SCHEMA}.role r ON r.id = po.role_id
+                JOIN {settings.SCHEMA}.user u ON u.organization_id = po.organization_id
                 WHERE po.project_id = :pid AND u.id = :uid
 
                 UNION ALL
@@ -171,16 +171,16 @@ async def read_project(
                 FROM customer.project p
                 JOIN (
                     SELECT rg2.resource_id, r2.name AS role_name
-                    FROM {settings.ACCOUNTS_SCHEMA}.resource_grant rg2
-                    JOIN {settings.ACCOUNTS_SCHEMA}.role r2 ON r2.id = rg2.role_id
+                    FROM {settings.SCHEMA}.resource_grant rg2
+                    JOIN {settings.SCHEMA}.role r2 ON r2.id = rg2.role_id
                     WHERE rg2.resource_type = 'folder'
                       AND (
                           (rg2.grantee_type = 'team' AND EXISTS (
-                              SELECT 1 FROM {settings.ACCOUNTS_SCHEMA}.user_team ut2
+                              SELECT 1 FROM {settings.SCHEMA}.user_team ut2
                               WHERE ut2.team_id = rg2.grantee_id AND ut2.user_id = :uid
                           ))
                           OR (rg2.grantee_type = 'organization' AND EXISTS (
-                              SELECT 1 FROM {settings.ACCOUNTS_SCHEMA}.user u2
+                              SELECT 1 FROM {settings.SCHEMA}.user u2
                               WHERE u2.id = :uid AND u2.organization_id = rg2.grantee_id
                           ))
                       )

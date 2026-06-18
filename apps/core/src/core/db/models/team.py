@@ -28,7 +28,7 @@ class Team(UUIDServerDefaultBase, TeamBase, table=True):
     """A team: a collection of users within an organization."""
 
     __tablename__ = "team"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     layer_links: List["LayerTeamLink"] = Relationship(
         back_populates="team", sa_relationship_kwargs={"cascade": "all, delete-orphan"}

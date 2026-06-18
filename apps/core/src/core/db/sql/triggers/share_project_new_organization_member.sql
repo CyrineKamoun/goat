@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.share_project_new_organization_member()
+CREATE OR REPLACE FUNCTION customer.share_project_new_organization_member()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Handle case where organization_id is set to NULL
@@ -13,7 +13,7 @@ BEGIN
 		FROM 
 		(
 		    SELECT p.project_id
-		    FROM accounts.project_organization p 
+		    FROM customer.project_organization p 
 		    WHERE p.organization_id = NEW.organization_id
 		) p
 		CROSS JOIN LATERAL 
@@ -37,6 +37,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER share_project_new_organization_member_trigger
-AFTER INSERT OR UPDATE OR DELETE ON accounts.user
+AFTER INSERT OR UPDATE OR DELETE ON customer.user
 FOR EACH ROW
-EXECUTE FUNCTION accounts.share_project_new_organization_member();
+EXECUTE FUNCTION customer.share_project_new_organization_member();

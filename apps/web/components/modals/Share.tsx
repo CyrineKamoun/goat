@@ -66,7 +66,6 @@ import {
 import { shareLayer, shareProject } from "@/lib/api/share";
 import { useTeams } from "@/lib/api/teams";
 import { useOrganization } from "@/lib/api/users";
-import { ACCOUNTS_DISABLED } from "@/lib/constants";
 import { type Layer, layerShareRoleEnum } from "@/lib/validations/layer";
 import { type Folder, folderShareRoleEnum } from "@/lib/validations/folder";
 import { type Project, projectShareRoleEnum } from "@/lib/validations/project";
@@ -614,12 +613,6 @@ const ShareModal: React.FC<ShareProps> = ({ open, onClose, type, content }) => {
   };
 
   const tabItems = useMemo(() => {
-    // If accounts features are disabled → ONLY show "Public"
-    if (ACCOUNTS_DISABLED) {
-      return [{ label: t("public"), value: "public" }];
-    }
-
-    // Otherwise → show the normal tabs
     const items = [
       { label: t("organization"), value: "organization" },
       { label: t("teams"), value: "teams" },

@@ -23,7 +23,7 @@ class CreditUsage(SQLModel, table=True):
     """A ledger row recording credit consumption by a user/organization."""
 
     __tablename__ = "credit_usage"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: Optional[int] = Field(
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
@@ -41,7 +41,7 @@ class CreditUsage(SQLModel, table=True):
         sa_column=Column(
             UUID_PG(as_uuid=True),
             ForeignKey(
-                f"{settings.ACCOUNTS_SCHEMA}.organization.id", ondelete="CASCADE"
+                f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"
             ),
             nullable=False,
         )

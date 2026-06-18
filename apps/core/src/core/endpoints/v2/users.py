@@ -196,8 +196,8 @@ async def get_profile(
     Get user profile
     """
     user_id = user_id or user_token["sub"]
-    accounts_user = await crud_user.get_user_with_roles(db_session=db, user_id=user_id)
-    if not accounts_user:
+    db_user = await crud_user.get_user_with_roles(db_session=db, user_id=user_id)
+    if not db_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
@@ -205,12 +205,12 @@ async def get_profile(
     admin = await keycloak_admin()
     keycloak_user = admin.get_user(user_id) if admin else {}
 
-    roles = []  # accounts_user[0].role_links[0].role.name
-    for role_link in accounts_user.role_links:
+    roles = []
+    for role_link in db_user.role_links:
         roles.append(role_link.role.name)
 
     user = UserRead(
-        **accounts_user.model_dump(),
+        **db_user.model_dump(),
         enabled=keycloak_user.get("enabled"),
         topt=keycloak_user.get("totp"),
         roles=roles,
@@ -235,8 +235,8 @@ async def update_profile(
     Update user profile
     """
     user_id = user_id or user_token["sub"]
-    accounts_user = await crud_user.get(db=db, id=user_id)
-    if not accounts_user:
+    db_user = await crud_user.get(db=db, id=user_id)
+    if not db_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
@@ -248,7 +248,7 @@ async def update_profile(
             keycloak_payload["firstName"] = user.firstname
         if user.lastname:
             keycloak_payload["lastName"] = user.lastname
-        if user.email and user.email != accounts_user.email:
+        if user.email and user.email != db_user.email:
             keycloak_payload["email"] = user.email
             keycloak_payload["emailVerified"] = False
         admin.update_user(
@@ -267,11 +267,11 @@ async def update_profile(
             f"image/{extension}",
         )
         user.avatar = f"https://assets.plan4better.de/img/users/{settings.ENVIRONMENT}/{file_name}"
-    accounts_updated_user = UserUpdate(
+    user_update = UserUpdate(
         **user.model_dump(exclude_unset=True, exclude_none=True),
     )
     updated_user = await crud_user.update(
-        db=db, db_obj=accounts_user, obj_in=accounts_updated_user
+        db=db, db_obj=db_user, obj_in=user_update
     )
 
     return updated_user

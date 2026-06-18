@@ -26,7 +26,7 @@ class Role(UUIDServerDefaultBase, table=True):
     """A role: a named collection of permissions scoped to a resource type."""
 
     __tablename__ = "role"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     name: str = Field(sa_column=Column(Text, nullable=False), max_length=255)
     resource_type: RessourceTypeEnum = Field(sa_column=Column(Text, nullable=False))

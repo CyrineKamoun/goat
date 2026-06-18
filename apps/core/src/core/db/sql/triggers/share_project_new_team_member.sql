@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.share_project_new_team_member()
+CREATE OR REPLACE FUNCTION customer.share_project_new_team_member()
 RETURNS TRIGGER AS $$
 DECLARE
     user_organization_id UUID;
@@ -7,7 +7,7 @@ BEGIN
     -- Get the organization_id of the user
     SELECT organization_id
     INTO user_organization_id
-    FROM accounts.user
+    FROM customer.user
     WHERE id = OLD.user_id;
 
     -- DELETE FROM customer.user_project for all project that are shared with the team
@@ -15,7 +15,7 @@ BEGIN
 
         WITH candidates_to_delete AS (
             SELECT p.project_id
-            FROM accounts.project_team p, accounts.team t
+            FROM customer.project_team p, customer.team t
             WHERE team_id = OLD.team_id
             AND p.team_id = t.id
         ),
@@ -23,7 +23,7 @@ BEGIN
             -- Make sure not in project_user and not in project_organization
             SELECT c.project_id
             FROM candidates_to_delete c
-            LEFT JOIN accounts.project_user up
+            LEFT JOIN customer.project_user up
             ON up.project_id = c.project_id
             AND up.user_id = OLD.user_id
             WHERE up.project_id IS NULL
@@ -31,7 +31,7 @@ BEGIN
         to_delete AS (
             SELECT u.project_id
             FROM unmatched_user u
-            LEFT JOIN accounts.project_organization po
+            LEFT JOIN customer.project_organization po
             ON po.project_id = u.project_id
             AND po.organization_id = user_organization_id
             WHERE po.project_id IS NULL
@@ -49,7 +49,7 @@ BEGIN
         FROM
         (
             SELECT p.project_id 
-            FROM accounts.project_team p, accounts.team t
+            FROM customer.project_team p, customer.team t
             WHERE team_id = NEW.team_id
             AND p.team_id = t.id
         ) p
@@ -73,6 +73,6 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE TRIGGER share_project_new_team_member_trigger
-AFTER INSERT OR UPDATE OR DELETE ON accounts.user_team
+AFTER INSERT OR UPDATE OR DELETE ON customer.user_team
 FOR EACH ROW
-EXECUTE FUNCTION accounts.share_project_new_team_member();
+EXECUTE FUNCTION customer.share_project_new_team_member();

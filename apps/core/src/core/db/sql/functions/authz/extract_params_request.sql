@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.extract_params_request(
+CREATE OR REPLACE FUNCTION customer.extract_params_request(
     requested_resource TEXT,
     requested_path TEXT
 )

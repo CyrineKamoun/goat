@@ -35,7 +35,7 @@ class UserBase(SQLModel):
         sa_column=Column(
             UUID_PG(as_uuid=True),
             ForeignKey(
-                f"{settings.ACCOUNTS_SCHEMA}.organization.id", ondelete="CASCADE"
+                f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"
             ),
             nullable=True,
         ),
@@ -46,7 +46,7 @@ class User(UUIDServerDefaultBase, UserBase, table=True):
     """A user, member of an organization. Most attributes live in Keycloak."""
 
     __tablename__ = "user"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     # Relationships
     folders: List["Folder"] = Relationship(

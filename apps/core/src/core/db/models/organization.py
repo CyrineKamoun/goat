@@ -174,7 +174,7 @@ class Organization(UUIDServerDefaultBase, OrganizationBase, table=True):
     """An organization: container for users, teams, quotas and subscription."""
 
     __tablename__ = "organization"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     # Relationships
     users: List["User"] = Relationship(back_populates="organization")

@@ -317,7 +317,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     """Layer model."""
 
     __tablename__ = "layer"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: UUID | None = Field(
         default=None,
@@ -332,7 +332,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Layer owner ID",
@@ -340,7 +340,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     folder_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.folder.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.folder.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Layer folder ID",
@@ -352,7 +352,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.data_store.id"),
+            ForeignKey(f"{settings.SCHEMA}.data_store.id"),
         ),
         description="Data store ID of the layer",
     )

@@ -229,7 +229,6 @@ Only use this if you're modifying the GOAT source code.
 | `KEYCLOAK_CLIENT_SECRET` | Keycloak client secret |
 | `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN (optional) |
 | `NEXT_PUBLIC_AUTH_DISABLED` | Enable/disable auth in frontend |
-| `NEXT_PUBLIC_ACCOUNTS_DISABLED` | Enable/disable accounts features |
 | `NEXTAUTH_URL` | URL for Auth.js backend |
 | `NEXTAUTH_SECRET` | Secret key for Auth.js sessions |
 

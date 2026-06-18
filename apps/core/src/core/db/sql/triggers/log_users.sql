@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.log_user()
+CREATE OR REPLACE FUNCTION customer.log_user()
 RETURNS TRIGGER AS $$
 DECLARE
     organization_id_input UUID;
@@ -14,15 +14,15 @@ BEGIN
     ELSIF TG_TABLE_NAME = 'user_role' THEN
         SELECT organization_id
         INTO organization_id_input
-        FROM accounts.user u
-        JOIN accounts.user_role r ON u.id = r.user_id
+        FROM customer.user u
+        JOIN customer.user_role r ON u.id = r.user_id
         WHERE r.user_id = COALESCE(NEW.user_id, OLD.user_id);
     END IF;
 
     WITH user_roles AS (
         SELECT r.*
-        FROM accounts.user u
-        JOIN accounts.user_role r ON u.id = r.user_id
+        FROM customer.user u
+        JOIN customer.user_role r ON u.id = r.user_id
         WHERE u.organization_id = organization_id_input
     ),
     role_counts AS (
@@ -32,18 +32,18 @@ BEGIN
         FROM 
         (
             SELECT name
-            FROM accounts.role r
+            FROM customer.role r
             JOIN user_roles ur ON r.id = ur.role_id
             WHERE r.resource_type = 'organization'
             UNION ALL 
             SELECT (payload ->> 'role')::text
-            FROM accounts.invitation
+            FROM customer.invitation
             WHERE organization_id = organization_id_input
             AND TYPE = 'organization'
             AND status = 'pending'
         ) r
     )
-    UPDATE accounts.organization o
+    UPDATE customer.organization o
     SET used_viewers = rc.viewer_count,
     used_editors = rc.editor_count
     FROM role_counts rc
@@ -56,21 +56,21 @@ $$ LANGUAGE plpgsql;
 -- Create a single trigger for INSERT, UPDATE, and DELETE
 CREATE OR REPLACE TRIGGER log_user_trigger
 AFTER INSERT OR UPDATE OR DELETE
-ON accounts.user
+ON customer.user
 FOR EACH ROW
-EXECUTE FUNCTION accounts.log_user();
+EXECUTE FUNCTION customer.log_user();
 
 -- Create a single trigger for INSERT, UPDATE, and DELETE
 CREATE OR REPLACE TRIGGER log_user_role_trigger
 AFTER INSERT OR UPDATE OR DELETE
-ON accounts.user_role
+ON customer.user_role
 FOR EACH ROW
-EXECUTE FUNCTION accounts.log_user();
+EXECUTE FUNCTION customer.log_user();
 
 -- Trigger for invitation if of type organization
 CREATE OR REPLACE TRIGGER log_invitation_trigger
 AFTER INSERT OR UPDATE OR DELETE
-ON accounts.invitation
+ON customer.invitation
 FOR EACH ROW
-EXECUTE FUNCTION accounts.log_user();
+EXECUTE FUNCTION customer.log_user();
 

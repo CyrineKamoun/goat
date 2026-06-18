@@ -13,7 +13,7 @@ class Cost(UUIDServerDefaultBase, table=True):
     """The calculation cost (in credits) per action."""
 
     __tablename__ = "cost"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     action: str = Field(sa_column=Column(Text, nullable=False), max_length=255)
     credit: float = Field(sa_column=Column(Float, nullable=False))

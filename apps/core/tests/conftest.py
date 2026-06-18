@@ -21,8 +21,7 @@ from sqlalchemy import select, text
 
 
 def set_test_mode():
-    settings.CUSTOMER_SCHEMA = "test_customer1"
-    settings.ACCOUNTS_SCHEMA = "test_accounts1"
+    settings.SCHEMA = "test_schema"
     settings.MAX_FOLDER_COUNT = 15
     settings.TEST_MODE = True
     settings.AUTH = False
@@ -52,15 +51,11 @@ async def session_fixture(event_loop):
     session_manager.init(settings.ASYNC_SQLALCHEMY_DATABASE_URI)
     session_manager._engine.update_execution_options(
         schema_translate_map={
-            "customer": settings.CUSTOMER_SCHEMA,
-            "accounts": settings.ACCOUNTS_SCHEMA,
+            "customer": settings.SCHEMA,
         }
     )
     async with session_manager.connect() as connection:
-        for schema in [
-            settings.CUSTOMER_SCHEMA,
-            settings.ACCOUNTS_SCHEMA,
-        ]:
+        for schema in [settings.SCHEMA]:
             await connection.execute(
                 text(f"""DROP SCHEMA IF EXISTS {schema} CASCADE""")
             )

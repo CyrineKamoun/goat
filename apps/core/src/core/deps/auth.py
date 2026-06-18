@@ -97,7 +97,7 @@ async def _validate_authorization(
                     route.path
                 )  # e.g /organizations/{organization_id}
                 authz_query = text(
-                    f"SELECT * FROM {settings.ACCOUNTS_SCHEMA}.authorization('{user_id}', '{cleaned_route_path}', '{cleaned_path}', '{method}');"
+                    f"SELECT * FROM {settings.SCHEMA}.authorization('{user_id}', '{cleaned_route_path}', '{cleaned_path}', '{method}');"
                 )
                 response = await async_session.execute(authz_query)
                 state = response.scalars().all()

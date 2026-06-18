@@ -8,6 +8,6 @@ class Permission(UUIDServerDefaultBase, table=True):
     """A permission identified by a slug (e.g. ``read-layer``)."""
 
     __tablename__ = "permission"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     slug: str = Field(sa_column=Column(Text, nullable=False))

@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION accounts.check_organization(
+CREATE OR REPLACE FUNCTION customer.check_organization(
     rec_user RECORD,
     rec_resource RECORD,
     organization_id UUID
@@ -13,7 +13,7 @@ BEGIN
     /*Get organization into a record.*/
    	SELECT o.*
    	INTO rec_organization
-   	FROM accounts.organization o
+   	FROM customer.organization o
    	WHERE o.id = rec_user.organization_id;
 
     /*Check if organization exists*/

@@ -31,7 +31,7 @@ class InvitationType(str, Enum):
 
 class Invitation(UUIDServerDefaultBase, table=True):
     __tablename__ = "invitation"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     send_by: UUID = Field(
         sa_column=Column(
@@ -42,20 +42,20 @@ class Invitation(UUIDServerDefaultBase, table=True):
     send_to: UUID | None = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
         ),
     )
     team_id: UUID | None = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.team.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.team.id", ondelete="CASCADE"),
         )
     )
     organization_id: UUID | None = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
             ForeignKey(
-                f"{settings.ACCOUNTS_SCHEMA}.organization.id", ondelete="CASCADE"
+                f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"
             ),
         )
     )
