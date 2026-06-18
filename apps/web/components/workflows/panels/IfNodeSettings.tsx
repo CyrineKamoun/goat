@@ -598,18 +598,26 @@ export default function IfNodeSettings({
     | { kind: "tool"; nodeId: string }
     | undefined
   >(() => {
-    const incoming = edges.find((e) => e.target === node.id);
-    if (!incoming) return undefined;
-    const sourceNode = nodes.find((n) => n.id === incoming.source);
-    if (!sourceNode) return undefined;
-    const d = sourceNode.data as Record<string, unknown> | undefined;
-    if (d?.type === "dataset" && typeof d.layerId === "string") {
-      const uuid = resolveDatasetLayerUuid(d.layerId, projectLayers);
-      if (uuid) return { kind: "dataset", layerId: uuid };
+    let targetId = node.id;
+    for (let i = 0; i < 50; i++) {
+      const incoming = edges.find((e) => e.target === targetId);
+      if (!incoming) return undefined;
+      const sourceNode = nodes.find((n) => n.id === incoming.source);
+      if (!sourceNode) return undefined;
+      const d = sourceNode.data as Record<string, unknown> | undefined;
+      if (d?.type === "dataset" && typeof d.layerId === "string") {
+        const uuid = resolveDatasetLayerUuid(d.layerId, projectLayers);
+        if (uuid) return { kind: "dataset", layerId: uuid };
+        return undefined;
+      }
+      if (d?.type === "tool") {
+        return { kind: "tool", nodeId: sourceNode.id };
+      }
+      if (d?.type === "if") {
+        targetId = sourceNode.id;
+        continue;
+      }
       return undefined;
-    }
-    if (d?.type === "tool") {
-      return { kind: "tool", nodeId: sourceNode.id };
     }
     return undefined;
   }, [edges, node.id, nodes, projectLayers]);

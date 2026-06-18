@@ -312,6 +312,7 @@ class JoinToolParams(ScenarioSelectorMixin, ToolInputBase, BaseModel):
                 visible_when={
                     "$and": [
                         {"add_join_fields": True},
+                        {"calculate_statistics": False},
                         {"spatial_relationship": {"$ne": "disjoint"}},
                     ]
                 },
