@@ -9,6 +9,7 @@ import { Search as SearchIcon, Settings as SettingsIcon } from "@mui/icons-mater
 import {
   Box,
   CircularProgress,
+  Divider,
   Grid,
   InputAdornment,
   Stack,
@@ -57,6 +58,7 @@ interface ToolItem {
   id: string;
   title: string;
   description?: string;
+  beta?: boolean;
 }
 
 interface ToolCardProps {
@@ -157,6 +159,7 @@ function ToolsTabContent({ onSelectTool }: ToolsTabContentProps) {
         id: process.id,
         title: process.title,
         description: process.description,
+        beta: process["x-ui-beta"] === true,
       });
     }
 
@@ -220,17 +223,54 @@ function ToolsTabContent({ onSelectTool }: ToolsTabContentProps) {
 
           {sortedCategories.map(([category, tools]) => {
             const config = CATEGORY_CONFIG[category as ToolCategory];
+            const betaTools = tools.filter((tool) => tool.beta);
+            const mainTools = tools.filter((tool) => !tool.beta);
 
             return (
               <Box key={category}>
                 <SettingsGroupHeader label={t(config?.name ?? category)} />
                 <Grid container spacing={4}>
-                  {tools.map((tool) => (
+                  {mainTools.map((tool) => (
                     <Grid item xs={4} key={tool.id}>
                       <ToolCard tool={tool} onSelect={onSelectTool} />
                     </Grid>
                   ))}
                 </Grid>
+                {betaTools.length > 0 && (
+                  <Box sx={{ mt: 3 }}>
+                    <Box sx={{ mb: 3, display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box
+                        sx={{
+                          flexShrink: 0,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          height: 14,
+                          minWidth: 28,
+                          px: 0.625,
+                          borderRadius: "4px",
+                          bgcolor: isDark ? "#999999" : "#666666",
+                          color: isDark ? "#1A1A1A" : "#E3E3E3",
+                          fontSize: "8px",
+                          fontWeight: 700,
+                          fontFamily: "Arial, sans-serif",
+                          lineHeight: 1,
+                          letterSpacing: "0.02em",
+                          textTransform: "none",
+                        }}>
+                        {t("beta")}
+                      </Box>
+                      <Divider sx={{ flexGrow: 1 }} />
+                    </Box>
+                    <Grid container spacing={4}>
+                      {betaTools.map((tool) => (
+                        <Grid item xs={4} key={tool.id}>
+                          <ToolCard tool={tool} onSelect={onSelectTool} />
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                )}
               </Box>
             );
           })}

@@ -36,6 +36,8 @@ class ToolDefinition:
         category: Tool category for grouping (e.g., "geoprocessing", "data")
         keywords: Search keywords for discovery
         toolbox_hidden: If True, hide from toolbox UI (still available via API)
+        beta: If True, render in a "Beta" sub-section at the bottom of its
+            category in the toolbox UI
         docs_path: Path to documentation (appended to docs base URL)
         worker_tag: Windmill worker tag for job routing (e.g., "tools", "print")
     """
@@ -49,6 +51,7 @@ class ToolDefinition:
     category: str = "geoprocessing"
     keywords: tuple[str, ...] = ()
     toolbox_hidden: bool = False
+    beta: bool = False
     docs_path: str | None = None
     worker_tag: str = "tools"
 
@@ -355,6 +358,7 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
             "on-the-fly",
             "travel time",
         ),
+        beta=True,
         docs_path="/toolbox/accessibility_indicators/gravity",
     ),
     ToolDefinition(
@@ -391,6 +395,7 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
             "on-the-fly",
             "travel time",
         ),
+        beta=True,
         docs_path="/toolbox/accessibility_indicators/closest_average",
     ),
     ToolDefinition(
@@ -426,6 +431,7 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
             "on-the-fly",
             "travel time",
         ),
+        beta=True,
         docs_path="/toolbox/accessibility_indicators/connectivity",
     ),
     ToolDefinition(
