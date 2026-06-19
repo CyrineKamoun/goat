@@ -1034,6 +1034,7 @@
   "lock_styles": "Layerstile sperren",
   "locked_layers_count": "{{count}} Layer gesperrt",
   "logical_expression": "Logischer Ausdruck",
+  "spatial_expression": "Räumlicher Ausdruck",
   "logical_operator": "Logischer Operator",
   "login": "Anmeldung",
   "logo": "Logo",

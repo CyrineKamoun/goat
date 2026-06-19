@@ -54,33 +54,6 @@ logger = logging.getLogger(__name__)
 class CRUDLayer(CRUDLayerBase):
     """CRUD class for Layer."""
 
-    async def label_cluster_keep(
-        self, async_session: AsyncSession, layer: Layer
-    ) -> None:
-        """Label the rows that should be kept in case of vector tile clustering. Based on the logic to priotize features close to the centroid of an h3 grid of resolution 8."""
-
-        # Build query to update the selected rows
-        if layer.type == LayerType.feature:
-            sql_query = f"""WITH to_update AS
-            (
-                SELECT id, CASE
-                    WHEN row_number() OVER (PARTITION BY h3_group
-                    ORDER BY ST_DISTANCE(ST_CENTROID(geom), ST_SETSRID(h3_cell_to_lat_lng(h3_group)::geometry, 4326))) = 1 THEN TRUE
-                    ELSE FALSE
-                END AS cluster_keep
-                FROM {layer.table_name}
-                WHERE layer_id = '{str(layer.id)}'
-                ORDER BY h3_group, ST_DISTANCE(ST_CENTROID(geom), ST_SETSRID(h3_cell_to_lat_lng(h3_lat_lng_to_cell(ST_CENTROID(geom)::point, 8))::geometry, 4326))
-            )
-            UPDATE {layer.table_name} p
-            SET cluster_keep = TRUE
-            FROM to_update u
-            WHERE p.id = u.id
-            AND u.cluster_keep IS TRUE"""
-
-            await async_session.execute(text(sql_query))
-            await async_session.commit()
-
     async def get_internal(self, async_session: AsyncSession, id: UUID) -> Layer:
         """Gets a layer and make sure it is a internal layer."""
 

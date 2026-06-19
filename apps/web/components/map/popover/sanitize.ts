@@ -17,6 +17,8 @@ const ALLOWED_TAGS = [
   "table", "thead", "tbody", "tr", "th", "td", "caption",
   // definition lists (field list "list" layout)
   "dl", "dt", "dd",
+  // disclosure (expand/collapse without JS)
+  "details", "summary",
   // Inline SVG — a presentational subset only (shapes, paths, gradients,
   // text). Deliberately EXCLUDES the SVG XSS vectors: <script>,
   // <foreignObject> (embeds arbitrary HTML), <use>/xlink (external refs),
@@ -32,6 +34,7 @@ const ALLOWED_ATTRS = [
   "src", "alt", "width", "height",
   "class", "style",
   "colspan", "rowspan",
+  "open",
   // SVG presentational attributes
   "viewbox", "xmlns", "fill", "stroke", "stroke-width", "stroke-linecap",
   "stroke-linejoin", "stroke-dasharray", "fill-rule", "clip-rule", "clip-path",

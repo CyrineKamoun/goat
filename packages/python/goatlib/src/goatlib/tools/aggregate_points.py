@@ -137,6 +137,7 @@ class AggregatePointsToolParams(
             label_key="select_statistics_configuration",
             repeatable=True,
             min_items=1,
+            max_items=30,
         ),
     )
 

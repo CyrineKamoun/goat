@@ -81,7 +81,10 @@ class AggregateColumnStatistic(FieldStatistic):
         json_schema_extra={
             "x-ui": {
                 "widget": "field-selector",
-                "widget_options": {"source_layer": "source_layer_id"},
+                "widget_options": {
+                    "source_layer": "source_layer_id",
+                    "field_types": ["number"],
+                },
                 "visible_when": {"operation": {"$ne": "count"}},
             }
         },

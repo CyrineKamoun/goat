@@ -977,6 +977,7 @@
   "lock_styles": "Lock styles for layers",
   "locked_layers_count": "{{count}} layers locked",
   "logical_expression": "Logical Expression",
+  "spatial_expression": "Spatial Expression",
   "logical_operator": "Logical Operator",
   "logo": "Logo",
   "login": "Login",

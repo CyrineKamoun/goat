@@ -586,9 +586,6 @@ class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
                 FROM '{temp_parquet}'
                 WHERE "{geom_col}" IS NOT NULL
             """).fetchall()
-
-            import os
-            os.unlink(temp_parquet)
         else:
             import json
 

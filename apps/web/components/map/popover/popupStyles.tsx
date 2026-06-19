@@ -80,6 +80,23 @@ export function PopupHtmlStyles() {
             backgroundColor: "#8A8D93",
           },
 
+          // ---- Details disclosure ("Mehr Details" expand/collapse) ----
+          "& details > summary": {
+            listStyle: "none",
+            cursor: "pointer",
+            userSelect: "none",
+          },
+          "& details > summary::-webkit-details-marker": { display: "none" },
+          "& details > summary .chev": {
+            display: "inline-block",
+            transition: "transform 120ms",
+          },
+          "& details[open] > summary .chev": { transform: "rotate(180deg)" },
+          // Optional label swap: <span class="when-closed">Mehr Details</span>
+          // <span class="when-open">Weniger</span> inside the summary.
+          "& details[open] > summary .when-closed": { display: "none" },
+          "& details:not([open]) > summary .when-open": { display: "none" },
+
           // ---- Buttons (match PopupBlockRenderer button styles) ----
           "& .btn-link": {
             color: theme.palette.primary.main,

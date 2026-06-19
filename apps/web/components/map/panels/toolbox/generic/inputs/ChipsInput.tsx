@@ -67,7 +67,9 @@ export default function ChipsInput({ input, value, onChange, disabled, formValue
   }, [steps, activeLimit]);
 
   // Regenerate chips when the computed result changes (steps or limit changed)
-  const prevComputedKeyRef = useRef<string | undefined>(undefined);
+  const prevComputedKeyRef = useRef<string | undefined>(
+    value && value.length > 0 ? computedKey : undefined
+  );
   useEffect(() => {
     if (computedKey === undefined) return;
     if (prevComputedKeyRef.current === computedKey) return;

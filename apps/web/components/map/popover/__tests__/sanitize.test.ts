@@ -74,6 +74,30 @@ describe("sanitizePopupHtml", () => {
     expect(out).not.toContain("alert");
   });
 
+  it("preserves <details>/<summary> with content (Mehr-Details disclosure)", () => {
+    const input =
+      "<details><summary>Mehr Details</summary>" +
+      "<div><span>Fahrstreifen</span></div></details>";
+    const out = sanitizePopupHtml(input);
+    expect(out).toContain("<details>");
+    expect(out).toContain("<summary>Mehr Details</summary>");
+    expect(out).toContain("<span>Fahrstreifen</span>");
+  });
+
+  it("preserves the open attribute on <details>", () => {
+    const out = sanitizePopupHtml("<details open><summary>x</summary>y</details>");
+    expect(out).toContain("open");
+  });
+
+  it("strips event handlers on <details>/<summary>", () => {
+    const out = sanitizePopupHtml(
+      '<details ontoggle="alert(1)"><summary onclick="alert(1)">x</summary></details>',
+    );
+    expect(out).not.toContain("ontoggle");
+    expect(out).not.toContain("onclick");
+    expect(out).not.toContain("alert");
+  });
+
   it("strips <foreignObject> (HTML smuggling vector)", () => {
     const out = sanitizePopupHtml(
       '<svg><foreignObject><img src=x onerror="alert(1)"></foreignObject></svg>',

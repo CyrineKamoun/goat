@@ -27,13 +27,10 @@ def upgrade():
     op.execute("CREATE SCHEMA IF NOT EXISTS temporal;")
     op.execute("CREATE EXTENSION IF NOT EXISTS postgis;")
     op.execute("CREATE EXTENSION IF NOT EXISTS postgis_raster;")
-    op.execute("CREATE EXTENSION IF NOT EXISTS h3;")
     op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "btree_gist";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "fuzzystrmatch";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "hstore";')
-    op.execute('CREATE EXTENSION IF NOT EXISTS "citus";')
-    op.execute('CREATE EXTENSION IF NOT EXISTS "citus_columnar";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "postgres_fdw";')
     op.execute('CREATE EXTENSION IF NOT EXISTS "intarray";')
     # Check if accounts.user exists, and create a minimal version if not
@@ -105,6 +102,28 @@ def upgrade():
                 avatar TEXT NULL,
                 created_at timestamp DEFAULT CURRENT_TIMESTAMP NULL,
                 updated_at timestamp DEFAULT CURRENT_TIMESTAMP NULL
+            );
+        END IF;
+    END
+    $$;
+    """)
+    # Check accounts.project_user exists, and create a minimal version if not.
+    # Written by endpoints/v2/project.py when a project is created (to grant
+    # the creator project-owner access), and read by the auth_z role-resolution
+    # query. Closed-source accounts owns the full schema; OSS mode needs this
+    # stub for POST /api/v2/project to succeed.
+    op.execute("""
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'accounts' AND table_name = 'project_user'
+        ) THEN
+            CREATE TABLE accounts.project_user (
+                project_id UUID NOT NULL,
+                user_id UUID NOT NULL,
+                role_id UUID NOT NULL,
+                PRIMARY KEY (project_id, user_id)
             );
         END IF;
     END
