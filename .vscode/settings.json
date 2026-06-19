@@ -75,6 +75,10 @@
   "mypy-type-checker.preferDaemon": false,
   // Disable automatic venv activation in terminals (breaks frontend dev server)
   "python.terminal.activateEnvironment": false,
+  // "Launch App" runs each service inside a tmux session so it survives
+  // Remote-SSH disconnects. Scan the remote process list (not just terminal
+  // output) for listening ports so they still auto-forward to localhost.
+  "remote.autoForwardPortsSource": "process",
   "terminal.integrated.sendKeybindingsToShell": true,
   // Copilot commit message generation uses our commit convention instructions
   "github.copilot.chat.commitMessageGeneration.instructions": [
