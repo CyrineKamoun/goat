@@ -16,11 +16,26 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { deleteOrganization, updateOrganization } from "@/lib/api/organizations";
 import { useOrganization } from "@/lib/api/users";
-import type { OrganizationUpdate } from "@/lib/validations/organization";
+import type { Organization, OrganizationUpdate } from "@/lib/validations/organization";
 import { organizationUpdateSchema } from "@/lib/validations/organization";
 
 import { RhfAvatar } from "@/components/common/form-inputs/AvatarUpload";
 import ConfirmModal from "@/components/modals/Confirm";
+
+// Seed the edit form from the organization. Optional profile fields can come
+// back null/empty from the API, so coerce to "" rather than running the read
+// object through the update schema (whose fields require non-empty strings).
+const toOrgFormDefaults = (organization: Organization): OrganizationUpdate => ({
+  name: organization.name ?? "",
+  type: organization.type ?? "",
+  size: organization.size ?? "",
+  industry: organization.industry ?? "",
+  department: organization.department ?? "",
+  use_case: organization.use_case ?? "",
+  phone_number: organization.phone_number ?? "",
+  location: organization.location ?? "",
+  avatar: organization.avatar ?? "",
+});
 
 const OrganizationProfile = () => {
   const theme = useTheme();
@@ -40,7 +55,7 @@ const OrganizationProfile = () => {
     resolver: zodResolver(organizationUpdateSchema),
     defaultValues: useMemo(() => {
       if (organization) {
-        return organizationUpdateSchema.parse(organization);
+        return toOrgFormDefaults(organization);
       }
       return {};
     }, [organization]),
@@ -48,7 +63,7 @@ const OrganizationProfile = () => {
 
   useEffect(() => {
     if (organization) {
-      reset(organizationUpdateSchema.parse(organization));
+      reset(toOrgFormDefaults(organization));
     }
   }, [organization, reset]);
 
