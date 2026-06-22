@@ -1,19 +1,15 @@
 #include "pipeline.h"
 
-#include "data/street_network_loader.h"
 #include "input/request_config.h"
 #include "input/validation.h"
 #include "kernel/dijkstra.h"
-#include "kernel/graph_builder.h"
-#include "kernel/mode_selector.h"
 #include "kernel/reachability_field.h"
-#include "kernel/snap.h"
 #include "output/geojson.h"
 #include "output/grid_contour_common.h"
 #include "output/parquet.h"
 #include "geometry/grid_surface_builder.h"
 #include "heatmap/heatmap.h"
-#include "heatmap/network_prep.h"
+#include "network/network_prep.h"
 #include "pt/pt_pipeline.h"
 
 #include <chrono>
@@ -118,43 +114,19 @@ namespace routing
             input::validate(cfg);
         }
 
-        std::vector<std::string> select_valid_classes(RequestConfig const &cfg)
+        // Radial street-network prep for catchment: runs the shared loading
+        // core (edges → costs → SubNetwork → snap) and applies catchment's
+        // policy of keeping only the snapped (connected) starting points.
+        PreparedNetwork prepare_catchment_network(RequestConfig const &cfg,
+                                                  duckdb::Connection &con,
+                                                  bool load_geometry = false)
         {
-            return input::valid_classes(cfg.mode);
-        }
+            auto prep = network::prepare_radial_network(con, cfg, load_geometry);
 
-        std::vector<Edge> load_filtered_edges(RequestConfig const &cfg,
-                                              duckdb::Connection &con,
-                                              std::vector<std::string> const &classes,
-                                              bool load_geometry = false)
-        {
-            double buffer_m = input::buffer_distance(cfg);
-            auto edges = data::load_edges(con, cfg.edge_dir, cfg.node_dir, cfg.starting_points,
-                                          buffer_m, classes, cfg.mode, load_geometry);
-            if (edges.empty())
-            {
-                throw std::runtime_error(
-                    "No edges loaded. Check edge_dir and H3 cell coverage.");
-            }
-            return edges;
-        }
-
-        void compute_edge_costs(std::vector<Edge> &edges,
-                                RequestConfig const &cfg)
-        {
-            kernel::compute_costs(edges, cfg);
-        }
-
-        PreparedNetwork build_network_and_starts(std::vector<Edge> edges,
-                                                 RequestConfig const &cfg)
-        {
-            PreparedNetwork prepared{.net = kernel::build_sub_network(edges),
+            PreparedNetwork prepared{.net = std::move(prep.net),
                                      .valid_starts = {}};
-
-            auto start_nodes = kernel::snap_origins(
-                prepared.net, cfg.starting_points, cfg);
-            prepared.valid_starts.reserve(start_nodes.size());
-            for (auto s : start_nodes)
+            prepared.valid_starts.reserve(prep.snapped_nodes.size());
+            for (auto s : prep.snapped_nodes)
             {
                 if (s >= 0)
                 {
@@ -218,10 +190,7 @@ namespace routing
             }
             else
             {
-                auto classes = select_valid_classes(cfg);
-                auto edges = load_filtered_edges(cfg, con, classes, load_geom);
-                compute_edge_costs(edges, cfg);
-                auto prepared = build_network_and_starts(std::move(edges), cfg);
+                auto prepared = prepare_catchment_network(cfg, con, load_geom);
                 auto costs = run_reachability_dijkstra(prepared.net,
                                                        prepared.valid_starts,
                                                        cfg);
@@ -245,10 +214,7 @@ namespace routing
             validate_request(cfg);
             bool const load_geom = true;  // jsolines needs edge geometry
 
-            auto classes = select_valid_classes(cfg);
-            auto edges = load_filtered_edges(cfg, con, classes, load_geom);
-            compute_edge_costs(edges, cfg);
-            auto prepared = build_network_and_starts(std::move(edges), cfg);
+            auto prepared = prepare_catchment_network(cfg, con, load_geom);
             auto net_ptr = std::make_shared<SubNetwork const>(std::move(prepared.net));
             bool const use_distance = (cfg.cost_type == CostType::Distance);
             auto adj = kernel::build_adjacency_list(*net_ptr);
@@ -408,7 +374,7 @@ namespace routing
         }
         else
         {
-            heatmap::StreetMatrixPrepInput prep_in{
+            network::StreetMatrixPrepInput prep_in{
                 .origins = cfg.origins,
                 .destinations = cfg.destinations,
                 .mode = cfg.mode,
@@ -418,7 +384,7 @@ namespace routing
                 .edge_dir = cfg.edge_dir,
                 .node_dir = cfg.node_dir,
             };
-            auto prep = heatmap::prepare_street_matrix_network(con, prep_in);
+            auto prep = network::prepare_street_matrix_network(con, prep_in);
 
             bool use_distance = (cfg.cost_type == CostType::Distance);
             for (size_t oi = 0; oi < n_origins; ++oi)

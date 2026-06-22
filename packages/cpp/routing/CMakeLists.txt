@@ -153,6 +153,7 @@ file(GLOB_RECURSE SOURCES
     src/geometry/*.cpp
     src/output/*.cpp
     src/heatmap/*.cpp
+    src/network/*.cpp
     src/pipeline.cpp
 )
 

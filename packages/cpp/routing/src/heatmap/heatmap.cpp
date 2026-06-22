@@ -1,6 +1,6 @@
 #include "heatmap.h"
 
-#include "network_prep.h"
+#include "../network/network_prep.h"
 
 #include "../geometry/field_sampler.h"
 #include "../kernel/dijkstra.h"
@@ -106,7 +106,7 @@ void run_street(HeatmapConfig const &cfg, duckdb::Connection &con,
     for (auto const &o : cfg.opportunities)
         opp_points.push_back(o.point);
 
-    HeatmapNetworkPrepInput prep_in{
+    network::HeatmapNetworkPrepInput prep_in{
         .opportunities = opp_points,
         .mode = cfg.mode,
         .cost_type = cfg.cost_type,
@@ -115,7 +115,7 @@ void run_street(HeatmapConfig const &cfg, duckdb::Connection &con,
         .edge_dir = cfg.edge_dir,
         .node_dir = cfg.node_dir,
     };
-    auto prep = prepare_radial_street_network(con, prep_in);
+    auto prep = network::prepare_radial_street_network(con, prep_in);
     std::fprintf(
         stderr,
         "[Pipeline] Network prep (%d nodes, %zu edges, %zu opps): %.0f ms\n",
