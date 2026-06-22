@@ -105,6 +105,31 @@ class WindmillClient:
             logger.error(f"Error submitting job: {e}")
             raise WindmillError(f"Failed to submit job: {e}") from e
 
+    async def get_variable(self, path: str) -> str | None:
+        """Get a Windmill workspace variable value by path.
+
+        Args:
+            path: Variable path (e.g. "f/goat/config/beta_user_email_domains")
+
+        Returns:
+            The variable value, or None if the variable does not exist.
+
+        Raises:
+            WindmillError: If the API call fails for a reason other than
+                the variable being absent.
+        """
+        client = self._get_client()
+
+        try:
+            return await self._run_sync(client.get_variable, path)
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "not found" in error_msg or "404" in error_msg:
+                logger.info(f"Windmill variable not found: {path}")
+                return None
+            logger.error(f"Error getting Windmill variable {path}: {e}")
+            raise WindmillError(f"Failed to get variable {path}: {e}") from e
+
     async def get_job_status(self, job_id: str) -> dict[str, Any]:
         """Get job details from Windmill.
 

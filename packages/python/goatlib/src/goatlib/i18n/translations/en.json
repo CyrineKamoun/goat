@@ -199,9 +199,21 @@
       "label": "Travel Time Limit",
       "description": "Maximum travel time in minutes"
     },
+    "max_cost_time": {
+      "label": "Travel Time Limit",
+      "description": "Maximum travel time in minutes"
+    },
+    "max_cost_distance": {
+      "label": "Travel Distance Limit",
+      "description": "Maximum travel distance in meters"
+    },
     "sensitivity": {
       "label": "Sensitivity",
       "description": "Decay sensitivity parameter for gravity model"
+    },
+    "potential_type": {
+      "label": "Potential Type",
+      "description": "How to determine the potential value for each opportunity."
     },
     "potential_field": {
       "label": "Potential Field",
@@ -485,7 +497,7 @@
     },
     "measure_type": {
       "label": "Calculate by",
-      "description": "Calculate catchment area by time or distance"
+      "description": "Measure travel cost by time or distance"
     },
     "max_distance": {
       "label": "Maximum Distance",
@@ -778,6 +790,17 @@
       "exponential": "Exponential",
       "power": "Power"
     },
+    "gravity_decay": {
+      "gaussian": "Gaussian",
+      "exponential": "Exponential",
+      "linear": "Linear",
+      "power": "Power"
+    },
+    "heatmap_type": {
+      "gravity": "Gravity",
+      "closest_average": "Closest Average",
+      "connectivity": "Connectivity"
+    },
     "units": {
       "meters": "Meters",
       "kilometers": "Kilometers",
@@ -924,12 +947,24 @@
       "title": "Heatmap Gravity",
       "description": "The accessibility is calculated from each grid cell to multiple locations simultaneously. The travel times are weighted and aggregated using an impedance function."
     },
+    "heatmap_gravity_v2": {
+      "title": "Heatmap Gravity V2",
+      "description": "The accessibility is calculated from each grid cell to multiple locations simultaneously. The travel times are weighted and aggregated using an impedance function."
+    },
     "heatmap_closest_average": {
       "title": "Heatmap Closest Average",
       "description": "The average travel time to the nearest N destinations is shown, starting from each grid cell."
     },
+    "heatmap_closest_average_v2": {
+      "title": "Heatmap Closest Average V2",
+      "description": "The average travel time to the nearest N destinations is shown, starting from each grid cell."
+    },
     "heatmap_connectivity": {
       "title": "Heatmap Connectivity",
+      "description": "Connectivity of transport routes is determined by calculating catchment areas for each grid cell, where the reached area is the measure for connectivity."
+    },
+    "heatmap_connectivity_v2": {
+      "title": "Heatmap Connectivity V2",
       "description": "Connectivity of transport routes is determined by calculating catchment areas for each grid cell, where the reached area is the measure for connectivity."
     },
     "heatmap_2sfca": {

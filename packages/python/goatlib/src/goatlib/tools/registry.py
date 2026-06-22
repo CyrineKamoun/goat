@@ -36,6 +36,8 @@ class ToolDefinition:
         category: Tool category for grouping (e.g., "geoprocessing", "data")
         keywords: Search keywords for discovery
         toolbox_hidden: If True, hide from toolbox UI (still available via API)
+        beta: If True, render in a "Beta" sub-section at the bottom of its
+            category in the toolbox UI
         docs_path: Path to documentation (appended to docs base URL)
         worker_tag: Windmill worker tag for job routing (e.g., "tools", "print")
     """
@@ -49,6 +51,7 @@ class ToolDefinition:
     category: str = "geoprocessing"
     keywords: tuple[str, ...] = ()
     toolbox_hidden: bool = False
+    beta: bool = False
     docs_path: str | None = None
     worker_tag: str = "tools"
 
@@ -340,6 +343,25 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         docs_path="/toolbox/accessibility_indicators/gravity",
     ),
     ToolDefinition(
+        name="heatmap_gravity_v2",
+        display_name="Heatmap Gravity V2",
+        description="Gravity-based spatial accessibility analysis",
+        module_path="goatlib.tools.heatmap_gravity_v2",
+        params_class_name="HeatmapGravityV2WindmillParams",
+        windmill_path="f/goat/tools/heatmap_gravity_v2",
+        category="accessibility_indicators",
+        keywords=(
+            "accessibility",
+            "heatmap",
+            "gravity",
+            "opportunities",
+            "on-the-fly",
+            "travel time",
+        ),
+        beta=True,
+        docs_path="/toolbox/accessibility_indicators/gravity",
+    ),
+    ToolDefinition(
         name="heatmap_closest_average",
         display_name="Heatmap Closest Average",
         description="Average distance/time to N closest destinations",
@@ -358,6 +380,25 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         docs_path="/toolbox/accessibility_indicators/closest_average",
     ),
     ToolDefinition(
+        name="heatmap_closest_average_v2",
+        display_name="Heatmap Closest Average V2",
+        description="Average distance/time to N closest destinations",
+        module_path="goatlib.tools.heatmap_closest_average_v2",
+        params_class_name="HeatmapClosestAverageV2WindmillParams",
+        windmill_path="f/goat/tools/heatmap_closest_average_v2",
+        category="accessibility_indicators",
+        keywords=(
+            "accessibility",
+            "heatmap",
+            "closest",
+            "average",
+            "on-the-fly",
+            "travel time",
+        ),
+        beta=True,
+        docs_path="/toolbox/accessibility_indicators/closest_average",
+    ),
+    ToolDefinition(
         name="heatmap_connectivity",
         display_name="Heatmap Connectivity",
         description="Total area reachable within max travel cost",
@@ -372,6 +413,25 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
             "reachability",
             "travel time",
         ),
+        docs_path="/toolbox/accessibility_indicators/connectivity",
+    ),
+    ToolDefinition(
+        name="heatmap_connectivity_v2",
+        display_name="Heatmap Connectivity V2",
+        description="Total area reachable within max travel cost",
+        module_path="goatlib.tools.heatmap_connectivity_v2",
+        params_class_name="HeatmapConnectivityV2WindmillParams",
+        windmill_path="f/goat/tools/heatmap_connectivity_v2",
+        category="accessibility_indicators",
+        keywords=(
+            "accessibility",
+            "heatmap",
+            "connectivity",
+            "reachability",
+            "on-the-fly",
+            "travel time",
+        ),
+        beta=True,
         docs_path="/toolbox/accessibility_indicators/connectivity",
     ),
     ToolDefinition(

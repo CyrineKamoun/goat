@@ -32,5 +32,6 @@ from .travel_cost_matrix import TravelCostMatrixTool
 from .closest_average import HeatmapClosestAverageTool
 from .connectivity import HeatmapConnectivityTool
 from .gravity import HeatmapGravityTool
+from .heatmap_v2 import HeatmapV2Tool
 from .oev_gueteklasse import OevGueteklasseTool
 from .trip_count import TripCountStationTool

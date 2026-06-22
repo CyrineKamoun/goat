@@ -159,6 +159,53 @@ namespace routing
         double cost;  // minutes or meters, +inf if unreachable
     };
 
+    enum class HeatmapType : uint8_t
+    {
+        Gravity,         // sum_j weight_j × decay(cost_ij)
+        ClosestAverage,  // mean cost of the K closest reachable opportunities
+        Connectivity,    // sum of H3 cell areas reachable to each opportunity
+    };
+
+    enum class GravityDecay : uint8_t
+    {
+        Gaussian,     // exp(-(cost/max_cost)^2 × max_sensitivity/sensitivity)
+        Exponential,  // exp(-(sensitivity/max_sensitivity) × cost/max_cost)
+        Linear,       // max(0, 1 - cost/max_cost)
+        Power,        // (cost/max_cost)^(-sensitivity/max_sensitivity)
+    };
+
+    struct Opportunity
+    {
+        Point3857 point;
+        double weight = 1.0;  // gravity potential / connectivity contribution
+    };
+
+    struct HeatmapConfig
+    {
+        // Pre-extracted opportunity points + weights.
+        std::vector<Opportunity> opportunities;
+
+        // Routing
+        RoutingMode mode = RoutingMode::Walking;
+        CostType cost_type = CostType::Time;
+        double max_cost = 15.0;     // minutes (time) or meters (distance)
+        double speed_km_h = 5.0;
+        std::string edge_dir;
+        std::string node_dir;       // empty → inferred from edge_dir
+
+        // Formula
+        HeatmapType heatmap_type = HeatmapType::Gravity;
+        GravityDecay decay = GravityDecay::Gaussian;
+        // Caller-visible sensitivity; max_sensitivity is the normalization
+        // anchor (same convention as goatlib gravity tool — default 1e6).
+        double sensitivity = 300000.0;
+        double max_sensitivity = 1000000.0;
+        int closest_k = 3;          // ClosestAverage only
+
+        // Output
+        std::string output_path;    // parquet: (h3_index BIGINT, score DOUBLE)
+    };
+
     struct MatrixResult
     {
         std::vector<MatrixEntry> entries;

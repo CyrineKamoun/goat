@@ -436,4 +436,14 @@ export const maxFeatureCnt = {
   heatmap_closest_average_motorized_mobility: 1000000,
   heatmap_connectivity_active_mobility: 1000000,
   heatmap_connectivity_motorized_mobility: 1000000,
+  // v2 (on-the-fly C++ routing) is more compute-heavy than v1 (precomputed
+  // OD matrix), so layers are capped at 10k features until streaming-
+  // aggregation / matrix-precompute work lands. Applies uniformly across
+  // formulas (gravity / closest_avg / connectivity) and modes.
+  heatmap_gravity_v2_active_mobility: 10000,
+  heatmap_gravity_v2_motorized_mobility: 10000,
+  heatmap_closest_average_v2_active_mobility: 10000,
+  heatmap_closest_average_v2_motorized_mobility: 10000,
+  heatmap_connectivity_v2_active_mobility: 10000,
+  heatmap_connectivity_v2_motorized_mobility: 10000,
 };

@@ -4,7 +4,6 @@ Computes catchment areas for all transport modes via the C++ routing package
 (walking, bicycle, pedelec, car, public transport). No external HTTP services.
 """
 
-import importlib
 import logging
 import math
 import time
@@ -49,16 +48,6 @@ class CatchmentAreaToolV2(AnalysisTool):
         self._edge_dir = settings.routing.street_network_edges_base_path
         self._node_dir = settings.routing.street_network_nodes_base_path
         self._timetable_path = settings.routing.pt_network_base_path
-
-    @staticmethod
-    def _get_routing_module() -> Any:
-        try:
-            return importlib.import_module("routing")
-        except Exception as exc:
-            raise RuntimeError(
-                "Local routing package is not available. "
-                "Install the 'routing' package (packages/cpp/routing)."
-            ) from exc
 
     @staticmethod
     def _to_web_mercator(lon: float, lat: float) -> tuple[float, float]:

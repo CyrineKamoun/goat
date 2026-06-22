@@ -19,4 +19,10 @@ namespace routing
     //   origin_id (INT), destination_id (INT), cost (DOUBLE)
     void compute_travel_cost_matrix(MatrixConfig const &cfg);
 
+    // Compute a per-origin accessibility heatmap against a fixed
+    // opportunity layer. Writes parquet to cfg.output_path with columns:
+    //   origin_id (VARCHAR), score (DOUBLE).
+    // Implementation lives in src/heatmap/.
+    void compute_heatmap(HeatmapConfig const &cfg);
+
 } // namespace routing

@@ -115,6 +115,47 @@ PYBIND11_MODULE(_routing, m)
         .def_readwrite("egress_speed_km_h", &routing::MatrixConfig::egress_speed_km_h)
         .def_readwrite("transfer_cost", &routing::MatrixConfig::transfer_cost);
 
+    py::enum_<routing::HeatmapType>(m, "HeatmapType")
+        .value("Gravity",        routing::HeatmapType::Gravity)
+        .value("ClosestAverage", routing::HeatmapType::ClosestAverage)
+        .value("Connectivity",   routing::HeatmapType::Connectivity);
+
+    py::enum_<routing::GravityDecay>(m, "GravityDecay")
+        .value("Gaussian",    routing::GravityDecay::Gaussian)
+        .value("Exponential", routing::GravityDecay::Exponential)
+        .value("Linear",      routing::GravityDecay::Linear)
+        .value("Power",       routing::GravityDecay::Power);
+
+    py::class_<routing::Opportunity>(m, "Opportunity")
+        .def(py::init<>())
+        .def(py::init([](routing::Point3857 const &p, double w) {
+                 routing::Opportunity o;
+                 o.point = p;
+                 o.weight = w;
+                 return o;
+             }),
+             py::arg("point"), py::arg("weight") = 1.0)
+        .def_readwrite("point",  &routing::Opportunity::point)
+        .def_readwrite("weight", &routing::Opportunity::weight);
+
+    py::class_<routing::HeatmapConfig>(m, "HeatmapConfig")
+        .def(py::init<>())
+        .def_readwrite("opportunities",   &routing::HeatmapConfig::opportunities)
+        .def_readwrite("mode",            &routing::HeatmapConfig::mode)
+        .def_readwrite("cost_type",       &routing::HeatmapConfig::cost_type)
+        .def_readwrite("max_cost",        &routing::HeatmapConfig::max_cost)
+        .def_readwrite("speed_km_h",      &routing::HeatmapConfig::speed_km_h)
+        .def_readwrite("edge_dir",        &routing::HeatmapConfig::edge_dir)
+        .def_readwrite("node_dir",        &routing::HeatmapConfig::node_dir)
+        // Formula
+        .def_readwrite("heatmap_type",    &routing::HeatmapConfig::heatmap_type)
+        .def_readwrite("decay",           &routing::HeatmapConfig::decay)
+        .def_readwrite("sensitivity",     &routing::HeatmapConfig::sensitivity)
+        .def_readwrite("max_sensitivity", &routing::HeatmapConfig::max_sensitivity)
+        .def_readwrite("closest_k",       &routing::HeatmapConfig::closest_k)
+        // Output
+        .def_readwrite("output_path",     &routing::HeatmapConfig::output_path);
+
     m.def("compute_catchment",
           [elapsed_ms](routing::RequestConfig const &config)
           {
@@ -132,4 +173,17 @@ PYBIND11_MODULE(_routing, m)
           &routing::compute_travel_cost_matrix,
           py::arg("config"),
           "Compute many-to-many travel cost matrix between origins and destinations");
+
+    m.def("compute_heatmap",
+          [elapsed_ms](routing::HeatmapConfig const &config)
+          {
+              auto t0 = std::chrono::steady_clock::now();
+              routing::compute_heatmap(config);
+              auto t1 = std::chrono::steady_clock::now();
+              py::print("[routing] compute_heatmap total_ms=",
+                        elapsed_ms(t0, t1));
+          },
+          py::arg("config"),
+          "Compute per-origin accessibility heatmap (Gravity / ClosestAverage) "
+          "against a fixed opportunity layer");
 }
