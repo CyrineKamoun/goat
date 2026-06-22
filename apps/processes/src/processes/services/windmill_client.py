@@ -121,7 +121,8 @@ class WindmillClient:
         client = self._get_client()
 
         try:
-            return await self._run_sync(client.get_variable, path)
+            value: str | None = await self._run_sync(client.get_variable, path)
+            return value
         except Exception as e:
             error_msg = str(e).lower()
             if "not found" in error_msg or "404" in error_msg:
