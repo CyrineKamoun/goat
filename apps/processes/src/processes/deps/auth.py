@@ -173,3 +173,39 @@ async def get_optional_user_id(
         return UUID(user_id) if user_id else None
     except (JOSEError, ValueError, TypeError):
         return None
+
+
+async def get_optional_user_email(
+    request: Request,
+    token: str | None = Depends(oauth2_scheme),
+) -> str | None:
+    """Get the user's email from the token if present, otherwise None.
+
+    Used for read-only endpoints that adjust their response based on the
+    user (e.g. gating beta tools) but must still work unauthenticated.
+    """
+    # If auth is disabled, decode a provided token, else fall back to mock.
+    if not settings.AUTH:
+        if token:
+            try:
+                email = decode_token(token).get("email")
+                if email:
+                    return str(email).lower()
+            except (JOSEError, ValueError, TypeError):
+                pass
+        return "dev@example.com"
+
+    # Try to get token from header if not provided by the scheme
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
+    if not token:
+        return None
+
+    try:
+        email = decode_token(token).get("email")
+        return str(email).lower() if email else None
+    except (JOSEError, ValueError, TypeError):
+        return None

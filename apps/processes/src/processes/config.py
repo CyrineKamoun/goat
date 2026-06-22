@@ -119,6 +119,15 @@ class Settings(BaseSettings):
     # Print worker URL (for PrintReport tool to render pages)
     PRINT_BASE_URL: str = os.getenv("PRINT_BASE_URL", "http://goat-web:3000")
 
+    # Beta tool gating: users whose email domain is allowlisted are shown beta
+    # tools in the toolbox. The allowlist lives in a Windmill variable (a
+    # comma-separated list of domains, e.g. "plan4better.de,example.org")
+    # configured on the Windmill variables page, like other operational config.
+    # When the variable is unset/empty, beta tools are hidden from everyone.
+    BETA_USER_EMAIL_DOMAINS_WM_PATH: str = os.getenv(
+        "BETA_USER_EMAIL_DOMAINS_WM_PATH", "f/goat/config/beta_user_email_domains"
+    )
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
@@ -127,3 +136,18 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+
+def normalize_email_domains(raw: str | None) -> set[str]:
+    """Parse a comma-separated domain list into a normalized set.
+
+    Lowercases, trims whitespace, and strips a leading '@' so both
+    "@plan4better.de" and "plan4better.de" are accepted.
+    """
+    if not raw:
+        return set()
+    return {
+        domain.strip().lstrip("@").lower()
+        for domain in raw.split(",")
+        if domain.strip()
+    }
