@@ -521,8 +521,14 @@ const Layers = (props: LayersProps) => {
 
     apply();
     map.on("styledata", apply);
+    // After a basemap switch the new style loads and react-map-gl re-adds the
+    // user layers asynchronously; styledata can fire before the user layers are
+    // back, leaving stacking unapplied. "idle" fires once everything has settled,
+    // so re-apply then. once() (not on()) avoids re-running on every pan/zoom.
+    map.once("idle", apply);
     return () => {
       map.off("styledata", apply);
+      map.off("idle", apply);
     };
   }, [useDataLayers, mapRef, basemapLayerConfig]);
 
