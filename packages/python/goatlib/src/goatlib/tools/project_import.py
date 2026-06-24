@@ -888,6 +888,12 @@ class ProjectImportRunner(SimpleToolRunner):
                     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
                     re.IGNORECASE,
                 )
+                # DuckLake caches catalog metadata on the connection; on large
+                # catalogs each CREATE TABLE adds tens of MB that is only freed on
+                # close. Recycle the connection every few layers to keep peak RSS
+                # bounded — otherwise importing into a big catalog OOMs the worker.
+                imported_layer_count = 0
+                recycle_every = 5
                 for layer_meta in layer_index_layers:
                     old_layer_id = layer_meta["id"]
                     if not uuid_re.match(old_layer_id):
@@ -918,6 +924,9 @@ class ProjectImportRunner(SimpleToolRunner):
                                 new_layer_id=new_layer_id,
                                 tracker=tracker,
                             )
+                            imported_layer_count += 1
+                            if imported_layer_count % recycle_every == 0:
+                                self.recycle_duckdb_connection()
                         else:
                             logger.warning(
                                 "No data.parquet for internal layer %s, skipping DuckLake import",
