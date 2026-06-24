@@ -346,6 +346,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
           }}>
           <Geocoder
             accessToken={MAPBOX_TOKEN}
+            bbox={project?.max_extent ?? undefined}
             placeholder={t("enter_an_address")}
             tooltip={t("search")}
             onSelect={(result) => {

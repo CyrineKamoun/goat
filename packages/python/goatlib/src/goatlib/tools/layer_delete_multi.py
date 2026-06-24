@@ -159,8 +159,12 @@ class LayerDeleteMultiRunner(SimpleToolRunner):
             wm_labels=wm_labels,
         )
 
+        # Each DROP TABLE is a DuckLake commit whose memory cost scales with
+        # catalog size and accumulates on the connection; recycle periodically so
+        # deleting many layers against a large catalog doesn't OOM the worker.
+        recycle_every = 5
         try:
-            for layer_id in params.layer_ids:
+            for processed, layer_id in enumerate(params.layer_ids, start=1):
                 result = LayerDeleteResult(
                     layer_id=layer_id,
                 )
@@ -195,6 +199,9 @@ class LayerDeleteMultiRunner(SimpleToolRunner):
                     logger.warning("Failed to delete layer %s: %s", layer_id, e)
 
                 output.results.append(result)
+
+                if processed % recycle_every == 0:
+                    self.recycle_duckdb_connection()
 
             logger.info(
                 "Multi-layer deletion complete: total=%d, deleted=%d, failed=%d",

@@ -486,6 +486,23 @@ class SimpleToolRunner:
             self._duckdb_con = self._get_duckdb_connection()
         return self._duckdb_con
 
+    def recycle_duckdb_connection(self: Self) -> None:
+        """Close and clear the cached DuckDB connection so the next access rebuilds it.
+
+        DuckLake caches catalog metadata on the connection. For tools that create
+        many tables in a loop (e.g. project import), that cache grows with the
+        catalog size (cumulative snapshots) and is only freed when the connection
+        closes — driving the worker toward OOM on large catalogs. Recycling between
+        batches releases it. Safe between DuckLake commits (each CREATE TABLE is its
+        own commit), but never call it mid-transaction.
+        """
+        if self._duckdb_con is not None:
+            try:
+                self._duckdb_con.close()
+            except Exception:
+                pass
+            self._duckdb_con = None
+
     @property
     def s3_client(self: Self) -> Any:
         """Get or create S3 client (cached)."""

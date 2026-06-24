@@ -74,55 +74,6 @@
       }
     },
     {
-      "name": "Accounts Debug",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "uvicorn",
-      "args": [
-        "src.main:app",
-        "--host", "0.0.0.0",
-        "--port", "5001"
-      ],
-      "consoleName": "Accounts Debug Console",
-      "cwd": "${workspaceFolder}/apps/accounts",
-      "justMyCode": false,
-      "jinja": true,
-      "envFile": "${workspaceFolder}/apps/accounts/.env",
-      "python": "/home/p4b/.cache/pypoetry/virtualenvs/goat-accounts-iw7Yms5F-py3.11/bin/python",
-      "waitForClient": false,
-      "presentation": {
-        "hidden": false,
-        "group": "backend",
-        "order": 3
-      }
-    },
-    {
-      "name": "Routing Debug",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "fastapi",
-      "args": [
-        "dev",
-        "src/routing/main.py",
-        "--reload",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        "8200"
-      ],
-      "consoleName": "Routing Debug Console",
-      "cwd": "${workspaceFolder}/apps/routing",
-      "justMyCode": false,
-      "jinja": true,
-      "envFile": "${workspaceFolder}/.env",
-      "preLaunchTask": "routing-pre-launch",
-      "presentation": {
-        "hidden": false,
-        "group": "backend",
-        "order": 3
-      }
-    },
-    {
       "name": "Web Debug",
       "type": "node-terminal",
       "request": "launch",
@@ -159,6 +110,34 @@
         "group": "frontend",
         "order": 2
       }
+    },
+    {
+      "name": "Core (tmux)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "tmux new -ADs core 'cd ${workspaceFolder}/apps/core && set -a && . ${workspaceFolder}/.env && set +a && exec uv run fastapi dev src/core/main.py --reload --port 8000'",
+      "presentation": { "hidden": false, "group": "tmux", "order": 1 }
+    },
+    {
+      "name": "GeoAPI (tmux)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "tmux new -ADs geoapi 'cd ${workspaceFolder}/apps/geoapi && set -a && . ${workspaceFolder}/.env && set +a && exec uv run fastapi dev src/geoapi/main.py --reload --port 8100'",
+      "presentation": { "hidden": false, "group": "tmux", "order": 2 }
+    },
+    {
+      "name": "Processes (tmux)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "tmux new -ADs processes 'cd ${workspaceFolder}/apps/processes && set -a && . ${workspaceFolder}/.env && set +a && exec uv run fastapi dev src/processes/main.py --reload --port 8300'",
+      "presentation": { "hidden": false, "group": "tmux", "order": 3 }
+    },
+    {
+      "name": "Web (tmux)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "tmux new -ADs web 'cd ${workspaceFolder} && set -a && . ${workspaceFolder}/.env && set +a && exec pnpm web'",
+      "presentation": { "hidden": false, "group": "tmux", "order": 4 }
     },
     {
       "name": "Python: Current File",
@@ -207,10 +186,12 @@
   ],
   "compounds": [
     {
-      "name": "Backend Debug",
+      "name": "Launch App",
       "configurations": [
         "GeoAPI Debug",
+        "Processes Debug",
         "Core Debug",
+        "Web Debug"
       ],
       "presentation": {
         "hidden": false,
@@ -219,18 +200,29 @@
       }
     },
     {
-      "name": "Launch App",
+      "name": "Backend Debug",
       "configurations": [
         "GeoAPI Debug",
-        "Processes Debug",
-        "Core Debug",
-        "Accounts Debug",
-        "Web Debug"
+        "Core Debug"
       ],
       "presentation": {
         "hidden": false,
         "group": "compounds",
         "order": 1
+      }
+    },
+    {
+      "name": "Launch App (tmux)",
+      "configurations": [
+        "GeoAPI (tmux)",
+        "Processes (tmux)",
+        "Core (tmux)",
+        "Web (tmux)"
+      ],
+      "presentation": {
+        "hidden": false,
+        "group": "compounds",
+        "order": 2
       }
     }
   ]

@@ -32,15 +32,6 @@
       }
     },
     {
-      "label": "kill-port-8200",
-      "type": "shell",
-      "command": "kill $(ss -tlnp | grep ':8200 ' | grep -oP 'pid=\\K[0-9]+') 2>/dev/null || true",
-      "presentation": {
-        "reveal": "silent",
-        "close": true
-      }
-    },
-    {
       "label": "kill-port-8300",
       "type": "shell",
       "command": "kill $(ss -tlnp | grep ':8300 ' | grep -oP 'pid=\\K[0-9]+') 2>/dev/null || true",
@@ -60,27 +51,26 @@
     },
     {
       "label": "core-pre-launch",
-      "dependsOn": ["kill-port-8000", "uv-sync"],
+      "dependsOn": [
+        "kill-port-8000",
+        "uv-sync"
+      ],
       "dependsOrder": "sequence"
     },
     {
       "label": "geoapi-pre-launch",
-      "dependsOn": ["kill-port-8100", "uv-sync"],
+      "dependsOn": [
+        "kill-port-8100",
+        "uv-sync"
+      ],
       "dependsOrder": "sequence"
     },
     {
       "label": "processes-pre-launch",
-      "dependsOn": ["kill-port-8300", "uv-sync"],
-      "dependsOrder": "sequence"
-    },
-    {
-      "label": "accounts-pre-launch",
-      "dependsOn": ["kill-port-8100", "uv-sync"],
-      "dependsOrder": "sequence"
-    },
-    {
-      "label": "routing-pre-launch",
-      "dependsOn": ["kill-port-8200", "uv-sync"],
+      "dependsOn": [
+        "kill-port-8300",
+        "uv-sync"
+      ],
       "dependsOrder": "sequence"
     },
     {
@@ -94,12 +84,16 @@
     },
     {
       "label": "web-pre-launch",
-      "dependsOn": ["kill-port-3000"],
+      "dependsOn": [
+        "kill-port-3000"
+      ],
       "dependsOrder": "sequence"
     },
     {
       "label": "docs-pre-launch",
-      "dependsOn": ["kill-port-3001"],
+      "dependsOn": [
+        "kill-port-3001"
+      ],
       "dependsOrder": "sequence"
     }
   ]
