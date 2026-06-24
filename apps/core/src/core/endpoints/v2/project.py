@@ -664,10 +664,12 @@ async def delete_layer_from_project(
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
         )
     assert type(project) is Project
-    assert isinstance(project.layer_order, List)
 
-    layer_order = project.layer_order.copy()
-    layer_order.remove(layer_project.id)
+    # layer_order may be None (e.g. copied projects whose source had no order),
+    # so treat it as empty and only remove the id if present.
+    layer_order = list(project.layer_order or [])
+    if layer_project.id in layer_order:
+        layer_order.remove(layer_project.id)
 
     await crud_project.update(
         async_session,

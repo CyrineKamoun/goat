@@ -29,7 +29,7 @@ import { setSelectedBuilderItem } from "@/lib/store/map/slice";
 import { addOrUpdateMarkerImages, addPatternImages } from "@/lib/transformers/map-image";
 import { createSnapToCursorModifier } from "@/lib/utils/dnd-modifier";
 import type { FeatureLayerPointProperties } from "@/lib/validations/layer";
-import { type BuilderWidgetSchema, builderWidgetSchema, projectSchema } from "@/lib/validations/project";
+import { type BuilderWidgetSchema, type CustomBasemap, builderWidgetSchema, projectSchema } from "@/lib/validations/project";
 import { widgetSchemaMap } from "@/lib/validations/widget";
 
 import { useAuthZ } from "@/hooks/auth/AuthZ";
@@ -180,7 +180,27 @@ export default function MapPage({ params: { projectId } }) {
     return allProjectLayersIncludingTables || [];
   }, [allProjectLayersIncludingTables]);
 
-  const { activeBasemap, mapStyle } = useBasemap(project);
+  const { activeBasemap, mapStyle, setActiveBasemap } = useBasemap(project);
+
+  // Keep the Redux active basemap (read by Layers for basemap layer_config) in
+  // sync with the persisted basemap, re-resolving only when the active basemap
+  // value or its own layer_config actually changes. Keyed on a stable string so
+  // unrelated SWR revalidations (which hand back new array refs) don't re-dispatch
+  // and force a style reload on raster/solid basemaps.
+  const activeBasemapValue = project?.basemap;
+  const activeBasemapLayerConfigKey = useMemo(() => {
+    const customs = (project?.custom_basemaps as CustomBasemap[] | undefined) ?? [];
+    const active = customs.find((c) => c.id === activeBasemapValue);
+    return JSON.stringify(
+      active && active.type === "vector" ? (active.layer_config ?? null) : null
+    );
+  }, [project?.custom_basemaps, activeBasemapValue]);
+  useEffect(() => {
+    if (activeBasemapValue) setActiveBasemap(activeBasemapValue);
+    // setActiveBasemap is recreated on each render; the stable deps above gate
+    // when we actually need to re-sync.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBasemapValue, activeBasemapLayerConfigKey]);
 
   const { isOrgEditor, isLoading: isAuthZLoading } = useAuthZ();
   const { folders, isLoading: isFoldersLoading } = useFolders({});

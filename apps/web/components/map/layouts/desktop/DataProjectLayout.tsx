@@ -1,5 +1,5 @@
 import { Box, Stack } from "@mui/material";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 
@@ -79,7 +79,10 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
     return allProjectLayers?.filter((layer) => !SYSTEM_LAYERS_IDS.includes(layer.layer_id)) || [];
   }, [allProjectLayers]);
 
-  const { translatedBaseMaps, activeBasemap } = useBasemap(project);
+  const { translatedBaseMaps, activeBasemap, setActiveBasemap } = useBasemap(project);
+  // When editing a non-active basemap we preview it ephemerally (Redux only, no
+  // persist); this remembers what to restore when the dialog closes.
+  const basemapBeforeEdit = useRef<string | null>(null);
 
   const { addCustomBasemap, editCustomBasemap, deleteCustomBasemap } =
     useCustomBasemapMutations(project, onProjectUpdate);
@@ -421,6 +424,11 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
                   (project?.custom_basemaps as CustomBasemap[] | undefined)?.find(
                     (c) => c.id === id
                   ) ?? null;
+                if (target && project?.basemap !== id) {
+                  // Ephemeral preview only — reverted on close, never persisted.
+                  basemapBeforeEdit.current = project?.basemap ?? DEFAULT_BASEMAP;
+                  setActiveBasemap(id);
+                }
                 setEditing(target);
                 setDialogOpen(true);
               }}
@@ -485,7 +493,14 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
       <CustomBasemapDialog
         open={dialogOpen}
         initial={editing}
-        onClose={() => setDialogOpen(false)}
+        projectLayers={projectLayers}
+        onClose={() => {
+          setDialogOpen(false);
+          if (basemapBeforeEdit.current !== null) {
+            setActiveBasemap(basemapBeforeEdit.current);
+            basemapBeforeEdit.current = null;
+          }
+        }}
         onSubmit={async (payload) => {
           if (editing) {
             await editCustomBasemap(editing.id, payload);

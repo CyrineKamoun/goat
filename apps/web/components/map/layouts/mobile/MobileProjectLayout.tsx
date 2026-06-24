@@ -213,7 +213,10 @@ const MobileProjectLayout = ({
   );
 
   // --- Hooks ---
-  const { translatedBaseMaps, activeBasemap } = useBasemap(project);
+  const { translatedBaseMaps, activeBasemap, setActiveBasemap } = useBasemap(project);
+  // Ephemeral preview of a non-active basemap while its edit dialog is open;
+  // restored on close (never persisted).
+  const basemapBeforeEdit = useRef<string | null>(null);
   const mapMode = useAppSelector((state) => state.map.mapMode);
   const editable = mapMode !== "public";
   const { addCustomBasemap, editCustomBasemap, deleteCustomBasemap } =
@@ -565,6 +568,11 @@ const MobileProjectLayout = ({
                     (project?.custom_basemaps as CustomBasemap[] | undefined)?.find(
                       (c) => c.id === id
                     ) ?? null;
+                  if (target && project?.basemap !== id) {
+                    // Ephemeral preview only — reverted on close, never persisted.
+                    basemapBeforeEdit.current = project?.basemap ?? DEFAULT_BASEMAP;
+                    setActiveBasemap(id);
+                  }
                   setEditing(target);
                   setDialogOpen(true);
                 }}
@@ -647,7 +655,14 @@ const MobileProjectLayout = ({
       <CustomBasemapDialog
         open={dialogOpen}
         initial={editing}
-        onClose={() => setDialogOpen(false)}
+        projectLayers={projectLayers}
+        onClose={() => {
+          setDialogOpen(false);
+          if (basemapBeforeEdit.current !== null) {
+            setActiveBasemap(basemapBeforeEdit.current);
+            basemapBeforeEdit.current = null;
+          }
+        }}
         onSubmit={async (payload) => {
           if (editing) {
             await editCustomBasemap(editing.id, payload);

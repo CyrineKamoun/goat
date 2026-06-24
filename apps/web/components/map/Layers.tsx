@@ -24,6 +24,7 @@ import {
 } from "@/lib/transformers/layer";
 import { addOrUpdateMarkerImages, loadImage } from "@/lib/transformers/map-image";
 import { transformToLineDecorationLayers } from "@/lib/transformers/lineStyle";
+import { computeStackOrder, resolveTarget } from "@/lib/utils/map/basemapLayers";
 import { generateCOGColorFunction } from "@/lib/utils/map/cog-styling";
 import { getLayerKey } from "@/lib/utils/map/layer";
 import { registerSpriteImages } from "@/lib/utils/map/registerSpriteImages";
@@ -34,7 +35,7 @@ import type {
   Layer,
   RasterLayerProperties,
 } from "@/lib/validations/layer";
-import type { ProjectLayer } from "@/lib/validations/project";
+import type { BasemapLayerConfig, ProjectLayer } from "@/lib/validations/project";
 import { type ScenarioFeatures, scenarioEditTypeEnum } from "@/lib/validations/scenario";
 
 import { useAppSelector } from "@/hooks/store/ContextHooks";
@@ -59,6 +60,22 @@ const Layers = (props: LayersProps) => {
   const mapMode = useAppSelector((state) => state.map.mapMode);
   const pendingFeatures = useAppSelector((state) => state.featureEditor.pendingFeatures);
   const editLayerId = useAppSelector((state) => state.featureEditor.activeLayerId);
+  const activeBasemap = useAppSelector((state) => state.map.activeBasemap);
+  const basemapLayerConfigOverride = useAppSelector((state) => state.map.basemapLayerConfigOverride);
+  const basemapLayerConfig = useMemo<BasemapLayerConfig>(() => {
+    // Live preview (dialog open) takes precedence over the persisted config.
+    if (basemapLayerConfigOverride !== undefined) {
+      return basemapLayerConfigOverride;
+    }
+    if (
+      activeBasemap &&
+      activeBasemap.source === "custom" &&
+      activeBasemap.type === "vector"
+    ) {
+      return (activeBasemap.layer_config as BasemapLayerConfig | undefined) ?? {};
+    }
+    return {};
+  }, [activeBasemap, basemapLayerConfigOverride]);
 
   // Get editing layer to copy its style to the overlay
   const editingLayer = useMemo(() => {
@@ -391,6 +408,123 @@ const Layers = (props: LayersProps) => {
     }
   }, [useDataLayers, mapRef]);
 
+  // Apply basemap layer visibility and stacking for custom vector basemaps.
+  // Fully declarative: reset to the basemap's pristine layer order, then apply
+  // the current config — so toggling off↔on and promoting↔un-promoting both
+  // reflect correctly (no stuck state).
+  const basemapAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!mapRef) return;
+    const map = mapRef.getMap();
+
+    const apply = () => {
+      if (!map.isStyleLoaded()) return;
+      const hasConfig = Object.keys(basemapLayerConfig).length > 0;
+      // Nothing configured and nothing was ever applied → nothing to do/restore.
+      if (!hasConfig && !basemapAppliedRef.current) return;
+
+      const styleLayers = map.getStyle()?.layers ?? [];
+      const allIdsBottomToTop = styleLayers.map((l) => l.id);
+      const styleIds = new Set(allIdsBottomToTop);
+
+      // User data layers (panel order top→bottom), each expanded to its source group.
+      const userLayers = (useDataLayers ?? [])
+        .map((layer) => {
+          const mainId = layer.id.toString();
+          const main = styleLayers.find((l) => l.id === mainId);
+          if (!main || !("source" in main)) return null;
+          const sublayers = styleLayers
+            .filter((l) => "source" in l && l.source === main.source)
+            .map((l) => l.id)
+            .reverse();
+          return { id: mainId, sublayers };
+        })
+        .filter(Boolean) as Array<{ id: string; sublayers: string[] }>;
+      const userSubIds = new Set(userLayers.flatMap((u) => u.sublayers));
+
+      // Basemap layers = everything that isn't a user data layer. Capture their
+      // pristine order once per basemap style (keyed by the basemap layer-id set,
+      // which is stable when user layers are added/removed).
+      const basemapIds = allIdsBottomToTop.filter((id) => !userSubIds.has(id));
+      const styleKey = [...basemapIds].sort().join("|");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cache = map as any;
+      if (!cache.__basemapPristine || cache.__basemapPristine.key !== styleKey) {
+        cache.__basemapPristine = { key: styleKey, order: basemapIds.slice() };
+      }
+      const pristineTopToBottom: string[] = [...cache.__basemapPristine.order]
+        .reverse()
+        .filter((id: string) => styleIds.has(id));
+
+      // 1) Visibility — every basemap layer reflects config (default: visible).
+      for (const id of pristineTopToBottom) {
+        const desired = (basemapLayerConfig[id]?.visible ?? true) ? "visible" : "none";
+        try {
+          if ((map.getLayoutProperty(id, "visibility") ?? "visible") !== desired) {
+            map.setLayoutProperty(id, "visibility", desired);
+          }
+        } catch {
+          /* layer not ready */
+        }
+      }
+
+      // 2) Stacking — promoted basemap layers move into the user-layer region;
+      //    everything else stays below in pristine order. Resolve the target the
+      //    same way computeStackOrder does, so an orphaned "below <deleted layer>"
+      //    collapses to "below all" and falls through to the native-position group
+      //    (rather than being promoted-but-never-placed).
+      const userMainIds = new Set(userLayers.map((u) => u.id));
+      const promoted = pristineTopToBottom
+        .filter((id) => {
+          const s = basemapLayerConfig[id];
+          if (!s) return false;
+          const target = resolveTarget(s.target, userMainIds);
+          return !(s.relation === "below" && target === "all");
+        })
+        .map((id) => {
+          const s = basemapLayerConfig[id];
+          return { id, relation: s.relation, target: s.target };
+        });
+      const promotedIds = new Set(promoted.map((p) => p.id));
+
+      const stack = computeStackOrder(userLayers, promoted); // top→bottom
+      const below = pristineTopToBottom.filter((id) => !promotedIds.has(id));
+      const desiredOrder = [...stack, ...below]; // full top→bottom
+
+      basemapAppliedRef.current = hasConfig;
+
+      if (desiredOrder.length === 0) return;
+
+      const orderSet = new Set(desiredOrder);
+      const currentRelative = allIdsBottomToTop
+        .slice()
+        .reverse() // style is bottom→top; compare in top→bottom
+        .filter((id) => orderSet.has(id));
+      const alreadyOrdered =
+        currentRelative.length === desiredOrder.length &&
+        currentRelative.every((id, i) => id === desiredOrder[i]);
+      if (alreadyOrdered) return;
+
+      try {
+        map.moveLayer(desiredOrder[0]); // force top item to absolute top
+      } catch {
+        /* not ready */
+      }
+      for (let i = 1; i < desiredOrder.length; i++) {
+        try {
+          map.moveLayer(desiredOrder[i], desiredOrder[i - 1]);
+        } catch {
+          /* not ready */
+        }
+      }
+    };
+
+    apply();
+    map.on("styledata", apply);
+    return () => {
+      map.off("styledata", apply);
+    };
+  }, [useDataLayers, mapRef, basemapLayerConfig]);
 
   return (
     <>

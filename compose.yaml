@@ -136,6 +136,11 @@ x-worker-tools-base: &worker-tools-base
     - goat
   environment:
     <<: *env-tools
+  deploy:
+    resources:
+      limits:
+        cpus: "2"
+        memory: 4G
   depends_on:
     - windmill-server
 
@@ -361,6 +366,10 @@ services:
     <<: *worker-workflows-base
     deploy:
       replicas: 3
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
     volumes:
       - goat-data:/app/data
 
@@ -369,6 +378,10 @@ services:
     <<: *worker-workflows-base
     deploy:
       replicas: 5
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
     volumes:
       - ./packages/python/goatlib/src/goatlib:/venv/lib/python3.11/site-packages/goatlib:ro
       - goat-data:/app/data

@@ -120,3 +120,61 @@ describe("customBasemapSchema", () => {
     ).toThrow();
   });
 });
+
+describe("customBasemapSchema layer_config", () => {
+  it("accepts a vector basemap with layer_config", () => {
+    const parsed = customBasemapSchema.parse({
+      ...baseFields,
+      type: "vector",
+      url: "https://example.com/style.json",
+      layer_config: {
+        road_label: { visible: true, relation: "above", target: "12" },
+        water: { visible: false, relation: "below", target: "all" },
+      },
+    });
+    expect(parsed.type).toBe("vector");
+    if (parsed.type === "vector") {
+      expect(parsed.layer_config?.road_label.relation).toBe("above");
+      expect(parsed.layer_config?.road_label.target).toBe("12");
+      expect(parsed.layer_config?.water.visible).toBe(false);
+    }
+  });
+
+  it("applies defaults to a partial layer_config entry", () => {
+    const parsed = customBasemapSchema.parse({
+      ...baseFields,
+      type: "vector",
+      url: "https://example.com/style.json",
+      layer_config: { road_label: {} },
+    });
+    if (parsed.type === "vector") {
+      expect(parsed.layer_config?.road_label).toEqual({
+        visible: true,
+        relation: "below",
+        target: "all",
+      });
+    }
+  });
+
+  it("rejects an invalid relation", () => {
+    expect(() =>
+      customBasemapSchema.parse({
+        ...baseFields,
+        type: "vector",
+        url: "https://example.com/style.json",
+        layer_config: { road_label: { relation: "sideways" } },
+      })
+    ).toThrow();
+  });
+
+  it("accepts a vector basemap without layer_config (optional)", () => {
+    const parsed = customBasemapSchema.parse({
+      ...baseFields,
+      type: "vector",
+      url: "https://example.com/style.json",
+    });
+    if (parsed.type === "vector") {
+      expect(parsed.layer_config).toBeUndefined();
+    }
+  });
+});
