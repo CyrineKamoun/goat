@@ -26,10 +26,7 @@ import type {
 } from "@/lib/validations/layer";
 
 export const LAYERS_API_BASE_URL = new URL("api/v2/layer", process.env.NEXT_PUBLIC_API_URL).href;
-export const CATALOG_API_BASE_URL = new URL(
-  "api/v2/catalog/records/collections/datasets",
-  process.env.NEXT_PUBLIC_API_URL
-).href;
+export const CATALOG_API_BASE_URL = `${GEOAPI_BASE_URL}/catalog/records/collections/datasets`;
 export const COLLECTIONS_API_BASE_URL = `${GEOAPI_BASE_URL}/collections`;
 
 export const updateBaseLayerProperties = async (
@@ -66,6 +63,7 @@ const buildOgcQuery = (
     payload.language_code?.forEach((v) => qs.append("language", v));
     payload.distributor_name?.forEach((v) => qs.append("publisher", v));
     if (payload.spatial_search) qs.append("bbox", payload.spatial_search);
+    if (payload.spatial_boost) qs.append("bbox_boost", payload.spatial_boost);
   }
   if (pagination) {
     const size = pagination.size ?? 10;
@@ -246,7 +244,7 @@ export const useNutsSearch = (query?: string, level?: number, limit = 20) => {
   if (query && query.trim()) params.set("q", query.trim());
   if (level !== undefined) params.set("level", String(level));
   params.set("limit", String(limit));
-  const url = `${new URL("api/v2/catalog/records/nuts", process.env.NEXT_PUBLIC_API_URL).href}?${params.toString()}`;
+  const url = `${GEOAPI_BASE_URL}/catalog/records/nuts?${params.toString()}`;
   const { data, isLoading, error, mutate } = useSWR<NutsRegion[]>(url, async (u: string) => {
     const res = await apiRequestAuth(u, { method: "GET" });
     if (!res.ok) {

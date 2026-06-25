@@ -36,11 +36,11 @@ import SpatialFilterSearch from "@/components/dashboard/catalog/SpatialFilterSea
 import ContentSearchBar from "@/components/dashboard/common/ContentSearchbar";
 
 const CATALOG_FILTER_ORDER = [
+  "type",
   "data_category",
   "language_code",
   "distributor_name",
   "license",
-  "type",
 ] as const;
 
 const Catalog = () => {

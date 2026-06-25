@@ -169,13 +169,14 @@ const DatasetSummary: React.FC<DatasetSummaryProps> = ({
       case "distributor_email":
         return (props.publisher as { email?: string } | undefined)?.email;
       case "distribution_url": {
-        // Prefer the source PACKAGE page (CKAN "via" link, e.g. ckan.govdata.de/dataset/…),
-        // then a resource download (enclosure), then publisher URL.
+        // "Datengeber-URL" = the data provider's URL. Prefer the publisher (Datengeber)
+        // URL; only when it's missing fall back to the CKAN package page ("via"), then a
+        // resource download (enclosure). So it's not always the CKAN aggregator link.
         const links = (props.links as { rel?: string; href?: string }[] | undefined) ?? [];
         return (
+          (props.publisher as { url?: string } | undefined)?.url ??
           links.find((l) => l.rel === "via")?.href ??
-          links.find((l) => l.rel === "enclosure")?.href ??
-          (props.publisher as { url?: string } | undefined)?.url
+          links.find((l) => l.rel === "enclosure")?.href
         );
       }
       default:

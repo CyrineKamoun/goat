@@ -6,7 +6,8 @@ and analytical processes from DuckLake/DuckDB storage.
 
 import asyncio
 import logging
-from contextlib import asynccontextmanager
+import os
+from contextlib import AsyncExitStack, asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
@@ -23,8 +24,14 @@ from geoapi.deps.auth import decode_token
 from geoapi.ducklake import ducklake_manager
 from geoapi.ducklake_pool import ducklake_pool
 from geoapi.ducklake_write import ducklake_write_manager
+try:
+    from geoapi.mcp_server import mcp
+except Exception as _mcp_err:  # MCP is optional — never take down the HTTP API if it fails to load
+    mcp = None
+    logging.getLogger(__name__).warning("MCP server unavailable, /mcp disabled: %s", _mcp_err)
 from geoapi.models import HealthCheck
 from geoapi.routers import (
+    catalog_records_router,
     download_router,
     expressions_router,
     features_router,
@@ -101,7 +108,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     logger.info("GeoAPI started successfully")
 
-    yield
+    # Run the MCP session manager for the /mcp Streamable HTTP transport (optional)
+    if mcp is not None:
+        async with AsyncExitStack() as stack:
+            await stack.enter_async_context(mcp.session_manager.run())
+            yield
+    else:
+        yield
 
     # Cleanup
     logger.info("Shutting down GeoAPI...")
@@ -155,11 +168,16 @@ app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
 # Include routers
 app.include_router(metadata_router)
+app.include_router(catalog_records_router, prefix="/catalog/records")
 app.include_router(features_router)
 app.include_router(features_write_router)
 app.include_router(tiles_router)
 app.include_router(expressions_router)
 app.include_router(download_router)
+
+# Mount the MCP server (Streamable HTTP) for LLM catalog queries at /mcp (optional)
+if mcp is not None:
+    app.mount("/mcp", mcp.streamable_http_app())
 
 
 @app.get(

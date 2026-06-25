@@ -450,7 +450,6 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.layer_group.id", ondelete="SET NULL"),
             nullable=True,
         ),
         description="Optional grouping link for multi-file catalog datasets",

@@ -1,5 +1,6 @@
 """Routers package for GeoAPI."""
 
+from geoapi.routers.catalog_records import router as catalog_records_router
 from geoapi.routers.download import router as download_router
 from geoapi.routers.expressions import router as expressions_router
 from geoapi.routers.features import router as features_router
@@ -8,6 +9,7 @@ from geoapi.routers.metadata import router as metadata_router
 from geoapi.routers.tiles import router as tiles_router
 
 __all__ = [
+    "catalog_records_router",
     "tiles_router",
     "features_router",
     "features_write_router",

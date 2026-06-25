@@ -1,4 +1,6 @@
 # Standard library imports
+import copy
+import json
 import logging
 from typing import Any, List
 from uuid import UUID
@@ -62,12 +64,44 @@ class CRUDLayer(CRUDBase):
             feature_layer_type=layer.feature_layer_type,
         )
 
-        # Populate layer schema
+        submitted = dict(layer_in) if isinstance(layer_in, dict) else {}
         layer_in = schema(**layer_in)
 
         layer = await CRUDBase(Layer).update(
             async_session, db_obj=layer, obj_in=layer_in
         )
+
+        # Persist catalog metadata edits as a user override so they survive re-harvest.
+        if layer.in_catalog and layer.record_jsonb and submitted:
+            from core.services.catalog import (
+                _deep_merge,
+                compute_user_override_diff,
+                get_record_override,
+                merge_record_overrides,
+                upsert_record_override,
+            )
+
+            existing_user = await get_record_override(async_session, id, "user")
+            user_override, changed = compute_user_override_diff(
+                layer.record_jsonb, existing_user, submitted
+            )
+            if changed:
+                await upsert_record_override(
+                    async_session, id, "user", 100, user_override
+                )
+                merged = await merge_record_overrides(async_session, id)
+                final_rj = (
+                    merged
+                    if merged and merged.get("properties")
+                    else _deep_merge(copy.deepcopy(layer.record_jsonb), user_override)
+                )
+                await async_session.execute(
+                    text(
+                        "UPDATE customer.layer SET record_jsonb = CAST(:rj AS jsonb)"
+                        " WHERE id = :id"
+                    ),
+                    {"rj": json.dumps(final_rj), "id": str(id)},
+                )
 
         return layer
 

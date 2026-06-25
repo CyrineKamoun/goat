@@ -712,6 +712,7 @@ export const getDatasetSchema = z.object({
   distributor_name: z.array(z.string()).optional(),
   in_catalog: z.boolean().optional(),
   spatial_search: z.string().optional(),
+  spatial_boost: z.string().optional(),
 });
 
 export const datasetMetadataValue = z.object({
