@@ -6,7 +6,9 @@ Provides endpoints for the Formula Builder feature:
 - Get available functions by category
 """
 
+import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, HTTPException
 from goatlib.utils.expressions import (
@@ -23,6 +25,10 @@ from geoapi.services.layer_service import layer_service
 
 router = APIRouter(prefix="/expressions", tags=["Expressions"])
 logger = logging.getLogger(__name__)
+
+# Expression preview runs a blocking DuckLake query; offload it to a thread so
+# it never freezes the event loop. Bounded by the shared DuckLake read pool.
+_preview_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="expr-preview")
 
 
 # Request/Response models
@@ -235,19 +241,24 @@ async def preview_expression(
         if not metadata:
             raise HTTPException(status_code=404, detail="Collection not found")
 
-        # Use the pool's connection context manager
-        with ducklake_pool.connection() as con:
-            evaluator = ExpressionEvaluator(
-                con=con,
-                table_name=layer_info.full_table_name,
-                column_names=metadata.column_names,
-                geometry_column=metadata.geometry_column,
-            )
-            result = evaluator.preview(
-                expression=request.expression,
-                where_clause=request.where_clause,
-                limit=request.limit,
-            )
+        # Run the blocking DuckLake preview in a thread pool so it doesn't
+        # freeze the event loop (and stall tiles/features on the same worker).
+        def _run_preview():
+            with ducklake_pool.connection() as con:
+                evaluator = ExpressionEvaluator(
+                    con=con,
+                    table_name=layer_info.full_table_name,
+                    column_names=metadata.column_names,
+                    geometry_column=metadata.geometry_column,
+                )
+                return evaluator.preview(
+                    expression=request.expression,
+                    where_clause=request.where_clause,
+                    limit=request.limit,
+                )
+
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(_preview_executor, _run_preview)
 
         return PreviewExpressionResponse(
             success=result.success,

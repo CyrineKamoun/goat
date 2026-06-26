@@ -96,11 +96,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize DuckLake connection pool for tiles (4 concurrent connections)
     ducklake_pool.init()
 
-    # Initialize single DuckLake connection for features/other queries
+    # Initialize single DuckLake connection for schema lookups / downloads.
     ducklake_manager.init(settings)
 
-    # Initialize write-capable DuckLake connection for mutations
-    ducklake_write_manager.init(settings)
+    # The write-capable DuckLake connection is created lazily on first write
+    # (see ducklake_write.LazyDuckLakeWriteManager) to avoid paying its catalog
+    # memory floor on pods that only serve reads.
 
     # Initialize layer service (PostgreSQL pool for metadata)
     await layer_service.init()

@@ -1,6 +1,9 @@
 """Features router for OGC Features API endpoints."""
 
+import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import Annotated, Optional
 from uuid import UUID
 
@@ -22,6 +25,13 @@ from geoapi.services.layer_service import layer_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Features"])
+
+# Feature queries hit DuckLake synchronously. Run them in a thread pool so the
+# blocking query never freezes the worker's event loop (which would stall every
+# concurrent request on the pod, tiles included). Mirrors the tile path's
+# run_in_executor offloading. Concurrency is ultimately bounded by the shared
+# DuckLake read pool, so a small worker count is sufficient.
+_feature_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="feature")
 
 # Type alias for optional user ID dependency
 OptionalUserIdDep = Annotated[UUID | None, Depends(get_optional_user_id)]
@@ -68,13 +78,18 @@ async def get_features(
         user_id_str = str(user_id)
         layer_uuid = layer_info.layer_id
 
-        features, total_count = feature_service.get_temp_features(
-            user_id=user_id_str,
-            layer_uuid=layer_uuid,
-            limit=limit,
-            offset=offset,
-            bbox=bbox,
-            properties=properties,
+        loop = asyncio.get_event_loop()
+        features, total_count = await loop.run_in_executor(
+            _feature_executor,
+            partial(
+                feature_service.get_temp_features,
+                user_id=user_id_str,
+                layer_uuid=layer_uuid,
+                limit=limit,
+                offset=offset,
+                bbox=bbox,
+                properties=properties,
+            ),
         )
 
         # Build links
@@ -120,19 +135,24 @@ async def get_features(
         id_list = [id.strip() for id in ids.split(",")]
 
     # Get features
-    features, total_count = feature_service.get_features(
-        layer_info=layer_info,
-        limit=limit,
-        offset=offset,
-        bbox=bbox,
-        properties=properties,
-        cql_filter=cql_filter,
-        column_names=column_names,
-        sortby=sortby,
-        ids=id_list,
-        geometry_column=geometry_column,
-        has_geometry=has_geometry,
-        native_column_types=metadata.native_column_types,
+    loop = asyncio.get_event_loop()
+    features, total_count = await loop.run_in_executor(
+        _feature_executor,
+        partial(
+            feature_service.get_features,
+            layer_info=layer_info,
+            limit=limit,
+            offset=offset,
+            bbox=bbox,
+            properties=properties,
+            cql_filter=cql_filter,
+            column_names=column_names,
+            sortby=sortby,
+            ids=id_list,
+            geometry_column=geometry_column,
+            has_geometry=has_geometry,
+            native_column_types=metadata.native_column_types,
+        ),
     )
 
     # Build links
@@ -228,14 +248,19 @@ async def get_feature(
     has_geometry = metadata.has_geometry
 
     # Get feature
-    feature = feature_service.get_feature_by_id(
-        layer_info=layer_info,
-        feature_id=itemId,
-        properties=properties,
-        geometry_column=geometry_column,
-        has_geometry=has_geometry,
-        column_names=metadata.column_names,
-        native_column_types=metadata.native_column_types,
+    loop = asyncio.get_event_loop()
+    feature = await loop.run_in_executor(
+        _feature_executor,
+        partial(
+            feature_service.get_feature_by_id,
+            layer_info=layer_info,
+            feature_id=itemId,
+            properties=properties,
+            geometry_column=geometry_column,
+            has_geometry=has_geometry,
+            column_names=metadata.column_names,
+            native_column_types=metadata.native_column_types,
+        ),
     )
 
     if not feature:

@@ -11,8 +11,7 @@ from goatlib.storage import build_filters, build_order_clause
 
 from geoapi.config import settings
 from geoapi.dependencies import LayerInfo
-from geoapi.ducklake import ducklake_manager
-from geoapi.ducklake_pool import execute_with_retry
+from geoapi.ducklake_pool import ducklake_pool, execute_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +137,7 @@ class FeatureService:
         logger.debug("Count query: %s with params: %s", count_query, params)
         try:
             count_result, _ = execute_with_retry(
-                ducklake_manager,
+                ducklake_pool,
                 count_query,
                 params if params else None,
                 fetch_all=False,
@@ -161,7 +160,7 @@ class FeatureService:
         features = []
         try:
             result, description = execute_with_retry(
-                ducklake_manager, query, params if params else None, fetch_all=True
+                ducklake_pool, query, params if params else None, fetch_all=True
             )
 
             # Get column names from description
@@ -244,7 +243,7 @@ class FeatureService:
             # Convert public feature ID to internal rowid (feature_id = rowid + 1)
             rowid = int(feature_id) - 1
             result, description = execute_with_retry(
-                ducklake_manager, query, [rowid], fetch_all=False
+                ducklake_pool, query, [rowid], fetch_all=False
             )
 
             if not result:

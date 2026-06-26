@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     # Total potential memory = DUCKLAKE_POOL_SIZE * DUCKDB_MEMORY_LIMIT
     DUCKDB_MEMORY_LIMIT: str = os.getenv("GEOAPI_DUCKDB_MEMORY_LIMIT", "1GB")
 
+    # DuckDB thread count per connection. Must be pinned to the container's CPU
+    # limit: DuckDB otherwise defaults to the host core count, oversubscribing a
+    # 2-CPU container and causing scheduler throttling. Mirrors the processes app.
+    DUCKDB_THREADS: int = int(os.getenv("GEOAPI_DUCKDB_THREADS", "2"))
+
     # Timeout Settings (in seconds)
     REQUEST_TIMEOUT: int = int(os.getenv("GEOAPI_REQUEST_TIMEOUT", "30"))
     TILE_TIMEOUT: int = int(
