@@ -418,12 +418,20 @@ const Layers = (props: LayersProps) => {
     const map = mapRef.getMap();
 
     const apply = () => {
-      if (!map.isStyleLoaded()) return;
+      // Gate only on the style JSON being loaded (getStyle() returns undefined
+      // before that). isStyleLoaded() is the wrong gate here: it stays false
+      // while any source is still fetching tiles — which is the entire window
+      // in which react-map-gl mounts the user layers (each addLayer fires
+      // styledata). Tile completion fires sourcedata/idle but no styledata, so
+      // gating on isStyleLoaded() would skip every styledata event and leave
+      // the stacking permanently unapplied. moveLayer/setLayoutProperty are
+      // safe while tiles load.
+      const styleLayers = map.getStyle()?.layers;
+      if (!styleLayers) return;
       const hasConfig = Object.keys(basemapLayerConfig).length > 0;
       // Nothing configured and nothing was ever applied → nothing to do/restore.
       if (!hasConfig && !basemapAppliedRef.current) return;
 
-      const styleLayers = map.getStyle()?.layers ?? [];
       const allIdsBottomToTop = styleLayers.map((l) => l.id);
       const styleIds = new Set(allIdsBottomToTop);
 
@@ -521,11 +529,13 @@ const Layers = (props: LayersProps) => {
 
     apply();
     map.on("styledata", apply);
-    // After a basemap switch the new style loads and react-map-gl re-adds the
-    // user layers asynchronously; styledata can fire before the user layers are
-    // back, leaving stacking unapplied. "idle" fires once everything has settled,
-    // so re-apply then. once() (not on()) avoids re-running on every pan/zoom.
-    map.once("idle", apply);
+    // Safety net: react-map-gl mounts user layers asynchronously after
+    // styledata, so the map can go idle before they exist. A persistent idle
+    // listener (not once() — a single shot can be consumed during that gap)
+    // re-applies after everything settles; the alreadyOrdered check makes
+    // repeat idle calls cheap, so pan/zoom idles cost a style scan, no
+    // mutations.
+    map.on("idle", apply);
     return () => {
       map.off("styledata", apply);
       map.off("idle", apply);

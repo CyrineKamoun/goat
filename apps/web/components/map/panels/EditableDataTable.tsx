@@ -1215,22 +1215,21 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
             <ListItemText>{t("calculate_field", { defaultValue: "Calculate field" })}</ListItemText>
           </MenuItem>
         )}
-        {isEditor && (
-          <>
-            <Divider sx={{ my: 0.5 }} />
-            <MenuItem
-              onClick={() => {
-                if (columnMenuField) handleDeleteColumnRequest(columnMenuField);
-                handleColumnMenuClose();
-              }}
-              sx={{ color: "error.main" }}>
-              <ListItemIcon>
-                <DeleteIcon sx={{ color: "error.main" }} />
-              </ListItemIcon>
-              <ListItemText>{t("delete_column", { defaultValue: "Delete column" })}</ListItemText>
-            </MenuItem>
-          </>
-        )}
+        {isEditor && [
+          <Divider key="delete-column-divider" sx={{ my: 0.5 }} />,
+          <MenuItem
+            key="delete-column"
+            onClick={() => {
+              if (columnMenuField) handleDeleteColumnRequest(columnMenuField);
+              handleColumnMenuClose();
+            }}
+            sx={{ color: "error.main" }}>
+            <ListItemIcon>
+              <DeleteIcon sx={{ color: "error.main" }} />
+            </ListItemIcon>
+            <ListItemText>{t("delete_column", { defaultValue: "Delete column" })}</ListItemText>
+          </MenuItem>,
+        ]}
       </Menu>
 
       {/* Row Context Menu */}
