@@ -15,6 +15,8 @@
   "car_time_limit_message": "Car travel time must be between 1 and 90 minutes",
   "car_distance_limit_message": "Distance must be between 50 and 100,000 meters",
   "pt_time_limit_message": "PT travel time must be between 1 and 90 minutes",
+  "pt_access_time_limit_message": "Access time must be between 1 and 20 minutes",
+  "pt_egress_time_limit_message": "Egress time must be between 1 and 20 minutes",
   "max_transfers_limit_message": "Max transfers must be between 0 and 5",
   "invalid_number": "Must be a valid number",
   "walking_speed_limit_message": "Walking speed must be between 1 and 30 km/h",

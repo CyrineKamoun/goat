@@ -15,6 +15,8 @@
   "car_time_limit_message": "Auto-Reisezeit muss zwischen 1 und 90 Minuten liegen",
   "car_distance_limit_message": "Entfernung muss zwischen 50 und 100.000 Metern liegen",
   "pt_time_limit_message": "ÖV-Reisezeit muss zwischen 1 und 90 Minuten liegen",
+  "pt_access_time_limit_message": "Zugangszeit muss zwischen 1 und 20 Minuten liegen",
+  "pt_egress_time_limit_message": "Abgangszeit muss zwischen 1 und 20 Minuten liegen",
   "max_transfers_limit_message": "Max. Umstiege muss zwischen 0 und 5 liegen",
   "invalid_number": "Muss eine gültige Zahl sein",
   "walking_speed_limit_message": "Gehgeschwindigkeit muss zwischen 1 und 30 km/h liegen",

@@ -78,7 +78,7 @@ void validate(HeatmapConfig const &cfg)
     if (cfg.mode == RoutingMode::PublicTransport)
     {
         // PT goes through run_pt (reverse RAPTOR + precomputed access/egress
-        // lookup tables); connectivity isn't wired for PT yet.
+        // lookup tables), for all three heatmap types incl. connectivity.
         if (cfg.timetable_path.empty())
             throw std::runtime_error("PT heatmap requires timetable_path");
         if (cfg.access_table_path.empty() || cfg.egress_table_path.empty())
@@ -86,9 +86,6 @@ void validate(HeatmapConfig const &cfg)
                 "PT heatmap requires access_table_path and egress_table_path");
         if (cfg.arrival_time <= 0)
             throw std::runtime_error("PT heatmap requires a positive arrival_time");
-        if (cfg.heatmap_type == HeatmapType::Connectivity)
-            throw std::runtime_error(
-                "PT connectivity heatmap is not supported yet");
     }
     if (cfg.heatmap_type == HeatmapType::Gravity)
     {
@@ -475,9 +472,22 @@ void run_pt(HeatmapConfig const &cfg, duckdb::Connection &con,
         constexpr double kCoarsenOutputExtentM = 50000.0;  // ~50 km ground
         if (ground_m > kCoarsenOutputExtentM && h3_resolution > 1)
             output_resolution = h3_resolution - 1;  // res-9 → res-8
-        std::fprintf(stderr,
-                     "[Pipeline] Output resolution: h3-%d (opp extent ~%.0f km)\n",
-                     output_resolution, ground_m / 1000.0);
+        // Connectivity keys the output map at connectivity_output_resolution
+        // (the caller's AOI raster resolution); output_resolution then only sets
+        // the granularity of the reachable cells whose area is summed. For
+        // gravity/closest the output map *is* output_resolution. Report the
+        // resolution the emitted cells actually use.
+        if (cfg.heatmap_type == HeatmapType::Connectivity)
+            std::fprintf(stderr,
+                         "[Pipeline] Output resolution: h3-%d (AOI extent "
+                         "~%.0f km; area summed at h3-%d)\n",
+                         cfg.connectivity_output_resolution, ground_m / 1000.0,
+                         output_resolution);
+        else
+            std::fprintf(stderr,
+                         "[Pipeline] Output resolution: h3-%d "
+                         "(opp extent ~%.0f km)\n",
+                         output_resolution, ground_m / 1000.0);
     }
 
     // 1. Load the timetable.
@@ -759,10 +769,20 @@ void run_pt(HeatmapConfig const &cfg, duckdb::Connection &con,
     // 7. Reducer meta: one row per group (grp_idx as the reducer's opp_idx),
     //    carrying the summed weight + opportunity count so gravity sums and
     //    closest-average counts score per opportunity, not per group.
+    //    Connectivity keys its output by opp_cell; grp_cell is res-9 (forced by
+    //    the egress-table join) but connectivity opportunities are the AOI
+    //    cells the caller rasterized at cfg.connectivity_output_resolution, so
+    //    roll grp_cell up to that parent resolution. Gravity/closest keep the
+    //    res-9 grp_cell unchanged.
     {
+        std::string const opp_cell_expr =
+            cfg.heatmap_type == HeatmapType::Connectivity
+                ? "h3_cell_to_parent(grp_cell, " +
+                      std::to_string(cfg.connectivity_output_resolution) + ")"
+                : "grp_cell";
         auto r = con.Query(
             "CREATE OR REPLACE TEMP TABLE _hm_opp_meta AS "
-            "SELECT grp_idx AS opp_idx, grp_cell AS opp_cell, "
+            "SELECT grp_idx AS opp_idx, " + opp_cell_expr + " AS opp_cell, "
             "       weight, opp_count FROM _grp");
         if (r->HasError())
             throw std::runtime_error("PT: group meta build failed: " +

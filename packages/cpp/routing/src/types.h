@@ -222,6 +222,14 @@ namespace routing
         std::string access_table_path;  // accessegress parquet for access_mode
         std::string egress_table_path;  // accessegress parquet for egress_mode
 
+        // PT connectivity only: H3 resolution of the output cells, which MUST
+        // equal the resolution the caller rasterized the AOI opportunities at
+        // (they are the same cells). The egress lookup runs at res-9, so the
+        // res-9 group cell is rolled up to this parent resolution for the
+        // output. Single source of truth lives caller-side; keep in sync.
+        // Default matches the caller-side fallback (finest = egress-lookup res).
+        int connectivity_output_resolution = 9;
+
         // Output
         std::string output_path;    // parquet: (h3_index BIGINT, score DOUBLE)
     };

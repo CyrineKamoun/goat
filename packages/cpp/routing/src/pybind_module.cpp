@@ -166,6 +166,7 @@ PYBIND11_MODULE(_routing, m)
         .def_readwrite("transfer_cost",   &routing::HeatmapConfig::transfer_cost)
         .def_readwrite("access_table_path", &routing::HeatmapConfig::access_table_path)
         .def_readwrite("egress_table_path", &routing::HeatmapConfig::egress_table_path)
+        .def_readwrite("connectivity_output_resolution", &routing::HeatmapConfig::connectivity_output_resolution)
         // Output
         .def_readwrite("output_path",     &routing::HeatmapConfig::output_path);
 

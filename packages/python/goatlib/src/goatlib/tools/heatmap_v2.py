@@ -34,6 +34,8 @@ from goatlib.analysis.schemas.heatmap import (
     PotentialType,
 )
 from goatlib.analysis.schemas.heatmap_v2 import (
+    N_DESTINATIONS_MAX,
+    N_DESTINATIONS_MIN,
     SENSITIVITY_MAX,
     SENSITIVITY_MIN,
     GravityDecay,
@@ -95,19 +97,6 @@ class HeatmapRoutingMode(StrEnum):
     pedelec = "pedelec"
     car = "car"
     pt = "pt"
-
-
-class HeatmapStreetRoutingMode(StrEnum):
-    """Street-only modes — for tools that don't support PT (connectivity).
-
-    PT connectivity isn't implemented in the routing engine yet, so the
-    connectivity tile offers only active-mobility + car modes.
-    """
-
-    walking = "walking"
-    bicycle = "bicycle"
-    pedelec = "pedelec"
-    car = "car"
 
 
 # Routing-mode icons/labels for the heatmap form. Extends the street-mode
@@ -443,7 +432,7 @@ class OpportunityV2PointGravity(OpportunityV2PointBase):
 class OpportunityV2PointClosestAverage(OpportunityV2PointBase):
     """Closest-Average opportunity card: re-exposes n_destinations."""
 
-    n_destinations: Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10] = Field(
+    n_destinations: int = Field(
         default=1,
         title="Number of Destinations",
         description="Number of closest destinations to average",
@@ -451,6 +440,15 @@ class OpportunityV2PointClosestAverage(OpportunityV2PointBase):
             section="opportunities",
             field_order=5,
             label_key="n_destinations",
+            widget="number",
+            # min/max live in widget_options (not ge/le) so the field renders
+            # as a number input rather than a slider; the 1–10 bound is
+            # enforced server-side by the analysis-layer schema.
+            widget_options={
+                "min": N_DESTINATIONS_MIN,
+                "max": N_DESTINATIONS_MAX,
+                "step": 1,
+            },
             visible_when={"input_path": {"$ne": None}},
         ),
     )
@@ -598,23 +596,33 @@ class HeatmapV2WindmillParams(ToolInputBase):
     # (minutes, mode speed baked in), so there's no speed/distance override
     # and the budget is capped at the table's built max (20 min). The mode
     # selects which lookup table is loaded.
-    pt_access_mode: AccessEgressMode = Field(
-        default=AccessEgressMode.walk,
-        description="Mode to reach transit stops.",
-        json_schema_extra=ui_field(
-            section="configuration",
-            field_order=20,
-            label_key="access_mode",
-            group_label="groups.access_leg",
-            enum_icons=ACCESS_EGRESS_MODE_ICONS,
-            enum_labels=ACCESS_EGRESS_MODE_LABELS,
-            visible_when={
-                "$and": [
-                    {"routing_mode": "pt"},
-                    {"show_advanced": True},
-                ]
-            },
-        ),
+    # Access/egress legs are walk-only for PT heatmaps: only the walk
+    # access/egress lookup table is precomputed. The mode selector stays visible
+    # for consistency with the other legs/config, but is restricted to the
+    # single "walk" option (== AccessEgressMode.walk) via the Literal type.
+    pt_access_mode: Literal["walk"] = Field(
+        default="walk",
+        description="Mode to reach transit stops (walk-only for PT heatmaps).",
+        # Literal keeps validation walk-only (emits `const`); the explicit
+        # `enum` makes the frontend render it as a (single-option) dropdown,
+        # since it derives options from schema `enum`, not `const`.
+        json_schema_extra={
+            **ui_field(
+                section="configuration",
+                field_order=20,
+                label_key="access_mode",
+                group_label="groups.access_leg",
+                enum_icons=ACCESS_EGRESS_MODE_ICONS,
+                enum_labels=ACCESS_EGRESS_MODE_LABELS,
+                visible_when={
+                    "$and": [
+                        {"routing_mode": "pt"},
+                        {"show_advanced": True},
+                    ]
+                },
+            ),
+            "enum": [AccessEgressMode.walk.value],
+        },
     )
     pt_access_max_time: int = Field(
         default=DEFAULT_MAX_TIME_ACTIVE_MIN,
@@ -644,23 +652,29 @@ class HeatmapV2WindmillParams(ToolInputBase):
             },
         ),
     )
-    pt_egress_mode: AccessEgressMode = Field(
-        default=AccessEgressMode.walk,
-        description="Mode from transit stops to the opportunity.",
-        json_schema_extra=ui_field(
-            section="configuration",
-            field_order=22,
-            label_key="pt_egress_mode",
-            group_label="groups.egress_leg",
-            enum_icons=ACCESS_EGRESS_MODE_ICONS,
-            enum_labels=ACCESS_EGRESS_MODE_LABELS,
-            visible_when={
-                "$and": [
-                    {"routing_mode": "pt"},
-                    {"show_advanced": True},
-                ]
-            },
-        ),
+    pt_egress_mode: Literal["walk"] = Field(
+        default="walk",
+        description="Mode from transit stops to the opportunity "
+                    "(walk-only for PT heatmaps).",
+        # See pt_access_mode: Literal for validation + explicit enum so the
+        # frontend renders a (single-option) dropdown.
+        json_schema_extra={
+            **ui_field(
+                section="configuration",
+                field_order=22,
+                label_key="pt_egress_mode",
+                group_label="groups.egress_leg",
+                enum_icons=ACCESS_EGRESS_MODE_ICONS,
+                enum_labels=ACCESS_EGRESS_MODE_LABELS,
+                visible_when={
+                    "$and": [
+                        {"routing_mode": "pt"},
+                        {"show_advanced": True},
+                    ]
+                },
+            ),
+            "enum": [AccessEgressMode.walk.value],
+        },
     )
     pt_egress_max_time: int = Field(
         default=DEFAULT_MAX_TIME_ACTIVE_MIN,
@@ -1035,19 +1049,10 @@ class HeatmapClosestAverageV2WindmillParams(HeatmapV2WindmillParams):
 class HeatmapConnectivityV2WindmillParams(HeatmapV2WindmillParams):
     """Total area reachable within max travel cost."""
 
-    # Street-only modes: PT connectivity isn't supported by the routing
-    # engine yet, so the connectivity tile excludes PT from the selector.
-    routing_mode: HeatmapStreetRoutingMode = Field(
-        ...,
-        description="Transport mode for the heatmap.",
-        json_schema_extra=ui_field(
-            section="routing",
-            field_order=1,
-            label_key="routing_mode",
-            enum_icons=ROUTING_MODE_ICONS,
-            enum_labels=ROUTING_MODE_LABELS,
-        ),
-    )
+    # routing_mode is inherited from the base (full mode set incl. PT). PT
+    # connectivity runs through the same arrive-by reverse-RAPTOR pipeline as
+    # gravity/closest-average; the inherited PT fields (arrival time,
+    # access/egress, transfers) surface via their routing_mode == pt guards.
 
     # Hide the heatmap_type selector and pre-bind to connectivity
     heatmap_type: HeatmapType = Field(
@@ -1097,6 +1102,7 @@ class HeatmapConnectivityV2WindmillParams(HeatmapV2WindmillParams):
                         "bicycle": DEFAULT_MAX_TIME_ACTIVE_MIN,
                         "pedelec": DEFAULT_MAX_TIME_ACTIVE_MIN,
                         "car": DEFAULT_MAX_TIME_CAR_MIN,
+                        "pt": DEFAULT_MAX_TIME_PT_MIN,
                     },
                 },
                 "max_value_from": {
@@ -1120,6 +1126,11 @@ class HeatmapConnectivityV2WindmillParams(HeatmapV2WindmillParams):
                             "value": MAX_TIME_CAR_MIN,
                             "when": {"routing_mode": "car"},
                             "message": CAR_TIME_LIMIT_MSG,
+                        },
+                        {
+                            "value": MAX_TIME_PT_MIN,
+                            "when": {"routing_mode": "pt"},
+                            "message": PT_TIME_LIMIT_MSG,
                         },
                     ],
                     "min": 1,
@@ -1397,8 +1408,8 @@ class HeatmapV2ToolRunner(BaseToolRunner[HeatmapV2WindmillParams]):
             [] if is_connectivity else self._resolve_opportunities(params)
         )
 
-        # routing_mode may be HeatmapRoutingMode (gravity/closest-avg) or
-        # HeatmapStreetRoutingMode (connectivity); normalise via value.
+        # routing_mode is HeatmapRoutingMode across all heatmap types; normalise
+        # via value to be robust to a raw string coming from Windmill.
         mode = HeatmapRoutingMode(
             params.routing_mode.value
             if hasattr(params.routing_mode, "value")

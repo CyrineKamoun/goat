@@ -9,7 +9,7 @@ underlying semantics are identical to keep cross-tool consistency.
 """
 
 from enum import StrEnum
-from typing import Literal, Self
+from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -24,6 +24,12 @@ from goatlib.analysis.schemas.heatmap import OpportunityGravity
 # decay kernel is calibrated for.
 SENSITIVITY_MIN = 1_000
 SENSITIVITY_MAX = 1_000_000
+
+# Validation bounds for the ClosestAverage k (number of nearest destinations to
+# average). V2 exposes this as a free numeric input rather than the v1 fixed
+# dropdown, bounded to a sensible range.
+N_DESTINATIONS_MIN = 1
+N_DESTINATIONS_MAX = 10
 
 
 class HeatmapType(StrEnum):
@@ -64,8 +70,13 @@ class OpportunityV2(OpportunityGravity):
         le=SENSITIVITY_MAX,
         description="Gravity decay sensitivity (β); larger = slower decay / wider reach.",
     )
-    n_destinations: Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10] = Field(
+    # Free numeric value (validated range), mirroring the sensitivity override
+    # above — replaces the v1 Literal dropdown so the tool can expose it as a
+    # number input.
+    n_destinations: int = Field(
         default=1,
+        ge=N_DESTINATIONS_MIN,
+        le=N_DESTINATIONS_MAX,
         description="Number of closest destinations to average (closest_average only).",
     )
 

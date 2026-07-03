@@ -62,6 +62,30 @@ DEFAULT_H3_RESOLUTION: dict[RoutingMode, int] = {
 # tool's CLI (walking is spelled "walk").
 _PT_ACCESSEGRESS_RES = 9
 _PT_ACCESSEGRESS_MAX_MIN = 20
+
+# PT connectivity rasterizes the reference area to H3 cells, and each cell is a
+# reverse-RAPTOR group — so the cell count (≈ AOI area / cell area) drives cost.
+# The resolution is therefore chosen *dynamically* from the AOI's area: the
+# finest resolution whose estimated cell count stays under the target. Small
+# AOIs land at res-9 (== the egress-lookup resolution, so no coarsening at all);
+# larger AOIs step coarser to keep the RAPTOR run count bounded. The same chosen
+# resolution is used both to rasterize (here) and to key the C++ output cells
+# (cfg.connectivity_output_resolution), so opportunity and output cells align.
+_PT_CONNECTIVITY_MIN_RES = 8   # coarsest (large AOI)
+_PT_CONNECTIVITY_MAX_RES = 9   # finest (== egress-lookup res; small AOI)
+_PT_CONNECTIVITY_TARGET_CELLS = 6000  # headroom under MAX_OPPORTUNITIES_PER_LAYER
+
+# Average H3 cell area (m²) by resolution — used to size the AOI raster.
+_H3_CELL_AREA_M2: dict[int, float] = {
+    8: 737_327.0,
+    9: 105_332.0,
+}
+_PT_TABLE_MODE_NAME: dict[RoutingMode, str] = {
+    RoutingMode.walking: "walk",
+    RoutingMode.bicycle: "bicycle",
+    RoutingMode.pedelec: "pedelec",
+    RoutingMode.car: "car",
+}
 _PT_TABLE_MODE_NAME: dict[RoutingMode, str] = {
     RoutingMode.walking: "walk",
     RoutingMode.bicycle: "bicycle",
@@ -297,19 +321,69 @@ class HeatmapV2Tool(HeatmapToolBase):
             cfg.egress_table_path = self._accessegress_table_path(
                 params.egress_mode
             )
+            # Connectivity keys its output at the same resolution the AOI was
+            # rasterized to (chosen dynamically in _resolve_opportunity_layers),
+            # so the C++ output cells align with the opportunity cells.
+            cfg.connectivity_output_resolution = getattr(
+                self, "_pt_connectivity_res", _PT_CONNECTIVITY_MAX_RES
+            )
 
         return cfg
 
     # ----------------------- connectivity helpers ----------------------------
 
+    def _pick_pt_connectivity_resolution(
+        self: Self,
+        aoi_table: str,
+        aoi_meta: object,
+    ) -> int:
+        """Choose the finest H3 resolution whose estimated AOI cell count stays
+        under the target, so PT connectivity's per-cell reverse-RAPTOR run count
+        is bounded and scales with the reference area.
+
+        Probes at the coarsest resolution (cheap even for huge AOIs) and
+        extrapolates the finer-resolution counts by H3 cell area.
+        """
+        probe = self._process_table_to_h3(
+            aoi_table, aoi_meta, _PT_CONNECTIVITY_MIN_RES,
+            "aoi_probe", h3_column="probe_cell",
+        )
+        n_probe = self.con.execute(f"SELECT COUNT(*) FROM {probe}").fetchone()[0]
+        if not n_probe:
+            return _PT_CONNECTIVITY_MAX_RES
+        area_m2 = n_probe * _H3_CELL_AREA_M2[_PT_CONNECTIVITY_MIN_RES]
+        chosen = _PT_CONNECTIVITY_MIN_RES
+        for res in range(_PT_CONNECTIVITY_MIN_RES + 1, _PT_CONNECTIVITY_MAX_RES + 1):
+            if area_m2 / _H3_CELL_AREA_M2[res] <= _PT_CONNECTIVITY_TARGET_CELLS:
+                chosen = res
+            else:
+                break
+        logger.info(
+            "[Heatmap] PT connectivity: AOI ~%.0f km² → res-%d "
+            "(~%d cells; probe %d cells @res-%d)",
+            area_m2 / 1e6, chosen,
+            round(area_m2 / _H3_CELL_AREA_M2[chosen]), n_probe,
+            _PT_CONNECTIVITY_MIN_RES,
+        )
+        return chosen
+
     def _rasterize_aoi_to_opportunities(
         self: Self,
         reference_area_path: str,
-        h3_resolution: int,
-    ) -> list[tuple[float, float, float]]:
-        """Rasterize reference AOI polygon to H3 cells; return centroid points in EPSG:3857 with weight=1.0."""
+        h3_resolution: int | None,
+    ) -> tuple[list[tuple[float, float, float]], int]:
+        """Rasterize reference AOI polygon to H3 cells.
+
+        Returns (centroid points in EPSG:3857 with weight=1.0, resolution used).
+        When ``h3_resolution`` is None the resolution is chosen dynamically from
+        the AOI area (PT connectivity); otherwise the given fixed resolution is
+        used (street connectivity).
+        """
         # Register the AOI
         aoi_meta, aoi_table = self.import_input(reference_area_path, table_name="aoi_input")
+
+        if h3_resolution is None:
+            h3_resolution = self._pick_pt_connectivity_resolution(aoi_table, aoi_meta)
 
         # Convert to H3 cells (parent helper)
         aoi_cells_table = self._process_table_to_h3(
@@ -334,7 +408,7 @@ class HeatmapV2Tool(HeatmapToolBase):
             "Rasterized AOI to %d H3 cells at resolution %d",
             len(rows), h3_resolution,
         )
-        return [(float(x), float(y), 1.0) for x, y in rows]
+        return [(float(x), float(y), 1.0) for x, y in rows], h3_resolution
 
     # ----------------------- opportunity-layer resolution -------------------
 
@@ -348,10 +422,21 @@ class HeatmapV2Tool(HeatmapToolBase):
         that layer's compute_heatmap call.
         """
         if params.heatmap_type == HeatmapType.connectivity:
-            h3_res = DEFAULT_H3_RESOLUTION[params.routing_mode]
-            opp_points = self._rasterize_aoi_to_opportunities(
-                params.reference_area_path, h3_res
+            # PT connectivity picks its rasterization resolution dynamically from
+            # the AOI area (h3_resolution=None) so the per-cell reverse-RAPTOR run
+            # count stays bounded; street uses the fixed per-mode default. The
+            # chosen PT resolution is stashed for _build_heatmap_cfg so the C++
+            # output cells key at the same resolution.
+            fixed_res = (
+                None
+                if params.routing_mode == RoutingMode.pt
+                else DEFAULT_H3_RESOLUTION[params.routing_mode]
             )
+            opp_points, used_res = self._rasterize_aoi_to_opportunities(
+                params.reference_area_path, fixed_res
+            )
+            if params.routing_mode == RoutingMode.pt:
+                self._pt_connectivity_res = used_res
             if not opp_points:
                 raise ValueError(
                     "The reference area is empty or invalid. "
