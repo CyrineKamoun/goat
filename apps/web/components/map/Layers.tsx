@@ -450,10 +450,23 @@ const Layers = (props: LayersProps) => {
         .filter(Boolean) as Array<{ id: string; sublayers: string[] }>;
       const userSubIds = new Set(userLayers.flatMap((u) => u.sublayers));
 
-      // Basemap layers = everything that isn't a user data layer. Capture their
-      // pristine order once per basemap style (keyed by the basemap layer-id set,
-      // which is stable when user layers are added/removed).
-      const basemapIds = allIdsBottomToTop.filter((id) => !userSubIds.has(id));
+      // Overlay layers (active-feature pulse, pending-feature edits, draw
+      // controls) must always sit ABOVE the data layers — they highlight/annotate
+      // features, so they are neither user data nor basemap. Excluding them here
+      // keeps the restack from pushing them underneath the features.
+      const isOverlayId = (id: string) =>
+        id.startsWith("popup-active-feature") ||
+        id.startsWith("pending-features") ||
+        id.startsWith("gl-draw") ||
+        id.startsWith("mapbox-gl-draw") ||
+        id.startsWith("__measure");
+
+      // Basemap layers = everything that isn't a user data layer or an overlay.
+      // Capture their pristine order once per basemap style (keyed by the basemap
+      // layer-id set, which is stable when user layers are added/removed).
+      const basemapIds = allIdsBottomToTop.filter(
+        (id) => !userSubIds.has(id) && !isOverlayId(id)
+      );
       const styleKey = [...basemapIds].sort().join("|");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cache = map as any;
@@ -513,8 +526,13 @@ const Layers = (props: LayersProps) => {
         currentRelative.every((id, i) => id === desiredOrder[i]);
       if (alreadyOrdered) return;
 
+      // Place the top data/basemap layer just beneath the lowest overlay layer
+      // (pulse/pending/draw) so those overlays stay on top. With no overlays
+      // present, move it to the absolute top.
+      const lowestOverlayId = allIdsBottomToTop.find(isOverlayId);
       try {
-        map.moveLayer(desiredOrder[0]); // force top item to absolute top
+        if (lowestOverlayId) map.moveLayer(desiredOrder[0], lowestOverlayId);
+        else map.moveLayer(desiredOrder[0]);
       } catch {
         /* not ready */
       }

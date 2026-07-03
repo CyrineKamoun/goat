@@ -380,7 +380,12 @@ const MapViewer: React.FC<MapProps> = ({
         [e.point.x + TAP_BUFFER, e.point.y + TAP_BUFFER],
       ];
       features = map.queryRenderedFeatures(bbox, {
-        layers: interactiveLayerIds,
+        // Unlike react-map-gl's event delegation (which ignores unknown ids),
+        // queryRenderedFeatures throws if ANY id is absent from the style.
+        // interactiveLayerIds includes cluster sub-layer ids that only exist in
+        // certain marker modes (and can be transiently missing during style
+        // reloads), so restrict the query to layers currently in the style.
+        layers: interactiveLayerIds.filter((id) => map.getLayer(id)),
       }) as typeof features;
     }
 
