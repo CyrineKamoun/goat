@@ -62,7 +62,7 @@ interface DataProjectLayoutProps {
 }
 
 const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps) => {
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   const dispatch = useAppDispatch();
   const projectId = project.id;
 
@@ -350,6 +350,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
           <Geocoder
             accessToken={MAPBOX_TOKEN}
             bbox={project?.max_extent ?? undefined}
+            language={i18n.language}
             placeholder={t("enter_an_address")}
             tooltip={t("search")}
             onSelect={(result) => {

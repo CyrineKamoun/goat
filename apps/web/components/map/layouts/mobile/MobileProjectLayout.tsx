@@ -139,7 +139,7 @@ const MobileProjectLayout = ({
   onProjectUpdate,
   viewOnly,
 }: PublicProjectLayoutProps) => {
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   const theme = useTheme();
   const dispatch = useAppDispatch();
 
@@ -425,6 +425,7 @@ const MobileProjectLayout = ({
               <Geocoder
                 accessToken={MAPBOX_TOKEN}
                 bbox={project?.max_extent ?? undefined}
+                language={i18n.language}
                 placeholder={t("enter_an_address")}
                 tooltip={t("search")}
                 onSelect={(result) => {

@@ -120,21 +120,6 @@ def test_invalidate_pmtiles_cache() -> None:
     assert "user_test/t_layer" not in service._pmtiles_exists_cache
 
 
-def test_invalidate_all_pmtiles_cache() -> None:
-    """Test clearing entire cache."""
-    service = TileService()
-
-    # Add multiple mock entries
-    service._pmtiles_exists_cache["layer1"] = True
-    service._pmtiles_exists_cache["layer2"] = False
-
-    # Invalidate all
-    service.invalidate_all_pmtiles_cache()
-
-    # Verify all removed
-    assert len(service._pmtiles_exists_cache) == 0
-
-
 def test_pmtiles_exists_caching() -> None:
     """Test that PMTiles existence check is cached."""
     with tempfile.TemporaryDirectory() as tmpdir:

@@ -616,6 +616,7 @@ const Layers = (props: LayersProps) => {
                   });
                   return (
                     <Source
+                      id={`src-${layer.id}`}
                       key={`${layer.id}-cluster-${layer.updated_at || ""}-${clusterKeySalt}`}
                       type="geojson"
                       data={dataUrl}
@@ -812,6 +813,7 @@ const Layers = (props: LayersProps) => {
 
                 return (
                   <Source
+                    id={`src-${layer.id}`}
                     key={`${layer.id}-${layer.updated_at || ""}`}
                     type="vector"
                     tiles={[getFeatureTileUrl(layer, needsLabel, decorationParam)]}
@@ -901,6 +903,7 @@ const Layers = (props: LayersProps) => {
 
                 return (
                   <Source
+                    id={`src-${layer.id}`}
                     key={layer.id}
                     type="raster"
                     {...(layer.data_type === "cog" ? { url: `cog://${layer.url}` } : { tiles: [layer.url] })}
@@ -944,6 +947,7 @@ const Layers = (props: LayersProps) => {
                 const mapLayerFilter = getMapLayerFilter(layerFilter);
                 return (
               <Source
+                id={`src-sys-${layer.id}`}
                 key={`${layer.id}-${layer.updated_at || ""}`}
                 type="vector"
                 tiles={[getFeatureTileUrl(layer)]}
@@ -974,7 +978,7 @@ const Layers = (props: LayersProps) => {
           : null;
 
         return (
-          <Source key="pending-features" type="geojson" data={pendingGeoJSON}>
+          <Source id="src-pending-features" key="pending-features" type="geojson" data={pendingGeoJSON}>
             {geomType === "polygon" && layerStyle.type === "fill" && (
               <MapLayer
                 id="pending-features-fill"

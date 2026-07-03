@@ -1,6 +1,13 @@
 """Tests for API endpoints."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
+
+
+def features_json_fragment(features):
+    """Mimic get_features_json's return: (fragment, returned, total)."""
+    fragment = ",".join(json.dumps(f, separators=(",", ":")) for f in features)
+    return fragment, len(features)
 
 
 class TestHealthCheck:
@@ -151,7 +158,10 @@ class TestFeatureEndpoints:
         mock_layer_service.get_layer_metadata = AsyncMock(
             return_value=sample_layer_metadata
         )
-        mock_feature_service.get_features = MagicMock(return_value=(sample_features, 2))
+        fragment, returned = features_json_fragment(sample_features)
+        mock_feature_service.get_features_json = MagicMock(
+            return_value=(fragment, returned, 2)
+        )
 
         response = test_client.get(
             "/collections/abc123de-f456-7890-1234-5678901234ab/items"
@@ -167,6 +177,81 @@ class TestFeatureEndpoints:
 
     @patch("geoapi.routers.features.feature_service")
     @patch("geoapi.routers.features.layer_service")
+    def test_get_features_has_no_per_feature_links(
+        self,
+        mock_layer_service,
+        mock_feature_service,
+        test_client,
+        sample_layer_metadata,
+        sample_features,
+    ):
+        """Features in the items response must not carry per-feature links.
+
+        OGC API Features Core only requires links on the response document
+        (/req/core/fc-links) and on the single-feature resource
+        (/req/core/f-links); per-feature links in the collection are pure
+        payload overhead for bulk consumers.
+        """
+        mock_layer_service.get_layer_metadata = AsyncMock(
+            return_value=sample_layer_metadata
+        )
+        fragment, returned = features_json_fragment(sample_features)
+        mock_feature_service.get_features_json = MagicMock(
+            return_value=(fragment, returned, 2)
+        )
+
+        response = test_client.get(
+            "/collections/abc123de-f456-7890-1234-5678901234ab/items"
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        assert len(data["features"]) == 2
+        for feature in data["features"]:
+            assert "links" not in feature
+
+        # Top-level document links stay (OGC requirement)
+        rels = [link["rel"] for link in data["links"]]
+        assert "self" in rels
+
+    @patch("geoapi.routers.features.feature_service")
+    @patch("geoapi.routers.features.layer_service")
+    def test_get_features_large_response_is_gzipped(
+        self,
+        mock_layer_service,
+        mock_feature_service,
+        test_client,
+        sample_layer_metadata,
+    ):
+        """Items responses above the size threshold are served gzip-encoded."""
+        mock_layer_service.get_layer_metadata = AsyncMock(
+            return_value=sample_layer_metadata
+        )
+        features = [
+            {
+                "type": "Feature",
+                "id": str(i),
+                "geometry": {"type": "Point", "coordinates": [10.0, 52.0]},
+                "properties": {"name": f"feature-{i}", "value": i},
+            }
+            for i in range(100)
+        ]
+        fragment, returned = features_json_fragment(features)
+        mock_feature_service.get_features_json = MagicMock(
+            return_value=(fragment, returned, 100)
+        )
+
+        response = test_client.get(
+            "/collections/abc123de-f456-7890-1234-5678901234ab/items",
+            headers={"Accept-Encoding": "gzip"},
+        )
+        assert response.status_code == 200
+        assert response.headers.get("content-encoding") == "gzip"
+        data = response.json()
+        assert data["numberReturned"] == 100
+
+    @patch("geoapi.routers.features.feature_service")
+    @patch("geoapi.routers.features.layer_service")
     def test_get_features_with_limit(
         self,
         mock_layer_service,
@@ -179,8 +264,9 @@ class TestFeatureEndpoints:
         mock_layer_service.get_layer_metadata = AsyncMock(
             return_value=sample_layer_metadata
         )
-        mock_feature_service.get_features = MagicMock(
-            return_value=(sample_features[:1], 2)
+        fragment, returned = features_json_fragment(sample_features[:1])
+        mock_feature_service.get_features_json = MagicMock(
+            return_value=(fragment, returned, 2)
         )
 
         response = test_client.get(
@@ -219,6 +305,11 @@ class TestFeatureEndpoints:
 
         assert data["type"] == "Feature"
         assert data["id"] == "feature-1"
+
+        # Single-feature resource keeps its links (OGC /req/core/f-links)
+        rels = [link["rel"] for link in data["links"]]
+        assert "self" in rels
+        assert "collection" in rels
 
     @patch("geoapi.routers.features.feature_service")
     @patch("geoapi.routers.features.layer_service")

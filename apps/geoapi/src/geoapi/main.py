@@ -154,8 +154,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add compression middleware
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+# Add compression middleware. Level 6 over the default 9: on multi-MB items
+# responses level 9 costs ~2x the CPU for ~4% smaller output.
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 
 
 # Include routers

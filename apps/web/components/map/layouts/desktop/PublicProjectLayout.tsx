@@ -570,6 +570,7 @@ const PublicProjectLayout = ({
               key="location"
               accessToken={MAPBOX_TOKEN}
               bbox={project?.max_extent ?? undefined}
+              language={i18n.language}
               placeholder={t("enter_an_address")}
               tooltip={t("search")}
               onSelect={(result) => {
@@ -635,6 +636,7 @@ const PublicProjectLayout = ({
     },
     [
       t,
+      i18n.language,
       measureTool,
       allowedStyles,
       activeBasemap,
