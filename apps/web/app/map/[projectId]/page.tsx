@@ -28,6 +28,7 @@ import { MeasureProvider } from "@/lib/providers/MeasureProvider";
 import { setSelectedBuilderItem } from "@/lib/store/map/slice";
 import { addOrUpdateMarkerImages, addPatternImages } from "@/lib/transformers/map-image";
 import { createSnapToCursorModifier } from "@/lib/utils/dnd-modifier";
+import { orderLayersByTree } from "@/lib/utils/map/layerTreeOrder";
 import { getLocFromUrl, writeLocToUrl, writeMapLocToUrl } from "@/lib/utils/map/loc-url";
 import type { FeatureLayerPointProperties } from "@/lib/validations/layer";
 import { type BuilderWidgetSchema, type CustomBasemap, builderWidgetSchema, projectSchema } from "@/lib/validations/project";
@@ -109,75 +110,10 @@ export default function MapPage({ params: { projectId } }) {
 
   // Order layers using tree-aware DFS traversal so the map rendering order
   // matches the visual tree order (layers inside a group inherit the group's position).
-  const projectLayers = useMemo(() => {
-    if (!allProjectLayers || !projectLayerGroups) {
-      return allProjectLayers || [];
-    }
-
-    // Create a set of invisible group IDs (including nested invisible groups)
-    const invisibleGroupIds = new Set<number>();
-
-    const findInvisibleGroups = (groups: typeof projectLayerGroups) => {
-      groups.forEach((group) => {
-        const groupVisibility = group.properties?.visibility ?? true;
-        if (!groupVisibility) {
-          invisibleGroupIds.add(group.id);
-        }
-        if (group.parent_id && invisibleGroupIds.has(group.parent_id)) {
-          invisibleGroupIds.add(group.id);
-        }
-      });
-    };
-
-    let previousSize = -1;
-    while (invisibleGroupIds.size !== previousSize) {
-      previousSize = invisibleGroupIds.size;
-      findInvisibleGroups(projectLayerGroups);
-    }
-
-    // Build a lookup of children by parent_id for efficient DFS traversal.
-    // allProjectLayers is already sorted by order from useFilteredProjectLayers.
-    type TreeNode = { type: "group" | "layer"; id: number; order: number; layer?: (typeof allProjectLayers)[number] };
-    const childrenByParent = new Map<number | null, TreeNode[]>();
-
-    for (const group of projectLayerGroups) {
-      const parentKey = group.parent_id ?? null;
-      if (!childrenByParent.has(parentKey)) childrenByParent.set(parentKey, []);
-      childrenByParent.get(parentKey)!.push({ type: "group", id: group.id, order: group.order ?? 0 });
-    }
-
-    for (const layer of allProjectLayers) {
-      const parentKey = layer.layer_project_group_id ?? null;
-      if (!childrenByParent.has(parentKey)) childrenByParent.set(parentKey, []);
-      childrenByParent.get(parentKey)!.push({ type: "layer", id: layer.id, order: layer.order ?? 0, layer });
-    }
-
-    // Sort each group of children by order
-    for (const children of childrenByParent.values()) {
-      children.sort((a, b) => a.order - b.order);
-    }
-
-    // DFS traversal collects layers in visual tree order
-    const orderedLayers: (typeof allProjectLayers)[number][] = [];
-    const collectLayers = (parentId: number | null) => {
-      const children = childrenByParent.get(parentId);
-      if (!children) return;
-      for (const child of children) {
-        if (child.type === "layer" && child.layer) {
-          if (!child.layer.layer_project_group_id || !invisibleGroupIds.has(child.layer.layer_project_group_id)) {
-            orderedLayers.push(child.layer);
-          }
-        } else if (child.type === "group") {
-          if (!invisibleGroupIds.has(child.id)) {
-            collectLayers(child.id);
-          }
-        }
-      }
-    };
-    collectLayers(null);
-
-    return orderedLayers;
-  }, [allProjectLayers, projectLayerGroups]);
+  const projectLayers = useMemo(
+    () => orderLayersByTree(allProjectLayers || [], projectLayerGroups),
+    [allProjectLayers, projectLayerGroups]
+  );
 
   const widgetProjectLayers = useMemo(() => {
     return allProjectLayersIncludingTables || [];
