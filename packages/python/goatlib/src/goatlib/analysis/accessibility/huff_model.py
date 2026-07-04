@@ -460,19 +460,20 @@ class HuffmodelTool(HeatmapToolBase):
                     geometry_col = col_name
                     break
 
-        # Join results back to original supply geometries using supply_id
+        # Append the computed probability to the original supply_input rows
         query = f"""
             SELECT
-                r.*,
+                o.* EXCLUDE (supply_id, {geometry_col}),
+                r.probability AS probability,
                 o.{geometry_col} AS geometry
-            FROM {results_table} r
-            INNER JOIN (
-                SELECT 
+            FROM (
+                SELECT
                     ROW_NUMBER() OVER () AS supply_id,
-                    {geometry_col}
+                    *
                 FROM supply_input
                 WHERE {geometry_col} IS NOT NULL
-            ) o ON r.{supply_id_column} = o.supply_id
+            ) o
+            INNER JOIN {results_table} r ON o.supply_id = r.{supply_id_column}
         """
 
         # Execute the query and write results to parquet file

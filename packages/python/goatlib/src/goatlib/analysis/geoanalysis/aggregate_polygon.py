@@ -232,13 +232,15 @@ class AggregatePolygonTool(AnalysisTool):
             grouped_proj = ", ".join(
                 f"g.{col}_grouped AS {col}_grouped" for col, _ in agg_specs
             )
+            select_parts = [f"a.{area_geom} AS geometry"]
+            if area_select_with_prefix:
+                select_parts.append(area_select_with_prefix)
+            select_parts.append(coalesced_total_select)
+            select_parts.append(grouped_proj)
             self.con.execute(f"""
                 CREATE OR REPLACE TABLE aggregation_result AS
                 SELECT
-                    a.{area_geom} AS geometry,
-                    {area_select_with_prefix},
-                    {coalesced_total_select},
-                    {grouped_proj}
+                    {", ".join(select_parts)}
                 FROM area_with_id a
                 LEFT JOIN total_stats t ON a.area_id = t.area_id
                 LEFT JOIN grouped_json g ON a.area_id = g.area_id
@@ -253,12 +255,14 @@ class AggregatePolygonTool(AnalysisTool):
                 GROUP BY a.area_id
             """)
 
+            select_parts = [f"a.{area_geom} AS geometry"]
+            if area_select_with_prefix:
+                select_parts.append(area_select_with_prefix)
+            select_parts.append(coalesced_total_select)
             self.con.execute(f"""
                 CREATE OR REPLACE TABLE aggregation_result AS
                 SELECT
-                    a.{area_geom} AS geometry,
-                    {area_select_with_prefix},
-                    {coalesced_total_select}
+                    {", ".join(select_parts)}
                 FROM area_with_id a
                 LEFT JOIN total_stats t ON a.area_id = t.area_id
             """)
@@ -394,13 +398,16 @@ class AggregatePolygonTool(AnalysisTool):
             grouped_proj = ", ".join(
                 f"g.{col}_grouped AS {col}_grouped" for col, _ in agg_specs
             )
+            select_parts = [
+                "ST_GeomFromText(h3_cell_to_boundary_wkt(t.h3_index)) AS geometry",
+                f"h3_h3_to_string(t.h3_index) AS h3_{h3_resolution}",
+                total_proj,
+                grouped_proj,
+            ]
             self.con.execute(f"""
                 CREATE OR REPLACE TABLE aggregation_result AS
                 SELECT
-                    ST_GeomFromText(h3_cell_to_boundary_wkt(t.h3_index)) AS geometry,
-                    h3_h3_to_string(t.h3_index) AS h3_{h3_resolution},
-                    {total_proj},
-                    {grouped_proj}
+                    {", ".join(select_parts)}
                 FROM total_stats t
                 LEFT JOIN grouped_json g ON t.h3_index = g.h3_index
             """)
@@ -413,12 +420,15 @@ class AggregatePolygonTool(AnalysisTool):
             """)
 
             total_proj = ", ".join(f"{col} AS {col}" for col, _ in agg_specs)
+            select_parts = [
+                "ST_GeomFromText(h3_cell_to_boundary_wkt(h3_index)) AS geometry",
+                f"h3_h3_to_string(h3_index) AS h3_{h3_resolution}",
+                total_proj,
+            ]
             self.con.execute(f"""
                 CREATE OR REPLACE TABLE aggregation_result AS
                 SELECT
-                    ST_GeomFromText(h3_cell_to_boundary_wkt(h3_index)) AS geometry,
-                    h3_h3_to_string(h3_index) AS h3_{h3_resolution},
-                    {total_proj}
+                    {", ".join(select_parts)}
                 FROM total_stats
             """)
 
