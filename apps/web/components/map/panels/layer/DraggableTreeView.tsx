@@ -43,6 +43,8 @@ interface DraggableTreeViewProps<T extends BaseTreeItem> {
   renderActions?: (item: T) => React.ReactNode;
   renderPrefix?: (item: T) => React.ReactNode;
   enableSelection?: boolean;
+  /** Disable drag & drop reordering while keeping selection/expand behavior (e.g. view-only trees) */
+  disableDrag?: boolean;
   selectedIds?: string[];
   onSelect?: (ids: string[]) => void;
   /** Callback for HTML5 external drag start (e.g., to workflow canvas) */
@@ -211,19 +213,21 @@ const EmptyGroupPlaceholder = ({
   parentId,
   level,
   enableSelection,
+  disableDrag,
 }: {
   parentId: string;
   level: number;
   enableSelection?: boolean;
+  disableDrag?: boolean;
 }) => {
   const { setNodeRef, isOver } = useDroppable({
     id: `placeholder-${parentId}`,
     data: { parentId: parentId },
-    disabled: !enableSelection,
+    disabled: !enableSelection || disableDrag,
   });
   const indentStyle = { marginLeft: (level + 1) * 24 };
 
-  if (!enableSelection) {
+  if (!enableSelection || disableDrag) {
     return (
       <Typography
         variant="caption"
@@ -260,6 +264,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
   renderPrefix,
   isOverlay,
   enableSelection,
+  disableDrag,
   selectedIds,
   onSelect,
   onExternalDragStart,
@@ -272,13 +277,14 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
   renderPrefix?: (item: T) => React.ReactNode;
   isOverlay?: boolean;
   enableSelection?: boolean;
+  disableDrag?: boolean;
   selectedIds: string[];
   onSelect?: (ids: string[]) => void;
   onExternalDragStart?: (event: React.DragEvent, item: T) => void;
 }) => {
   const children = allData.filter((i) => i.parentId === item.id);
   const isSelected = selectedIds.includes(item.id);
-  const isDragDisabled = !enableSelection || isOverlay;
+  const isDragDisabled = !enableSelection || disableDrag || isOverlay;
 
   const hasLegend = !!item.legendContent;
   const isExpanded = !item.collapsed;
@@ -377,7 +383,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
         {...(!isOverlay && !useExternalDrag ? listeners : {})}
         {...(!isOverlay && !useExternalDrag ? attributes : {})}
         style={{
-          touchAction: useExternalDrag ? "auto" : "none",
+          touchAction: useExternalDrag || isDragDisabled ? "auto" : "none",
           paddingBottom: isOverlay ? 0 : undefined,
         }}
         draggable={useExternalDrag}
@@ -481,11 +487,17 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
                     selectedIds={selectedIds}
                     onSelect={onSelect}
                     enableSelection={enableSelection}
+                    disableDrag={disableDrag}
                     onExternalDragStart={onExternalDragStart}
                   />
                 ))}
                 {children.length === 0 && (
-                  <EmptyGroupPlaceholder parentId={item.id} level={level} enableSelection={enableSelection} />
+                  <EmptyGroupPlaceholder
+                    parentId={item.id}
+                    level={level}
+                    enableSelection={enableSelection}
+                    disableDrag={disableDrag}
+                  />
                 )}
               </>
             )}
@@ -522,6 +534,8 @@ const MemoizedRecursiveTreeItem = React.memo(RecursiveTreeItemInner, (prevProps,
   if (prevSelected !== nextSelected) return false;
   // Check if enableSelection changed
   if (prevProps.enableSelection !== nextProps.enableSelection) return false;
+  // Check if disableDrag changed
+  if (prevProps.disableDrag !== nextProps.disableDrag) return false;
   // Check if renderActions or renderPrefix changed (e.g. toggle style/position changed)
   if (prevProps.renderActions !== nextProps.renderActions) return false;
   if (prevProps.renderPrefix !== nextProps.renderPrefix) return false;
@@ -547,6 +561,7 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
     selectedIds = [],
     onSelect,
     enableSelection = false,
+    disableDrag = false,
     onExternalDragStart,
     sx,
   } = props;
@@ -562,7 +577,7 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
-    if (!enableSelection || !over) return;
+    if (!enableSelection || disableDrag || !over) return;
     const activeIdStr = String(active.id);
     const overIdStr = String(over.id);
     if (overIdStr.startsWith("placeholder-")) {
@@ -614,6 +629,7 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
             selectedIds={selectedIds}
             onSelect={onSelect}
             enableSelection={enableSelection}
+            disableDrag={disableDrag}
             onExternalDragStart={onExternalDragStart}
           />
         ))}

@@ -42,8 +42,6 @@ import { seedPopupFromInteraction } from "@/components/map/panels/style/popup/se
 import SimpleLayerStyle from "@/components/map/panels/style/SimpleLayerStyle";
 import { PopupContent } from "@/components/map/popover/MapFeaturePopover";
 
-import "@/styles/swiper.css";
-
 // --- Constants ---
 const drawerBleeding = 56;
 
@@ -214,6 +212,11 @@ const MobileProjectLayout = ({
 
   // --- Hooks ---
   const { translatedBaseMaps, activeBasemap, setActiveBasemap } = useBasemap(project);
+  const allowedStyles = useMemo(() => {
+    const allowed = project?.builder_config?.settings?.allowed_basemaps;
+    if (!allowed) return translatedBaseMaps;
+    return translatedBaseMaps.filter((b) => b.source === "custom" || allowed.includes(b.value));
+  }, [project?.builder_config, translatedBaseMaps]);
   // Ephemeral preview of a non-active basemap while its edit dialog is open;
   // restored on close (never persisted).
   const basemapBeforeEdit = useRef<string | null>(null);
@@ -323,6 +326,22 @@ const MobileProjectLayout = ({
   // --- Handlers ---
   const toggleDrawer = (newOpen: boolean) => () => {
     setOpen(newOpen);
+  };
+
+  // Swipe-dismiss (SwipeableDrawer onClose). Unlike the X button, a swipe
+  // means "close the drawer" regardless of what was open before, so the
+  // drawer stays closed — but the map state must still be cleared:
+  // popupInfo left behind would block taps on other layers' features
+  // (MapViewer ignores cross-layer clicks while a popup is open).
+  const handleDrawerDismiss = () => {
+    if (drawerView === "layerInfo" && layerInfo) {
+      layerInfo.onClose();
+    }
+    if (activeRightPanel) {
+      dispatch(setActiveRightPanel(undefined));
+    }
+    setDrawerView("default");
+    setOpen(false);
   };
 
   // Handles clicks on the close ('X') button in the InfoHeader
@@ -456,7 +475,7 @@ const MobileProjectLayout = ({
             {hasControl("find_my_location") && (
               <UserLocation tooltip={t("find_location")} />
             )}
-            {hasControl("basemap") && (
+            {hasControl("basemap") && allowedStyles.length > 0 && (
               <BasemapSelectorButton
                 // Use `open` state derived from drawerView for visual indication (optional)
                 open={drawerView === "basemapSelector"}
@@ -501,7 +520,7 @@ const MobileProjectLayout = ({
             },
             keepMounted: true, // Keep content mounted for transitions/state
           }}
-          onClose={toggleDrawer(false)}
+          onClose={handleDrawerDismiss}
           onOpen={toggleDrawer(true)}
           swipeAreaWidth={drawerBleeding}
           disableSwipeToOpen={false}
@@ -577,7 +596,7 @@ const MobileProjectLayout = ({
 
             {drawerView === "basemapSelector" && (
               <BaseMapSelectorList
-                styles={translatedBaseMaps}
+                styles={allowedStyles}
                 active={activeBasemap.value}
                 editable={editable}
                 basemapChange={async (basemap) => {
