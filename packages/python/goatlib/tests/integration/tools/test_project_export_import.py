@@ -489,11 +489,11 @@ async def test_export_import_round_trip(
             assert "manifest.json" in names
             assert "project.json" in names
             assert "layer_groups.json" in names
+            assert "layer_project_links.json" in names
 
             # Internal layer has data.parquet
             assert f"layers/{layer_id_1}/data.parquet" in names
             assert f"layers/{layer_id_1}/metadata.json" in names
-            assert f"layers/{layer_id_1}/project_link.json" in names
 
             # External layer has metadata but no parquet
             assert f"layers/{layer_id_2}/metadata.json" in names
@@ -504,7 +504,7 @@ async def test_export_import_round_trip(
 
             # Manifest structure
             manifest = json.loads(zf.read("manifest.json"))
-            assert manifest["format_version"] == "1.0"
+            assert manifest["format_version"] == "1.1"
             assert manifest["project_name"] == "Test Export Project"
             assert manifest["layer_count"] == 2
             assert manifest["internal_layer_count"] == 1

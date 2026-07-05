@@ -146,7 +146,7 @@ const TileCard = (props: TileCard) => {
           <Avatar
             sx={{ width: 25, height: 25 }}
             alt={`${item.owned_by.firstname} ${item.owned_by.lastname}`}
-            src={item.owned_by.avatar}
+            src={item.owned_by.avatar ?? undefined}
           />
         </Tooltip>
       )}

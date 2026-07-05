@@ -321,6 +321,30 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
               }}
             />
 
+            {/* App icon (PWA / home-screen). Falls back to the GOAT logo —
+                deliberately NOT to the favicon. */}
+            <Box>
+              <MarkerIconPicker
+                label={t("app_icon")}
+                selectedMarker={
+                  settings?.app_icon_url
+                    ? {
+                        name: t("app_icon"),
+                        url: settings.app_icon_url as string,
+                        category: "",
+                        source: "custom",
+                      }
+                    : undefined
+                }
+                onSelectMarker={(marker) => {
+                  onChange("app_icon_url", marker.url ?? "");
+                }}
+              />
+              <Typography variant="caption" color="text.secondary">
+                {t("app_icon_description")}
+              </Typography>
+            </Box>
+
           </Stack>
         </Box>
         {/* ── Social sharing ── */}

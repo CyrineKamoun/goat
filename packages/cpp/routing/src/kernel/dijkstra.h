@@ -27,6 +27,32 @@ namespace routing::kernel
         return adj;
     }
 
+    // Build the reverse-graph adjacency list. For every directed edge u→v
+    // in the original graph G, the reverse graph G^T contains v→u with the
+    // same cost. So a Dijkstra from node s on G^T gives, for every node v,
+    // the shortest path cost v→s in the original G. For symmetric modes
+    // (walking/bicycle/pedelec where cost == reverse_cost), G^T is
+    // structurally identical to G; for car, edges with reverse_cost=99999
+    // (one-way restrictions) drop out of the appropriate direction.
+    inline std::vector<std::vector<AdjEntry>>
+    build_reverse_adjacency_list(SubNetwork const &net)
+    {
+        std::vector<std::vector<AdjEntry>> adj(net.node_count);
+        for (size_t i = 0; i < net.source.size(); ++i)
+        {
+            // Forward edge u→v in G becomes v→u in G^T.
+            if (net.cost[i] >= 0.0 && net.cost[i] < 99999.0)
+                adj[net.target[i]].push_back(
+                    {net.source[i], net.cost[i]});
+            // The reverse direction of an edge in G (encoded as reverse_cost
+            // applied to v→u traversal) becomes a forward edge u→v in G^T.
+            if (net.reverse_cost[i] >= 0.0 && net.reverse_cost[i] < 99999.0)
+                adj[net.source[i]].push_back(
+                    {net.target[i], net.reverse_cost[i]});
+        }
+        return adj;
+    }
+
     // One-to-all Dijkstra from multiple start vertices.
     // travel_budget: maximum cost to explore (seconds for time mode, meters for
     // distance). Returns cost array of size node_count (unreachable = +inf).

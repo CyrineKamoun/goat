@@ -116,7 +116,11 @@ class ExportLayerMetadata(BaseModel):
 
 
 class ExportLayerProjectLink(BaseModel):
-    """layers/{layer_id}/project_link.json — per-project layer config."""
+    """layers/{layer_id}/project_link.json — per-project layer config (format 1.0).
+
+    Retained for backward-compatible import of 1.0 archives. New exports use
+    [ExportLayerProjectLinkEntry] in [ExportLayerProjectLinks].
+    """
 
     model_config = ConfigDict(extra="ignore")
 
@@ -127,6 +131,39 @@ class ExportLayerProjectLink(BaseModel):
     query: dict[str, Any] | None = None
     charts: dict[str, Any] | None = None
     group_id: str | int | None = None  # References group by original ID
+
+
+class ExportLayerProjectLinkEntry(BaseModel):
+    """One entry in layer_project_links.json (format 1.1).
+
+    Unlike [ExportLayerProjectLink], this carries `layer_id` so the archive
+    can represent multiple links referencing the same dataset.
+
+    Note: the DB column is `layer_project_group_id`; older code/tests
+    sometimes used the shorter `group_id`. Both are accepted on read; the
+    importer prefers `layer_project_group_id`.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: int | None = None
+    layer_id: str
+    name: str | None = None
+    order: int = 0
+    properties: dict[str, Any] | None = None
+    other_properties: dict[str, Any] | None = None
+    query: dict[str, Any] | None = None
+    charts: dict[str, Any] | None = None
+    layer_project_group_id: int | None = None
+    group_id: str | int | None = None
+
+
+class ExportLayerProjectLinks(BaseModel):
+    """layer_project_links.json — full list of layer_project rows (format 1.1)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    links: list[ExportLayerProjectLinkEntry]
 
 
 class ExportLayerIndex(BaseModel):
@@ -210,4 +247,4 @@ class ExportAssetManifest(BaseModel):
 
 # Constants
 EXTERNAL_DATA_TYPES = {"wms", "wfs", "xyz", "cog", "wmts", "mvt"}
-FORMAT_VERSION = "1.0"
+FORMAT_VERSION = "1.1"

@@ -27,6 +27,7 @@ export interface OGCProcessSummary {
   links: OGCLink[];
   "x-ui-toolbox-hidden"?: boolean;
   "x-ui-category"?: string;
+  "x-ui-beta"?: boolean;
 }
 
 export interface OGCProcessList {

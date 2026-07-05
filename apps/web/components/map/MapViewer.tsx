@@ -104,6 +104,45 @@ const MapViewer: React.FC<MapProps> = ({
   const popupPreview = useAppSelector((state) => state.map.popupPreview);
   const mapMode = useAppSelector((state) => state.map.mapMode);
 
+  // --- Basemap swap without tearing down project layers ---------------------
+  // react-map-gl is given the basemap once (frozen prop). Changing the basemap
+  // then goes through an imperative setStyle with transformStyle that carries
+  // the project sources/layers (stable "src-*" ids from Layers.tsx) across the
+  // style change, so MapLibre's diff leaves them mounted and their tiles are
+  // NOT refetched. Feeding the changed style through the prop instead would make
+  // react-map-gl replace the whole style, dropping and re-adding every source.
+  const initialMapStyleRef = useRef(mapStyle);
+  const appliedMapStyleRef = useRef(mapStyle);
+  useEffect(() => {
+    if (mapStyle === appliedMapStyleRef.current) return;
+    const map = mapRef?.current?.getMap();
+    if (!map) return;
+    const target = mapStyle;
+    const swap = () => {
+      map.setStyle(target, {
+        diff: true,
+        transformStyle: (previous, next) => {
+          if (!previous) return next;
+          // Carry every project source (and the layers bound to it) from the
+          // old style into the new basemap style, unchanged.
+          const sources = { ...next.sources };
+          for (const [id, src] of Object.entries(previous.sources ?? {})) {
+            if (id.startsWith("src-")) sources[id] = src;
+          }
+          const carriedLayers = (previous.layers ?? []).filter(
+            (l) => "source" in l && typeof l.source === "string" && l.source.startsWith("src-")
+          );
+          // Append on top of the basemap layers; the basemapLayerConfig effect
+          // in <Layers> re-applies any promote/restack afterwards on styledata.
+          return { ...next, sources, layers: [...next.layers, ...carriedLayers] };
+        },
+      });
+      appliedMapStyleRef.current = target;
+    };
+    if (map.isStyleLoaded()) swap();
+    else map.once("idle", swap);
+  }, [mapStyle, mapRef]);
+
   // Look up the layer that owns the currently-clicked feature. `popupInfo.layerId`
   // is set to `layer_id ?? id` at dispatch time, so we try both: ProjectLayer
   // stores the dataset id on `layer_id` while plain Layer uses `id`.
@@ -332,7 +371,12 @@ const MapViewer: React.FC<MapProps> = ({
         [e.point.x + TAP_BUFFER, e.point.y + TAP_BUFFER],
       ];
       features = map.queryRenderedFeatures(bbox, {
-        layers: interactiveLayerIds,
+        // Unlike react-map-gl's event delegation (which ignores unknown ids),
+        // queryRenderedFeatures throws if ANY id is absent from the style.
+        // interactiveLayerIds includes cluster sub-layer ids that only exist in
+        // certain marker modes (and can be transiently missing during style
+        // reloads), so restrict the query to layers currently in the style.
+        layers: interactiveLayerIds.filter((id) => map.getLayer(id)),
       }) as typeof features;
     }
 
@@ -847,7 +891,7 @@ const MapViewer: React.FC<MapProps> = ({
           ref={mapRef}
           style={{ width: "100%", height: "100%" }}
           initialViewState={initialViewState}
-          mapStyle={mapStyle}
+          mapStyle={initialMapStyleRef.current}
           interactiveLayerIds={interactiveLayerIds}
           dragRotate={dragRotate}
           touchZoomRotate={touchZoomRotate}

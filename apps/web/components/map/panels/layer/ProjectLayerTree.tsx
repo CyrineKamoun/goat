@@ -1292,6 +1292,7 @@ export const ProjectLayerTree = ({
           renderActions={renderRowActions}
           renderPrefix={togglePosition === "left" ? renderPrefix : undefined}
           enableSelection
+          disableDrag={!isEditMode}
           selectedIds={treeSelectedIds}
           onSelect={handleNodeClick}
           onExternalDragStart={

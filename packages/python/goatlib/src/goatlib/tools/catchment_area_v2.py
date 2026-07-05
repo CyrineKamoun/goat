@@ -52,13 +52,23 @@ class StepsStyle(StrEnum):
     cumulative = "cumulative"
 
 
-# Default per-mode budgets — catchment v2 uses these as field defaults; TCM
-# reuses them as placeholder hints in its (optional) max_cost inputs.
-DEFAULT_MAX_TIME_ACTIVE_MIN = 15
-DEFAULT_MAX_TIME_CAR_MIN = 30
-DEFAULT_MAX_TIME_PT_MIN = 30
-DEFAULT_MAX_DISTANCE_ACTIVE_M = 500
-DEFAULT_MAX_DISTANCE_CAR_M = 5000
+# Per-mode budget defaults + hard caps come from a shared module so the
+# catchment_area_v2 and heatmap_v2 form schemas stay in lockstep.
+from goatlib.tools._routing_limits import (  # noqa: E402
+    DEFAULT_MAX_DISTANCE_ACTIVE_M,
+    DEFAULT_MAX_DISTANCE_CAR_M,
+    DEFAULT_MAX_TIME_ACTIVE_MIN,
+    DEFAULT_MAX_TIME_CAR_MIN,
+    DEFAULT_MAX_TIME_PT_MIN,
+)
+
+__all__ = [
+    "DEFAULT_MAX_DISTANCE_ACTIVE_M",
+    "DEFAULT_MAX_DISTANCE_CAR_M",
+    "DEFAULT_MAX_TIME_ACTIVE_MIN",
+    "DEFAULT_MAX_TIME_CAR_MIN",
+    "DEFAULT_MAX_TIME_PT_MIN",
+]
 
 
 # =========================================================================

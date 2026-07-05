@@ -310,6 +310,78 @@ class TestProjectImportRunner:
         assert result["sections"][0]["layerId"] == new_uuid_1
         assert result["sections"][1]["layerId"] == new_uuid_2
 
+    def test_remap_builder_config_remaps_group_icon_keys(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        """Group IDs embedded in widget config keys must be remapped.
+
+        Regression: `group_icon_<old_group_id>` keys and `group_info` keys
+        survived import unchanged, so after import they pointed at group IDs
+        from the source project that no longer exist. Result: custom group
+        icons silently fell back to the generic LAYERS icon, and group_info
+        descriptions appeared on no group.
+        """
+        lp_id_map: dict[int, int] = {}
+        group_id_map: dict[int, int] = {220: 69, 222: 71, 223: 68, 227: 70}
+
+        config = {
+            "interface": [
+                {
+                    "widgets": [
+                        {
+                            "config": {
+                                "type": "layers",
+                                "setup": {
+                                    "title": "",
+                                    "group_info": {
+                                        "220": "Parking description",
+                                        "227": "Charging description",
+                                        "999": "Stale description",
+                                    },
+                                },
+                                "options": {
+                                    "group_icon_110": {"url": "stale.svg"},
+                                    "group_icon_220": {"url": "parking.svg"},
+                                    "group_icon_222": {"url": "road.svg"},
+                                    "group_icon_223": {"url": "warn.svg"},
+                                    "group_icon_227": {"url": "ev.svg"},
+                                },
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+
+        result = runner._remap_builder_config(config, lp_id_map, group_id_map)
+
+        widget = result["interface"][0]["widgets"][0]["config"]
+        opts = widget["options"]
+        info = widget["setup"]["group_info"]
+
+        # Known groups get remapped to their new IDs.
+        assert opts["group_icon_69"] == {"url": "parking.svg"}, opts
+        assert opts["group_icon_71"] == {"url": "road.svg"}, opts
+        assert opts["group_icon_68"] == {"url": "warn.svg"}, opts
+        assert opts["group_icon_70"] == {"url": "ev.svg"}, opts
+
+        # Stale keys (no mapping) are left untouched so the operation is
+        # lossless — frontend will silently ignore them, same as before.
+        assert opts["group_icon_110"] == {"url": "stale.svg"}, opts
+
+        # Old keys must NOT linger after remap.
+        for old_gid in group_id_map:
+            assert f"group_icon_{old_gid}" not in opts, (
+                f"group_icon_{old_gid} should have been renamed: {opts}"
+            )
+
+        # group_info: known keys remapped, unknown left as-is.
+        assert info["69"] == "Parking description", info
+        assert info["70"] == "Charging description", info
+        assert info["999"] == "Stale description", info
+        assert "220" not in info, info
+        assert "227" not in info, info
+
     def test_cleanup_on_failure(self, runner: ProjectImportRunner) -> None:
         """DuckLake tables dropped, S3 objects deleted."""
         tracker = ImportCleanupTracker()
@@ -514,3 +586,324 @@ class TestProjectImportRunner:
         assert dl_kwargs["Bucket"] == "test-bucket"
         assert dl_kwargs["Key"] == "imports/test-export.zip"
         assert isinstance(dl_kwargs["Filename"], str)
+
+    def test_import_preserves_link_group_membership(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        """A 1.1 archive carrying `layer_project_group_id` per link must
+        produce layer_project rows with that group remapped to the new
+        serial id — not NULL.
+
+        Regression: ExportLayerProjectLinkEntry had no field for
+        `layer_project_group_id`, and `extra="ignore"` silently dropped it
+        during validation, so every imported link ended up with NULL group.
+        """
+        user_id = "00000000-0000-0000-0000-000000000001"
+        folder_id = "00000000-0000-0000-0000-ffffffffffff"
+        layer_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+        with tempfile.TemporaryDirectory() as build_dir:
+            zip_path = Path(build_dir) / "export.zip"
+
+            project_data = {"name": "Grouped Project"}
+            layer_meta = {
+                "id": layer_id,
+                "name": "Charging",
+                "type": "feature",
+                "data_type": None,
+            }
+            layer_index = {"layers": [layer_meta]}
+            layer_groups = {
+                "groups": [
+                    {"id": 76, "name": "Laden", "order": 0, "parent_id": None}
+                ]
+            }
+            # Two links to the same layer, both attached to group 76 in the
+            # source. The import must remap 76 -> new serial and stamp it on
+            # both links.
+            links_payload = {
+                "links": [
+                    {
+                        "id": 575,
+                        "layer_id": layer_id,
+                        "layer_project_group_id": 76,
+                        "name": "Locations",
+                        "order": 0,
+                    },
+                    {
+                        "id": 576,
+                        "layer_id": layer_id,
+                        "layer_project_group_id": 76,
+                        "name": "Status",
+                        "order": 1,
+                    },
+                ]
+            }
+
+            def _cs(b: bytes) -> str:
+                return f"sha256:{hashlib.sha256(b).hexdigest()}"
+
+            checksums: dict[str, str] = {}
+            project_bytes = json.dumps(project_data, indent=2).encode()
+            checksums["project.json"] = _cs(project_bytes)
+            index_bytes = json.dumps(layer_index, indent=2).encode()
+            checksums["layers/index.json"] = _cs(index_bytes)
+            meta_bytes = json.dumps(layer_meta, indent=2).encode()
+            checksums[f"layers/{layer_id}/metadata.json"] = _cs(meta_bytes)
+            groups_bytes = json.dumps(layer_groups, indent=2).encode()
+            checksums["layer_groups.json"] = _cs(groups_bytes)
+            links_bytes = json.dumps(links_payload, indent=2).encode()
+            checksums["layer_project_links.json"] = _cs(links_bytes)
+
+            manifest = {
+                "format_version": "1.1",
+                "exported_at": "2025-06-01T00:00:00Z",
+                "project_name": "Grouped Project",
+                "checksums": checksums,
+                "layer_count": 1,
+                "internal_layer_count": 1,
+                "external_layer_count": 0,
+                "workflow_count": 0,
+                "report_count": 0,
+            }
+
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("project.json", project_bytes)
+                zf.writestr("layers/index.json", index_bytes)
+                zf.writestr(f"layers/{layer_id}/metadata.json", meta_bytes)
+                zf.writestr(f"layers/{layer_id}/data.parquet", b"FAKE_PARQUET")
+                zf.writestr("layer_groups.json", groups_bytes)
+                zf.writestr("layer_project_links.json", links_bytes)
+                zf.writestr("manifest.json", json.dumps(manifest, indent=2).encode())
+
+            zip_bytes = zip_path.read_bytes()
+
+        params = ProjectImportParams(
+            user_id=user_id,
+            s3_key="imports/grouped.zip",
+            target_folder_id=folder_id,
+        )
+
+        def mock_download_file(**kwargs: object) -> None:
+            Path(str(kwargs["Filename"])).write_bytes(zip_bytes)
+
+        runner._s3_client.download_file.side_effect = mock_download_file
+        runner._duckdb_con.execute.return_value.fetchall.return_value = [
+            ("id", "INTEGER"),
+            ("name", "VARCHAR"),
+            ("geometry", "GEOMETRY"),
+        ]
+
+        # Capture the parameters passed to layer_project inserts.
+        lp_insert_args: list[tuple[object, ...]] = []
+        next_serial = [1000]
+        # First fetchval call is the layer_project_group insert -> returns
+        # a deterministic new serial we can assert against later.
+        new_group_serial = 9000
+
+        mock_asyncpg_conn = AsyncMock()
+        mock_asyncpg_conn.set_type_codec = AsyncMock()
+        mock_txn = MagicMock()
+        mock_txn.__aenter__ = AsyncMock(return_value=mock_txn)
+        mock_txn.__aexit__ = AsyncMock(return_value=False)
+        mock_asyncpg_conn.transaction = MagicMock(return_value=mock_txn)
+        mock_asyncpg_conn.execute = AsyncMock(return_value=None)
+
+        async def tracking_fetchval(query: str, *args: object) -> int:
+            if "INSERT INTO customer.layer_project_group" in query:
+                return new_group_serial
+            if "INSERT INTO customer.layer_project\n" in query:
+                lp_insert_args.append(args)
+                next_serial[0] += 1
+                return next_serial[0]
+            return next_serial[0]
+
+        mock_asyncpg_conn.fetchval = AsyncMock(side_effect=tracking_fetchval)
+
+        with patch("goatlib.tools.project_import.asyncpg") as mock_asyncpg:
+            mock_asyncpg.connect = AsyncMock(return_value=mock_asyncpg_conn)
+            runner.run(params)
+
+        # Layer_project insert signature (see _insert_pg_records):
+        # (layer_uuid, project_uuid, name, order, properties,
+        #  other_properties, query, charts, group_serial)
+        assert len(lp_insert_args) == 2, (
+            f"Expected 2 layer_project inserts, got {len(lp_insert_args)}"
+        )
+        for args in lp_insert_args:
+            group_serial = args[8]
+            assert group_serial == new_group_serial, (
+                f"Link must be assigned to remapped group {new_group_serial},"
+                f" got {group_serial!r}. Full args: {args}"
+            )
+
+    def test_import_duplicate_layer_links(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        """A 1.1 archive with 2 links to the same layer creates 2 layer_project rows.
+
+        Regression: previously the import iterated the layer index and inserted
+        one layer_project row per layer. The unique dataset must be inserted
+        once, but each link in layer_project_links.json must produce its own
+        layer_project row.
+        """
+        user_id = "00000000-0000-0000-0000-000000000001"
+        folder_id = "00000000-0000-0000-0000-ffffffffffff"
+        layer_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+        with tempfile.TemporaryDirectory() as build_dir:
+            zip_path = Path(build_dir) / "export.zip"
+
+            project_data = {"name": "Dup Project"}
+            layer_meta = {
+                "id": layer_id,
+                "name": "Shared Dataset",
+                "type": "feature",
+                "data_type": None,
+            }
+            layer_index = {"layers": [layer_meta]}
+            layer_project_links = {
+                "links": [
+                    {
+                        "id": 101,
+                        "layer_id": layer_id,
+                        "name": "View A",
+                        "order": 0,
+                    },
+                    {
+                        "id": 102,
+                        "layer_id": layer_id,
+                        "name": "View B",
+                        "order": 1,
+                    },
+                ]
+            }
+
+            checksums: dict[str, str] = {}
+
+            def _cs(b: bytes) -> str:
+                return f"sha256:{hashlib.sha256(b).hexdigest()}"
+
+            project_bytes = json.dumps(project_data, indent=2).encode()
+            checksums["project.json"] = _cs(project_bytes)
+
+            index_bytes = json.dumps(layer_index, indent=2).encode()
+            checksums["layers/index.json"] = _cs(index_bytes)
+
+            meta_bytes = json.dumps(layer_meta, indent=2).encode()
+            checksums[f"layers/{layer_id}/metadata.json"] = _cs(meta_bytes)
+
+            links_bytes = json.dumps(layer_project_links, indent=2).encode()
+            checksums["layer_project_links.json"] = _cs(links_bytes)
+
+            manifest = {
+                "format_version": "1.1",
+                "exported_at": "2025-06-01T00:00:00Z",
+                "project_name": "Dup Project",
+                "checksums": checksums,
+                "layer_count": 1,
+                "internal_layer_count": 1,
+                "external_layer_count": 0,
+                "workflow_count": 0,
+                "report_count": 0,
+            }
+
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("project.json", project_bytes)
+                zf.writestr("layers/index.json", index_bytes)
+                zf.writestr(f"layers/{layer_id}/metadata.json", meta_bytes)
+                zf.writestr(f"layers/{layer_id}/data.parquet", b"FAKE_PARQUET")
+                zf.writestr("layer_project_links.json", links_bytes)
+                zf.writestr(
+                    "manifest.json", json.dumps(manifest, indent=2).encode()
+                )
+
+            zip_bytes = zip_path.read_bytes()
+
+        params = ProjectImportParams(
+            user_id=user_id,
+            s3_key="imports/dup.zip",
+            target_folder_id=folder_id,
+        )
+
+        def mock_download_file(**kwargs: object) -> None:
+            Path(str(kwargs["Filename"])).write_bytes(zip_bytes)
+
+        runner._s3_client.download_file.side_effect = mock_download_file
+        runner._duckdb_con.execute.return_value.fetchall.return_value = [
+            ("id", "INTEGER"),
+            ("name", "VARCHAR"),
+            ("geometry", "GEOMETRY"),
+        ]
+
+        # Track INSERT statements per target table.
+        layer_inserts = 0
+        layer_project_inserts = 0
+        execute_log: list[str] = []
+
+        mock_asyncpg_conn = AsyncMock()
+        mock_asyncpg_conn.set_type_codec = AsyncMock()
+        mock_txn = MagicMock()
+        mock_txn.__aenter__ = AsyncMock(return_value=mock_txn)
+        mock_txn.__aexit__ = AsyncMock(return_value=False)
+        mock_asyncpg_conn.transaction = MagicMock(return_value=mock_txn)
+
+        async def tracking_execute(query: str, *args: object) -> None:
+            nonlocal layer_inserts
+            execute_log.append(query)
+            if "INSERT INTO customer.layer\n" in query or query.lstrip().startswith(
+                "INSERT INTO customer.layer "
+            ):
+                layer_inserts += 1
+            return None
+
+        # asyncpg's INSERT INTO customer.layer query in source is multi-line.
+        # Use a simpler matcher: any insert mentioning customer.layer but not
+        # layer_project or layer_project_group.
+        async def tracking_execute_strict(query: str, *args: object) -> None:
+            execute_log.append(query)
+            return None
+
+        mock_asyncpg_conn.execute = AsyncMock(side_effect=tracking_execute_strict)
+
+        # layer_project insert returns id via fetchval; track those too.
+        next_link_id = [1000]
+
+        async def tracking_fetchval(query: str, *args: object) -> int:
+            nonlocal layer_project_inserts
+            execute_log.append(query)
+            if "INSERT INTO customer.layer_project\n" in query or (
+                "INSERT INTO customer.layer_project " in query
+                and "layer_project_group" not in query
+            ):
+                layer_project_inserts += 1
+            next_link_id[0] += 1
+            return next_link_id[0]
+
+        mock_asyncpg_conn.fetchval = AsyncMock(side_effect=tracking_fetchval)
+
+        with patch("goatlib.tools.project_import.asyncpg") as mock_asyncpg:
+            mock_asyncpg.connect = AsyncMock(return_value=mock_asyncpg_conn)
+            result = runner.run(params)
+
+        # Count actual inserts via execute_log. The trailing whitespace after
+        # the table name disambiguates layer vs layer_project vs
+        # layer_project_group (each followed by a newline + column list).
+        layer_inserts = sum(
+            1 for q in execute_log if "INSERT INTO customer.layer\n" in q
+        )
+        layer_project_inserts = sum(
+            1 for q in execute_log if "INSERT INTO customer.layer_project\n" in q
+        )
+
+        assert result["layer_count"] == 1
+        # Unique dataset inserted once.
+        assert layer_inserts == 1, (
+            f"Expected 1 layer insert, got {layer_inserts}. "
+            f"Queries: {execute_log}"
+        )
+        # Both layer_project links inserted.
+        assert layer_project_inserts == 2, (
+            f"Expected 2 layer_project inserts, got {layer_project_inserts}. "
+            f"Queries: {execute_log}"
+        )

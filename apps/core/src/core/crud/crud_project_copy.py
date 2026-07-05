@@ -223,6 +223,11 @@ async def copy_project(
         )
         async_session.add(new_project)
 
+    if new_project.custom_basemaps and old_to_new_link_id:
+        new_project.custom_basemaps = _remap_basemap_layer_config(
+            new_project.custom_basemaps, old_to_new_link_id
+        )
+
     # ------------------------------------------------------------------
     # 8. Create new Workflows (deep copy config; layer refs stay valid since
     #    layers are shared)
@@ -275,6 +280,38 @@ async def copy_project(
         "Copied project %s -> %s (user=%s)", project_id, new_project.id, user_id
     )
     return new_project
+
+
+def _remap_basemap_layer_config(
+    custom_basemaps: list[dict],
+    old_to_new_link_id: dict[int, int],
+) -> list[dict]:
+    """Rewrite layer_config target layer ids after a project copy.
+
+    target "all" is preserved; a target referencing a remapped layer id is
+    rewritten; an unmapped non-"all" target falls back to "all".
+    """
+    remapped: list[dict] = []
+    for basemap in custom_basemaps:
+        config = basemap.get("layer_config")
+        if not config:
+            remapped.append(basemap)
+            continue
+        new_config: dict = {}
+        for layer_id, setting in config.items():
+            target = setting.get("target", "all")
+            if target != "all":
+                try:
+                    old_id = int(target)
+                except (TypeError, ValueError):
+                    old_id = None
+                new_id = (
+                    old_to_new_link_id.get(old_id) if old_id is not None else None
+                )
+                target = str(new_id) if new_id is not None else "all"
+            new_config[layer_id] = {**setting, "target": target}
+        remapped.append({**basemap, "layer_config": new_config})
+    return remapped
 
 
 def _remap_builder_config(

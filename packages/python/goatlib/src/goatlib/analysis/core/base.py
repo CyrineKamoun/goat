@@ -1,3 +1,4 @@
+import importlib
 import logging
 import os
 import tempfile
@@ -50,6 +51,21 @@ class AnalysisTool:
         self.con.execute("INSTALL spatial; LOAD spatial;")
         self.con.execute("INSTALL httpfs; LOAD httpfs;")
         self.con.execute("SET memory_limit='4GB';")
+
+    @staticmethod
+    def _get_routing_module() -> Any:
+        """Lazy-import the C++ routing pybind module.
+
+        Shared by tools (catchment v2, heatmap v2, …) that dispatch
+        compute to the local C++ routing backend.
+        """
+        try:
+            return importlib.import_module("routing")
+        except Exception as exc:
+            raise RuntimeError(
+                "Local routing package is not available. "
+                "Install the 'routing' package (packages/cpp/routing)."
+            ) from exc
 
     def cleanup(self: Self) -> None:
         """

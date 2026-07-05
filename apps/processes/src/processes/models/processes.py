@@ -139,6 +139,11 @@ class ProcessSummary(BaseModel):
         alias="x-ui-category",
         description="Category for grouping in toolbox UI",
     )
+    x_ui_beta: bool = Field(
+        default=False,
+        alias="x-ui-beta",
+        description="If true, render the process in a Beta sub-section within its category",
+    )
 
     model_config = {"populate_by_name": True}
 

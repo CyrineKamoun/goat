@@ -3,7 +3,9 @@
 Base models used across OGC API Features, Tiles, and Processes services.
 """
 
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, Field, model_serializer
 
 
 class Link(BaseModel):
@@ -20,6 +22,25 @@ class Link(BaseModel):
     hreflang: str | None = None
     length: int | None = None
     templated: bool | None = None
+
+    @model_serializer
+    def _serialize(self) -> dict[str, Any]:
+        """Drop unset optional attributes so links don't serialize a noisy set of
+        ``null`` values (title/hreflang/length/templated) on every feature. Per the
+        OGC spec these attributes are optional and should be omitted when absent."""
+        return {
+            k: v
+            for k, v in (
+                ("href", self.href),
+                ("rel", self.rel),
+                ("type", self.type),
+                ("title", self.title),
+                ("hreflang", self.hreflang),
+                ("length", self.length),
+                ("templated", self.templated),
+            )
+            if v is not None
+        }
 
 
 class LandingPage(BaseModel):

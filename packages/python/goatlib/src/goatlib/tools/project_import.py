@@ -34,6 +34,7 @@ from goatlib.tools.project_schemas import (
     ExportAssetManifest,
     ExportLayerGroupTree,
     ExportLayerIndex,
+    ExportLayerProjectLinks,
     ExportManifest,
     ExportProjectMetadata,
     ExportReportLayout,
@@ -42,6 +43,8 @@ from goatlib.tools.project_schemas import (
 from goatlib.tools.schemas import ToolInputBase
 
 logger = logging.getLogger(__name__)
+
+_GROUP_ICON_KEY_RE = re.compile(r"^group_icon_(\d+)$")
 
 
 class ProjectImportParams(ToolInputBase):
@@ -156,6 +159,42 @@ class ProjectImportRunner(SimpleToolRunner):
         logger.info("Generated %d ID mappings", len(id_map))
         return id_map
 
+    def _load_layer_project_links(
+        self: Self,
+        archive_dir: Path,
+        layer_index: ExportLayerIndex,
+    ) -> list[dict[str, Any]]:
+        """Load layer_project links from the archive.
+
+        Format 1.1: a single `layer_project_links.json` at the archive root
+        holds all links as a list (multiple links may share `layer_id`),
+        validated against [ExportLayerProjectLinks].
+
+        Format 1.0 fallback: one `layers/{layer_id}/project_link.json` per
+        layer — at most one link per layer, since the path embeds the layer id.
+        If both files exist, the 1.1 file wins (legacy files are ignored).
+        """
+        links_path = archive_dir / "layer_project_links.json"
+        if links_path.exists():
+            with open(links_path) as f:
+                payload = json.load(f)
+            validated = ExportLayerProjectLinks.model_validate(payload)
+            return [lk.model_dump() for lk in validated.links]
+
+        # Format 1.0 fallback. layer_id isn't recorded inside the file because
+        # the directory path embeds it — attach it here so the downstream
+        # insert loop has a uniform schema.
+        legacy_links: list[dict[str, Any]] = []
+        for layer_meta in layer_index.layers:
+            link_path = archive_dir / "layers" / layer_meta.id / "project_link.json"
+            if not link_path.exists():
+                continue
+            with open(link_path) as f:
+                link_data = json.load(f)
+            link_data["layer_id"] = layer_meta.id
+            legacy_links.append(link_data)
+        return legacy_links
+
     def _remap_workflow_config(
         self: Self, config: dict[str, Any], id_map: dict[str, str]
     ) -> dict[str, Any]:
@@ -224,11 +263,16 @@ class ProjectImportRunner(SimpleToolRunner):
         self: Self,
         config: dict[str, Any],
         lp_id_map: dict[int, int],
+        group_id_map: dict[int, int] | None = None,
     ) -> dict[str, Any]:
-        """Remap layer_project_id references in builder_config.
+        """Remap layer_project_id and group_id references in builder_config.
 
-        Widget configs reference layer_project link IDs (integers) which change
-        on import. This walks the config JSON and replaces old IDs with new ones.
+        Widget configs reference layer_project link IDs (integers) and
+        layer_project_group IDs (integers) which both change on import.
+        For layer_project IDs, walks the serialized JSON and rewrites
+        `"layer_project_id": <int>` plus integers in arrays. For group IDs,
+        walks the deserialized tree and rewrites widget config keys of the
+        form `group_icon_<id>` and `group_info` object keys.
         """
         config_str = json.dumps(config)
         # Replace integer IDs carefully — match "layer_project_id": 66 patterns
@@ -249,7 +293,59 @@ class ProjectImportRunner(SimpleToolRunner):
                 str(new_id),
                 config_str,
             )
-        return json.loads(config_str)
+        remapped = json.loads(config_str)
+        if group_id_map:
+            remapped = self._remap_group_ids_in_config(remapped, group_id_map)
+        return remapped  # type: ignore[no-any-return]
+
+    def _remap_group_ids_in_config(
+        self: Self,
+        node: Any,
+        group_id_map: dict[int, int],
+    ) -> Any:
+        """Recursively rewrite `group_icon_<id>` keys and `group_info` keys.
+
+        Layer-widget configs encode group IDs into dynamic keys (one per
+        group), which a pure value-based remap cannot touch. Keys with no
+        mapping are preserved so stale entries (e.g. for groups deleted
+        before export) don't get silently dropped — the frontend ignores
+        them, same as before the remap.
+        """
+        if isinstance(node, dict):
+            new_dict: dict[str, Any] = {}
+            for key, value in node.items():
+                if key == "group_info" and isinstance(value, dict):
+                    new_dict[key] = {
+                        self._remap_group_info_key(k, group_id_map): v
+                        for k, v in value.items()
+                    }
+                    continue
+                match = _GROUP_ICON_KEY_RE.match(key) if isinstance(key, str) else None
+                if match:
+                    old_gid = int(match.group(1))
+                    new_gid = group_id_map.get(old_gid)
+                    new_key = f"group_icon_{new_gid}" if new_gid is not None else key
+                    new_dict[new_key] = self._remap_group_ids_in_config(
+                        value, group_id_map
+                    )
+                else:
+                    new_dict[key] = self._remap_group_ids_in_config(
+                        value, group_id_map
+                    )
+            return new_dict
+        if isinstance(node, list):
+            return [self._remap_group_ids_in_config(item, group_id_map) for item in node]
+        return node
+
+    @staticmethod
+    def _remap_group_info_key(key: str, group_id_map: dict[int, int]) -> str:
+        """Map a single group_info key (string-encoded int) to its new ID."""
+        try:
+            old_gid = int(key)
+        except (TypeError, ValueError):
+            return key
+        new_gid = group_id_map.get(old_gid)
+        return str(new_gid) if new_gid is not None else key
 
     def _import_ducklake_layer(
         self: Self,
@@ -445,6 +541,10 @@ class ProjectImportRunner(SimpleToolRunner):
 
                 # Map old group id (str) -> new serial id (returned by RETURNING id)
                 group_new_serial: dict[str, int] = {}
+                # Same mapping, but keyed by the old integer id — used for
+                # remapping group references inside builder_config (which
+                # are stored as ints in widget keys like `group_icon_42`).
+                group_old_int_to_new: dict[int, int] = {}
 
                 for group in sorted_groups:
                     old_gid = str(group.id)
@@ -471,26 +571,33 @@ class ProjectImportRunner(SimpleToolRunner):
                     )
                     if new_serial is not None:
                         group_new_serial[old_gid] = new_serial
+                        try:
+                            group_old_int_to_new[int(old_gid)] = new_serial
+                        except ValueError:
+                            # Non-numeric source group id (shouldn't happen
+                            # for PG serial ids, but stay defensive).
+                            pass
                     # Also store in id_map for reference (old group id -> new serial str)
                     if new_group_id:
                         group_new_serial[new_group_id] = group_new_serial.get(
                             old_gid, 0
                         )
 
-                # 4. Insert layers and layer_project links
-                layer_project_id_map: dict[int, int] = {}  # old link ID -> new link ID
+                # 4a. Insert one layer row per unique dataset. Skipped layers
+                # (e.g. street_network) are not entered in old_to_new_layer_id,
+                # so 4b's `target_layer_id is None` branch drops their links.
+                old_to_new_layer_id: dict[str, str] = {}
                 for layer_meta in layer_index.layers:
+                    if layer_meta.feature_layer_type == "street_network":
+                        logger.info(
+                            "Skipping system layer in PG insert: %s (%s)",
+                            layer_meta.name,
+                            layer_meta.id,
+                        )
+                        continue
                     old_layer_id = layer_meta.id
                     new_layer_id = id_map.get(old_layer_id, str(uuid4()))
-
-                    # Load project_link
-                    link_path = (
-                        archive_dir / "layers" / old_layer_id / "project_link.json"
-                    )
-                    link_data: dict[str, Any] = {}
-                    if link_path.exists():
-                        with open(link_path) as f:
-                            link_data = json.load(f)
+                    old_to_new_layer_id[old_layer_id] = new_layer_id
 
                     remapped_other_properties = self._remap_layer_other_properties(
                         layer_meta.other_properties, id_map
@@ -546,7 +653,20 @@ class ProjectImportRunner(SimpleToolRunner):
                         layer_meta.data_category,
                     )
 
-                    # layer_project link
+                # 4b. Insert one layer_project row per exported link.
+                # Format 1.1: links in archive_dir/layer_project_links.json.
+                # Format 1.0 fallback: layers/{layer_id}/project_link.json.
+                layer_project_id_map: dict[int, int] = {}  # old link ID -> new link ID
+                links_to_insert = self._load_layer_project_links(
+                    archive_dir, layer_index
+                )
+                for link_data in links_to_insert:
+                    link_layer_id = link_data["layer_id"]
+                    target_layer_id = old_to_new_layer_id.get(link_layer_id)
+                    if target_layer_id is None:
+                        # Link references a layer that was skipped (e.g. system layer).
+                        continue
+
                     old_group_id = link_data.get(
                         "layer_project_group_id"
                     ) or link_data.get("group_id")
@@ -565,7 +685,7 @@ class ProjectImportRunner(SimpleToolRunner):
                             ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
                         RETURNING id
                         """,
-                        uuid.UUID(new_layer_id),
+                        uuid.UUID(target_layer_id),
                         uuid.UUID(new_project_id),
                         link_data.get("name"),
                         link_data.get("order", 0),
@@ -580,10 +700,17 @@ class ProjectImportRunner(SimpleToolRunner):
                     if old_link_id is not None and new_link_id is not None:
                         layer_project_id_map[int(old_link_id)] = int(new_link_id)
 
-                # 4b. Update builder_config with remapped layer_project IDs
-                if project_data.builder_config and layer_project_id_map:
+                # 4c. Update builder_config with remapped layer_project IDs
+                # and remapped group IDs (the latter affects widget keys like
+                # `group_icon_<id>` and `group_info` dictionaries).
+                needs_remap = bool(layer_project_id_map) or bool(
+                    group_old_int_to_new
+                )
+                if project_data.builder_config and needs_remap:
                     remapped_config = self._remap_builder_config(
-                        project_data.builder_config, layer_project_id_map
+                        project_data.builder_config,
+                        layer_project_id_map,
+                        group_old_int_to_new,
                     )
                     await conn.execute(
                         f"UPDATE {schema}.project SET builder_config = $1 WHERE id = $2",
@@ -761,6 +888,12 @@ class ProjectImportRunner(SimpleToolRunner):
                     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
                     re.IGNORECASE,
                 )
+                # DuckLake caches catalog metadata on the connection; on large
+                # catalogs each CREATE TABLE adds tens of MB that is only freed on
+                # close. Recycle the connection every few layers to keep peak RSS
+                # bounded — otherwise importing into a big catalog OOMs the worker.
+                imported_layer_count = 0
+                recycle_every = 5
                 for layer_meta in layer_index_layers:
                     old_layer_id = layer_meta["id"]
                     if not uuid_re.match(old_layer_id):
@@ -791,6 +924,9 @@ class ProjectImportRunner(SimpleToolRunner):
                                 new_layer_id=new_layer_id,
                                 tracker=tracker,
                             )
+                            imported_layer_count += 1
+                            if imported_layer_count % recycle_every == 0:
+                                self.recycle_duckdb_connection()
                         else:
                             logger.warning(
                                 "No data.parquet for internal layer %s, skipping DuckLake import",

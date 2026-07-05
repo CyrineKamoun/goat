@@ -12,6 +12,8 @@
 #include "output/grid_contour_common.h"
 #include "output/parquet.h"
 #include "geometry/grid_surface_builder.h"
+#include "heatmap/heatmap.h"
+#include "heatmap/network_prep.h"
 #include "pt/pt_pipeline.h"
 
 #include <chrono>
@@ -406,122 +408,28 @@ namespace routing
         }
         else
         {
-            // Street network: single network covering all origins + destinations.
-            std::vector<Point3857> all_points;
-            all_points.reserve(n_origins + n_dests);
-            all_points.insert(all_points.end(),
-                              cfg.origins.begin(), cfg.origins.end());
-            all_points.insert(all_points.end(),
-                              cfg.destinations.begin(), cfg.destinations.end());
-
-            auto rcfg = matrix_to_request_config(cfg, all_points);
-            double buffer_m = input::buffer_distance(rcfg);
-
-            // Compute bbox of all points
-            double bmin_x = all_points[0].x, bmax_x = bmin_x;
-            double bmin_y = all_points[0].y, bmax_y = bmin_y;
-            for (auto const &p : all_points)
-            {
-                bmin_x = std::min(bmin_x, p.x);
-                bmax_x = std::max(bmax_x, p.x);
-                bmin_y = std::min(bmin_y, p.y);
-                bmax_y = std::max(bmax_y, p.y);
-            }
-            double dx = bmax_x - bmin_x;
-            double dy = bmax_y - bmin_y;
-            double extent = std::sqrt(dx * dx + dy * dy);
-
-            std::vector<Edge> edges;
-            static constexpr double kBboxMarginM = 10000.0;
-            static constexpr double kDetailBufferM = 5000.0;
-
-            if (extent > 10000.0)
-            {
-                // Large extent: tiered loading.
-                // Skeleton (classified roads) via bbox corridor,
-                // detail (local roads) via per-point circles.
-                std::vector<std::string> skeleton_classes;
-                std::vector<std::string> detail_classes;
-
-                if (cfg.mode == RoutingMode::Car)
-                {
-                    skeleton_classes = {
-                        "motorway", "trunk", "primary", "secondary",
-                        "tertiary"};
-                    detail_classes = {
-                        "residential", "living_street", "unclassified",
-                        "service", "track"};
-                }
-                else
-                {
-                    skeleton_classes = {
-                        "primary", "secondary", "tertiary", "trunk"};
-                    detail_classes = {
-                        "residential", "living_street", "unclassified",
-                        "service", "pedestrian", "footway", "steps",
-                        "path", "track", "cycleway", "bridleway",
-                        "unknown"};
-                }
-
-                auto bbox_filter = data::compute_h3_filter_bbox(
-                    con, bmin_x, bmin_y, bmax_x, bmax_y, kBboxMarginM);
-                auto skeleton = data::load_edges(
-                    con, cfg.edge_dir, cfg.node_dir,
-                    bbox_filter, skeleton_classes, cfg.mode);
-
-                auto detail = data::load_edges(
-                    con, cfg.edge_dir, cfg.node_dir,
-                    all_points, kDetailBufferM, detail_classes, cfg.mode);
-
-                // Merge and deduplicate by edge ID
-                std::unordered_set<int64_t> seen;
-                seen.reserve(skeleton.size() + detail.size());
-                edges.reserve(skeleton.size() + detail.size());
-                for (auto &e : skeleton)
-                {
-                    seen.insert(e.id);
-                    edges.push_back(std::move(e));
-                }
-                for (auto &e : detail)
-                {
-                    if (seen.find(e.id) == seen.end())
-                        edges.push_back(std::move(e));
-                }
-            }
-            else
-            {
-                // Small extent: all classes via bbox corridor.
-                auto classes = input::valid_classes(cfg.mode);
-                auto bbox_filter = data::compute_h3_filter_bbox(
-                    con, bmin_x, bmin_y, bmax_x, bmax_y, kBboxMarginM);
-                edges = data::load_edges(con, cfg.edge_dir, cfg.node_dir,
-                                         bbox_filter, classes, cfg.mode);
-            }
-
-            if (edges.empty())
-                throw std::runtime_error(
-                    "No edges loaded. Check edge_dir and coverage.");
-
-            kernel::compute_costs(edges, rcfg);
-            auto net = kernel::build_sub_network(edges);
-
-            auto origin_nodes = kernel::snap_origins(net, cfg.origins, rcfg);
-            auto dest_nodes = kernel::snap_origins(net, cfg.destinations, rcfg);
+            heatmap::StreetMatrixPrepInput prep_in{
+                .origins = cfg.origins,
+                .destinations = cfg.destinations,
+                .mode = cfg.mode,
+                .cost_type = cfg.cost_type,
+                .max_cost = cfg.max_cost,
+                .speed_km_h = cfg.speed_km_h,
+                .edge_dir = cfg.edge_dir,
+                .node_dir = cfg.node_dir,
+            };
+            auto prep = heatmap::prepare_street_matrix_network(con, prep_in);
 
             bool use_distance = (cfg.cost_type == CostType::Distance);
-            auto adj = kernel::build_adjacency_list(net);
-
             for (size_t oi = 0; oi < n_origins; ++oi)
             {
-                int32_t start = origin_nodes[oi];
+                int32_t start = prep.origin_nodes[oi];
                 if (start < 0)
                     continue;
-
-                std::vector<int32_t> starts = {start};
                 auto costs = kernel::dijkstra(
-                    adj, starts, cfg.max_cost, use_distance);
-
-                read_dest_costs(oi, costs, dest_nodes);
+                    prep.adj, std::vector<int32_t>{start},
+                    cfg.max_cost, use_distance);
+                read_dest_costs(oi, costs, prep.destination_nodes);
             }
         }
 
@@ -575,6 +483,11 @@ namespace routing
                     "Travel cost matrix parquet export failed: " + result->GetError());
             con.Query("DROP TABLE _matrix_tmp");
         }
+    }
+
+    void compute_heatmap(HeatmapConfig const &cfg)
+    {
+        heatmap::compute_heatmap(cfg);
     }
 
 } // namespace routing

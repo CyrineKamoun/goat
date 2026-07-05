@@ -9,13 +9,16 @@ export interface InteractionEvent {
 }
 
 export interface InteractionState {
-  pendingEvent: InteractionEvent | null;
+  // Queue of events awaiting dispatch. A single slot would drop events when
+  // several are emitted synchronously (e.g. the "Show all" master toggle emits
+  // one per layer), because only the last would survive to the dispatcher.
+  pendingEvents: InteractionEvent[];
   activeTabOverrides: Record<string, string>;
   suppressEvents: boolean;
 }
 
 const initialState: InteractionState = {
-  pendingEvent: null,
+  pendingEvents: [],
   activeTabOverrides: {},
   suppressEvents: false,
 };
@@ -29,13 +32,13 @@ const interactionSlice = createSlice({
       action: PayloadAction<Omit<InteractionEvent, "timestamp">>
     ) => {
       if (state.suppressEvents) return;
-      state.pendingEvent = {
+      state.pendingEvents.push({
         ...action.payload,
         timestamp: Date.now(),
-      };
+      });
     },
-    clearPendingEvent: (state) => {
-      state.pendingEvent = null;
+    clearPendingEvents: (state) => {
+      state.pendingEvents = [];
     },
     setActiveTabOverride: (
       state,
@@ -54,7 +57,7 @@ const interactionSlice = createSlice({
 
 export const {
   emitInteractionEvent,
-  clearPendingEvent,
+  clearPendingEvents,
   setActiveTabOverride,
   clearActiveTabOverride,
   setSuppressEvents,

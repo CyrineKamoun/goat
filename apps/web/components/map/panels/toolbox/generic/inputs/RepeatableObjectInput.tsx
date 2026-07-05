@@ -405,7 +405,7 @@ export default function RepeatableObjectInput({
         size="small"
         startIcon={<Icon iconName={ICON_NAME.PLUS} style={{ fontSize: "15px" }} />}>
         <Typography variant="body2" color="inherit">
-          {t("add")} {formatInputName(input.title.replace(/s$/, ""))}
+          {t("add")} {formatInputName(input.title.replace(/ies$/i, "y").replace(/s$/i, ""))}
         </Typography>
       </Button>
     </Stack>

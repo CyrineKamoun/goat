@@ -1,6 +1,8 @@
 #include "hexagon_builder.h"
+#include "hex_resolution.h"
 
-#include <cmath>
+#include "../geometry/field_sampler.h"
+
 #include <duckdb.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -11,12 +13,6 @@ namespace routing::output
 namespace
 {
 static constexpr char kHexagonFeaturesTempTable[] = "routing_hexagon_features_tmp";
-static constexpr double kSampleSpacingMeters = 20.0;
-
-int32_t hex_resolution_for_mode(RoutingMode mode)
-{
-    return (mode == RoutingMode::Car) ? 8 : 10;
-}
 
 int64_t count_rows(duckdb::Connection &con, std::string const &table)
 {
@@ -50,68 +46,20 @@ int64_t materialize_hexagon_features_table(ReachabilityField const &field,
     if (!field.network)
         return 0;
 
-    auto const &net = *field.network;
+    // Build (x, y, cost) samples using the shared field sampler.
+    auto const samples = geometry::sample_reachability_field(field, budget);
 
-    // Build sampled points in C++ from node coords + edge interpolation.
-    // No geometry loading needed — interpolate along straight lines between nodes.
     con.Query("DROP TABLE IF EXISTS hex_sample_points");
     con.Query("CREATE TEMP TABLE hex_sample_points (x DOUBLE, y DOUBLE, cost DOUBLE)");
     {
         duckdb::Appender appender(con, "hex_sample_points");
-
-        // Add node points
-        for (int32_t nid = 0; nid < net.node_count; ++nid)
+        for (auto const &s : samples)
         {
-            double cost = field.costs[nid];
-            if (!std::isfinite(cost) || cost > budget)
-                continue;
-            auto const &c = net.node_coords[nid];
             appender.BeginRow();
-            appender.Append(c.x);
-            appender.Append(c.y);
-            appender.Append(cost);
+            appender.Append(s.x_3857);
+            appender.Append(s.y_3857);
+            appender.Append(s.cost);
             appender.EndRow();
-        }
-
-        // Interpolate along edges using parallel arrays
-        for (size_t i = 0; i < net.source.size(); ++i)
-        {
-            int32_t s = net.source[i];
-            int32_t t = net.target[i];
-            if (s < 0 || t < 0 ||
-                s >= static_cast<int32_t>(field.costs.size()) ||
-                t >= static_cast<int32_t>(field.costs.size()))
-                continue;
-
-            double src_cost = field.costs[s];
-            double tgt_cost = field.costs[t];
-            if (!std::isfinite(src_cost) || !std::isfinite(tgt_cost))
-                continue;
-            if (std::min(src_cost, tgt_cost) > budget)
-                continue;
-
-            double length = net.length_3857[i];
-            if (length <= kSampleSpacingMeters)
-                continue;
-
-            auto const &sc = net.node_coords[s];
-            auto const &tc = net.node_coords[t];
-            double dx = tc.x - sc.x;
-            double dy = tc.y - sc.y;
-
-            int n_splits = static_cast<int>(std::floor(length / kSampleSpacingMeters));
-            for (int n = 1; n < n_splits; ++n)
-            {
-                double frac = static_cast<double>(n) / n_splits;
-                double cost = src_cost + frac * (tgt_cost - src_cost);
-                if (cost > budget)
-                    continue;
-                appender.BeginRow();
-                appender.Append(sc.x + frac * dx);
-                appender.Append(sc.y + frac * dy);
-                appender.Append(cost);
-                appender.EndRow();
-            }
         }
     }
 

@@ -1,6 +1,7 @@
 import { autocompletion, type CompletionContext } from "@codemirror/autocomplete";
 import { html } from "@codemirror/lang-html";
 import { Autocomplete, Box, Stack, TextField, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import CodeMirror from "@uiw/react-codemirror";
 import { useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -17,6 +18,7 @@ interface Props {
 
 export function HtmlModeEditor({ value, onChange, fields }: Props) {
   const { t } = useTranslation("common");
+  const theme = useTheme();
   const insertAtCursor = useRef<(snippet: string) => void>(() => {});
 
   // `{{`-triggered field completion. Fires when the two chars before the
@@ -100,6 +102,7 @@ export function HtmlModeEditor({ value, onChange, fields }: Props) {
         <CodeMirror
           value={value}
           extensions={[html(), fieldCompletion]}
+          theme={theme.palette.mode === "dark" ? "dark" : "light"}
           minHeight="200px"
           maxHeight="calc(82vh - 260px)"
           onChange={onChange}

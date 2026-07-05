@@ -27,8 +27,10 @@ import { MeasureProvider } from "@/lib/providers/MeasureProvider";
 import { setSelectedBuilderItem } from "@/lib/store/map/slice";
 import { addOrUpdateMarkerImages, addPatternImages } from "@/lib/transformers/map-image";
 import { createSnapToCursorModifier } from "@/lib/utils/dnd-modifier";
+import { orderLayersByTree } from "@/lib/utils/map/layerTreeOrder";
+import { getLocFromUrl, writeLocToUrl, writeMapLocToUrl } from "@/lib/utils/map/loc-url";
 import type { FeatureLayerPointProperties } from "@/lib/validations/layer";
-import { type BuilderWidgetSchema, builderWidgetSchema, projectSchema } from "@/lib/validations/project";
+import { type BuilderWidgetSchema, type CustomBasemap, builderWidgetSchema, projectSchema } from "@/lib/validations/project";
 import { widgetSchemaMap } from "@/lib/validations/widget";
 
 import { useAuthZ } from "@/hooks/auth/AuthZ";
@@ -55,6 +57,8 @@ export default function MapPage({ params: { projectId } }) {
   const theme = useTheme();
   const { t, i18n } = useTranslation("common");
   const mapRef = useRef<MapRef | null>(null);
+  // Read ?loc= once on mount; it wins over the project's saved initial view.
+  const urlLoc = useMemo(() => getLocFromUrl(), []);
   const mapMode = useAppSelector((state) => state.map.mapMode);
   const dispatch = useAppDispatch();
 
@@ -105,81 +109,36 @@ export default function MapPage({ params: { projectId } }) {
 
   // Order layers using tree-aware DFS traversal so the map rendering order
   // matches the visual tree order (layers inside a group inherit the group's position).
-  const projectLayers = useMemo(() => {
-    if (!allProjectLayers || !projectLayerGroups) {
-      return allProjectLayers || [];
-    }
-
-    // Create a set of invisible group IDs (including nested invisible groups)
-    const invisibleGroupIds = new Set<number>();
-
-    const findInvisibleGroups = (groups: typeof projectLayerGroups) => {
-      groups.forEach((group) => {
-        const groupVisibility = group.properties?.visibility ?? true;
-        if (!groupVisibility) {
-          invisibleGroupIds.add(group.id);
-        }
-        if (group.parent_id && invisibleGroupIds.has(group.parent_id)) {
-          invisibleGroupIds.add(group.id);
-        }
-      });
-    };
-
-    let previousSize = -1;
-    while (invisibleGroupIds.size !== previousSize) {
-      previousSize = invisibleGroupIds.size;
-      findInvisibleGroups(projectLayerGroups);
-    }
-
-    // Build a lookup of children by parent_id for efficient DFS traversal.
-    // allProjectLayers is already sorted by order from useFilteredProjectLayers.
-    type TreeNode = { type: "group" | "layer"; id: number; order: number; layer?: (typeof allProjectLayers)[number] };
-    const childrenByParent = new Map<number | null, TreeNode[]>();
-
-    for (const group of projectLayerGroups) {
-      const parentKey = group.parent_id ?? null;
-      if (!childrenByParent.has(parentKey)) childrenByParent.set(parentKey, []);
-      childrenByParent.get(parentKey)!.push({ type: "group", id: group.id, order: group.order ?? 0 });
-    }
-
-    for (const layer of allProjectLayers) {
-      const parentKey = layer.layer_project_group_id ?? null;
-      if (!childrenByParent.has(parentKey)) childrenByParent.set(parentKey, []);
-      childrenByParent.get(parentKey)!.push({ type: "layer", id: layer.id, order: layer.order ?? 0, layer });
-    }
-
-    // Sort each group of children by order
-    for (const children of childrenByParent.values()) {
-      children.sort((a, b) => a.order - b.order);
-    }
-
-    // DFS traversal collects layers in visual tree order
-    const orderedLayers: (typeof allProjectLayers)[number][] = [];
-    const collectLayers = (parentId: number | null) => {
-      const children = childrenByParent.get(parentId);
-      if (!children) return;
-      for (const child of children) {
-        if (child.type === "layer" && child.layer) {
-          if (!child.layer.layer_project_group_id || !invisibleGroupIds.has(child.layer.layer_project_group_id)) {
-            orderedLayers.push(child.layer);
-          }
-        } else if (child.type === "group") {
-          if (!invisibleGroupIds.has(child.id)) {
-            collectLayers(child.id);
-          }
-        }
-      }
-    };
-    collectLayers(null);
-
-    return orderedLayers;
-  }, [allProjectLayers, projectLayerGroups]);
+  const projectLayers = useMemo(
+    () => orderLayersByTree(allProjectLayers || [], projectLayerGroups),
+    [allProjectLayers, projectLayerGroups]
+  );
 
   const widgetProjectLayers = useMemo(() => {
     return allProjectLayersIncludingTables || [];
   }, [allProjectLayersIncludingTables]);
 
-  const { activeBasemap, mapStyle } = useBasemap(project);
+  const { activeBasemap, mapStyle, setActiveBasemap } = useBasemap(project);
+
+  // Keep the Redux active basemap (read by Layers for basemap layer_config) in
+  // sync with the persisted basemap, re-resolving only when the active basemap
+  // value or its own layer_config actually changes. Keyed on a stable string so
+  // unrelated SWR revalidations (which hand back new array refs) don't re-dispatch
+  // and force a style reload on raster/solid basemaps.
+  const activeBasemapValue = project?.basemap;
+  const activeBasemapLayerConfigKey = useMemo(() => {
+    const customs = (project?.custom_basemaps as CustomBasemap[] | undefined) ?? [];
+    const active = customs.find((c) => c.id === activeBasemapValue);
+    return JSON.stringify(
+      active && active.type === "vector" ? (active.layer_config ?? null) : null
+    );
+  }, [project?.custom_basemaps, activeBasemapValue]);
+  useEffect(() => {
+    if (activeBasemapValue) setActiveBasemap(activeBasemapValue);
+    // setActiveBasemap is recreated on each render; the stable deps above gate
+    // when we actually need to re-sync.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBasemapValue, activeBasemapLayerConfigKey]);
 
   const { isOrgEditor, isLoading: isAuthZLoading } = useAuthZ();
   const { folders, isLoading: isFoldersLoading } = useFolders({});
@@ -237,6 +196,22 @@ export default function MapPage({ params: { projectId } }) {
       }, UPDATE_VIEW_STATE_DEBOUNCE_TIME),
     [initialView?.max_zoom, initialView?.min_zoom, projectId]
   );
+
+  const handleMoveEnd = useCallback(
+    (e: ViewStateChangeEvent) => {
+      writeLocToUrl(e.viewState);
+      if (isProjectEditor) {
+        updateViewState(e);
+      }
+    },
+    [isProjectEditor, updateViewState]
+  );
+
+  const handleMapLoaded = useCallback(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    writeMapLocToUrl(map);
+  }, []);
 
   const handleMapLoad = useCallback(() => {
     if (mapRef.current) {
@@ -570,18 +545,19 @@ export default function MapPage({ params: { projectId } }) {
                             mapRef={mapRef}
                             maxExtent={project?.max_extent || undefined}
                             initialViewState={{
-                              zoom: initialView?.zoom ?? 3,
-                              latitude: initialView?.latitude ?? 48.13,
-                              longitude: initialView?.longitude ?? 11.57,
-                              pitch: initialView?.pitch ?? 0,
-                              bearing: initialView?.bearing ?? 0,
+                              zoom: urlLoc?.zoom ?? initialView?.zoom ?? 3,
+                              latitude: urlLoc?.latitude ?? initialView?.latitude ?? 48.13,
+                              longitude: urlLoc?.longitude ?? initialView?.longitude ?? 11.57,
+                              pitch: urlLoc?.pitch ?? initialView?.pitch ?? 0,
+                              bearing: urlLoc?.bearing ?? initialView?.bearing ?? 0,
                               fitBoundsOptions: {
                                 minZoom: initialView?.min_zoom ?? 0,
                                 maxZoom: initialView?.max_zoom ?? 24,
                               },
                             }}
                             mapStyle={mapStyle}
-                            {...(isProjectEditor ? { onMoveEnd: updateViewState } : {})}
+                            onMoveEnd={handleMoveEnd}
+                            onLoad={handleMapLoaded}
                             isEditor={isProjectEditor}
                           />
                           <DataPanel projectLayers={allProjectLayersIncludingTables} isEditor={isProjectEditor} />

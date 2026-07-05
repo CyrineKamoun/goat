@@ -91,8 +91,25 @@ export function synthesizeMapStyle(
 }
 
 /**
+ * A text-field that varies the label BY ZOOM — either a legacy zoom/property
+ * function (`{ stops: [...] }`) or a `step`/`interpolate` expression. Styles use
+ * these to gate label *content* by zoom (e.g. mobidata-bw's `place_town` is `""`
+ * below zoom 9, name at 9+). Overwriting them with a flat name expression makes
+ * those labels appear at every zoom, so we leave them untouched.
+ */
+function isZoomDependentTextField(tf: unknown): boolean {
+  if (tf && typeof tf === "object" && !Array.isArray(tf) && "stops" in (tf as object)) {
+    return true;
+  }
+  if (Array.isArray(tf) && (tf[0] === "step" || tf[0] === "interpolate")) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Apply label language to a MapLibre map instance by rewriting text-field
- * expressions on all symbol layers to prefer the given locale.
+ * expressions on symbol layers to prefer the given locale.
  *
  * Fallback chain (first non-empty wins):
  *   1. name:{locale}  — preferred locale (e.g. name:de)
@@ -102,6 +119,9 @@ export function synthesizeMapStyle(
  *                       `name`/`name:en`/`name:de` empty, so without
  *                       this entry labels render blank on that basemap)
  *   4. name           — raw native name
+ *
+ * Zoom-dependent text-fields are preserved (see isZoomDependentTextField) so the
+ * style's per-zoom label gating keeps working.
  */
 export function applyMapLanguage(map: maplibregl.Map, locale: string) {
   if (!map.isStyleLoaded()) return;
@@ -112,6 +132,9 @@ export function applyMapLanguage(map: maplibregl.Map, locale: string) {
     if (layer.type !== "symbol") continue;
     const textField = map.getLayoutProperty(layer.id, "text-field");
     if (!textField) continue;
+
+    // Don't clobber zoom-gated labels (would make them show at every zoom).
+    if (isZoomDependentTextField(textField)) continue;
 
     const textStr = JSON.stringify(textField);
     if (!textStr.includes("name")) continue;

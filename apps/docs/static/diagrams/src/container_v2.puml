@@ -35,10 +35,7 @@ System_Boundary(a2, "GOAT Application"){
 
     ContainerDb(applicationdb, "Application Database", "PostgreSQL", "Holds application-specific base data, user accounts, and subscriptions.", $sprite="postgresql")
 
-    Container(r5, "Routing API PT", "Java and R5", "Java engine handling travel-time calculation logic for public transport (PT).", $sprite="java")
-    Container(goatrouting, "Routing API Car/Walking/Cycling", "Python and FastAPI", "Python engine using Numba for travel-time calculation (car, walking, cycling).", $sprite="python")
-
-    Container(workflow, "Workflow Engine", "Windmill", "Orchestrates and executes background analysis jobs.", $sprite="python")
+    Container(workflow, "Workflow Engine", "Windmill + goatlib", "Runs analysis jobs. Ships with goatlib pre-installed — all analytical tools (accessibility, routing, indicators, I/O).", $sprite="python")
     ContainerDb(ducklake, "Analysis Database", "DuckDB (DuckLake)", "High-performance analytical database for user layers and analysis results.", $sprite="file")
 }
 
@@ -49,9 +46,6 @@ Rel(applicationapi, applicationdb, "Reads/Writes", "SQLAlchemy")
 Rel(processesapi, workflow, "Triggers", "HTTP")
 Rel(geoapi, ducklake, "Reads/Writes", "DuckDB API")
 Rel(workflow, ducklake, "Reads/Writes", "DuckDB API")
-
-Rel(workflow, r5, "HTTP (Private)")
-Rel(workflow, goatrouting, "HTTP (Private)")
 
 Rel(user, c1, "")
 Rel(c1, a1, "")

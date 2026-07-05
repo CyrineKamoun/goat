@@ -11,7 +11,8 @@ The backend of GOAT is making use of a Microservice architecture that is built u
 - [PostGIS](https://postgis.net/)
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [Keycloak](https://www.keycloak.org/)
-- [R5](https://github.com/conveyal/r5)
+- [DuckDB / DuckLake](https://duckdb.org/)
+- [Windmill](https://www.windmill.dev/)
 
 To describe the software architecture the [C4 Model](https://c4model.com/) is used. The C4 Model is a hierarchical model that describes the software architecture on four different levels. The following sections will describe level 1 and level 2 of the C4 Model, which are context and containers.
 
@@ -71,14 +72,11 @@ The GeoAPI, developed in Python and FastAPI, exposes geospatial data through OGC
 #### Processes API
 The Processes API, developed in Python and FastAPI, implements the OGC API Processes interface for analytics. It runs lightweight synchronous queries directly and dispatches long-running tools to the Workflow Engine for asynchronous execution, managing the resulting jobs.
 
-#### Workflow Engine
-Windmill orchestrates and executes background analysis jobs. It reads and writes the Analysis Database and invokes the routing engines as needed to compute travel times and accessibility indicators.
+#### Workflow Engine (Windmill + goatlib)
+Heavy analyses run on [Windmill](https://www.windmill.dev/), which acts as the workflow and job-execution engine. The Windmill workers ship with `goatlib` pre-installed — the shared Python library that contains all of GOAT's analytical features: accessibility and isochrone analyses, routing for car/walking/cycling/public transport, indicator calculations, scenario logic, and data import/export. Every analytical tool is registered as a Windmill job and reads/writes directly from the DuckLake analysis database. This collapses what used to be several dedicated routing services into a single, horizontally scalable execution layer.
 
 #### Application Database
 A PostgreSQL database with the PostGIS extension. It holds GOAT's base data (network configuration, opportunity datasets, base settings) along with all metadata managed by the Core API — projects, layers, folders, scenarios, and the user, organization, team, and subscription data. It stores metadata and base data, not user-uploaded layer contents.
 
-#### Analysis Database
-A DuckDB-based analytical database (DuckLake), backed by S3 object storage. It holds the actual user layer data and the results produced by analyses. Keeping high-volume geospatial data here — separate from the relational metadata in PostgreSQL — is the platform's core storage split: metadata in PostgreSQL, data in DuckLake.
-
-#### Routing Engines
-Two engines compute travel times, both invoked by the Workflow Engine during analysis jobs. The R5 Engine, written in Java, performs intermodal travel-time analyses for public transport. A second engine, written in Python using Numba, handles car, walking, and cycling.
+#### Analysis Database (DuckLake)
+User layers and the outputs of analytical jobs are stored in a [DuckLake](https://ducklake.select/) catalog backed by Parquet on S3 object storage and queried with DuckDB. Keeping high-volume geospatial data here — separate from the relational metadata in PostgreSQL — is the platform's core storage split: metadata in PostgreSQL, data in DuckLake.

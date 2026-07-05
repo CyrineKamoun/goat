@@ -68,6 +68,7 @@ class ToolInfo:
     job_control_options: list[str] = field(default_factory=lambda: ["async-execute"])
     keywords: list[str] = field(default_factory=list)
     toolbox_hidden: bool = False  # Hide from toolbox UI
+    beta: bool = False  # Render in a "Beta" sub-section in the toolbox UI
     docs_path: str | None = (
         None  # Documentation path (e.g., "/toolbox/geoprocessing/buffer")
     )
@@ -174,6 +175,7 @@ class ToolRegistry:
                         ],  # All tools support async
                         keywords=list(tool_def.keywords),
                         toolbox_hidden=tool_def.toolbox_hidden,
+                        beta=tool_def.beta,
                         docs_path=tool_def.docs_path,
                         worker_tag=tool_def.worker_tag,
                         module_path=tool_def.module_path,
@@ -406,6 +408,7 @@ class ToolRegistry:
             outputTransmission=[TransmissionMode.value, TransmissionMode.reference],
             x_ui_toolbox_hidden=tool.toolbox_hidden,
             x_ui_category=tool.category,
+            x_ui_beta=tool.beta,
             links=[
                 Link(
                     href=f"{base_url}/processes/{tool.name}",

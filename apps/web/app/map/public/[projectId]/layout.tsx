@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 
 import { API_BASE_URL, APP_URL } from "@/lib/constants";
 import { getLocalizedMetadata } from "@/lib/metadata";
+import { isCustomDomainHost } from "@/lib/pwa/manifest";
 import { DEFAULT_FAVICON_URL } from "@/lib/validations/project";
 import type { ProjectPublic } from "@/lib/validations/project";
 
@@ -44,18 +45,8 @@ export async function generateMetadata({ params: { projectId } }) {
     // On a custom domain the public path is hidden by middleware rewrite —
     // the user-visible URL is just `/`. On the canonical host we still
     // show the full path. Distinguish by comparing host.
-    const canonicalHost = (() => {
-      if (!APP_URL) return null;
-      try {
-        return new URL(APP_URL).host;
-      } catch {
-        return null;
-      }
-    })();
-    const url =
-      reqHost && reqHost !== canonicalHost
-        ? `${baseUrl}/`
-        : `${baseUrl}/map/public/${projectId}`;
+    const isCustomDomain = isCustomDomainHost(reqHost);
+    const url = isCustomDomain ? `${baseUrl}/` : `${baseUrl}/map/public/${projectId}`;
 
     const overrides: { title: string; description?: string; image?: string } = { title };
     if (metaDescription) overrides.description = metaDescription;
@@ -73,7 +64,23 @@ export async function generateMetadata({ params: { projectId } }) {
       }
     );
 
-    return { ...metadata, icons: { icon: faviconUrl || DEFAULT_FAVICON_URL } };
+    // Manifest URL must be host-aware: on custom domains the middleware
+    // rewrite maps <domain>/manifest.webmanifest to this project's route.
+    const manifestUrl = isCustomDomain
+      ? `${baseUrl}/manifest.webmanifest`
+      : `${baseUrl}/map/public/${projectId}/manifest.webmanifest`;
+
+    return {
+      ...metadata,
+      icons: {
+        icon: faviconUrl || DEFAULT_FAVICON_URL,
+        apple: `/api/pwa-icon/${projectId}?size=180`,
+      },
+      manifest: manifestUrl,
+      // iOS ignores most of the manifest; these meta tags carry the
+      // installed name and standalone behavior there.
+      appleWebApp: { capable: true, title, statusBarStyle: "default" },
+    };
   }
 
   return {};

@@ -27,6 +27,7 @@ from fastapi.responses import JSONResponse
 from processes.config import settings
 from processes.deps.auth import (
     decode_token,
+    get_optional_user_email,
     get_optional_user_id,
     get_user_id,
     oauth2_scheme,
@@ -48,6 +49,7 @@ from processes.models.processes import (
 )
 from processes.services.analytics_registry import analytics_registry
 from processes.services.analytics_service import AnalyticsService
+from processes.services.beta_access import get_beta_email_domains, is_beta_user_email
 from processes.services.tool_registry import tool_registry
 from processes.services.windmill_client import (
     WindmillClient,
@@ -321,10 +323,15 @@ def get_language_from_request(request: Request) -> str:
 async def list_processes(
     request: Request,
     limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    user_email: str | None = Depends(get_optional_user_email),
 ) -> ProcessList:
     """Get list of all available processes (analytics + async tools).
 
     Supports i18n via Accept-Language header (en, de).
+
+    Beta tools (x-ui-beta) are only included for users whose email domain is
+    in the beta allowlist (a Windmill variable); everyone else gets them
+    filtered out so they don't render in the toolbox.
     """
     base_url = get_base_url(request)
     language = get_language_from_request(request)
@@ -337,6 +344,11 @@ async def list_processes(
 
     # Combine both
     all_processes = analytics_summaries + tool_list.processes
+
+    # Hide beta tools unless the user's email domain is allowlisted
+    beta_domains = await get_beta_email_domains(windmill_client)
+    if not is_beta_user_email(user_email, beta_domains):
+        all_processes = [p for p in all_processes if not p.x_ui_beta]
 
     # Apply limit
     all_processes = all_processes[:limit]

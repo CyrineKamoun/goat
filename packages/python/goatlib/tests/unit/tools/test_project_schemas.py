@@ -77,4 +77,4 @@ def test_workflow_config_preserved() -> None:
 
 def test_format_version() -> None:
     """Format version constant is set."""
-    assert FORMAT_VERSION == "1.0"
+    assert FORMAT_VERSION == "1.1"

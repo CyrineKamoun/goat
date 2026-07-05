@@ -4,8 +4,8 @@ import type { Theme } from "@mui/material";
 import { Box, useMediaQuery, useTheme } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useMemo, useRef } from "react";
-import type { MapRef } from "react-map-gl/maplibre";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { MapRef, ViewStateChangeEvent } from "react-map-gl/maplibre";
 import { MapProvider } from "react-map-gl/maplibre";
 import { shallowEqual, useSelector } from "react-redux";
 
@@ -16,6 +16,7 @@ import type { RootState } from "@/lib/store";
 import { selectFilteredProjectLayers, selectProjectLayers } from "@/lib/store/layer/selectors";
 import { setProjectLayerGroups, setProjectLayers } from "@/lib/store/layer/slice";
 import { setMapMode, setProject } from "@/lib/store/map/slice";
+import { getLocFromUrl, writeLocToUrl, writeMapLocToUrl } from "@/lib/utils/map/loc-url";
 import type { ProjectLayerGroup } from "@/lib/validations/project";
 import { type Project, type ProjectLayer, projectSchema } from "@/lib/validations/project";
 
@@ -47,6 +48,20 @@ export default function MapPage({ params: { projectId } }) {
   const _project = sharedProject?.config?.["project"] as Project;
   const mapRef = useRef<MapRef | null>(null);
   const initialView = sharedProject?.config?.["project"]?.["initial_view_state"] ?? {};
+
+  // Read ?loc= once on mount; it wins over the published initial view. Nothing is
+  // persisted on public maps — the URL is the only carrier of position across reloads.
+  const urlLoc = useMemo(() => getLocFromUrl(), []);
+
+  const handleMoveEnd = useCallback((e: ViewStateChangeEvent) => {
+    writeLocToUrl(e.viewState);
+  }, []);
+
+  const handleMapLoaded = useCallback(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+    writeMapLocToUrl(map);
+  }, []);
 
   const _projectLayers = useSelector(
     (state: RootState) => selectFilteredProjectLayers(state, ["table"], []),
@@ -160,17 +175,19 @@ export default function MapPage({ params: { projectId } }) {
                   touchZoomRotate
                   maxExtent={project?.max_extent || undefined}
                   initialViewState={{
-                    zoom: initialView?.zoom ?? 3,
-                    latitude: initialView?.latitude ?? 48.13,
-                    longitude: initialView?.longitude ?? 11.57,
-                    pitch: initialView?.pitch ?? 0,
-                    bearing: initialView?.bearing ?? 0,
+                    zoom: urlLoc?.zoom ?? initialView?.zoom ?? 3,
+                    latitude: urlLoc?.latitude ?? initialView?.latitude ?? 48.13,
+                    longitude: urlLoc?.longitude ?? initialView?.longitude ?? 11.57,
+                    pitch: urlLoc?.pitch ?? initialView?.pitch ?? 0,
+                    bearing: urlLoc?.bearing ?? initialView?.bearing ?? 0,
                     fitBoundsOptions: {
                       minZoom: initialView?.min_zoom ?? 0,
                       maxZoom: initialView?.max_zoom ?? 24,
                     },
                   }}
                   mapStyle={mapStyle}
+                  onMoveEnd={handleMoveEnd}
+                  onLoad={handleMapLoaded}
                   isEditor={false}
                 />
               </Box>

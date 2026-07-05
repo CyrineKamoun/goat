@@ -38,6 +38,25 @@ class TestLink:
         assert link.title == "Example Link"
         assert link.templated is True
 
+    def test_link_serialization_omits_unset_optionals(self):
+        """Unset optional attributes must not serialize as null values."""
+        link = Link(href="https://example.com", rel="self", type="application/geo+json")
+        dumped = link.model_dump()
+        assert dumped == {
+            "href": "https://example.com",
+            "rel": "self",
+            "type": "application/geo+json",
+        }
+        # Populated optionals are preserved.
+        full = Link(href="h", rel="self", title="t", length=5, templated=True)
+        assert full.model_dump() == {
+            "href": "h",
+            "rel": "self",
+            "title": "t",
+            "length": 5,
+            "templated": True,
+        }
+
 
 class TestCollection:
     """Tests for Collection model."""

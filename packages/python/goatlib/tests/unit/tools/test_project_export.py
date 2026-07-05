@@ -151,9 +151,9 @@ class TestProjectExportRunner:
                     "user_id": user_id,
                 }
             ],
-            "layer_project_links": {
-                layer_id: {"name": "My Layer", "order": 0},
-            },
+            "layer_project_links": [
+                {"layer_id": layer_id, "name": "My Layer", "order": 0},
+            ],
             "layer_groups": [
                 {"id": "g1", "name": "Group 1", "order": 0},
             ],
@@ -236,11 +236,133 @@ class TestProjectExportRunner:
             assert "project.json" in names
             assert "layers/index.json" in names
             assert "layer_groups.json" in names
+            assert "layer_project_links.json" in names
             assert f"layers/{layer_id}/metadata.json" in names
-            assert f"layers/{layer_id}/project_link.json" in names
+            # Format 1.1: per-layer project_link.json is no longer written
+            assert f"layers/{layer_id}/project_link.json" not in names
 
             # Check manifest
             manifest = json.loads(zf.read("manifest.json"))
-            assert manifest["format_version"] == "1.0"
+            assert manifest["format_version"] == "1.1"
             assert manifest["project_name"] == "Test Project"
             assert manifest["layer_count"] == 1
+
+    def test_run_preserves_multiple_links_for_same_layer(
+        self, runner: ProjectExportRunner
+    ) -> None:
+        """A project with N layer_project links to the same dataset exports all N.
+
+        Regression: previously the export deduplicated links by layer_id, so
+        only one link survived. The archive must preserve every link.
+        """
+        layer_id = "00000000-0000-0000-0000-aaaaaaaaaaaa"
+        user_id = "00000000-0000-0000-0000-000000000001"
+
+        params = ProjectExportParams(
+            user_id=user_id,
+            project_id="00000000-0000-0000-0000-000000000099",
+        )
+
+        # Two layer_project rows pointing at the same layer with different
+        # styling/query — the common "same dataset, two views" pattern.
+        mock_metadata = {
+            "project_metadata": {"name": "Dup Project"},
+            "layers": [
+                {
+                    "id": layer_id,
+                    "name": "Shared Dataset",
+                    "type": "feature",
+                    "user_id": user_id,
+                }
+            ],
+            "layer_project_links": [
+                {
+                    "id": 101,
+                    "layer_id": layer_id,
+                    "name": "View A",
+                    "order": 0,
+                    "query": {"op": "=", "args": [{"property": "status"}, "active"]},
+                },
+                {
+                    "id": 102,
+                    "layer_id": layer_id,
+                    "name": "View B",
+                    "order": 1,
+                    "query": {"op": "=", "args": [{"property": "status"}, "archived"]},
+                },
+            ],
+            "layer_groups": [],
+            "workflows": [],
+            "reports": [],
+            "assets": [],
+            "asset_s3_keys": [],
+            "thumbnail_s3_key": None,
+        }
+
+        mock_con = runner._duckdb_con
+        mock_con.execute.return_value.fetchone.return_value = (1,)
+        mock_con.execute.return_value.fetchall.return_value = [
+            ("id", "INTEGER"),
+            ("name", "VARCHAR"),
+            ("geometry", "GEOMETRY"),
+        ]
+
+        uploaded: dict[str, bytes] = {}
+
+        def mock_put_object(**kwargs: object) -> None:
+            uploaded["zip"] = kwargs["Body"].read()  # type: ignore[union-attr]
+
+        runner._s3_client.put_object.side_effect = mock_put_object
+        mock_public_client = MagicMock()
+        mock_public_client.generate_presigned_url.return_value = "https://x"
+        runner.settings.get_s3_public_client.return_value = mock_public_client
+
+        with (
+            patch("goatlib.io.parquet.write_optimized_parquet") as mock_wp,
+            patch.object(
+                runner,
+                "_gather_metadata",
+                new_callable=AsyncMock,
+                return_value=mock_metadata,
+            ),
+        ):
+
+            def parquet_side_effect(
+                con: MagicMock,
+                source: str,
+                output_path: str,
+                geometry_column: str,
+            ) -> int:
+                Path(output_path).touch()
+                return 5
+
+            mock_wp.side_effect = parquet_side_effect
+            runner.run(params)
+
+        import io
+
+        with zipfile.ZipFile(io.BytesIO(uploaded["zip"])) as zf:
+            names = zf.namelist()
+
+            # The new archive layout puts links in a single root file.
+            assert "layer_project_links.json" in names, (
+                f"Expected layer_project_links.json in archive, got: {sorted(names)}"
+            )
+
+            links_payload = json.loads(zf.read("layer_project_links.json"))
+            links = links_payload["links"]
+
+            # Both links must be present — not collapsed to one.
+            assert len(links) == 2, (
+                f"Expected 2 layer_project links, got {len(links)}: {links}"
+            )
+
+            # Each link carries its layer_id and unique fields.
+            assert all(lk["layer_id"] == layer_id for lk in links)
+            names_in_archive = {lk["name"] for lk in links}
+            assert names_in_archive == {"View A", "View B"}
+
+            # The unique dataset still appears once in the layer index.
+            layer_index = json.loads(zf.read("layers/index.json"))
+            assert len(layer_index["layers"]) == 1
+            assert layer_index["layers"][0]["id"] == layer_id

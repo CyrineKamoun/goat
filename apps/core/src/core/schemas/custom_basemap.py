@@ -50,6 +50,12 @@ def _validate_http_url(value: str) -> str:
 HttpUrlStr = Annotated[str, AfterValidator(_validate_http_url)]
 
 
+class BasemapLayerSetting(BaseModel):
+    visible: bool = True
+    relation: Literal["above", "below"] = "below"
+    target: str = "all"
+
+
 class _BaseCustomBasemap(BaseModel):
     id: UUIDStr
     name: str = Field(min_length=1, max_length=255)
@@ -63,6 +69,7 @@ class _BaseCustomBasemap(BaseModel):
 class VectorCustomBasemap(_BaseCustomBasemap):
     type: Literal["vector"] = "vector"
     url: HttpUrlStr
+    layer_config: dict[str, BasemapLayerSetting] | None = None
 
 
 class RasterCustomBasemap(_BaseCustomBasemap):

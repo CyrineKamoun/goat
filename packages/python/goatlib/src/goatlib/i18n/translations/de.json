@@ -199,9 +199,21 @@
       "label": "Reisezeitlimit",
       "description": "Maximale Reisezeit in Minuten"
     },
+    "max_cost_time": {
+      "label": "Reisezeitlimit",
+      "description": "Maximale Reisezeit in Minuten"
+    },
+    "max_cost_distance": {
+      "label": "Reisedistanzlimit",
+      "description": "Maximale Reisedistanz in Metern"
+    },
     "sensitivity": {
       "label": "Sensitivität",
       "description": "Abbau-Sensitivitätsparameter für das Gravitationsmodell"
+    },
+    "potential_type": {
+      "label": "Potenzialtyp",
+      "description": "Wie der Potenzialwert jeder Gelegenheit bestimmt wird."
     },
     "potential_field": {
       "label": "Potenzialfeld",
@@ -509,7 +521,7 @@
     },
     "measure_type": {
       "label": "Berechnen nach",
-      "description": "Berechnung des Einzugsgebiets nach Zeit oder Entfernung"
+      "description": "Reiseaufwand nach Zeit oder Entfernung messen"
     },
     "max_distance": {
       "label": "Maximale Entfernung",
@@ -798,6 +810,17 @@
       "exponential": "Exponentiell",
       "power": "Potenz"
     },
+    "gravity_decay": {
+      "gaussian": "Gauß",
+      "exponential": "Exponentiell",
+      "linear": "Linear",
+      "power": "Potenz"
+    },
+    "heatmap_type": {
+      "gravity": "Gravitation",
+      "closest_average": "Nächstgelegener Durchschnitt",
+      "connectivity": "Konnektivität"
+    },
     "units": {
       "meters": "Meter",
       "kilometers": "Kilometer",
@@ -944,12 +967,24 @@
       "title": "Heatmap Gravity",
       "description": "Es wird die Erreichbarkeit ausgehend von jeder Rasterzelle zu mehreren Orten gleichzeitig berechnet. Die Reisezeiten werden hierfür mit einer Widerstandsfunktion gewichtet und aggregiert."
     },
+    "heatmap_gravity_v2": {
+      "title": "Heatmap Gravity V2",
+      "description": "Es wird die Erreichbarkeit ausgehend von jeder Rasterzelle zu mehreren Orten gleichzeitig berechnet. Die Reisezeiten werden hierfür mit einer Widerstandsfunktion gewichtet und aggregiert."
+    },
     "heatmap_closest_average": {
       "title": "Heatmap Durchschnitt Reisezeit",
       "description": "Es wird die durchschnittliche Reisezeit zu den nächsten N Zielen aufgezeigt ausgehend von jeder Rasterzelle."
     },
+    "heatmap_closest_average_v2": {
+      "title": "Heatmap Durchschnitt Reisezeit V2",
+      "description": "Es wird die durchschnittliche Reisezeit zu den nächsten N Zielen aufgezeigt ausgehend von jeder Rasterzelle."
+    },
     "heatmap_connectivity": {
       "title": "Heatmap Konnektivität",
+      "description": "Die Vernetzung der Verkehrswege wird ausgedrückt durch die Berechnung von Einzugsbereichen für jede Rasterzelle, wobei die erreichbare Fläche der Einzugsbereiche die Konnektivität ausdrückt."
+    },
+    "heatmap_connectivity_v2": {
+      "title": "Heatmap Konnektivität V2",
       "description": "Die Vernetzung der Verkehrswege wird ausgedrückt durch die Berechnung von Einzugsbereichen für jede Rasterzelle, wobei die erreichbare Fläche der Einzugsbereiche die Konnektivität ausdrückt."
     },
     "heatmap_2sfca": {

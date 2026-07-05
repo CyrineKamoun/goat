@@ -21,7 +21,10 @@ function deriveCanonicalHost(): string | null {
   const url = process.env.NEXT_PUBLIC_APP_URL;
   if (!url) return null;
   try {
-    return new URL(url).host.toLowerCase();
+    // hostname (port stripped) — the request host below is compared
+    // port-stripped too, and lib/pwa/manifest.ts#isCustomDomainHost
+    // must agree with this check.
+    return new URL(url).hostname.toLowerCase();
   } catch {
     return null;
   }

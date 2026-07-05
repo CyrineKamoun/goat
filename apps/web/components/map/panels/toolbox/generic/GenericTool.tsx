@@ -366,8 +366,9 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
           }
         }
 
-        // For repeatable-object inputs, validate that at least one item
-        // has all its visible required fields filled
+        // For repeatable-object inputs, every added item must have its
+        // visible required fields filled. If the user adds a slot and
+        // leaves it blank, the form should not be runnable.
         if (input.inputType === "repeatable-object" && Array.isArray(effectiveValues[input.name])) {
           const items = effectiveValues[input.name] as Record<string, unknown>[];
           // Resolve item schema (handle $ref and anyOf nullable patterns)
@@ -384,14 +385,27 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
           }
           if (itemSchema) {
             const itemInputs = processObjectProperties(itemSchema, process.$defs);
-            const hasCompleteItem = items.some((item) => {
-              const mergedItemValues = { ...effectiveValues, ...item };
-              const visibleItemInputs = getVisibleInputs(itemInputs, mergedItemValues);
-              return visibleItemInputs
-                .filter((ii) => ii.required)
-                .every((ii) => !isEmpty(item[ii.name]));
-            });
-            if (!hasCompleteItem) {
+            const allItemsComplete =
+              items.length > 0 &&
+              items.every((item) => {
+                const mergedItemValues = { ...effectiveValues, ...item };
+                const visibleItemInputs = getVisibleInputs(itemInputs, mergedItemValues);
+                // Mirror the top-level conditional-required logic: a field
+                // is required if it's explicitly required OR if it has a
+                // visible_when condition with no default (i.e. once shown,
+                // the user must fill it).
+                return visibleItemInputs.every((ii) => {
+                  const isExplicitlyOptional = ii.uiMeta?.optional === true;
+                  const hasConditionalVisibility = !!ii.uiMeta?.visible_when;
+                  const hasNoDefault =
+                    ii.defaultValue === undefined || ii.defaultValue === null;
+                  const isConditionallyRequired =
+                    hasConditionalVisibility && hasNoDefault && !isExplicitlyOptional;
+                  const isItemRequired = ii.required || isConditionallyRequired;
+                  return !isItemRequired || !isEmpty(item[ii.name]);
+                });
+              });
+            if (!allItemsComplete) {
               return false;
             }
           }

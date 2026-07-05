@@ -151,6 +151,10 @@ export const builderConfigSchema = z.object({
       icon_color: z.string().optional(),
       font_color: z.string().optional(),
       favicon_url: z.string().default(DEFAULT_FAVICON_URL),
+      // Home-screen/PWA icon. Optional; when absent the GOAT logo is used.
+      // Deliberately independent from favicon_url (favicons are often too
+      // small to make good app icons).
+      app_icon_url: z.string().optional(),
       // Social sharing — when unset, public pages fall back to GOAT defaults
       // (see lib/metadata.ts and app/map/public/[projectId]/layout.tsx).
       og_image_url: z.string().optional(),
@@ -175,10 +179,23 @@ const baseCustomBasemapSchema = z.object({
   updated_at: z.string().datetime({ offset: true }),
 });
 
+export const basemapLayerSettingSchema = z.object({
+  visible: z.boolean().default(true),
+  relation: z.enum(["above", "below"]).default("below"),
+  // "all" = relative to all project layers; otherwise a project layer id (number) as a string
+  target: z.string().default("all"),
+});
+export type BasemapLayerSetting = z.infer<typeof basemapLayerSettingSchema>;
+
+// keyed by basemap layer id; sparse — only overridden layers are stored
+export const basemapLayerConfigSchema = z.record(basemapLayerSettingSchema);
+export type BasemapLayerConfig = z.infer<typeof basemapLayerConfigSchema>;
+
 export const customBasemapSchema = z.discriminatedUnion("type", [
   baseCustomBasemapSchema.extend({
     type: z.literal("vector"),
     url: z.string().url(),
+    layer_config: basemapLayerConfigSchema.optional(),
   }),
   baseCustomBasemapSchema.extend({
     type: z.literal("raster"),

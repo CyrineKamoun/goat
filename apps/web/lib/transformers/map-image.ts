@@ -7,6 +7,27 @@ import type { FeatureLayerPointProperties } from "@/lib/validations/layer";
 // name conflicts with other images from mapbox basemaps
 export const PATTERN_IMAGE_PREFIX = "goat-pattern-";
 
+// Track which image name→url is already loaded (and in-flight) per map, so that
+// repeated loadImage() calls — panel re-renders, layer toggles, duplicate
+// map-load handlers — don't refetch and re-decode an icon that's already on the
+// map. Keyed by the underlying maplibre Map (survives MapRef identity changes,
+// GC'd with the map). Presence is gated by hasImage() so a basemap style swap
+// (which wipes all images) still triggers a reload; a changed url also reloads.
+const loadedImageUrls = new WeakMap<object, Map<string, string>>();
+const inFlightImageUrls = new WeakMap<object, Map<string, string>>();
+
+function trackFor(
+  store: WeakMap<object, Map<string, string>>,
+  key: object
+): Map<string, string> {
+  let m = store.get(key);
+  if (!m) {
+    m = new Map();
+    store.set(key, m);
+  }
+  return m;
+}
+
 /**
  * Load image from url and adds or updates the map with the image
  * @param map MapRef
@@ -27,6 +48,22 @@ export const loadImage = (
 ) => {
   if (!map) return;
 
+  // Idempotency guard: skip if this exact image (name→url) is already on the map
+  // or currently loading. A style-swap wipe (hasImage false) or a url change
+  // both fall through and reload.
+  const glMap = (typeof map.getMap === "function" ? map.getMap() : map) as object;
+  const loaded = trackFor(loadedImageUrls, glMap);
+  const inFlight = trackFor(inFlightImageUrls, glMap);
+  let present = false;
+  try {
+    present = !!map.hasImage(marker_name);
+  } catch {
+    present = false;
+  }
+  if (present && loaded.get(marker_name) === url) return;
+  if (inFlight.get(marker_name) === url) return;
+  inFlight.set(marker_name, url);
+
   const addOrUpdateImage = (
     image:
       | HTMLImageElement
@@ -44,9 +81,12 @@ export const loadImage = (
         map.removeImage(marker_name);
       }
       map.addImage(marker_name, image, { sdf: sdf ?? true, pixelRatio: pixelRatio ?? 1 });
+      loaded.set(marker_name, url);
     } catch (error) {
       // Map may have been unmounted or style not loaded yet - ignore silently
       console.debug(`Failed to add/update map image "${marker_name}":`, error);
+    } finally {
+      inFlight.delete(marker_name);
     }
   };
 
@@ -82,7 +122,10 @@ export const loadImage = (
   img.onload = () => {
     rasterizeToCanvas(img, targetWidth, targetHeight);
   };
-  img.onerror = (err) => console.error(`Failed to load image: ${url}`, err);
+  img.onerror = (err) => {
+    inFlight.delete(marker_name);
+    console.error(`Failed to load image: ${url}`, err);
+  };
 };
 
 /**

@@ -1,6 +1,6 @@
 import { Global } from "@emotion/react";
 import type { Theme } from "@mui/material";
-import { Box, IconButton, Stack, SwipeableDrawer, Typography, styled, useTheme } from "@mui/material";
+import { Box, IconButton, Stack, SwipeableDrawer, Typography, alpha, styled, useTheme } from "@mui/material";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "swiper/css";
@@ -41,8 +41,6 @@ import { buildLayerIcon } from "@/components/map/panels/layer/legend/LayerIcon";
 import { seedPopupFromInteraction } from "@/components/map/panels/style/popup/seedFromLegacy";
 import SimpleLayerStyle from "@/components/map/panels/style/SimpleLayerStyle";
 import { PopupContent } from "@/components/map/popover/MapFeaturePopover";
-
-import "@/styles/swiper.css";
 
 // --- Constants ---
 const drawerBleeding = 56;
@@ -139,7 +137,7 @@ const MobileProjectLayout = ({
   onProjectUpdate,
   viewOnly,
 }: PublicProjectLayoutProps) => {
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   const theme = useTheme();
   const dispatch = useAppDispatch();
 
@@ -213,7 +211,15 @@ const MobileProjectLayout = ({
   );
 
   // --- Hooks ---
-  const { translatedBaseMaps, activeBasemap } = useBasemap(project);
+  const { translatedBaseMaps, activeBasemap, setActiveBasemap } = useBasemap(project);
+  const allowedStyles = useMemo(() => {
+    const allowed = project?.builder_config?.settings?.allowed_basemaps;
+    if (!allowed) return translatedBaseMaps;
+    return translatedBaseMaps.filter((b) => b.source === "custom" || allowed.includes(b.value));
+  }, [project?.builder_config, translatedBaseMaps]);
+  // Ephemeral preview of a non-active basemap while its edit dialog is open;
+  // restored on close (never persisted).
+  const basemapBeforeEdit = useRef<string | null>(null);
   const mapMode = useAppSelector((state) => state.map.mapMode);
   const editable = mapMode !== "public";
   const { addCustomBasemap, editCustomBasemap, deleteCustomBasemap } =
@@ -221,6 +227,32 @@ const MobileProjectLayout = ({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CustomBasemap | null>(null);
   const scrollableContentRef = useRef<HTMLDivElement | null>(null);
+
+  // --- Panel appearance (mobile) ---
+  // The bottom drawer is a single shared surface that pages through the
+  // builder panels via Swiper. Mirror the desktop PanelContainer so the
+  // configured panel background color (e.g. a branded yellow) is honored
+  // on mobile too, instead of always falling back to background.paper.
+  const panels = useMemo(
+    () =>
+      (project?.builder_config?.interface ?? []).filter(
+        (item) => item.type === "panel" && (item?.widgets?.length ?? 0) > 0
+      ),
+    [project?.builder_config?.interface]
+  );
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const getPanelBgColor = (panel: (typeof panels)[number] | undefined) =>
+    alpha(
+      panel?.config?.appearance?.backgroundColor || theme.palette.background.paper,
+      panel?.config?.appearance?.opacity ?? 1
+    );
+  // Color for the shared drawer chrome (puller + content area). Use the
+  // active panel's color while showing panels; fall back to the theme
+  // surface for utility views (basemap selector, layer settings, popup).
+  const drawerBgColor =
+    drawerView === "default"
+      ? getPanelBgColor(panels[activeSlideIndex] ?? panels[0])
+      : theme.palette.background.paper;
 
   // --- Effects ---
   // Effect to handle changes in layerInfo (feature selection/deselection)
@@ -294,6 +326,22 @@ const MobileProjectLayout = ({
   // --- Handlers ---
   const toggleDrawer = (newOpen: boolean) => () => {
     setOpen(newOpen);
+  };
+
+  // Swipe-dismiss (SwipeableDrawer onClose). Unlike the X button, a swipe
+  // means "close the drawer" regardless of what was open before, so the
+  // drawer stays closed — but the map state must still be cleared:
+  // popupInfo left behind would block taps on other layers' features
+  // (MapViewer ignores cross-layer clicks while a popup is open).
+  const handleDrawerDismiss = () => {
+    if (drawerView === "layerInfo" && layerInfo) {
+      layerInfo.onClose();
+    }
+    if (activeRightPanel) {
+      dispatch(setActiveRightPanel(undefined));
+    }
+    setDrawerView("default");
+    setOpen(false);
   };
 
   // Handles clicks on the close ('X') button in the InfoHeader
@@ -395,6 +443,8 @@ const MobileProjectLayout = ({
               }}>
               <Geocoder
                 accessToken={MAPBOX_TOKEN}
+                bbox={project?.max_extent ?? undefined}
+                language={i18n.language}
                 placeholder={t("enter_an_address")}
                 tooltip={t("search")}
                 onSelect={(result) => {
@@ -425,7 +475,7 @@ const MobileProjectLayout = ({
             {hasControl("find_my_location") && (
               <UserLocation tooltip={t("find_location")} />
             )}
-            {hasControl("basemap") && (
+            {hasControl("basemap") && allowedStyles.length > 0 && (
               <BasemapSelectorButton
                 // Use `open` state derived from drawerView for visual indication (optional)
                 open={drawerView === "basemapSelector"}
@@ -470,7 +520,7 @@ const MobileProjectLayout = ({
             },
             keepMounted: true, // Keep content mounted for transitions/state
           }}
-          onClose={toggleDrawer(false)}
+          onClose={handleDrawerDismiss}
           onOpen={toggleDrawer(true)}
           swipeAreaWidth={drawerBleeding}
           disableSwipeToOpen={false}
@@ -487,7 +537,7 @@ const MobileProjectLayout = ({
               left: 0,
               height: drawerBleeding,
               cursor: "grab",
-              backgroundColor: theme.palette.background.paper,
+              backgroundColor: drawerBgColor,
               boxShadow: "0 -3px 6px -2px rgba(0,0,0,0.15)",
             }}>
             <Puller />
@@ -519,7 +569,7 @@ const MobileProjectLayout = ({
               overflow: "auto", // Hide overflow, specific content scrolls internally
               borderTopLeftRadius: 8,
               borderTopRightRadius: 8,
-              backgroundColor: theme.palette.background.paper,
+              backgroundColor: drawerBgColor,
             }}
             // Attach touch move handler to prevent drawer swipe when scrolling content
             onTouchMove={handleContentTouchMove}>
@@ -546,7 +596,7 @@ const MobileProjectLayout = ({
 
             {drawerView === "basemapSelector" && (
               <BaseMapSelectorList
-                styles={translatedBaseMaps}
+                styles={allowedStyles}
                 active={activeBasemap.value}
                 editable={editable}
                 basemapChange={async (basemap) => {
@@ -564,6 +614,11 @@ const MobileProjectLayout = ({
                     (project?.custom_basemaps as CustomBasemap[] | undefined)?.find(
                       (c) => c.id === id
                     ) ?? null;
+                  if (target && project?.basemap !== id) {
+                    // Ephemeral preview only — reverted on close, never persisted.
+                    basemapBeforeEdit.current = project?.basemap ?? DEFAULT_BASEMAP;
+                    setActiveBasemap(id);
+                  }
                   setEditing(target);
                   setDialogOpen(true);
                 }}
@@ -601,43 +656,45 @@ const MobileProjectLayout = ({
                 style={{ height: "100%", width: "100%" }}
                 // Ensure Swiper doesn't conflict with drawer swipe
                 touchStartPreventDefault={false} // Let drawer handle swipe if needed
-              >
-                {project.builder_config.interface.map((item, index) => {
-                  if (item.type === "panel" && item?.widgets?.length > 0) {
-                    return (
-                      <SwiperSlide key={index} style={{ height: "100%", boxSizing: "border-box" }}>
-                        {/* Scrollable container for widgets */}
-                        <Box
-                          ref={scrollableContentRef}
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            height: "100%",
-                            width: "100%",
-                            overflowY: "auto", // Enable vertical scrolling for widgets
-                            overflowX: "hidden",
-                            boxSizing: "border-box",
-                            pb: 4, // Padding at the bottom
-                            touchAction: "pan-y", // Hint for browser scroll handling
-                          }}
-                          // No touch handlers needed here anymore, handled by parent Box
-                        >
-                          {item?.widgets?.map((widget) => (
-                            <Box key={widget.id} sx={{ p: 2, width: "100%", flexShrink: 0 }}>
-                              <WidgetWrapper
-                                widget={widget}
-                                projectLayers={projectLayers}
-                                projectLayerGroups={projectLayerGroups}
-                                viewOnly
-                              />
-                            </Box>
-                          ))}
+                // Track the active panel so the shared drawer chrome
+                // (puller + content area) can match its background color.
+                onSlideChange={(swiper: { activeIndex: number }) =>
+                  setActiveSlideIndex(swiper.activeIndex)
+                }>
+                {panels.map((item, index) => (
+                  <SwiperSlide key={index} style={{ height: "100%", boxSizing: "border-box" }}>
+                    {/* Scrollable container for widgets */}
+                    <Box
+                      ref={scrollableContentRef}
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        height: "100%",
+                        width: "100%",
+                        // Each slide carries its own configured panel color so
+                        // adjacent panels render correctly mid-swipe.
+                        backgroundColor: getPanelBgColor(item),
+                        overflowY: "auto", // Enable vertical scrolling for widgets
+                        overflowX: "hidden",
+                        boxSizing: "border-box",
+                        pb: 4, // Padding at the bottom
+                        touchAction: "pan-y", // Hint for browser scroll handling
+                      }}
+                      // No touch handlers needed here anymore, handled by parent Box
+                    >
+                      {item?.widgets?.map((widget) => (
+                        <Box key={widget.id} sx={{ p: 2, width: "100%", flexShrink: 0 }}>
+                          <WidgetWrapper
+                            widget={widget}
+                            projectLayers={projectLayers}
+                            projectLayerGroups={projectLayerGroups}
+                            viewOnly
+                          />
                         </Box>
-                      </SwiperSlide>
-                    );
-                  }
-                  return null;
-                })}
+                      ))}
+                    </Box>
+                  </SwiperSlide>
+                ))}
               </Swiper>
             )}
           </Box>
@@ -646,7 +703,14 @@ const MobileProjectLayout = ({
       <CustomBasemapDialog
         open={dialogOpen}
         initial={editing}
-        onClose={() => setDialogOpen(false)}
+        projectLayers={projectLayers}
+        onClose={() => {
+          setDialogOpen(false);
+          if (basemapBeforeEdit.current !== null) {
+            setActiveBasemap(basemapBeforeEdit.current);
+            basemapBeforeEdit.current = null;
+          }
+        }}
         onSubmit={async (payload) => {
           if (editing) {
             await editCustomBasemap(editing.id, payload);

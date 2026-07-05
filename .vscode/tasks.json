@@ -51,17 +51,26 @@
     },
     {
       "label": "core-pre-launch",
-      "dependsOn": ["kill-port-8000", "uv-sync"],
+      "dependsOn": [
+        "kill-port-8000",
+        "uv-sync"
+      ],
       "dependsOrder": "sequence"
     },
     {
       "label": "geoapi-pre-launch",
-      "dependsOn": ["kill-port-8100", "uv-sync"],
+      "dependsOn": [
+        "kill-port-8100",
+        "uv-sync"
+      ],
       "dependsOrder": "sequence"
     },
     {
       "label": "processes-pre-launch",
-      "dependsOn": ["kill-port-8300", "uv-sync"],
+      "dependsOn": [
+        "kill-port-8300",
+        "uv-sync"
+      ],
       "dependsOrder": "sequence"
     },
     {
@@ -75,12 +84,16 @@
     },
     {
       "label": "web-pre-launch",
-      "dependsOn": ["kill-port-3000"],
+      "dependsOn": [
+        "kill-port-3000"
+      ],
       "dependsOrder": "sequence"
     },
     {
       "label": "docs-pre-launch",
-      "dependsOn": ["kill-port-3001"],
+      "dependsOn": [
+        "kill-port-3001"
+      ],
       "dependsOrder": "sequence"
     }
   ]

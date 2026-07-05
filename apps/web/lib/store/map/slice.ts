@@ -4,7 +4,12 @@ import type { MapGeoJSONFeature } from "react-map-gl/maplibre";
 
 import { BASEMAPS } from "@/lib/constants/basemaps";
 import type { UnitPreference } from "@/lib/utils/measurementUnits";
-import type { BuilderPanelSchema, BuilderWidgetSchema, Project } from "@/lib/validations/project";
+import type {
+  BasemapLayerConfig,
+  BuilderPanelSchema,
+  BuilderWidgetSchema,
+  Project,
+} from "@/lib/validations/project";
 
 import type { Basemap } from "@/types/map/common";
 import { MapSidebarItemID } from "@/types/map/common";
@@ -83,6 +88,9 @@ export interface MapState {
   project: Project | undefined;
   basemaps: Basemap[];
   activeBasemap: Basemap | undefined;
+  // Ephemeral live-preview of basemap layer settings while the edit dialog is
+  // open. undefined = no preview (use the persisted activeBasemap.layer_config).
+  basemapLayerConfigOverride: BasemapLayerConfig | undefined;
   maskLayer: string | undefined; // Toolbox mask layer
   toolboxStartingPoints: [number, number][] | undefined;
   activeLeftPanel: MapSidebarItemID | undefined;
@@ -124,6 +132,7 @@ const initialState = {
   basemaps: BASEMAPS,
   maskLayer: undefined,
   activeBasemap: undefined,
+  basemapLayerConfigOverride: undefined,
   activeLeftPanel: MapSidebarItemID.LAYERS,
   toolboxStartingPoints: undefined,
   activeRightPanel: undefined,
@@ -165,6 +174,15 @@ const mapSlice = createSlice({
     },
     setActiveBasemap: (state, action: PayloadAction<Basemap>) => {
       state.activeBasemap = action.payload;
+    },
+    // Live preview of basemap layer settings (dialog edits before save). Set
+    // while the dialog is open; the map renderer prefers it over the persisted
+    // activeBasemap.layer_config. Cleared (undefined) on dialog close.
+    setBasemapLayerConfigOverride: (
+      state,
+      action: PayloadAction<BasemapLayerConfig | undefined>
+    ) => {
+      state.basemapLayerConfigOverride = action.payload;
     },
     setActiveLeftPanel: (state, action: PayloadAction<MapSidebarItemID | undefined>) => {
       state.activeLeftPanel = action.payload;
@@ -316,6 +334,7 @@ export const {
   setProject,
   updateProject,
   setActiveBasemap,
+  setBasemapLayerConfigOverride,
   setActiveLeftPanel,
   setActiveRightPanel,
   setMaskLayer,

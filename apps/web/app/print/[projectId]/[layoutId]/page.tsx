@@ -12,6 +12,7 @@ import { useProject } from "@/lib/api/projects";
 import { useReportLayout } from "@/lib/api/reportLayouts";
 import type { AtlasPage } from "@/lib/print/atlas-utils";
 import { PAGE_SIZES, mmToPx } from "@/lib/print/units";
+import { orderLayersByTree } from "@/lib/utils/map/layerTreeOrder";
 import type { ProjectLayer } from "@/lib/validations/project";
 import type { ReportLayoutConfig } from "@/lib/validations/reportLayout";
 
@@ -63,39 +64,12 @@ export default function PrintPage() {
   const { layerGroups: projectLayerGroups } = useProjectLayerGroups(projectId);
   const { mapStyle } = useBasemap(project);
 
-  // Filter out layers that belong to invisible groups (same logic as editor)
-  const projectLayers = useMemo(() => {
-    if (!allProjectLayers || !projectLayerGroups) {
-      return allProjectLayers || [];
-    }
-
-    const invisibleGroupIds = new Set<number>();
-
-    const findInvisibleGroups = (groups: typeof projectLayerGroups) => {
-      groups.forEach((group) => {
-        const groupVisibility = group.properties?.visibility ?? true;
-        if (!groupVisibility) {
-          invisibleGroupIds.add(group.id);
-        }
-        if (group.parent_id && invisibleGroupIds.has(group.parent_id)) {
-          invisibleGroupIds.add(group.id);
-        }
-      });
-    };
-
-    let previousSize = -1;
-    while (invisibleGroupIds.size !== previousSize) {
-      previousSize = invisibleGroupIds.size;
-      findInvisibleGroups(projectLayerGroups);
-    }
-
-    return allProjectLayers.filter((layer) => {
-      if (!layer.layer_project_group_id) {
-        return true;
-      }
-      return !invisibleGroupIds.has(layer.layer_project_group_id);
-    });
-  }, [allProjectLayers, projectLayerGroups]);
+  // Order layers to match the visual layer panel hierarchy (same logic as editor)
+  // and filter out layers that belong to invisible groups.
+  const projectLayers = useMemo(
+    () => orderLayersByTree(allProjectLayers || [], projectLayerGroups),
+    [allProjectLayers, projectLayerGroups]
+  );
   const [isReady, setIsReady] = useState(false);
 
   // Print config (atlas limits from backend)
