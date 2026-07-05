@@ -27,16 +27,16 @@ class UserBase(SQLModel):
     email: str = Field(sa_column=Column(Text, nullable=False))
     firstname: str = Field(sa_column=Column(Text, nullable=True))
     lastname: str = Field(sa_column=Column(Text, nullable=True))
-    avatar: str = Field(sa_column=Column(Text, nullable=True))
-    newsletter_subscribe: bool | None = Field(sa_column=Column(Boolean, nullable=True))
+    avatar: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
+    newsletter_subscribe: bool | None = Field(
+        default=None, sa_column=Column(Boolean, nullable=True)
+    )
     hubspot_id: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     organization_id: Optional[UUID] = Field(
         default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(
-                f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"
-            ),
+            ForeignKey(f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"),
             nullable=True,
         ),
     )

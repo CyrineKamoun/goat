@@ -1,5 +1,13 @@
+import logging
+from typing import Any
+
 from core.core.config import settings
 from keycloak import KeycloakAdmin, KeycloakOpenIDConnection
+from keycloak.exceptions import KeycloakError
+
+logger = logging.getLogger(__name__)
+
+_admin: KeycloakAdmin | None = None
 
 
 async def keycloak_admin() -> KeycloakAdmin | None:
@@ -8,14 +16,40 @@ async def keycloak_admin() -> KeycloakAdmin | None:
 
     Returns ``None`` when the service-account client isn't configured, so callers
     degrade gracefully (skip Keycloak enrichment / writes) instead of crashing.
+
+    The client is created once and reused — python-keycloak obtains its token
+    lazily and refreshes it when expired, so rebuilding per request would cost
+    an extra token grant on every call.
     """
+    global _admin
     if not (settings.KEYCLOAK_CLIENT_ID and settings.KEYCLOAK_CLIENT_SECRET):
         return None
-    connection = KeycloakOpenIDConnection(
-        server_url=settings.KEYCLOAK_SERVER_URL,
-        realm_name=settings.REALM_NAME,
-        client_id=settings.KEYCLOAK_CLIENT_ID,
-        client_secret_key=settings.KEYCLOAK_CLIENT_SECRET,
-        verify=True,
-    )
-    return KeycloakAdmin(connection=connection)
+    if _admin is None:
+        connection = KeycloakOpenIDConnection(
+            server_url=settings.KEYCLOAK_SERVER_URL,
+            realm_name=settings.REALM_NAME,
+            client_id=settings.KEYCLOAK_CLIENT_ID,
+            client_secret_key=settings.KEYCLOAK_CLIENT_SECRET,
+            verify=True,
+        )
+        _admin = KeycloakAdmin(connection=connection)
+    return _admin
+
+
+async def get_keycloak_user(user_id: str) -> dict[str, Any]:
+    """User representation from Keycloak, or ``{}`` when the admin client is
+    unconfigured or the lookup fails.
+
+    Enrichment reads must never break the caller: Keycloak being unreachable,
+    the client lacking service-account access, or the user missing from the
+    realm all degrade to "no extra data". Writes (update/delete) intentionally
+    do NOT go through this — a failed write must surface, not desync silently.
+    """
+    admin = await keycloak_admin()
+    if admin is None:
+        return {}
+    try:
+        return admin.get_user(user_id) or {}
+    except KeycloakError:
+        logger.warning("keycloak user lookup failed for %s", user_id, exc_info=True)
+        return {}

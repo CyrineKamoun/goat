@@ -8,7 +8,7 @@ from core.db.models import User
 from core.db.models._link_model import UserRoleLink
 from core.db.models.organization import Organization
 from core.db.models.role import Role
-from core.deps.keycloak import keycloak_admin
+from core.deps.keycloak import get_keycloak_user
 from core.schemas import UserCreate, UserUpdate
 
 
@@ -71,9 +71,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
                 await db_session.commit()
             return user_obj
         avatar = settings.USER_DEFAULT_AVATAR
-        # Get user from keycloak using id (skip enrichment if admin unconfigured)
-        admin = await keycloak_admin()
-        keycloak_user = admin.get_user(user_id) if admin else {}
+        keycloak_user = await get_keycloak_user(user_id)
         if keycloak_user.get("attributes") and keycloak_user["attributes"].get(
             "avatar"
         ):

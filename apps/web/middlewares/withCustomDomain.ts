@@ -15,10 +15,11 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 import { lookupCustomDomain } from "@/lib/api/customDomainLookup";
+import { serverAppUrl } from "@/lib/utils/server-env";
 import type { MiddlewareFactory } from "@/middlewares/types";
 
 function deriveCanonicalHost(): string | null {
-  const url = process.env.NEXT_PUBLIC_APP_URL;
+  const url = serverAppUrl();
   if (!url) return null;
   try {
     // hostname (port stripped) — the request host below is compared

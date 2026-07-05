@@ -1,16 +1,12 @@
+import { isAuthDisabled } from "@/lib/utils/auth-flag";
+
 export const KEYCLOAK_CLIENT_ID = process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID;
 export const KEYCLOAK_ISSUER = process.env.NEXT_PUBLIC_KEYCLOAK_ISSUER;
 export const GEOAPI_BASE_URL = process.env.NEXT_PUBLIC_GEOAPI_URL;
 export const PROCESSES_BASE_URL = process.env.NEXT_PUBLIC_PROCESSES_URL;
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
-// Handle placeholder values properly
-const authDisabledRaw = process.env.NEXT_PUBLIC_AUTH_DISABLED;
-
-export const AUTH_DISABLED =
-  authDisabledRaw &&
-  authDisabledRaw !== "APP_NEXT_PUBLIC_AUTH_DISABLED" &&
-  authDisabledRaw.toLowerCase() === "true";
+export const AUTH_DISABLED = isAuthDisabled(process.env.NEXT_PUBLIC_AUTH);
 
 export const DOCS_URL = "https://goat.plan4better.de/docs";
 export const CONTACT_US_URL = "https://plan4better.de/contact";

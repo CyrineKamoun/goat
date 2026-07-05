@@ -2,6 +2,7 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
+from pydantic import field_validator
 from sqlmodel import SQLModel
 
 from core.db.models.invitation import (
@@ -37,8 +38,13 @@ class InvitationOrgCreate(SQLModel):
     role: OrganizationInvitationRole
     expires: int | None = None
 
+    @field_validator("user_email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        # Keycloak stores emails lowercase; the invitation payload must match
+        # the token's email claim, so normalize at the boundary.
+        return value.strip().lower()
+
 
 class InvitationOrgUpdate(SQLModel):
     role: OrganizationInvitationRole | None = None
-
-

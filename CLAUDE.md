@@ -117,7 +117,7 @@ Copy `.env.example` to `.env`. Key variables:
 - `POSTGRES_SERVER`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` — database connection
 - `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` — object storage (MinIO locally)
 - `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_GEOAPI_URL`, `NEXT_PUBLIC_PROCESSES_URL` — frontend API endpoints
-- `AUTH=False` / `NEXT_PUBLIC_AUTH_DISABLED=True` — disable auth for local dev
+- `AUTH=False` — disable auth for local dev (single switch for backend, web middleware and client bundle)
 - `WINDMILL_URL`, `WINDMILL_TOKEN` — Windmill workflow engine
 - `DATA_DIR` — data directory path (`/app/data` in Docker, local path otherwise)
 

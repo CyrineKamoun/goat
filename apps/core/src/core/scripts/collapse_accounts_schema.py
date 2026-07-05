@@ -83,6 +83,37 @@ ACCOUNTS_TABLES = [
 # already exist in the canonical table, so no reference is orphaned.
 RECONCILE_TABLES = ("user",)
 
+# Legacy functions that linger on old/restored databases but are NOT in the
+# codebase (so ``initial_data`` never recreates them). Dropped here — by name,
+# CASCADE, IF EXISTS — so the cutover leaves a clean DB; a harmless no-op on fresh
+# databases that never had them. Each was verified unreferenced by the repo and by
+# any live function body / column default (nothing depends on them). Checked in
+# both ``settings.SCHEMA`` and ``public``. What they were:
+#   * create/delete_user_data_tables — pre-DuckLake per-user Postgres data tables
+#     (``user_data.*``); actively harmful (their user-table triggers fail every
+#     INSERT/DELETE once the ``user_data`` schema is gone). CASCADE drops the triggers.
+#   * trigger_layer_changes — pg_notify('layer_changes', …) with no listener left.
+#     CASCADE drops its ``layer_changes_trigger``.
+#   * fetch_mapped_data — orphan helper, no callers.
+#   * test_accountscheck_layer — test debris.
+#   * adjust_polygon / to_short_h3_* — old in-Postgres geometry/H3 helpers from
+#     before layer data moved to DuckLake.
+# NOTE: intentionally excludes ``_final_median`` — it is the finalfunc of the
+# still-used ``median`` aggregate, so dropping it would break ``median``.
+LEGACY_DEAD_FUNCTIONS = (
+    "create_user_data_tables",
+    "delete_user_data_tables",
+    "trigger_layer_changes",
+    "fetch_mapped_data",
+    "test_accountscheck_layer",
+    "adjust_polygon",
+    "to_short_h3_3",
+    "to_short_h3_5",
+    "to_short_h3_6",
+    "to_short_h3_9",
+    "to_short_h3_10",
+)
+
 
 def _dsn() -> str:
     return (
@@ -201,6 +232,22 @@ def _triggers_on_functions_in(
     return [(r[0], r[1]) for r in rows]
 
 
+def _dead_functions_present(conn: "psycopg.Connection") -> list[str]:
+    """Which ``LEGACY_DEAD_FUNCTIONS`` actually exist (in the data schema or
+    ``public``), as ``schema.name`` — reported in the plan, dropped in --apply."""
+    names = list(LEGACY_DEAD_FUNCTIONS)
+    rows = conn.execute(
+        """
+        SELECT n.nspname || '.' || p.proname
+        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname IN (%s, 'public') AND p.proname = ANY(%s)
+        ORDER BY 1
+        """,
+        (settings.SCHEMA, names),
+    ).fetchall()
+    return [r[0] for r in rows]
+
+
 def forward(apply: bool) -> int:
     target = settings.SCHEMA
     if target == LEGACY_SCHEMA:
@@ -265,6 +312,13 @@ def forward(apply: bool) -> int:
                 f"{len(dep_triggers)}: {[f'{tbl}:{nm}' for nm, tbl in dep_triggers]}"
             )
 
+        dead_fns = _dead_functions_present(conn)
+        if dead_fns:
+            print(
+                f"\nLegacy dead functions to drop (not in codebase, not recreated) "
+                f"— {len(dead_fns)}: {dead_fns}"
+            )
+
         if not apply:
             print("\n[dry-run] no changes made. Re-run with --apply to execute.")
             return 0
@@ -303,9 +357,19 @@ def forward(apply: bool) -> int:
         # legacy function/trigger layer, which initial_data rebuilds. CASCADE
         # drops those plus the triggers depending on them.
         conn.execute(f"DROP SCHEMA {LEGACY_SCHEMA} CASCADE")
+
+        # Drop the legacy dead functions (by name → covers arg-taking ones;
+        # CASCADE removes any triggers using them; IF EXISTS → harmless no-op on
+        # DBs that never had them, so this is safe to run at every cutover).
+        for schema in (target, "public"):
+            for fn in LEGACY_DEAD_FUNCTIONS:
+                conn.execute(f'DROP FUNCTION IF EXISTS "{schema}"."{fn}" CASCADE')
+
         conn.commit()
         print(f"\nMoved {len(legacy_tables)} tables into '{target}' and dropped "
               f"'{LEGACY_SCHEMA}' (with {len(legacy_funcs)} legacy function(s)).")
+        if dead_fns:
+            print(f"Dropped legacy dead functions: {dead_fns}.")
         if reconcile_plan:
             print(f"Reconciled duplicate(s): {list(reconcile_plan)}.")
         print("NEXT: you MUST re-run initial_data now to reinstall functions/"

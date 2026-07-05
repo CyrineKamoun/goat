@@ -117,7 +117,7 @@ def get_test_settings() -> ToolSettings:
         s3_endpoint_url=os.environ.get("S3_ENDPOINT_URL", "http://minio:9000"),
         s3_access_key_id=os.environ.get("S3_ACCESS_KEY_ID", "minioadmin"),
         s3_secret_access_key=os.environ.get("S3_SECRET_ACCESS_KEY", "minioadmin"),
-        s3_region_name=os.environ.get("S3_REGION_NAME", "us-east-1"),
+        s3_region_name=os.environ.get("S3_REGION", "us-east-1"),
         s3_bucket_name=os.environ.get("S3_BUCKET_NAME", "goat"),
         # Routing settings (optional for tool tests)
         goat_routing_url=os.environ.get(

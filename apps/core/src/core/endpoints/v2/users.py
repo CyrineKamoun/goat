@@ -5,7 +5,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.params import Query
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.core.config import settings
@@ -17,7 +17,7 @@ from core.db.models._link_model import UserRoleLink
 from core.db.models.invitation import Invitation, InvitationStatusEnum, InvitationType
 from core.db.models.organization import Organization
 from core.deps.auth import auth, auth_z, user_token
-from core.deps.keycloak import keycloak_admin
+from core.deps.keycloak import get_keycloak_user, keycloak_admin
 from core.endpoints.deps import get_db
 from core.schemas.common import OrderEnum
 from core.schemas.user import UserProfileUpdate, UserRead, UserUpdate, request_examples
@@ -74,7 +74,10 @@ async def accept_invitation(
     if (
         not invitation
         or invitation.status != InvitationStatusEnum.pending
-        or invitation.payload["user_email"] != user_token["email"]
+        # Case-insensitive: legacy invitations may store the email as typed,
+        # while Keycloak lowercases the token's email claim.
+        or invitation.payload["user_email"].lower()
+        != (user_token.get("email") or "").lower()
     ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -122,7 +125,10 @@ async def decline_invitation(
     if (
         not invitation
         or invitation.status != InvitationStatusEnum.pending
-        or invitation.payload["user_email"] != user_token["email"]
+        # Case-insensitive: legacy invitations may store the email as typed,
+        # while Keycloak lowercases the token's email claim.
+        or invitation.payload["user_email"].lower()
+        != (user_token.get("email") or "").lower()
     ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -152,13 +158,13 @@ async def get_invitations(
     Get invitations
     """
 
-    user_id = user_token["sub"]
-    admin = await keycloak_admin()
-    keycloak_user = admin.get_user(user_id) if admin else {}
-    email = keycloak_user.get("email")
+    # Invitations are keyed by email (they can target users without an account
+    # yet); the token's email claim is also what accept/decline validate against.
+    # Case-insensitive: legacy invitations may store the email as typed.
+    email = (user_token.get("email") or "").lower()
     query = select(crud_invitation.model)
     query = query.where(
-        crud_invitation.model.payload["user_email"].astext == email,
+        func.lower(crud_invitation.model.payload["user_email"].astext) == email,
     )
 
     if invitation_id:
@@ -202,8 +208,7 @@ async def get_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    admin = await keycloak_admin()
-    keycloak_user = admin.get_user(user_id) if admin else {}
+    keycloak_user = await get_keycloak_user(user_id)
 
     roles = []
     for role_link in db_user.role_links:
@@ -270,9 +275,7 @@ async def update_profile(
     user_update = UserUpdate(
         **user.model_dump(exclude_unset=True, exclude_none=True),
     )
-    updated_user = await crud_user.update(
-        db=db, db_obj=db_user, obj_in=user_update
-    )
+    updated_user = await crud_user.update(db=db, db_obj=db_user, obj_in=user_update)
 
     return updated_user
 

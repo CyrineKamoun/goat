@@ -246,9 +246,7 @@ def _resolve_file_name_template(
     result = template
     result = result.replace("{{@page_number}}", str(page_number))
     result = result.replace("{{@total_pages}}", str(total_pages))
-    result = result.replace(
-        "{{@layout_name}}", _sanitize_path_segment(layout_name)
-    )
+    result = result.replace("{{@layout_name}}", _sanitize_path_segment(layout_name))
 
     # Resolve feature attribute placeholders
     def replace_feature_attr(match: re.Match) -> str:  # type: ignore[type-arg]
@@ -525,9 +523,7 @@ class PrintReportRunner(SimpleToolRunner):
                         }
                     except (json.JSONDecodeError, TypeError):
                         pass
-                page_label = (
-                    await metadata.get_attribute("data-atlas-page-label") or ""
-                )
+                page_label = await metadata.get_attribute("data-atlas-page-label") or ""
             else:
                 width_mm = "210"
                 height_mm = "297"
@@ -615,10 +611,7 @@ class PrintReportRunner(SimpleToolRunner):
                     f"{keycloak_url}/realms/{keycloak_realm}"
                     f"/protocol/openid-connect/token"
                 )
-            self._keycloak_client_id = os.environ.get(
-                "KEYCLOAK_CLIENT_ID",
-                os.environ.get("NEXT_PUBLIC_KEYCLOAK_CLIENT_ID"),
-            )
+            self._keycloak_client_id = os.environ.get("KEYCLOAK_CLIENT_ID")
             self._keycloak_client_secret = os.environ.get("KEYCLOAK_CLIENT_SECRET")
 
             # Refresh the access token immediately to start with a fresh one
@@ -671,7 +664,9 @@ class PrintReportRunner(SimpleToolRunner):
 
                 batch_results = await asyncio.gather(*tasks)
                 rendered_pages.extend(batch_results)
-                logger.info(f"Rendered batch {i // settings.print.atlas_batch_size + 1}")
+                logger.info(
+                    f"Rendered batch {i // settings.print.atlas_batch_size + 1}"
+                )
 
             # Generate output file
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -679,10 +674,7 @@ class PrintReportRunner(SimpleToolRunner):
 
             # Create filename base from layout name or ID
             safe_name = (
-                "".join(
-                    c if c.isalnum() or c in "-_ " else "_"
-                    for c in layout_name
-                )
+                "".join(c if c.isalnum() or c in "-_ " else "_" for c in layout_name)
                 .strip()
                 .replace(" ", "_")
             )
@@ -707,8 +699,7 @@ class PrintReportRunner(SimpleToolRunner):
                 if len(rendered_pages) > 1:
                     # Resolve filenames from template (or default)
                     template = (
-                        params.file_name_template
-                        or "{{@layout_name}}_{{@page_number}}"
+                        params.file_name_template or "{{@layout_name}}_{{@page_number}}"
                     )
                     total_pages = len(rendered_pages)
                     raw_names: list[str] = []
@@ -728,9 +719,7 @@ class PrintReportRunner(SimpleToolRunner):
 
                     # Create ZIP of images
                     zip_buffer = io.BytesIO()
-                    with zipfile.ZipFile(
-                        zip_buffer, "w", zipfile.ZIP_DEFLATED
-                    ) as zf:
+                    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                         for rp, name in zip(rendered_pages, final_names):
                             zf.writestr(name, rp.data)
                     output_bytes = zip_buffer.getvalue()
@@ -748,7 +737,9 @@ class PrintReportRunner(SimpleToolRunner):
                             feature_properties=rp.feature_properties,
                         )
                         # Strip folder structure for single files (no ZIP)
-                        resolved = resolved.rsplit("/", 1)[-1] if "/" in resolved else resolved
+                        resolved = (
+                            resolved.rsplit("/", 1)[-1] if "/" in resolved else resolved
+                        )
                         file_name = f"{resolved}.{ext}"
                     else:
                         file_name = f"{file_base}.{ext}"

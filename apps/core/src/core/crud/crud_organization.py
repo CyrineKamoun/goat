@@ -16,7 +16,7 @@ from core.db.models.invitation import Invitation, InvitationStatusEnum
 from core.db.models.organization import OrganizationRolesEnum
 from core.db.models.role import Role
 from core.db.models.user import User
-from core.deps.keycloak import keycloak_admin
+from core.deps.keycloak import get_keycloak_user
 from core.schemas import OrganizationUpdate
 from core.schemas.email import EmailTemplateContent
 from core.schemas.organization import (
@@ -148,10 +148,7 @@ class CRUDOrganization(CRUDBase[Organization, OrganizationCreate, OrganizationUp
     ) -> Any:
         # send email that organization has been deleted.
         # todo: send email also to all members
-        admin = await keycloak_admin()
-        keycloak_user = (
-            admin.get_user(organization_obj.contact_user_id) if admin else {}
-        )
+        keycloak_user = await get_keycloak_user(organization_obj.contact_user_id)
         organization_obj.suspended = True
         db.add(organization_obj)
         await db.commit()

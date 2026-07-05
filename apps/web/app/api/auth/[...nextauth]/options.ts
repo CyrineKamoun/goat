@@ -2,11 +2,13 @@ import type { KeycloakTokenSet, NextAuthOptions } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import KeycloakProvider from "next-auth/providers/keycloak";
 
+import { serverKeycloakClientId, serverKeycloakIssuer } from "@/lib/utils/server-env";
+
 const keycloak = KeycloakProvider({
   id: "keycloak",
-  clientId: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID as string,
+  clientId: serverKeycloakClientId() as string,
   clientSecret: process.env.KEYCLOAK_CLIENT_SECRET as string,
-  issuer: process.env.NEXT_PUBLIC_KEYCLOAK_ISSUER,
+  issuer: serverKeycloakIssuer(),
   authorization: { params: { scope: "openid email profile offline_access" } },
 });
 
@@ -100,14 +102,14 @@ export const options: NextAuthOptions = {
   events: {
     signOut: async ({ token }) => doFinalSignoutHandshake(token),
   },
-  jwt: {
-    maxAge: 1 * 60, // 1 minute, same as in Keycloak
-  },
   pages: {
     signIn: "/auth/login",
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days : 2592000, same as in Keycloak
+    // Upper bound for the session cookie only. The real session length is
+    // governed by Keycloak (SSO idle/max timeouts): when the refresh token
+    // dies, refreshAccessToken flags the session and the app forces re-login.
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
 };
