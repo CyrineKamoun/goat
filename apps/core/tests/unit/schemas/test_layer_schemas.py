@@ -112,3 +112,38 @@ def test_layer_base_creation_invalid_geographical_code():
     # Test with an invalid geographical code
     with pytest.raises(ValidationError):
         LayerBase(geographical_code="XX")
+
+
+def test_read_models_accept_legacy_codes():
+    """Stored legacy metadata values must not fail response serialization.
+
+    The strict geographical/language checks apply on write only — a single
+    legacy row (e.g. geographical_code='EU') must not 500 a whole listing.
+    """
+    from core.schemas.layer import FeatureStandardRead, RasterRead, TableRead
+
+    base = {
+        "user_id": uuid4(),
+        "folder_id": uuid4(),
+        "name": "legacy",
+        "geographical_code": "EU",
+        "language_code": "xx",
+    }
+    table = TableRead.model_validate({**base, "type": "table"})
+    assert table.geographical_code == "EU"
+    assert table.language_code == "xx"
+
+    feature = FeatureStandardRead.model_validate(
+        {
+            **base,
+            "type": "feature",
+            "feature_layer_type": "standard",
+            "feature_layer_geometry_type": "point",
+        }
+    )
+    assert feature.geographical_code == "EU"
+
+    raster = RasterRead.model_validate(
+        {**base, "type": "raster", "url": "https://example.com/wms"}
+    )
+    assert raster.geographical_code == "EU"

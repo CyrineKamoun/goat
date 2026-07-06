@@ -63,6 +63,20 @@ class LayerReadBaseAttributes(BaseModel):
     )
     owned_by: Dict[str, Any] | None = Field(None, description="User ID of the owner")
 
+    # Read models must serve whatever is stored: legacy metadata values that
+    # the strict write-side checks no longer accept must not fail response
+    # serialization. Same-name overrides replace LayerBase's validators via
+    # MRO — this class must precede LayerBase in every read model's bases.
+    @field_validator("geographical_code", mode="after", check_fields=False)
+    @classmethod
+    def geographical_code_valid(cls, value: str | None) -> str | None:
+        return value
+
+    @field_validator("language_code", mode="after", check_fields=False)
+    @classmethod
+    def language_code_valid(cls, value: str | None) -> str | None:
+        return value
+
 
 class LayerProperties(BaseModel):
     """Base model for layer properties."""
@@ -469,8 +483,8 @@ imagery_layer_update_base_example = {
 
 class TableRead(
     ThumbnailUrlMixin,
-    LayerBase,
     LayerReadBaseAttributes,
+    LayerBase,
     DateTimeBase,
     ExternalServiceAttributesBase,
 ):
