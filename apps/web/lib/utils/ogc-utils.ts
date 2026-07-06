@@ -70,9 +70,6 @@ export function inferInputType(
   if (topLevelUiMeta?.widget === "field-statistics-selector") {
     return "field-statistics";
   }
-  if (topLevelUiMeta?.widget === "scenario-selector") {
-    return "scenario";
-  }
   if (topLevelUiMeta?.widget === "chips") {
     return "chips";
   }
@@ -96,9 +93,6 @@ export function inferInputType(
   }
   if (uiMeta?.widget === "field-statistics-selector") {
     return "field-statistics";
-  }
-  if (uiMeta?.widget === "scenario-selector") {
-    return "scenario";
   }
 
   // Check for repeatable array of objects (e.g., opportunities in heatmap, attribute relationships in join)

@@ -30,14 +30,12 @@ import {
   type PopupProperties,
 } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
-import type { ScenarioFeatures } from "@/lib/validations/scenario";
 
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useFeatureEditor } from "@/hooks/map/useFeatureEditor";
 import GeocoderLayer from "@/components/map/GeocoderLayer";
 import Layers from "@/components/map/Layers";
-import ScenarioLayer from "@/components/map/ScenarioLayer";
 import ToolboxLayers from "@/components/map/ToolboxLayers";
 import UserLocationLayer from "@/components/map/UserLocationLayer";
 import DrawControl from "@/components/map/controls/Draw";
@@ -67,7 +65,6 @@ interface MapProps {
   maxExtent?: [number, number, number, number];
   mapStyle: string | maplibregl.StyleSpecification;
   layers: ProjectLayer[] | Layer[];
-  scenarioFeatures?: ScenarioFeatures;
   onMove?: ((e: ViewStateChangeEvent) => void | undefined) | undefined;
   onMoveEnd?: ((e: ViewStateChangeEvent) => void | undefined) | undefined;
   onClick?: (e: MapLayerMouseEvent) => void;
@@ -85,7 +82,6 @@ const MapViewer: React.FC<MapProps> = ({
   initialViewState,
   mapStyle,
   layers,
-  scenarioFeatures,
   onMove,
   onMoveEnd,
   onClick,
@@ -146,11 +142,6 @@ const MapViewer: React.FC<MapProps> = ({
     if (map.isStyleLoaded()) swap();
     else map.once("idle", swap);
   }, [mapStyle, mapRef]);
-
-  const _selectedScenarioEditLayer = useAppSelector((state) => state.map.selectedScenarioLayer);
-  const selectedScenarioEditLayer = useMemo(() => {
-    return layers?.find((layer) => layer.id === _selectedScenarioEditLayer?.value);
-  }, [_selectedScenarioEditLayer, layers]);
 
   // Look up the layer that owns the currently-clicked feature. `popupInfo.layerId`
   // is set to `layer_id ?? id` at dispatch time, so we try both: ProjectLayer
@@ -918,13 +909,7 @@ const MapViewer: React.FC<MapProps> = ({
             displayControlsDefault={false}
             defaultMode={MapboxDraw.constants.modes.SIMPLE_SELECT}
           />
-          <Layers
-            layers={layers}
-            highlightFeature={highlightedFeature}
-            scenarioFeatures={scenarioFeatures}
-            selectedScenarioLayer={selectedScenarioEditLayer as ProjectLayer}
-          />
-          <ScenarioLayer scenarioLayerData={scenarioFeatures} projectLayers={layers as ProjectLayer[]} />
+          <Layers layers={layers} highlightFeature={highlightedFeature} />
           <GeocoderLayer />
           <UserLocationLayer />
           <ToolboxLayers />

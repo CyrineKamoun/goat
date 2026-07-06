@@ -1,0 +1,256 @@
+# Translations template for PROJECT.
+# Copyright (C) 2024 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2024-09-24 19:16+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.16.0\n"
+
+#: src/crud/organization.py:126
+msgid "Thank you for signing up for the free demo!"
+msgstr ""
+
+#: src/crud/organization.py:127
+msgid ""
+"We are delighted that you are becoming part of the GOAT community! During"
+" your trial period, you will have full access to the GOAT platform"
+msgstr ""
+
+#: src/crud/organization.py:133
+msgid "Welcome to GOAT!"
+msgstr ""
+
+#: src/crud/organization.py:156
+msgid "Organization has been deleted"
+msgstr ""
+
+#: src/crud/organization.py:157
+msgid "Your organization has been deleted."
+msgstr ""
+
+#: src/crud/organization.py:258 src/crud/organization.py:325
+msgid "User is not part of the organization"
+msgstr ""
+
+#: src/crud/organization.py:271 src/crud/organization.py:334
+msgid "User is not part of the organization or has no role"
+msgstr ""
+
+#: src/crud/organization.py:299
+msgid "You have been removed from the organization"
+msgstr ""
+
+#: src/crud/organization.py:300
+msgid "You have been removed from the organization."
+msgstr ""
+
+#: src/crud/organization.py:304
+msgid "GOAT - Removed from organization"
+msgstr ""
+
+#: src/crud/organization.py:338 src/crud/organization.py:377
+#: src/crud/organization.py:420 src/crud/team.py:136
+msgid "Invalid role"
+msgstr ""
+
+#: src/crud/stripe.py:19
+msgid "Error getting product in Stripe"
+msgstr ""
+
+#: src/crud/stripe.py:37
+msgid "Error creating customer in Stripe"
+msgstr ""
+
+#: src/crud/stripe.py:50
+msgid "Could not find a trial product"
+msgstr ""
+
+#: src/crud/stripe.py:54
+msgid "Error getting stripe plan default price"
+msgstr ""
+
+#: src/crud/stripe.py:76
+msgid "Error creating subscription in Stripe"
+msgstr ""
+
+#: src/endpoints/v1/organizations.py:290
+msgid "Organization not found"
+msgstr ""
+
+#: src/endpoints/v1/organizations.py:296
+msgid "Invited user already has an organization"
+msgstr ""
+
+#: src/endpoints/v1/organizations.py:312
+msgid "User has already been invited"
+msgstr ""
+
+#: src/endpoints/v1/organizations.py:339 src/endpoints/v1/organizations.py:348
+msgid "You have been invited to join an organization"
+msgstr ""
+
+#: src/endpoints/v1/organizations.py:340
+msgid ""
+"You have been invited to join an organization. Click on the button below "
+"to accept the invitation."
+msgstr ""
+
+#: src/endpoints/v1/organizations.py:344
+msgid "Join organization"
+msgstr ""
+
+#: src/endpoints/v1/webhooks.py:214
+msgid "Your trial is about to end"
+msgstr ""
+
+#: src/endpoints/v1/webhooks.py:215
+msgid "Please reach out to us to continue using GOAT."
+msgstr ""
+
+#: src/endpoints/v1/webhooks.py:216 src/endpoints/v1/webhooks.py:240
+#: src/templates/email/template.html:170
+msgid "Contact us"
+msgstr ""
+
+#: src/endpoints/v1/webhooks.py:222
+msgid "GOAT - Your trial is about to end"
+msgstr ""
+
+#: src/endpoints/v1/webhooks.py:238
+msgid "Your account is suspended"
+msgstr ""
+
+#: src/endpoints/v1/webhooks.py:239
+msgid "Please reach out to us to reactivate your subscription."
+msgstr ""
+
+#: src/endpoints/v1/webhooks.py:246
+msgid "GOAT - Your subscription was deleted"
+msgstr ""
+
+#: src/schemas/plan.py:22
+msgid "goat_starter"
+msgstr ""
+
+#: src/schemas/plan.py:23
+msgid "Starter"
+msgstr ""
+
+#: src/schemas/plan.py:24
+msgid ""
+"Ideal for individuals or small teams beginning with GOAT, offering "
+"essential features to explore its core capabilities."
+msgstr ""
+
+#: src/schemas/plan.py:28
+msgid "For small teams with up to 10 viewers and 3 editors"
+msgstr ""
+
+#: src/schemas/plan.py:29
+msgid "Integrated and custom data"
+msgstr ""
+
+#: src/schemas/plan.py:30
+msgid "Manage teams"
+msgstr ""
+
+#: src/schemas/plan.py:31
+msgid "Share and collaborate"
+msgstr ""
+
+#: src/schemas/plan.py:32
+msgid "Basic support"
+msgstr ""
+
+#: src/schemas/plan.py:36
+msgid "goat_professional"
+msgstr ""
+
+#: src/schemas/plan.py:37
+msgid "Professional"
+msgstr ""
+
+#: src/schemas/plan.py:38
+msgid ""
+"Designed for growing organizations, this plan offers advanced tools for "
+"deeper analysis and enhanced collaboration."
+msgstr ""
+
+#: src/schemas/plan.py:42
+msgid "For organization with up to 50 viewers and 5 editors"
+msgstr ""
+
+#: src/schemas/plan.py:43
+msgid "Create scenarios"
+msgstr ""
+
+#: src/schemas/plan.py:44
+msgid "Increased usage quota limits"
+msgstr ""
+
+#: src/schemas/plan.py:45
+msgid "Premium support"
+msgstr ""
+
+#: src/schemas/plan.py:49
+msgid "goat_enterprise"
+msgstr ""
+
+#: src/schemas/plan.py:50
+msgid "Enterprise"
+msgstr ""
+
+#: src/schemas/plan.py:51
+msgid ""
+"Tailored for large organizations, this plan provides full-scale "
+"capabilities to manage multiple teams and projects at an enterprise "
+"level."
+msgstr ""
+
+#: src/schemas/plan.py:55
+msgid "For large enterprises with multiple departments"
+msgstr ""
+
+#: src/schemas/plan.py:56
+msgid "Unlimited viewers and editors"
+msgstr ""
+
+#: src/schemas/plan.py:57
+msgid "Custom branding and On-premise deployment"
+msgstr ""
+
+#: src/schemas/plan.py:58
+msgid "Elite support"
+msgstr ""
+
+#: src/templates/email/template.html:144
+msgid "All Rights Reserved"
+msgstr ""
+
+#: src/templates/email/template.html:159
+msgid "Privacy"
+msgstr ""
+
+#: src/templates/email/template.html:181
+msgid "About us"
+msgstr ""
+
+#: src/utils/email.py:39
+msgid "Test email"
+msgstr ""
+
+#: src/utils/email.py:40
+msgid "This is a test email"
+msgstr ""
+

@@ -10,7 +10,13 @@ from . import (
     trip_count,
     ui,
 )
-from .base import ALL_GEOMETRY_TYPES, POLYGON_TYPES, GeometryType
+from .base import (
+    ALL_GEOMETRY_TYPES,
+    POLYGON_TYPES,
+    FieldStatistic,
+    GeometryType,
+    StatisticOperation,
+)
 from .catchment_area import (
     AccessEgressMode,
     CatchmentAreaRoutingMode,
@@ -20,7 +26,6 @@ from .catchment_area import (
     PTTimeWindow,
 )
 from .catchment_area_v2 import CatchmentAreaV2Params
-from .base import FieldStatistic, StatisticOperation
 from .data_management import (
     AttributeRelationship,
     JoinOperationType,

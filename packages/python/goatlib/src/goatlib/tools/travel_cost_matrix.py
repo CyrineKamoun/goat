@@ -18,6 +18,7 @@ import duckdb
 from pydantic import Field
 
 from goatlib.analysis.accessibility import TravelCostMatrixTool
+from goatlib.analysis.schemas.catchment_area import WEEKDAY_LABELS
 from goatlib.analysis.schemas.travel_cost_matrix import (
     AccessEgressMode,
     CostType,
@@ -35,7 +36,6 @@ from goatlib.analysis.schemas.ui import (
 )
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
-from goatlib.analysis.schemas.catchment_area import WEEKDAY_LABELS
 from goatlib.tools.catchment_area_v2 import (
     ACCESS_EGRESS_MODE_LABELS,
     COST_TYPE_ICONS,
@@ -45,7 +45,11 @@ from goatlib.tools.catchment_area_v2 import (
     DEFAULT_MAX_TIME_ACTIVE_MIN,
     DEFAULT_MAX_TIME_CAR_MIN,
     PT_MODE_LABELS,
+)
+from goatlib.tools.catchment_area_v2 import (
     ROUTING_MODE_ICONS as _CATCHMENT_ROUTING_MODE_ICONS,
+)
+from goatlib.tools.catchment_area_v2 import (
     ROUTING_MODE_LABELS as _CATCHMENT_ROUTING_MODE_LABELS,
 )
 from goatlib.tools.schemas import ToolInputBase, ToolOutputBase, get_default_layer_name

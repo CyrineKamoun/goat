@@ -37,13 +37,12 @@ import time
 from typing import Any, Awaitable, Callable
 
 import asyncpg
+from goatobs import setup_observability
 from opentelemetry import metrics as otel_metrics
 from opentelemetry.metrics import CallbackOptions, Observation
 from opentelemetry.sdk.metrics import MeterProvider
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from goatobs import setup_observability
 
 from core.core.config import settings
 from core.db.session import session_manager
@@ -73,7 +72,7 @@ MISSING_DIM = "-"
 #
 # Strategy: suffix the name ONLY when it collides, using the owner's
 # full email as the human-readable disambiguator. The owner is the
-# user with the `organization-owner` role (see accounts/src/db/seed_roles.py)
+# user with the `organization-owner` role (see core/db/seed_roles.py)
 # whose own `organization_id` points at this org. If the org has
 # multiple owners we pick MIN(email) deterministically; if it has zero
 # owners we fall back to an 8-char UUID prefix. Output shape:
@@ -91,9 +90,9 @@ ORG_DISAMBIG_CTE = """
             u.organization_id,
             -- Pick a deterministic owner if there are multiple.
             MIN(u.email) AS owner_email
-        FROM {accounts}."user" u
-        JOIN {accounts}.user_role ur ON ur.user_id = u.id
-        JOIN {accounts}.role r ON r.id = ur.role_id
+        FROM {schema}."user" u
+        JOIN {schema}.user_role ur ON ur.user_id = u.id
+        JOIN {schema}.role r ON r.id = ur.role_id
         WHERE r.name = 'organization-owner'
           AND u.email IS NOT NULL
         GROUP BY u.organization_id
@@ -107,7 +106,7 @@ ORG_DISAMBIG_CTE = """
                       || ')'
                  ELSE o.name
             END AS display_name
-        FROM {accounts}.organization o
+        FROM {schema}.organization o
         LEFT JOIN org_owner_emails oe ON oe.organization_id = o.id
     )
 """
@@ -229,19 +228,16 @@ def _make_instruments(meter: otel_metrics.Meter) -> dict[str, object]:
 # ----------------------------------------------------------------------------
 
 
-async def snapshot_layers(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_layers(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_layers_total`` per (org, type, feature_layer_type).
 
     "Org" here is the *owning* org: ``layer.user_id -> user.organization_id``.
-    Sharing links (``accounts.layer_organization``) intentionally do not
+    Sharing links (the ``layer_organization`` table) intentionally do not
     contribute -- otherwise a shared layer would be double-counted across
     every org it's shared into, and the dashboard's "total layers" panel
-    would no longer equal ``count(*) FROM customer.layer``.
+    would no longer equal ``count(*)`` over the ``layer`` table.
     """
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     # Five dimensions on top of org:
     #   * `type`             feature / raster / table
     #   * `feature_subtype`  standard / tool / street_network / "-"
@@ -259,7 +255,7 @@ async def snapshot_layers(
     #                        Raw enum from the DB so panels can filter
     #                        "external by protocol".
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             o.id::text AS org_id,
@@ -271,9 +267,9 @@ async def snapshot_layers(
                  THEN 'internal' ELSE 'external' END           AS source,
             COALESCE(l.data_type, :sentinel)                   AS data_type,
             count(*) AS n
-        FROM {customer}.layer l
-        JOIN {accounts}."user" u ON u.id = l.user_id
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}.layer l
+        JOIN {schema}."user" u ON u.id = l.user_id
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         GROUP BY
             o.id, do_.display_name,
@@ -299,22 +295,19 @@ async def snapshot_layers(
     return len(rows)
 
 
-async def snapshot_layer_bytes(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_layer_bytes(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_layer_bytes_total`` per org (SUM of ``layer.size`` bytes)."""
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             o.id::text AS org_id,
             do_.display_name AS org_name,
             COALESCE(SUM(l.size), 0)::bigint AS bytes
-        FROM {customer}.layer l
-        JOIN {accounts}."user" u ON u.id = l.user_id
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}.layer l
+        JOIN {schema}."user" u ON u.id = l.user_id
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         GROUP BY o.id, do_.display_name
         """
@@ -329,9 +322,7 @@ async def snapshot_layer_bytes(
     return len(rows)
 
 
-async def snapshot_layer_size_distribution(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_layer_size_distribution(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_layer_size_distribution`` per (org, type, size_bucket).
 
     Buckets every layer into a size class so the dashboard can render
@@ -346,10 +337,9 @@ async def snapshot_layer_size_distribution(
     changing them produces new series, but the old ones go stale within
     the 5-min Prometheus staleness window.
     """
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             o.id::text AS org_id,
@@ -364,9 +354,9 @@ async def snapshot_layer_size_distribution(
                 ELSE                                  '> 1 GiB'
             END AS size_bucket,
             count(*) AS n
-        FROM {customer}.layer l
-        JOIN {accounts}."user" u ON u.id = l.user_id
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}.layer l
+        JOIN {schema}."user" u ON u.id = l.user_id
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         GROUP BY o.id, do_.display_name, l.type, size_bucket
         """
@@ -386,22 +376,19 @@ async def snapshot_layer_size_distribution(
     return len(rows)
 
 
-async def snapshot_projects(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_projects(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_projects_total`` per org (owner-of-record interpretation)."""
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             o.id::text AS org_id,
             do_.display_name AS org_name,
             count(*) AS n
-        FROM {customer}.project p
-        JOIN {accounts}."user" u ON u.id = p.user_id
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}.project p
+        JOIN {schema}."user" u ON u.id = p.user_id
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         GROUP BY o.id, do_.display_name
         """
@@ -416,9 +403,7 @@ async def snapshot_projects(
     return len(rows)
 
 
-async def snapshot_users(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_users(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_users_total`` per org (DISTINCT user count).
 
     Earlier iteration broke this out by role too, which caused
@@ -431,19 +416,19 @@ async def snapshot_users(
     role to be a GOAT user" semantics — unrole'd ghost rows in the
     ``user`` table are still excluded.
     """
-    accounts = settings.ACCOUNTS_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             o.id::text AS org_id,
             do_.display_name AS org_name,
             count(DISTINCT u.id) AS n
-        FROM {accounts}."user" u
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}."user" u
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         WHERE EXISTS (
-            SELECT 1 FROM {accounts}.user_role ur WHERE ur.user_id = u.id
+            SELECT 1 FROM {schema}.user_role ur WHERE ur.user_id = u.id
         )
         GROUP BY o.id, do_.display_name
         """
@@ -461,9 +446,7 @@ async def snapshot_users(
     return len(rows)
 
 
-async def snapshot_user_projects(
-    db: AsyncSession, gauge: Instrument
-) -> int:
+async def snapshot_user_projects(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_user_projects_total{user_email, org_id, org_name}``.
 
     Users have a single ``organization_id`` in this schema, so emitting one
@@ -471,19 +454,18 @@ async def snapshot_user_projects(
     extra org labels keep the dashboard's Organization dropdown working
     when scoped to a specific org.
     """
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             u.email AS user_email,
             o.id::text AS org_id,
             do_.display_name AS org_name,
             count(p.id) AS n
-        FROM {accounts}."user" u
-        JOIN {accounts}.organization o ON o.id = u.organization_id
-        JOIN {customer}.project p ON p.user_id = u.id
+        FROM {schema}."user" u
+        JOIN {schema}.organization o ON o.id = u.organization_id
+        JOIN {schema}.project p ON p.user_id = u.id
         JOIN disambig_orgs do_ ON do_.id = o.id
         WHERE u.email IS NOT NULL
         GROUP BY u.email, o.id, do_.display_name
@@ -520,10 +502,9 @@ async def snapshot_user_layers(
     a handful of unique (type, subtype, geometry, source, data_type)
     tuples, not the cross-product.
     """
-    accounts = settings.ACCOUNTS_SCHEMA
-    customer = settings.CUSTOMER_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             u.email AS user_email,
@@ -537,9 +518,9 @@ async def snapshot_user_layers(
             COALESCE(l.data_type, :sentinel)                   AS data_type,
             count(l.id) AS n,
             COALESCE(SUM(l.size), 0)::bigint AS bytes
-        FROM {accounts}."user" u
-        JOIN {accounts}.organization o ON o.id = u.organization_id
-        JOIN {customer}.layer l ON l.user_id = u.id
+        FROM {schema}."user" u
+        JOIN {schema}.organization o ON o.id = u.organization_id
+        JOIN {schema}.layer l ON l.user_id = u.id
         JOIN disambig_orgs do_ ON do_.id = o.id
         WHERE u.email IS NOT NULL
         GROUP BY
@@ -634,25 +615,22 @@ async def _fetch_user_org_map(
     typically: log + skip Windmill metrics, since they can't be
     org-attributed without this map).
     """
-    accounts = settings.ACCOUNTS_SCHEMA
+    schema = settings.SCHEMA
     query = text(
-        ORG_DISAMBIG_CTE.format(accounts=accounts)
+        ORG_DISAMBIG_CTE.format(schema=schema)
         + f"""
         SELECT
             u.id::text AS user_id,
             o.id::text AS org_id,
             do_.display_name AS org_name,
             COALESCE(u.email, '(unknown)') AS email
-        FROM {accounts}."user" u
-        JOIN {accounts}.organization o ON o.id = u.organization_id
+        FROM {schema}."user" u
+        JOIN {schema}.organization o ON o.id = u.organization_id
         JOIN disambig_orgs do_ ON do_.id = o.id
         """
     )
     result = await db.execute(query)
-    return {
-        row.user_id: (row.org_id, row.org_name, row.email)
-        for row in result.all()
-    }
+    return {row.user_id: (row.org_id, row.org_name, row.email) for row in result.all()}
 
 
 def _tool_from_path(runnable_path: str | None) -> str:
@@ -737,7 +715,8 @@ async def fetch_windmill_completed_jobs(
           AND j.trigger_kind IS NULL
         GROUP BY j.args->>'user_id', j.runnable_path, c.status
         """,
-        window_start, window_end,
+        window_start,
+        window_end,
     )
 
     jobs: list[Observation] = []
@@ -766,12 +745,13 @@ async def fetch_windmill_completed_jobs(
         # do "Top failing tools" via status="failure"), but duration
         # and output-bytes are unconditional sums (don't break out by
         # status — failure jobs contributed to time/bytes consumed too).
-        jobs.append(Observation(int(row["n"]),
-                                  attributes={**attrs, "status": row["status"]}))
-        durations.append(Observation(int(row["duration_ms_sum"]) / 1000.0,
-                                       attributes=attrs))
-        output_bytes.append(Observation(int(row["output_bytes_sum"]),
-                                          attributes=attrs))
+        jobs.append(
+            Observation(int(row["n"]), attributes={**attrs, "status": row["status"]})
+        )
+        durations.append(
+            Observation(int(row["duration_ms_sum"]) / 1000.0, attributes=attrs)
+        )
+        output_bytes.append(Observation(int(row["output_bytes_sum"]), attributes=attrs))
 
     _OBSERVATIONS["jobs_count"] = jobs
     _OBSERVATIONS["jobs_duration_seconds"] = durations
@@ -830,19 +810,20 @@ async def fetch_windmill_running_jobs(
 # because their value represents a count over the last 5-minute window,
 # not a cumulative all-time total.
 
-def _cb_jobs_count(_options: CallbackOptions):
+
+def _cb_jobs_count(_options: CallbackOptions) -> list[Observation]:
     return _OBSERVATIONS.get("jobs_count", [])
 
 
-def _cb_jobs_duration_seconds(_options: CallbackOptions):
+def _cb_jobs_duration_seconds(_options: CallbackOptions) -> list[Observation]:
     return _OBSERVATIONS.get("jobs_duration_seconds", [])
 
 
-def _cb_jobs_output_bytes(_options: CallbackOptions):
+def _cb_jobs_output_bytes(_options: CallbackOptions) -> list[Observation]:
     return _OBSERVATIONS.get("jobs_output_bytes", [])
 
 
-def _cb_jobs_running(_options: CallbackOptions):
+def _cb_jobs_running(_options: CallbackOptions) -> list[Observation]:
     return _OBSERVATIONS.get("jobs_running", [])
 
 
@@ -931,9 +912,7 @@ async def _apply_session_safety_limits(db: AsyncSession) -> None:
     try:
         await db.execute(text("SET LOCAL statement_timeout = '30s'"))
         await db.execute(text("SET LOCAL lock_timeout = '5s'"))
-        await db.execute(
-            text("SET LOCAL idle_in_transaction_session_timeout = '60s'")
-        )
+        await db.execute(text("SET LOCAL idle_in_transaction_session_timeout = '60s'"))
     except Exception:
         logger.exception("failed to apply session safety limits; continuing")
 
@@ -962,7 +941,8 @@ async def _run_windmill_block(
             user_to_org = await _fetch_user_org_map(goat_db)
             logger.info(
                 "snapshot query %s ok: %d users mapped",
-                Q_WM_USER_ORG, len(user_to_org),
+                Q_WM_USER_ORG,
+                len(user_to_org),
             )
 
         # 2. Open Windmill connection.
@@ -1009,14 +989,16 @@ async def snapshot() -> bool:
                 await _run_query(
                     name=Q_LAYER_BYTES,
                     fn=lambda: snapshot_layer_bytes(
-                        db, instr["layer_bytes_total"]  # type: ignore[arg-type]
+                        db,
+                        instr["layer_bytes_total"],  # type: ignore[arg-type]
                     ),
                     error_counter=error_counter,  # type: ignore[arg-type]
                 ),
                 await _run_query(
                     name=Q_LAYER_SIZE_DIST,
                     fn=lambda: snapshot_layer_size_distribution(
-                        db, instr["layer_size_distribution"]  # type: ignore[arg-type]
+                        db,
+                        instr["layer_size_distribution"],  # type: ignore[arg-type]
                     ),
                     error_counter=error_counter,  # type: ignore[arg-type]
                 ),
@@ -1033,7 +1015,8 @@ async def snapshot() -> bool:
                 await _run_query(
                     name=Q_USER_PROJECTS,
                     fn=lambda: snapshot_user_projects(
-                        db, instr["user_projects_total"]  # type: ignore[arg-type]
+                        db,
+                        instr["user_projects_total"],  # type: ignore[arg-type]
                     ),
                     error_counter=error_counter,  # type: ignore[arg-type]
                 ),

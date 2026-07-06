@@ -11,18 +11,16 @@ from core.services.domain_reconciliation import (
     release_domain,
 )
 from core.services.provisioner import FakeProvisioner
+from tests.utils import fake_dns_resolve
 
 CANON = "cname.goat.plan4better.de"
 
 
 @pytest.mark.asyncio
 async def test_check_dns_match(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_resolve(domain: str) -> list[str]:
-        return ["cname.goat.plan4better.de."]
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(cname=["cname.goat.plan4better.de."]),
     )
 
     status, msg = await check_dns("klima.example.com", canonical_target=CANON)
@@ -36,12 +34,9 @@ async def test_check_dns_match_without_trailing_dot(
 ) -> None:
     """Targets returned without a trailing dot should still match canonical."""
 
-    async def fake_resolve(domain: str) -> list[str]:
-        return ["cname.goat.plan4better.de"]
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(cname=["cname.goat.plan4better.de"]),
     )
 
     status, _ = await check_dns("klima.example.com", canonical_target=CANON)
@@ -50,12 +45,9 @@ async def test_check_dns_match_without_trailing_dot(
 
 @pytest.mark.asyncio
 async def test_check_dns_no_record(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_resolve(domain: str) -> list[str]:
-        return []
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(),
     )
 
     status, msg = await check_dns("klima.example.com", canonical_target=CANON)
@@ -66,12 +58,9 @@ async def test_check_dns_no_record(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_check_dns_wrong_target(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def fake_resolve(domain: str) -> list[str]:
-        return ["other.example.com."]
-
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
-        fake_resolve,
+        "core.services.domain_reconciliation._resolve",
+        fake_dns_resolve(cname=["other.example.com."]),
     )
 
     status, msg = await check_dns("klima.example.com", canonical_target=CANON)
@@ -88,11 +77,11 @@ async def test_check_dns_resolver_error_returns_pending(
     """A transient DNS error should leave the domain pending with the error message,
     not flip it to FAILED. (Failed is reserved for permanent rejection.)"""
 
-    async def boom(domain: str) -> list[str]:
+    async def boom(domain: str, rdtype: str) -> list[str]:
         raise RuntimeError("DNS error: timeout")
 
     monkeypatch.setattr(
-        "core.services.domain_reconciliation._resolve_cname",
+        "core.services.domain_reconciliation._resolve",
         boom,
     )
 

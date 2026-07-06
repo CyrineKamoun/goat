@@ -30,13 +30,12 @@ if TYPE_CHECKING:
     )
 
     from .report_layout import ReportLayout
-    from .scenario import Scenario
     from .workflow import Workflow
 
 
 class Project(ContentBaseAttributes, DateTimeBase, table=True):
     __tablename__ = "project"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: UUID | None = Field(
         sa_column=Column(
@@ -50,7 +49,7 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Project owner ID",
@@ -58,17 +57,10 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
     folder_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.folder.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.folder.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Project folder ID",
-    )
-    active_scenario_id: UUID | None = Field(
-        sa_column=Column(
-            UUID_PG(as_uuid=True),
-            nullable=True,
-        ),
-        description="Active scenario ID",
     )
     layer_order: List[int] | None = Field(
         sa_column=Column(
@@ -124,10 +116,6 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         back_populates="project",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
-    scenarios: List["Scenario"] = Relationship(
-        back_populates="project",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
     team_links: List["ProjectTeamLink"] = Relationship(
         back_populates="project",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
@@ -180,7 +168,7 @@ class ProjectPublic(DateTimeBase, table=True, extend_existing=True):
     """
 
     __tablename__ = "project_public"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
     id: UUID | None = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
@@ -195,7 +183,7 @@ class ProjectPublic(DateTimeBase, table=True, extend_existing=True):
     project_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.project.id", ondelete="CASCADE"),
             nullable=False,
         ),
     )
@@ -204,7 +192,7 @@ class ProjectPublic(DateTimeBase, table=True, extend_existing=True):
         sa_column=Column(
             UUID_PG(as_uuid=True),
             ForeignKey(
-                f"{settings.CUSTOMER_SCHEMA}.organization_domain.id",
+                f"{settings.SCHEMA}.organization_domain.id",
                 ondelete="SET NULL",
             ),
             unique=True,

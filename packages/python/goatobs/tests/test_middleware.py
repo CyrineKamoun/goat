@@ -1,13 +1,11 @@
 """Unit tests for goatobs.middleware — reusable auth-context middleware factory."""
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI, Request
-from httpx import AsyncClient
-
 from goatobs.context import get_user_context
 from goatobs.middleware import build_auth_context_middleware
+from httpx import AsyncClient
 
 
 def _make_app(
@@ -34,7 +32,10 @@ def _make_app(
 async def test_no_token_no_context():
     """Request with no Authorization header → no user context bound."""
     captured: list[dict[str, Any]] = []
-    decode = lambda t: {"sub": "should-not-be-called"}
+
+    def decode(t: str) -> dict[str, Any]:
+        return {"sub": "should-not-be-called"}
+
     app = _make_app(captured, decode)
 
     async with AsyncClient(app=app, base_url="http://test") as client:
@@ -91,7 +92,10 @@ async def test_invalid_token_no_context_no_500():
 async def test_payload_missing_sub_no_context():
     """Token decodes successfully but `sub` is absent → no context bound."""
     captured: list[dict[str, Any]] = []
-    decode = lambda t: {"email": "a@b.com"}  # no sub
+
+    def decode(t: str) -> dict[str, Any]:  # no sub
+        return {"email": "a@b.com"}
+
     app = _make_app(captured, decode)
 
     async with AsyncClient(app=app, base_url="http://test") as client:

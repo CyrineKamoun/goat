@@ -1,4 +1,5 @@
 import { isValidUrl } from "@/lib/utils/helpers";
+import { serverAppUrl } from "@/lib/utils/server-env";
 import type { Metadata } from "next";
 
 
@@ -46,7 +47,7 @@ export function getLocalizedMetadata(
     image: overrides.image ?? defaultContent.image,
   };
 
-  const openGraphUrl = otherOptions.openGraphUrl || process.env.NEXT_PUBLIC_APP_URL
+  const openGraphUrl = otherOptions.openGraphUrl || serverAppUrl()
 
   let robotsIndex = otherOptions.robotsIndex !== undefined ? !!otherOptions.robotsIndex : false;
 

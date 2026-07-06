@@ -1,23 +1,13 @@
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict
 
-from pydantic import UUID4, BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
 
 
 class OrderEnum(str, Enum):
     ascendent = "ascendent"
     descendent = "descendent"
-
-
-class ContentIdList(BaseModel):
-    ids: List[UUID4]
-
-
-class IntersectionGeomType(str, Enum):
-    bbox = "bbox"
-    draw = "draw"
-    boundary = "boundary"
 
 
 class IntersectionQueryMetadata(BaseModel):

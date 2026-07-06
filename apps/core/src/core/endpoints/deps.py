@@ -1,21 +1,14 @@
-from typing import Generator, Optional
+from typing import Generator
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, Path, Request, status
-from httpx import AsyncClient, Timeout
+from fastapi import Depends, HTTPException, Request
 from jose import jwt
-from pydantic import UUID4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.core.config import settings
 from core.crud.crud_folder import folder as crud_folder
-from core.crud.crud_scenario import scenario as crud_scenario
-from core.db.models.scenario import Scenario
-from core.db.models.user import User
 from core.db.session import session_manager
 from core.schemas.folder import FolderCreate
-
-http_client: Optional[AsyncClient] = None
 
 
 async def get_db() -> Generator:  # type: ignore
@@ -23,8 +16,19 @@ async def get_db() -> Generator:  # type: ignore
         yield session
 
 
+def default_user_claims() -> dict:
+    """Synthetic JWT claims for the default identity (AUTH=False only)."""
+    return {
+        "sub": settings.DEFAULT_USER_ID,
+        "email": settings.DEFAULT_USER_EMAIL,
+        "given_name": settings.DEFAULT_USER_FIRSTNAME,
+        "family_name": settings.DEFAULT_USER_LASTNAME,
+        "realm_access": {"roles": ["superuser"]},
+    }
+
+
 def get_user_id(request: Request) -> UUID:
-    """Get the user ID from the JWT token or use the pre-defined user_id if running without authentication."""
+    """Get the user ID from the JWT token or the default identity if running without authentication."""
     # Check if the request has an Authorization header
     authorization = request.headers.get("Authorization")
 
@@ -40,91 +44,66 @@ def get_user_id(request: Request) -> UUID:
         # Decode the JWT token and extract the user_id
         result = jwt.get_unverified_claims(token)["sub"]
     else:
-        # This is returned if there is no Authorization header and therefore no authentication.
-        scheme, _, token = settings.SAMPLE_AUTHORIZATION.partition(" ")
-        result = jwt.get_unverified_claims(token)["sub"]
+        # No Authorization header: act as the default identity.
+        result = settings.DEFAULT_USER_ID
 
     return UUID(result)
 
 
-async def get_scenario(
-    project_id: UUID4 = Path(
-        ...,
-        description="The ID of the project",
-        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    ),
-    scenario_id: UUID4 = Path(
-        ...,
-        description="The ID of the scenario",
-        example="3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    ),
-    async_session: AsyncSession = Depends(get_db),
-) -> Scenario:
-    """Get a scenario by its ID and project ID."""
+def get_current_token_claims(request: Request) -> dict:
+    """Return the JWT claims with the signature verified (when AUTH is enabled).
 
-    scenario = await crud_scenario.get_by_multi_keys(
-        async_session, keys={"project_id": project_id, "id": scenario_id}
-    )
-    if len(scenario) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Scenario not found"
-        )
-    return scenario[0]
+    Falls back to the sample token only when AUTH is disabled (local/dev). Unlike
+    ``get_user_id`` this does NOT use unverified claims, so it is safe to base
+    user provisioning on it.
+    """
+    from jose import JOSEError, jwt
 
+    from core.deps.auth import decode_token
 
-def get_http_client() -> AsyncClient:
-    """Returns an asynchronous HTTP client, typically used for connecting to the GOAT Routing service."""
+    authorization = request.headers.get("Authorization")
 
-    global http_client
-    if http_client is None:
-        http_client = AsyncClient(
-            timeout=Timeout(
-                settings.ASYNC_CLIENT_DEFAULT_TIMEOUT,
-                read=settings.ASYNC_CLIENT_READ_TIMEOUT,
-            )
-        )
-    return http_client
+    if not settings.AUTH:
+        # Dev mode: no verification. Use the provided bearer token or the
+        # default identity.
+        if authorization:
+            return jwt.get_unverified_claims(authorization.partition(" ")[2])
+        return default_user_claims()
 
-
-async def close_http_client() -> None:
-    """Clean-up network resources used by the HTTP client."""
-
-    global http_client
-    if http_client is not None:
-        await http_client.aclose()
-        http_client = None
+    # AUTH enabled: a bearer token is required and its signature is verified.
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization Token")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(status_code=401, detail="Invalid Authorization header")
+    try:
+        return decode_token(token)
+    except JOSEError as e:
+        raise HTTPException(status_code=401, detail=str(e))
 
 
 async def ensure_home_folder(
     async_session: AsyncSession = Depends(get_db),
-    user_id: UUID4 = Depends(get_user_id),
+    claims: dict = Depends(get_current_token_claims),
 ) -> None:
-    """Ensure the user has a home folder, create one if not exists.
+    """Lazily provision the user (from the verified token) and a home folder.
 
-    This provides lazy initialization for users who authenticate via external
-    providers (e.g., Keycloak) but don't have local data yet.
+    For users authenticating via an external provider (Keycloak) who don't have
+    local data yet. The user row is upserted straight from the token claims, so
+    it works without a Keycloak admin client.
     """
-    from sqlalchemy import select
     from sqlalchemy.exc import IntegrityError
 
-    # First ensure user exists (for external auth providers like Keycloak)
-    user_result = await async_session.execute(select(User).where(User.id == user_id))
-    if not user_result.scalar_one_or_none():
-        try:
-            user = User(id=user_id)
-            async_session.add(user)
-            await async_session.commit()
-        except IntegrityError:
-            # Another request already created the user (race condition)
-            await async_session.rollback()
+    from core.crud.crud_user import user as crud_user
 
-    # Then ensure home folder exists
+    user = await crud_user.upsert_from_token(token=claims, db_session=async_session)
+
     existing = await crud_folder.get_by_multi_keys(
-        async_session, keys={"user_id": user_id, "name": "home"}
+        async_session, keys={"user_id": user.id, "name": "home"}
     )
     if not existing:
         try:
-            folder = FolderCreate(name="home", user_id=user_id)
+            folder = FolderCreate(name="home", user_id=user.id)
             await crud_folder.create(async_session, obj_in=folder)
         except IntegrityError:
             # Another request already created the folder (race condition)

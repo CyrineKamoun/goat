@@ -28,10 +28,13 @@ target_metadata = SQLModel.metadata
 # ... etc.
 
 
+# Autogenerate only considers tables in the configurable data schema.
+MANAGED_SCHEMAS = [settings.SCHEMA]
+
+
 def include_object(object, name, type_, reflected, compare_to):
-    if type_ == "table" and object.schema != "customer":
+    if type_ == "table" and object.schema not in MANAGED_SCHEMAS:
         return False
-    print(type_)
     if type_ in ["table"] and reflected and compare_to is None:
         return False
     else:
@@ -40,15 +43,14 @@ def include_object(object, name, type_, reflected, compare_to):
 
 def include_name(name, type_, parent_names):
     if type_ == "schema":
-        return name in ["customer"]
+        return name in MANAGED_SCHEMAS
     else:
         return True
 
 
-config.set_main_option(
-    "sqlalchemy.url",
-    settings.ASYNC_SQLALCHEMY_DATABASE_URI
-)
+_db_url = settings.ASYNC_SQLALCHEMY_DATABASE_URI
+assert _db_url is not None, "ASYNC_SQLALCHEMY_DATABASE_URI must be configured"
+config.set_main_option("sqlalchemy.url", _db_url)
 
 
 def run_migrations_offline():
@@ -109,6 +111,7 @@ def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
 
     asyncio.run(run_async_migrations())
+
 
 if context.is_offline_mode():
     run_migrations_offline()

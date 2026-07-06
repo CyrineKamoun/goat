@@ -1,12 +1,13 @@
 from enum import Enum
 from uuid import UUID
 
+from pydantic import field_serializer
 from sqlalchemy import ForeignKey, text
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import Column, Field, Relationship, SQLModel, Text
 
 from core.core.config import settings
-from core.db.models._base_class import DateTimeBase
+from core.db.models._base_class import DateTimeBase, serialize_str_enum
 from core.db.models.user import User
 
 
@@ -36,10 +37,14 @@ class SystemSettingBase(SQLModel):
     preferred_language: LanguageType = Field(sa_column=Column(Text, nullable=False))
     unit: UnitType = Field(sa_column=Column(Text, nullable=False))
 
+    @field_serializer("client_theme", "preferred_language", "unit")
+    def _serialize_enum(self, value: Enum | str | None) -> str | None:
+        return serialize_str_enum(value)
+
 
 class SystemSetting(SystemSettingBase, DateTimeBase, table=True):
     __tablename__ = "system_setting"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: UUID | None = Field(
         default=None,
@@ -54,7 +59,7 @@ class SystemSetting(SystemSettingBase, DateTimeBase, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="System Setting owner ID",

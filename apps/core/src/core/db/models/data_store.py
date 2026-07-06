@@ -32,7 +32,7 @@ class DataStore(DataStoreBase, DateTimeBase, table=True):
     """Data store model."""
 
     __tablename__ = "data_store"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: UUID | None = Field(
         sa_column=Column(

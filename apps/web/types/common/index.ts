@@ -27,12 +27,6 @@ export enum MapLayerActions {
   STYLE = "style",
 }
 
-export enum ScenarioActions {
-  EDIT = "edit",
-  EDIT_METADATA = "editMetadata",
-  DELETE = "delete",
-}
-
 export enum LayerStyleActions {
   RESET = "reset",
   SAVE_AS_DEFAULT = "saveAsDefault",

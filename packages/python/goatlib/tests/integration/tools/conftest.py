@@ -79,9 +79,8 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.integration)
 
 
-# Test schema names - isolated from production data
+# Test schema name - isolated from production data
 TEST_CUSTOMER_SCHEMA = "test_customer"
-TEST_ACCOUNTS_SCHEMA = "test_accounts"
 
 # Test user/folder/project IDs - consistent across test runs
 TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
@@ -118,7 +117,7 @@ def get_test_settings() -> ToolSettings:
         s3_endpoint_url=os.environ.get("S3_ENDPOINT_URL", "http://minio:9000"),
         s3_access_key_id=os.environ.get("S3_ACCESS_KEY_ID", "minioadmin"),
         s3_secret_access_key=os.environ.get("S3_SECRET_ACCESS_KEY", "minioadmin"),
-        s3_region_name=os.environ.get("S3_REGION_NAME", "us-east-1"),
+        s3_region_name=os.environ.get("S3_REGION", "us-east-1"),
         s3_bucket_name=os.environ.get("S3_BUCKET_NAME", "goat"),
         # Routing settings (optional for tool tests)
         goat_routing_url=os.environ.get(
@@ -156,21 +155,21 @@ async def postgres_pool(tool_settings: ToolSettings) -> asyncpg.Pool:
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def test_schemas(postgres_pool: asyncpg.Pool) -> None:
-    """Create test schemas for customer and accounts tables.
+    """Create the test schema and its tables.
 
-    Creates isolated test schemas that mirror the production schema structure.
-    Schemas are dropped and recreated at the start of each test session.
+    Creates an isolated test schema that mirrors the production schema structure.
+    The schema is dropped and recreated at the start of each test session.
     """
     async with postgres_pool.acquire() as conn:
         # Drop existing test schemas (clean slate)
-        for schema in [TEST_CUSTOMER_SCHEMA, TEST_ACCOUNTS_SCHEMA]:
+        for schema in [TEST_CUSTOMER_SCHEMA]:
             await conn.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
             await conn.execute(f"CREATE SCHEMA {schema}")
             logger.info(f"Created test schema: {schema}")
 
-        # Create accounts.user table (minimal - just what tools need)
+        # Create the user table (minimal - just what tools need)
         await conn.execute(f"""
-            CREATE TABLE {TEST_ACCOUNTS_SCHEMA}.user (
+            CREATE TABLE {TEST_CUSTOMER_SCHEMA}.user (
                 id UUID PRIMARY KEY,
                 firstname TEXT,
                 lastname TEXT,
@@ -182,7 +181,7 @@ async def test_schemas(postgres_pool: asyncpg.Pool) -> None:
         await conn.execute(f"""
             CREATE TABLE {TEST_CUSTOMER_SCHEMA}.folder (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                user_id UUID NOT NULL REFERENCES {TEST_ACCOUNTS_SCHEMA}.user(id) ON DELETE CASCADE,
+                user_id UUID NOT NULL REFERENCES {TEST_CUSTOMER_SCHEMA}.user(id) ON DELETE CASCADE,
                 name TEXT NOT NULL,
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -194,7 +193,7 @@ async def test_schemas(postgres_pool: asyncpg.Pool) -> None:
         await conn.execute(f"""
             CREATE TABLE {TEST_CUSTOMER_SCHEMA}.project (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                user_id UUID NOT NULL REFERENCES {TEST_ACCOUNTS_SCHEMA}.user(id) ON DELETE CASCADE,
+                user_id UUID NOT NULL REFERENCES {TEST_CUSTOMER_SCHEMA}.user(id) ON DELETE CASCADE,
                 folder_id UUID NOT NULL REFERENCES {TEST_CUSTOMER_SCHEMA}.folder(id) ON DELETE CASCADE,
                 name TEXT NOT NULL,
                 description TEXT,
@@ -211,7 +210,7 @@ async def test_schemas(postgres_pool: asyncpg.Pool) -> None:
         await conn.execute(f"""
             CREATE TABLE {TEST_CUSTOMER_SCHEMA}.layer (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                user_id UUID NOT NULL REFERENCES {TEST_ACCOUNTS_SCHEMA}.user(id) ON DELETE CASCADE,
+                user_id UUID NOT NULL REFERENCES {TEST_CUSTOMER_SCHEMA}.user(id) ON DELETE CASCADE,
                 folder_id UUID NOT NULL REFERENCES {TEST_CUSTOMER_SCHEMA}.folder(id) ON DELETE CASCADE,
                 name TEXT NOT NULL,
                 description TEXT,
@@ -255,14 +254,14 @@ async def test_schemas(postgres_pool: asyncpg.Pool) -> None:
 
     # Cleanup: Drop test schemas after all tests
     async with postgres_pool.acquire() as conn:
-        for schema in [TEST_CUSTOMER_SCHEMA, TEST_ACCOUNTS_SCHEMA]:
+        for schema in [TEST_CUSTOMER_SCHEMA]:
             await conn.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
             logger.info(f"Dropped test schema: {schema}")
 
 
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def test_user(postgres_pool: asyncpg.Pool, test_schemas: None) -> dict[str, Any]:
-    """Create a test user in the accounts schema.
+    """Create a test user in the test schema.
 
     Returns:
         Dict with user info: id, firstname, lastname
@@ -272,7 +271,7 @@ async def test_user(postgres_pool: asyncpg.Pool, test_schemas: None) -> dict[str
     async with postgres_pool.acquire() as conn:
         await conn.execute(
             f"""
-            INSERT INTO {TEST_ACCOUNTS_SCHEMA}.user (id, firstname, lastname, avatar)
+            INSERT INTO {TEST_CUSTOMER_SCHEMA}.user (id, firstname, lastname, avatar)
             VALUES ($1, $2, $3, $4)
             ON CONFLICT (id) DO NOTHING
             """,

@@ -87,8 +87,8 @@ class DifferenceTool(AnalysisTool):
 
         # Detect input geometry type to filter output appropriately
         input_geom_type = self.con.execute(f"""
-            SELECT ST_GeometryType({input_geom}) 
-            FROM {input_view} 
+            SELECT ST_GeometryType({input_geom})
+            FROM {input_view}
             LIMIT 1
         """).fetchone()[0]
 
@@ -139,7 +139,7 @@ class DifferenceTool(AnalysisTool):
         if allowed_types:
             geom_type_filter = f"""
                 AND (
-                    u.unified_geom IS NULL 
+                    u.unified_geom IS NULL
                     OR ST_GeometryType(ST_Difference(i.{input_geom}, u.unified_geom)) IN {allowed_types}
                 )
             """
@@ -149,7 +149,7 @@ class DifferenceTool(AnalysisTool):
             SELECT
                 i.* EXCLUDE ({input_geom}, bbox),
                 CASE
-                    WHEN u.unified_geom IS NOT NULL 
+                    WHEN u.unified_geom IS NOT NULL
                         AND ST_Intersects(i.{input_geom}, u.unified_geom)
                         -- Bbox-based spatial filter for performance (GeoParquet spatial indexing)
                         AND i.bbox.xmin <= u.bbox.xmax

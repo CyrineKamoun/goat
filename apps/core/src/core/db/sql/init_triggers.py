@@ -33,6 +33,11 @@ async def init_triggers() -> None:
                 logger.info(f"Executing trigger: {file_path.name}")
                 sql_text = file_path.read_text()
 
+                # Honor the configurable data schema: `customer.` in the trigger
+                # SQL is the canonical placeholder, substituted to the actual
+                # schema at install time (no-op when SCHEMA="customer").
+                sql_text = sql_text.replace("customer.", f"{settings.SCHEMA}.")
+
                 await session.execute(text(sql_text))
 
             await session.commit()

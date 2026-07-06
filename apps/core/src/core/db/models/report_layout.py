@@ -38,7 +38,7 @@ class ReportLayout(DateTimeBase, table=True):
     """
 
     __tablename__ = "report_layout"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: UUID | None = Field(
         sa_column=Column(
@@ -53,7 +53,7 @@ class ReportLayout(DateTimeBase, table=True):
     project_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.project.id", ondelete="CASCADE"),
             nullable=False,
             index=True,
         ),

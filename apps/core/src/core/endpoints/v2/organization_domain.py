@@ -57,9 +57,8 @@ async def list_domains(
         async_session, organization_id=organization_id
     )
     return [
-        OrganizationDomainRead.model_validate(
-            {
-                **domain.model_dump(),
+        OrganizationDomainRead.model_validate(domain).model_copy(
+            update={
                 "assigned_project_id": project_id,
                 "assigned_project_name": project_name,
             }
@@ -160,9 +159,8 @@ async def get_domain(
             status_code=status.HTTP_404_NOT_FOUND, detail="domain not found"
         )
     domain, project_id, project_name = row
-    return OrganizationDomainRead.model_validate(
-        {
-            **domain.model_dump(),
+    return OrganizationDomainRead.model_validate(domain).model_copy(
+        update={
             "assigned_project_id": project_id,
             "assigned_project_name": project_name,
         }

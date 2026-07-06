@@ -16,16 +16,16 @@ from typing import AsyncGenerator
 import sentry_sdk
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from goatlib.auth import JOSEError
+from goatobs import build_auth_context_middleware, setup_observability
 from starlette.middleware.gzip import GZipMiddleware
 
 from processes.config import settings
+from processes.deps.auth import decode_token
 from processes.ducklake import ducklake_manager, preview_ducklake_manager
 from processes.models import HealthCheck
 from processes.routers import processes_router, workflows_router
-from processes.deps.auth import decode_token
 from processes.services.windmill_client import windmill_client
-from goatlib.auth import JOSEError
-from goatobs import build_auth_context_middleware, setup_observability
 
 # Configure logging
 logging.basicConfig(

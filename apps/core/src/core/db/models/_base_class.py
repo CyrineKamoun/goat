@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from enum import Enum
 from uuid import UUID
 
 from sqlalchemy import ForeignKey, Text
@@ -6,6 +7,16 @@ from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import Column, DateTime, Field, SQLModel, text
 
 from core.core.config import settings
+
+
+def serialize_str_enum(value: "Enum | str | None") -> "str | None":
+    """Serialize a str-enum field whether the value arrives as an enum member or
+    a raw str (e.g. read straight off a Text column). Avoids Pydantic's
+    enum-vs-str serializer warning while keeping the JSON output identical.
+
+    Delegate to this from a model's ``@field_serializer(...)`` method.
+    """
+    return value.value if isinstance(value, Enum) else value
 
 
 class DateTimeBase(SQLModel):
@@ -31,6 +42,35 @@ class DateTimeBase(SQLModel):
     )
 
 
+class UUIDServerDefaultBase(SQLModel):
+    """Base with a UUID primary key and naive timestamps.
+
+    Server-side ``uuid_generate_v4()`` default for the id and naive
+    ``CURRENT_TIMESTAMP`` ``created_at``/``updated_at`` columns
+    (``timestamp without time zone``), unlike the timezone-aware
+    ``DateTimeBase``.
+    """
+
+    id: UUID | None = Field(
+        default=None,
+        primary_key=True,
+        index=True,
+        nullable=False,
+        sa_type=UUID_PG(as_uuid=True),
+        sa_column_kwargs={"server_default": text("uuid_generate_v4()")},
+    )
+    created_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime,
+        sa_column_kwargs={"server_default": text("CURRENT_TIMESTAMP")},
+    )
+    updated_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime,
+        sa_column_kwargs={"server_default": text("CURRENT_TIMESTAMP")},
+    )
+
+
 class ContentBaseAttributes(SQLModel):
     """Base model for content attributes."""
 
@@ -38,7 +78,7 @@ class ContentBaseAttributes(SQLModel):
         default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.folder.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.folder.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Layer folder ID",
@@ -64,15 +104,3 @@ content_base_example = {
     "description": "Layer description",
     "tags": ["tag1", "tag2"],
 }
-
-
-# TODO: Reevaluate the use of this - it doesn't seem to be used as a parent class for most models
-# @as_declarative()
-# class Base:
-#     id: Any
-#     __name__: str
-#
-#     # Generate __tablename__ automatically
-#     @declared_attr
-#     def __tablename__(cls) -> str:
-#         return cls.__name__.lower()

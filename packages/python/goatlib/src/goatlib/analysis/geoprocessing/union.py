@@ -153,7 +153,6 @@ class UnionTool(AnalysisTool):
         output_path: Path,
     ) -> None:
         """Execute the union operation in DuckDB."""
-        con = self.con
 
         if overlay_table is None:
             # Self-union: split overlapping features within the same layer
@@ -190,7 +189,7 @@ class UnionTool(AnalysisTool):
         # Then explode it back into individual features using UNNEST(ST_Dump(...))
         self.con.execute(f"""
             CREATE OR REPLACE VIEW unioned AS
-            SELECT 
+            SELECT
                 ROW_NUMBER() OVER () AS fid,
                 geom_part.geom AS {input_geom}
             FROM (
@@ -384,8 +383,8 @@ class UnionTool(AnalysisTool):
         """
         # Detect geometry type from first feature
         input_geom_type = self.con.execute(f"""
-            SELECT ST_GeometryType({geom_column}) 
-            FROM {view_name} 
+            SELECT ST_GeometryType({geom_column})
+            FROM {view_name}
             LIMIT 1
         """).fetchone()[0]
 

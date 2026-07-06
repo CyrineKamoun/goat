@@ -1,3 +1,5 @@
+import { serverAppUrl } from "@/lib/utils/server-env";
+
 const DEFAULT_THEME_COLOR = "#2BB381";
 const SHORT_NAME_MAX = 30;
 
@@ -20,9 +22,9 @@ export type WebAppManifest = {
 };
 
 // Mirrors the host comparison in middlewares/withCustomDomain.ts: the
-// request host (port stripped) vs. NEXT_PUBLIC_APP_URL's hostname.
+// request host (port stripped) vs. the app URL's hostname.
 export function isCustomDomainHost(host: string | null): boolean {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const appUrl = serverAppUrl();
   if (!host || !appUrl) return false;
   let canonical: string;
   try {

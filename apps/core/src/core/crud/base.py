@@ -4,36 +4,18 @@ from uuid import UUID
 from fastapi_pagination import Page, Params
 from fastapi_pagination.ext.sqlalchemy import paginate
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import func, or_
+from sqlalchemy import delete, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import RelationshipProperty, selectinload
 from sqlalchemy.sql import Select
+from sqlmodel import SQLModel
 
-from core.db.models import (
-    Folder,
-    Layer,
-    Project,
-    Scenario,
-    Status,
-    SystemSetting,
-    User,
-)
 from core.schemas import OrderEnum
-from core.schemas.folder import FolderCreate, FolderUpdate
-from core.schemas.scenario import IScenarioCreate, IScenarioUpdate
-from core.schemas.system_setting import SystemSettingsCreate, SystemSettingsUpdate
 
-ModelType = TypeVar(
-    "ModelType",
-    bound=Layer | Project | User | Folder | Scenario | Status | SystemSetting,
-)
-CreateSchemaType = TypeVar(
-    "CreateSchemaType", bound=FolderCreate | SystemSettingsCreate | IScenarioCreate
-)
-UpdateSchemaType = TypeVar(
-    "UpdateSchemaType", bound=FolderUpdate | SystemSettingsUpdate | IScenarioUpdate
-)
+ModelType = TypeVar("ModelType", bound=SQLModel)
+CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
+UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
 
 class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
@@ -185,36 +167,6 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 raise e
         return db_obj
 
-    async def update_multi(
-        self,
-        db: AsyncSession,
-        *,
-        db_objs: ModelType,
-        objs_in: List[Union[UpdateSchemaType, Dict[str, Any]]],
-    ) -> List[ModelType]:
-        """Update multiple objects at once by id."""
-        ids = []
-        # Loop through all db_objs and objs_in and update the db_obj with the obj_in.
-        for db_obj, obj_in in zip(db_objs, objs_in, strict=True):
-            if isinstance(obj_in, dict):
-                update_data = obj_in
-                fields = obj_in.keys()
-            else:
-                update_data = obj_in.model_dump(exclude_unset=True)
-                fields = type(obj_in).model_fields.keys()
-            for field in fields:
-                if field in update_data:
-                    setattr(db_obj, field, update_data[field])
-            db.add(db_obj)
-            ids.append(db_obj.id)
-        await db.commit()
-
-        # Get objects again to return them. Refresh cannot be used as it only returns one object.
-        ids = [db_obj.id for db_obj in db_objs]
-        statement = select(self.model).where(self.model.id.in_(ids))
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
     async def remove(self, db: AsyncSession, *, id: int | UUID) -> ModelType:
         obj = await db.get(self.model, id)
 
@@ -227,6 +179,44 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
 
     async def delete(self, db: AsyncSession, *, id: int | UUID) -> ModelType:
         return await self.remove(db, id=id)
+
+    async def get_by_key(
+        self, db: AsyncSession, *, key: str, value: Any, extra_fields: List[Any] = []
+    ) -> List[ModelType]:
+        statement = select(self.model).where(getattr(self.model, key) == value)
+        statement = self.extend_statement(statement, extra_fields=extra_fields)
+        result = await db.execute(statement)
+        return list(result.scalars().all())
+
+    async def get_multi_by_key(
+        self,
+        db: AsyncSession,
+        *,
+        key: str,
+        value: Any,
+        skip: int = 0,
+        limit: int = 100,
+        extra_fields: List[Any] = [],
+    ) -> List[ModelType]:
+        statement = (
+            select(self.model)
+            .offset(skip)
+            .limit(limit)
+            .where(getattr(self.model, key) == value)
+        )
+        statement = self.extend_statement(statement, extra_fields=extra_fields)
+        result = await db.execute(statement)
+        return list(result.scalars().all())
+
+    async def remove_multi(
+        self, db: AsyncSession, *, ids: int | List[int]
+    ) -> List[int]:
+        if isinstance(ids, int):
+            ids = [ids]
+        statement = delete(self.model).where(self.model.id.in_(ids))
+        await db.execute(statement)
+        await db.commit()
+        return ids
 
     async def count(self, db: AsyncSession) -> int:
         """

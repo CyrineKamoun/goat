@@ -12,7 +12,6 @@ Schedule: every 5 minutes
 """
 
 import logging
-from typing import Self
 
 from pydantic import BaseModel, Field
 

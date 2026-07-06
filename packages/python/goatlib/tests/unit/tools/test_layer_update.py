@@ -343,7 +343,7 @@ class TestLayerUpdateIntegration:
             patch.object(runner, "_replace_ducklake_table") as mock_replace,
             patch.object(
                 runner, "_update_layer_metadata", new_callable=AsyncMock
-            ) as mock_update,
+            ),
         ):
             mock_get_info.return_value = layer_info
             mock_import_wfs.return_value = mock_metadata

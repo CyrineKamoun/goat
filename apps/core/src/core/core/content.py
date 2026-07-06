@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from pydantic import UUID4
-from sqlalchemy import Row, and_, null, or_, select, union
+from sqlalchemy import Row, and_, null, select, union
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager, selectinload
 from sqlalchemy.sql import Select
@@ -29,22 +29,6 @@ if TYPE_CHECKING:
     from core.crud.crud_project import CRUDProject
 
 
-# TODO: Unused, remove if not required
-### Generic helper functions for content
-# async def create_content(
-#     async_session: AsyncSession,
-#     *,
-#     model: Type[SQLModel],
-#     crud_content: Callable,
-#     content_in: SQLModel,
-#     other_params: dict = {},
-# ) -> SQLModel:
-#     """Create a new content."""
-#     content_in = model(**content_in.dict(exclude_none=True), **other_params)
-#     content = await crud_content.create(async_session, obj_in=content_in)
-#     return content
-
-
 async def read_content_by_id(
     async_session: AsyncSession,
     id: UUID4,
@@ -63,36 +47,6 @@ async def read_content_by_id(
     return content
 
 
-# TODO: Unused, remove if not required
-# async def read_contents_by_ids(
-#     async_session: AsyncSession,
-#     ids: ContentIdList,
-#     model: Type[SQLModel],
-#     crud_content: Callable,
-#     page_params: PaginationParams = Depends(),
-# ) -> Select:
-#     """Read contents by their IDs."""
-#     # Read contents by IDs
-#     query = select(model).where(model.id.in_(ids.ids))
-#     contents = await crud_content.get_multi(
-#         async_session, query=query, page_params=page_params
-#     )
-
-#     # Check if all contents were found
-#     if len(contents.items) != len(ids.ids):
-#         not_found_contents = [
-#             content_id
-#             for content_id in ids.ids
-#             if content_id not in [content.id for content in contents.items]
-#         ]
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND,
-#             detail=f"{model.__name__} with {not_found_contents} not found",
-#         )
-
-#     return contents
-
-
 async def update_content_by_id(
     async_session: AsyncSession,
     id: UUID4,
@@ -108,129 +62,6 @@ async def update_content_by_id(
         )
     content = await crud_content.update(async_session, db_obj=db_obj, obj_in=content_in)
     return content
-
-
-# TODO: Unused, remove if not required
-# async def delete_content_by_id(
-#     async_session: AsyncSession,
-#     id: UUID4,
-#     model: Type[SQLModel],
-#     crud_content: Callable,
-# ) -> None:
-#     """Delete a content by its ID."""
-#     db_obj = await crud_content.get(async_session, id=id)
-#     if db_obj is None:
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND, detail=f"{model.__name__} not found"
-#         )
-#     await crud_content.remove(async_session, id=id)
-#     return
-
-
-# TODO: Unused, remove if not required
-# def create_query_shared_content(
-#     model,
-#     team_link_model,
-#     organization_link_model,
-#     team_model,
-#     organization_model,
-#     role_model,
-#     filters,
-#     team_id=None,
-#     organization_id=None,
-# ):
-#     """
-#     Creates a dynamic query for a given model (Layer or Project) and its associated team, organization, and owner user.
-
-#     :param model: The main model (Layer or Project)
-#     :param team_link_model: The model linking the main model with teams (LayerTeamLink or ProjectTeamLink)
-#     :param organization_link_model: The model linking the main model with organizations (LayerOrganizationLink or ProjectOrganizationLink)
-#     :param team_model: The Team model
-#     :param organization_model: The Organization model
-#     :param role_model: The Role model
-#     :param filters: Additional filters to apply
-#     :param team_id: ID of the team (optional)
-#     :param organization_id: ID of the organization (optional)
-#     :return: A SQLAlchemy query object
-#     """
-
-#     # Determine the link field based on the model
-#     link_field = f"{model.__tablename__}_id"
-
-#     # Basic query to join the User who owns the Layer or Project
-#     base_query = select(
-#         model,
-#         role_model.id.label("valid_role_id"),
-#         team_model.name,
-#         team_model.id,
-#         team_model.avatar,
-#         User.firstname.label("user_firstname"),
-#         User.lastname.label("user_lastname"),
-#         User.avatar.label("user_avatar"),
-#     ).join(
-#         User, model.user_id == User.id  # Join on owner_id field with User model
-#     )
-
-#     if team_id:
-#         query = (
-#             base_query
-#             .join(
-#                 team_link_model, getattr(team_link_model, link_field) == model.id
-#             )  # Dynamically replace `layer_id` or `project_id`
-#             .join(role_model, team_link_model.role_id == role_model.id)
-#             .join(team_model, team_link_model.team_id == team_model.id)
-#             .where(
-#                 and_(
-#                     team_link_model.team_id == team_id,
-#                     *filters,
-#                 )
-#             )
-#             .options(
-#                 contains_eager(getattr(model, "team_links"))
-#             )  # Adjust field as needed for relationships
-#         )
-#     elif organization_id:
-#         query = (
-#             base_query
-#             .join(
-#                 organization_link_model,
-#                 getattr(organization_link_model, link_field) == model.id,
-#             )  # Dynamically replace `layer_id` or `project_id`
-#             .join(role_model, organization_link_model.role_id == role_model.id)
-#             .join(
-#                 organization_model,
-#                 organization_link_model.organization_id == organization_model.id,
-#             )
-#             .where(
-#                 and_(
-#                     organization_link_model.organization_id == organization_id,
-#                     *filters,
-#                 )
-#             )
-#             .options(
-#                 contains_eager(getattr(model, "organization_links"))
-#             )  # Adjust field as needed for relationships
-#         )
-#     else:
-#         query = (
-#             base_query
-#             .outerjoin(
-#                 team_link_model, getattr(team_link_model, link_field) == model.id
-#             )  # Dynamically replace `layer_id` or `project_id`
-#             .outerjoin(
-#                 organization_link_model,
-#                 getattr(organization_link_model, link_field) == model.id,
-#             )  # Dynamically replace `layer_id` or `project_id`
-#             .where(and_(*filters))
-#             .options(
-#                 selectinload(getattr(model, "team_links")).selectinload(
-#                     getattr(team_link_model, "team")
-#                 ),  # Adjust fields as needed
-#                 selectinload(getattr(model, "organization_links")).selectinload(
-#                     getattr(organization_link_model, "organization")
-#                 ),  # Adjust fields as needed
-#             )
-#         )
 
 
 def create_query_shared_content(
@@ -506,46 +337,3 @@ def create_query_accessible_folders(
         branches.append(shared_via_org)
 
     return union(*branches)
-
-
-def create_query_layers_via_folder_grant(
-    team_ids: list[UUID],
-    organization_id: Optional[UUID],
-) -> Optional[Any]:
-    """Return a subquery of layer IDs reachable via folder grants.
-
-    OR this into the layer listing query to give folder-grant visibility.
-    """
-    conditions = []
-
-    if team_ids:
-        conditions.append(
-            and_(
-                ResourceGrant.grantee_type == "team",
-                ResourceGrant.grantee_id.in_(team_ids),
-            )
-        )
-
-    if organization_id:
-        conditions.append(
-            and_(
-                ResourceGrant.grantee_type == "organization",
-                ResourceGrant.grantee_id == organization_id,
-            )
-        )
-
-    if not conditions:
-        return None
-
-    return (
-        select(Layer.id)
-        .join(
-            ResourceGrant,
-            and_(
-                ResourceGrant.resource_type == "folder",
-                ResourceGrant.resource_id == Layer.folder_id,
-                or_(*conditions),
-            ),
-        )
-        .where(Layer.folder_id.isnot(None))
-    )

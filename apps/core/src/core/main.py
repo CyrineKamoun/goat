@@ -1,4 +1,3 @@
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
@@ -8,16 +7,14 @@ from fastapi import FastAPI, Request, status
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from goatobs import setup_observability
 from sqlalchemy.exc import IntegrityError
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import HTMLResponse
 
-from goatobs import setup_observability
-
 import core._dotenv  # noqa: E402, F401, I001
 from core.core.config import settings
 from core.db.session import session_manager
-from core.endpoints.deps import close_http_client
 from core.endpoints.v2.api import router as api_router_v2
 
 if settings.SENTRY_DSN and settings.ENVIRONMENT:
@@ -27,6 +24,7 @@ if settings.SENTRY_DSN and settings.ENVIRONMENT:
         traces_sample_rate=1.0 if settings.ENVIRONMENT == "prod" else 0.1,
     )
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print("Starting up...")
@@ -34,7 +32,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
     print("Shutting down...")
     await session_manager.close()
-    await close_http_client()
 
 
 app = FastAPI(
@@ -85,6 +82,7 @@ app.add_middleware(
 
 from goatlib.auth import JOSEError  # noqa: E402
 from goatobs import build_auth_context_middleware  # noqa: E402
+
 from core.deps.auth import decode_token  # noqa: E402
 
 app.middleware("http")(
@@ -112,8 +110,3 @@ async def item_already_exists_handler(
             "detail": str(exc.__dict__.get("orig")),
         },
     )
-
-
-# Create data folder in case it does not exist
-if not os.path.exists(settings.DATA_DIR):
-    os.makedirs(settings.DATA_DIR)

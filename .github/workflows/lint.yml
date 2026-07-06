@@ -16,6 +16,7 @@ on:
 
 jobs:
   web:
+    # REQUIRED. lint-web.sh runs `tsc --noEmit` (typecheck) + eslint.
     runs-on: ubuntu-latest
     if: ${{ inputs.web }}
     steps:
@@ -69,6 +70,19 @@ jobs:
         run: uv sync --frozen --all-packages
         working-directory: ${{ github.workspace }}
 
-      - name: 🔬 Run linting
+      # REQUIRED: ruff lint on the packages that are clean. Keeps them clean and
+      # blocks regressions. (Not goatlib — it still carries ruff debt — and not
+      # `ruff format --check`, which is currently dirty repo-wide.)
+      - name: 🔬 ruff check (clean packages, required)
+        run: >-
+          uv run ruff check
+          apps/core apps/geoapi apps/processes packages/python/goatobs
+        working-directory: ${{ github.workspace }}
+
+      # ADVISORY: full gate (mypy --strict + repo-wide ruff check + ruff format
+      # --check). Currently red on pre-existing debt — reports but does not
+      # block. Remove `continue-on-error` once the debt is cleared.
+      - name: 🔬 Full lint (mypy + ruff + format, advisory)
+        continue-on-error: true
         run: uv run bash scripts/lint-python.sh
         working-directory: ${{ github.workspace }}

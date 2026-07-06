@@ -89,7 +89,6 @@ const SECTION_ICON_MAP: Record<string, ICON_NAME> = {
   "location-marker": ICON_NAME.LOCATION_MARKER,
   aggregate: ICON_NAME.AGGREGATE,
   chart: ICON_NAME.CHART,
-  scenario: ICON_NAME.SCENARIO,
   clock: ICON_NAME.CLOCK,
   save: ICON_NAME.SAVE,
 };
@@ -1055,8 +1054,8 @@ export default function WorkflowNodeSettings({
               {sections.map((section) => {
                 // In workflows, skip sections that are handled by node connections or not applicable
                 // Starting points and opportunities come from connected input nodes
-                // Scenario and result sections are not supported in workflows
-                const workflowHiddenSections = ["starting", "scenario", "result"];
+                // Result sections are not supported in workflows
+                const workflowHiddenSections = ["starting", "result"];
                 // Only hide opportunities section for tools with repeatable per-opportunity config
                 // (gravity, closest_average, 2sfca). Other tools like huff_model have
                 // non-repeatable fields in the opportunities section that must remain visible.

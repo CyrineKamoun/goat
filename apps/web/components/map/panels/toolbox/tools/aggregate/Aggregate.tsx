@@ -25,7 +25,6 @@ import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 import {
   useLayerByGeomType,
   useLayerDatasetId,
-  useScenarioItems,
   useStatisticValues,
 } from "@/hooks/map/ToolsHooks";
 import { useProjectLayerFeatureCount } from "@/hooks/map/useProjectLayerFeatureCount";
@@ -99,10 +98,6 @@ const Aggregate = ({ onBack, onClose, type }: AggregateProps) => {
   const [weightPolygonByIntersectingArea, setWeightPolygonByIntersectingArea] = useState(false);
 
   const [fieldGroup, setFieldGroup] = useState<LayerFieldType[] | undefined>([]);
-
-  // Scenario
-  const { scenarioItems } = useScenarioItems(projectId as string);
-  const [selectedScenario, setSelectedScenario] = useState<SelectorItem | undefined>(undefined);
 
   const areaTypes: SelectorItem[] = useMemo(() => {
     return [
@@ -212,10 +207,6 @@ const Aggregate = ({ onBack, onClose, type }: AggregateProps) => {
       payload["source_group_by_field"] = fieldGroup.map((field) => field.name);
     }
 
-    if (selectedScenario) {
-      payload["scenario_id"] = selectedScenario.value;
-    }
-
     const schema = type === "point" ? aggregatePointSchema : aggregatePolygonSchema;
     const computeApi = type === "point" ? computeAggregatePoint : computeAggregatePolygon;
     try {
@@ -245,7 +236,6 @@ const Aggregate = ({ onBack, onClose, type }: AggregateProps) => {
     setStatisticAdvancedOptions(true);
     setWeightPolygonByIntersectingArea(false);
     setFieldGroup([]);
-    setSelectedScenario(undefined);
     setStatisticField(undefined);
     setResultName("");
   };
@@ -479,32 +469,6 @@ const Aggregate = ({ onBack, onClose, type }: AggregateProps) => {
                       tooltip={t("select_group_fields_tooltip")}
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       multiple={true as any}
-                    />
-                  </>
-                }
-              />
-
-              {/* SCENARIO */}
-              <SectionHeader
-                active={isValid}
-                alwaysActive={true}
-                label={t("scenario")}
-                icon={ICON_NAME.SCENARIO}
-                disableAdvanceOptions={true}
-              />
-              <SectionOptions
-                active={isValid}
-                baseOptions={
-                  <>
-                    <Selector
-                      selectedItems={selectedScenario}
-                      setSelectedItems={(item: SelectorItem[] | SelectorItem | undefined) => {
-                        setSelectedScenario(item as SelectorItem);
-                      }}
-                      items={scenarioItems}
-                      label={t("scenario")}
-                      placeholder={t("select_scenario")}
-                      tooltip={t("choose_scenario")}
                     />
                   </>
                 }

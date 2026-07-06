@@ -217,12 +217,7 @@ async def upload_asset(
         f"/{asset_type.value}/{uuid.uuid4().hex}{file_extension}"
     )
 
-    settings.S3_CLIENT.upload_fileobj(
-        Fileobj=io.BytesIO(file_content),
-        Bucket=settings.AWS_S3_ASSETS_BUCKET,
-        Key=s3_key,
-        ExtraArgs={"ContentType": actual_mime_type},
-    )
+    s3_service.upload_asset(io.BytesIO(file_content), s3_key, actual_mime_type)
 
     new_asset = UploadedAsset(
         user_id=user_id,
@@ -328,7 +323,7 @@ async def delete_asset(
     if not asset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
 
-    settings.S3_CLIENT.delete_object(Bucket=settings.AWS_S3_ASSETS_BUCKET, Key=asset.s3_key)
+    s3_service.delete_asset(asset.s3_key)
     await async_session.delete(asset)
     await async_session.commit()
     return None

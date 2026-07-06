@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
-import { ACCOUNTS_DISABLED } from "@/lib/constants";
 import type { Layer } from "@/lib/validations/layer";
 import type { Project } from "@/lib/validations/project";
 import type { Folder } from "@/lib/validations/folder";
@@ -79,7 +78,7 @@ export const useContentMoreMenu = () => {
                 : []),
             ]
           : []),
-        ...(!ACCOUNTS_DISABLED && isOwner
+        ...(isOwner
           ? [
               {
                 id: ContentActions.SHARE,

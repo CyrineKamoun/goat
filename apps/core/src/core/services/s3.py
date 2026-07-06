@@ -61,6 +61,47 @@ class S3Service:
                 **public_extra,
             )
 
+        # Separate client for the assets bucket (avatars, documents). This bucket
+        # lives on AWS with its own credentials, independent of the data bucket's
+        # provider (which may be Hetzner/MinIO).
+        self.assets_client = boto3.client(
+            "s3",
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_REGION,
+        )
+
+    def upload_asset(
+        self, fileobj: BinaryIO, s3_key: str, content_type: str
+    ) -> None:
+        """Upload a file object to the assets bucket (avatars, documents)."""
+        try:
+            self.assets_client.upload_fileobj(
+                Fileobj=fileobj,
+                Bucket=settings.AWS_S3_ASSETS_BUCKET,
+                Key=s3_key,
+                ExtraArgs={"ContentType": content_type},
+            )
+        except ClientError as e:
+            logger.error(f"Asset upload failed for {s3_key}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to upload asset: {e}",
+            )
+
+    def delete_asset(self, s3_key: str) -> None:
+        """Delete an object from the assets bucket."""
+        try:
+            self.assets_client.delete_object(
+                Bucket=settings.AWS_S3_ASSETS_BUCKET, Key=s3_key
+            )
+        except ClientError as e:
+            logger.error(f"Asset delete failed for {s3_key}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete asset: {e}",
+            )
+
     def generate_presigned_post(
         self,
         bucket_name: str,

@@ -6,7 +6,6 @@ import type { LayerProps, MapGeoJSONFeature } from "react-map-gl/maplibre";
 import { Layer as MapLayer, Source, useMap } from "react-map-gl/maplibre";
 
 import { GEOAPI_BASE_URL, SYSTEM_LAYERS_IDS } from "@/lib/constants";
-import { excludes as excludeOp } from "@/lib/transformers/filter";
 import {
   buildClusterBadgeSpec,
   buildClusterCirclePaint,
@@ -36,15 +35,12 @@ import type {
   RasterLayerProperties,
 } from "@/lib/validations/layer";
 import type { BasemapLayerConfig, ProjectLayer } from "@/lib/validations/project";
-import { type ScenarioFeatures, scenarioEditTypeEnum } from "@/lib/validations/scenario";
 
 import { useAppSelector } from "@/hooks/store/ContextHooks";
 
 interface LayersProps {
   layers?: ProjectLayer[] | Layer[];
-  selectedScenarioLayer?: ProjectLayer | null;
   highlightFeature?: MapGeoJSONFeature | null;
-  scenarioFeatures?: ScenarioFeatures | null;
   /**
    * Atlas-driven filter applied client-side to the matching layer's MapLibre
    * filter. Lets the report renderer restrict the coverage layer to the
@@ -117,47 +113,13 @@ const Layers = (props: LayersProps) => {
     return Array.isArray(filter) ? (filter as FilterSpecification) : undefined;
   };
 
-  const scenarioFeaturesToExclude = useMemo(() => {
-    const featuresToExclude: { [key: string]: string[] } = {};
-    props.scenarioFeatures?.features.forEach((feature) => {
-      // Exclude deleted and modified features
-      if (
-        feature.properties?.edit_type === scenarioEditTypeEnum.Enum.d ||
-        feature.properties?.edit_type === scenarioEditTypeEnum.Enum.m
-      ) {
-        const projectLayerId = feature.properties.layer_project_id;
-        if (!projectLayerId || !feature.properties?.feature_id) return;
-
-        if (!featuresToExclude[projectLayerId]) featuresToExclude[projectLayerId] = [];
-
-        if (feature.properties?.feature_id)
-          featuresToExclude[projectLayerId].push(feature.properties?.feature_id);
-      }
-    });
-
-    return featuresToExclude;
-  }, [props.scenarioFeatures]);
-
   const getLayerQueryFilter = (layer: ProjectLayer | Layer) => {
     const cqlFilter = layer["query"]?.cql;
-    if (!layer["layer_id"] || (!Object.keys(scenarioFeaturesToExclude).length && mapMode === "data"))
-      return cqlFilter;
+    if (!layer["layer_id"] || mapMode === "data") return cqlFilter;
 
     const extendedFilter = JSON.parse(JSON.stringify(cqlFilter || {}));
-    if (scenarioFeaturesToExclude[layer.id]?.length && mapMode === "data") {
-      const scenarioFeaturesExcludeFilter = excludeOp("id", scenarioFeaturesToExclude[layer.id]);
-      const parsedScenarioFeaturesExcludeFilter = JSON.parse(scenarioFeaturesExcludeFilter);
-      // Append the filter to the existing filters
-      if (extendedFilter["op"] === "and" && extendedFilter["args"]) {
-        extendedFilter["args"].push(parsedScenarioFeaturesExcludeFilter);
-      } else {
-        // Create a new filter
-        extendedFilter["op"] = "and";
-        extendedFilter["args"] = [parsedScenarioFeaturesExcludeFilter];
-      }
-    }
 
-    if (mapMode !== "data" && temporaryFilters.length > 0) {
+    if (temporaryFilters.length > 0) {
       // Primary layer filters (filter.layer_id matches this layer)
       // Skip filters with excludeFromSourceLayer (used by click-to-filter to keep features clickable)
       const primaryFilters = temporaryFilters
@@ -232,19 +194,15 @@ const Layers = (props: LayersProps) => {
     return getClusterGeoJsonUrl(GEOAPI_BASE_URL ?? "", layerId, filterStr);
   };
 
-  const { useDataLayers, systemLayers } = useMemo(() => {
+  const useDataLayers = useMemo(() => {
     const dataLayers = [] as ProjectLayer[] | Layer[];
-    const sysLayers = [] as ProjectLayer[] | Layer[];
-
     props.layers?.forEach((layer) => {
       const layerId = layer["layer_id"] ?? layer.id;
       if (SYSTEM_LAYERS_IDS.indexOf(layerId) === -1) {
         dataLayers.push(layer);
-      } else {
-        sysLayers.push(layer);
       }
     });
-    return { useDataLayers: dataLayers, systemLayers: sysLayers };
+    return dataLayers;
   }, [props.layers]);
 
   // Lazy-load clustered (GeoJSON) layers: their source downloads the full
@@ -985,37 +943,6 @@ const Layers = (props: LayersProps) => {
                 return null;
               }
             })()
-          )
-        : null}
-      {systemLayers?.length
-        ? systemLayers.map((layer: ProjectLayer | Layer) =>
-            props.selectedScenarioLayer?.id === layer.id ? (
-              (() => {
-                const { filter: layerFilter, layerStyleSpec } = splitLayerFilter(
-                  transformToMapboxLayerStyleSpec(layer) as any
-                );
-                const mapLayerFilter = getMapLayerFilter(layerFilter);
-                return (
-              <Source
-                id={`src-sys-${layer.id}`}
-                key={`${layer.id}-${layer.updated_at || ""}`}
-                type="vector"
-                tiles={[getFeatureTileUrl(layer)]}
-                minzoom={14}
-                maxzoom={22}>
-                <MapLayer
-                  key={getLayerKey(layer)}
-                  id={layer.id.toString()}
-                  {...(layerStyleSpec as any)}
-                  {...(mapLayerFilter ? { filter: mapLayerFilter } : {})}
-                  source-layer="default"
-                  minzoom={14}
-                  maxzoom={22}
-                />
-              </Source>
-                );
-              })()
-            ) : null
           )
         : null}
       {/* Pending features overlay — uses editing layer's original style */}

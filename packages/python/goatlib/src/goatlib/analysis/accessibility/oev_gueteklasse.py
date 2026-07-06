@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any, Self
 
 from goatlib.analysis.accessibility.base import PTToolBase
-from goatlib.analysis.schemas.base import PTTimeWindow
 from goatlib.analysis.schemas.oev_gueteklasse import (
     STATION_CONFIG_DEFAULT,
     OevGueteklasseParams,
@@ -537,7 +536,7 @@ class OevGueteklasseTool(PTToolBase):
                 # Best class - no subtraction needed
                 self.con.execute(f"""
                     INSERT INTO oev_gueteklassen_final
-                    SELECT 
+                    SELECT
                         pt_class,
                         '{label}' AS pt_class_label,
                         ST_Multi(geom) AS geom
@@ -554,7 +553,7 @@ class OevGueteklasseTool(PTToolBase):
                 # Subtract all better classes from this class
                 self.con.execute(f"""
                     INSERT INTO oev_gueteklassen_final
-                    SELECT 
+                    SELECT
                         c.pt_class,
                         '{label}' AS pt_class_label,
                         ST_Multi(ST_Difference(c.geom, b.geom)) AS geom
@@ -562,10 +561,10 @@ class OevGueteklasseTool(PTToolBase):
                     CROSS JOIN better_coverage b
                     WHERE c.pt_class = {pt_class}
                       AND ST_Intersects(c.geom, b.geom)
-                    
+
                     UNION ALL
-                    
-                    SELECT 
+
+                    SELECT
                         c.pt_class,
                         '{label}' AS pt_class_label,
                         ST_Multi(c.geom) AS geom

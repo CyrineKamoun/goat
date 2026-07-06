@@ -29,6 +29,15 @@ import ConfirmModal from "@/components/modals/Confirm";
 import TeamMemberInviteModal from "@/components/modals/settings/InviteTeamMember";
 import TeamMemberDialogWrapper from "@/components/modals/settings/TeamMembersDialogWrapper";
 
+// Seed the edit form from the team. Optional fields can come back null/empty
+// from the API, so coerce to "" rather than running the read object through the
+// update schema (whose fields don't accept null).
+const toTeamFormDefaults = (team: Team): TeamUpdate => ({
+  name: team.name ?? "",
+  description: team.description ?? "",
+  avatar: team.avatar ?? "",
+});
+
 function TeamProfile({ team }: { team: Team }) {
   const theme = useTheme();
   const { t } = useTranslation("common");
@@ -51,7 +60,7 @@ function TeamProfile({ team }: { team: Team }) {
     resolver: zodResolver(teamUpdateSchema),
     defaultValues: useMemo(() => {
       if (team) {
-        return teamUpdateSchema.parse(team);
+        return toTeamFormDefaults(team);
       }
       return {};
     }, [team]),
@@ -59,7 +68,7 @@ function TeamProfile({ team }: { team: Team }) {
 
   useEffect(() => {
     if (team) {
-      reset(teamUpdateSchema.parse(team));
+      reset(toTeamFormDefaults(team));
     }
   }, [team, reset]);
 

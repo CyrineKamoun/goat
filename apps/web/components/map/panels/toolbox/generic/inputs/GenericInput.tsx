@@ -19,7 +19,6 @@ import NumberInput from "@/components/map/panels/toolbox/generic/inputs/NumberIn
 import ObjectInput from "@/components/map/panels/toolbox/generic/inputs/ObjectInput";
 import OevStationConfigInput from "@/components/map/panels/toolbox/generic/inputs/OevStationConfigInput";
 import RepeatableObjectInput from "@/components/map/panels/toolbox/generic/inputs/RepeatableObjectInput";
-import ScenarioInput from "@/components/map/panels/toolbox/generic/inputs/ScenarioInput";
 import StartingPointsInput from "@/components/map/panels/toolbox/generic/inputs/StartingPointsInput";
 import StringInput from "@/components/map/panels/toolbox/generic/inputs/StringInput";
 import TimePickerInput from "@/components/map/panels/toolbox/generic/inputs/TimePickerInput";
@@ -112,16 +111,6 @@ export default function GenericInput({
           formValues={safeFormValues}
           layerDatasetIds={layerDatasetIds}
           predictedColumns={predictedColumns}
-        />
-      );
-
-    case "scenario":
-      return (
-        <ScenarioInput
-          input={input}
-          value={value as string | undefined}
-          onChange={onChange}
-          disabled={disabled}
         />
       );
 

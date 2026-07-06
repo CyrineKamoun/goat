@@ -26,7 +26,7 @@ from goatlib.tools.base import ToolSettings
 from goatlib.tools.project_export import ProjectExportParams, ProjectExportRunner
 from goatlib.tools.project_import import ProjectImportParams, ProjectImportRunner
 
-from .conftest import TEST_ACCOUNTS_SCHEMA, TEST_CUSTOMER_SCHEMA
+from .conftest import TEST_CUSTOMER_SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -542,7 +542,7 @@ async def test_export_import_round_trip(
         async with postgres_pool.acquire() as conn:
             await conn.execute(
                 f"""
-                INSERT INTO {TEST_ACCOUNTS_SCHEMA}.user (id, firstname, lastname, avatar)
+                INSERT INTO {TEST_CUSTOMER_SCHEMA}.user (id, firstname, lastname, avatar)
                 VALUES ($1, $2, $3, $4)
                 """,
                 uuid.UUID(import_user_id),
@@ -763,7 +763,7 @@ async def test_export_import_round_trip(
         try:
             async with postgres_pool.acquire() as conn:
                 await conn.execute(
-                    f"DELETE FROM {TEST_ACCOUNTS_SCHEMA}.user WHERE id = $1",
+                    f"DELETE FROM {TEST_CUSTOMER_SCHEMA}.user WHERE id = $1",
                     uuid.UUID(import_user_id),
                 )
         except Exception as exc:

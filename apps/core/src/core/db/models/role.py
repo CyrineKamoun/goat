@@ -1,16 +1,18 @@
 from enum import Enum
-from uuid import UUID
+from typing import TYPE_CHECKING, List
 
-from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
     Column,
     Field,
+    Relationship,
     Text,
-    text,
 )
 
 from core.core.config import settings
-from core.db.models._base_class import DateTimeBase
+from core.db.models._base_class import UUIDServerDefaultBase
+
+if TYPE_CHECKING:
+    from ._link_model import UserRoleLink
 
 
 class RessourceTypeEnum(str, Enum):
@@ -20,25 +22,16 @@ class RessourceTypeEnum(str, Enum):
     project = "project"
 
 
-class Role(DateTimeBase, table=True):
-    """
-    A table representing a role. A role is a collection of permissions.
-
-    Attributes:
-        id (str): The unique identifier for the role.
-        name (str): The name of the role.
-    """
+class Role(UUIDServerDefaultBase, table=True):
+    """A role: a named collection of permissions scoped to a resource type."""
 
     __tablename__ = "role"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
-    id: UUID | None = Field(
-        sa_column=Column(
-            UUID_PG(as_uuid=True),
-            primary_key=True,
-            nullable=False,
-            server_default=text("uuid_generate_v4()"),
-        ),
-        description="Organization ID",
-    )
     name: str = Field(sa_column=Column(Text, nullable=False), max_length=255)
+    resource_type: RessourceTypeEnum = Field(sa_column=Column(Text, nullable=False))
+
+    # Relationships
+    user_links: List["UserRoleLink"] = Relationship(
+        back_populates="role", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )

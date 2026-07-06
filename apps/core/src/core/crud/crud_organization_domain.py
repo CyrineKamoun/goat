@@ -17,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from core.db.models.organization_domain import (
-    CertStatus,
     DnsStatus,
     OrganizationDomain,
 )
@@ -28,26 +27,6 @@ from .base import CRUDBase
 
 class CRUDOrganizationDomain(CRUDBase[OrganizationDomain, Any, Any]):
     """CRUD operations for the OrganizationDomain model."""
-
-    async def get_by_base_domain(
-        self, async_session: AsyncSession, *, base_domain: str
-    ) -> OrganizationDomain | None:
-        """Get an organization domain by its globally unique base domain hostname."""
-        statement = select(self.model).where(self.model.base_domain == base_domain)
-        result = await async_session.execute(statement)
-        return result.scalars().first()
-
-    async def list_by_organization(
-        self, async_session: AsyncSession, *, organization_id: UUID
-    ) -> List[OrganizationDomain]:
-        """List all custom domains owned by an organization, newest first."""
-        statement = (
-            select(self.model)
-            .where(self.model.organization_id == organization_id)
-            .order_by(self.model.created_at.desc())
-        )
-        result = await async_session.execute(statement)
-        return list(result.scalars().all())
 
     async def list_with_assignment_by_organization(
         self, async_session: AsyncSession, *, organization_id: UUID
@@ -105,26 +84,6 @@ class CRUDOrganizationDomain(CRUDBase[OrganizationDomain, Any, Any]):
                 self.model.dns_status == DnsStatus.PENDING,
                 self.model.created_at >= cutoff,
             )
-        )
-        result = await async_session.execute(statement)
-        return list(result.scalars().all())
-
-    async def list_issuing_certs(
-        self, async_session: AsyncSession
-    ) -> List[OrganizationDomain]:
-        """List domains whose TLS certificate is being provisioned (pending or issuing)."""
-        statement = select(self.model).where(
-            self.model.cert_status.in_([CertStatus.PENDING, CertStatus.ISSUING])
-        )
-        result = await async_session.execute(statement)
-        return list(result.scalars().all())
-
-    async def list_active(
-        self, async_session: AsyncSession
-    ) -> List[OrganizationDomain]:
-        """List domains with an active TLS certificate."""
-        statement = select(self.model).where(
-            self.model.cert_status == CertStatus.ACTIVE
         )
         result = await async_session.execute(statement)
         return list(result.scalars().all())

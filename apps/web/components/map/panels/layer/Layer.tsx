@@ -20,7 +20,7 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import React from "react";
 import { useTranslation } from "react-i18next";
 import { useMap } from "react-map-gl/maplibre";
@@ -33,8 +33,6 @@ import {
   updateProject,
   updateProjectLayer,
   useProject,
-  useProjectScenarioFeatures,
-  useProjectScenarios,
 } from "@/lib/api/projects";
 import { useUserProfile } from "@/lib/api/users";
 import { MAX_EDITABLE_LAYER_SIZE } from "@/lib/constants";
@@ -44,9 +42,7 @@ import {
   setActiveLeftPanel,
   setActiveRightPanel,
   setDataPanelLayerId,
-  setEditingScenario,
   setIsDataPanelOpen,
-  setSelectedScenarioLayer,
 } from "@/lib/store/map/slice";
 import { zoomToProjectLayer } from "@/lib/utils/map/navigate";
 import type { Layer } from "@/lib/validations/layer";
@@ -303,21 +299,8 @@ const LayerPanel = ({ projectId }: PanelProps) => {
   const activeLayerId = useAppSelector((state) => state.layers.activeLayerId);
   const activeRightPanel = useAppSelector((state) => state.map.activeRightPanel);
   const mapMode = useAppSelector((state) => state.map.mapMode);
-  const selectedScenarioLayer = useAppSelector((state) => state.map.selectedScenarioLayer);
-  const { scenarios } = useProjectScenarios(projectId);
   const { project, mutate: mutateProject } = useProject(projectId);
   const { layers: projectLayers, mutate: mutateProjectLayers } = useFilteredProjectLayers(projectId);
-  const { scenarioFeatures } = useProjectScenarioFeatures(projectId, project?.active_scenario_id);
-  const scenarioFeaturesCount = useMemo(() => {
-    const count = {};
-    scenarioFeatures?.features.forEach((feature) => {
-      if (!count[feature.properties.layer_project_id]) {
-        count[feature.properties.layer_project_id] = 0;
-      }
-      count[feature.properties.layer_project_id]++;
-    });
-    return count;
-  }, [scenarioFeatures]);
 
   const {
     getLayerMoreMenuOptions,
@@ -394,9 +377,6 @@ const LayerPanel = ({ projectId }: PanelProps) => {
     let width = 0;
     const offset = 24;
     if (layer.query?.cql && layer.query?.cql["args"]?.length) {
-      width += offset;
-    }
-    if (scenarioFeaturesCount && scenarioFeaturesCount[layer.id]) {
       width += offset;
     }
 
@@ -536,64 +516,6 @@ const LayerPanel = ({ projectId }: PanelProps) => {
                             toggleLayerVisibility={toggleLayerVisibility}
                           />
 
-                          {scenarioFeaturesCount && scenarioFeaturesCount[layer.id] && (
-                            <Tooltip
-                              key={layer.id + "_scenario"}
-                              title={
-                                selectedScenarioLayer && selectedScenarioLayer.value === layer.id
-                                  ? t("hide_scenario_features")
-                                  : t("show_scenario_features")
-                              }
-                              arrow
-                              placement="top">
-                              <IconButton
-                                size="small"
-                                sx={{ pr: 2 }}
-                                color={
-                                  selectedScenarioLayer && selectedScenarioLayer.value === layer.id
-                                    ? "primary"
-                                    : "default"
-                                }
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  if (selectedScenarioLayer?.value === layer.id) {
-                                    dispatch(setSelectedScenarioLayer(undefined));
-                                  } else {
-                                    const _scenario = scenarios?.items?.find(
-                                      (scenario) => scenario.id === project?.active_scenario_id
-                                    );
-                                    dispatch(setActiveRightPanel(MapSidebarItemID.SCENARIO));
-                                    dispatch(setEditingScenario(_scenario));
-                                    dispatch(
-                                      setSelectedScenarioLayer({
-                                        label: layer.name,
-                                        value: layer.id,
-                                        icon: getLayerIcon(layer),
-                                      })
-                                    );
-                                  }
-                                }}>
-                                <Badge
-                                  badgeContent={scenarioFeaturesCount[layer.id]}
-                                  color="primary"
-                                  sx={{
-                                    "& .MuiBadge-badge": {
-                                      fontSize: 9,
-                                      height: 15,
-                                      minWidth: 15,
-                                    },
-                                  }}>
-                                  <Icon
-                                    htmlColor="inherit"
-                                    iconName={ICON_NAME.SCENARIO}
-                                    style={{
-                                      fontSize: 15,
-                                    }}
-                                  />
-                                </Badge>
-                              </IconButton>
-                            </Tooltip>
-                          )}
 
                           {layer.query?.cql && layer.query?.cql["args"]?.length && (
                             <Tooltip

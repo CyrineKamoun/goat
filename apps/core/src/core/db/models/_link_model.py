@@ -24,15 +24,14 @@ if TYPE_CHECKING:
 
     from .layer import Layer
     from .project import Project
-    from .scenario import Scenario
-    from .scenario_feature import ScenarioFeature
+    from .role import Role
     from .team import Team
     from .user import User
 
 
 class LayerProjectLink(DateTimeBase, table=True):
     __tablename__ = "layer_project"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: int | None = Field(
         default=None, sa_column=Column(Integer, primary_key=True, autoincrement=True)
@@ -40,14 +39,14 @@ class LayerProjectLink(DateTimeBase, table=True):
     layer_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.layer.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.layer.id", ondelete="CASCADE"),
         ),
         description="Layer ID",
     )
     project_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.project.id", ondelete="CASCADE"),
         ),
         description="Project ID",
     )
@@ -56,7 +55,7 @@ class LayerProjectLink(DateTimeBase, table=True):
         sa_column=Column(
             Integer,
             ForeignKey(
-                f"{settings.CUSTOMER_SCHEMA}.layer_project_group.id", ondelete="CASCADE"
+                f"{settings.SCHEMA}.layer_project_group.id", ondelete="CASCADE"
             ),
             nullable=True,
         ),
@@ -88,17 +87,12 @@ class LayerProjectLink(DateTimeBase, table=True):
     # Relationships
     project: "Project" = Relationship(back_populates="layer_projects")
     layer: "Layer" = Relationship(back_populates="layer_projects")
-
-    scenario_features: List["ScenarioFeature"] = Relationship(
-        back_populates="layer_project",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
     group: Optional["LayerProjectGroup"] = Relationship(back_populates="layers")
 
 
 class LayerProjectGroup(DateTimeBase, table=True):
     __tablename__ = "layer_project_group"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: int | None = Field(
         default=None, sa_column=Column(Integer, primary_key=True, autoincrement=True)
@@ -111,7 +105,7 @@ class LayerProjectGroup(DateTimeBase, table=True):
     project_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.project.id", ondelete="CASCADE"),
             nullable=False,
         )
     )
@@ -122,7 +116,7 @@ class LayerProjectGroup(DateTimeBase, table=True):
         sa_column=Column(
             Integer,
             ForeignKey(
-                f"{settings.CUSTOMER_SCHEMA}.layer_project_group.id", ondelete="CASCADE"
+                f"{settings.SCHEMA}.layer_project_group.id", ondelete="CASCADE"
             ),
             nullable=True,
         ),
@@ -148,41 +142,9 @@ class LayerProjectGroup(DateTimeBase, table=True):
     )
 
 
-class ScenarioScenarioFeatureLink(DateTimeBase, table=True):
-    __tablename__ = "scenario_scenario_feature"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
-
-    id: int | None = Field(
-        sa_column=Column(Integer, primary_key=True, autoincrement=True)
-    )
-    scenario_id: UUID | None = Field(
-        sa_column=Column(
-            UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.scenario.id", ondelete="CASCADE"),
-            primary_key=True,
-            nullable=False,
-        ),
-        description="Scenario ID",
-    )
-    scenario_feature_id: UUID | None = Field(
-        sa_column=Column(
-            UUID_PG(as_uuid=True),
-            ForeignKey(
-                f"{settings.CUSTOMER_SCHEMA}.scenario_feature.id", ondelete="CASCADE"
-            ),
-            primary_key=True,
-            nullable=False,
-        ),
-        description="Scenario Feature ID",
-    )
-
-    scenario: "Scenario" = Relationship(back_populates="scenario_features_links")
-    scenario_feature: "ScenarioFeature" = Relationship(back_populates="scenarios_links")
-
-
 class UserProjectLink(DateTimeBase, table=True):
     __tablename__ = "user_project"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: int | None = Field(
         default=None, sa_column=Column(Integer, primary_key=True, autoincrement=True)
@@ -190,14 +152,14 @@ class UserProjectLink(DateTimeBase, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
         ),
         description="User ID",
     )
     project_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.project.id", ondelete="CASCADE"),
         ),
         description="Project ID",
     )
@@ -224,7 +186,7 @@ class UserTeamLink(SQLModel, table=True):
     """
 
     __tablename__ = "user_team"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: Optional[int] = Field(
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
@@ -232,14 +194,21 @@ class UserTeamLink(SQLModel, table=True):
     team_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.team.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.team.id", ondelete="CASCADE"),
             nullable=False,
         )
     )
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    role_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.role.id"),
             nullable=False,
         )
     )
@@ -260,7 +229,7 @@ class LayerOrganizationLink(SQLModel, table=True):
     """
 
     __tablename__ = "layer_organization"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: Optional[int] = Field(
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
@@ -269,7 +238,7 @@ class LayerOrganizationLink(SQLModel, table=True):
         sa_column=Column(
             UUID_PG(as_uuid=True),
             ForeignKey(
-                f"{settings.ACCOUNTS_SCHEMA}.organization.id", ondelete="CASCADE"
+                f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"
             ),
             nullable=False,
         )
@@ -277,14 +246,14 @@ class LayerOrganizationLink(SQLModel, table=True):
     layer_id: Optional[UUID] = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.layer.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.layer.id", ondelete="CASCADE"),
             nullable=False,
         )
     )
     role_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.role.id"),
+            ForeignKey(f"{settings.SCHEMA}.role.id"),
             nullable=False,
         )
     )
@@ -305,7 +274,7 @@ class LayerTeamLink(SQLModel, table=True):
     """
 
     __tablename__ = "layer_team"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: Optional[int] = Field(
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
@@ -313,21 +282,21 @@ class LayerTeamLink(SQLModel, table=True):
     team_id: Optional[UUID] = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.team.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.team.id", ondelete="CASCADE"),
             nullable=False,
         )
     )
     layer_id: Optional[UUID] = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.layer.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.layer.id", ondelete="CASCADE"),
             nullable=False,
         )
     )
     role_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.role.id"),
+            ForeignKey(f"{settings.SCHEMA}.role.id"),
             nullable=False,
         )
     )
@@ -348,7 +317,7 @@ class ProjectTeamLink(SQLModel, table=True):
     """
 
     __tablename__ = "project_team"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: Optional[int] = Field(
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
@@ -356,21 +325,21 @@ class ProjectTeamLink(SQLModel, table=True):
     team_id: Optional[UUID] = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.team.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.team.id", ondelete="CASCADE"),
             nullable=False,
         )
     )
     project_id: Optional[UUID] = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.project.id", ondelete="CASCADE"),
             nullable=False,
         )
     )
     role_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.role.id"),
+            ForeignKey(f"{settings.SCHEMA}.role.id"),
             nullable=False,
         )
     )
@@ -384,37 +353,48 @@ class ResourceGrant(SQLModel, table=True):
     """Generic sharing table: grants a role on any resource to a team or organization."""
 
     __tablename__ = "resource_grant"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = (
+        UniqueConstraint(
+            "resource_type",
+            "resource_id",
+            "grantee_type",
+            "grantee_id",
+            name="resource_grant_resource_type_resource_id_grantee_type_grant_key",
+        ),
+        {"schema": settings.SCHEMA},
+    )
 
     id: Optional[UUID] = Field(
         default=None,
-        sa_column=Column(UUID_PG(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+        ),
     )
-    resource_type: str = Field(sa_column=Column(Text, nullable=False))
-    resource_id: UUID = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), nullable=False)
-    )
-    grantee_type: str = Field(sa_column=Column(Text, nullable=False))
-    grantee_id: UUID = Field(
-        sa_column=Column(UUID_PG(as_uuid=True), nullable=False)
-    )
+    resource_type: str = Field(sa_column=Column(sa.String(length=50), nullable=False))
+    resource_id: UUID = Field(sa_column=Column(UUID_PG(as_uuid=True), nullable=False))
+    grantee_type: str = Field(sa_column=Column(sa.String(length=50), nullable=False))
+    grantee_id: UUID = Field(sa_column=Column(UUID_PG(as_uuid=True), nullable=False))
     role_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.role.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.role.id", ondelete="CASCADE"),
             nullable=False,
         )
     )
     granted_by: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         )
     )
     created_at: Optional[Any] = Field(
         default=None,
-        sa_column=Column(sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa_column=Column(
+            sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
+        ),
     )
 
 
@@ -429,7 +409,7 @@ class ProjectOrganizationLink(SQLModel, table=True):
     """
 
     __tablename__ = "project_organization"
-    __table_args__ = {"schema": settings.ACCOUNTS_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: Optional[int] = Field(
         sa_column=Column(Integer, primary_key=True, autoincrement=True)
@@ -438,7 +418,7 @@ class ProjectOrganizationLink(SQLModel, table=True):
         sa_column=Column(
             UUID_PG(as_uuid=True),
             ForeignKey(
-                f"{settings.ACCOUNTS_SCHEMA}.organization.id", ondelete="CASCADE"
+                f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"
             ),
             nullable=False,
         )
@@ -446,14 +426,14 @@ class ProjectOrganizationLink(SQLModel, table=True):
     project_id: Optional[UUID] = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.project.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.project.id", ondelete="CASCADE"),
             nullable=False,
         )
     )
     role_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.role.id"),
+            ForeignKey(f"{settings.SCHEMA}.role.id"),
             nullable=False,
         )
     )
@@ -461,3 +441,326 @@ class ProjectOrganizationLink(SQLModel, table=True):
     # Relationships
     project: "Project" = Relationship(back_populates="organization_links")
     organization: "Organization" = Relationship(back_populates="project_links")
+
+
+# ---------------------------------------------------------------------------
+# RBAC link tables. Defined column-only (no ORM Relationship); the authz SQL
+# functions and seeds query these tables directly.
+# ---------------------------------------------------------------------------
+
+
+class RolePermissionLink(SQLModel, table=True):
+    """Relation between roles and permissions."""
+
+    __tablename__ = "role_permission"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id: Optional[int] = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
+    role_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.role.id", ondelete="CASCADE"),
+        ),
+    )
+    permission_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.permission.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+    )
+
+
+sa.Index(
+    "idx_role_permission",
+    RolePermissionLink.__table__.c.role_id,
+    RolePermissionLink.__table__.c.permission_id,
+    unique=True,
+)
+sa.Index(
+    "idx_role_permission_permission_id", RolePermissionLink.__table__.c.permission_id
+)
+sa.Index("idx_role_permission_role_id", RolePermissionLink.__table__.c.role_id)
+
+
+class ResourcePermissionLink(SQLModel, table=True):
+    """Relation between resources and permissions."""
+
+    __tablename__ = "resource_permission"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id: Optional[int] = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
+    resource_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.resource.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+    )
+    permission_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.permission.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+    )
+
+
+sa.Index(
+    "idx_resource_permission",
+    ResourcePermissionLink.__table__.c.resource_id,
+    ResourcePermissionLink.__table__.c.permission_id,
+    unique=True,
+)
+sa.Index(
+    "idx_resource_permission_permission_id",
+    ResourcePermissionLink.__table__.c.permission_id,
+)
+sa.Index(
+    "idx_resource_permission_resource_id",
+    ResourcePermissionLink.__table__.c.resource_id,
+)
+
+
+class UserRoleLink(SQLModel, table=True):
+    """Relation between users and roles."""
+
+    __tablename__ = "user_role"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id: Optional[int] = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
+    role_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.role.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    user_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+
+    # Relationships
+    role: "Role" = Relationship(back_populates="user_links")
+    user: "User" = Relationship(back_populates="role_links")
+
+
+sa.Index(
+    "idx_user_role",
+    UserRoleLink.__table__.c.user_id,
+    UserRoleLink.__table__.c.role_id,
+    unique=True,
+)
+sa.Index("idx_user_role_role_id", UserRoleLink.__table__.c.role_id)
+sa.Index("idx_user_role_user_id", UserRoleLink.__table__.c.user_id)
+
+
+class LayerUserLink(SQLModel, table=True):
+    """Relation between layers and users (per-user layer grant)."""
+
+    __tablename__ = "layer_user"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id: Optional[int] = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
+    user_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    layer_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.layer.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    role_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.role.id"),
+            nullable=False,
+        )
+    )
+
+
+sa.Index(
+    "idx_layer_user_role",
+    LayerUserLink.__table__.c.user_id,
+    LayerUserLink.__table__.c.layer_id,
+    LayerUserLink.__table__.c.role_id,
+    unique=True,
+)
+sa.Index(
+    "idx_layer_user",
+    LayerUserLink.__table__.c.user_id,
+    LayerUserLink.__table__.c.layer_id,
+    unique=True,
+)
+sa.Index("idx_layer_user_layer_id", LayerUserLink.__table__.c.layer_id)
+sa.Index("idx_layer_user_user_id", LayerUserLink.__table__.c.user_id)
+sa.Index("idx_layer_user_role_id", LayerUserLink.__table__.c.role_id)
+
+
+class ProjectUserLink(SQLModel, table=True):
+    """Relation between projects and users (per-user project grant)."""
+
+    __tablename__ = "project_user"
+    __table_args__ = {"schema": settings.SCHEMA}
+
+    id: Optional[int] = Field(
+        sa_column=Column(Integer, primary_key=True, autoincrement=True)
+    )
+    user_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    project_id: Optional[UUID] = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.project.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    role_id: UUID = Field(
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.role.id"),
+            nullable=False,
+        )
+    )
+
+
+sa.Index(
+    "idx_project_user_role",
+    ProjectUserLink.__table__.c.user_id,
+    ProjectUserLink.__table__.c.project_id,
+    ProjectUserLink.__table__.c.role_id,
+    unique=True,
+)
+sa.Index(
+    "idx_project_user",
+    ProjectUserLink.__table__.c.user_id,
+    ProjectUserLink.__table__.c.project_id,
+    unique=True,
+)
+sa.Index("idx_project_user_project_id", ProjectUserLink.__table__.c.project_id)
+sa.Index("idx_project_user_user_id", ProjectUserLink.__table__.c.user_id)
+sa.Index("idx_project_user_role_id", ProjectUserLink.__table__.c.role_id)
+
+
+# ---------------------------------------------------------------------------
+# Secondary indexes on the shared link tables. Declared here so the squash
+# baseline / autogenerate matches the indexes present in the database.
+# ---------------------------------------------------------------------------
+sa.Index(
+    "idx_user_team", UserTeamLink.__table__.c.user_id, UserTeamLink.__table__.c.team_id
+)
+sa.Index("idx_user_team_team_id", UserTeamLink.__table__.c.team_id)
+sa.Index("idx_user_team_user_id", UserTeamLink.__table__.c.user_id)
+
+sa.Index(
+    "idx_layer_organization_role",
+    LayerOrganizationLink.__table__.c.organization_id,
+    LayerOrganizationLink.__table__.c.layer_id,
+    LayerOrganizationLink.__table__.c.role_id,
+    unique=True,
+)
+sa.Index(
+    "idx_layer_organization",
+    LayerOrganizationLink.__table__.c.organization_id,
+    LayerOrganizationLink.__table__.c.layer_id,
+    unique=True,
+)
+sa.Index("idx_layer_organization_layer_id", LayerOrganizationLink.__table__.c.layer_id)
+sa.Index(
+    "idx_layer_organization_organization_id",
+    LayerOrganizationLink.__table__.c.organization_id,
+)
+sa.Index("idx_layer_organization_role_id", LayerOrganizationLink.__table__.c.role_id)
+
+sa.Index(
+    "idx_layer_team_role",
+    LayerTeamLink.__table__.c.team_id,
+    LayerTeamLink.__table__.c.layer_id,
+    LayerTeamLink.__table__.c.role_id,
+    unique=True,
+)
+sa.Index(
+    "idx_layer_team",
+    LayerTeamLink.__table__.c.team_id,
+    LayerTeamLink.__table__.c.layer_id,
+    unique=True,
+)
+sa.Index("idx_layer_team_layer_id", LayerTeamLink.__table__.c.layer_id)
+sa.Index("idx_layer_team_team_id", LayerTeamLink.__table__.c.team_id)
+sa.Index("idx_layer_team_role_id", LayerTeamLink.__table__.c.role_id)
+
+sa.Index(
+    "idx_project_team_role",
+    ProjectTeamLink.__table__.c.team_id,
+    ProjectTeamLink.__table__.c.project_id,
+    ProjectTeamLink.__table__.c.role_id,
+    unique=True,
+)
+sa.Index(
+    "idx_project_team",
+    ProjectTeamLink.__table__.c.team_id,
+    ProjectTeamLink.__table__.c.project_id,
+    unique=True,
+)
+sa.Index("idx_project_team_project_id", ProjectTeamLink.__table__.c.project_id)
+sa.Index("idx_project_team_team_id", ProjectTeamLink.__table__.c.team_id)
+sa.Index("idx_project_team_role_id", ProjectTeamLink.__table__.c.role_id)
+
+sa.Index(
+    "idx_project_organization_role",
+    ProjectOrganizationLink.__table__.c.organization_id,
+    ProjectOrganizationLink.__table__.c.project_id,
+    ProjectOrganizationLink.__table__.c.role_id,
+    unique=True,
+)
+sa.Index(
+    "idx_project_organization",
+    ProjectOrganizationLink.__table__.c.organization_id,
+    ProjectOrganizationLink.__table__.c.project_id,
+    unique=True,
+)
+sa.Index(
+    "idx_project_organization_project_id",
+    ProjectOrganizationLink.__table__.c.project_id,
+)
+sa.Index(
+    "idx_project_organization_organization_id",
+    ProjectOrganizationLink.__table__.c.organization_id,
+)
+sa.Index(
+    "idx_project_organization_role_id", ProjectOrganizationLink.__table__.c.role_id
+)
+
+sa.Index(
+    "idx_resource_grant_resource",
+    ResourceGrant.__table__.c.resource_type,
+    ResourceGrant.__table__.c.resource_id,
+)
+sa.Index(
+    "idx_resource_grant_grantee",
+    ResourceGrant.__table__.c.grantee_type,
+    ResourceGrant.__table__.c.grantee_id,
+)

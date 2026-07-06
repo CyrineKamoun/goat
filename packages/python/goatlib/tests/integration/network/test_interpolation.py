@@ -14,7 +14,7 @@ def test_interpolate_long_edges(processor: InMemoryNetworkProcessor) -> None:
 
     # Find a reasonable threshold - use 75th percentile of edge lengths
     edge_lengths = processor.con.execute(f"""
-        SELECT length_m FROM {processor.network_table_name} 
+        SELECT length_m FROM {processor.network_table_name}
         ORDER BY length_m DESC
     """).fetchall()
 
@@ -58,7 +58,7 @@ def test_interpolate_long_edges(processor: InMemoryNetworkProcessor) -> None:
         intermediate_nodes = processor.con.execute(f"""
             SELECT COUNT(DISTINCT node_id) FROM (
                 SELECT source as node_id FROM {interpolated_table} WHERE source LIKE 'interp_%'
-                UNION 
+                UNION
                 SELECT target as node_id FROM {interpolated_table} WHERE target LIKE 'interp_%'
             )
         """).fetchone()[0]

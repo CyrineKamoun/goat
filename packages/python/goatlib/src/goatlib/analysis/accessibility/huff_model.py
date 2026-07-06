@@ -1,15 +1,10 @@
-
 import logging
-import uuid
 from pathlib import Path
 from typing import Self
 
-from goatlib.analysis.accessibility.base import HeatmapToolBase, sanitize_sql_name
+from goatlib.analysis.accessibility.base import HeatmapToolBase
+from goatlib.analysis.schemas.heatmap import HuffmodelParams
 from goatlib.io.parquet import write_optimized_parquet
-
-from goatlib.analysis.schemas.heatmap import (
-    HuffmodelParams
-)
 from goatlib.io.utils import Metadata
 from goatlib.models.io import DatasetMetadata
 
@@ -48,7 +43,9 @@ class HuffmodelTool(HeatmapToolBase):
         logger.info("Opportunity table created: %s", opportunity_table)
 
         # Process demand layer
-        demand_table = self._process_demand(params.demand_path, params.demand_field, h3_resolution)
+        demand_table = self._process_demand(
+            params.demand_path, params.demand_field, h3_resolution
+        )
         logger.info("Demand table created: %s", demand_table)
 
         # Filter opportunities and demand to study area
@@ -67,20 +64,29 @@ class HuffmodelTool(HeatmapToolBase):
         demand_table_filtered = f"{demand_table}_filtered"
 
         # Extract unique H3 IDs from filtered tables using base methods
-        opportunity_ids = self._extract_h3_ids(opportunity_table_filtered, column_name="dest_id")
+        opportunity_ids = self._extract_h3_ids(
+            opportunity_table_filtered, column_name="dest_id"
+        )
         demand_ids = self._extract_h3_ids(demand_table_filtered, column_name="orig_id")
 
         if not opportunity_ids:
-            raise ValueError("No opportunity IDs found in opportunity data within study area")
+            raise ValueError(
+                "No opportunity IDs found in opportunity data within study area"
+            )
         if not demand_ids:
             raise ValueError("No demand IDs found in demand data within study area")
 
-        logger.info("Found %d unique opportunity IDs in study area", len(opportunity_ids))
+        logger.info(
+            "Found %d unique opportunity IDs in study area", len(opportunity_ids)
+        )
         logger.info("Found %d unique demand IDs in study area", len(demand_ids))
 
         # Filter OD matrix using base method
         filtered_matrix = self._filter_od_matrix(
-            od_table, origin_ids=demand_ids, destination_ids=opportunity_ids, max_cost=params.max_cost
+            od_table,
+            origin_ids=demand_ids,
+            destination_ids=opportunity_ids,
+            max_cost=params.max_cost,
         )
 
         # Compute Huff model using filtered tables
@@ -90,7 +96,7 @@ class HuffmodelTool(HeatmapToolBase):
             demand_table_filtered,
             params.attractiveness_param,
             params.distance_decay,
-            params.max_cost
+            params.max_cost,
         )
 
         output_path = Path(params.output_path)
@@ -172,9 +178,7 @@ class HuffmodelTool(HeatmapToolBase):
         """
         table_name = "supply_input"
         try:
-            meta, table_name = self.import_input(
-                supply_table, table_name=table_name
-            )
+            meta, table_name = self.import_input(supply_table, table_name=table_name)
             geom_col = meta.geometry_column or "geom"
             geom_type = (meta.geometry_type or "").lower()
             output_table = f"{table_name}_std"
@@ -225,7 +229,7 @@ class HuffmodelTool(HeatmapToolBase):
                 WHERE {geom_col} IS NOT NULL
             ),
             polygons AS (
-                SELECT 
+                SELECT
                     supply_id,
                     attractivity,
                     (UNNEST(ST_Dump(ST_Force2D(geom))).geom) AS geom
@@ -265,9 +269,7 @@ class HuffmodelTool(HeatmapToolBase):
         """
         try:
             table_name = "demand_input"
-            meta, table_name = self.import_input(
-                demand_path, table_name=table_name
-            )
+            meta, table_name = self.import_input(demand_path, table_name=table_name)
             geom_col = meta.geometry_column or "geom"
             geom_type = (meta.geometry_type or "").lower()
             output_table = f"{table_name}_std"
@@ -356,7 +358,6 @@ class HuffmodelTool(HeatmapToolBase):
         self.con.execute(query)
         return output_table
 
-
     def _compute_huff_model(
         self: Self,
         filtered_matrix: str,
@@ -368,19 +369,22 @@ class HuffmodelTool(HeatmapToolBase):
     ) -> str:
         """
         Compute Huff model accessibility using gravity-style pattern.
-        
+
         Uses single JOIN + GROUP BY pattern inspired by _compute_gravity_accessibility:
         - Direct aggregation without window functions
         - Pre-filter by max_cost in WHERE clause
         - Individual column computation with sum expressions
         """
         result_table = "huff_model_final"
-        
+
         # Pre-compute total demand once for efficiency
-        total_demand = self.con.execute(
-            f"SELECT SUM(demand_value) FROM {demand_table}"
-        ).fetchone()[0] or 0
-        
+        total_demand = (
+            self.con.execute(
+                f"SELECT SUM(demand_value) FROM {demand_table}"
+            ).fetchone()[0]
+            or 0
+        )
+
         if total_demand == 0:
             raise ValueError("Total demand is zero - cannot compute Huff model")
 
@@ -405,7 +409,7 @@ class HuffmodelTool(HeatmapToolBase):
                     supply_id,
                     attractivity,
                     POW(attractivity, {attractiveness_param}) * POW(min_cost, -{distance_decay}) AS weighted_attr,
-                    SUM(POW(attractivity, {attractiveness_param}) * POW(min_cost, -{distance_decay})) 
+                    SUM(POW(attractivity, {attractiveness_param}) * POW(min_cost, -{distance_decay}))
                         OVER (PARTITION BY orig_id) AS total_weighted_attr
                 FROM origin_supply_min_cost
             ),
@@ -428,8 +432,12 @@ class HuffmodelTool(HeatmapToolBase):
         """
 
         self.con.execute(query)
-        row_count = self.con.execute(f"SELECT COUNT(*) FROM {result_table}").fetchone()[0]
-        logger.info("Computed Huff model probabilities for %d supply locations", row_count)
+        row_count = self.con.execute(f"SELECT COUNT(*) FROM {result_table}").fetchone()[
+            0
+        ]
+        logger.info(
+            "Computed Huff model probabilities for %d supply locations", row_count
+        )
         return result_table
 
     def _export_original_geom_results(
@@ -449,7 +457,7 @@ class HuffmodelTool(HeatmapToolBase):
         geometry_col = "geometry"
         columns_result = self.con.execute("PRAGMA table_info(supply_input)").fetchall()
         column_names = [col[1] for col in columns_result]
-        
+
         if "geom" in column_names:
             geometry_col = "geom"
         elif "geometry" in column_names:

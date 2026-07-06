@@ -4,10 +4,11 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 import * as Sentry from "@sentry/nextjs";
 
-if (process.env.NEXT_PUBLIC_SENTRY_DSN && process.env.NEXT_PUBLIC_APP_ENVIRONMENT) {
+const sentryEnvironment = process.env.NEXT_PUBLIC_APP_ENVIRONMENT || process.env.ENVIRONMENT;
+if (process.env.NEXT_PUBLIC_SENTRY_DSN && sentryEnvironment) {
   Sentry.init({
     dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-    environment: process.env.NEXT_PUBLIC_APP_ENVIRONMENT,
+    environment: sentryEnvironment,
 
     // Adjust this value in production, or use tracesSampler for greater control
     tracesSampleRate: 1,

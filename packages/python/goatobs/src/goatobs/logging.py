@@ -24,13 +24,12 @@ plain-text uvicorn-style output with no user / trace context.
 """
 import logging
 import sys
-from typing import Any, MutableMapping
+from typing import Any, Callable, MutableMapping
 
 import structlog
 from opentelemetry import trace as otel_trace
 
 from goatobs.context import get_user_context
-
 
 EventDict = MutableMapping[str, Any]
 
@@ -53,7 +52,9 @@ def _add_trace_context(_logger: Any, _method: str, event_dict: EventDict) -> Eve
     return event_dict
 
 
-def _add_service_fields(service_name: str, environment: str):
+def _add_service_fields(
+    service_name: str, environment: str
+) -> Callable[[Any, str, EventDict], EventDict]:
     """Closure-bound processor that attaches service+environment."""
 
     def _proc(_logger: Any, _method: str, event_dict: EventDict) -> EventDict:

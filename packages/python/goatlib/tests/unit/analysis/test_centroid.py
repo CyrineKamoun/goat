@@ -50,8 +50,8 @@ def test_centroid_polygons() -> None:
 
     # Check geometry type
     geom_type = con.execute(f"""
-        SELECT ST_GeometryType(geometry) 
-        FROM read_parquet('{result_path}') 
+        SELECT ST_GeometryType(geometry)
+        FROM read_parquet('{result_path}')
         LIMIT 1
     """).fetchone()[0]
 
@@ -106,8 +106,8 @@ def test_centroid_multipoints() -> None:
 
     # Check geometry type
     geom_type = con.execute(f"""
-        SELECT ST_GeometryType(geometry) 
-        FROM read_parquet('{result_path}') 
+        SELECT ST_GeometryType(geometry)
+        FROM read_parquet('{result_path}')
         LIMIT 1
     """).fetchone()[0]
 

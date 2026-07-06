@@ -6,7 +6,7 @@
 # Standalone Windmill script: Back up PostgreSQL databases and upload to S3.
 #
 # Databases:
-#   - goat: Only specified schemas (accounts, ducklake, customer)
+#   - goat: Only specified schemas (public, ducklake, customer)
 #   - keycloak: Full database
 #   - windmill: Full database
 #
@@ -27,7 +27,7 @@ from pathlib import Path
 
 # ── Configuration ────────────────────────────────────────────────────
 
-DEFAULT_GOAT_SCHEMAS = ["public", "accounts", "ducklake", "customer"]
+DEFAULT_GOAT_SCHEMAS = ["public", "ducklake", "customer"]
 PG_CLIENT_MAJOR = "17"
 PG_TOOLS_DIR = "pg_tools"
 PGDG_REPO_BASE = "https://apt.postgresql.org/pub/repos/apt"

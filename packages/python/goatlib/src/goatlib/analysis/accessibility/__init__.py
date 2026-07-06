@@ -28,10 +28,10 @@ from .catchment_area import (
     jsolines,
 )
 from .catchment_area_v2 import CatchmentAreaToolV2
-from .travel_cost_matrix import TravelCostMatrixTool
 from .closest_average import HeatmapClosestAverageTool
 from .connectivity import HeatmapConnectivityTool
 from .gravity import HeatmapGravityTool
 from .heatmap_v2 import HeatmapV2Tool
 from .oev_gueteklasse import OevGueteklasseTool
+from .travel_cost_matrix import TravelCostMatrixTool
 from .trip_count import TripCountStationTool

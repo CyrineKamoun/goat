@@ -1,12 +1,14 @@
+import logging
 from typing import Any, Dict
 
 from core.core.config import settings
-from core.endpoints.deps import get_db
+from core.endpoints.deps import get_current_token_claims, get_db
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import OAuth2PasswordBearer
 from goatlib.auth import JOSEError, KeycloakAuth
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 # Initialize Keycloak auth using goatlib
 _keycloak_auth = KeycloakAuth(
@@ -19,10 +21,6 @@ _keycloak_auth = KeycloakAuth(
 auth_key = _keycloak_auth.public_key
 ISSUER_URL = _keycloak_auth.issuer_url
 
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V2_STR}/auth/access-token",
-)
-
 
 def decode_token(token: str) -> Dict[str, Any]:
     """
@@ -31,25 +29,46 @@ def decode_token(token: str) -> Dict[str, Any]:
     return _keycloak_auth.decode_token(token)
 
 
-async def auth(token: str = Depends(oauth2_scheme)) -> str:
+def auth(request: Request) -> str:
+    """Raw bearer token for the request, for forwarding to other services.
+
+    Signature-verified when AUTH is enabled; with AUTH disabled the provided
+    bearer token (or the sample token) is used unverified, matching the other
+    dev-mode dependencies.
+    """
+    authorization = request.headers.get("Authorization")
+    if not settings.AUTH:
+        # No verification in dev mode; downstream services running with
+        # AUTH=False ignore the forwarded token.
+        return authorization.partition(" ")[2] if authorization else ""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authorization token",
+        )
+    token = authorization.partition(" ")[2]
     try:
         decode_token(token)
     except JOSEError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
-
     return token
 
 
-def user_token(token: str = Depends(auth)) -> Dict[str, Any]:
-    payload = decode_token(token)
-    return payload
+def user_token(request: Request) -> Dict[str, Any]:
+    """JWT claims for the request.
+
+    Signature-verified when AUTH is enabled; with AUTH disabled the provided
+    bearer token (or the sample token) is used unverified, matching the other
+    dev-mode dependencies.
+    """
+    return get_current_token_claims(request)
 
 
 def is_superuser(
     user_token: Dict[str, Any] = Depends(user_token), throw_error: bool = True
 ) -> bool:
     is_superuser = False
-    if user_token["realm_access"] and user_token["realm_access"]["roles"]:
+    if user_token.get("realm_access", {}).get("roles"):
         is_superuser = "superuser" in user_token["realm_access"]["roles"]
 
     if not is_superuser and throw_error:
@@ -80,18 +99,38 @@ async def _validate_authorization(
                 cleaned_route_path = clean_path(
                     route.path
                 )  # e.g /organizations/{organization_id}
+                # Bind all user-controlled values as parameters — never
+                # f-string-interpolate them (SQL injection). The schema is a
+                # trusted config identifier (cannot be a bind param). user_id is
+                # cast to uuid to match the function signature.
                 authz_query = text(
-                    f"SELECT * FROM {settings.ACCOUNTS_SCHEMA}.authorization('{user_id}', '{cleaned_route_path}', '{cleaned_path}', '{method}');"
+                    f"SELECT * FROM {settings.SCHEMA}.authorization("
+                    "CAST(:user_id AS uuid), :requested_resource, "
+                    ":requested_path, :requested_method)"
                 )
-                response = await async_session.execute(authz_query)
+                response = await async_session.execute(
+                    authz_query,
+                    {
+                        "user_id": user_id,
+                        "requested_resource": cleaned_route_path,
+                        "requested_path": cleaned_path,
+                        "requested_method": method,
+                    },
+                )
                 state = response.scalars().all()
                 if not state or not len(state) or state[0] is False:
                     raise ValueError("Unauthorized")
                 return True
             else:
                 raise ValueError("Missing path, route, or method in request scope")
-        except Exception as e:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+        except HTTPException:
+            raise
+        except Exception:
+            # Don't leak the internal error (e.g. DB messages) to the client.
+            logger.warning("authorization check failed", exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+            )
 
     return True
 
@@ -116,29 +155,15 @@ async def auth_z(
             )
         user_token = decode_token(token)
         await _validate_authorization(request, user_token, async_session)
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        # Don't leak the internal error (token/decode/DB details) to the client.
+        logger.warning("authorization failed", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+        )
 
     return True
 
 
-async def auth_z_lite(request: Request, async_session: AsyncSession) -> bool:
-    """
-    Authorization function to check if the user has access to the requested resource (without FastAPI dependencies).
-    """
-
-    try:
-        if settings.AUTH is False:
-            return True
-        token = request.headers.get("Authorization")
-        if token:
-            token = token.split(" ")[1]
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing authorization token",
-            )
-        user_token = decode_token(token)
-        return await _validate_authorization(request, user_token, async_session)
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))

@@ -370,7 +370,7 @@ class TestTripCountStationTool:
         )
 
         tool = TripCountStationTool()
-        result = tool.run(params)
+        tool.run(params)
 
         # Verify frequency calculation: frequency = time_window / total
         con = duckdb.connect()

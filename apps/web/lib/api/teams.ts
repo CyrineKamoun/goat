@@ -1,40 +1,21 @@
 import useSWR from "swr";
 
+import { API_BASE_URL } from "@/lib/constants";
+
 import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
 import type { Team, TeamBase, TeamMember, TeamUpdate } from "@/lib/validations/team";
 
-const ACCOUNTS_BASE = process.env.NEXT_PUBLIC_ACCOUNTS_API_URL;
-export const ACCOUNTS_ENABLED = Boolean(ACCOUNTS_BASE);
-
-export const TEAMS_API_BASE_URL = ACCOUNTS_ENABLED ? new URL("api/v1/teams", ACCOUNTS_BASE!).href : "";
-
-const ACCOUNTS_DISABLED_ERROR = { error: "ACCOUNTS_DISABLED" } as const;
-
-// Stubs for OSS mode (IDs match dev DB seeded by scripts/setup_accounts_dev.sql)
-const STUB_TEAM: Team = {
-  id: "00000000-0000-0000-0000-000000000003",
-  name: "Marketing Dev Team",
-  role: "team-owner",
-};
-const STUB_TEAMS: Team[] = [STUB_TEAM];
-const STUB_TEAM_MEMBERS: TeamMember[] = [];
+export const TEAMS_API_BASE_URL = new URL("api/v2/teams", API_BASE_URL).href;
 
 // Hooks
 
 export const useTeams = () => {
-  const disabled = !ACCOUNTS_ENABLED;
   const { data, isLoading, error, mutate, isValidating } = useSWR<Team[]>(
-    disabled ? null : `${TEAMS_API_BASE_URL}`,
-    fetcher,
-    {
-      fallbackData: STUB_TEAMS,
-      revalidateOnFocus: !disabled,
-      revalidateOnReconnect: !disabled,
-      shouldRetryOnError: !disabled,
-    }
+    `${TEAMS_API_BASE_URL}`,
+    fetcher
   );
   return {
-    teams: data ?? STUB_TEAMS,
+    teams: data ?? [],
     isLoading,
     isError: error,
     mutate,
@@ -43,19 +24,12 @@ export const useTeams = () => {
 };
 
 export const useTeam = (teamId: string) => {
-  const disabled = !ACCOUNTS_ENABLED || !teamId;
   const { data, isLoading, error, mutate, isValidating } = useSWR<Team>(
-    disabled ? null : `${TEAMS_API_BASE_URL}/${teamId}`,
-    fetcher,
-    {
-      fallbackData: STUB_TEAM,
-      revalidateOnFocus: !disabled,
-      revalidateOnReconnect: !disabled,
-      shouldRetryOnError: !disabled,
-    }
+    teamId ? `${TEAMS_API_BASE_URL}/${teamId}` : null,
+    fetcher
   );
   return {
-    team: data ?? STUB_TEAM,
+    team: data,
     isLoading,
     isError: error,
     mutate,
@@ -64,19 +38,12 @@ export const useTeam = (teamId: string) => {
 };
 
 export const useTeamMembers = (teamId: string) => {
-  const disabled = !ACCOUNTS_ENABLED || !teamId;
   const { data, isLoading, error, mutate, isValidating } = useSWR<TeamMember[]>(
-    disabled ? null : `${TEAMS_API_BASE_URL}/${teamId}/members`,
-    fetcher,
-    {
-      fallbackData: STUB_TEAM_MEMBERS,
-      revalidateOnFocus: !disabled,
-      revalidateOnReconnect: !disabled,
-      shouldRetryOnError: !disabled,
-    }
+    teamId ? `${TEAMS_API_BASE_URL}/${teamId}/members` : null,
+    fetcher
   );
   return {
-    teamMembers: data ?? STUB_TEAM_MEMBERS,
+    teamMembers: data ?? [],
     isLoading,
     isError: error,
     mutate,
@@ -87,7 +54,6 @@ export const useTeamMembers = (teamId: string) => {
 // Mutations
 
 export const createTeam = async (payload: TeamBase) => {
-  if (!ACCOUNTS_ENABLED) throw ACCOUNTS_DISABLED_ERROR;
   const response = await apiRequestAuth(`${TEAMS_API_BASE_URL}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -104,7 +70,6 @@ export const createTeam = async (payload: TeamBase) => {
 };
 
 export const updateTeam = async (teamId: string, organization: TeamUpdate) => {
-  if (!ACCOUNTS_ENABLED) throw ACCOUNTS_DISABLED_ERROR;
   const response = await apiRequestAuth(`${TEAMS_API_BASE_URL}/${teamId}/profile`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -115,7 +80,6 @@ export const updateTeam = async (teamId: string, organization: TeamUpdate) => {
 };
 
 export const deleteTeam = async (teamId: string) => {
-  if (!ACCOUNTS_ENABLED) throw ACCOUNTS_DISABLED_ERROR;
   const response = await apiRequestAuth(`${TEAMS_API_BASE_URL}/${teamId}`, {
     method: "DELETE",
   });
@@ -130,7 +94,6 @@ export const deleteTeam = async (teamId: string) => {
 };
 
 export const deleteMember = async (teamId: string, memberId: string) => {
-  if (!ACCOUNTS_ENABLED) throw ACCOUNTS_DISABLED_ERROR;
   const response = await apiRequestAuth(`${TEAMS_API_BASE_URL}/${teamId}/users/${memberId}`, {
     method: "DELETE",
   });
@@ -139,7 +102,6 @@ export const deleteMember = async (teamId: string, memberId: string) => {
 };
 
 export const createTeamMember = async (teamId: string, memberId: string) => {
-  if (!ACCOUNTS_ENABLED) throw ACCOUNTS_DISABLED_ERROR;
   const response = await apiRequestAuth(`${TEAMS_API_BASE_URL}/${teamId}/users/${memberId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

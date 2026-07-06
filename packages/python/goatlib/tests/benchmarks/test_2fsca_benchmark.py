@@ -6,13 +6,11 @@ import time
 from pathlib import Path
 
 import duckdb
-
 from goatlib.analysis.accessibility.two_step_catchment_area import Heatmap2SFCATool
 from goatlib.analysis.schemas.heatmap import (
     Heatmap2SFCAParams,
-    ImpedanceFunction,
-    TwoSFCAType,
     Opportunity2SFCA,
+    TwoSFCAType,
 )
 
 
@@ -93,12 +91,12 @@ def benchmark_2sfca_oberbayern() -> tuple[float, float, str, int]:
 
     print("🏔️  OBERBAYERN 2FSCA BENCHMARK")
     print("=" * 50)
-    print(f"🗺️  Region: Oberbayern (Bavaria)")
+    print("🗺️  Region: Oberbayern (Bavaria)")
     print(f"📍 Bounding box: {xmin:.2f}, {ymin:.2f}, {xmax:.2f}, {ymax:.2f}")
-    print(f"🏫 Opportunities: Kindergartens")
-    print(f"👥 Demand: Population (einwohner)")
-    print(f"🚶 Mode: Walking (15min catchment)")
-    print(f"📊 Method: 2-Step Floating Catchment Area")
+    print("🏫 Opportunities: Kindergartens")
+    print("👥 Demand: Population (einwohner)")
+    print("🚶 Mode: Walking (15min catchment)")
+    print("📊 Method: 2-Step Floating Catchment Area")
 
     # Get input data statistics from clipped datasets
     try:
@@ -130,7 +128,7 @@ def benchmark_2sfca_oberbayern() -> tuple[float, float, str, int]:
     tool.con.execute("SET memory_limit='8GB';")  # Increase memory for large dataset
     tool.con.execute("SET threads=8;")  # Use multiple threads
 
-    results = tool.run(params)
+    tool.run(params)
 
     # End timing
     end_time = time.time()
@@ -191,8 +189,8 @@ if __name__ == "__main__":
         print("=" * 60)
         print("📋 BENCHMARK RESULTS SUMMARY")
         print("=" * 60)
-        print(f"   Region: Oberbayern (Bavaria)")
-        print(f"   Analysis: 2-Step Floating Catchment Area")
+        print("   Region: Oberbayern (Bavaria)")
+        print("   Analysis: 2-Step Floating Catchment Area")
         print(f"   Points processed: {point_count:,}")
         print(f"   Execution Time: {exec_time:.2f}s")
         print(f"   Output Size: {file_size:.2f} MB")

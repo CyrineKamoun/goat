@@ -20,7 +20,6 @@ import {
   useProject,
   useProjectInitialViewState,
   useProjectLayerGroups,
-  useProjectScenarioFeatures,
 } from "@/lib/api/projects";
 import { PATTERN_IMAGES } from "@/lib/constants/pattern-images";
 import { DrawProvider } from "@/lib/providers/DrawProvider";
@@ -159,7 +158,6 @@ export default function MapPage({ params: { projectId } }) {
     return isOrgEditor;
   }, [project?.my_role, projectFolder, isOrgEditor]);
 
-  const { scenarioFeatures } = useProjectScenarioFeatures(projectId, project?.active_scenario_id);
   const isLoading = useMemo(
     () =>
       isProjectLoading ||
@@ -545,7 +543,6 @@ export default function MapPage({ params: { projectId } }) {
                             containerSx={{ zIndex: 0 }}
                             layers={projectLayers}
                             mapRef={mapRef}
-                            scenarioFeatures={scenarioFeatures}
                             maxExtent={project?.max_extent || undefined}
                             initialViewState={{
                               zoom: urlLoc?.zoom ?? initialView?.zoom ?? 3,

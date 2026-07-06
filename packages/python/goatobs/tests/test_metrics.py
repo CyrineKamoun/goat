@@ -1,10 +1,9 @@
 """Unit tests for goatobs.metrics — OTel metrics SDK setup."""
 import pytest
+from goatobs.metrics import setup_metrics
 from opentelemetry import metrics as otel_metrics
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.resources import Resource
-
-from goatobs.metrics import setup_metrics
 
 
 @pytest.fixture(autouse=True)

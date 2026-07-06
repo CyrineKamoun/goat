@@ -25,11 +25,9 @@ export const planNames = {
 } as const;
 
 export enum FeatureName {
-  SCENARIO = "SCENARIO",
 }
 
 export const featureToPlanMap = {
-  [FeatureName.SCENARIO]: [planNames.PRO, planNames.ENTERPRISE],
 };
 
 export const organizationRolesEnum = z.enum([

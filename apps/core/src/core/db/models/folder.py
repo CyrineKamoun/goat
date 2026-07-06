@@ -13,7 +13,7 @@ from core.db.models.user import User
 
 class Folder(DateTimeBase, table=True):
     __tablename__ = "folder"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: UUID | None = Field(
         default=None,
@@ -27,7 +27,7 @@ class Folder(DateTimeBase, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Folder owner ID",

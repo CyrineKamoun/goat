@@ -285,10 +285,12 @@ class ToolSettings:
             or None,
             s3_access_key_id=cls._get_secret("S3_ACCESS_KEY_ID", ""),
             s3_secret_access_key=cls._get_secret("S3_SECRET_ACCESS_KEY", ""),
-            s3_region_name=cls._get_secret("S3_REGION_NAME", "")
-            or cls._get_secret("S3_REGION", "us-east-1"),
+            s3_region_name=cls._get_secret("S3_REGION", "us-east-1"),
             s3_bucket_name=cls._get_secret("S3_BUCKET_NAME", ""),
-            customer_schema=cls._get_secret("CUSTOMER_SCHEMA", "customer"),
+            # `SCHEMA` is the canonical name (core's single data schema);
+            # `CUSTOMER_SCHEMA` is accepted as a fallback for older deployments.
+            customer_schema=cls._get_secret("SCHEMA", "")
+            or cls._get_secret("CUSTOMER_SCHEMA", "customer"),
             geocoding_url=cls._get_secret("GEOCODING_URL", "") or None,
             geocoding_authorization=cls._get_secret("GEOCODING_AUTHORIZATION", "")
             or None,
@@ -336,7 +338,6 @@ class SimpleToolRunner:
             logging.Formatter("%(name)s - %(levelname)s - %(message)s")
         )
         root_logger.addHandler(handler)
-
 
     def init_from_env(self: Self) -> None:
         """Initialize settings from environment variables."""

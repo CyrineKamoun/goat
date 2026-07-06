@@ -1,7 +1,6 @@
 # Standard library imports
 import logging
-from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, List
 from uuid import UUID
 
 # Third party imports
@@ -10,61 +9,40 @@ from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from geoalchemy2.elements import WKTElement
 from pydantic import BaseModel
-from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Local application imports
-from core.core.config import settings
 from core.core.content import build_shared_with_object, create_query_shared_content
-from core.core.layer import CRUDLayerBase
 from core.crud.base import CRUDBase
 from core.db.models._link_model import (
     LayerOrganizationLink,
     LayerTeamLink,
     ResourceGrant,
 )
+from core.db.models.folder import Folder
 from core.db.models.layer import Layer, LayerType
 from core.db.models.organization import Organization
 from core.db.models.role import Role
 from core.db.models.team import Team
 from core.schemas.error import (
-    ColumnNotFoundError,
     LayerNotFoundError,
-    OperationNotSupportedError,
-    UnsupportedLayerTypeError,
 )
 from core.schemas.layer import (
-    AreaStatisticsOperation,
-    ComputeBreakOperation,
     ICatalogLayerGet,
     ILayerGet,
     IMetadataAggregate,
     IMetadataAggregateRead,
-    IUniqueValue,
     MetadataGroupAttributes,
-    UserDataGeomType,
     get_layer_schema,
     layer_update_class,
 )
-from core.utils import build_where
 
 logger = logging.getLogger(__name__)
 
 
-class CRUDLayer(CRUDLayerBase):
+class CRUDLayer(CRUDBase):
     """CRUD class for Layer."""
-
-    async def get_internal(self, async_session: AsyncSession, id: UUID) -> Layer:
-        """Gets a layer and make sure it is a internal layer."""
-
-        layer: Layer | None = await self.get(async_session, id=id)
-        if layer is None:
-            raise LayerNotFoundError("Layer not found")
-        if layer.type not in [LayerType.feature, LayerType.table]:
-            raise UnsupportedLayerTypeError(
-                "Layer is not a feature layer or table layer. The requested operation cannot be performed on these layer types."
-            )
-        return layer
 
     async def update(
         self,
@@ -92,306 +70,6 @@ class CRUDLayer(CRUDLayerBase):
         )
 
         return layer
-
-    async def delete(
-        self,
-        async_session: AsyncSession,
-        id: UUID,
-    ) -> None:
-        """Delete layer metadata from PostgreSQL.
-
-        Note: DuckLake data deletion has been moved to the Processes API.
-        Use POST /processes/LayerDelete/execution for full layer deletion
-        including DuckLake data.
-        """
-        layer = await CRUDBase(Layer).get(async_session, id=id)
-        if layer is None:
-            raise LayerNotFoundError(f"{Layer.__name__} not found")
-
-        # Delete layer metadata
-        await CRUDBase(Layer).delete(
-            db=async_session,
-            id=id,
-        )
-
-        # Delete layer thumbnail
-        if (
-            layer.thumbnail_url
-            and settings.THUMBNAIL_DIR_LAYER in layer.thumbnail_url
-            and settings.TEST_MODE is False
-        ):
-            settings.S3_CLIENT.delete_object(
-                Bucket=settings.AWS_S3_ASSETS_BUCKET,
-                Key=layer.thumbnail_url.replace(settings.ASSETS_URL + "/", ""),
-            )
-
-    async def get_feature_layer_size(
-        self, async_session: AsyncSession, layer: Layer
-    ) -> int:
-        """Get size of feature layer."""
-
-        # Get size
-        sql_query = f"""
-            SELECT SUM(pg_column_size(p.*))
-            FROM {layer.table_name} AS p
-            WHERE layer_id = '{str(layer.id)}'
-        """
-        result: int = (await async_session.execute(text(sql_query))).fetchall()[0][0]
-        return result
-
-    async def get_feature_layer_extent(
-        self, async_session: AsyncSession, layer: Layer
-    ) -> WKTElement:
-        """Get extent of feature layer."""
-
-        # Get extent
-        sql_query = f"""
-            SELECT CASE WHEN ST_MULTI(ST_ENVELOPE(ST_Extent(geom))) <> 'ST_MultiPolygon'
-            THEN ST_MULTI(ST_ENVELOPE(ST_Extent(ST_BUFFER(geom, 0.00001))))
-            ELSE ST_MULTI(ST_ENVELOPE(ST_Extent(geom))) END AS extent
-            FROM {layer.table_name}
-            WHERE layer_id = '{str(layer.id)}'
-        """
-        result: WKTElement = (
-            (await async_session.execute(text(sql_query))).fetchall()
-        )[0][0]
-        return result
-
-    async def check_if_column_suitable_for_stats(
-        self, async_session: AsyncSession, id: UUID, column_name: str, query: str | None
-    ) -> Dict[str, Any]:
-        # Check if layer is internal layer
-        layer = await self.get_internal(async_session, id=id)
-
-        # Ensure a valid ID and attribute mapping is available
-        if layer.id is None or layer.attribute_mapping is None:
-            raise ValueError(
-                "ID or attribute mapping is not defined for this layer, unable to compute stats."
-            )
-
-        column_mapped = next(
-            (
-                key
-                for key, value in layer.attribute_mapping.items()
-                if value == column_name
-            ),
-            None,
-        )
-
-        if column_mapped is None:
-            raise ColumnNotFoundError("Column not found")
-
-        return {
-            "layer": layer,
-            "column_mapped": column_mapped,
-            "where_query": build_where(
-                id=layer.id,
-                table_name=layer.table_name,
-                query=query,
-                attribute_mapping=layer.attribute_mapping,
-            ),
-        }
-
-    async def get_unique_values(
-        self,
-        async_session: AsyncSession,
-        id: UUID,
-        column_name: str,
-        order: str,
-        query: str,
-        page_params: PaginationParams,
-    ) -> Page:
-        # Check if layer is suitable for stats
-        res_check = await self.check_if_column_suitable_for_stats(
-            async_session=async_session, id=id, column_name=column_name, query=query
-        )
-        layer = res_check["layer"]
-        column_mapped = res_check["column_mapped"]
-        where_query = res_check["where_query"]
-        # Map order
-        order_mapped = {"descendent": "DESC", "ascendent": "ASC"}[order]
-
-        # Build count query
-        count_query = f"""
-            SELECT COUNT(*) AS total_count
-            FROM (
-                SELECT {column_mapped}
-                FROM {layer.table_name}
-                WHERE {where_query}
-                AND {column_mapped} IS NOT NULL
-                GROUP BY {column_mapped}
-            ) AS subquery
-        """
-
-        # Execute count query
-        count_result = await async_session.execute(text(count_query))
-        total_results = count_result.scalar_one()
-
-        # Build data query
-        data_query = f"""
-        SELECT *
-        FROM (
-
-            SELECT JSONB_BUILD_OBJECT(
-                'value', {column_mapped}, 'count', COUNT(*)
-            )
-            FROM {layer.table_name}
-            WHERE {where_query}
-            AND {column_mapped} IS NOT NULL
-            GROUP BY {column_mapped}
-            ORDER BY COUNT(*) {order_mapped}, {column_mapped}
-        ) AS subquery
-        LIMIT {page_params.size}
-        OFFSET {(page_params.page - 1) * page_params.size}
-        """
-
-        # Execute data query
-        data_result = await async_session.execute(text(data_query))
-        result = data_result.fetchall()
-        result = [IUniqueValue(**res[0]) for res in result]
-
-        # Create Page object
-        page = Page(
-            items=result,
-            total=total_results,
-            page=page_params.page,
-            size=page_params.size,
-        )
-
-        return page
-
-    async def get_area_statistics(
-        self,
-        async_session: AsyncSession,
-        id: UUID,
-        operation: AreaStatisticsOperation,
-        query: str,
-    ) -> Dict[str, Any] | None:
-        # Check if layer is internal layer
-        layer = await self.get_internal(async_session, id=id)
-
-        # Ensure a valid ID and attribute mapping is available
-        if layer.id is None or layer.attribute_mapping is None:
-            raise ValueError(
-                "ID or attribute mapping is not defined for this layer, unable to compute stats."
-            )
-
-        # Where query
-        where_query = build_where(
-            id=layer.id,
-            table_name=layer.table_name,
-            query=query,
-            attribute_mapping=layer.attribute_mapping,
-        )
-
-        # Ensure where query is valid
-        if where_query is None:
-            raise ValueError("Invalid where query for layer.")
-
-        # Check if layer has polygon geoms
-        if layer.feature_layer_geometry_type != UserDataGeomType.polygon.value:
-            raise UnsupportedLayerTypeError(
-                "Operation not supported. The layer does not contain polygon geometries. Pick a layer with polygon geometries."
-            )
-
-        # TODO: Feature count validation moved to geoapi - consider adding limit check there
-        where_query = "WHERE " + where_query
-
-        # Call SQL function
-        sql_query = text(f"""
-            SELECT * FROM basic.area_statistics('{operation.value}', '{layer.table_name}', '{where_query.replace("'", "''")}')
-        """)
-        res = (
-            await async_session.execute(
-                sql_query,
-            )
-        ).fetchall()
-        res_value: Dict[str, Any] | None = res[0][0] if res else None
-        return res_value
-
-    async def get_class_breaks(
-        self,
-        async_session: AsyncSession,
-        id: UUID,
-        operation: ComputeBreakOperation,
-        query: str | None,
-        column_name: str,
-        stripe_zeros: bool | None = None,
-        breaks: int | None = None,
-    ) -> Dict[str, Any] | None:
-        # Check if layer is suitable for stats
-        res = await self.check_if_column_suitable_for_stats(
-            async_session=async_session, id=id, column_name=column_name, query=query
-        )
-
-        args = res
-        where_clause = res["where_query"]
-        args["table_name"] = args["layer"].table_name
-        # del layer from args
-        del args["layer"]
-
-        # Extend where clause
-        column_mapped = res["column_mapped"]
-        if stripe_zeros:
-            where_extension = (
-                f" AND {column_mapped} != 0"
-                if where_clause
-                else f"{column_mapped} != 0"
-            )
-            args["where"] = where_clause + where_extension
-
-        # Define additional arguments
-        if breaks:
-            args["breaks"] = breaks
-
-        # Choose the SQL query based on operation
-        if operation == ComputeBreakOperation.quantile:
-            sql_query = "SELECT * FROM basic.quantile_breaks(:table_name, :column_mapped, :where, :breaks)"
-        elif operation == ComputeBreakOperation.equal_interval:
-            sql_query = "SELECT * FROM basic.equal_interval_breaks(:table_name, :column_mapped, :where, :breaks)"
-        elif operation == ComputeBreakOperation.standard_deviation:
-            sql_query = "SELECT * FROM basic.standard_deviation_breaks(:table_name, :column_mapped, :where)"
-        elif operation == ComputeBreakOperation.heads_and_tails:
-            sql_query = "SELECT * FROM basic.heads_and_tails_breaks(:table_name, :column_mapped, :where, :breaks)"
-        else:
-            raise OperationNotSupportedError("Operation not supported")
-
-        # Execute the query
-        result = (await async_session.execute(text(sql_query), args)).fetchall()
-        result_value: Dict[str, Any] | None = result[0][0] if result else None
-        return result_value
-
-    async def get_last_data_updated_at(
-        self, async_session: AsyncSession, id: UUID, query: str
-    ) -> datetime:
-        """Get last updated at timestamp."""
-
-        # Check if layer is internal layer
-        layer = await self.get_internal(async_session, id=id)
-
-        # Ensure a valid ID and attribute mapping is available
-        if layer.id is None or layer.attribute_mapping is None:
-            raise ValueError(
-                "ID or attribute mapping is not defined for this layer, unable to compute stats."
-            )
-
-        where_query = build_where(
-            id=layer.id,
-            table_name=layer.table_name,
-            query=query,
-            attribute_mapping=layer.attribute_mapping,
-        )
-
-        # Get last updated at timestamp
-        sql_query = f"""
-            SELECT MAX(updated_at)
-            FROM {layer.table_name}
-            WHERE {where_query}
-        """
-        result: datetime = (await async_session.execute(text(sql_query))).fetchall()[0][
-            0
-        ]
-        return result
 
     async def get_base_filter(
         self,
@@ -438,6 +116,16 @@ class CRUDLayer(CRUDLayerBase):
             else:
                 if not team_id and not organization_id:
                     filters.append(Layer.user_id == user_id)
+                    # My Content is folder-scoped navigation: a layer sitting in
+                    # a folder the user does not own is unreachable there.
+                    filters.append(
+                        or_(
+                            Layer.folder_id.is_(None),
+                            Layer.folder_id.in_(
+                                select(Folder.id).where(Folder.user_id == user_id)
+                            ),
+                        )
+                    )
         else:
             filters.append(Layer.in_catalog == bool(True))
 
@@ -499,20 +187,28 @@ class CRUDLayer(CRUDLayerBase):
         grant_conditions: list[Any] = []
         if team_id:
             grant_conditions.append(
-                and_(ResourceGrant.grantee_type == "team", ResourceGrant.grantee_id == team_id)
+                and_(
+                    ResourceGrant.grantee_type == "team",
+                    ResourceGrant.grantee_id == team_id,
+                )
             )
         if organization_id:
             grant_conditions.append(
-                and_(ResourceGrant.grantee_type == "organization", ResourceGrant.grantee_id == organization_id)
+                and_(
+                    ResourceGrant.grantee_type == "organization",
+                    ResourceGrant.grantee_id == organization_id,
+                )
             )
 
         if folder_id and grant_conditions:
             grant_result = await async_session.execute(
-                select(ResourceGrant.id).where(
+                select(ResourceGrant.id)
+                .where(
                     ResourceGrant.resource_type == "folder",
                     ResourceGrant.resource_id == folder_id,
                     or_(*grant_conditions),
-                ).limit(1)
+                )
+                .limit(1)
             )
             use_folder_grant_query = grant_result.first() is not None
         elif not folder_id and grant_conditions:
@@ -527,6 +223,7 @@ class CRUDLayer(CRUDLayerBase):
                 ResourceGrant.resource_type == "folder",
                 or_(*grant_conditions),
             )
+
             # NULL-safe: folder_id IS NULL means no folder, always include such layers.
             # Without this, NULL NOT IN (...) evaluates to UNKNOWN (= excluded).
             def not_in_granted(col: Any) -> Any:
@@ -536,7 +233,9 @@ class CRUDLayer(CRUDLayerBase):
                 accessible.append(
                     and_(
                         Layer.id.in_(
-                            select(LayerTeamLink.layer_id).where(LayerTeamLink.team_id == team_id)
+                            select(LayerTeamLink.layer_id).where(
+                                LayerTeamLink.team_id == team_id
+                            )
                         ),
                         not_in_granted(Layer.folder_id),
                     )

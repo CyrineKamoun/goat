@@ -5,7 +5,13 @@ from uuid import UUID
 import pycountry
 from geoalchemy2 import Geometry, WKBElement
 from geoalchemy2.shape import to_shape
-from pydantic import EmailStr, HttpUrl, computed_field, field_validator
+from pydantic import (
+    EmailStr,
+    HttpUrl,
+    computed_field,
+    field_serializer,
+    field_validator,
+)
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
@@ -22,7 +28,11 @@ from sqlmodel import (
 )
 
 from core.core.config import settings
-from core.db.models._base_class import ContentBaseAttributes, DateTimeBase
+from core.db.models._base_class import (
+    ContentBaseAttributes,
+    DateTimeBase,
+    serialize_str_enum,
+)
 
 if TYPE_CHECKING:
     from core.db.models.folder import Folder
@@ -31,56 +41,12 @@ if TYPE_CHECKING:
     from .data_store import DataStore
 
 
-class ToolType(str, Enum):
-    """Indicator types."""
-
-    catchment_area_active_mobility = "catchment_area_active_mobility"
-    catchment_area_pt = "catchment_area_pt"
-    catchment_area_car = "catchment_area_car"
-    catchment_area_nearby_station_access = "catchment_area_nearby_station_access"
-    oev_gueteklasse = "oev_gueteklasse"
-    trip_count_station = "trip_count_station"
-    join = "join"
-    aggregate_point = "aggregate_point"
-    aggregate_polygon = "aggregate_polygon"
-    aggregate_line = "aggregate_line"
-    intersect = "intersect"
-    buffer = "buffer"
-    origin_destination = "origin_destination"
-    nearby_station_access = "nearby_station_access"
-    heatmap_gravity_active_mobility = "heatmap_gravity_active_mobility"
-    heatmap_gravity_motorized_mobility = "heatmap_gravity_motorized_mobility"
-    heatmap_closest_average_active_mobility = "heatmap_closest_average_active_mobility"
-    heatmap_closest_average_motorized_mobility = (
-        "heatmap_closest_average_motorized_mobility"
-    )
-    heatmap_connectivity_active_mobility = "heatmap_connectivity_active_mobility"
-    heatmap_connectivity_motorized_mobility = "heatmap_connectivity_motorized_mobility"
-
-
 class FeatureType(str, Enum):
     """Feature layer types."""
 
     standard = "standard"
     tool = "tool"
     street_network = "street_network"
-
-
-class TableUploadType(str, Enum):
-    """Table data types."""
-
-    csv = "csv"
-    xlsx = "xlsx"
-
-
-# It was decided against using MIME types here because for e.g. gpkg they are commonly just generic application/octet-stream
-class FeatureUploadType(str, Enum):
-    """File upload types."""
-
-    geojson = "geojson"
-    gpkg = "gpkg"
-    kml = "kml"
-    zip = "zip"  # Commonly used for shapefiles
 
 
 class FileUploadType(str, Enum):
@@ -93,31 +59,6 @@ class FileUploadType(str, Enum):
     kml = "kml"
     zip = "zip"  # Commonly used for shapefiles
     parquet = "parquet"  # GeoParquet files
-
-
-class FeatureLayerExportType(str, Enum):
-    """Feature Layer export types."""
-
-    geojson = "geojson"
-    shp = "shp"
-    gpkg = "gpkg"
-    csv = "csv"
-    xlsx = "xlsx"
-    kml = "kml"
-    parquet = "parquet"
-
-
-class TableLayerExportType(str, Enum):
-    """Table Layer export types."""
-
-    csv = "csv"
-    xlsx = "xlsx"
-
-
-class FeatureServeType(str, Enum):
-    mvt = "mvt"
-    wfs = "wfs"
-    binary = "binary"
 
 
 class RasterDataType(str, Enum):
@@ -135,15 +76,6 @@ class LayerType(str, Enum):
     feature = "feature"
     raster = "raster"
     table = "table"
-
-
-class RasterStyleType(str, Enum):
-    """Raster style types for COG layers."""
-
-    image = "image"
-    color_range = "color_range"
-    categories = "categories"
-    hillshade = "hillshade"
 
 
 class FeatureDataType(str, Enum):
@@ -212,11 +144,8 @@ class GeospatialAttributes(SQLModel):
 
 
 def validate_language_code(v: str | None) -> str | None:
-    if v:
-        try:
-            pycountry.languages.get(alpha_2=v)
-        except KeyError:
-            raise ValueError(f"The passed language {v} is not valid.")
+    if v and pycountry.languages.get(alpha_2=v) is None:
+        raise ValueError(f"The passed language {v} is not valid.")
     return v
 
 
@@ -233,12 +162,9 @@ def validate_geographical_code(v: str | None) -> str | None:
     ]
 
     if v:
-        # Try if country code if not try if any of the continent codes
-        try:
-            pycountry.countries.get(alpha_2=v)
-        except KeyError:
-            if v not in continents:
-                raise ValueError(f"The passed country {v} is not valid.")
+        # Accept either a country code or one of the continent names
+        if pycountry.countries.get(alpha_2=v) is None and v not in continents:
+            raise ValueError(f"The passed country {v} is not valid.")
     return v
 
 
@@ -391,7 +317,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     """Layer model."""
 
     __tablename__ = "layer"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: UUID | None = Field(
         default=None,
@@ -406,7 +332,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Layer owner ID",
@@ -414,7 +340,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     folder_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.folder.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.folder.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="Layer folder ID",
@@ -426,7 +352,7 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.data_store.id"),
+            ForeignKey(f"{settings.SCHEMA}.data_store.id"),
         ),
         description="Data store ID of the layer",
     )
@@ -534,6 +460,19 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         if value is not None and isinstance(value, WKBElement):
             return str(to_shape(value).wkt)
         return value
+
+    @field_serializer("extent")
+    def _serialize_extent(self, value: str | WKBElement | None) -> str | None:
+        """Serialize extent whether it arrives as WKT (validated) or a raw
+        WKBElement (e.g. direct model_dump of an ORM instance), avoiding the
+        WKBElement-vs-str serializer warning while keeping output identical."""
+        if isinstance(value, WKBElement):
+            return str(to_shape(value).wkt)
+        return value
+
+    @field_serializer("type", "feature_layer_type", "feature_layer_geometry_type")
+    def _serialize_enum(self, value: Enum | str | None) -> str | None:
+        return serialize_str_enum(value)
 
     @field_validator("url", "distribution_url", mode="before")
     @classmethod

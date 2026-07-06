@@ -32,7 +32,6 @@ export enum MapSidebarItemID {
   FILTER = "filter",
   STYLE = "style",
   TOOLBOX = "toolbox",
-  SCENARIO = "scenario",
   FEATURE_EDITOR = "feature_editor",
 }
 

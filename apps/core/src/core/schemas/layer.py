@@ -1,6 +1,5 @@
 # Standard library imports
-from enum import Enum
-from typing import Annotated, Any, Dict, List, Literal, Union
+from typing import Any, Dict, List, Literal, Union
 from uuid import UUID
 
 # Third party imports
@@ -9,12 +8,8 @@ from pydantic import (
     Field,
     HttpUrl,
     RootModel,
-    ValidationError,
-    ValidationInfo,
     field_validator,
 )
-from pyproj import CRS
-from pyproj.exceptions import CRSError
 from shapely import wkt
 
 # Local application imports
@@ -25,18 +20,15 @@ from core.db.models.layer import (
     DataLicense,
     FeatureDataType,
     FeatureGeometryType,
-    FeatureLayerExportType,
     FeatureType,
     GeospatialAttributes,
     LayerBase,
     LayerType,
     RasterDataType,
-    TableLayerExportType,
     layer_base_example,
     validate_geographical_code,
     validate_language_code,
 )
-from core.schemas.common import CQLQuery
 from core.utils import optional
 
 
@@ -62,30 +54,6 @@ class ThumbnailUrlMixin(BaseModel):
         return s3_service.get_thumbnail_url(
             value, default_url=settings.DEFAULT_LAYER_THUMBNAIL
         )
-
-
-class UserDataGeomType(Enum):
-    point = "point"
-    line = "line"
-    polygon = "polygon"
-    no_geometry = "no_geometry"
-
-
-class ComputeBreakOperation(Enum):
-    """Allowed operations on numeric columns."""
-
-    quantile = "quantile"
-    standard_deviation = "standard_deviation"
-    equal_interval = "equal_interval"
-    heads_and_tails = "heads_and_tails"
-
-
-class AreaStatisticsOperation(Enum):
-    """Allowed operations on polygon geometries."""
-
-    sum = "sum"
-    min = "min"
-    max = "max"
 
 
 class LayerReadBaseAttributes(BaseModel):
@@ -578,30 +546,24 @@ def get_layer_schema(
         raise ValueError(f"Layer type ({layer_type}) is invalid")
 
 
-class FeatureLayer(
-    RootModel[
-        Annotated[
-            Union[
-                IFeatureStandardLayerRead,
-                IFeatureToolLayerRead,
-                IFeatureStreetNetworkLayerRead,
-            ],
-            Field(discriminator="feature_layer_type"),
-        ]
-    ]
-):
-    pass
-
-
+# Flat union of all concrete layer-read variants, with NO discriminator.
+#
+# A discriminated union can't be used here: the three feature variants all share
+# type="feature" (a single discriminator value can't map to three schemas), and
+# wrapping them in a nested discriminated union either (a) hides the outer "type"
+# discriminator behind a RootModel — forcing slow, warning-emitting left-to-right
+# serialization — or (b) emits a nested-object discriminator mapping that is
+# invalid OpenAPI. A plain union lets Pydantic's smart-mode match by the Literal
+# `type`/`feature_layer_type` fields: correct routing, no serializer warnings,
+# and valid OpenAPI (a plain oneOf with no discriminator mapping).
 class ILayerRead(
     RootModel[
-        Annotated[
-            Union[
-                FeatureLayer,
-                ITableLayerRead,
-                IRasterLayerRead,
-            ],
-            Field(discriminator="type"),
+        Union[
+            IFeatureStandardLayerRead,
+            IFeatureToolLayerRead,
+            IFeatureStreetNetworkLayerRead,
+            ITableLayerRead,
+            IRasterLayerRead,
         ]
     ]
 ):
@@ -620,43 +582,6 @@ class IUniqueValue(BaseModel):
         if isinstance(value, str):
             return value
         return str(value)
-
-
-class ILayerExport(CQLQuery):
-    """Layer export input schema."""
-
-    id: UUID = Field(..., description="Layer ID")
-    file_type: FeatureLayerExportType | TableLayerExportType = Field(
-        ..., description="File type"
-    )
-    file_name: str = Field(
-        ..., description="File name of the exported file.", max_length=500
-    )
-    crs: str | None = Field(
-        None, description="CRS of the exported file.", max_length=20
-    )
-
-    # Check if crs is valid
-    @field_validator("crs")
-    @classmethod
-    def validate_crs(cls: type["ILayerExport"], value: str | None) -> str | None:
-        # Validate the provided CRS
-        try:
-            CRS(value)
-        except CRSError as e:
-            raise ValidationError(f"Invalid CRS: {e}")
-        return value
-
-    # Check that projection is EPSG:4326 for KML
-    @field_validator("crs")
-    @classmethod
-    def validate_crs_kml(
-        cls: type["ILayerExport"], value: str | None, info: ValidationInfo
-    ) -> str | None:
-        if info.data["file_type"] == FeatureLayerExportType.kml:
-            if value != "EPSG:4326":
-                raise ValidationError("KML export only supports EPSG:4326 projection.")
-        return value
 
 
 class LayerGetBase(BaseModel):
@@ -718,7 +643,7 @@ class LayerGetBase(BaseModel):
             try:
                 wkt.loads(value)
             except Exception as e:
-                raise ValidationError(f"Invalid Geometry: {e}")
+                raise ValueError(f"Invalid Geometry: {e}")
         return value
 
 

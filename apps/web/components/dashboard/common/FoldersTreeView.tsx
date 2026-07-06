@@ -17,7 +17,6 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import { useFolders } from "@/lib/api/folders";
 import { useTeams } from "@/lib/api/teams";
 import { useOrganization } from "@/lib/api/users";
-import { ACCOUNTS_DISABLED } from "@/lib/constants";
 import type { GetDatasetSchema } from "@/lib/validations/layer";
 import type { GetProjectsQueryParams } from "@/lib/validations/project";
 
@@ -60,7 +59,6 @@ export default function FoldersTreeView(props: FoldersTreeViewProps) {
   const { folders } = useFolders({});
 
   const theme = useTheme();
-  const hideTeamsAndOrgs = ACCOUNTS_DISABLED;
 
   const teams = useMemo(
     () => teamsData?.map((team) => ({ id: team.id, avatar: team.avatar, name: team.name })) ?? [],
@@ -156,7 +154,7 @@ export default function FoldersTreeView(props: FoldersTreeViewProps) {
         )}
 
         {/* Teams */}
-        {!hideTeamsAndOrgs && teams.length > 0 && (
+        {teams.length > 0 && (
           <>
             <ListItemButton disableRipple onClick={() => setTeamsOpen((o) => !o)}>
               {teamsOpen ? (
@@ -204,7 +202,7 @@ export default function FoldersTreeView(props: FoldersTreeViewProps) {
         )}
 
         {/* Organizations */}
-        {!hideTeamsAndOrgs && organizations.length > 0 && (
+        {organizations.length > 0 && (
           <>
             <ListItemButton disableRipple onClick={() => setOrgsOpen((o) => !o)}>
               {orgsOpen ? (

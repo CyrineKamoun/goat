@@ -1,21 +1,16 @@
+import { API_BASE_URL } from "@/lib/constants";
+
 import { apiRequestAuth } from "@/lib/api/fetcher";
 import type { LayerSharedWith } from "@/lib/validations/layer";
 import type { ProjectSharedWith } from "@/lib/validations/project";
 
-const ACCOUNTS_BASE = process.env.NEXT_PUBLIC_ACCOUNTS_API_URL;
-export const ACCOUNTS_ENABLED = Boolean(ACCOUNTS_BASE);
-
-export const SHARE_API_BASE_URL = ACCOUNTS_ENABLED ? new URL("api/v1/share", ACCOUNTS_BASE!).href : "";
-
-const ACCOUNTS_DISABLED_ERROR = { error: "ACCOUNTS_DISABLED" } as const;
+export const SHARE_API_BASE_URL = new URL("api/v2/share", API_BASE_URL).href;
 
 const shareItem = async (
   itemType: "project" | "layer",
   itemId: string,
   payload: ProjectSharedWith | LayerSharedWith
 ) => {
-  if (!ACCOUNTS_ENABLED) throw ACCOUNTS_DISABLED_ERROR;
-
   const params = new URLSearchParams();
   payload.organizations?.forEach((o) => params.append("organization_ids", o.id));
   payload.teams?.forEach((t) => params.append("team_ids", t.id));

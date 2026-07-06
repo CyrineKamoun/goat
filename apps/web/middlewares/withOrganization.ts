@@ -2,6 +2,8 @@ import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+import { isAuthDisabled } from "@/lib/utils/auth-flag";
+import { publicEnv } from "@/lib/utils/public-env";
 import type { InvitationPaginated } from "@/lib/validations/invitation";
 
 import { refreshAccessToken } from "@/app/api/auth/[...nextauth]/options";
@@ -12,25 +14,21 @@ const publicPaths = ["/map/public"];
 
 export const withOrganization: MiddlewareFactory = (next) => {
   return async (request: NextRequest, _next) => {
-    // Check if auth/accounts are disabled using server-only env vars (without NEXT_PUBLIC_ prefix)
-    // IMPORTANT: NEXT_PUBLIC_* vars are inlined at build time and won't work for runtime checks
-    // in Edge Runtime middleware. Use AUTH_DISABLED and ACCOUNTS_DISABLED (server-only) for runtime configuration.
-    const authDisabledEnv = process.env.AUTH_DISABLED;
-    const accountsDisabledEnv = process.env.ACCOUNTS_DISABLED;
-    const isAuthDisabled = authDisabledEnv && authDisabledEnv.toLowerCase() === "true";
-    const isAccountsDisabled = accountsDisabledEnv && accountsDisabledEnv.toLowerCase() === "true";
-
+    // AUTH is read at runtime (middleware runs server-side); the client bundle
+    // gets the same flag as NEXT_PUBLIC_AUTH, inlined at build time.
+    // API_URL (runtime, e.g. a cluster-internal URL) overrides the public API
+    // URL inlined at build time.
+    const apiUrl = process.env.API_URL || publicEnv(process.env.NEXT_PUBLIC_API_URL);
     if (
-      isAuthDisabled ||
-      isAccountsDisabled ||
+      isAuthDisabled(process.env.AUTH) ||
       !process.env.NEXTAUTH_URL ||
       !process.env.NEXTAUTH_SECRET ||
-      !process.env.ACCOUNTS_API_URL
+      !apiUrl
     ) {
       return next(request, _next);
     }
 
-    const USERS_API_BASE_URL = new URL("api/v1/users", process.env.ACCOUNTS_API_URL).href;
+    const USERS_API_BASE_URL = new URL("api/v2/users", apiUrl).href;
 
     const { pathname, origin, basePath } = request.nextUrl;
 

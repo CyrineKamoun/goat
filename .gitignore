@@ -78,11 +78,11 @@ storybook-static
 /.idea
 cache
 
-# Submodules
-apps/accounts
-
 # Git worktrees
 .worktrees/
+
+# Playwright MCP browser-session artifacts
+.playwright-mcp/
 
 # Local nigiri builds (SDK is fetched automatically during cmake build)
 packages/cpp/nigiri/

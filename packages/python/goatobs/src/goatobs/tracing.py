@@ -17,7 +17,6 @@ the global OTel TracerProvider:
     unconditionally from a shared package.
 """
 import sys
-from typing import Any
 
 from opentelemetry import trace as otel_trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -41,6 +40,7 @@ try:
 except ImportError:  # pragma: no cover
     SQLAlchemyInstrumentor = None  # type: ignore[assignment,misc]
 
+from opentelemetry.context import Context
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, Span, TracerProvider
 from opentelemetry.sdk.trace.export import (
@@ -49,7 +49,6 @@ from opentelemetry.sdk.trace.export import (
     SimpleSpanProcessor,
     SpanProcessor,
 )
-from opentelemetry.context import Context
 
 from goatobs.context import get_user_context
 

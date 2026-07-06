@@ -5,18 +5,12 @@ from uuid import UUID
 # Third party imports
 from fastapi import HTTPException, status
 from pydantic import BaseModel, TypeAdapter, ValidationError
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.core.layer import CRUDLayerBase
 from core.db.models._link_model import LayerProjectLink
 from core.db.models.layer import Layer
 from core.db.models.project import Project
-from core.schemas.error import LayerNotFoundError, UnsupportedLayerTypeError
-from core.schemas.layer import (
-    FeatureGeometryType,
-    LayerType,
-)
 from core.schemas.project import (
     IFeatureStandardProjectRead,
     IFeatureStreetNetworkProjectRead,
@@ -31,7 +25,7 @@ from core.schemas.project import (
 from .base import CRUDBase
 
 
-class CRUDLayerProject(CRUDLayerBase):
+class CRUDLayerProject(CRUDBase):
     async def layer_projects_to_schemas(
         self,
         async_session: AsyncSession,
@@ -154,55 +148,6 @@ class CRUDLayerProject(CRUDLayerBase):
             ),
         )
         return layer_projects
-
-    async def get_internal(
-        self,
-        async_session: AsyncSession,
-        id: int,
-        project_id: UUID,
-        expected_layer_types: List[Union[LayerType.feature, LayerType.table]] = [
-            LayerType.feature
-        ],
-        expected_geometry_types: List[FeatureGeometryType] | None = None,
-    ) -> BaseModel:
-        """Get internal layer from layer project"""
-
-        # Get layer project
-        query = select(Layer, LayerProjectLink).where(
-            LayerProjectLink.id == id,
-            Layer.id == LayerProjectLink.layer_id,
-            LayerProjectLink.project_id == project_id,
-        )
-        all_layer_projects = await self.layer_projects_to_schemas(
-            async_session,
-            await self.get_multi(
-                db=async_session,
-                query=query,
-            ),
-        )
-
-        # Make sure layer project exists
-        if all_layer_projects == []:
-            raise LayerNotFoundError("Layer projects not found")
-        layer_project = all_layer_projects[0]
-        # Check if one of the expected layer types is given
-        if layer_project.type not in expected_layer_types:
-            raise UnsupportedLayerTypeError(
-                f"Layer {layer_project.name} is not a {[layer_type.value for layer_type in expected_layer_types]} layer"
-            )
-
-        # Check if geometry type is correct
-        if layer_project.type == LayerType.feature.value:
-            if expected_geometry_types is not None:
-                if (
-                    layer_project.feature_layer_geometry_type
-                    not in expected_geometry_types
-                ):
-                    raise UnsupportedLayerTypeError(
-                        f"Layer {layer_project.name} is not a {[geom_type.value for geom_type in expected_geometry_types]} layer"
-                    )
-
-        return layer_project
 
     async def create(
         self,
@@ -366,25 +311,6 @@ class CRUDLayerProject(CRUDLayerBase):
         layer_project = model_type_read(**layer_dict)
         # Note: total_count and filtered_count are fetched on-demand via geoapi
         return layer_project
-
-    async def update_layer_id(
-        self,
-        async_session: AsyncSession,
-        layer_id: UUID,
-        new_layer_id: UUID,
-    ) -> None:
-        """Update layer id in layer project link."""
-
-        # Update all layers from project by id
-        query = (
-            update(LayerProjectLink)
-            .where(LayerProjectLink.layer_id == layer_id)
-            .values(layer_id=new_layer_id)
-        )
-
-        async with async_session.begin():
-            await async_session.execute(query)
-            await async_session.commit()
 
 
 layer_project = CRUDLayerProject(LayerProjectLink)

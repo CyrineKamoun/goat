@@ -1,4 +1,4 @@
-import { getSession } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 
 /**
  * Cached access token to avoid hitting /api/auth/session on every API request.
@@ -49,6 +49,17 @@ const getAccessToken = async (): Promise<string | null> => {
 
   pendingSessionPromise = getSession()
     .then((session) => {
+      if (session?.error === "RefreshAccessTokenError") {
+        // The refresh token is no longer valid (e.g. the Keycloak SSO session
+        // expired). Never replay the stale access token — re-authenticate: a
+        // live SSO session redirects straight back, otherwise the login page.
+        cachedToken = null;
+        cacheExpiry = Date.now() + NULL_CACHE_MS;
+        if (typeof window !== "undefined") {
+          void signIn("keycloak");
+        }
+        return null;
+      }
       cachedToken = session?.access_token ?? null;
       if (cachedToken) {
         const exp = getTokenExpiry(cachedToken);

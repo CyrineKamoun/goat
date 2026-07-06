@@ -4,13 +4,13 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import select
 
-from core.core.layer import CRUDLayerBase
+from core.crud.base import CRUDBase
 from core.db.models._link_model import LayerProjectGroup
 from core.db.session import AsyncSession
 from core.schemas.project import ILayerProjectGroupCreate, ILayerProjectGroupUpdate
 
 
-class CRUDLayerProjectGroup(CRUDLayerBase):
+class CRUDLayerProjectGroup(CRUDBase):
     async def get(
         self, async_session: AsyncSession, id: UUID
     ) -> Optional[LayerProjectGroup]:

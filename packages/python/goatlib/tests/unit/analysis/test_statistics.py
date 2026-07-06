@@ -439,7 +439,7 @@ class TestExtent:
         Uses ST_Extent_Agg which is the correct aggregate function in DuckDB spatial.
         """
         query = f"""
-            SELECT 
+            SELECT
                 ST_XMin(extent) as minx,
                 ST_YMin(extent) as miny,
                 ST_XMax(extent) as maxx,

@@ -213,25 +213,20 @@ Only use this if you're modifying the GOAT source code.
 | `S3_SECRET_ACCESS_KEY` | Secret key for S3 / MinIO |
 | `S3_ENDPOINT_URL` | Internal S3 endpoint (`http://minio:9000`) |
 | `S3_BUCKET_NAME` | Name of the S3 bucket to create/use |
-| `S3_REGION_NAME` | Region (may remain empty for MinIO) |
+| `S3_REGION` | Region (may remain empty for MinIO) |
 | `S3_PUBLIC_ENDPOINT_URL` | Public URL for accessing S3 objects |
 | `KEYCLOAK_ADMIN` | Keycloak admin username |
 | `KEYCLOAK_ADMIN_PASSWORD` | Keycloak admin password |
-| `AUTH` | Backend auth flag (True/False) |
-| `NEXT_PUBLIC_APP_URL` | Public URL of the Web UI |
+| `AUTH` | Auth switch for all services and the web app (True/False) |
 | `NEXT_PUBLIC_API_URL` | Public URL of the Core API |
 | `NEXT_PUBLIC_GEOAPI_URL` | Public URL of the GeoAPI (tiles/features) |
 | `NEXT_PUBLIC_PROCESSES_URL` | Public URL of the Processes API |
-| `NEXT_PUBLIC_ACCOUNTS_API_URL` | Public URL of Accounts API (optional) |
 | `NEXT_PUBLIC_DOCS_URL` | URL for documentation |
 | `NEXT_PUBLIC_MAP_TOKEN` | MapLibre/Mapbox token |
-| `NEXT_PUBLIC_KEYCLOAK_ISSUER` | Keycloak OpenID issuer URL |
-| `NEXT_PUBLIC_KEYCLOAK_CLIENT_ID` | Keycloak client ID |
+| `KEYCLOAK_CLIENT_ID` | Keycloak client (web login, core admin, print worker) |
 | `KEYCLOAK_CLIENT_SECRET` | Keycloak client secret |
 | `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN (optional) |
-| `NEXT_PUBLIC_AUTH_DISABLED` | Enable/disable auth in frontend |
-| `NEXT_PUBLIC_ACCOUNTS_DISABLED` | Enable/disable accounts features |
-| `NEXTAUTH_URL` | URL for Auth.js backend |
+| `NEXTAUTH_URL` | Public URL of the Web UI (also drives `NEXT_PUBLIC_APP_URL`) |
 | `NEXTAUTH_SECRET` | Secret key for Auth.js sessions |
 
 
@@ -241,11 +236,9 @@ GOAT is a commercial open‑source project. The core platform is licensed under 
 [GNU General Public License v3.0 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.en.html),
 which allows anyone to use, modify, and distribute the software under the terms of the GPL.
 
-Some components, such as the Accounts API and features related to user management,
-teams, or organizations, are not open source and are provided under a commercial
-license. These components are not required for running the core platform but are
-available for organizations that need advanced functionality, hosted deployments,
-or enterprise‑level capabilities.
+The full platform — including user management, teams, and organizations — is part
+of the open-source core. Optional commercial services (hosting, support, and
+enterprise capabilities) are available for organizations that need them.
 
 This structure makes GOAT accessible for everyone, while providing extended functionalities through
 optional commercial services.

@@ -4,7 +4,7 @@ import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { useTranslation } from 'react-i18next'
 
-import { useProjectLayers, useProjectScenarios } from "@/lib/api/projects";
+import { useProjectLayers } from "@/lib/api/projects";
 import { statisticOperationEnum } from "@/lib/validations/common";
 import type { LayerFieldType } from "@/lib/validations/layer";
 import {
@@ -359,23 +359,5 @@ export const useStatisticValues = (hasExpression: boolean = false) => {
     setStatisticMethodSelected,
     statisticField,
     setStatisticField,
-  };
-};
-
-export const useScenarioItems = (projectId: string) => {
-  const { scenarios } = useProjectScenarios(projectId as string);
-  const scenarioItems: SelectorItem[] = useMemo(() => {
-    if (!scenarios) return [];
-    return scenarios?.items.map((scenario) => {
-      return {
-        value: scenario.id,
-        label: scenario.name,
-        icon: ICON_NAME.SCENARIO,
-      };
-    });
-  }, [scenarios]);
-
-  return {
-    scenarioItems,
   };
 };

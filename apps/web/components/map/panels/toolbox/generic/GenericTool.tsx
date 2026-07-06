@@ -61,7 +61,6 @@ const SECTION_ICON_MAP: Record<string, ICON_NAME> = {
   "location-marker": ICON_NAME.LOCATION_MARKER,
   aggregate: ICON_NAME.AGGREGATE,
   chart: ICON_NAME.CHART,
-  scenario: ICON_NAME.SCENARIO,
   clock: ICON_NAME.CLOCK,
   save: ICON_NAME.SAVE,
 };
@@ -117,7 +116,7 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
   // User profile for user_id
   const { userProfile } = useUserProfile();
 
-  // Project for active scenario
+  // Project (used for folder_id in the tool payload)
   const { project } = useProject(projectId as string);
 
   // Project layers for geometry type detection
@@ -557,13 +556,6 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
       }
     }
 
-    // Determine scenario_id: use form value if present (from scenario selector widget),
-    // otherwise fall back to active project scenario
-    const scenarioId =
-      visibleValues.scenario_id !== undefined
-        ? visibleValues.scenario_id
-        : project?.active_scenario_id || null;
-
     // Build full payload with hidden fields and filters
     const payload = {
       ...visibleValues,
@@ -571,7 +563,6 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
       user_id: userProfile.id,
       project_id: projectId,
       folder_id: project?.folder_id,
-      scenario_id: scenarioId,
       save_results: true,
     };
 

@@ -1,7 +1,7 @@
 from enum import Enum
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import BigInteger, Column, Field, ForeignKey, String, Text
 
@@ -17,7 +17,7 @@ class AssetType(str, Enum):
 
 class UploadedAsset(DateTimeBase, table=True):
     __tablename__ = "uploaded_asset"
-    __table_args__ = {"schema": settings.CUSTOMER_SCHEMA}
+    __table_args__ = {"schema": settings.SCHEMA}
 
     id: UUID | None = Field(
         default=None,
@@ -31,7 +31,7 @@ class UploadedAsset(DateTimeBase, table=True):
     user_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.ACCOUNTS_SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
             nullable=False,
         ),
         description="ID of the user who uploaded the asset.",
@@ -40,7 +40,7 @@ class UploadedAsset(DateTimeBase, table=True):
         default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.CUSTOMER_SCHEMA}.folder.id", ondelete="SET NULL"),
+            ForeignKey(f"{settings.SCHEMA}.folder.id", ondelete="SET NULL"),
             nullable=True,
         ),
         description="Optional folder this asset belongs to.",
@@ -90,3 +90,6 @@ class UploadedAsset(DateTimeBase, table=True):
         ),
         description="SHA256 hash of the file content for deduplication.",
     )
+
+
+Index("idx_uploaded_asset_folder_id", UploadedAsset.__table__.c.folder_id)

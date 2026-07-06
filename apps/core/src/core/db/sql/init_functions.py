@@ -20,6 +20,10 @@ async def init_functions() -> None:
                 session=session,
                 path="functions",
                 schema="basic",
+                # Honor the configurable data schema: the `.sql` files use
+                # `customer.` as the canonical placeholder, substituted to the
+                # actual schema at install time (no-op when SCHEMA="customer").
+                schema_mapping={"basic": "basic", "customer": settings.SCHEMA},
             )
 
             await manager.update_functions()
