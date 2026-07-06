@@ -2,7 +2,6 @@ import types
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from core.core.config import settings
 from core.deps.auth import _validate_authorization
 

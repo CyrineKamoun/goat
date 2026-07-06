@@ -101,8 +101,9 @@ jobs:
       # converter paths import it (lazily), so this suite runs without it.
       - name: 🐍 Install dependencies
         run: uv sync --frozen --all-packages --no-install-package gdal
+      # --no-sync: a bare `uv run` re-syncs and would pull gdal back in.
       - name: 🧪 pytest
-        run: uv run pytest tests/
+        run: uv run --no-sync pytest tests/
         working-directory: apps/core
 
   goatlib:
@@ -129,15 +130,14 @@ jobs:
       - name: 🐍 Install dependencies
         run: uv sync --frozen --all-packages
       - name: 🧪 pytest (unit)
-        run: uv run pytest tests/unit
+        run: uv run --no-sync pytest tests/unit
         working-directory: packages/python/goatlib
 
   geoapi:
     name: geoapi (pytest)
     if: ${{ inputs.geoapi }}
     runs-on: ubuntu-latest
-    # ADVISORY until the geoapi suite is confirmed green in CI.
-    continue-on-error: true
+    # REQUIRED. Suite is fully mocked (DuckLake/Postgres) — no services needed.
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
@@ -151,15 +151,14 @@ jobs:
       - name: 🐍 Install dependencies
         run: uv sync --frozen --all-packages --no-install-package gdal
       - name: 🧪 pytest
-        run: uv run pytest tests/ || echo "no tests / advisory"
+        run: uv run --no-sync pytest tests/
         working-directory: apps/geoapi
 
   processes:
     name: processes (pytest)
     if: ${{ inputs.processes }}
     runs-on: ubuntu-latest
-    # ADVISORY until the processes suite is confirmed green in CI.
-    continue-on-error: true
+    # REQUIRED. Suite is fully mocked (Windmill/DB) — no services needed.
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
@@ -173,5 +172,5 @@ jobs:
       - name: 🐍 Install dependencies
         run: uv sync --frozen --all-packages --no-install-package gdal
       - name: 🧪 pytest
-        run: uv run pytest tests/ || echo "no tests / advisory"
+        run: uv run --no-sync pytest tests/
         working-directory: apps/processes

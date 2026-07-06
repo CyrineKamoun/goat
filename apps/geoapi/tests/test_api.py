@@ -344,9 +344,12 @@ class TestTileEndpoints:
         mock_layer_service.get_layer_metadata = AsyncMock(
             return_value=sample_layer_metadata
         )
-        mock_tile_service.get_tile = MagicMock(
-            return_value=b"\x1a\x00"
-        )  # Minimal MVT bytes
+        mock_tile_service.can_serve_from_pmtiles_by_layer_id = MagicMock(
+            return_value=True
+        )
+        mock_tile_service.get_tile_from_pmtiles_by_layer_id = AsyncMock(
+            return_value=(b"\x1a\x00", False, "pmtiles")  # Minimal MVT bytes
+        )
 
         response = test_client.get(
             "/collections/abc123de-f456-7890-1234-5678901234ab/tiles/WebMercatorQuad/10/512/256"
@@ -363,7 +366,12 @@ class TestTileEndpoints:
         mock_layer_service.get_layer_metadata = AsyncMock(
             return_value=sample_layer_metadata
         )
-        mock_tile_service.get_tile = MagicMock(return_value=None)
+        mock_tile_service.can_serve_from_pmtiles_by_layer_id = MagicMock(
+            return_value=True
+        )
+        mock_tile_service.get_tile_from_pmtiles_by_layer_id = AsyncMock(
+            return_value=(b"", False, "pmtiles")
+        )
 
         response = test_client.get(
             "/collections/abc123de-f456-7890-1234-5678901234ab/tiles/WebMercatorQuad/10/512/256"

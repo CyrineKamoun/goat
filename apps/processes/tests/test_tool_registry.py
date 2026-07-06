@@ -158,4 +158,5 @@ class TestToolInfo:
         assert hasattr(tool_info, "display_name")
         assert hasattr(tool_info, "description")
         assert hasattr(tool_info, "params_class")
-        assert hasattr(tool_info, "tool_class")
+        assert hasattr(tool_info, "windmill_path")
+        assert hasattr(tool_info, "module_path")

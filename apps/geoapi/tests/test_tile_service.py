@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from geoapi.config import settings
 from geoapi.services.tile_service import (
     TileService,
     tile_to_bbox_3857,
@@ -67,8 +68,7 @@ def test_tile_to_bbox_3857_higher_zoom() -> None:
 def test_tile_service_init() -> None:
     """Test TileService initialization."""
     service = TileService()
-    assert hasattr(service, "_pmtiles_exists_cache")
-    assert isinstance(service._pmtiles_exists_cache, dict)
+    assert service.max_features == settings.MAX_FEATURES_PER_TILE
 
 
 def test_should_use_pmtiles_with_filter() -> None:

@@ -75,9 +75,10 @@ jobs:
       # REQUIRED: ruff lint on the packages that are clean. Keeps them clean and
       # blocks regressions. (Not goatlib — it still carries ruff debt — and not
       # `ruff format --check`, which is currently dirty repo-wide.)
+      # --no-sync: a bare `uv run` re-syncs and would pull gdal back in.
       - name: 🔬 ruff check (clean packages, required)
         run: >-
-          uv run ruff check
+          uv run --no-sync ruff check
           apps/core apps/geoapi apps/processes packages/python/goatobs
         working-directory: ${{ github.workspace }}
 
@@ -86,5 +87,5 @@ jobs:
       # block. Remove `continue-on-error` once the debt is cleared.
       - name: 🔬 Full lint (mypy + ruff + format, advisory)
         continue-on-error: true
-        run: uv run bash scripts/lint-python.sh
+        run: uv run --no-sync bash scripts/lint-python.sh
         working-directory: ${{ github.workspace }}

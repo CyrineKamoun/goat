@@ -15,7 +15,7 @@ Intelligent software for modern web mapping and integrated planning
 </p>
 
 <p align="center">
-   <a href="https://github.com/plan4better/goat/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-AGPL-purple" alt="License"></a>
+   <a href="https://github.com/plan4better/goat/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-purple" alt="License"></a>
    <a href="https://github.com/plan4better/goat/pulse"><img src="https://img.shields.io/github/commit-activity/m/plan4better/goat" alt="Commits-per-month"></a>
     <a href="https://github.com/plan4better/goat/issues?q=is:issue+is:open+label:%22%F0%9F%99%8B%F0%9F%8F%BB%E2%80%8D%E2%99%82%EF%B8%8Fhelp+wanted%22"><img src="https://img.shields.io/badge/Help%20Wanted-Contribute-blue"></a>
 </p>
@@ -96,7 +96,7 @@ GOAT is also available as a fully hosted cloud service.  If you prefer not to ma
 
 ### 🐳 Self-hosting (Docker)
 
-**Official support:** We provide a maintained `docker-compose.yml` for running the full GOAT stack in a production‑like environment.
+**Official support:** We provide a maintained `compose.yaml` for running the full GOAT stack in a production‑like environment.
 
 **Important:** While we provide Docker resources, **self‑hosted deployments are community‑supported**. We do not offer official support for managing your infrastructure.
 
@@ -208,6 +208,7 @@ Only use this if you're modifying the GOAT source code.
 | `POSTGRES_USER` | Username for PostgreSQL authentication |
 | `POSTGRES_PASSWORD` | Password for PostgreSQL authentication |
 | `POSTGRES_SERVER` | Hostname of the Postgres service (usually `db`) |
+| `POSTGRES_DB` | Name of the PostgreSQL database |
 | `S3_PROVIDER` | Storage provider (e.g., `minio`) |
 | `S3_ACCESS_KEY_ID` | Access key for S3 / MinIO |
 | `S3_SECRET_ACCESS_KEY` | Secret key for S3 / MinIO |
@@ -215,19 +216,24 @@ Only use this if you're modifying the GOAT source code.
 | `S3_BUCKET_NAME` | Name of the S3 bucket to create/use |
 | `S3_REGION` | Region (may remain empty for MinIO) |
 | `S3_PUBLIC_ENDPOINT_URL` | Public URL for accessing S3 objects |
-| `KEYCLOAK_ADMIN` | Keycloak admin username |
-| `KEYCLOAK_ADMIN_PASSWORD` | Keycloak admin password |
-| `AUTH` | Auth switch for all services and the web app (True/False) |
+| `AUTH` | Auth switch for all services and the web app (True/False). With `False`, the Keycloak variables are not needed and a default user/organization is seeded |
 | `NEXT_PUBLIC_API_URL` | Public URL of the Core API |
 | `NEXT_PUBLIC_GEOAPI_URL` | Public URL of the GeoAPI (tiles/features) |
 | `NEXT_PUBLIC_PROCESSES_URL` | Public URL of the Processes API |
 | `NEXT_PUBLIC_DOCS_URL` | URL for documentation |
 | `NEXT_PUBLIC_MAP_TOKEN` | MapLibre/Mapbox token |
+| `KEYCLOAK_SERVER_URL` | Base URL of the Keycloak server (derives the issuer together with `REALM_NAME`) |
+| `REALM_NAME` | Keycloak realm |
 | `KEYCLOAK_CLIENT_ID` | Keycloak client (web login, core admin, print worker) |
 | `KEYCLOAK_CLIENT_SECRET` | Keycloak client secret |
+| `WINDMILL_TOKEN` | Token for the Windmill workflow engine (analytics tools) |
 | `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN (optional) |
 | `NEXTAUTH_URL` | Public URL of the Web UI (also drives `NEXT_PUBLIC_APP_URL`) |
 | `NEXTAUTH_SECRET` | Secret key for Auth.js sessions |
+
+See [`.env.example`](/.env.example) for the full list, including optional
+settings such as the `AUTH=False` default identity (`DEFAULT_USER_*`,
+`DEFAULT_ORGANIZATION_NAME`, `DEFAULT_QUOTA_*`), SMTP, and Stripe.
 
 
 ## 👩‍⚖️ License
@@ -253,7 +259,7 @@ optional commercial services.
 | Modify and redistribute           | ✅    | ❌ (closed parts excluded) |
 | Official support                  | ❌    | ✅         |
 | Derivative work kept private      | ❌    | ✅ (for commercial components only) |
-| Teams / Organizations API         | ❌    | ✅         |
+| Teams / Organizations API         | ✅    | ✅         |
 | Authentication integrations       | ❌    | ✅         |
 | Hosted SaaS version               | ❌    | ✅         |
 

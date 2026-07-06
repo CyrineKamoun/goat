@@ -9,20 +9,35 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def mock_ducklake_manager():
-    """Mock DuckLake manager for tests."""
-    with patch("geoapi.ducklake.ducklake_manager") as mock:
+    """Mock the DuckLake connections the app lifespan initializes.
+
+    Patches the names bound in `geoapi.main` (the lifespan calls those
+    references, not the defining modules' attributes).
+    """
+    with (
+        patch("geoapi.main.ducklake_pool") as mock_pool,
+        patch("geoapi.main.ducklake_manager") as mock,
+        patch("geoapi.main.ducklake_write_manager"),
+    ):
         mock_conn = MagicMock()
         mock.connection.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock.connection.return_value.__exit__ = MagicMock(return_value=None)
+        mock_pool.connection.return_value.__enter__ = MagicMock(return_value=mock_conn)
+        mock_pool.connection.return_value.__exit__ = MagicMock(return_value=None)
         yield mock
 
 
 @pytest.fixture
 def mock_layer_service():
-    """Mock layer service for tests."""
-    with patch("geoapi.services.layer_service.layer_service") as mock:
-        mock.init = AsyncMock()
-        mock.close = AsyncMock()
+    """Mock layer service for tests (both the defining module and the
+    reference the lifespan in `geoapi.main` holds)."""
+    with (
+        patch("geoapi.services.layer_service.layer_service") as mock,
+        patch("geoapi.main.layer_service") as mock_main,
+    ):
+        for m in (mock, mock_main):
+            m.init = AsyncMock()
+            m.close = AsyncMock()
         yield mock
 
 
