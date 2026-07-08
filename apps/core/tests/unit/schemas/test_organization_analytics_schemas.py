@@ -48,6 +48,34 @@ def test_create_rejects_http_url() -> None:
         OrganizationAnalyticsCreate.model_validate(payload)
 
 
+def test_create_accepts_subdirectory_url() -> None:
+    """Self-hosted Matomo often lives under a path, e.g. host.de/matomo/."""
+    payload = _valid_payload()
+    payload["config"]["url"] = "https://analytics.example.org/matomo/"
+    parsed = OrganizationAnalyticsCreate.model_validate(payload)
+    assert str(parsed.config.url) == "https://analytics.example.org/matomo/"
+
+
+def test_create_normalizes_missing_trailing_slash() -> None:
+    """The tracker appends matomo.php/matomo.js to the base, so the stored
+    URL must end with a slash."""
+    payload = _valid_payload()
+    payload["config"]["url"] = "https://analytics.example.org/matomo"
+    parsed = OrganizationAnalyticsCreate.model_validate(payload)
+    assert str(parsed.config.url) == "https://analytics.example.org/matomo/"
+
+
+def test_create_still_rejects_query_and_fragment() -> None:
+    for bad in (
+        "https://analytics.example.org/matomo/?x=1",
+        "https://analytics.example.org/matomo/#frag",
+    ):
+        payload = _valid_payload()
+        payload["config"]["url"] = bad
+        with pytest.raises(ValidationError):
+            OrganizationAnalyticsCreate.model_validate(payload)
+
+
 def test_read_defaults_usage_count_to_zero() -> None:
     read = OrganizationAnalyticsRead.model_validate(
         {

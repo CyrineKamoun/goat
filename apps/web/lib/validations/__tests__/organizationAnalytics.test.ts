@@ -33,6 +33,28 @@ describe("organizationAnalyticsCreateSchema", () => {
     ).toThrow();
   });
 
+  it("accepts a subdirectory url and normalizes the trailing slash", () => {
+    const parsed = organizationAnalyticsCreateSchema.parse({
+      ...validCreate,
+      config: { ...validCreate.config, url: "https://analytics.example.org/matomo" },
+    });
+    expect(parsed.config.url).toBe("https://analytics.example.org/matomo/");
+  });
+
+  it("still rejects urls with query or fragment", () => {
+    for (const bad of [
+      "https://analytics.example.org/matomo/?x=1",
+      "https://analytics.example.org/matomo/#frag",
+    ]) {
+      expect(() =>
+        organizationAnalyticsCreateSchema.parse({
+          ...validCreate,
+          config: { ...validCreate.config, url: bad },
+        })
+      ).toThrow();
+    }
+  });
+
   it("rejects http urls", () => {
     expect(() =>
       organizationAnalyticsCreateSchema.parse({

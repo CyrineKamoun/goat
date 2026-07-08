@@ -39,13 +39,15 @@ class MatomoConfig(BaseModel):
         # would either fail (mixed content) or downgrade privacy.
         if v.scheme != "https":
             raise ValueError("Matomo URL must use https://")
-        # No query / fragment. Path other than "/" is suspicious — the JS
-        # snippet appends "matomo.php" / "matomo.js" to the base.
+        # No query / fragment — the JS snippet appends "matomo.php" /
+        # "matomo.js" to the base. A path is fine (self-hosted Matomo often
+        # lives under one, e.g. https://host.de/matomo/); normalize it to a
+        # trailing slash so the append yields ".../matomo/matomo.js".
         if v.query or v.fragment:
             raise ValueError("Matomo URL must not contain a query or fragment")
         path = v.path or "/"
-        if path not in ("", "/"):
-            raise ValueError("Matomo URL must point at the instance root")
+        if not path.endswith("/"):
+            return AnyHttpUrl(f"{v}/")
         return v
 
 

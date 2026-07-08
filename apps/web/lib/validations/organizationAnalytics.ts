@@ -14,11 +14,15 @@ export const matomoConfigSchema = z.object({
     .refine((v) => {
       try {
         const u = new URL(v);
-        return (u.pathname === "" || u.pathname === "/") && !u.search && !u.hash;
+        return !u.search && !u.hash;
       } catch {
         return false;
       }
-    }, "Must point at the Matomo root (no path, query, or fragment)"),
+    }, "Must not contain a query or fragment")
+    // A path is fine (self-hosted Matomo often lives under one, e.g.
+    // https://host.de/matomo/); the tracker appends matomo.php/matomo.js,
+    // so normalize to a trailing slash.
+    .transform((v) => (v.endsWith("/") ? v : `${v}/`)),
   site_id: z
     .string()
     .min(1)
