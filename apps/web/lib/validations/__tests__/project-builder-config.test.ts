@@ -147,3 +147,28 @@ describe("builderConfigSchema — control_positions", () => {
     expect(result.data.settings.toolbar).toBe(false);
   });
 });
+
+describe("builderConfigSchema — map_view", () => {
+  it("defaults map_view zoom limits to null when absent", () => {
+    const result = builderConfigSchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.settings.map_view).toEqual({ min_zoom: null, max_zoom: null });
+  });
+
+  it("preserves provided min_zoom and max_zoom", () => {
+    const result = builderConfigSchema.safeParse({
+      settings: { map_view: { min_zoom: 5, max_zoom: 15 } },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.settings.map_view).toEqual({ min_zoom: 5, max_zoom: 15 });
+  });
+
+  it("rejects zoom values outside 0..24", () => {
+    const result = builderConfigSchema.safeParse({
+      settings: { map_view: { min_zoom: -1, max_zoom: 30 } },
+    });
+    expect(result.success).toBe(false);
+  });
+});

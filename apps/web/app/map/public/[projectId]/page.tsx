@@ -84,6 +84,10 @@ export default function MapPage({ params: { projectId } }) {
     }
   }, [_project]);
 
+  const mapView = project?.builder_config?.settings?.map_view;
+  const minZoom = mapView?.min_zoom ?? undefined;
+  const maxZoom = mapView?.max_zoom ?? undefined;
+
   useEffect(() => {
     if (projectLayers && project) {
       dispatch(setProjectLayers(projectLayers as ProjectLayer[]));
@@ -174,6 +178,8 @@ export default function MapPage({ params: { projectId } }) {
                   mapRef={mapRef}
                   touchZoomRotate
                   maxExtent={project?.max_extent || undefined}
+                  minZoom={minZoom}
+                  maxZoom={maxZoom}
                   initialViewState={{
                     zoom: urlLoc?.zoom ?? initialView?.zoom ?? 3,
                     latitude: urlLoc?.latitude ?? initialView?.latitude ?? 48.13,

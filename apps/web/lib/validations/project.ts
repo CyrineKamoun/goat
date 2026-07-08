@@ -159,6 +159,14 @@ export const builderConfigSchema = z.object({
       // (see lib/metadata.ts and app/map/public/[projectId]/layout.tsx).
       og_image_url: z.string().optional(),
       meta_description: z.string().max(300).optional(),
+      // Dashboard-owned map camera settings. Namespaced for future growth
+      // (initial_state, sync_with_project, …); only zoom limits for now.
+      map_view: z
+        .object({
+          min_zoom: z.number().min(0).max(24).nullable().default(null),
+          max_zoom: z.number().min(0).max(24).nullable().default(null),
+        })
+        .default({}),
     })
     .default({}),
   interface: z.preprocess(

@@ -63,6 +63,8 @@ interface MapProps {
     };
   };
   maxExtent?: [number, number, number, number];
+  minZoom?: number;
+  maxZoom?: number;
   mapStyle: string | maplibregl.StyleSpecification;
   layers: ProjectLayer[] | Layer[];
   onMove?: ((e: ViewStateChangeEvent) => void | undefined) | undefined;
@@ -89,6 +91,8 @@ const MapViewer: React.FC<MapProps> = ({
   dragRotate = false,
   touchZoomRotate = false,
   maxExtent,
+  minZoom,
+  maxZoom,
   children,
   containerSx,
   isEditor,
@@ -903,6 +907,8 @@ const MapViewer: React.FC<MapProps> = ({
           onMouseMove={handleMapOverImmediate}
           onMove={_onMove}
           maxBounds={maxExtent}
+          minZoom={minZoom}
+          maxZoom={maxZoom}
           onLoad={handleMapLoad}>
           <DrawControl
             position="top-right"

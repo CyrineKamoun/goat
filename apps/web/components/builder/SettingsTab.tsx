@@ -1,6 +1,7 @@
-import { Box, Button, FormControl, Link, MenuItem, Select, Stack, Switch, TextField, Typography } from "@mui/material";
-import { useMemo, useState } from "react";
+import { Box, Button, FormControl, Link, MenuItem, Select, Stack, Switch, TextField, Typography, useTheme } from "@mui/material";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useMap } from "react-map-gl/maplibre";
 
 import { BASEMAPS } from "@/lib/constants/basemaps";
 
@@ -18,6 +19,7 @@ import SocialPreviewImagePicker from "@/components/builder/SocialPreviewImagePic
 import SettingsGroupHeader from "@/components/builder/widgets/common/SettingsGroupHeader";
 import ConfirmModal from "@/components/modals/Confirm";
 import Selector from "@/components/map/panels/common/Selector";
+import SliderInput from "@/components/map/panels/common/SliderInput";
 import MarkerIconPicker from "@/components/map/panels/style/marker/MarkerIconPicker";
 
 /** Google Fonts available for dashboard display */
@@ -66,6 +68,28 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
 
   const [showInteractionsModal, setShowInteractionsModal] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const theme = useTheme();
+  const { map } = useMap();
+
+  const currentMapView = settings?.map_view as { min_zoom?: number | null; max_zoom?: number | null } | undefined;
+  const [zoomLevels, setZoomLevels] = useState<number[]>([
+    currentMapView?.min_zoom ?? 0,
+    currentMapView?.max_zoom ?? 22,
+  ]);
+
+  // Live map zoom, mirrored onto the slider as a marker (same as the style panel)
+  const [currentZoom, setCurrentZoom] = useState<number>(map?.getZoom() ?? 0);
+  useEffect(() => {
+    if (!map) return;
+    const updateZoom = () => setCurrentZoom(map.getZoom());
+    map.on("move", updateZoom);
+    updateZoom();
+    return () => {
+      map.off("move", updateZoom);
+    };
+  }, [map]);
+  const currentZoomPercent = Math.min(Math.max((currentZoom / 22) * 100, 0), 100);
 
   const builderConfig = useMemo(() => {
     const parsed = builderConfigSchema.safeParse(project?.builder_config);
@@ -165,6 +189,63 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
                 </Box>
               );
             })()}
+
+            {/* Zoom limits — dashboard-only min/max zoom */}
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                {t("zoom_limits")}
+              </Typography>
+              <Typography variant="caption" color="text.disabled" sx={{ mb: 1, display: "block" }}>
+                {t("zoom_limits_help")}
+              </Typography>
+              <Box sx={{ position: "relative", width: "100%", px: 4, mt: 3 }}>
+                {/* Current map zoom marker above the slider */}
+                <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, padding: "0 16px" }}>
+                  <Box sx={{ position: "relative", width: "100%" }}>
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: "-12px",
+                        left: `${currentZoomPercent}%`,
+                        transform: "translateX(-50%)",
+                        pointerEvents: "none",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                      }}>
+                      <Typography variant="caption" fontWeight="bold" sx={{ fontSize: 12, lineHeight: 1, mb: "2px" }}>
+                        {currentZoom.toFixed(1)}
+                      </Typography>
+                      <Box
+                        sx={{
+                          width: 0,
+                          height: 0,
+                          borderLeft: "6px solid transparent",
+                          borderRight: "6px solid transparent",
+                          borderTop: `6px solid ${theme.palette.primary.main}`,
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                </Box>
+                <SliderInput
+                  value={zoomLevels}
+                  isRange
+                  min={0}
+                  max={22}
+                  step={1}
+                  onChange={(value) => setZoomLevels(value as number[])}
+                  onChangeCommitted={(value) => {
+                    const [min, max] = value as number[];
+                    onChange("map_view", {
+                      ...(settings?.map_view as Record<string, unknown>),
+                      min_zoom: min,
+                      max_zoom: max,
+                    });
+                  }}
+                />
+              </Box>
+            </Box>
           </Stack>
         </Box>
         <Box sx={{ mb: 6 }}>
@@ -212,22 +293,30 @@ const SettingsTab: React.FC<SettingsTabProps> = ({
                   </FormControl>
                   {isCustom && (
                     <>
-                      <TextField
-                        size="small"
-                        fullWidth
-                        label={t("font_url")}
-                        placeholder="https://example.com/font.woff2"
-                        value={fontUrl ?? ""}
-                        onChange={(e) => onChange("font_url", e.target.value)}
-                      />
-                      <TextField
-                        size="small"
-                        fullWidth
-                        label={t("font_family")}
-                        placeholder="BaWue Sans, sans-serif"
-                        value={(settings?.font_family as string) ?? ""}
-                        onChange={(e) => onChange("font_family", e.target.value)}
-                      />
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                          {t("font_url")}
+                        </Typography>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          placeholder="https://example.com/font.woff2"
+                          value={fontUrl ?? ""}
+                          onChange={(e) => onChange("font_url", e.target.value)}
+                        />
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
+                          {t("font_family")}
+                        </Typography>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          placeholder="BaWue Sans, sans-serif"
+                          value={(settings?.font_family as string) ?? ""}
+                          onChange={(e) => onChange("font_family", e.target.value)}
+                        />
+                      </Box>
                     </>
                   )}
                 </>
