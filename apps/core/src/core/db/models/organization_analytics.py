@@ -1,8 +1,10 @@
-"""Analytics configuration for an organization (white-label feature).
+"""Analytics configurations for an organization (white-label feature).
 
-One row per organization. ``provider`` selects which integration; ``config``
-holds provider-specific settings as JSONB so adding new providers later is
-additive (new Pydantic validator + new tracker component, no migration).
+An organization can hold any number of instances (e.g. its own Matomo plus
+one per client); dashboards reference one via ``project_public.analytics_id``.
+``provider`` selects which integration; ``config`` holds provider-specific
+settings as JSONB so adding new providers later is additive (new Pydantic
+validator + new tracker component, no migration).
 """
 
 from enum import Enum
@@ -30,7 +32,7 @@ class AnalyticsProvider(str, Enum):
 
 
 class OrganizationAnalytics(DateTimeBase, table=True):
-    """One analytics configuration per organization."""
+    """An analytics instance owned by an organization."""
 
     __tablename__ = "organization_analytics"
     __table_args__ = {"schema": settings.SCHEMA}
@@ -47,14 +49,16 @@ class OrganizationAnalytics(DateTimeBase, table=True):
     organization_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(
-                f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"
-            ),
-            unique=True,
+            ForeignKey(f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"),
             index=True,
             nullable=False,
         ),
-        description="Owning organization ID (one config per org).",
+        description="Owning organization ID.",
+    )
+    name: str = Field(
+        sa_column=Column(Text, nullable=False),
+        max_length=120,
+        description="User-given label to tell instances apart (e.g. 'Client XY Matomo').",
     )
     provider: AnalyticsProvider = Field(
         sa_column=Column(Text, nullable=False),

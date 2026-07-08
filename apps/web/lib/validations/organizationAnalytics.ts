@@ -29,8 +29,9 @@ export const matomoConfigSchema = z.object({
 export type AnalyticsProvider = z.infer<typeof analyticsProviderSchema>;
 export type MatomoConfig = z.infer<typeof matomoConfigSchema>;
 
-/** Request body for PUT /organizations/{org_id}/analytics. */
+/** Request body for POST/PUT /organizations/{org_id}/analytics. */
 export const organizationAnalyticsCreateSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120),
   provider: analyticsProviderSchema,
   config: matomoConfigSchema,
 });
@@ -39,12 +40,14 @@ export type OrganizationAnalyticsCreate = z.infer<
   typeof organizationAnalyticsCreateSchema
 >;
 
-/** Response body for GET /organizations/{org_id}/analytics. */
+/** One item of GET /organizations/{org_id}/analytics. */
 export const organizationAnalyticsSchema = z.object({
   id: z.string().uuid(),
   organization_id: z.string().uuid(),
+  name: z.string(),
   provider: analyticsProviderSchema,
   config: matomoConfigSchema.partial({ provider: true }),
+  usage_count: z.number().int().nonnegative().default(0),
   created_at: z.string(),
   updated_at: z.string(),
 });

@@ -247,7 +247,6 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
         # the analytics model (which imports the organization model), and
         # the project model.
         from core.db.models.organization_analytics import OrganizationAnalytics
-        from core.db.models.user import User
         from core.schemas.project import PublicAnalytics
 
         result = await async_session.execute(
@@ -257,19 +256,22 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
         if not project_public:
             return None
 
-        # Resolve analytics only when the project owner has opted this
-        # project in AND the owning org has a configuration. A single
-        # JOIN keeps the request a single SQL hop.
+        # Resolve the assigned analytics instance (if any) via the direct
+        # FK; a dangling reference (instance deleted mid-request) simply
+        # yields no analytics block.
         analytics: PublicAnalytics | None = None
-        if project_public.tracking_enabled:
+        if project_public.analytics_id is not None:
             analytics_row = (
-                await async_session.execute(
-                    select(OrganizationAnalytics)
-                    .join(User, User.organization_id == OrganizationAnalytics.organization_id)
-                    .join(Project, Project.user_id == User.id)
-                    .where(Project.id == project_id)
+                (
+                    await async_session.execute(
+                        select(OrganizationAnalytics).where(
+                            OrganizationAnalytics.id == project_public.analytics_id
+                        )
+                    )
                 )
-            ).scalars().first()
+                .scalars()
+                .first()
+            )
             if analytics_row is not None:
                 analytics = PublicAnalytics(
                     provider=analytics_row.provider,
@@ -358,7 +360,7 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
         new_config = json.loads(new_project_public_config.model_dump_json())
 
         # Update in place when a public row already exists so we preserve
-        # custom_domain_id, password, subdomain, tracking_enabled across
+        # custom_domain_id, password, subdomain, analytics_id across
         # re-publish. The previous delete+recreate flow silently dropped
         # the custom-domain assignment every time the user clicked "Update".
         if project_public:

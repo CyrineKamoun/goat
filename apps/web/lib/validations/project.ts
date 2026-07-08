@@ -291,7 +291,7 @@ export const projectPublicSchema = z.object({
   project_id: z.string(),
   config: projectPublicSchemaConfig,
   custom_domain_id: z.string().uuid().nullable().optional(),
-  tracking_enabled: z.boolean().optional(),
+  analytics_id: z.string().uuid().nullable().optional(),
   tracking_require_consent: z.boolean().optional(),
   analytics: projectPublicAnalyticsSchema.nullable().optional(),
 });

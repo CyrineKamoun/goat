@@ -4,12 +4,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import UUID4, BaseModel
 from sqlalchemy import select
 
+from core.crud.crud_organization_analytics import (
+    organization_analytics as crud_organization_analytics,
+)
 from core.crud.crud_organization_domain import (
     organization_domain as crud_organization_domain,
 )
 from core.crud.crud_project import project as crud_project
 from core.db.models.organization_domain import CertStatus
-from core.db.models.project import ProjectPublic
+from core.db.models.project import Project, ProjectPublic
+from core.db.models.user import User
 from core.db.session import AsyncSession
 from core.deps.auth import auth_z
 from core.endpoints.deps import get_db, get_user_id
@@ -154,15 +158,17 @@ async def unassign_custom_domain(
     await async_session.commit()
 
 
-class TrackingTogglePayload(BaseModel):
+class TrackingSettingsPayload(BaseModel):
     """Body of PUT /project/{project_id}/public/tracking.
 
-    Both fields are optional and updated independently — clients can send
-    either or both. Lets the Share dialog flip each Switch with a single
-    PUT to the same endpoint.
+    Fields are updated independently — clients can send either or both.
+    ``analytics_id`` selects which of the org's analytics instances this
+    dashboard reports to; explicit null switches tracking off.
+    ``require_consent`` controls whether the tracker waits for the
+    visitor's consent banner.
     """
 
-    enabled: bool | None = None
+    analytics_id: UUID4 | None = None
     require_consent: bool | None = None
 
 
@@ -173,21 +179,20 @@ class TrackingTogglePayload(BaseModel):
 )
 async def set_tracking_settings(
     project_id: str,
-    payload: TrackingTogglePayload,
+    payload: TrackingSettingsPayload,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
 ) -> ProjectPublicRead:
-    """Per-project opt-in toggles for analytics behaviour.
+    """Assign an analytics instance to a published project (or clear it).
 
-    ``enabled`` controls whether the tracker fires at all; ``require_consent``
-    controls whether the tracker waits for the visitor's consent banner.
-    Both flags are independent project preferences; what's actually injected
-    at view time also depends on the org having an analytics configuration.
+    The instance must belong to the project owner's organization. Presence
+    of ``analytics_id`` in the body is detected via ``model_fields_set`` so
+    an explicit null (= tracking off) is distinguishable from omission.
     """
-    if payload.enabled is None and payload.require_consent is None:
+    if not payload.model_fields_set:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="at least one of 'enabled' or 'require_consent' is required",
+            detail="at least one of 'analytics_id' or 'require_consent' is required",
         )
 
     result = await async_session.execute(
@@ -200,10 +205,38 @@ async def set_tracking_settings(
             detail="project is not published",
         )
 
-    if payload.enabled is not None:
-        project_public.tracking_enabled = payload.enabled
+    if "analytics_id" in payload.model_fields_set:
+        if payload.analytics_id is None:
+            project_public.analytics_id = None
+        else:
+            analytics_row = await crud_organization_analytics.get(
+                async_session, id=payload.analytics_id
+            )
+            if analytics_row is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="analytics instance not found",
+                )
+            owner_org_id = (
+                await async_session.execute(
+                    select(User.organization_id)
+                    .join(Project, Project.user_id == User.id)
+                    .where(Project.id == UUID(project_id))
+                )
+            ).scalar_one_or_none()
+            if owner_org_id is None or analytics_row.organization_id != owner_org_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "analytics instance does not belong to the project "
+                        "owner's organization"
+                    ),
+                )
+            project_public.analytics_id = payload.analytics_id
+
     if payload.require_consent is not None:
         project_public.tracking_require_consent = payload.require_consent
+
     await async_session.commit()
     await async_session.refresh(project_public)
     return ProjectPublicRead.model_validate(project_public)

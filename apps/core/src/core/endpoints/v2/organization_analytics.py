@@ -1,11 +1,10 @@
-"""User-facing endpoints for the organization-level analytics configuration.
+"""User-facing endpoints for the organization's analytics instances.
 
-One row per organization; PUT is idempotent upsert. Authz is delegated to
-``auth_z`` (same gate as the other organization endpoints — UI gates by
-org-admin role).
+An organization can register any number of instances (e.g. its own Matomo
+plus one per client); dashboards pick one in the Share dialog. Authz is
+delegated to ``auth_z`` (same gate as the other organization endpoints —
+UI gates by org-admin role).
 """
-
-from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
 from pydantic import UUID4
@@ -26,47 +25,47 @@ router = APIRouter()
 
 @router.get(
     "/",
-    summary="Get the organization's analytics configuration",
-    response_model=Optional[OrganizationAnalyticsRead],
+    summary="List the organization's analytics instances",
+    response_model=list[OrganizationAnalyticsRead],
     dependencies=[Depends(auth_z)],
 )
-async def get_analytics(
+async def list_analytics(
     *,
     organization_id: UUID4 = Path(...),
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-) -> Optional[OrganizationAnalyticsRead]:
-    """Returns null when no analytics has been configured yet.
-
-    Returning 200+null rather than 404 keeps "feature not enabled yet" out
-    of error reporters and the browser's network panel — the org itself
-    exists, the config singleton just hasn't been set.
-    """
-    row = await crud.get_by_organization(
+) -> list[OrganizationAnalyticsRead]:
+    """Each instance carries ``usage_count`` — how many published dashboards
+    currently report to it — so the UI can hint at reuse before assigning."""
+    rows = await crud.list_by_organization(
         async_session, organization_id=organization_id
     )
-    if row is None:
-        return None
-    return OrganizationAnalyticsRead.model_validate(row)
+    return [
+        OrganizationAnalyticsRead.model_validate(row).model_copy(
+            update={"usage_count": count}
+        )
+        for row, count in rows
+    ]
 
 
-@router.put(
+@router.post(
     "/",
-    summary="Create or update the organization's analytics configuration",
+    summary="Create an analytics instance",
     response_model=OrganizationAnalyticsRead,
+    status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(auth_z)],
 )
-async def upsert_analytics(
+async def create_analytics(
     *,
     organization_id: UUID4 = Path(...),
     payload: OrganizationAnalyticsCreate = Body(...),
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
 ) -> OrganizationAnalyticsRead:
-    """Idempotent: overwrites whatever is currently stored for this org."""
-    row = await crud.upsert(
+    row = await crud.create_instance(
         async_session,
         organization_id=organization_id,
+        name=payload.name,
         provider=payload.provider.value,
         # The discriminated union validates fields; persist the plain dict
         # form (HttpUrl serializes to string via mode="json").
@@ -75,29 +74,59 @@ async def upsert_analytics(
     return OrganizationAnalyticsRead.model_validate(row)
 
 
+@router.put(
+    "/{analytics_id}",
+    summary="Update an analytics instance",
+    response_model=OrganizationAnalyticsRead,
+    dependencies=[Depends(auth_z)],
+)
+async def update_analytics(
+    *,
+    organization_id: UUID4 = Path(...),
+    analytics_id: UUID4 = Path(...),
+    payload: OrganizationAnalyticsCreate = Body(...),
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+) -> OrganizationAnalyticsRead:
+    """Full replace of the instance's name, provider, and config."""
+    row = await crud.update_instance(
+        async_session,
+        organization_id=organization_id,
+        analytics_id=analytics_id,
+        name=payload.name,
+        provider=payload.provider.value,
+        config=payload.config.model_dump(mode="json", exclude={"provider"}),
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="analytics instance not found",
+        )
+    return OrganizationAnalyticsRead.model_validate(row)
+
+
 @router.delete(
-    "/",
-    summary="Remove the organization's analytics configuration",
+    "/{analytics_id}",
+    summary="Delete an analytics instance",
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(auth_z)],
 )
 async def delete_analytics(
     *,
     organization_id: UUID4 = Path(...),
+    analytics_id: UUID4 = Path(...),
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
 ) -> None:
-    """Clearing the config also implicitly stops tracking on every project
-    in the org that had ``tracking_enabled=true`` — the public-project
-    endpoint joins to this row, so absence means analytics simply isn't
-    served to dashboards. The per-project flag stays as-is in the DB so
-    re-adding a config later resumes tracking without re-toggling each
-    project."""
-    deleted = await crud.delete_by_organization(
-        async_session, organization_id=organization_id
+    """Dashboards referencing this instance keep working but stop tracking:
+    the FK is ON DELETE SET NULL, so their ``analytics_id`` is cleared."""
+    deleted = await crud.delete_instance(
+        async_session,
+        organization_id=organization_id,
+        analytics_id=analytics_id,
     )
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="no analytics configuration to remove",
+            detail="analytics instance not found",
         )

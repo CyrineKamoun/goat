@@ -206,10 +206,22 @@ class ProjectPublic(DateTimeBase, table=True, extend_existing=True):
         sa_column=Column(Text, nullable=True),
         description="Always NULL for v1; reserved for v2 wildcard domains.",
     )
-    tracking_enabled: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default=text("false")),
-        description="Whether visitor analytics tracking is enabled for this published project.",
+    analytics_id: UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(
+                f"{settings.SCHEMA}.organization_analytics.id",
+                ondelete="SET NULL",
+            ),
+            index=True,
+            nullable=True,
+        ),
+        description=(
+            "Analytics instance this published project reports to. Non-null "
+            "means tracking is on; null means off. Cleared automatically when "
+            "the instance is deleted."
+        ),
     )
     tracking_require_consent: bool = Field(
         default=True,

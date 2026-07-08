@@ -46,7 +46,7 @@ import {
   useOrganizationDomains,
 } from "@/lib/api/customDomains";
 import {
-  setProjectTrackingEnabled,
+  setProjectAnalytics,
   setProjectTrackingRequireConsent,
   useOrganizationAnalytics,
 } from "@/lib/api/organizationAnalytics";
@@ -211,7 +211,9 @@ const ShareWithPublicTab: React.FC<ShareWithPublicTabProps> = ({ project }) => {
   const { domains: orgDomains, mutate: mutateOrgDomains } = useOrganizationDomains(
     organization?.id
   );
-  const { analytics: orgAnalytics } = useOrganizationAnalytics(organization?.id);
+  const { analyticsList, mutate: mutateOrgAnalytics } = useOrganizationAnalytics(
+    organization?.id
+  );
   const [isPublishing, setIsPublishing] = useState(false);
   const [isUnpublishing, setIsUnpublishing] = useState(false);
   const [isCustomUrlBusy, setIsCustomUrlBusy] = useState(false);
@@ -223,6 +225,7 @@ const ShareWithPublicTab: React.FC<ShareWithPublicTabProps> = ({ project }) => {
   const embedCode = `<iframe src="${publicUrl}" width="100%" height="600" frameborder="0" style="max-width: 100%; border: 1px solid #EAEAEA; border-radius: 4px;"></iframe>`;
 
   const assignedDomainId = sharedProject?.custom_domain_id ?? null;
+  const assignedAnalyticsId = sharedProject?.analytics_id ?? null;
   // Domains the user can pick:
   //   - cert is active (so it can actually serve traffic), AND
   //   - not already taken by a different project (the backend rejects
@@ -276,17 +279,19 @@ const ShareWithPublicTab: React.FC<ShareWithPublicTabProps> = ({ project }) => {
     }
   };
 
-  const handleTrackingToggle = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const next = event.target.checked;
+  const handleAnalyticsChange = async (event: SelectChangeEvent<string>) => {
+    const value = event.target.value;
+    const next = value === "__none__" ? null : value;
     setIsTrackingBusy(true);
     try {
-      await setProjectTrackingEnabled(project.id, next);
+      await setProjectAnalytics(project.id, next);
       toast.success(
         next
           ? t("share_tracking_enabled_success", "Analytics tracking enabled")
           : t("share_tracking_disabled_success", "Analytics tracking disabled")
       );
       await mutate();
+      await mutateOrgAnalytics();
     } catch {
       toast.error(t("share_tracking_update_error", "Failed to update tracking"));
     } finally {
@@ -491,68 +496,114 @@ const ShareWithPublicTab: React.FC<ShareWithPublicTabProps> = ({ project }) => {
                 </Stack>
               )}
 
-              {/* Analytics opt-in. Only renders when the org has an
-                  analytics configuration; otherwise the whole section is
-                  hidden so we don't surface a dead toggle. */}
-              {orgAnalytics && (
-                <Stack spacing={1}>
-                  <Typography variant="body1">
-                    {t("share_analytics_label", "Analytics tracking")}
+              {/* Analytics instance selection. All org instances are listed —
+                  including ones already used by other dashboards (an
+                  informational hint shows the reuse); selecting one assigns
+                  it to this dashboard. */}
+              <Stack spacing={1}>
+                <Typography variant="body1">
+                  {t("share_analytics_label", "Analytics tracking")}
+                </Typography>
+                {analyticsList.length === 0 && (
+                  <Typography variant="caption" color="text.secondary">
+                    {t(
+                      "share_analytics_empty",
+                      "No analytics instances configured. Add one in Settings → Organization → White label → Analytics."
+                    )}
                   </Typography>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <Switch
-                      checked={Boolean(sharedProject?.tracking_enabled)}
-                      disabled={isTrackingBusy}
-                      onChange={handleTrackingToggle}
-                      inputProps={{ "aria-label": "tracking-toggle" }}
-                    />
-                    <Typography variant="body2" color="text.secondary">
+                )}
+                {analyticsList.length > 0 && (
+                  <>
+                    <FormControl fullWidth size="small">
+                      <Select
+                        value={assignedAnalyticsId ?? "__none__"}
+                        disabled={isTrackingBusy}
+                        onChange={handleAnalyticsChange}
+                        renderValue={(selected) => {
+                          if (!selected || selected === "__none__") {
+                            return (
+                              <Typography variant="body2" color="text.secondary">
+                                {t("share_analytics_none", "No tracking")}
+                              </Typography>
+                            );
+                          }
+                          return (
+                            analyticsList.find((a) => a.id === selected)?.name ?? ""
+                          );
+                        }}>
+                        <MenuItem value="__none__">
+                          {t("share_analytics_none", "No tracking")}
+                        </MenuItem>
+                        {analyticsList.map((instance) => {
+                          const otherCount =
+                            instance.usage_count -
+                            (instance.id === assignedAnalyticsId ? 1 : 0);
+                          return (
+                            <MenuItem key={instance.id} value={instance.id}>
+                              <Stack>
+                                <Typography variant="body2">{instance.name}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {(instance.config as { url?: string }).url}
+                                  {otherCount > 0 &&
+                                    ` — ${t(
+                                      "share_analytics_used_by_hint",
+                                      "also used by {{count}} other dashboard(s)",
+                                      { count: otherCount }
+                                    )}`}
+                                </Typography>
+                              </Stack>
+                            </MenuItem>
+                          );
+                        })}
+                      </Select>
+                    </FormControl>
+                    <Typography variant="caption" color="text.secondary">
                       {t(
                         "share_analytics_helper",
-                        "Use your organization's analytics configuration to track visits to this dashboard."
+                        "Choose which of your organization's analytics instances tracks visits to this dashboard."
                       )}
                     </Typography>
-                  </Stack>
 
-                  {sharedProject?.tracking_enabled && (
-                    <Stack spacing={0.5}>
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Switch
-                          checked={sharedProject.tracking_require_consent !== false}
-                          disabled={isConsentBusy}
-                          onChange={handleConsentToggle}
-                          inputProps={{ "aria-label": "consent-toggle" }}
-                        />
-                        <Typography variant="body2" color="text.secondary">
-                          {t(
-                            "share_consent_helper",
-                            "Wait for visitor consent before sending analytics events (recommended in GDPR jurisdictions)."
-                          )}
-                        </Typography>
-                      </Stack>
-                      {sharedProject.tracking_require_consent === false && (
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          alignItems="flex-start"
-                          sx={{ pl: 7 }}>
-                          <Icon
-                            iconName={ICON_NAME.CIRCLEINFO}
-                            htmlColor={theme.palette.warning.main}
-                            style={{ fontSize: 14, marginTop: 3, flexShrink: 0 }}
+                    {assignedAnalyticsId && (
+                      <Stack spacing={0.5}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Switch
+                            checked={sharedProject?.tracking_require_consent !== false}
+                            disabled={isConsentBusy}
+                            onChange={handleConsentToggle}
+                            inputProps={{ "aria-label": "consent-toggle" }}
                           />
-                          <Typography variant="caption" color="warning.main">
+                          <Typography variant="body2" color="text.secondary">
                             {t(
-                              "share_consent_warning",
-                              "Tracking will fire on every page view without waiting for consent. In Germany and most of the EU this is not compliant with GDPR/TDDDG — only disable if you operate in a jurisdiction that permits cookieless analytics without consent."
+                              "share_consent_helper",
+                              "Wait for visitor consent before sending analytics events (recommended in GDPR jurisdictions)."
                             )}
                           </Typography>
                         </Stack>
-                      )}
-                    </Stack>
-                  )}
-                </Stack>
-              )}
+                        {sharedProject?.tracking_require_consent === false && (
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="flex-start"
+                            sx={{ pl: 7 }}>
+                            <Icon
+                              iconName={ICON_NAME.CIRCLEINFO}
+                              htmlColor={theme.palette.warning.main}
+                              style={{ fontSize: 14, marginTop: 3, flexShrink: 0 }}
+                            />
+                            <Typography variant="caption" color="warning.main">
+                              {t(
+                                "share_consent_warning",
+                                "Tracking will fire on every page view without waiting for consent. In Germany and most of the EU this is not compliant with GDPR/TDDDG — only disable if you operate in a jurisdiction that permits cookieless analytics without consent."
+                              )}
+                            </Typography>
+                          </Stack>
+                        )}
+                      </Stack>
+                    )}
+                  </>
+                )}
+              </Stack>
             </>
           )}
         </Stack>

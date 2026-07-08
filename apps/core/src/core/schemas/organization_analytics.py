@@ -58,20 +58,24 @@ AnalyticsConfig = Annotated[MatomoConfig, Field(discriminator="provider")]
 
 
 class OrganizationAnalyticsCreate(BaseModel):
-    """Request body for PUT /organizations/{org_id}/analytics."""
+    """Request body for POST and PUT /organizations/{org_id}/analytics."""
 
+    name: str = Field(min_length=1, max_length=120)
     provider: AnalyticsProvider
     config: AnalyticsConfig
 
 
 class OrganizationAnalyticsRead(BaseModel):
-    """Response body."""
+    """Response body. ``usage_count`` is the number of published dashboards
+    currently reporting to this instance (filled by the list endpoint)."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     organization_id: UUID
+    name: str
     provider: AnalyticsProvider
     config: Dict[str, Any]
+    usage_count: int = 0
     created_at: datetime
     updated_at: datetime

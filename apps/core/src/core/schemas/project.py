@@ -369,9 +369,9 @@ class ProjectPublicConfig(BaseModel):
 class PublicAnalytics(BaseModel):
     """Analytics block included in the public-project response.
 
-    Only present when the project has ``tracking_enabled=True`` AND the
-    owning organization has an analytics configuration. The frontend
-    dispatches on ``provider`` to choose which tracker to inject.
+    Only present when the project has an analytics instance assigned
+    (``analytics_id`` set). The frontend dispatches on ``provider`` to
+    choose which tracker to inject.
     """
 
     provider: str
@@ -389,9 +389,9 @@ class ProjectPublicRead(BaseModel):
         default=None,
         description="ID of the custom domain assigned to this published project, if any.",
     )
-    tracking_enabled: bool = Field(
-        default=False,
-        description="Per-project opt-in for analytics. Tracker is injected only if true AND the org has an analytics config.",
+    analytics_id: UUID | None = Field(
+        default=None,
+        description="Analytics instance this dashboard reports to. Null means tracking is off.",
     )
     tracking_require_consent: bool = Field(
         default=True,
@@ -399,7 +399,7 @@ class ProjectPublicRead(BaseModel):
     )
     analytics: PublicAnalytics | None = Field(
         default=None,
-        description="Resolved analytics integration to inject. Null when tracking is disabled or the org has no config.",
+        description="Resolved analytics integration to inject. Null when no instance is assigned.",
     )
 
 

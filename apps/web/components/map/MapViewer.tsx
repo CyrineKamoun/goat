@@ -914,15 +914,18 @@ const MapViewer: React.FC<MapProps> = ({
           <UserLocationLayer />
           <ToolboxLayers />
           <MeasureLabels />
-          {!isMobile && popupInfo && activePopupConfig && (
+          {popupInfo && activePopupConfig && (
             <>
               {/* Fixed-anchor popups are rendered by the active layout
                   via <MapFixedPopupSlot>, so they pick up the layout's
                   toolbar / panel positioning the same way Geocoder /
                   ToolboxCtrl / MeasureButton do. Only the in-place
                   variant lives inside <Map>, where it needs useMap to
-                  anchor to feature coordinates. */}
-              {activePopupConfig.layout !== "pinned" && (
+                  anchor to feature coordinates. On mobile the popup
+                  content lives in the bottom drawer instead, but the
+                  active-feature pulse below still marks the feature
+                  on the map. */}
+              {!isMobile && activePopupConfig.layout !== "pinned" && (
                 <MapFeaturePopover
                   key={highlightedFeature?.id ?? v4()}
                   layerId={popupInfo.layerId ?? ""}
