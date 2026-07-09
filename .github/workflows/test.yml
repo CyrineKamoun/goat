@@ -100,7 +100,7 @@ jobs:
       # gdal is sdist-only and needs libgdal to build; only goatlib's WFS/
       # converter paths import it (lazily), so this suite runs without it.
       - name: 🐍 Install dependencies
-        run: uv sync --frozen --all-packages --no-install-package gdal
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
       # --no-sync: a bare `uv run` re-syncs and would pull gdal back in.
       - name: 🧪 pytest
         run: uv run --no-sync pytest tests/
@@ -128,7 +128,7 @@ jobs:
       - name: 🌍 Install libgdal-dev
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libgdal-dev
       - name: 🐍 Install dependencies
-        run: uv sync --frozen --all-packages
+        run: uv sync --frozen --all-packages --all-extras
       - name: 🧪 pytest (unit)
         run: uv run --no-sync pytest tests/unit
         working-directory: packages/python/goatlib
@@ -149,7 +149,7 @@ jobs:
           version: "0.9.2"
           enable-cache: true
       - name: 🐍 Install dependencies
-        run: uv sync --frozen --all-packages --no-install-package gdal
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
       - name: 🧪 pytest
         run: uv run --no-sync pytest tests/
         working-directory: apps/geoapi
@@ -170,7 +170,7 @@ jobs:
           version: "0.9.2"
           enable-cache: true
       - name: 🐍 Install dependencies
-        run: uv sync --frozen --all-packages --no-install-package gdal
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
       - name: 🧪 pytest
         run: uv run --no-sync pytest tests/
         working-directory: apps/processes
