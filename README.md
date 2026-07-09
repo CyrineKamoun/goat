@@ -241,7 +241,6 @@ Only use this if you're modifying the GOAT source code.
 | `KEYCLOAK_CLIENT_ID` | Keycloak client (web login, core admin, print worker) |
 | `KEYCLOAK_CLIENT_SECRET` | Keycloak client secret |
 | `WINDMILL_TOKEN` | Token for the Windmill workflow engine (analytics tools) |
-| `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN (optional) |
 | `NEXTAUTH_URL` | Public URL of the Web UI (also drives `NEXT_PUBLIC_APP_URL`) |
 | `NEXTAUTH_SECRET` | Secret key for Auth.js sessions |
 

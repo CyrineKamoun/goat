@@ -14,7 +14,6 @@ class Settings(BaseSettings):
     API_URL: str = "http://localhost:8000/api/v2"
     CLIENT_URL: str = "http://localhost:3000"
     MAX_FOLDER_COUNT: int = 100
-    SENTRY_DSN: str | None = None
 
     # ------------------------------------------------------------------
     # Database

@@ -501,7 +501,6 @@ dependencies = [
     { name = "requests" },
     { name = "rich" },
     { name = "scipy" },
-    { name = "sentry-sdk" },
     { name = "shapely" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sqlmodel" },
@@ -557,7 +556,6 @@ requires-dist = [
     { name = "requests", specifier = "==2.32.3" },
     { name = "rich", specifier = "==13.9.4" },
     { name = "scipy", specifier = ">=1.15.3" },
-    { name = "sentry-sdk", specifier = "==2.18.0" },
     { name = "shapely", specifier = "==2.0.6" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.0.41" },
     { name = "sqlmodel", specifier = "==0.0.24" },
@@ -957,7 +955,6 @@ dependencies = [
     { name = "python-jose", extra = ["cryptography"] },
     { name = "redis" },
     { name = "requests" },
-    { name = "sentry-sdk" },
     { name = "wmill" },
 ]
 
@@ -987,7 +984,6 @@ requires-dist = [
     { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0" },
     { name = "redis", specifier = ">=5.0.0" },
     { name = "requests", specifier = ">=2.25.0" },
-    { name = "sentry-sdk", specifier = ">=2.0.0" },
     { name = "wmill", specifier = ">=1.0.0" },
 ]
 
@@ -2007,7 +2003,6 @@ dependencies = [
     { name = "pygeofilter" },
     { name = "python-jose", extra = ["cryptography"] },
     { name = "requests" },
-    { name = "sentry-sdk" },
     { name = "wmill" },
 ]
 
@@ -2035,7 +2030,6 @@ requires-dist = [
     { name = "pygeofilter", specifier = ">=0.2.0" },
     { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0" },
     { name = "requests", specifier = ">=2.25.0" },
-    { name = "sentry-sdk", specifier = ">=2.0.0" },
     { name = "wmill", specifier = ">=1.0.0" },
 ]
 
@@ -2743,19 +2737,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/7e/31/be59513aa9695519b18e1851bb9e487de66f2d31f835201f1b42f5d4d475/scipy-1.15.3-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:795c46999bae845966368a3c013e0e00947932d68e235702b5c3f6ea799aa8c9", size = 37244796, upload-time = "2025-05-08T16:05:48.119Z" },
     { url = "https://files.pythonhosted.org/packages/10/c0/4f5f3eeccc235632aab79b27a74a9130c6c35df358129f7ac8b29f562ac7/scipy-1.15.3-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:18aaacb735ab38b38db42cb01f6b92a2d0d4b6aabefeb07f02849e47f8fb3594", size = 40047684, upload-time = "2025-05-08T16:05:54.22Z" },
     { url = "https://files.pythonhosted.org/packages/ab/a7/0ddaf514ce8a8714f6ed243a2b391b41dbb65251affe21ee3077ec45ea9a/scipy-1.15.3-cp311-cp311-win_amd64.whl", hash = "sha256:ae48a786a28412d744c62fd7816a4118ef97e5be0bee968ce8f0a2fba7acf3bb", size = 41246504, upload-time = "2025-05-08T16:06:00.437Z" },
-]
-
-[[package]]
-name = "sentry-sdk"
-version = "2.18.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "certifi" },
-    { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/24/cc/0d87cc8246f52d92228aa6718a24e1988a2893f4abe2f64ec5a8bcba4185/sentry_sdk-2.18.0.tar.gz", hash = "sha256:0dc21febd1ab35c648391c664df96f5f79fb0d92d7d4225cd9832e53a617cafd", size = 293615, upload-time = "2024-11-04T13:58:17.093Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/76/9b/2d512efdb0de203d1f0312fae53433c3009ba70b0078421d25baaedc960a/sentry_sdk-2.18.0-py2.py3-none-any.whl", hash = "sha256:ee70e27d1bbe4cd52a38e1bd28a5fadb9b17bc29d91b5f2b97ae29c0a7610442", size = 317514, upload-time = "2024-11-04T13:58:15.166Z" },
 ]
 
 [[package]]

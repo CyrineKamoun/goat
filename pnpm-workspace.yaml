@@ -3,7 +3,6 @@ packages:
   - packages/js/*
 
 ignoredBuiltDependencies:
-  - '@sentry/cli'
   - '@swc/core'
   - core-js
   - core-js-pure

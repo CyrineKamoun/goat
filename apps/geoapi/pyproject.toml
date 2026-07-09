@@ -11,7 +11,6 @@ dependencies = [
     "duckdb>=1.4.3",
     "asyncpg>=0.29.0",
     "pygeofilter>=0.2.0",
-    "sentry-sdk>=2.0.0",
     "goatlib",
     "goatobs",
     "cachetools",
