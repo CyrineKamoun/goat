@@ -56,3 +56,4 @@ WORKDIR /app
 EXPOSE 8000
 
 CMD ["fastapi", "run", "apps/core/src/core/main.py"]
+
