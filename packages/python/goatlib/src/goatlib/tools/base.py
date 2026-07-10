@@ -384,7 +384,15 @@ class SimpleToolRunner:
         # which trigger serializable-isolation failures (40001) when many workers
         # connect simultaneously.
         self._ensure_lake_option(con, "parquet_compression", PARQUET_COMPRESSION)
-        self._ensure_lake_option(con, "parquet_version", PARQUET_VERSION)
+        # parquet_version only accepts numeric input ('2') but is stored in
+        # canonical form ('V2'); compare against the stored form or the guard
+        # re-writes on every connection.
+        self._ensure_lake_option(
+            con,
+            "parquet_version",
+            PARQUET_VERSION,
+            stored_value=f"V{PARQUET_VERSION}",
+        )
         self._ensure_lake_option(
             con, "parquet_row_group_size", str(PARQUET_ROW_GROUP_SIZE)
         )
@@ -395,19 +403,26 @@ class SimpleToolRunner:
         self: Self,
         con: duckdb.DuckDBPyConnection,
         key: str,
-        expected_value: str,
+        value: str,
+        stored_value: str | None = None,
     ) -> None:
-        """Set a DuckLake option only if its current value differs.
+        """Set a DuckLake option only if its stored value differs.
 
         Every `CALL lake.set_option` is an UPSERT against the PostgreSQL
         `ducklake_metadata` table. When many worker connections issue the same
         writes simultaneously, they race on serializable isolation
         (`could not serialize access due to concurrent update`, SQLSTATE 40001).
         Reading first means steady-state reconnects skip the write entirely.
+
+        Some options are stored in a canonical form that differs from the
+        accepted input form (e.g. parquet_version: input '2', stored 'V2');
+        pass `stored_value` for those so the comparison matches what DuckLake
+        actually persists. `set_option` always receives `value`.
         """
         if self.settings is None:
             raise RuntimeError("Settings not initialized")
         schema = self.settings.ducklake_catalog_schema
+        expected = value if stored_value is None else stored_value
         try:
             rows = con.execute(
                 f"SELECT value FROM __ducklake_metadata_lake.{schema}.ducklake_metadata "  # noqa: S608
@@ -422,9 +437,21 @@ class SimpleToolRunner:
             )
             rows = None
 
-        if rows and all(row[0] == expected_value for row in rows):
+        if rows and all(row[0] == expected for row in rows):
             return
-        con.execute(f"CALL lake.set_option('{key}', '{expected_value}')")
+        try:
+            con.execute(f"CALL lake.set_option('{key}', '{value}')")
+        except Exception as e:
+            # All connections write the same constants, so losing the race to
+            # a concurrent writer leaves the option in the desired state.
+            if "could not serialize access" in str(e):
+                logger.warning(
+                    "Concurrent writer already set DuckLake option %s: %s",
+                    key,
+                    e,
+                )
+                return
+            raise
 
     def _is_retriable_ducklake_error(self: Self, error: Exception) -> bool:
         """Check if a DuckLake error is retriable (connection/transaction issues)."""
