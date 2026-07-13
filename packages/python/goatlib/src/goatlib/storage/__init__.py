@@ -19,6 +19,7 @@ from goatlib.storage.ducklake import (
     execute_with_retry,
     is_connection_error,
 )
+from goatlib.storage.pin_errors import is_pin_miss_error
 from goatlib.storage.query_builder import (
     QueryFilters,
     build_bbox_filter,
@@ -27,6 +28,7 @@ from goatlib.storage.query_builder import (
     build_id_filter,
     build_order_clause,
 )
+from goatlib.storage.snapshot_pin import SnapshotPin
 
 __all__ = [
     # DuckLake
@@ -50,4 +52,7 @@ __all__ = [
     "build_filters",
     "build_id_filter",
     "build_order_clause",
+    # Snapshot Pin
+    "SnapshotPin",
+    "is_pin_miss_error",
 ]

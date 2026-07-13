@@ -15,6 +15,9 @@ from urllib.parse import unquote, urlparse
 
 import duckdb
 
+from goatlib.storage.pin_errors import is_pin_miss_error
+from goatlib.storage.snapshot_pin import SnapshotPin
+
 logger = logging.getLogger(__name__)
 
 # Connection error patterns that should trigger a retry/reconnect
@@ -81,6 +84,13 @@ def execute_with_retry(
                 return result, con.description
         except Exception as e:
             last_error = e
+            if (
+                is_pin_miss_error(e)
+                and attempt < max_retries
+                and manager.force_pin_refresh()
+            ):
+                logger.info("Pin miss, refreshed snapshot and retrying: %s", e)
+                continue
             if is_connection_error(e) and attempt < max_retries:
                 logger.warning(
                     "Connection error (attempt %d/%d), reconnecting: %s",
@@ -149,7 +159,12 @@ class BaseDuckLakeManager:
     # DuckLake metadata cache and libpq/SSL state in long-running processes.
     MAX_CONNECTION_AGE_SECONDS = 300  # 5 minutes
 
-    def __init__(self: "BaseDuckLakeManager", read_only: bool = False) -> None:
+    def __init__(
+        self: "BaseDuckLakeManager",
+        read_only: bool = False,
+        pin_snapshot: bool = False,
+        refresh_interval: float = 5.0,
+    ) -> None:
         self._connection: duckdb.DuckDBPyConnection | None = None
         self._lock = threading.Lock()
         self._created_at: float = 0.0
@@ -163,6 +178,11 @@ class BaseDuckLakeManager:
         self._read_only: bool = read_only
         self._memory_limit: str | None = None
         self._threads: int | None = None
+        self._pin_snapshot = pin_snapshot
+        self._refresh_interval = refresh_interval
+        self._pin: SnapshotPin | None = None
+        self._poll_con: duckdb.DuckDBPyConnection | None = None
+        self._poll_lock = threading.Lock()
 
     def init(self: "BaseDuckLakeManager", settings: DuckLakeSettings) -> None:
         """Initialize DuckLake connection."""
@@ -190,7 +210,21 @@ class BaseDuckLakeManager:
             if not self._read_only and not os.path.exists(self._storage_path):
                 os.makedirs(self._storage_path, exist_ok=True)
 
-        self._create_connection()
+        if self._pin_snapshot:
+            initial = self._fetch_latest_snapshot_id()
+            self._create_connection(snapshot_version=initial)
+            assert self._connection is not None
+            self._warm_connection(self._connection)
+            self._pin = SnapshotPin(
+                self._fetch_latest_snapshot_id,
+                self._apply_snapshot,
+                refresh_interval=self._refresh_interval,
+                maintain=self._recycle_aged,
+                name="manager",
+            )
+            self._pin.start(initial)
+        else:
+            self._create_connection()
         logger.info("DuckLake initialized: catalog=%s", self._catalog_schema)
 
     def init_from_params(
@@ -216,10 +250,10 @@ class BaseDuckLakeManager:
         self._create_connection()
         logger.info("DuckLake initialized: catalog=%s", self._catalog_schema)
 
-    def _create_connection(self: "BaseDuckLakeManager") -> None:
-        """Create and configure the DuckDB connection."""
-        import time
-
+    def _build_connection(
+        self: "BaseDuckLakeManager", snapshot_version: int | None = None
+    ) -> duckdb.DuckDBPyConnection:
+        """Create and configure a DuckDB connection (does not assign it)."""
         con = duckdb.connect()
         if self._memory_limit:
             con.execute(f"SET memory_limit='{self._memory_limit}'")
@@ -233,12 +267,29 @@ class BaseDuckLakeManager:
         self._install_extensions(con)
         self._load_extensions(con)
         self._setup_s3(con)
-        self._attach_ducklake(con)
-        self._connection = con
+        self._attach_ducklake(con, snapshot_version=snapshot_version)
+        return con
+
+    def _create_connection(
+        self: "BaseDuckLakeManager", snapshot_version: int | None = None
+    ) -> None:
+        """Create and configure the DuckDB connection, assigning it in place."""
+        import time
+
+        self._connection = self._build_connection(snapshot_version)
         self._created_at = time.time()
 
     def close(self: "BaseDuckLakeManager") -> None:
         """Close the connection, explicitly detaching DuckLake first."""
+        if self._pin is not None:
+            self._pin.stop()
+            self._pin = None
+        if self._poll_con is not None:
+            try:
+                self._poll_con.close()
+            except Exception:
+                pass
+            self._poll_con = None
         if self._connection:
             try:
                 self._connection.execute("DETACH lake")
@@ -274,6 +325,14 @@ class BaseDuckLakeManager:
         if not self._connection or not self._created_at:
             return
         age = time.time() - self._created_at
+
+        if self._pin_snapshot:
+            # Age recycling for pinned connections is owned by the pin's
+            # maintain hook (_recycle_aged), which runs on the poll thread
+            # and builds+warms replacements outside self._lock. Never
+            # recycle inline on the request path.
+            return
+
         if age > self.MAX_CONNECTION_AGE_SECONDS:
             logger.info(
                 "Recycling DuckLake connection (age %.0fs > %ds)",
@@ -347,7 +406,8 @@ class BaseDuckLakeManager:
                     self._connection.close()
                 except Exception:
                     pass
-            self._create_connection()
+            snapshot_version = self._pin.current if self._pin else None
+            self._create_connection(snapshot_version=snapshot_version)
             logger.info("DuckLake reconnected")
 
     def execute(
@@ -387,6 +447,14 @@ class BaseDuckLakeManager:
                 return self.execute(query, params)
             except Exception as e:
                 last_error = e
+                if (
+                    self._pin is not None
+                    and is_pin_miss_error(e)
+                    and attempt < max_retries
+                    and self.force_pin_refresh()
+                ):
+                    logger.info("Pin miss, refreshed snapshot and retrying: %s", e)
+                    continue
                 if is_connection_error(e) and attempt < max_retries:
                     logger.warning(
                         "Query failed (attempt %d/%d), reconnecting: %s",
@@ -452,7 +520,9 @@ class BaseDuckLakeManager:
         return params
 
     def _attach_ducklake(
-        self: "BaseDuckLakeManager", con: duckdb.DuckDBPyConnection
+        self: "BaseDuckLakeManager",
+        con: duckdb.DuckDBPyConnection,
+        snapshot_version: int | None = None,
     ) -> None:
         params = self._parse_postgres_uri()
 
@@ -468,12 +538,167 @@ class BaseDuckLakeManager:
         options.append("OVERRIDE_DATA_PATH")
         if self._read_only:
             options.append("READ_ONLY")
+        if snapshot_version is not None:
+            options.append(f"SNAPSHOT_VERSION {snapshot_version}")
         options_str = ", ".join(options)
 
         attach_sql = f"ATTACH 'ducklake:postgres:{libpq_str}' AS lake ({options_str})"
         con.execute(attach_sql)
         mode = "read-only" if self._read_only else "read-write"
         logger.info("DuckLake catalog attached (%s)", mode)
+
+    def _fetch_latest_snapshot_id(self: "BaseDuckLakeManager") -> int:
+        """Newest snapshot id, via a plain postgres attach (~2 ms).
+
+        Serialized by _poll_lock: the shared _poll_con is used by both the
+        background poll thread and request threads (force_pin_refresh), and
+        a DuckDB connection must not be used concurrently.
+        """
+        query = (
+            "SELECT * FROM postgres_query('pincat', "
+            f"'SELECT max(snapshot_id) FROM {self._catalog_schema}.ducklake_snapshot')"
+        )
+        with self._poll_lock:
+            for attempt in range(2):
+                try:
+                    if self._poll_con is None:
+                        con = duckdb.connect()
+                        try:
+                            con.execute("INSTALL postgres")
+                        except duckdb.IOException as install_err:
+                            # Extension might already be installed or network
+                            # unavailable; LOAD below still works if so.
+                            logger.warning(
+                                "Could not install postgres extension for poll "
+                                "connection (may already be installed): %s",
+                                install_err,
+                            )
+                        con.execute("LOAD postgres")
+                        params = self._parse_postgres_uri()
+                        params.update(POSTGRES_KEEPALIVE_PARAMS)
+                        libpq = " ".join(f"{k}={v}" for k, v in params.items())
+                        con.execute(
+                            f"ATTACH '{libpq}' AS pincat (TYPE postgres, READ_ONLY)"
+                        )
+                        self._poll_con = con
+                    row = self._poll_con.execute(query).fetchone()
+                    if row is None or row[0] is None:
+                        raise RuntimeError("ducklake_snapshot is empty")
+                    return int(row[0])
+                except Exception:
+                    if self._poll_con is not None:
+                        try:
+                            self._poll_con.close()
+                        except Exception:
+                            pass
+                        self._poll_con = None
+                    if attempt == 1:
+                        raise
+        raise RuntimeError("unreachable")
+
+    def _warm_connection(
+        self: "BaseDuckLakeManager", con: duckdb.DuckDBPyConnection
+    ) -> None:
+        """Force the DuckLake catalog metadata load off the request path.
+
+        DuckDB does not support catalog-qualified information_schema access
+        (e.g. `lake.information_schema.tables`), so duckdb_tables() is used
+        to enumerate the attached catalog's tables and force the metadata
+        load instead.
+        """
+        con.execute(
+            "SELECT count(*) FROM duckdb_tables() WHERE database_name = 'lake'"
+        ).fetchone()
+
+    def _build_warm_and_swap(
+        self: "BaseDuckLakeManager",
+        snapshot_version: int | None,
+        expected_con: duckdb.DuckDBPyConnection | None = None,
+    ) -> None:
+        """Build+warm a connection outside the lock, then swap it in.
+
+        On a build/warm failure the fresh connection is closed and the error
+        propagates; the current connection keeps serving untouched.
+
+        When expected_con is given, the swap only happens if the current
+        connection is still that one; otherwise a rebuild landed mid-build
+        (it pinned a newer snapshot) and the late replacement is discarded.
+        """
+        import time
+
+        started = time.monotonic()
+        new_con = self._build_connection(snapshot_version=snapshot_version)
+        try:
+            self._warm_connection(new_con)
+        except Exception:
+            try:
+                new_con.close()
+            except Exception:
+                pass
+            raise
+        old: duckdb.DuckDBPyConnection | None
+        with self._lock:
+            if expected_con is not None and self._connection is not expected_con:
+                old = new_con
+            else:
+                old = self._connection
+                self._connection = new_con
+                self._created_at = time.time()
+        if old is not None:
+            try:
+                old.execute("DETACH lake")
+            except Exception:
+                pass
+            try:
+                old.close()
+            except Exception:
+                pass
+        if old is new_con:
+            logger.info(
+                "DuckLake manager: late pinned rebuild discarded "
+                "(a newer snapshot is already active)"
+            )
+        else:
+            logger.info(
+                "DuckLake manager: pinned connection swapped to snapshot %s "
+                "in %.0f ms",
+                snapshot_version,
+                (time.monotonic() - started) * 1000,
+            )
+
+    def _apply_snapshot(self: "BaseDuckLakeManager", snapshot_id: int) -> None:
+        """Build a pinned connection at snapshot_id and swap it in."""
+        self._build_warm_and_swap(snapshot_id)
+
+    def _recycle_aged(self: "BaseDuckLakeManager") -> None:
+        """Rebuild the connection at the current pin once it ages out.
+
+        Runs on the pin's poll thread (maintain hook), keeping age recycling
+        off the request path: the replacement is built and warmed outside
+        self._lock and only the swap happens under it.
+        """
+        import time
+
+        con = self._connection
+        if not con or not self._created_at:
+            return
+        age = time.time() - self._created_at
+        if age <= self.MAX_CONNECTION_AGE_SECONDS:
+            return
+        logger.info(
+            "DuckLake manager: pinned connection aged out (%.0fs > %ds), "
+            "rebuilding at the current pin",
+            age,
+            self.MAX_CONNECTION_AGE_SECONDS,
+        )
+        snapshot_version = self._pin.current if self._pin is not None else None
+        self._build_warm_and_swap(snapshot_version, expected_con=con)
+
+    def force_pin_refresh(self: "BaseDuckLakeManager") -> bool:
+        """Bring the pin to the latest snapshot now. False when unpinned."""
+        if self._pin is None:
+            return False
+        return self._pin.force_refresh()
 
 
 class DuckLakePool:
@@ -504,14 +729,26 @@ class DuckLakePool:
     # This helps prevent stale PostgreSQL connections inside DuckLake
     MAX_CONNECTION_AGE_SECONDS = 300  # 5 minutes
 
-    def __init__(self, pool_size: int = 2) -> None:
+    def __init__(
+        self,
+        pool_size: int = 2,
+        pin_snapshot: bool = False,
+        refresh_interval: float = 5.0,
+    ) -> None:
         """Initialize connection pool.
 
         Args:
             pool_size: Number of connections to maintain in the pool.
+            pin_snapshot: When True, all pool connections are attached at a
+                pinned DuckLake snapshot version that is refreshed off the
+                request path by a background poll thread, instead of always
+                reading the latest snapshot.
+            refresh_interval: Seconds between background snapshot polls.
         """
         self._pool_size = pool_size
-        self._pool: queue.Queue[tuple[duckdb.DuckDBPyConnection, float]] = queue.Queue()
+        self._pool: queue.Queue[tuple[duckdb.DuckDBPyConnection, float, int]] = (
+            queue.Queue()
+        )
         self._initialized = False
         self._init_lock = threading.Lock()
         self._postgres_uri: str | None = None
@@ -523,6 +760,16 @@ class DuckLakePool:
         self._extensions_installed: bool = False
         self._memory_limit: str | None = None
         self._threads: int | None = None
+        self._pin_snapshot = pin_snapshot
+        self._refresh_interval = refresh_interval
+        self._pin: SnapshotPin | None = None
+        self._generation = 0
+        self._poll_con: duckdb.DuckDBPyConnection | None = None
+        self._poll_lock = threading.Lock()
+        # Serializes slow-path pool mutations (rebuild swaps, aged recycling,
+        # return-path close/repool decisions) so generation tags always match
+        # the snapshot a connection is actually attached to.
+        self._rebuild_lock = threading.Lock()
 
     def init(self, settings: DuckLakeSettings) -> None:
         """Initialize the connection pool from settings."""
@@ -549,13 +796,20 @@ class DuckLakePool:
                     base_dir = getattr(settings, "DATA_DIR", "/tmp")
                     self._storage_path = os.path.join(base_dir, "ducklake")
 
+            initial: int | None = None
+            if self._pin_snapshot:
+                initial = self._fetch_latest_snapshot_id()
+
             # Create pool connections with retry for transient connection errors
             import time
 
             for i in range(self._pool_size):
-                con = self._create_connection_with_retry()
-                # Store connection with its creation timestamp
-                self._pool.put((con, time.time()))
+                if self._pin_snapshot:
+                    con = self._create_warmed_connection(initial)
+                else:
+                    con = self._create_connection_with_retry()
+                # Store connection with its creation timestamp and generation
+                self._pool.put((con, time.time(), self._generation))
                 logger.debug("Created pool connection %d/%d", i + 1, self._pool_size)
 
             self._initialized = True
@@ -564,6 +818,17 @@ class DuckLakePool:
                 self._pool_size,
                 self._catalog_schema,
             )
+
+            if self._pin_snapshot:
+                assert initial is not None
+                self._pin = SnapshotPin(
+                    self._fetch_latest_snapshot_id,
+                    self._apply_snapshot,
+                    refresh_interval=self._refresh_interval,
+                    maintain=self._recycle_aged,
+                    name="pool",
+                )
+                self._pin.start(initial)
 
     def _parse_postgres_uri(self) -> dict[str, str]:
         """Parse PostgreSQL URI into libpq connection parameters."""
@@ -584,8 +849,60 @@ class DuckLakePool:
             params["dbname"] = parsed.path.lstrip("/")
         return params
 
+    def _fetch_latest_snapshot_id(self) -> int:
+        """Newest snapshot id, via a plain postgres attach (~2 ms).
+
+        Serialized by _poll_lock: the shared _poll_con is used by both the
+        background poll thread and request threads (force_pin_refresh), and
+        a DuckDB connection must not be used concurrently.
+        """
+        query = (
+            "SELECT * FROM postgres_query('pincat', "
+            f"'SELECT max(snapshot_id) FROM {self._catalog_schema}.ducklake_snapshot')"
+        )
+        with self._poll_lock:
+            for attempt in range(2):
+                try:
+                    if self._poll_con is None:
+                        con = duckdb.connect()
+                        try:
+                            con.execute("INSTALL postgres")
+                        except duckdb.IOException as install_err:
+                            # Extension might already be installed or network
+                            # unavailable; LOAD below still works if so.
+                            logger.warning(
+                                "Could not install postgres extension for poll "
+                                "connection (may already be installed): %s",
+                                install_err,
+                            )
+                        con.execute("LOAD postgres")
+                        params = self._parse_postgres_uri()
+                        params.update(POSTGRES_KEEPALIVE_PARAMS)
+                        libpq = " ".join(f"{k}={v}" for k, v in params.items())
+                        con.execute(
+                            f"ATTACH '{libpq}' AS pincat (TYPE postgres, READ_ONLY)"
+                        )
+                        self._poll_con = con
+                    row = self._poll_con.execute(query).fetchone()
+                    if row is None or row[0] is None:
+                        raise RuntimeError("ducklake_snapshot is empty")
+                    return int(row[0])
+                except Exception:
+                    if self._poll_con is not None:
+                        try:
+                            self._poll_con.close()
+                        except Exception:
+                            pass
+                        self._poll_con = None
+                    if attempt == 1:
+                        raise
+        raise RuntimeError("unreachable")
+
     def _create_connection_with_retry(
-        self, max_retries: int = 3, retry_delay: float = 1.0
+        self,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+        snapshot_version: int | None = None,
     ) -> duckdb.DuckDBPyConnection:
         """Create connection with retry on transient errors."""
         import time
@@ -593,7 +910,7 @@ class DuckLakePool:
         last_error = None
         for attempt in range(max_retries):
             try:
-                return self._create_connection()
+                return self._create_connection(snapshot_version=snapshot_version)
             except Exception as e:
                 last_error = e
                 if is_connection_error(e) and attempt < max_retries - 1:
@@ -608,7 +925,9 @@ class DuckLakePool:
                 break
         raise last_error
 
-    def _create_connection(self) -> duckdb.DuckDBPyConnection:
+    def _create_connection(
+        self, snapshot_version: int | None = None
+    ) -> duckdb.DuckDBPyConnection:
         """Create a new DuckDB connection with DuckLake attached (read-only)."""
         con = duckdb.connect()
 
@@ -651,6 +970,8 @@ class DuckLakePool:
             "OVERRIDE_DATA_PATH",
             "READ_ONLY",
         ]
+        if snapshot_version is not None:
+            options.append(f"SNAPSHOT_VERSION {snapshot_version}")
         options_str = ", ".join(options)
 
         attach_sql = f"ATTACH 'ducklake:postgres:{libpq_str}' AS lake ({options_str})"
@@ -658,17 +979,173 @@ class DuckLakePool:
 
         return con
 
-    def _get_healthy_connection(self) -> tuple[duckdb.DuckDBPyConnection, float]:
-        """Get a connection from the pool, recreating if too old.
+    def _warm_connection(self, con: duckdb.DuckDBPyConnection) -> None:
+        """Force the DuckLake catalog metadata load off the request path.
 
-        Only checks connection age - actual connection health is validated
-        by the retry logic when queries fail.
+        DuckDB does not support catalog-qualified information_schema access
+        (e.g. `lake.information_schema.tables`), so duckdb_tables() is used
+        to enumerate the attached catalog's tables and force the metadata
+        load instead.
+        """
+        con.execute(
+            "SELECT count(*) FROM duckdb_tables() WHERE database_name = 'lake'"
+        ).fetchone()
 
-        Returns a tuple of (connection, creation_time).
+    def _create_warmed_connection(
+        self, snapshot_version: int | None
+    ) -> duckdb.DuckDBPyConnection:
+        """Create and warm a connection; close it if warming fails."""
+        con = self._create_connection_with_retry(snapshot_version=snapshot_version)
+        try:
+            self._warm_connection(con)
+        except Exception:
+            try:
+                con.close()
+            except Exception:
+                pass
+            raise
+        return con
+
+    def _apply_snapshot(self, snapshot_id: int) -> None:
+        """Swap the pool to connections pinned at snapshot_id.
+
+        Two phases so a failed build never mutates the pool: every
+        replacement connection is built and warmed first; only then is the
+        generation bumped and the queue swapped under the rebuild lock. On a
+        build failure everything built so far is closed and the error
+        propagates — the pin keeps serving the previous snapshot and the
+        next poll tick retries.
         """
         import time
 
-        con, created_at = self._pool.get()  # Blocks until available
+        started = time.monotonic()
+        new_cons: list[duckdb.DuckDBPyConnection] = []
+        try:
+            for _ in range(self._pool_size):
+                new_cons.append(self._create_warmed_connection(snapshot_id))
+        except Exception:
+            for built in new_cons:
+                try:
+                    built.close()
+                except Exception:
+                    pass
+            raise
+
+        # Closing a DuckDB connection (with DETACH) can take tens of ms, so
+        # superseded connections are collected under the lock and closed
+        # after it is released — the return path must never queue behind
+        # connection teardown.
+        to_close: list[duckdb.DuckDBPyConnection] = []
+        with self._rebuild_lock:
+            self._generation += 1
+            gen = self._generation
+            for new_con in new_cons:
+                try:
+                    old_con, old_created, old_gen = self._pool.get_nowait()
+                    if old_gen == gen:
+                        self._pool.put((old_con, old_created, old_gen))
+                    else:
+                        to_close.append(old_con)
+                except queue.Empty:
+                    pass  # checked-out stale conns close themselves on return
+                self._pool.put((new_con, time.time(), gen))
+        for old_con in to_close:
+            try:
+                old_con.close()
+            except Exception:
+                pass
+        logger.info(
+            "DuckLake pool: %d pinned connections rebuilt at snapshot %s " "in %.0f ms",
+            self._pool_size,
+            snapshot_id,
+            (time.monotonic() - started) * 1000,
+        )
+
+    def _recycle_aged(self) -> None:
+        """Rebuild connections past MAX_CONNECTION_AGE_SECONDS at the current pin.
+
+        Builds happen outside the rebuild lock (they can take seconds); the
+        pulled entry and the generation are captured under the lock first,
+        and the put decision re-checks the generation afterwards so a rebuild
+        that landed mid-build wins and the late replacement is discarded.
+        """
+        import time
+
+        for _ in range(self._pool_size):
+            with self._rebuild_lock:
+                snapshot_id = self._pin.current if self._pin is not None else None
+                gen = self._generation
+                try:
+                    con, created_at, entry_gen = self._pool.get_nowait()
+                except queue.Empty:
+                    return
+                if entry_gen == gen and (
+                    time.time() - created_at <= self.MAX_CONNECTION_AGE_SECONDS
+                ):
+                    self._pool.put((con, created_at, entry_gen))
+                    continue
+            # Build the replacement before closing the old connection so a
+            # failed create/warm never shrinks the pool: on failure the old
+            # (aged but healthy) entry goes back and keeps serving.
+            try:
+                new_con = self._create_warmed_connection(snapshot_id)
+            except Exception:
+                with self._rebuild_lock:
+                    self._pool.put((con, created_at, entry_gen))
+                raise
+            try:
+                con.close()
+            except Exception:
+                pass
+            discard: duckdb.DuckDBPyConnection | None = None
+            with self._rebuild_lock:
+                if gen != self._generation:
+                    # A rebuild replaced this slot while we were building;
+                    # pooling ours would exceed pool_size and pin the wrong
+                    # snapshot. Discard it (closed outside the lock).
+                    discard = new_con
+                else:
+                    self._pool.put((new_con, time.time(), gen))
+            if discard is not None:
+                try:
+                    discard.close()
+                except Exception:
+                    pass
+
+    def force_pin_refresh(self) -> bool:
+        """Bring the pin to the latest snapshot now. False when unpinned."""
+        if self._pin is None:
+            return False
+        return self._pin.force_refresh()
+
+    @property
+    def pinned_snapshot_id(self) -> int | None:
+        """Currently pinned DuckLake snapshot id, or None when unpinned.
+
+        Lets callers (e.g. tile ETags) key a cache on the snapshot actually
+        being served rather than on a version bumped synchronously at write
+        time, which can otherwise run ahead of the (async, ~1-2s) pin
+        refresh and produce an ETag for data the pool isn't serving yet.
+        """
+        return self._pin.current if self._pin else None
+
+    def _get_healthy_connection(self) -> tuple[duckdb.DuckDBPyConnection, float, int]:
+        """Get a connection from the pool, recreating if too old.
+
+        Only checks connection age - actual connection health is validated
+        by the retry logic when queries fail. When the pool is pinned, age
+        recycling is owned by the pin's maintain hook (`_recycle_aged`), so
+        this method skips it entirely.
+
+        Returns a tuple of (connection, creation_time, generation).
+        """
+        import time
+
+        con, created_at, gen = self._pool.get()  # Blocks until available
+
+        if self._pin is not None:
+            return con, created_at, gen
+
         current_time = time.time()
         connection_age = current_time - created_at
 
@@ -684,10 +1161,10 @@ class DuckLakePool:
                 con.close()
             except Exception:
                 pass
-            con = self._create_connection_with_retry()
+            con = self._create_connection_with_retry(snapshot_version=None)
             created_at = current_time
 
-        return con, created_at
+        return con, created_at, gen
 
     @contextmanager
     def connection(self) -> Generator[duckdb.DuckDBPyConnection, None, None]:
@@ -702,7 +1179,7 @@ class DuckLakePool:
         if not self._initialized:
             raise RuntimeError("DuckLakePool not initialized")
 
-        con, created_at = self._get_healthy_connection()
+        con, created_at, gen = self._get_healthy_connection()
         connection_failed = False
         try:
             yield con
@@ -719,15 +1196,40 @@ class DuckLakePool:
         finally:
             # Only recreate if connection failed during use
             if connection_failed:
+                with self._rebuild_lock:
+                    snapshot_version = self._pin.current if self._pin else None
+                    gen = self._generation
                 try:
-                    con = self._create_connection_with_retry()
+                    con = self._create_connection_with_retry(
+                        snapshot_version=snapshot_version
+                    )
                     created_at = time.time()
                 except Exception as create_err:
                     logger.error("Failed to recreate connection: %s", create_err)
                     # Retry with more attempts
-                    con = self._create_connection_with_retry(max_retries=5)
+                    con = self._create_connection_with_retry(
+                        max_retries=5, snapshot_version=snapshot_version
+                    )
                     created_at = time.time()
-            self._pool.put((con, created_at))
+            stale_con: duckdb.DuckDBPyConnection | None = None
+            with self._rebuild_lock:
+                if gen != self._generation:
+                    # Stale generation: a rebuild happened while this
+                    # connection was checked out (or while its replacement
+                    # was being created). The rebuild already put a fresh
+                    # entry in for this slot — close ours instead of pooling
+                    # it, which would exceed pool_size or pin a superseded
+                    # snapshot. The close happens after the lock is released:
+                    # connection teardown can take tens of ms and must not
+                    # block other returns.
+                    stale_con = con
+                else:
+                    self._pool.put((con, created_at, gen))
+            if stale_con is not None:
+                try:
+                    stale_con.close()
+                except Exception:
+                    pass
 
     def execute_with_retry(
         self,
@@ -773,6 +1275,14 @@ class DuckLakePool:
                 raise
             except Exception as e:
                 last_error = e
+                if (
+                    self._pin is not None
+                    and is_pin_miss_error(e)
+                    and attempt < max_retries - 1
+                    and self.force_pin_refresh()
+                ):
+                    logger.info("Pin miss, refreshed snapshot and retrying: %s", e)
+                    continue
                 if is_connection_error(e) and attempt < max_retries - 1:
                     logger.warning(
                         "Query failed (attempt %d/%d), will retry: %s",
@@ -846,7 +1356,7 @@ class DuckLakePool:
                     item = self._pool.get_nowait()
                     # Handle both old format (just connection) and new format (tuple)
                     if isinstance(item, tuple):
-                        con, _ = item
+                        con = item[0]
                     else:
                         con = item
                     connections.append(con)
@@ -861,21 +1371,31 @@ class DuckLakePool:
 
             # Create new connections with timestamps
             current_time = time.time()
+            snapshot_version = self._pin.current if self._pin else None
             for i in range(self._pool_size):
-                con = self._create_connection()
-                self._pool.put((con, current_time))
+                con = self._create_connection(snapshot_version=snapshot_version)
+                self._pool.put((con, current_time, self._generation))
                 logger.debug("Recreated pool connection %d/%d", i + 1, self._pool_size)
 
             logger.info("DuckLake pool reconnected: %d connections", self._pool_size)
 
     def close(self) -> None:
         """Close all connections in the pool."""
+        if self._pin is not None:
+            self._pin.stop()
+            self._pin = None
+        if self._poll_con is not None:
+            try:
+                self._poll_con.close()
+            except Exception:
+                pass
+            self._poll_con = None
         while not self._pool.empty():
             try:
                 item = self._pool.get_nowait()
                 # Handle both old format (just connection) and new format (tuple)
                 if isinstance(item, tuple):
-                    con, _ = item
+                    con = item[0]
                 else:
                     con = item
                 con.close()
