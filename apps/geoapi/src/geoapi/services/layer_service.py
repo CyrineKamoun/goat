@@ -349,6 +349,17 @@ class LayerService:
         # Get column information from DuckLake schema
         columns = await self._get_layer_columns(layer_info)
 
+        if not columns:
+            # Every layer geoapi serves is DuckLake-backed, so a table with
+            # zero columns almost always means the pinned read connection's
+            # snapshot predates this layer's table (e.g. a just-created
+            # layer) rather than a genuinely column-less table. Force the
+            # pin to the latest snapshot and try once more before deciding.
+            from geoapi.ducklake import ducklake_manager
+
+            if ducklake_manager.force_pin_refresh():
+                columns = await self._get_layer_columns(layer_info)
+
         # Detect geometry column from columns (None if no geometry)
         geometry_column = None
         for col in columns:
@@ -372,6 +383,17 @@ class LayerService:
             user_id=str(row["user_id"]).replace("-", "") if row["user_id"] else None,
             geometry_column=geometry_column,
         )
+
+        if not columns:
+            # Still empty after a pin refresh (or the manager is unpinned):
+            # don't poison the shared cache with an empty-columns result.
+            # Skip writing so the next request re-resolves from DuckLake.
+            logger.warning(
+                "Layer %s resolved zero DuckLake columns; not caching so the "
+                "next request retries",
+                cache_key,
+            )
+            return metadata
 
         # Cache the metadata
         _metadata_cache[cache_key] = metadata

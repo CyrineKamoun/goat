@@ -17,6 +17,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import JSONResponse
 
+from geoapi.catalog_events import start_subscriber, stop_subscriber
 from geoapi.config import settings
 from geoapi.deps.auth import decode_token
 from geoapi.ducklake import ducklake_manager
@@ -95,6 +96,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize layer service (PostgreSQL pool for metadata)
     await layer_service.init()
 
+    # Start the cross-pod catalog-change subscriber (best-effort Redis pub/sub)
+    start_subscriber()
+
     logger.info("GeoAPI started successfully")
 
     yield
@@ -102,6 +106,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Cleanup
     logger.info("Shutting down GeoAPI...")
     await layer_service.close()
+    stop_subscriber()
     ducklake_pool.close()
     ducklake_write_manager.close()
     ducklake_manager.close()

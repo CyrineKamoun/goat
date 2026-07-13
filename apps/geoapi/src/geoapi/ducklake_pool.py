@@ -53,6 +53,8 @@ class GeoAPIDuckLakePool(DuckLakePool):
         # Get pool size from settings
         pool_size = getattr(settings, "DUCKLAKE_POOL_SIZE", 2)
         self._pool_size = pool_size
+        self._pin_snapshot = settings.DUCKLAKE_PIN_SNAPSHOT
+        self._refresh_interval = settings.DUCKLAKE_SNAPSHOT_REFRESH_SECONDS
 
         super().init(SettingsWrapper())
 
