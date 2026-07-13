@@ -192,3 +192,51 @@ def test_execute_with_retry_pin_miss_refresh(
     assert manager.execute_with_retry("SELECT 1") == [(42,)]
     assert calls["n"] == 2
     assert manager._pin.current == 10
+
+
+class TestDirectPgUri:
+    """DuckLake attaches prefer DUCKLAKE_POSTGRES_DATABASE_URI (direct PG,
+    bypassing the transaction pooler); absent -> app-wide URI unchanged."""
+
+    class _Base:
+        POSTGRES_DATABASE_URI = "postgresql://u:p@pooler:5432/goat"
+        DUCKLAKE_CATALOG_SCHEMA = "ducklake"
+        DUCKLAKE_DATA_DIR = "/tmp/lake"
+        DUCKLAKE_S3_ENDPOINT = None
+        DUCKLAKE_S3_BUCKET = None
+        DUCKLAKE_S3_ACCESS_KEY = None
+        DUCKLAKE_S3_SECRET_KEY = None
+
+    def test_manager_prefers_ducklake_uri(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class S(self._Base):
+            DUCKLAKE_POSTGRES_DATABASE_URI = "postgresql://u:p@primary:5432/goat"
+
+        m = BaseDuckLakeManager(read_only=True)
+        monkeypatch.setattr(m, "_create_connection", lambda *a, **k: None)
+        m.init(S())
+        assert m._postgres_uri == "postgresql://u:p@primary:5432/goat"
+
+    def test_manager_falls_back_without_ducklake_uri(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        m = BaseDuckLakeManager(read_only=True)
+        monkeypatch.setattr(m, "_create_connection", lambda *a, **k: None)
+        m.init(self._Base())
+        assert m._postgres_uri == "postgresql://u:p@pooler:5432/goat"
+
+    def test_pool_prefers_ducklake_uri(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from goatlib.storage.ducklake import DuckLakePool
+
+        class S(self._Base):
+            DUCKLAKE_POSTGRES_DATABASE_URI = "postgresql://u:p@primary:5432/goat"
+
+        p = DuckLakePool(pool_size=1)
+        monkeypatch.setattr(
+            p,
+            "_create_connection_with_retry",
+            lambda *a, **k: type("C", (), {"close": lambda self: None})(),
+        )
+        p.init(S())
+        assert p._postgres_uri == "postgresql://u:p@primary:5432/goat"

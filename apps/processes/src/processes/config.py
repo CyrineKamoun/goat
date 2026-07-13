@@ -55,10 +55,22 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "goat")
 
+    # Direct PostgreSQL host for DuckLake attaches (long-lived,
+    # idle-in-transaction sessions that waste transaction-pooler slots).
+    # Unset = same host as POSTGRES_SERVER.
+    DUCKLAKE_POSTGRES_SERVER: str = os.getenv(
+        "DUCKLAKE_POSTGRES_SERVER", ""
+    ) or os.getenv("POSTGRES_SERVER", "localhost")
+
     @property
     def POSTGRES_DATABASE_URI(self) -> str:
         """Construct PostgreSQL connection URI for DuckLake."""
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+    @property
+    def DUCKLAKE_POSTGRES_DATABASE_URI(self) -> str:
+        """PostgreSQL URI for DuckLake catalog attaches (direct, unpooled)."""
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DUCKLAKE_POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     # Schema settings
     CUSTOMER_SCHEMA: str = os.getenv("CUSTOMER_SCHEMA", "customer")

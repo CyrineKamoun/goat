@@ -253,13 +253,26 @@ class ToolSettings:
             f"postgresql://{pg_user}:{pg_password}@{pg_server}:{pg_port}/{pg_db}"
         )
 
+        # DuckLake attaches hold idle-in-transaction sessions for the whole
+        # job, which pins transaction-pooler slots for nothing. When
+        # DUCKLAKE_POSTGRES_SERVER is set they connect straight to that host
+        # (e.g. the CNPG primary); otherwise behavior is unchanged.
+        ducklake_pg_server = cls._get_secret("DUCKLAKE_POSTGRES_SERVER", "")
+        if ducklake_pg_server:
+            ducklake_uri = (
+                f"postgresql://{pg_user}:{pg_password}"
+                f"@{ducklake_pg_server}:{pg_port}/{pg_db}"
+            )
+        else:
+            ducklake_uri = cls._get_secret("POSTGRES_DATABASE_URI", default_uri)
+
         return cls(
             postgres_server=pg_server,
             postgres_port=int(pg_port),
             postgres_user=pg_user,
             postgres_password=pg_password,
             postgres_db=pg_db,
-            ducklake_postgres_uri=cls._get_secret("POSTGRES_DATABASE_URI", default_uri),
+            ducklake_postgres_uri=ducklake_uri,
             ducklake_catalog_schema=cls._get_secret(
                 "DUCKLAKE_CATALOG_SCHEMA", "ducklake"
             ),

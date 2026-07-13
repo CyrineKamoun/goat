@@ -32,6 +32,9 @@ class GeoAPIDuckLakePool(DuckLakePool):
         class SettingsWrapper:
             def __init__(self):
                 self.POSTGRES_DATABASE_URI = settings.POSTGRES_DATABASE_URI
+                self.DUCKLAKE_POSTGRES_DATABASE_URI = (
+                    settings.DUCKLAKE_POSTGRES_DATABASE_URI
+                )
                 self.DUCKLAKE_CATALOG_SCHEMA = settings.DUCKLAKE_CATALOG_SCHEMA
                 self.DUCKLAKE_S3_ENDPOINT = getattr(settings, "S3_ENDPOINT_URL", None)
                 self.DUCKLAKE_S3_BUCKET = (

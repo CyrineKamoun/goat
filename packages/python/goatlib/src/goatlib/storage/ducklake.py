@@ -187,7 +187,15 @@ class BaseDuckLakeManager:
 
     def init(self: "BaseDuckLakeManager", settings: DuckLakeSettings) -> None:
         """Initialize DuckLake connection."""
-        self._postgres_uri = settings.POSTGRES_DATABASE_URI
+        # DuckLake attaches are few, permanent, and idle-in-transaction —
+        # the worst clients for a transaction pooler (each pins a server
+        # slot forever). Deployments can point them directly at PostgreSQL
+        # via DUCKLAKE_POSTGRES_DATABASE_URI, keeping the pooler's slots
+        # for short-lived app queries. Falls back to the app-wide URI.
+        self._postgres_uri = (
+            getattr(settings, "DUCKLAKE_POSTGRES_DATABASE_URI", None)
+            or settings.POSTGRES_DATABASE_URI
+        )
         self._catalog_schema = settings.DUCKLAKE_CATALOG_SCHEMA
         self._s3_endpoint = getattr(settings, "DUCKLAKE_S3_ENDPOINT", None)
         self._s3_access_key = getattr(settings, "DUCKLAKE_S3_ACCESS_KEY", None)
@@ -795,7 +803,12 @@ class DuckLakePool:
             if self._initialized:
                 return
 
-            self._postgres_uri = settings.POSTGRES_DATABASE_URI
+                # Prefers DUCKLAKE_POSTGRES_DATABASE_URI (direct PG for the
+            # long-lived attaches) — see BaseDuckLakeManager.init.
+            self._postgres_uri = (
+                getattr(settings, "DUCKLAKE_POSTGRES_DATABASE_URI", None)
+                or settings.POSTGRES_DATABASE_URI
+            )
             self._catalog_schema = settings.DUCKLAKE_CATALOG_SCHEMA
             self._s3_endpoint = getattr(settings, "DUCKLAKE_S3_ENDPOINT", None)
             self._s3_access_key = getattr(settings, "DUCKLAKE_S3_ACCESS_KEY", None)
