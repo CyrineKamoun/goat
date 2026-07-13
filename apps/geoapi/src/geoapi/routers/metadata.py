@@ -4,10 +4,12 @@ from typing import Any, cast
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request, Response
 
 from geoapi.config import settings
 from geoapi.dependencies import LayerInfo, LayerInfoDep
+from geoapi.ducklake_pool import ducklake_pool
+from geoapi.http_cache import apply_cache_headers, build_query_etag, not_modified
 from geoapi.models import (
     Collection,
     Conformance,
@@ -17,6 +19,7 @@ from geoapi.models import (
     Queryables,
     SpatialExtent,
 )
+from geoapi.routers.tiles import get_layer_version
 from geoapi.services.computed_columns import fetch_field_config
 from geoapi.services.layer_service import layer_service
 
@@ -173,9 +176,20 @@ async def conformance() -> Conformance:
 )
 async def get_collection(
     request: Request,
+    response: Response,
     layer_info: LayerInfoDep,
-) -> Collection:
+    if_none_match: str | None = Header(default=None, alias="if-none-match"),
+) -> Collection | Response:
     """Get metadata for a specific collection."""
+    etag = build_query_etag(
+        layer_info.layer_id,
+        get_layer_version(layer_info.layer_id),
+        ducklake_pool.pinned_snapshot_id,
+        params={"kind": "collection"},
+    )
+    if cached := not_modified(if_none_match, etag):
+        return cached
+
     metadata = await layer_service.get_layer_metadata(layer_info)
     if not metadata:
         raise HTTPException(status_code=404, detail="Collection not found")
@@ -226,6 +240,7 @@ async def get_collection(
     if metadata.bounds:
         extent = Extent(spatial=SpatialExtent(bbox=[metadata.bounds]))
 
+    apply_cache_headers(response, etag)
     return Collection(
         id=collection_id,
         title=metadata.name,
@@ -241,9 +256,20 @@ async def get_collection(
 )
 async def get_queryables(
     request: Request,
+    response: Response,
     layer_info: LayerInfoDep,
-) -> Queryables:
+    if_none_match: str | None = Header(default=None, alias="if-none-match"),
+) -> Queryables | Response:
     """Get queryable properties for a collection."""
+    etag = build_query_etag(
+        layer_info.layer_id,
+        get_layer_version(layer_info.layer_id),
+        ducklake_pool.pinned_snapshot_id,
+        params={"kind": "queryables"},
+    )
+    if cached := not_modified(if_none_match, etag):
+        return cached
+
     metadata = await layer_service.get_layer_metadata(layer_info)
     if not metadata:
         raise HTTPException(status_code=404, detail="Collection not found")
@@ -270,6 +296,7 @@ async def get_queryables(
     field_config = await _load_field_config(layer_info)
     _apply_field_config_to_properties(properties, field_config)
 
+    apply_cache_headers(response, etag)
     return Queryables(
         title=collection_id,
         properties=properties,

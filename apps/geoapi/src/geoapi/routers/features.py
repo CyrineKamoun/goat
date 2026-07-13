@@ -10,7 +10,16 @@ from functools import partial
 from typing import Annotated, Any, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+)
 
 from geoapi.dependencies import (
     BBoxDep,
@@ -21,7 +30,10 @@ from geoapi.dependencies import (
     PropertiesDep,
 )
 from geoapi.deps.auth import get_optional_user_id
+from geoapi.ducklake_pool import ducklake_pool
+from geoapi.http_cache import apply_cache_headers, build_query_etag, not_modified
 from geoapi.models import Feature, Link
+from geoapi.routers.tiles import get_layer_version
 from geoapi.services.feature_service import feature_service
 from geoapi.services.layer_service import layer_service
 
@@ -126,6 +138,7 @@ async def get_features(
         default=None, description="Sort column (prefix with - for desc)"
     ),
     temp: bool = Query(default=False, description="Serve from temp storage"),
+    if_none_match: Optional[str] = Header(default=None, alias="if-none-match"),
 ) -> Response:
     """Get features from a collection.
 
@@ -172,7 +185,26 @@ async def get_features(
 
         return await loop.run_in_executor(_feature_executor, _run_temp)
 
-    # Standard layer serving
+    # Standard layer serving. Revalidation happens BEFORE any DuckLake work:
+    # a matching ETag skips the query and the (potentially multi-MB) payload.
+    # Temp layers above are excluded — they have no version/snapshot lifecycle.
+    etag = build_query_etag(
+        layer_info.layer_id,
+        get_layer_version(layer_info.layer_id),
+        ducklake_pool.pinned_snapshot_id,
+        params={
+            "limit": limit,
+            "offset": offset,
+            "bbox": bbox,
+            "properties": properties,
+            "filter": cql_filter,
+            "ids": ids,
+            "sortby": sortby,
+        },
+    )
+    if cached := not_modified(if_none_match, etag):
+        return cached
+
     # Get layer metadata
     logger.debug("Getting features for layer_info: %s", layer_info)
     metadata = await layer_service.get_layer_metadata(layer_info)
@@ -251,9 +283,11 @@ async def get_features(
                 }
             )
 
-        return _build_items_response_from_json(
+        response = _build_items_response_from_json(
             features_json, returned_count, total_count, links, accept_gzip
         )
+        apply_cache_headers(response, etag)
+        return response
 
     return await loop.run_in_executor(_feature_executor, _run)
 
@@ -265,11 +299,22 @@ async def get_features(
 )
 async def get_feature(
     request: Request,
+    response: Response,
     layer_info: LayerInfoDep,
     itemId: str = Path(..., description="Feature ID"),
     properties: PropertiesDep = None,
-) -> Feature:
+    if_none_match: Optional[str] = Header(default=None, alias="if-none-match"),
+) -> Feature | Response:
     """Get a single feature by ID."""
+    etag = build_query_etag(
+        layer_info.layer_id,
+        get_layer_version(layer_info.layer_id),
+        ducklake_pool.pinned_snapshot_id,
+        params={"item": itemId, "properties": properties},
+    )
+    if cached := not_modified(if_none_match, etag):
+        return cached
+
     # Get layer metadata
     metadata = await layer_service.get_layer_metadata(layer_info)
     if not metadata:
@@ -314,6 +359,7 @@ async def get_feature(
         ),
     ]
 
+    apply_cache_headers(response, etag)
     return Feature(
         id=feature["id"],
         geometry=feature["geometry"],
