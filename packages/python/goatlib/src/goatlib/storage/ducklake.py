@@ -1419,12 +1419,18 @@ class DuckLakePool:
                     logger.info("Pin miss, refreshed snapshot and retrying: %s", e)
                     continue
                 if is_connection_error(e) and attempt < max_retries - 1:
-                    if self._pin_snapshot:
+                    transient_data_error = (
+                        "failed to get data file list" in str(e).lower()
+                    )
+                    if self._pin_snapshot and not transient_data_error:
                         # A broken cursor means the shared base's PG link is
                         # dead for ALL cursors; rebuild it now (single-flight
                         # + dedup in _apply_snapshot coalesce concurrent
                         # failures onto one rebuild) instead of redrawing
                         # doomed cursors until the next snapshot advance.
+                        # Data-file-list failures are transient object-store
+                        # errors, not base death: a plain retry on the same
+                        # base is the right response, not a catalog rebuild.
                         try:
                             self.reconnect()
                         except Exception as rec_err:

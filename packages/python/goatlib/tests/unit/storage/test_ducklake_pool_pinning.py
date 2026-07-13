@@ -457,6 +457,49 @@ def test_connection_error_triggers_pinned_reconnect(
     assert all(not e[0].base.closed for e in entries)
 
 
+def test_transient_data_error_retries_without_rebuild(
+    pool: DuckLakePool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """S3/object-store blips ('failed to get data file list') must retry on
+    the same base instead of tearing it down with a full catalog rebuild."""
+    from goatlib.storage.snapshot_pin import SnapshotPin
+
+    pool._pin = SnapshotPin(pool._fetch_latest_snapshot_id, pool._apply_snapshot)
+    pool._pin._current = 10
+    reconnects = {"n": 0}
+    monkeypatch.setattr(
+        pool, "reconnect", lambda: reconnects.__setitem__("n", reconnects["n"] + 1)
+    )
+    calls = {"n": 0}
+
+    class BlipThenOk:
+        def execute(self, *_: Any) -> "BlipThenOk":
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("IO Error: Failed to get data file list from s3")
+            return self
+
+        def fetchone(self) -> tuple[int]:
+            return (7,)
+
+        def fetchall(self) -> list[tuple[int]]:
+            return [(7,)]
+
+        def close(self) -> None:
+            pass
+
+    import contextlib
+
+    @contextlib.contextmanager
+    def fake_conn() -> Generator[Any, None, None]:
+        yield BlipThenOk()
+
+    monkeypatch.setattr(pool, "connection", fake_conn)
+    assert pool.execute_with_retry("SELECT 1", fetch_all=False) == (7,)
+    assert calls["n"] == 2  # retried
+    assert reconnects["n"] == 0  # no base rebuild for a transient blip
+
+
 def test_scaled_memory_limit() -> None:
     p = DuckLakePool(pool_size=4, pin_snapshot=True)
     p._memory_limit = "1.5GB"
