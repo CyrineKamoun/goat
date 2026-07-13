@@ -184,6 +184,14 @@ class OpportunityV2PointBase(OpportunityV2):
         ),
     )
 
+    layer_project_id: int | None = Field(
+        default=None,
+        description="Project-layer id of the opportunity layer (auto-populated).",
+        json_schema_extra=ui_field(
+            section="opportunities", field_order=1, hidden=True
+        ),
+    )
+
     # Hide the inherited analysis-layer scalar `max_cost`. The runner sets
     # it via resolve_max_cost(cost_type) before handing the opportunity to
     # the analysis layer.
@@ -1369,10 +1377,19 @@ class HeatmapV2ToolRunner(BaseToolRunner[HeatmapV2WindmillParams]):
         # fields into the analysis-layer OpportunityV2.max_cost (resolved
         # against the form's outer routing_mode + cost_type), then swap
         # layer UUIDs for parquet paths.
+        # Name the result column after the project layer. Set before
+        # resolve_layer_paths, which fills the dataset name when name is unset.
         resolved = params.resolved_opportunities()
-        return self.resolve_layer_paths(
-            resolved, params.user_id, "input_path"
-        )
+        named = []
+        for opp, card in zip(resolved, params.opportunities):
+            if not opp.name:
+                proj_name = self.get_project_layer_name_by_id(
+                    getattr(card, "layer_project_id", None)
+                )
+                if proj_name:
+                    opp = opp.model_copy(update={"name": proj_name})
+            named.append(opp)
+        return self.resolve_layer_paths(named, params.user_id, "input_path")
 
     def _resolve_reference_area(
         self: Self, params: HeatmapV2WindmillParams

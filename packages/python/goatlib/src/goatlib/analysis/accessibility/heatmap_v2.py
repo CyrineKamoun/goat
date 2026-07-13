@@ -561,22 +561,36 @@ class HeatmapV2Tool(HeatmapToolBase):
     # ----------------------------------------------------------- join across layers
 
     def _join_layer_scores(
-        self: Self, score_tables: list[tuple[str, str]]
+        self: Self,
+        score_tables: list[tuple[str, str]],
+        heatmap_type: HeatmapType,
     ) -> str:
-        """FULL OUTER JOIN the per-layer score tables on h3_index. Missing
-        per-layer scores COALESCE to 0; total_accessibility = sum across
-        layers (rounded). Materialises `heatmap_v2_results` and returns the
-        table name."""
+        """FULL OUTER JOIN the per-layer score tables on h3_index into
+        total_accessibility. Gravity totals are a sum (cells not reaching every
+        layer are dropped); closest-average totals are the mean of reached
+        layers' costs. Unreached layers stay NULL. Materialises
+        `heatmap_v2_results`."""
         select_cols = ", ".join(
-            f"COALESCE(s{idx}.{col}_accessibility, 0.0) AS {col}_accessibility"
+            f"s{idx}.{col}_accessibility AS {col}_accessibility"
             for idx, (col, _) in enumerate(score_tables)
         )
-        total_expr = " + ".join(
-            f"COALESCE(s{idx}.{col}_accessibility, 0.0)"
+        sum_expr = " + ".join(
+            f"s{idx}.{col}_accessibility"
             for idx, (col, _) in enumerate(score_tables)
         )
-        # Build a left-deep FULL OUTER JOIN chain; each successive table
-        # joins ON its h3_index equaling COALESCE(s0.h3_index, …, s_{i-1}.h3_index).
+        if heatmap_type == HeatmapType.closest_average:
+            cnt_expr = " + ".join(
+                f"(s{idx}.{col}_accessibility IS NOT NULL)::INT"
+                for idx, (col, _) in enumerate(score_tables)
+            )
+            total_select = (
+                f"ROUND(({sum_expr}) / NULLIF({cnt_expr}, 0), 2) AS total_accessibility"
+            )
+            drop_null_total = False
+        else:
+            total_select = f"ROUND({sum_expr}, 2) AS total_accessibility"
+            drop_null_total = True
+
         from_clause = f"{score_tables[0][1]} s0"
         for i in range(1, len(score_tables)):
             prev_coalesce = "COALESCE(" + ", ".join(
@@ -590,15 +604,17 @@ class HeatmapV2Tool(HeatmapToolBase):
             f"s{idx}.h3_index" for idx in range(len(score_tables))
         ) + ")"
 
+        inner_select = (
+            f"SELECT {h3_coalesce} AS h3_index, {select_cols}, {total_select} "
+            f"FROM {from_clause}"
+        )
+        body = (
+            f"SELECT * FROM ({inner_select}) WHERE total_accessibility IS NOT NULL"
+            if drop_null_total
+            else inner_select
+        )
         self.con.execute(
-            f"""
-            CREATE OR REPLACE TEMP TABLE heatmap_v2_results AS
-            SELECT
-                {h3_coalesce} AS h3_index,
-                {select_cols},
-                ROUND({total_expr}, 2) AS total_accessibility
-            FROM {from_clause}
-            """
+            f"CREATE OR REPLACE TEMP TABLE heatmap_v2_results AS {body}"
         )
         return "heatmap_v2_results"
 
@@ -659,7 +675,9 @@ class HeatmapV2Tool(HeatmapToolBase):
                 score_tables.append((col, table))
             last_t = time.perf_counter()  # per-layer prints already accounted for time
 
-            results_table = self._join_layer_scores(score_tables)
+            results_table = self._join_layer_scores(
+                score_tables, params.heatmap_type
+            )
             n_cells = self.con.execute(
                 f"SELECT count(*) FROM {results_table}"
             ).fetchone()[0]
