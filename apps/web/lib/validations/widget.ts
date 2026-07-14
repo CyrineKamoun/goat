@@ -276,7 +276,7 @@ export const filterDataConfigSchema = dataConfigSchema.extend({
       show_histogram: z.boolean().optional().default(true),
       steps: z.number().min(1).max(100).optional().default(50),
       show_slider: z.boolean().optional().default(true),
-      // Temporal range slider step unit (only for date/datetime/time columns)
+      // Range slider step unit for datetime columns
       granularity: z.enum(["minute", "hour", "day", "week", "month"]).optional(),
     })
     .default({}),
