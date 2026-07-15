@@ -85,7 +85,7 @@ The Table widget **displays data from a layer as a scrollable table**. You can s
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">In Dashboard setup mode, use <code>Sort by</code> and <code>Sort</code> (<code>Ascending</code> / <code>Descending</code>) to set the default row order.</div>
+  <div class="content">In Dashboard setup mode, use <code>Sort by</code> and <code>Sort ascending</code> to set the default row order. Viewers can also sort interactively by clicking any column header — the first click sorts ascending, a second click sorts descending, and a third click removes the sort. An arrow icon in the header shows the active sort direction.</div>
 </div>
 
 <div class="step">
