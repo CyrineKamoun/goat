@@ -65,7 +65,7 @@ The Huff Model is available in certain regions. Upon selecting a `Routing type`,
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Pick the <code>Routing Type</code> you would like to use for the analysis.</div>
+  <div class="content">Pick the <code>Transport mode</code> you would like to use for the analysis.</div>
 </div>
 
 | Mode | Considers | Speed assumed |
@@ -138,8 +138,15 @@ Ideally, collect data on actual customer visits or market shares to estimate opt
 
 :::
 
+### Result Layer
+
 <div class="step">
   <div class="step-number">12</div>
+  <div class="content">Set the <code>Result layer name</code> for the output Huff Model layer.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">13</div>
   <div class="content">Click <code>Run</code> to start the calculation.</div>
 </div>
 

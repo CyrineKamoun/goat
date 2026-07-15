@@ -69,7 +69,7 @@ Geeignete Reisezeitlimits nach Einrichtungstyp finden Sie im [Standortwerkzeug](
 **Berechnet die geradlinige geodätische Entfernung zwischen jedem Ursprungs-Ziel-Paar.** Es wird kein Routing-Netzwerk verwendet. Für diesen Modus gibt es keine Konfigurationsfelder — wählen Sie ihn einfach aus und fahren Sie mit dem Abschnitt Eingabe fort.
 
 </TabItem>
-<TabItem value="pt" label="Öffentlicher Verkehr (ÖV)" className="tabItemBox">
+<TabItem value="pt" label="ÖPNV" className="tabItemBox">
 
 <div class="step">
   <div class="step-number">3</div>
@@ -98,23 +98,28 @@ Geeignete Reisezeitlimits nach Einrichtungstyp finden Sie im [Standortwerkzeug](
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Wählen Sie unter <b>Origins</b> Ihren <code>Startpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Startort ist) und legen Sie die <code>Herkunft-Bezeichnung</code> fest — die Spalte zur Identifikation der Startpunkte in der Ergebnismatrix.</div>
+  <div class="content">Wählen Sie unter <b>Startpunkte</b> Ihren <code>Startpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Startort ist) und legen Sie die <code>Herkunft-Bezeichnung</code> fest — die Spalte zur Identifikation der Startpunkte in der Ergebnismatrix.</div>
 </div>
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Wählen Sie unter <b>Destinations</b> Ihren <code>Zielpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Zielort ist) und legen Sie die <code>Ziel-Bezeichnung</code> fest — die Spalte zur Identifikation der Zielpunkte in der Ergebnismatrix.</div>
+  <div class="content">Wählen Sie unter <b>Zielpunkte</b> Ihren <code>Zielpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Zielort ist) und legen Sie die <code>Ziel-Bezeichnung</code> fest — die Spalte zur Identifikation der Zielpunkte in der Ergebnismatrix.</div>
 </div>
 
 ### Ergebnis-Layer
 
 <div class="step">
   <div class="step-number">9</div>
-  <div class="content">Optional können Sie den <code>Namen des Zielpunkte-Layers</code> für den Ausgabe-Zielpunkte-Layer festlegen.</div>
+  <div class="content">Legen Sie den <code>Namen des Zielpunkte-Layers</code> für den Ausgabe-Zielpunkte-Layer fest.</div>
 </div>
 
 <div class="step">
   <div class="step-number">10</div>
+  <div class="content">Legen Sie den <code>Namen des Matrix-Layers</code> für den Ausgabe-Tabellen-Layer fest.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">11</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>.</div>
 </div>
 

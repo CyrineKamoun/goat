@@ -74,8 +74,15 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 </div>
 
 
+### Result Layer
+
 <div class="step">
   <div class="step-number">6</div>
+  <div class="content">Set the <code>Result layer name</code> for the output heatmap layer.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">7</div>
   <div class="content">Click <code>Run</code> to start the calculation of the heatmap.</div>
 </div>
 

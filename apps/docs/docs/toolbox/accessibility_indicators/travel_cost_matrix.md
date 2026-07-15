@@ -110,11 +110,16 @@ For suitable travel time limits by amenity type, see the [Location Tool](https:/
 
 <div class="step">
   <div class="step-number">9</div>
-  <div class="content">Optionally, set the <code>Destinations layer name</code> for the output destinations point layer.</div>
+  <div class="content">Set the <code>Destinations layer name</code> for the output destinations point layer.</div>
 </div>
 
 <div class="step">
   <div class="step-number">10</div>
+  <div class="content">Set the <code>Matrix layer name</code> for the output table layer.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">11</div>
   <div class="content">Click on <code>Run</code>.</div>
 </div>
 

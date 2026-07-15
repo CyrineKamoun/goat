@@ -60,10 +60,10 @@ Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **üb
 
 | Verkehrsmittel | Berücksichtigt | Angenommene Geschwindigkeit |
 |----------------|----------------|----------------------------|
-| Walk | Alle zu Fuß begehbaren Wege | 5 km/h |
-| Bicycle | Alle mit dem Fahrrad befahrbaren Wege (Oberfläche, Glätte, Steigung) | 15 km/h |
+| Zu Fuß | Alle zu Fuß begehbaren Wege | 5 km/h |
+| Fahrrad | Alle mit dem Fahrrad befahrbaren Wege (Oberfläche, Glätte, Steigung) | 15 km/h |
 | Pedelec | Alle mit dem Pedelec befahrbaren Wege (Oberfläche, Glätte) | 23 km/h |
-| Car | Alle mit dem Auto befahrbaren Wege (Tempolimits, Einbahnstraßen) | — |
+| Auto | Alle mit dem Auto befahrbaren Wege (Tempolimits, Einbahnstraßen) | — |
 
 
 ### Gelegenheiten
@@ -99,8 +99,15 @@ Brauchen Sie Hilfe bei der Wahl eines geeigneten Reisezeitlimits für verschiede
   <div class="content">Optional können Sie unter <code>Erweiterte Optionen</code> ein <code>Referenzgebiet</code> auswählen — einen Polygon-Layer, der das vollständige Untersuchungsgebiet definiert. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; Zellen außerhalb der berechneten Erreichbarkeit werden als <code>NULL</code> dargestellt und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
 </div>
 
+### Ergebnis-Layer
+
 <div class="step">
   <div class="step-number">9</div>
+  <div class="content">Legen Sie den <code>Name der Ergebnislayer</code> für den Ausgabe-Heatmap-Layer fest.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">10</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Berechnung der Heatmap zu beginnen.</div>
 </div>
 

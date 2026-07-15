@@ -34,7 +34,7 @@ Die Berechnung ist in bestimmten Regionen verfügbar.
 
 Nach Auswahl eines `Routentyps` zeigt GOAT eine Kartenüberlagerung mit der Abdeckung an.
 Für `Zu Fuß`, `Fahrrad`, `Pedelec` und `Auto`: **über 30 europäische Länder** werden unterstützt.
-Für `Öffentlicher Verkehr`: Deutschland wird unterstützt.
+Für `ÖPNV`: Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich werden unterstützt.
 
 Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns gerne](https://plan4better.de/en/contact/) — wir besprechen weitere Möglichkeiten.
 :::
@@ -82,7 +82,7 @@ Geeignete Reisezeitlimits nach Einrichtungstyp finden Sie im [Standortwerkzeug](
 
 </TabItem>
 
-<TabItem value="public transport" label="Öffentlicher Verkehr (ÖV)" className="tabItemBox">
+<TabItem value="public transport" label="ÖPNV" className="tabItemBox">
 
 **Berücksichtigt alle per öffentlichem Verkehr erreichbaren Orte, einschließlich intermodaler Umstiege und Haltestellen-Zugang.**
 
@@ -140,7 +140,7 @@ Wählen Sie, wie die Isochronen-Schritte dargestellt werden:
 
 </TabItem>
 
-<TabItem value="pt-advanced" label="Öffentlicher Verkehr (ÖV)" className="tabItemBox">
+<TabItem value="pt-advanced" label="ÖPNV" className="tabItemBox">
 
 <div class="step">
   <div class="step-number">5</div>
@@ -179,8 +179,20 @@ Für jeden Modus können Sie die **maximale Reisezeit oder Entfernung** sowie di
   <div class="content">Wählen Sie die <code>Methode zur Startpunktauswahl</code>: Wählen Sie <code>Auf der Karte auswählen</code> und klicken Sie auf die Karte, um Startpunkte zu setzen, oder wählen Sie <code>Aus Layer auswählen</code> und wählen Sie einen Punktlayer mit den gewünschten Startpunkten. Alle Features des Layers werden als Startpunkte verwendet.</div>
 </div>
 
+### Ergebnis-Layer
+
 <div class="step">
   <div class="step-number">7</div>
+  <div class="content">Legen Sie den <code>Name der Ergebnislayer</code> für den Ausgabe-Einzugsgebiet-Layer fest.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">8</div>
+  <div class="content">Legen Sie den <code>Name des Startpunkte-Layer</code> für den Ausgabe-Startpunkte-Layer fest.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">9</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Berechnung zu starten.</div>
 </div>
 
@@ -208,13 +220,13 @@ Der Ergebnislayer wird automatisch mit einer Farbskala von der kürzesten bis zu
 | Routing-Modus | Maximale Startpunkte |
 | --- | --- |
 | Zu Fuß / Fahrrad / Pedelec / Auto | 1.000 |
-| Öffentlicher Verkehr | 100 |
+| ÖPNV | 100 |
 
 ### Visualisierung
 
 Der verwendete Algorithmus zur Ableitung der Einzugsgebietsform hängt vom Routing-Modus ab:
 
-- **Zu Fuß, Fahrrad, Pedelec und Öffentlicher Verkehr** — die Form wird aus dem Routing-Raster mithilfe des [Marching-Squares-Konturlinien-Algorithmus](https://de.wikipedia.org/wiki/Marching_Squares "Wikipedia: Marching Squares") abgeleitet, einem Computergraphik-Algorithmus, der zweidimensionale Konturlinien aus einem rechteckigen Wertearray erzeugt ([de Queiroz Neto et al. 2016](#6-referenzen)). Dieser Algorithmus transformiert das Routing-Raster von einem 2D-Array in glatte Polygonkonturen für die Visualisierung und räumliche Analyse.
+- **Zu Fuß, Fahrrad, Pedelec und ÖPNV** — die Form wird aus dem Routing-Raster mithilfe des [Marching-Squares-Konturlinien-Algorithmus](https://de.wikipedia.org/wiki/Marching_Squares "Wikipedia: Marching Squares") abgeleitet, einem Computergraphik-Algorithmus, der zweidimensionale Konturlinien aus einem rechteckigen Wertearray erzeugt ([de Queiroz Neto et al. 2016](#6-referenzen)). Dieser Algorithmus transformiert das Routing-Raster von einem 2D-Array in glatte Polygonkonturen für die Visualisierung und räumliche Analyse.
 - **Auto** — die Form wird mithilfe der DuckDB-Funktion [`ST_ConcaveHull`](https://duckdb.org/docs/current/core_extensions/spatial/functions#st_concavehull) abgeleitet, die sich eng um die erreichbaren Punkte legt, um das Einzugsgebiets-Polygon zu erzeugen. Es wird ein dynamisches Konkavitätsverhältnis basierend auf der Anzahl erreichter Knoten verwendet: `0,5` bei weniger als 10.000 Knoten, `0,3` bei weniger als 50.000 und `0,2` andernfalls — niedrigere Werte erzeugen engere, stärker konkave Formen bei großen Einzugsgebieten, höhere Werte glattere Konturen bei kleinen.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

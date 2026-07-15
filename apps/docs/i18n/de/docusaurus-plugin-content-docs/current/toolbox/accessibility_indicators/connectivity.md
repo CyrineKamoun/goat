@@ -51,10 +51,10 @@ Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **üb
 
 | Verkehrsmittel | Berücksichtigt | Angenommene Geschwindigkeit |
 |----------------|----------------|----------------------------|
-| Walk | Alle zu Fuß begehbaren Wege | 5 km/h |
-| Bicycle | Alle mit dem Fahrrad befahrbaren Wege (Oberfläche, Glätte, Steigung) | 15 km/h |
+| Zu Fuß | Alle zu Fuß begehbaren Wege | 5 km/h |
+| Fahrrad | Alle mit dem Fahrrad befahrbaren Wege (Oberfläche, Glätte, Steigung) | 15 km/h |
 | Pedelec | Alle mit dem Pedelec befahrbaren Wege (Oberfläche, Glätte) | 23 km/h |
-| Car | Alle mit dem Auto befahrbaren Wege (Tempolimits, Einbahnstraßen) | — |
+| Auto | Alle mit dem Auto befahrbaren Wege (Tempolimits, Einbahnstraßen) | — |
 
 <div class="step">
   <div class="step-number">4</div>
@@ -74,8 +74,15 @@ Benötigen Sie Hilfe bei der Auswahl eines geeigneten Reisezeitlimits für versc
 </div>
 
 
+### Ergebnis-Layer
+
 <div class="step">
   <div class="step-number">6</div>
+  <div class="content">Legen Sie den <code>Name der Ergebnislayer</code> für den Ausgabe-Heatmap-Layer fest.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">7</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Berechnung der Heatmap zu beginnen.</div>
 </div>
 

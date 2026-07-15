@@ -16,28 +16,10 @@ The **Trip Count Platform** shows the **average number of departures per hour fo
 
 This indicator is the foundation for the [ÖV-Güteklassen](./oev_gueteklassen.md) and is useful for **weak point analyses of local transport plans** (see, among others, [Guideline for Local Transport Planning in Bavaria](https://www.demografie-leitfaden-bayern.de/index.html)).
 
-import MapViewer from '@site/src/components/MapViewer';
+:::info
 
-:::info 
-The public transport (PT) trip count is only available in areas where the transport network is integrated into GOAT. 
+Trip Count Platform computation is available for areas where public transport GTFS data is integrated into GOAT. Currently supported regions include **Germany, Austria, and Switzerland**. If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/) and we'll check what is possible.
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-    <MapViewer
-      geojsonUrls={[
-        "https://assets.plan4better.de/other/geofence/geofence_gtfs.geojson"
-      ]}
-      styleOptions={{
-        fillColor: "#808080",
-        outlineColor: "#808080",
-        fillOpacity: 0.8
-      }}
-      legendItems={[
-        { label: "Coverage for public transport trip count calculation", color: "#ffffff" }
-      ]}
-    />
-</div> 
-
-In case you need to perform analysis beyond this geofence, feel free to contact the [Support](https://plan4better.de/en/contact/ "Contact Support") and we will check what is possible. 
 :::
 
 ## 2. Example use cases
@@ -65,16 +47,23 @@ In case you need to perform analysis beyond this geofence, feel free to contact 
   <div class="content">Choose the <code>Day</code>, <code>Start Time</code>, and <code>End Time</code> for your analysis.</div>
 </div>
 
-### Reference Layer
+### Configuration
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Select the <code>Reference Layer</code> (polygon feature layer) for the area you want to analyze.</div>
+  <div class="content">Select the <code>Reference Area Layer</code> — a polygon layer defining the study area boundary.</div>
 </div>
 
 
+### Result Layer
+
 <div class="step">
   <div class="step-number">5</div>
+  <div class="content">Set the <code>Result layer name</code> for the output layer.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">6</div>
   <div class="content">Click <code>Run</code> to start the calculation.</div>
 </div>
 
@@ -85,7 +74,7 @@ When the calculation is finished, a new layer called <b>"Trip Count Station"</b>
 Click on stations to view details including **station name**, **total departure count**, and **departure counts per mode**.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/trip_count/trip_count_calculation.gif').default} alt="Calculation - Public Transport Trip Count" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+
 </div>
 
 <p></p>
