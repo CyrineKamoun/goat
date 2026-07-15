@@ -103,6 +103,33 @@ https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
 For a broader list of compatible basemap providers and connection guides, see the [GOAT blog post on where to find basemaps](https://www.plan4better.de/en/post/where-to-find-basemaps).
 :::
 
+## Arrange basemap layers
+
+When editing a custom basemap, the **Layer** tab lets you control how each sub-layer group of that basemap is stacked relative to your own data layers — and toggle individual groups on or off.
+
+To access it, click the edit icon on a custom basemap in the basemap panel, then select the **Layer** tab.
+
+The basemap is organised into five layer groups:
+
+| Group | Contents |
+|-------|----------|
+| **Streets** | Road network, paths |
+| **Waters** | Rivers, lakes, coastlines |
+| **Land Use** | Forests, parks, fields |
+| **Buildings** | Building footprints |
+| **Other** | Remaining layers |
+
+For each group you can:
+- **Toggle visibility** — show or hide the group entirely using the switch on the right
+- **Position** — choose `Above` or `Below` to control whether the group renders above or below your own layers
+- **Reference layer** — select which of your layers acts as the boundary (defaults to *All my layers*)
+
+Click **Reset** to restore all groups to their default positions and visibility.
+
+:::tip When is this useful?
+Place **Streets** above your data to keep roads legible over polygon overlays. Place **Buildings** below your own layers so your data appears on top of building footprints.
+:::
+
 ## Basemaps in shared dashboards
 
 When you share a project as a public dashboard via the **Dashboard**, you can control which basemaps viewers are allowed to switch between. In the **Dashboard**, open the **Settings** tab and find the **Allowed basemaps** field. Select the basemaps you want to make available — if no restriction is set, all basemaps are shown to viewers.

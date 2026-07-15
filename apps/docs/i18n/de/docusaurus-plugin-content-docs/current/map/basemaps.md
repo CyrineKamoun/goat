@@ -103,6 +103,33 @@ https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
 Eine umfangreichere Liste kompatibler Grundkartenanbieter und Verbindungsanleitungen finden Sie im [GOAT-Blogbeitrag zu Grundkarten](https://www.plan4better.de/en/post/where-to-find-basemaps).
 :::
 
+## Basemap-Layer anordnen
+
+Beim Bearbeiten einer eigenen Grundkarte ermöglicht der Tab **Layer** die einzelnen Teilebenengruppen der Grundkarte relativ zu Ihren eigenen Datenlayern anzuordnen — und einzelne Gruppen ein- oder auszublenden.
+
+Um darauf zuzugreifen, klicken Sie auf das Bearbeitungssymbol einer eigenen Grundkarte im Grundkarten-Panel und wählen Sie dann den Tab **Layer**.
+
+Die Grundkarte ist in fünf Layer-Gruppen unterteilt:
+
+| Gruppe | Inhalt |
+|--------|--------|
+| **Straßen** | Straßennetz, Wege |
+| **Gewässer** | Flüsse, Seen, Küsten |
+| **Flächennutzung** | Wald, Parks, Felder |
+| **Gebäude** | Gebäudegrundrisse |
+| **Sonstiges** | Übrige Layer |
+
+Für jede Gruppe können Sie:
+- **Sichtbarkeit umschalten** — die Gruppe mit dem Schalter rechts vollständig ein- oder ausblenden
+- **Position** — `Über` oder `Unter` wählen, um festzulegen, ob die Gruppe über oder unter Ihren eigenen Layern dargestellt wird
+- **Bezugslayer** — auswählen, welcher Ihrer Layer als Referenz dient (Standard: *Alle meine Layer*)
+
+Klicken Sie auf **Zurücksetzen**, um alle Gruppen auf ihre Standardpositionen und -sichtbarkeit zurückzusetzen.
+
+:::tip Wann ist das sinnvoll?
+Platzieren Sie **Straßen** über Ihren Daten, damit Straßen über Polygon-Overlays lesbar bleiben. Platzieren Sie **Gebäude** unter Ihren eigenen Layern, damit Ihre Daten über den Gebäudegrundrissen erscheinen.
+:::
+
 ## Grundkarten in geteilten Dashboards
 
 Wenn Sie ein Projekt als öffentliches Dashboard teilen, können Sie im **Dashboard** festlegen, zwischen welchen Grundkarten die Betrachter wechseln dürfen. Öffnen Sie im **Dashboard** den Tab **Einstellungen** und suchen Sie das Feld **Erlaubte Hintergrundkarten**. Wählen Sie die gewünschten Grundkarten aus — wenn keine Einschränkung festgelegt ist, werden alle Grundkarten für die Betrachter angezeigt.
