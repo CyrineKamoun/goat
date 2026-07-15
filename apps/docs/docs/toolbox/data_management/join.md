@@ -175,7 +175,13 @@ In this example, population data is joined to Berlin districts using both condit
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Optionally, enable <code>Add Join Fields</code> to select which fields from the Join Layer to include in the output, and/or enable <code>Calculate Statistics</code> to compute aggregated values for matched features.</div>
+  <div class="content">Optionally, enable <code>Add Join Fields</code> to select which fields from the Join Layer to include in the output, and/or enable <code>Calculate Statistics</code> to compute aggregated values when multiple Join Layer records match a single Target Layer feature. When <code>Calculate Statistics</code> is enabled, configure the statistic:
+  <ul>
+    <li><code>Select operation</code> — choose one of: <code>Count</code>, <code>Sum</code>, <code>Min</code>, <code>Max</code>, <code>Mean</code>, or <code>Standard Deviation</code>.</li>
+    <li><code>Select field</code> — choose the numeric field from the Join Layer to aggregate (hidden when operation is <code>Count</code>).</li>
+    <li><code>Result column name</code> (optional) — name for the output column. Leave empty to use the default name (e.g. <code>count</code> or <code>fieldname_operation</code>).</li>
+  </ul>
+  </div>
 </div>
 
 <div class="step">
