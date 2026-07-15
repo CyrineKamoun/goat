@@ -365,8 +365,13 @@ class IOConverter:
         # Default ST_Read (no explicit header control)
         if effective_layer:
             safe_layer = effective_layer.replace("'", "''")
-            return f"ST_Read('{src_info.path}', layer='{safe_layer}')"
-        return f"ST_Read('{src_info.path}')"
+            reader = f"ST_Read('{src_info.path}', layer='{safe_layer}')"
+        else:
+            reader = f"ST_Read('{src_info.path}')"
+        # XLSX auto-detect path also surfaces GDAL's synthetic OGC_FID column.
+        if is_xlsx:
+            reader = self._strip_ogc_fid(reader)
+        return reader
 
     def _build_xlsx_reader(
         self: Self, path: str, layer: str | None, has_header: bool
@@ -379,7 +384,7 @@ class IOConverter:
         """
         safe_layer = layer.replace("'", "''") if layer else None
         layer_arg = f", layer='{safe_layer}'" if safe_layer else ""
-        base_read = (
+        base_read = self._strip_ogc_fid(
             f"ST_Read('{path}'{layer_arg}, "
             f"open_options=ARRAY['HEADERS=DISABLE'])"
         )
@@ -413,6 +418,30 @@ class IOConverter:
             f"SELECT *, ROW_NUMBER() OVER () AS __rn "
             f"FROM {base_read}) WHERE __rn > 1)"
         )
+
+    def _strip_ogc_fid(self: Self, read_fragment: str) -> str:
+        """Drop GDAL's synthetic OGC_FID column from an XLSX ST_Read.
+
+        duckdb spatial >= 1.5 surfaces an OGC_FID feature-id column for XLSX
+        that 1.4.x did not. It is not real spreadsheet data: it pollutes the
+        has_header=False column set and, being populated on every row
+        (including formatted-but-blank ones), defeats trailing-empty-row
+        stripping. Select only the real columns. No-op if OGC_FID is absent.
+        """
+        try:
+            cols = [
+                c[0]
+                for c in self.con.execute(
+                    f"SELECT * FROM {read_fragment} LIMIT 0"
+                ).description
+            ]
+        except Exception:
+            return read_fragment
+        data_cols = [c for c in cols if c.upper() != "OGC_FID"]
+        if len(data_cols) == len(cols):
+            return read_fragment
+        col_list = ", ".join(f'"{c}"' for c in data_cols)
+        return f"(SELECT {col_list} FROM {read_fragment})"
 
     @staticmethod
     def _is_tabular_format(src_info: SourceInfo) -> bool:
