@@ -141,17 +141,12 @@ Wählen Sie aus verschiedenen statistischen Methoden, die auf einem Layer berech
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Aktivieren oder deaktivieren Sie <code>Kreuzfilter</code>, um dieses <b>Widget abhängig von allen anderen verbundenen Widgets auf Ihrem Dashboard zu aktualisieren</b>.</div>
+  <div class="content">Aktivieren oder deaktivieren Sie die Option <code>Nach Kartenausschnitt filtern</code>, wodurch <b>nur die Daten innerhalb der aktuellen Kartenansicht sichtbar werden</b>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Aktivieren oder deaktivieren Sie die Option <code>Filteransichtsfenster</code>, wodurch <b>nur die Daten innerhalb der aktuellen Kartenansicht sichtbar werden</b>.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">7</div>
-  <div class="content">Legen Sie das <code>Zahlenformat</code> aus der Dropdown-Liste fest. Das <code>Standard-Zahlenformat</code> ist dynamisch basierend auf der Sprache der Kartenoberfläche.</div>
+  <div class="content">Legen Sie das <code>Zahlenformat</code> aus der Dropdown-Liste fest. Das Standardformat richtet sich nach der Sprache der Oberfläche.</div>
 </div>
 
 

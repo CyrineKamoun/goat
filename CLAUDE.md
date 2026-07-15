@@ -125,6 +125,7 @@ Copy `.env.example` to `.env`. Key variables:
 
 - **Always check the German glossary before writing German docs.** The glossary is at `apps/docs/docs/nerdy_content/GOAT_ui_glossary.md`. Use the exact German UI terms listed there for all UI element names, buttons, and section headings. Never translate UI terms from English without verifying in the glossary first.
 - For Docusaurus docs, also check existing DE pages (e.g. `i18n/de/...`) to confirm which terms are already in use and to maintain consistency.
+- **Always verify every UI label against the i18n files before writing docs** (`apps/web/i18n/locales/en/common.json` and `apps/web/i18n/locales/de/common.json`). Never copy labels from existing docs or assume a translation — always grep the i18n files for the exact string the UI renders.
 
 ## Commit Convention
 

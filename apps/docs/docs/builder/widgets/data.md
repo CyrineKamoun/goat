@@ -140,17 +140,12 @@ Choose from different statistic methods to be computed on a layer.
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Enable or disable <code>Cross filter</code> to make this <b>widget update depending on all other connected widgets </b> on your dashboard.</div>
+  <div class="content">Enable or disable <code>Filter viewport</code>, which <b>makes only the data within the current map view visible</b>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Enable or disable the option to <code>Filter viewport</code>,  which <b>makes only the data within the current map view visible</b>.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">7</div>
-  <div class="content">Set the <code>number format</code> from the dropdown list. The default number format is dynamic based on the language of the interface.</div>
+  <div class="content">Set the <code>Number format</code> from the dropdown list. The default number format is dynamic based on the language of the interface.</div>
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
