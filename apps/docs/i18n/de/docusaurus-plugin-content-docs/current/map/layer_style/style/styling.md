@@ -19,7 +19,7 @@ sidebar_position: 1
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Wählen Sie die Styling-Kategorie, die Sie ändern möchten: <code>Füllfarbe</code>, <code>Strichfarbe</code>, <code>Strichbreite</code>, <code>Clustering</code>, <code>Benutzerdefinierter Marker</code> und <code>Punkteinstellungen</code> (bei Punktdaten).</div>
+  <div class="content">Wählen Sie die Styling-Kategorie, die Sie ändern möchten: <code>Füllfarbe</code>, <code>Strichfarbe</code>, <code>Strichbreite</code>, <code>Linienstil</code> (nur Linien-Layer), <code>Clustering</code>, <code>Benutzerdefinierter Marker</code> und <code>Punkteinstellungen</code> (nur Punkt-Layer).</div>
 </div>
 
 
@@ -58,6 +58,44 @@ Strichfarbe gilt für die Umrisse und Kanten von Karten-Features. Sie hilft dabe
   <div class="content">Bei <code>Strichbreite</code> bewegen Sie den Regler, um <strong>die Dicke</strong> von Linien und Feature-Umrissen <strong>anzupassen</strong>.</div>
 </div>
 
+
+### Linienstil
+
+Der Abschnitt **Linienstil** ist nur für **Linien-Layer** verfügbar und steuert das Muster und die Dekoration von Linien.
+
+**Muster:**
+
+<div class="step">
+  <div class="step-number">7</div>
+  <div class="content">Wählen Sie unter <code>Muster</code>, wie die Linie gezeichnet wird: <code>Durchgezogen</code>, <code>Gestrichelt</code>, <code>Gepunktet</code> oder <code>Strich-Punkt</code>. Bei einem nicht-durchgezogenen Muster erscheint ein <code>Dichte</code>-Dropdown mit den Optionen <code>Eng</code>, <code>Normal</code> oder <code>Weit</code>.</div>
+</div>
+
+**Pfeile:**
+
+<div class="step">
+  <div class="step-number">8</div>
+  <div class="content">Wählen Sie unter <code>Pfeile</code> die Pfeilrichtung: <code>Keine</code>, <code>Vorwärts</code>, <code>Rückwärts</code> oder <code>Beide</code>. Bei Auswahl einer Richtung erscheinen weitere Einstellungen:
+    <ul>
+      <li><code>Position</code> — wo die Pfeile platziert werden: <code>Wiederholen entlang der Linie</code>, <code>Linienanfang</code>, <code>Linienende</code>, <code>Beide Enden</code> oder <code>Mitte (eine pro Linie)</code>.</li>
+      <li><code>Pfeilgröße</code> — Regler zur Steuerung der Pfeilgröße.</li>
+      <li><code>Pfeilabstand</code> — Regler zum Steuern des Abstands zwischen wiederholten Pfeilen (nur sichtbar wenn Position <code>Wiederholen entlang der Linie</code> ist).</li>
+      <li><code>Überlappung zulassen</code> — Checkbox, um zu verhindern, dass Pfeile bei Überlappung ausgeblendet werden.</li>
+    </ul>
+  </div>
+</div>
+
+**Erweiterte Optionen** (aufklappen für Zugriff):
+
+<div class="step">
+  <div class="step-number">9</div>
+  <div class="content">Erweitern Sie <code>Erweiterte Optionen</code>, um folgende Einstellungen vorzunehmen:
+    <ul>
+      <li><code>Linienende</code> — wie Linienendpunkte dargestellt werden: <code>Stumpf</code>, <code>Rund</code> oder <code>Quadratisch</code>.</li>
+      <li><code>Linienverbindung</code> — wie Ecken zwischen Liniensegmenten aussehen: <code>Abgeschrägt</code>, <code>Rund</code> oder <code>Spitz</code>.</li>
+      <li><code>Versatz</code> — verschiebt die Linie visuell nach links oder rechts von ihrer tatsächlichen Geometrie. Nützlich für parallele Straßen oder Richtungsfahrbahnen. Hinweis: Nur visuell — Auswahl und Fangen verwenden weiterhin die Originalgeometrie.</li>
+    </ul>
+  </div>
+</div>
 
 ### Clustering
 Clustering fasst nahe beieinander liegende Punkt-Features zu einem einzelnen Marker mit einer Zählung zusammen und hält die Karte übersichtlich, wenn viele Punkte übereinander liegen.
