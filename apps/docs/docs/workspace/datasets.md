@@ -162,7 +162,7 @@ Organize your datasets into folders for better structure and easier navigation.
 Click the <img src={require('/img/icons/3dots.png').default} alt="Options" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>More Options</code> icon next to any folder:
 
 - <code>Rename</code> — Change the folder name
-- <code>Share</code> — Open the <strong>Manage access</strong> dialog to grant access by <strong>Organization</strong> or per <strong>Team</strong>. Set the access level for each and click <code>Save</code>.
+- <code>Share</code> — Open the <strong>Manage access</strong> dialog with two tabs: <strong>Organization</strong> (share with your entire organization) and <strong>Teams</strong> (share with specific teams). These are mutually exclusive — granting access to the organization clears any team grants, and vice versa. For each entry, set the access level to <strong>Editor</strong> (can edit) or <strong>Viewer</strong> (read-only), or <strong>No Access</strong> to revoke. Click <code>Save</code> to apply. All datasets inside a shared folder automatically inherit the folder's access — inherited access is shown as <code>Via folder</code> in those items' own share dialogs and cannot be changed there directly.
 - <code>Delete</code> — Remove the folder
 
 <p></p>

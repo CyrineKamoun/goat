@@ -160,7 +160,7 @@ Organisieren Sie Ihre Datensätze in Ordnern für bessere Struktur und einfacher
 Klicken Sie auf das <img src={require('/img/icons/3dots.png').default} alt="Optionen" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Weitere Optionen</code>-Symbol neben einem Ordner:
 
 - <code>Umbenennen</code> — Ordnernamen ändern
-- <code>Teilen</code> — Den Dialog <strong>Zugriff verwalten</strong> öffnen, um den Zugriff nach <strong>Organisation</strong> oder pro <strong>Team</strong> zu vergeben. Zugriffsebene festlegen und auf <code>Speichern</code> klicken.
+- <code>Teilen</code> — Den Dialog <strong>Zugriff verwalten</strong> öffnen, der zwei Tabs enthält: <strong>Organisation</strong> (Zugriff für die gesamte Organisation) und <strong>Teams</strong> (Zugriff für bestimmte Teams). Diese schließen sich gegenseitig aus — wird der Organisation Zugriff gewährt, werden alle Team-Freigaben entfernt und umgekehrt. Für jeden Eintrag die Zugriffsebene auf <strong>Editor</strong> (kann bearbeiten) oder <strong>Viewer</strong> (nur lesen) setzen, oder <strong>Kein Zugriff</strong>, um den Zugriff zu entziehen. Auf <code>Speichern</code> klicken, um die Änderungen zu übernehmen. Alle Datensätze innerhalb eines geteilten Ordners erben automatisch den Ordnerzugriff — geerbter Zugriff wird in den Freigabe-Dialogen der jeweiligen Elemente als <code>Über Ordner</code> angezeigt und kann dort nicht direkt geändert werden.
 - <code>Löschen</code> — Ordner entfernen
 
 <p></p>
