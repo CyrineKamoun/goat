@@ -8,7 +8,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
 
 # --- DuckDB (pre-built release binary) ---
-set(DUCKDB_VERSION "v1.4.4")
+# MUST match the Python `duckdb` pin in goatlib/pyproject.toml — the routing
+# module and the Python process share one address space, so two different
+# libduckdb versions collide (symbol/ABI clash → memory corruption, crashes).
+set(DUCKDB_VERSION "v1.5.4")
 
 # Detect platform for pre-built binary
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
