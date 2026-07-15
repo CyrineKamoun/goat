@@ -11,6 +11,15 @@ Switching to Dashboard mode opens the Dashboard Interface, where **you can desig
   <img src={require('/img/builder/builder_interface.webp').default} alt="Dashboard Interface Overview in GOAT" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div>
 
+## Map controls
+
+The following controls are available on the dashboard map. Their position can be configured in [Settings](./settings).
+
+- **Location search** — search for an address or place and pan the map to it
+- **Zoom controls** — zoom in and out buttons
+- **Basemaps** — switch between available basemaps. See [Basemaps](../map/basemaps)
+- **Measurements** — measure distances, areas, and routes directly on the map. See [Measurements](../map/measurements)
+
 ## Panels
 
 Panels are the main areas where you organize your widgets. You can add, arrange, and style panels to create your dashboard layout.
@@ -101,7 +110,7 @@ For more details, see [Widgets](../category/widgets).
 
 ## Settings
 
-In the settings you can configure the **Map** controls, **Branding**, **Social sharing**, **General** options, and **Interactions** for your dashboard. See [Settings](../settings) for more details.
+In the settings you can configure the **Map** controls, **Branding**, **Social sharing**, **General** options, and **Interactions** for your dashboard. See [Settings](./settings) for more details.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
   <img src={require('/img/builder/interface_settings.webp').default} alt="Dragging a widget to the panel" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>

@@ -13,6 +13,15 @@ Der Wechsel in den Builder-Modus öffnet die Builder-Kartenoberfläche, **in der
 
 --- 
 
+## Kartensteuerung
+
+Die folgenden Steuerelemente sind auf der Dashboard-Karte verfügbar. Ihre Position kann in den [Einstellungen](./settings) konfiguriert werden.
+
+- **Standortsuche** — suchen Sie nach einer Adresse oder einem Ort und zentrieren Sie die Karte darauf
+- **Zoom-Steuerung** — Schaltflächen zum Vergrößern und Verkleinern
+- **Grundkarten** — wechseln Sie zwischen verfügbaren Grundkarten. Siehe [Grundkarten](../map/basemaps)
+- **Messen** — messen Sie Abstände, Flächen und Routen direkt auf der Karte. Siehe [Messen](../map/measurements)
+
 ## Panels
 
 Panels sind die Hauptbereiche, in denen Sie Ihre Widgets organisieren. Sie können Panels hinzufügen, anordnen und stylen, um Ihr Dashboard-Layout zu erstellen.
@@ -102,7 +111,7 @@ Weitere Details finden Sie unter [Widgets](../category/widgets).
 
 ## Einstellungen
 
-In den Einstellungen können Sie die **Karte**, das **Branding**, die **Social-Sharing**-Optionen, **Allgemeine** Einstellungen und **Interaktionen** für Ihr Dashboard konfigurieren. Weitere Details finden Sie unter [Einstellungen](../settings).
+In den Einstellungen können Sie die **Karte**, das **Branding**, die **Social-Sharing**-Optionen, **Allgemeine** Einstellungen und **Interaktionen** für Ihr Dashboard konfigurieren. Weitere Details finden Sie unter [Einstellungen](./settings).
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
   <img src={require('/img/builder/interface_settings_de.webp').default} alt="Dragging a widget to the panel" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
