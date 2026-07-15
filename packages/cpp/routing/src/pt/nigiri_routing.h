@@ -5,7 +5,10 @@
 #include <nigiri/timetable.h>
 #include <nigiri/routing/query.h>
 
+#include <cstdint>
 #include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace routing::pt
@@ -22,5 +25,21 @@ namespace routing::pt
         nigiri::timetable const &tt,
         std::vector<nigiri::routing::offset> const &seed_stops,
         RequestConfig const &cfg);
+
+    // Reverse (arrive-by) one-to-all RAPTOR for the PT heatmap. For every stop
+    // from which `seeds` can be reached so as to arrive by `arrival_min`
+    // within `max_travel` minutes, returns (location_idx, total minutes).
+    // `seeds` carry the per-stop egress offsets (alighting stop → opportunity),
+    // so the returned minutes already include egress + transit. Cost is
+    // symmetric with the forward search; only the result extraction differs
+    // (scan best_ for reached stops + sign flip, since backward durations are
+    // negative).
+    std::vector<std::pair<std::uint32_t, double>> run_reverse_raptor(
+        nigiri::timetable const &tt,
+        std::vector<nigiri::routing::offset> const &seeds,
+        std::int64_t arrival_min,
+        int max_travel,
+        int max_transfers,
+        std::vector<std::string> const &transit_modes);
 
 } // namespace routing::pt

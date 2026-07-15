@@ -99,4 +99,7 @@ packages/python/goatlib/tests/result/*
 data/*
 
 migration_scripts/*
-.playwright-mcp/
+
+base_networks/*
+
+/tmp/**

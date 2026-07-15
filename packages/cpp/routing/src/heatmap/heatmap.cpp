@@ -1,41 +1,41 @@
 #include "heatmap.h"
 
-#include "network_prep.h"
+#include "../network/network_prep.h"
 
-#include "../geometry/field_sampler.h"
 #include "../kernel/dijkstra.h"
 #include "../output/hex_resolution.h"
+#include "../output/sql_export.h"
+#include "../pt/nigiri_routing.h"
+
+#include <nigiri/routing/query.h>
+#include <nigiri/timetable.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <duckdb.hpp>
 #include <filesystem>
 #include <iomanip>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <thread>
+#include <utility>
 #include <vector>
 
 namespace routing::heatmap
 {
 
+using output::sql_escape;
+using output::write_query_to_parquet;
+
 namespace
 {
-
-std::string sql_escape(std::string const &s)
-{
-    std::string out;
-    out.reserve(s.size() + 4);
-    for (char c : s)
-    {
-        if (c == '\'') out += "''";
-        else           out.push_back(c);
-    }
-    return out;
-}
 
 void ensure_required_extensions_loaded(duckdb::Connection &con)
 {
@@ -76,9 +76,17 @@ void validate(HeatmapConfig const &cfg)
     if (cfg.max_cost <= 0.0)
         throw std::runtime_error("max_cost must be positive");
     if (cfg.mode == RoutingMode::PublicTransport)
-        throw std::runtime_error(
-            "Public transport is not supported by heatmap_v2 (yet). "
-            "Use one of: walking, bicycle, pedelec, car.");
+    {
+        // PT goes through run_pt (reverse RAPTOR + precomputed access/egress
+        // lookup tables), for all three heatmap types incl. connectivity.
+        if (cfg.timetable_path.empty())
+            throw std::runtime_error("PT heatmap requires timetable_path");
+        if (cfg.access_table_path.empty() || cfg.egress_table_path.empty())
+            throw std::runtime_error(
+                "PT heatmap requires access_table_path and egress_table_path");
+        if (cfg.arrival_time <= 0)
+            throw std::runtime_error("PT heatmap requires a positive arrival_time");
+    }
     if (cfg.heatmap_type == HeatmapType::Gravity)
     {
         if (cfg.sensitivity <= 0.0)
@@ -94,63 +102,82 @@ void validate(HeatmapConfig const &cfg)
     // Connectivity needs no formula-specific knobs.
 }
 
-void run_street(HeatmapConfig const &cfg, duckdb::Connection &con,
-                PhaseTimer &timer)
+// Half the Earth's WGS84 circumference (m); inverse-Mercator projection of
+// EPSG:3857 to (lng, lat).
+constexpr double kHalfCirc = 40075016.68557849 / 2.0;
+
+// DuckDB buffer-manager budget for the heatmap pipeline (GB). Set below
+// total RAM since nigiri's timetable (~1.7 GB) lives outside DuckDB; with a
+// spill directory configured, requests that exceed this spill to disk
+// instead of OOM-killing the worker on a shared host.
+constexpr int kHeatmapDuckDbMemoryLimitGb = 6;
+
+inline double merc_x_to_lng(double x) { return (x / kHalfCirc) * 180.0; }
+inline double merc_y_to_lat(double y)
 {
-    if (cfg.opportunities.empty())
-        return;
+    return std::atan(std::sinh(y / (kHalfCirc / M_PI))) * 180.0 / M_PI;
+}
 
-    // 1. Network prep (radial / point-buffer style around opportunities).
-    std::vector<Point3857> opp_points;
-    opp_points.reserve(cfg.opportunities.size());
-    for (auto const &o : cfg.opportunities)
-        opp_points.push_back(o.point);
-
-    HeatmapNetworkPrepInput prep_in{
+// Shared: radial network prep in `mode` around `opp_points` + per-opportunity
+// reverse-Dijkstra + reachability-field sampling, projected to H3 cells →
+// `out_table`(cell BIGINT, opp_idx INTEGER, min_cost DOUBLE). Used by both the
+// street heatmap and the PT direct-leg (which calls it with the access mode).
+void build_reach_per_opp(duckdb::Connection &con,
+                         std::vector<Point3857> const &opp_points,
+                         RoutingMode mode, CostType cost_type, double max_cost,
+                         double speed_km_h, std::string const &edge_dir,
+                         std::string const &node_dir, int32_t h3_resolution,
+                         double spacing_m, std::string const &out_table,
+                         PhaseTimer &timer)
+{
+    network::HeatmapNetworkPrepInput prep_in{
         .opportunities = opp_points,
-        .mode = cfg.mode,
-        .cost_type = cfg.cost_type,
-        .max_cost = cfg.max_cost,
-        .speed_km_h = cfg.speed_km_h,
-        .edge_dir = cfg.edge_dir,
-        .node_dir = cfg.node_dir,
+        .mode = mode,
+        .cost_type = cost_type,
+        .max_cost = max_cost,
+        .speed_km_h = speed_km_h,
+        .edge_dir = edge_dir,
+        .node_dir = node_dir,
     };
-    auto prep = prepare_radial_street_network(con, prep_in);
+    auto prep = network::prepare_radial_street_network(con, prep_in);
     std::fprintf(
         stderr,
         "[Pipeline] Network prep (%d nodes, %zu edges, %zu opps): %.0f ms\n",
-        prep.net.node_count,
-        prep.net.source.size(),
-        cfg.opportunities.size(),
+        prep.net.node_count, prep.net.source.size(), opp_points.size(),
         timer.elapsed_ms());
 
-    bool const use_distance = (cfg.cost_type == CostType::Distance);
-    int32_t const h3_resolution = output::hex_resolution_for_mode(cfg.mode);
-    // Half the Earth's WGS84 circumference (m); used for inverse-Mercator
-    // projection of EPSG:3857 samples to (lng, lat).
-    constexpr double kHalfCirc = 40075016.68557849 / 2.0;
-    // Edge-interpolation spacing for the reachability field sampler.
-    // 40 m for heatmaps (H3-10 cells ≈ 75 m, so 2 samples per edge-crossing
-    // is still enough to land in every covered cell); the catchment hexagon
-    // builder keeps the sampler's 20 m default for finer polygon edges.
-    constexpr double kHeatmapSampleSpacingM = 40.0;
+    bool const use_distance = (cost_type == CostType::Distance);
+    auto const &net = prep.net;
 
-    // 2. Per-opportunity reverse-Dijkstra; sample the reachability field;
-    //    stream (lng, lat, opp_idx, cost) rows into the DuckDB temp table.
-    //    Uses Appender::AppendDataChunk with a STANDARD_VECTOR_SIZE buffer
-    //    instead of the row-at-a-time BeginRow/Append/EndRow API — the
-    //    per-row API was dominating wall time at high sample volumes
-    //    (376M+ rows for 600-opp pedelec runs).
+    // Incident edges by source node, as a CSR built once and reused across all
+    // opportunities, so reachability sampling can walk only the edges touched
+    // by each reached subgraph instead of scanning every edge per opportunity.
+    std::vector<int32_t> inc_off(net.node_count + 1, 0);
+    for (size_t i = 0; i < net.source.size(); ++i)
+        if (net.source[i] >= 0 && net.source[i] < net.node_count)
+            ++inc_off[net.source[i] + 1];
+    for (int32_t u = 0; u < net.node_count; ++u)
+        inc_off[u + 1] += inc_off[u];
+    std::vector<int32_t> inc_edges(inc_off[net.node_count]);
+    {
+        std::vector<int32_t> pos(inc_off.begin(),
+                                 inc_off.begin() + net.node_count);
+        for (size_t i = 0; i < net.source.size(); ++i)
+            if (net.source[i] >= 0 && net.source[i] < net.node_count)
+                inc_edges[pos[net.source[i]]++] = static_cast<int32_t>(i);
+    }
+    // Reused across opportunities — avoids reallocating/zeroing node_count
+    // arrays per reverse-Dijkstra (the dominant cost at scale).
+    kernel::DijkstraScratch scratch(static_cast<size_t>(net.node_count));
+
+    // Per-opportunity reverse-Dijkstra; sample the reachability field; stream
+    // (lng, lat, opp_idx, cost) rows via Appender::AppendDataChunk with a
+    // STANDARD_VECTOR_SIZE buffer (the row-at-a-time API dominated wall time).
     con.Query("DROP TABLE IF EXISTS _hm_samples");
     con.Query("CREATE TEMP TABLE _hm_samples "
               "(lng DOUBLE, lat DOUBLE, opp_idx INTEGER, cost DOUBLE)");
-
     {
         duckdb::Appender appender(con, "_hm_samples");
-
-        // Reusable chunk buffer matching the table schema. DataChunk wants
-        // duckdb::vector (its allocator-typed wrapper around std::vector),
-        // not std::vector.
         duckdb::vector<duckdb::LogicalType> chunk_types{
             duckdb::LogicalType::DOUBLE,
             duckdb::LogicalType::DOUBLE,
@@ -159,23 +186,17 @@ void run_street(HeatmapConfig const &cfg, duckdb::Connection &con,
         };
         duckdb::DataChunk chunk;
         chunk.Initialize(duckdb::Allocator::DefaultAllocator(), chunk_types);
-
-        // Direct pointers into the chunk's flat-vector buffers. Re-acquired
-        // after every chunk.Reset() — DuckDB's ResetFromCache currently
-        // returns the same buffer for plain numeric types, but the contract
-        // doesn't guarantee that, so don't rely on it.
         double *lng_col = nullptr;
         double *lat_col = nullptr;
         int32_t *opp_col = nullptr;
         double *cost_col = nullptr;
         auto refresh_pointers = [&]() {
-            lng_col  = duckdb::FlatVector::GetData<double>(chunk.data[0]);
-            lat_col  = duckdb::FlatVector::GetData<double>(chunk.data[1]);
-            opp_col  = duckdb::FlatVector::GetData<int32_t>(chunk.data[2]);
+            lng_col = duckdb::FlatVector::GetData<double>(chunk.data[0]);
+            lat_col = duckdb::FlatVector::GetData<double>(chunk.data[1]);
+            opp_col = duckdb::FlatVector::GetData<int32_t>(chunk.data[2]);
             cost_col = duckdb::FlatVector::GetData<double>(chunk.data[3]);
         };
         refresh_pointers();
-
         size_t chunk_pos = 0;
         auto flush_chunk = [&]() {
             if (chunk_pos == 0) return;
@@ -185,113 +206,124 @@ void run_street(HeatmapConfig const &cfg, duckdb::Connection &con,
             refresh_pointers();
             chunk_pos = 0;
         };
-
-        // Reused across opportunities — Dijkstra takes a vector of start
-        // nodes; we always pass exactly one, but reusing the storage avoids
-        // a small allocation per opp.
-        std::vector<int32_t> start_buf(1);
-
         size_t unsnapped = 0;
         size_t total_samples = 0;
-
-        for (size_t oi = 0; oi < cfg.opportunities.size(); ++oi)
+        for (size_t oi = 0; oi < opp_points.size(); ++oi)
         {
             int32_t const start = prep.opportunity_nodes[oi];
-            if (start < 0)
-            {
-                ++unsnapped;
-                continue;
-            }
-            start_buf[0] = start;
-            // Dijkstra on the reverse graph: cost[v] is the cheapest path
-            // from v to the opportunity on the original directed graph.
-            auto costs = kernel::dijkstra(
-                prep.rev_adj, start_buf, cfg.max_cost, use_distance);
-
-            // Non-owning shared_ptr view of prep.net (aliasing constructor).
-            ReachabilityField field{};
-            field.costs = std::move(costs);
-            field.node_count = prep.net.node_count;
-            field.network = std::shared_ptr<SubNetwork const>(
-                std::shared_ptr<SubNetwork const>{}, &prep.net);
-
-            auto const samples = geometry::sample_reachability_field(
-                field, cfg.max_cost, kHeatmapSampleSpacingM);
-            total_samples += samples.size();
-
+            if (start < 0) { ++unsnapped; continue; }
+            // Reverse graph: cost[v] = cheapest path from v to the opportunity.
+            // Reusable scratch → cost is O(reached), not O(node_count).
+            auto const reached = kernel::dijkstra_reuse(
+                prep.rev_adj, start, max_cost, use_distance, scratch);
             int32_t const opp_idx = static_cast<int32_t>(oi);
-            for (auto const &s : samples)
+
+            // Sparse reachability sampling over only the reached subgraph
+            // (previously a full O(node_count + edges) scan per opportunity):
+            //   1) one sample per reached node, and
+            //   2) interpolated samples along edges between two reached nodes
+            //      that are longer than the sample spacing.
+            for (int32_t u : reached)
             {
-                double const lng = (s.x_3857 / kHalfCirc) * 180.0;
-                double const lat = std::atan(std::sinh(s.y_3857 / (kHalfCirc / M_PI)))
-                                   * 180.0 / M_PI;
-                lng_col[chunk_pos] = lng;
-                lat_col[chunk_pos] = lat;
+                auto const &c = net.node_coords[u];
+                lng_col[chunk_pos] = merc_x_to_lng(c.x);
+                lat_col[chunk_pos] = merc_y_to_lat(c.y);
                 opp_col[chunk_pos] = opp_idx;
-                cost_col[chunk_pos] = s.cost;
-                if (++chunk_pos == STANDARD_VECTOR_SIZE)
-                    flush_chunk();
+                cost_col[chunk_pos] = scratch.dist[u];
+                if (++chunk_pos == STANDARD_VECTOR_SIZE) flush_chunk();
+                ++total_samples;
+            }
+            for (int32_t u : reached)
+            {
+                double const su = scratch.dist[u];
+                auto const &sc = net.node_coords[u];
+                for (int32_t k = inc_off[u]; k < inc_off[u + 1]; ++k)
+                {
+                    int32_t const eidx = inc_edges[k];
+                    int32_t const t = net.target[eidx];
+                    if (t < 0 || !scratch.reached(t)) continue;
+                    double const tcost = scratch.dist[t];
+                    double const length = net.length_3857[eidx];
+                    if (length <= spacing_m) continue;
+                    auto const &tc = net.node_coords[t];
+                    double const dx = tc.x - sc.x;
+                    double const dy = tc.y - sc.y;
+                    int const n_splits =
+                        static_cast<int>(std::floor(length / spacing_m));
+                    for (int n = 1; n < n_splits; ++n)
+                    {
+                        double const frac = static_cast<double>(n) / n_splits;
+                        double const cost = su + frac * (tcost - su);
+                        if (cost > max_cost) continue;
+                        lng_col[chunk_pos] = merc_x_to_lng(sc.x + frac * dx);
+                        lat_col[chunk_pos] = merc_y_to_lat(sc.y + frac * dy);
+                        opp_col[chunk_pos] = opp_idx;
+                        cost_col[chunk_pos] = cost;
+                        if (++chunk_pos == STANDARD_VECTOR_SIZE) flush_chunk();
+                        ++total_samples;
+                    }
+                }
             }
         }
         flush_chunk();
         appender.Close();
-
-        std::fprintf(
-            stderr,
-            "[Pipeline] Dijkstras + sampling (%zu opps, %zu unsnapped, %zu samples): %.0f ms\n",
-            cfg.opportunities.size() - unsnapped,
-            unsnapped,
-            total_samples,
-            timer.elapsed_ms());
+        std::fprintf(stderr,
+                     "[Pipeline] Dijkstras + sampling (%zu opps, %zu unsnapped, "
+                     "%zu samples): %.0f ms\n",
+                     opp_points.size() - unsnapped, unsnapped, total_samples,
+                     timer.elapsed_ms());
     }
 
-    // 3. Project to H3 cells + per-(cell, opp) MIN.
+    std::ostringstream sql;
+    sql << "CREATE OR REPLACE TEMP TABLE " << out_table << " AS "
+        << "SELECT h3_latlng_to_cell(lat, lng, " << h3_resolution
+        << ")::BIGINT AS cell, opp_idx, MIN(cost) AS min_cost "
+        << "FROM _hm_samples GROUP BY 1, opp_idx";
+    auto r = con.Query(sql.str());
+    if (r->HasError())
+        throw std::runtime_error("Heatmap per-(cell, opp) min failed: " +
+                                 r->GetError());
+    std::fprintf(stderr, "[Pipeline] Per-(cell, opp) min (%s): %.0f ms\n",
+                 out_table.c_str(), timer.elapsed_ms());
+}
+
+// Shared: _hm_opp_meta(opp_idx, opp_cell, weight) from the opportunity points.
+void build_opp_meta(duckdb::Connection &con,
+                    std::vector<Opportunity> const &opportunities,
+                    int32_t h3_resolution)
+{
+    std::ostringstream sql;
+    sql << std::setprecision(15);
+    sql << "CREATE OR REPLACE TEMP TABLE _hm_opp_meta AS SELECT * FROM (VALUES ";
+    bool first = true;
+    for (size_t oi = 0; oi < opportunities.size(); ++oi)
     {
-        std::ostringstream sql;
-        sql << "CREATE OR REPLACE TEMP TABLE _hm_per_opp AS "
-            << "SELECT h3_latlng_to_cell(lat, lng, " << h3_resolution << ")::BIGINT AS cell, "
-            << "       opp_idx, "
-            << "       MIN(cost) AS min_cost "
-            << "FROM _hm_samples "
-            << "GROUP BY 1, opp_idx";
-        auto r = con.Query(sql.str());
-        if (r->HasError())
-            throw std::runtime_error("Heatmap per-(cell, opp) min failed: "
-                                     + r->GetError());
+        if (!first) sql << ",";
+        first = false;
+        double const lat = merc_y_to_lat(opportunities[oi].point.y);
+        double const lng = merc_x_to_lng(opportunities[oi].point.x);
+        // opp_count is 1 per opportunity; it lets the shared reducer treat a
+        // row as N co-located opportunities (used by the PT path, which groups
+        // opportunities by cell). x/y (Web Mercator) let the PT path derive a
+        // per-group representative point for the direct (no-transit) leg.
+        sql << "(" << oi << ", h3_latlng_to_cell(" << lat << ", " << lng << ", "
+            << h3_resolution << ")::BIGINT, " << opportunities[oi].weight
+            << ", 1, " << opportunities[oi].point.x << ", "
+            << opportunities[oi].point.y << ")";
     }
-    std::fprintf(
-        stderr,
-        "[Pipeline] Per-(cell, opp) min: %.0f ms\n",
-        timer.elapsed_ms());
+    sql << ") v(opp_idx, opp_cell, weight, opp_count, x_3857, y_3857)";
+    auto r = con.Query(sql.str());
+    if (r->HasError())
+        throw std::runtime_error("Heatmap opp-meta build failed: " +
+                                 r->GetError());
+}
 
-    // 4. Per-opportunity metadata (weight + opp's own H3 cell) — joined into
-    //    the reducer below.
-    {
-        std::ostringstream sql;
-        sql << std::setprecision(15);
-        sql << "CREATE OR REPLACE TEMP TABLE _hm_opp_meta AS "
-            << "SELECT * FROM (VALUES ";
-        bool first = true;
-        for (size_t oi = 0; oi < cfg.opportunities.size(); ++oi)
-        {
-            if (!first) sql << ",";
-            first = false;
-            double const x = cfg.opportunities[oi].point.x;
-            double const y = cfg.opportunities[oi].point.y;
-            double const lng = (x / kHalfCirc) * 180.0;
-            double const lat = std::atan(std::sinh(y / (kHalfCirc / M_PI))) * 180.0 / M_PI;
-            sql << "(" << oi << ", "
-                << "h3_latlng_to_cell(" << lat << ", " << lng << ", " << h3_resolution << ")::BIGINT, "
-                << cfg.opportunities[oi].weight << ")";
-        }
-        sql << ") v(opp_idx, opp_cell, weight)";
-        auto r = con.Query(sql.str());
-        if (r->HasError())
-            throw std::runtime_error("Heatmap opp-meta build failed: "
-                                     + r->GetError());
-    }
-
-    // 5. Apply the heatmap reducer (Gravity / ClosestAverage / Connectivity).
+// Shared: gravity / closest-average / connectivity reducer over
+// _hm_per_opp(cell, opp_idx, min_cost) + _hm_opp_meta(opp_idx, opp_cell,
+// weight) → parquet (h3_index, score) at cfg.output_path.
+void reduce_and_export(HeatmapConfig const &cfg, duckdb::Connection &con,
+                       PhaseTimer &timer)
+{
     {
         std::ostringstream sql;
         sql << std::setprecision(15);
@@ -337,16 +369,30 @@ void run_street(HeatmapConfig const &cfg, duckdb::Connection &con,
         else if (cfg.heatmap_type == HeatmapType::ClosestAverage)
         {
             int const k = std::max(1, cfg.closest_k);
-            sql << "WITH ranked AS ("
-                << "  SELECT po.cell, po.min_cost, "
-                << "         ROW_NUMBER() OVER ("
-                << "             PARTITION BY po.cell ORDER BY po.min_cost"
-                << "         ) AS rk "
+            // Count-weighted average of the k closest opportunities. Each row
+            // represents om.opp_count co-located opportunities at the same
+            // cost; `prev` is how many closer opportunities precede this row,
+            // so `take` is how many of this row's opportunities fall within the
+            // first k. With opp_count = 1 (street) this reduces to "average of
+            // the k smallest min_cost".
+            sql << "WITH joined AS ("
+                << "  SELECT po.cell, po.min_cost, om.opp_count AS cnt "
                 << "  FROM _hm_per_opp po "
+                << "  JOIN _hm_opp_meta om USING (opp_idx) "
                 << "  WHERE po.min_cost <= " << cfg.max_cost
+                << "), ranked AS ("
+                << "  SELECT cell, min_cost, cnt, "
+                << "         COALESCE(SUM(cnt) OVER ("
+                << "             PARTITION BY cell ORDER BY min_cost "
+                << "             ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING"
+                << "         ), 0) AS prev "
+                << "  FROM joined"
                 << ") "
-                << "SELECT cell, AVG(min_cost) AS score "
-                << "FROM ranked WHERE rk <= " << k << " "
+                << "SELECT cell, SUM(min_cost * take) / SUM(take) AS score FROM ("
+                << "  SELECT cell, min_cost, "
+                << "         LEAST(cnt, GREATEST(0, " << k << " - prev)) AS take "
+                << "  FROM ranked"
+                << ") WHERE take > 0 "
                 << "GROUP BY cell";
         }
         else // HeatmapType::Connectivity
@@ -361,34 +407,415 @@ void run_street(HeatmapConfig const &cfg, duckdb::Connection &con,
 
         auto r = con.Query(sql.str());
         if (r->HasError())
-            throw std::runtime_error("Heatmap reducer SQL failed: "
-                                     + r->GetError());
+            throw std::runtime_error("Heatmap reducer SQL failed: " +
+                                     r->GetError());
     }
-    std::fprintf(
-        stderr,
-        "[Pipeline] Reducer: %.0f ms\n",
-        timer.elapsed_ms());
+    std::fprintf(stderr, "[Pipeline] Reducer: %.0f ms\n", timer.elapsed_ms());
 
-    // 6. Write the H3-keyed score table out as parquet.
+    output::write_query_to_parquet(
+        con, "SELECT cell AS h3_index, score FROM _hm_results",
+        cfg.output_path, "Heatmap parquet export failed");
+    std::fprintf(stderr, "[Pipeline] Parquet output: %.0f ms\n",
+                 timer.elapsed_ms());
+}
+
+// Default speed (km/h) for an access/egress routing mode. Car cost actually
+// comes from per-edge OSM maxspeed; its value only sizes the load buffer.
+double default_mode_speed(RoutingMode m)
+{
+    switch (m)
     {
-        namespace fs = std::filesystem;
-        fs::path out_path(cfg.output_path);
-        if (!out_path.parent_path().empty())
-            fs::create_directories(out_path.parent_path());
+    case RoutingMode::Bicycle: return 15.0;
+    case RoutingMode::Pedelec: return 23.0;
+    case RoutingMode::Car:     return 50.0;
+    default:                   return 5.0;  // Walking
+    }
+}
 
+// PT heatmap: arrive-by reverse pipeline. Opportunities are grouped by egress
+// cell; per group:
+//   egress lookup (cell → stops) → reverse RAPTOR → access lookup
+//   (boarding stops → cells), MIN'd against a direct same-mode walk/bike leg
+//   from the group → _hm_per_opp → shared reducer. Access/egress legs come
+//   from precomputed per-mode lookup tables; transit from nigiri; the direct
+//   leg is an on-the-fly reverse Dijkstra bounded by the access time limit.
+void run_pt(HeatmapConfig const &cfg, duckdb::Connection &con,
+            PhaseTimer &timer)
+{
+    if (cfg.opportunities.empty())
+        return;
+
+    // The access/egress lookup tables and opportunity grouping live at the PT
+    // lookup resolution (res-9). The *output* cells are coarsened to res-8 when
+    // the opportunity layer is spread over a large area, to keep the output
+    // cell count (and downstream join cardinality) manageable — the access
+    // cell is rolled up to its res-8 parent and the direct leg samples at the
+    // same resolution. Lookups stay at res-9 so they still match the tables.
+    int32_t const h3_resolution =
+        output::hex_resolution_for_mode(RoutingMode::PublicTransport);
+    int32_t output_resolution = h3_resolution;
+    {
+        double minx = cfg.opportunities[0].point.x, maxx = minx;
+        double miny = cfg.opportunities[0].point.y, maxy = miny;
+        for (auto const &o : cfg.opportunities)
+        {
+            minx = std::min(minx, o.point.x); maxx = std::max(maxx, o.point.x);
+            miny = std::min(miny, o.point.y); maxy = std::max(maxy, o.point.y);
+        }
+        double const dx = maxx - minx, dy = maxy - miny;
+        // Mercator distance inflates by 1/cos(lat); divide it back out (at the
+        // bbox-centre latitude) so the threshold is in real ground metres and
+        // latitude-independent. Coarse on purpose — a "large spread" switch.
+        double const merc_diag = std::sqrt(dx * dx + dy * dy);
+        double const lat_c = merc_y_to_lat((miny + maxy) / 2.0);
+        double const ground_m = merc_diag * std::cos(lat_c * M_PI / 180.0);
+        constexpr double kCoarsenOutputExtentM = 50000.0;  // ~50 km ground
+        if (ground_m > kCoarsenOutputExtentM && h3_resolution > 1)
+            output_resolution = h3_resolution - 1;  // res-9 → res-8
+        // Connectivity keys the output map at connectivity_output_resolution
+        // (the caller's AOI raster resolution); output_resolution then only sets
+        // the granularity of the reachable cells whose area is summed. For
+        // gravity/closest the output map *is* output_resolution. Report the
+        // resolution the emitted cells actually use.
+        if (cfg.heatmap_type == HeatmapType::Connectivity)
+            std::fprintf(stderr,
+                         "[Pipeline] Output resolution: h3-%d (AOI extent "
+                         "~%.0f km; area summed at h3-%d)\n",
+                         cfg.connectivity_output_resolution, ground_m / 1000.0,
+                         output_resolution);
+        else
+            std::fprintf(stderr,
+                         "[Pipeline] Output resolution: h3-%d "
+                         "(opp extent ~%.0f km)\n",
+                         output_resolution, ground_m / 1000.0);
+    }
+
+    // 1. Load the timetable.
+    auto owned_tt =
+        nigiri::timetable::read(std::filesystem::path{cfg.timetable_path});
+    nigiri::timetable const *tt = &*owned_tt;
+    std::fprintf(stderr, "[Pipeline] Load timetable (%u locations): %.0f ms\n",
+                 tt->n_locations(), timer.elapsed_ms());
+
+    // 2. Access + egress lookup tables (per-mode parquet) as DuckDB views.
+    {
+        auto a = con.Query(
+            "CREATE OR REPLACE TEMP VIEW _access AS SELECT * FROM read_parquet('"
+            + sql_escape(cfg.access_table_path) + "')");
+        if (a->HasError())
+            throw std::runtime_error("PT: load access table failed: " +
+                                     a->GetError());
+        auto e = con.Query(
+            "CREATE OR REPLACE TEMP VIEW _egress AS SELECT * FROM read_parquet('"
+            + sql_escape(cfg.egress_table_path) + "')");
+        if (e->HasError())
+            throw std::runtime_error("PT: load egress table failed: " +
+                                     e->GetError());
+    }
+
+    // 3. Opportunity metadata, then group opportunities by egress cell.
+    //    Opportunities in the same res-9 cell share egress stops, so their
+    //    reverse RAPTOR is identical — routing per distinct cell instead of
+    //    per opportunity collapses the dominant cost for clustered layers
+    //    (e.g. 10k opportunities → a few hundred distinct cells). Each group
+    //    keeps the summed weight + opportunity count so gravity and
+    //    closest-average still score per opportunity.
+    build_opp_meta(con, cfg.opportunities, h3_resolution);
+    {
+        auto r = con.Query(
+            "CREATE OR REPLACE TEMP TABLE _grp AS "
+            "SELECT (row_number() OVER (ORDER BY opp_cell)) - 1 AS grp_idx, "
+            "       opp_cell AS grp_cell, SUM(weight) AS weight, "
+            "       COUNT(*) AS opp_count, "
+            "       AVG(x_3857) AS rep_x, AVG(y_3857) AS rep_y "
+            "FROM _hm_opp_meta GROUP BY opp_cell");
+        if (r->HasError())
+            throw std::runtime_error("PT: group build failed: " + r->GetError());
+    }
+    size_t n_grps = 0;
+    {
+        auto r = con.Query("SELECT COUNT(*) FROM _grp");
+        n_grps = static_cast<size_t>(r->GetValue(0, 0).GetValue<int64_t>());
+    }
+
+    // 4. Egress stops per group (group cell → stops within egress budget).
+    {
         std::ostringstream sql;
-        sql << "COPY (SELECT cell AS h3_index, score FROM _hm_results) "
-            << "TO '" << sql_escape(cfg.output_path) << "' "
-            << "(FORMAT PARQUET, COMPRESSION ZSTD)";
+        sql << "CREATE OR REPLACE TEMP TABLE _egress_stops AS "
+            << "SELECT g.grp_idx, e.stop_idx, e.cost_minutes AS egress_min "
+            << "FROM _grp g JOIN _egress e ON e.h3_index = g.grp_cell "
+            << "WHERE e.cost_minutes <= " << cfg.egress_max_time << " "
+            << "ORDER BY g.grp_idx";
         auto r = con.Query(sql.str());
         if (r->HasError())
-            throw std::runtime_error("Heatmap parquet export failed: "
-                                     + r->GetError());
+            throw std::runtime_error("PT: egress lookup failed: " +
+                                     r->GetError());
     }
-    std::fprintf(
-        stderr,
-        "[Pipeline] Parquet export: %.0f ms\n",
-        timer.elapsed_ms());
+
+    // 5. Per-group reverse RAPTOR seeded from each group's egress stops →
+    //    _pt_reach(grp_idx, stop_idx, cost_min = egress + transfer + transit).
+    //    The searches are independent (one_to_all only reads the const
+    //    timetable), so they run across a small thread pool. The DuckDB
+    //    appender isn't thread-safe, so each thread collects into its own
+    //    buffer and we append serially after the join.
+    con.Query("DROP TABLE IF EXISTS _pt_reach");
+    con.Query("CREATE TEMP TABLE _pt_reach "
+              "(grp_idx INTEGER, stop_idx UINTEGER, cost_min DOUBLE)");
+    size_t total_reach = 0;  // drives access-join chunk sizing (6b)
+    {
+        // Build per-group seed lists (serial; cheap). Egress walk + the
+        // transit→egress transfer penalty are baked into the seed offset.
+        struct GroupSeeds
+        {
+            int32_t grp;
+            std::vector<nigiri::routing::offset> seeds;
+        };
+        std::vector<GroupSeeds> groups;
+        {
+            auto rows = con.Query(
+                "SELECT grp_idx, stop_idx, egress_min FROM _egress_stops "
+                "ORDER BY grp_idx");
+            if (rows->HasError())
+                throw std::runtime_error("PT: read egress stops failed: " +
+                                         rows->GetError());
+            size_t const n = rows->RowCount();
+            int cur_grp = -1;
+            for (size_t i = 0; i < n; ++i)
+            {
+                int const grp = rows->GetValue(0, i).GetValue<int32_t>();
+                uint32_t const stop = rows->GetValue(1, i).GetValue<uint32_t>();
+                double const egress_min =
+                    rows->GetValue(2, i).GetValue<double>();
+                if (grp != cur_grp) { groups.push_back({grp, {}}); cur_grp = grp; }
+                double const seed_min = egress_min + cfg.transfer_cost;
+                groups.back().seeds.push_back(nigiri::routing::offset{
+                    nigiri::location_idx_t{stop},
+                    nigiri::duration_t{
+                        static_cast<int16_t>(std::lround(seed_min))},
+                    0U});
+            }
+        }
+
+        // Run the reverse RAPTOR for the groups in parallel, striped across
+        // threads, collecting (grp, stop, cost) into per-thread buffers.
+        struct Reach { int32_t grp; uint32_t stop; double cost; };
+        constexpr unsigned kRaptorThreads = 2;
+        std::vector<std::vector<Reach>> out(kRaptorThreads);
+        std::atomic<size_t> done{0};
+        std::atomic<size_t> reach_count{0};
+        std::mutex log_mtx;
+        auto const raptor_t0 = std::chrono::steady_clock::now();
+        constexpr size_t kRaptorProgressEvery = 250;
+
+        auto worker = [&](unsigned tid) {
+            auto &buf = out[tid];
+            for (size_t gi = tid; gi < groups.size(); gi += kRaptorThreads)
+            {
+                auto const &g = groups[gi];
+                auto reached = pt::run_reverse_raptor(
+                    *tt, g.seeds, cfg.arrival_time,
+                    static_cast<int>(cfg.max_cost), cfg.max_transfers,
+                    cfg.transit_modes);
+                for (auto const &pr : reached)
+                    buf.push_back({g.grp, pr.first, pr.second});
+                reach_count += reached.size();
+                size_t const n = ++done;
+                if (n % kRaptorProgressEvery == 0)
+                {
+                    double const ms = std::chrono::duration_cast<
+                        std::chrono::duration<double, std::milli>>(
+                        std::chrono::steady_clock::now() - raptor_t0).count();
+                    std::lock_guard<std::mutex> lk(log_mtx);
+                    std::fprintf(stderr,
+                        "[Pipeline]   Reverse RAPTOR: %zu/%zu groups, %zu "
+                        "reaches (%.0f ms)\n",
+                        n, groups.size(), reach_count.load(), ms);
+                }
+            }
+        };
+        std::vector<std::thread> threads;
+        for (unsigned t = 0; t < kRaptorThreads; ++t)
+            threads.emplace_back(worker, t);
+        for (auto &th : threads) th.join();
+
+        // Serial append of all per-thread results.
+        {
+            duckdb::Appender appender(con, "_pt_reach");
+            for (auto const &buf : out)
+                for (auto const &r : buf)
+                {
+                    appender.BeginRow();
+                    appender.Append<int32_t>(r.grp);
+                    appender.Append<uint32_t>(r.stop);
+                    appender.Append<double>(r.cost);
+                    appender.EndRow();
+                }
+            appender.Close();
+        }
+        total_reach = reach_count.load();
+        std::fprintf(
+            stderr,
+            "[Pipeline] Reverse RAPTOR (%zu groups routed, %zu boarding reaches): %.0f ms\n",
+            groups.size(), total_reach, timer.elapsed_ms());
+    }
+
+    // 6a. Direct leg: reverse-Dijkstra in the access mode from each group's
+    //     representative point (single-mode walk/bike to the opportunity, no
+    //     transit), bounded by the access time limit (willingness-to-walk is a
+    //     fixed threshold; mirrors the catchment). Run per group, not per
+    //     opportunity — co-located opportunities share the same walk reach.
+    std::vector<Point3857> grp_points;
+    {
+        auto rows = con.Query("SELECT rep_x, rep_y FROM _grp ORDER BY grp_idx");
+        if (rows->HasError())
+            throw std::runtime_error("PT: read group points failed: " +
+                                     rows->GetError());
+        grp_points.reserve(rows->RowCount());
+        for (size_t i = 0; i < rows->RowCount(); ++i)
+            grp_points.push_back(Point3857{
+                rows->GetValue(0, i).GetValue<double>(),
+                rows->GetValue(1, i).GetValue<double>()});
+    }
+    build_reach_per_opp(con, grp_points, cfg.access_mode, CostType::Time,
+                        static_cast<double>(cfg.access_max_time),
+                        default_mode_speed(cfg.access_mode), cfg.edge_dir,
+                        cfg.node_dir, output_resolution, /*spacing_m=*/40.0,
+                        "_direct_per_opp", timer);
+
+    // 6b. PT-chain cells: boarding-stop cost + access walk, per (cell, group).
+    //
+    // The access join is the pipeline's memory hot-spot: each reached stop
+    // fans out to ~60 access cells, so it is a many-to-many join whose
+    // intermediate scales with total boarding reaches. Grouping by egress cell
+    // (step 3) already shrinks this sharply for clustered layers; two further
+    // guards keep peak memory bounded regardless of group count:
+    //   (1) materialize only the access rows for stops actually reached
+    //       (and within the access budget) once, so the join build side is
+    //       small and we never re-scan the full lookup parquet; and
+    //   (2) run the join+aggregate in group-range chunks sized to a target
+    //       number of reaches, capping the live join intermediate per chunk.
+    {
+        std::ostringstream used;
+        used << "CREATE OR REPLACE TEMP TABLE _access_used AS "
+             << "SELECT a.stop_idx, a.h3_index, a.cost_minutes FROM _access a "
+             << "WHERE a.cost_minutes <= " << cfg.access_max_time << " "
+             << "  AND a.stop_idx IN (SELECT DISTINCT stop_idx FROM _pt_reach)";
+        auto ru = con.Query(used.str());
+        if (ru->HasError())
+            throw std::runtime_error("PT: access-used build failed: " +
+                                     ru->GetError());
+
+        con.Query("DROP TABLE IF EXISTS _pt_per_opp");
+        con.Query("CREATE TEMP TABLE _pt_per_opp "
+                  "(cell BIGINT, opp_idx INTEGER, min_cost DOUBLE)");
+
+        // ~1M reaches/chunk → bounded join intermediate (~60M rows). Dense
+        // groups (high reaches/group) get small chunks; sparse layers run in
+        // one pass.
+        constexpr size_t kTargetReachPerChunk = 1'000'000;
+        size_t chunk_grps = n_grps;
+        if (total_reach > kTargetReachPerChunk && n_grps > 1)
+            chunk_grps = std::max<size_t>(
+                1, n_grps * kTargetReachPerChunk / total_reach);
+
+        for (size_t lo = 0; lo < n_grps; lo += chunk_grps)
+        {
+            size_t const hi = std::min(n_grps, lo + chunk_grps);
+            // cost_min already includes egress + transit + the transit→egress
+            // transfer penalty (baked into the seed). Add the access walk plus
+            // the access→transit transfer penalty here, mirroring catchment.
+            // grp_idx is carried through as opp_idx for the shared reducer.
+            std::ostringstream sql;
+            sql << std::setprecision(15);
+            // Roll the access cell up to the output resolution (no-op when
+            // output_resolution == the table's resolution; coarsens to the
+            // res-8 parent for large spreads). MIN over the children gives the
+            // cheapest access into the coarser cell.
+            sql << "INSERT INTO _pt_per_opp "
+                << "SELECT h3_cell_to_parent(a.h3_index, " << output_resolution
+                << ")::BIGINT AS cell, pr.grp_idx AS opp_idx, "
+                << "       MIN(pr.cost_min + a.cost_minutes + "
+                << cfg.transfer_cost << ") AS min_cost "
+                << "FROM _pt_reach pr JOIN _access_used a "
+                << "  ON a.stop_idx = pr.stop_idx "
+                << "WHERE pr.grp_idx >= " << lo << " AND pr.grp_idx < " << hi
+                << " GROUP BY 1, 2";
+            auto r = con.Query(sql.str());
+            if (r->HasError())
+                throw std::runtime_error("PT: access join failed: " +
+                                         r->GetError());
+        }
+    }
+
+    // 6c. Combine the direct walk leg + PT chain → _hm_per_opp = MIN per
+    //     (cell, group), bounded by the total journey budget. opp_idx carries
+    //     the group index.
+    {
+        std::ostringstream sql;
+        sql << "CREATE OR REPLACE TEMP TABLE _hm_per_opp AS "
+            << "SELECT cell, opp_idx, MIN(min_cost) AS min_cost FROM ("
+            << "  SELECT cell, opp_idx, min_cost FROM _direct_per_opp "
+            << "  UNION ALL "
+            << "  SELECT cell, opp_idx, min_cost FROM _pt_per_opp"
+            << ") WHERE min_cost <= " << cfg.max_cost << " GROUP BY 1, 2";
+        auto r = con.Query(sql.str());
+        if (r->HasError())
+            throw std::runtime_error("PT: combine direct+PT failed: " +
+                                     r->GetError());
+    }
+    std::fprintf(stderr, "[Pipeline] Access join + direct + combine: %.0f ms\n",
+                 timer.elapsed_ms());
+
+    // 7. Reducer meta: one row per group (grp_idx as the reducer's opp_idx),
+    //    carrying the summed weight + opportunity count so gravity sums and
+    //    closest-average counts score per opportunity, not per group.
+    //    Connectivity keys its output by opp_cell; grp_cell is res-9 (forced by
+    //    the egress-table join) but connectivity opportunities are the AOI
+    //    cells the caller rasterized at cfg.connectivity_output_resolution, so
+    //    roll grp_cell up to that parent resolution. Gravity/closest keep the
+    //    res-9 grp_cell unchanged.
+    {
+        std::string const opp_cell_expr =
+            cfg.heatmap_type == HeatmapType::Connectivity
+                ? "h3_cell_to_parent(grp_cell, " +
+                      std::to_string(cfg.connectivity_output_resolution) + ")"
+                : "grp_cell";
+        auto r = con.Query(
+            "CREATE OR REPLACE TEMP TABLE _hm_opp_meta AS "
+            "SELECT grp_idx AS opp_idx, " + opp_cell_expr + " AS opp_cell, "
+            "       weight, opp_count FROM _grp");
+        if (r->HasError())
+            throw std::runtime_error("PT: group meta build failed: " +
+                                     r->GetError());
+    }
+
+    // 8. Shared reducer + export.
+    reduce_and_export(cfg, con, timer);
+}
+
+void run_street(HeatmapConfig const &cfg, duckdb::Connection &con,
+                PhaseTimer &timer)
+{
+    if (cfg.opportunities.empty())
+        return;
+
+    std::vector<Point3857> opp_points;
+    opp_points.reserve(cfg.opportunities.size());
+    for (auto const &o : cfg.opportunities)
+        opp_points.push_back(o.point);
+
+    int32_t const h3_resolution = output::hex_resolution_for_mode(cfg.mode);
+    // 40 m sampling for heatmaps (vs the catchment hexagon builder's 20 m):
+    // H3-9/10 cells are large enough that 40 m still lands a sample in every
+    // covered cell.
+    constexpr double kHeatmapSampleSpacingM = 40.0;
+
+    build_reach_per_opp(con, opp_points, cfg.mode, cfg.cost_type, cfg.max_cost,
+                        cfg.speed_km_h, cfg.edge_dir, cfg.node_dir,
+                        h3_resolution, kHeatmapSampleSpacingM, "_hm_per_opp",
+                        timer);
+    build_opp_meta(con, cfg.opportunities, h3_resolution);
+    reduce_and_export(cfg, con, timer);
 }
 
 } // namespace
@@ -401,12 +828,35 @@ void compute_heatmap(HeatmapConfig const &cfg)
     duckdb::DuckDB db(nullptr);
     duckdb::Connection con(db);
     ensure_required_extensions_loaded(con);
+
+    // Bound DuckDB's buffer manager and give it a spill directory. The PT
+    // pipeline's intermediates (per-opportunity boarding reaches, the direct
+    // walk-leg samples, and the access-join fan-out) scale with opportunity
+    // count × density and can otherwise grow past available RAM and trip the
+    // (shared-host) OOM killer, since an in-memory DuckDB without a temp
+    // directory cannot spill. With a limit + temp dir, oversized requests
+    // spill to disk and complete instead of crashing. nigiri's timetable
+    // (~1.7 GB) lives outside DuckDB, so the limit is set below total RAM.
+    {
+        std::error_code ec;
+        std::filesystem::path spill =
+            std::filesystem::path(cfg.output_path).parent_path();
+        if (spill.empty())
+            spill = std::filesystem::temp_directory_path(ec);
+        con.Query("SET memory_limit='" +
+                  std::to_string(kHeatmapDuckDbMemoryLimitGb) + "GB'");
+        con.Query("SET temp_directory='" + spill.string() + "'");
+    }
+
     std::fprintf(
         stderr,
         "[Pipeline] DuckDB init: %.0f ms\n",
         timer.elapsed_ms());
 
-    run_street(cfg, con, timer);
+    if (cfg.mode == RoutingMode::PublicTransport)
+        run_pt(cfg, con, timer);
+    else
+        run_street(cfg, con, timer);
 }
 
 } // namespace routing::heatmap

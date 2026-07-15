@@ -144,11 +144,11 @@
       "description": "Define the travel speed"
     },
     "access_mode": {
-      "label": "Access Mode",
+      "label": "Access mode",
       "description": "Mode of transport to access public transport stations"
     },
     "pt_egress_mode": {
-      "label": "Egress Mode",
+      "label": "Egress mode",
       "description": "Mode of transport after leaving public transport stations"
     },
     "catchment_area_type": {
@@ -164,11 +164,11 @@
       "description": "How steps are displayed in the output"
     },
     "choose_pt_mode": {
-      "label": "Choose PT Modes",
+      "label": "Choose PT modes",
       "description": "Select public transport modes to include in the analysis"
     },
     "impedance": {
-      "label": "Impedance Function",
+      "label": "Impedance function",
       "description": "Distance decay function for gravity calculation"
     },
     "max_sensitivity": {
@@ -180,11 +180,11 @@
       "description": "List of opportunity datasets with gravity parameters"
     },
     "input_path": {
-      "label": "Input Layer",
+      "label": "Input layer",
       "description": "Select the input layer for analysis"
     },
     "input_layer_id": {
-      "label": "Input Layer",
+      "label": "Input layer",
       "description": "Select the input layer for analysis"
     },
     "overlay_layer_id": {
@@ -196,15 +196,15 @@
       "description": "Name for the output layer"
     },
     "max_cost": {
-      "label": "Travel Time Limit",
+      "label": "Travel time limit",
       "description": "Maximum travel time in minutes"
     },
     "max_cost_time": {
-      "label": "Travel Time Limit",
+      "label": "Travel time limit",
       "description": "Maximum travel time in minutes"
     },
     "max_cost_distance": {
-      "label": "Travel Distance Limit",
+      "label": "Travel distance limit",
       "description": "Maximum travel distance in meters"
     },
     "sensitivity": {
@@ -212,11 +212,11 @@
       "description": "Decay sensitivity parameter for gravity model"
     },
     "potential_type": {
-      "label": "Potential Type",
+      "label": "Potential type",
       "description": "How to determine the potential value for each opportunity."
     },
     "potential_field": {
-      "label": "Potential Field",
+      "label": "Potential field",
       "description": "Field name containing destination potential values"
     },
     "capacity_field": {
@@ -224,7 +224,7 @@
       "description": "Field name containing destination capacity values"
     },
     "potential_constant": {
-      "label": "Constant Potential",
+      "label": "Constant potential",
       "description": "Use a constant value for all destinations"
     },
     "capacity_constant": {
@@ -232,7 +232,7 @@
       "description": "Use a constant value for all destination capacities"
     },
     "potential_expression": {
-      "label": "Potential Expression",
+      "label": "Potential expression",
       "description": "Expression to calculate potential (e.g., 'area', 'perimeter')"
     },
     "capacity_expression": {
@@ -240,11 +240,11 @@
       "description": "Expression to calculate capacity (e.g., 'area', 'perimeter')"
     },
     "n_destinations": {
-      "label": "Number of Destinations",
+      "label": "Number of destinations",
       "description": "Number of closest destinations to average"
     },
     "reference_area_path": {
-      "label": "Reference Area",
+      "label": "Reference area",
       "description": "Layer defining the reference area where the analysis would be conducted"
     },
     "demand_field": {
@@ -286,6 +286,14 @@
     "to_time": {
       "label": "End Time",
       "description": "End time of the analysis window"
+    },
+    "arrival_time": {
+      "label": "Arrival time",
+      "description": "Time of day to arrive by. Each cell is scored by the best public-transport journey that reaches the opportunities at or before this time."
+    },
+    "time_limit": {
+      "label": "Time limit (min)",
+      "description": "Maximum travel time in minutes"
     },
     "catchment_type": {
       "label": "Catchment Area Type",
@@ -798,7 +806,7 @@
     },
     "heatmap_type": {
       "gravity": "Gravity",
-      "closest_average": "Closest Average",
+      "closest_average": "Closest average",
       "connectivity": "Connectivity"
     },
     "units": {

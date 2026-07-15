@@ -3,7 +3,6 @@
 #include "../data/h3_util.h"
 #include "../data/street_network_loader.h"
 #include "../input/request_config.h"
-#include "../input/validation.h"
 #include "../kernel/dijkstra.h"
 #include "../kernel/graph_builder.h"
 #include "../kernel/mode_selector.h"
@@ -15,7 +14,7 @@
 #include <stdexcept>
 #include <unordered_set>
 
-namespace routing::heatmap
+namespace routing::network
 {
 
 namespace
@@ -46,6 +45,35 @@ RequestConfig make_rcfg(StreetMatrixPrepInput const &in)
 }
 
 } // namespace
+
+RadialNetworkPrep prepare_radial_network(
+    duckdb::Connection &con,
+    RequestConfig const &cfg,
+    bool load_geometry)
+{
+    if (cfg.starting_points.empty())
+        throw std::runtime_error("prepare_radial_network: no starting points");
+
+    double const buffer_m = input::buffer_distance(cfg);
+    auto const classes = input::valid_classes(cfg.mode);
+
+    auto edges = data::load_edges(
+        con, cfg.edge_dir, cfg.node_dir,
+        cfg.starting_points, buffer_m, classes, cfg.mode, load_geometry);
+
+    if (edges.empty())
+        throw std::runtime_error(
+            "No edges loaded. Check edge_dir and H3 cell coverage.");
+
+    kernel::compute_costs(edges, cfg);
+
+    RadialNetworkPrep out;
+    out.net = kernel::build_sub_network(edges);
+    // Snap after the network is finalized: snap_origins may insert connector
+    // nodes / split edges, so any adjacency list must be built afterwards.
+    out.snapped_nodes = kernel::snap_origins(out.net, cfg.starting_points, cfg);
+    return out;
+}
 
 StreetMatrixPrep prepare_street_matrix_network(
     duckdb::Connection &con,
@@ -80,23 +108,10 @@ StreetMatrixPrep prepare_street_matrix_network(
     {
         // Tiered: classified roads across the full bbox + local roads in
         // small per-point circles. Avoids loading every residential street
-        // in (e.g.) a 100 km matrix request.
-        std::vector<std::string> skeleton_classes;
-        std::vector<std::string> detail_classes;
-        if (in.mode == RoutingMode::Car)
-        {
-            skeleton_classes = {"motorway", "trunk", "primary", "secondary", "tertiary"};
-            detail_classes   = {"residential", "living_street", "unclassified",
-                                "service", "track"};
-        }
-        else
-        {
-            skeleton_classes = {"primary", "secondary", "tertiary", "trunk"};
-            detail_classes   = {"residential", "living_street", "unclassified",
-                                "service", "pedestrian", "footway", "steps",
-                                "path", "track", "cycleway", "bridleway",
-                                "unknown"};
-        }
+        // in (e.g.) a 100 km matrix request. The class partition is derived
+        // from the canonical taxonomy (input::valid_classes) so it can't drift.
+        auto const skeleton_classes = input::skeleton_classes(in.mode);
+        auto const detail_classes = input::detail_classes(in.mode);
 
         auto bbox_filter = data::compute_h3_filter_bbox(
             con, bmin_x, bmin_y, bmax_x, bmax_y, kBboxMarginM);
@@ -152,8 +167,8 @@ HeatmapNetworkPrep prepare_radial_street_network(
         throw std::runtime_error(
             "prepare_radial_street_network: no opportunities");
 
-    // Build a RequestConfig stub. The existing helpers (buffer_distance,
-    // compute_costs, snap_origins) all read from RequestConfig.
+    // Build a RequestConfig stub so the shared radial core can size the buffer
+    // and snap the opportunities as "starting points".
     RequestConfig rcfg;
     rcfg.mode = in.mode;
     rcfg.cost_type = in.cost_type;
@@ -161,29 +176,17 @@ HeatmapNetworkPrep prepare_radial_street_network(
     rcfg.speed_km_h = in.speed_km_h;
     rcfg.edge_dir = in.edge_dir;
     rcfg.node_dir = in.node_dir;
-    rcfg.starting_points = in.opportunities;  // for buffer_distance
+    rcfg.starting_points = in.opportunities;
     rcfg.steps = 1;
 
-    double const buffer_m = input::buffer_distance(rcfg);
-    auto const classes = input::valid_classes(in.mode);
-
-    auto edges = data::load_edges(
-        con, in.edge_dir, in.node_dir,
-        in.opportunities, buffer_m, classes, in.mode);
-
-    if (edges.empty())
-        throw std::runtime_error(
-            "No edges loaded. Check edge_dir and coverage.");
-
-    kernel::compute_costs(edges, rcfg);
+    auto core = prepare_radial_network(con, rcfg, /*load_geometry=*/false);
 
     HeatmapNetworkPrep out;
-    out.net = kernel::build_sub_network(edges);
-    out.opportunity_nodes =
-        kernel::snap_origins(out.net, in.opportunities, rcfg);
+    out.net = std::move(core.net);
+    out.opportunity_nodes = std::move(core.snapped_nodes);
     out.fwd_adj = kernel::build_adjacency_list(out.net);
     out.rev_adj = kernel::build_reverse_adjacency_list(out.net);
     return out;
 }
 
-} // namespace routing::heatmap
+} // namespace routing::network

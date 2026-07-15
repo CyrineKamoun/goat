@@ -1318,6 +1318,23 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
                 resolved.append(item)
         return resolved
 
+    def get_project_layer_name_by_id(
+        self: Self, layer_project_id: int | None
+    ) -> str | None:
+        """Layer name by the project-layer PK, or None. Best-effort."""
+        if layer_project_id is None:
+            return None
+        try:
+            return _get_or_create_event_loop().run_until_complete(
+                self.db_service.get_project_layer_name_by_id(int(layer_project_id))
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                "Could not resolve project layer name by id %s: %s",
+                layer_project_id, e,
+            )
+            return None
+
     def run(self: Self, params: TParams) -> dict[str, Any]:
         """Main entry point - runs the full tool workflow.
 

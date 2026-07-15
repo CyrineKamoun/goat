@@ -21,6 +21,17 @@ namespace routing::input
 
     std::vector<std::string> valid_classes(RoutingMode mode);
 
+    // Tiered-loading split of valid_classes(mode), used when loading a street
+    // network across a large extent (e.g. wide travel-cost matrices): skeleton
+    // classes (arterials) are loaded across the whole bbox, detail classes
+    // (local roads) only in small circles around points.
+    //
+    // detail_classes(mode) is exactly valid_classes(mode) minus
+    // skeleton_classes(mode), so the two partitions can never drift from the
+    // canonical taxonomy.
+    std::vector<std::string> skeleton_classes(RoutingMode mode);
+    std::vector<std::string> detail_classes(RoutingMode mode);
+
     double buffer_distance(RequestConfig const &cfg);
 
 } // namespace routing::input

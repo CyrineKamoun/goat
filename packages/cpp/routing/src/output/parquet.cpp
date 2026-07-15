@@ -5,6 +5,7 @@
 #include "network_builder.h"
 #include "point_grid_builder.h"
 #include "polygon_builder.h"
+#include "sql_export.h"
 
 #include "../geometry/grid_surface_builder.h"
 #include "../geometry/jsolines_processor.h"
@@ -12,7 +13,6 @@
 #include <chrono>
 #include <cstdio>
 #include <duckdb.hpp>
-#include <filesystem>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -23,23 +23,6 @@ namespace routing::output
 
 namespace
 {
-std::string sql_escape(std::string const &s)
-{
-    std::string out;
-    out.reserve(s.size() + 8);
-    for (char c : s)
-    {
-        if (c == '\'')
-        {
-            out += "''";
-        }
-        else
-        {
-            out.push_back(c);
-        }
-    }
-    return out;
-}
 
 void write_network_parquet(ReachabilityField const &field,
                            RequestConfig const &cfg,
@@ -50,27 +33,14 @@ void write_network_parquet(ReachabilityField const &field,
     if (feature_count == 0)
         throw std::runtime_error("No reachable edges found for parquet export.");
 
-    namespace fs = std::filesystem;
-    fs::path out_path(output_path);
-    if (!out_path.parent_path().empty())
-        fs::create_directories(out_path.parent_path());
-
-    std::string escaped_path = sql_escape(out_path.string());
-
-    std::ostringstream sql;
-    sql << "COPY ("
-        << "  SELECT "
-        << "    CAST(row_number() OVER (ORDER BY edge_id) AS INTEGER) AS id, "
-        << "    CAST(ROUND(step_cost) AS INTEGER) AS cost_step, "
-        << "    geometry "
-        << "  FROM " << network_features_table_name()
-        << ") TO '" << escaped_path << "' "
-        << "(FORMAT PARQUET, COMPRESSION ZSTD)";
-
-    auto copy_result = con.Query(sql.str());
-    if (copy_result->HasError())
-        throw std::runtime_error("Network parquet export failed: " +
-                                 copy_result->GetError());
+    std::ostringstream body;
+    body << "  SELECT "
+         << "    CAST(row_number() OVER (ORDER BY edge_id) AS INTEGER) AS id, "
+         << "    CAST(ROUND(step_cost) AS INTEGER) AS cost_step, "
+         << "    geometry "
+         << "  FROM " << network_features_table_name();
+    write_query_to_parquet(con, body.str(), output_path,
+                           "Network parquet export failed");
 }
 
 void write_hexagonal_grid_parquet(ReachabilityField const &field,
@@ -84,31 +54,14 @@ void write_hexagonal_grid_parquet(ReachabilityField const &field,
         throw std::runtime_error("No reachable edges found for hexagonal parquet export.");
     }
 
-    namespace fs = std::filesystem;
-    fs::path out_path(output_path);
-    if (!out_path.parent_path().empty())
-    {
-        fs::create_directories(out_path.parent_path());
-    }
-
-    std::string escaped_path = sql_escape(out_path.string());
-
-    std::ostringstream sql;
-    sql << "COPY ("
-        << "  SELECT "
-        << "    CAST(row_number() OVER (ORDER BY h3_h3_to_string(cell)) AS INTEGER) AS id, "
-        << "    CAST(ROUND(step_cost) AS INTEGER) AS cost_step, "
-        << "    geometry "
-        << "  FROM " << hexagon_features_table_name()
-        << ") TO '" << escaped_path << "' "
-        << "(FORMAT PARQUET, COMPRESSION ZSTD)";
-
-    auto copy_result = con.Query(sql.str());
-    if (copy_result->HasError())
-    {
-        throw std::runtime_error("Hexagonal grid parquet export failed: " +
-                                 copy_result->GetError());
-    }
+    std::ostringstream body;
+    body << "  SELECT "
+         << "    CAST(row_number() OVER (ORDER BY h3_h3_to_string(cell)) AS INTEGER) AS id, "
+         << "    CAST(ROUND(step_cost) AS INTEGER) AS cost_step, "
+         << "    geometry "
+         << "  FROM " << hexagon_features_table_name();
+    write_query_to_parquet(con, body.str(), output_path,
+                           "Hexagonal grid parquet export failed");
 }
 
 void write_polygon_parquet(std::vector<ReachabilityField> const &fields,
@@ -122,31 +75,14 @@ void write_polygon_parquet(std::vector<ReachabilityField> const &fields,
         throw std::runtime_error("No reachable polygons found for parquet export.");
     }
 
-    namespace fs = std::filesystem;
-    fs::path out_path(output_path);
-    if (!out_path.parent_path().empty())
-    {
-        fs::create_directories(out_path.parent_path());
-    }
-
-    std::string escaped_path = sql_escape(out_path.string());
-
-    std::ostringstream sql;
-    sql << "COPY ("
-        << "  SELECT "
-        << "    CAST(row_number() OVER (ORDER BY step_cost) AS INTEGER) AS id, "
-        << "    CAST(ROUND(step_cost) AS INTEGER) AS cost_step, "
-        << "    geometry "
-        << "  FROM " << polygon_features_table_name()
-        << ") TO '" << escaped_path << "' "
-        << "(FORMAT PARQUET, COMPRESSION ZSTD)";
-
-    auto copy_result = con.Query(sql.str());
-    if (copy_result->HasError())
-    {
-        throw std::runtime_error("Polygon parquet export failed: " +
-                                 copy_result->GetError());
-    }
+    std::ostringstream body;
+    body << "  SELECT "
+         << "    CAST(row_number() OVER (ORDER BY step_cost) AS INTEGER) AS id, "
+         << "    CAST(ROUND(step_cost) AS INTEGER) AS cost_step, "
+         << "    geometry "
+         << "  FROM " << polygon_features_table_name();
+    write_query_to_parquet(con, body.str(), output_path,
+                           "Polygon parquet export failed");
 }
 
 } // namespace
@@ -231,21 +167,9 @@ void write_grid_contour_parquet_from_features(
         throw std::runtime_error("Grid contour temp table failed: " +
                                  create_result->GetError());
 
-    namespace fs = std::filesystem;
-    fs::path out_path(output_path);
-    if (!out_path.parent_path().empty())
-        fs::create_directories(out_path.parent_path());
-    std::string escaped_path = sql_escape(out_path.string());
-
-    std::ostringstream copy_sql;
-    copy_sql << "COPY routing_grid_polygon_tmp TO '" << escaped_path
-             << "' (FORMAT PARQUET, COMPRESSION ZSTD)";
-
-    auto copy_result = con.Query(copy_sql.str());
+    write_query_to_parquet(con, "SELECT * FROM routing_grid_polygon_tmp",
+                           output_path, "Grid contour parquet export failed");
     std::fprintf(stderr, "[Output] COPY to parquet: %.0f ms\n", elapsed());
-    if (copy_result->HasError())
-        throw std::runtime_error("Grid contour parquet export failed: " +
-                                 copy_result->GetError());
 }
 
 namespace
@@ -279,62 +203,29 @@ void write_point_grid_parquet(ReachabilityField const &field,
         throw std::runtime_error("No reachable grid points for parquet export.");
     }
 
-    namespace fs = std::filesystem;
-    fs::path out_path(output_path);
-    if (!out_path.parent_path().empty())
-    {
-        fs::create_directories(out_path.parent_path());
-    }
-
-    std::string escaped_path = sql_escape(out_path.string());
-
-    std::ostringstream sql;
-    sql << "COPY ("
-        << "  SELECT "
-        << "    CAST(id AS INTEGER) AS id, "
-        << "    CAST(ROUND(cost) AS DOUBLE) AS cost, "
-        << "    cost_step, "
-        << "    geometry "
-        << "  FROM " << point_grid_features_table_name() << " "
-        << "  ORDER BY id"
-        << ") TO '" << escaped_path << "' "
-        << "(FORMAT PARQUET, COMPRESSION ZSTD)";
-
-    auto copy_result = con.Query(sql.str());
-    if (copy_result->HasError())
-    {
-        throw std::runtime_error("Point grid parquet export failed: " +
-                                 copy_result->GetError());
-    }
+    std::ostringstream body;
+    body << "  SELECT "
+         << "    CAST(id AS INTEGER) AS id, "
+         << "    CAST(ROUND(cost) AS DOUBLE) AS cost, "
+         << "    cost_step, "
+         << "    geometry "
+         << "  FROM " << point_grid_features_table_name() << " "
+         << "  ORDER BY id";
+    write_query_to_parquet(con, body.str(), output_path,
+                           "Point grid parquet export failed");
 }
 
 void write_empty_parquet(std::string const &output_path,
                          duckdb::Connection &con)
 {
-    namespace fs = std::filesystem;
-    fs::path out_path(output_path);
-    if (!out_path.parent_path().empty())
-    {
-        fs::create_directories(out_path.parent_path());
-    }
-
-    std::string escaped_path = sql_escape(out_path.string());
-    std::ostringstream sql;
-    sql << "COPY ("
-        << "  SELECT "
-        << "    CAST(NULL AS INTEGER) AS id, "
-        << "    CAST(NULL AS INTEGER) AS cost_step, "
-        << "    CAST(NULL AS VARCHAR) AS geometry "
-        << "  WHERE FALSE"
-        << ") TO '" << escaped_path << "' "
-        << "(FORMAT PARQUET, COMPRESSION ZSTD)";
-
-    auto copy_result = con.Query(sql.str());
-    if (copy_result->HasError())
-    {
-        throw std::runtime_error("Empty parquet export failed: " +
-                                 copy_result->GetError());
-    }
+    write_query_to_parquet(
+        con,
+        "  SELECT "
+        "    CAST(NULL AS INTEGER) AS id, "
+        "    CAST(NULL AS INTEGER) AS cost_step, "
+        "    CAST(NULL AS VARCHAR) AS geometry "
+        "  WHERE FALSE",
+        output_path, "Empty parquet export failed");
 }
 
 } // namespace

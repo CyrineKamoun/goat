@@ -1,6 +1,8 @@
 #include "street_network_loader.h"
 #include "h3_util.h"
 
+#include "../output/sql_export.h"
+
 #include <cstdlib>
 #include <duckdb.hpp>
 #include <filesystem>
@@ -10,24 +12,7 @@
 namespace routing::data
 {
 
-
-    static std::string sql_escape(std::string const &s)
-    {
-        std::string out;
-        out.reserve(s.size() + 8);
-        for (char c : s)
-        {
-            if (c == '\'')
-            {
-                out += "''";
-            }
-            else
-            {
-                out.push_back(c);
-            }
-        }
-        return out;
-    }
+    using routing::output::sql_escape;
 
     static bool is_glob_or_file_path(std::string const &path)
     {

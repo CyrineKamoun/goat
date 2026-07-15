@@ -1,5 +1,7 @@
 #include "request_config.h"
 
+#include <unordered_set>
+
 namespace routing::input
 {
 
@@ -31,6 +33,31 @@ namespace routing::input
                     "track", "cycleway", "bridleway", "unknown"};
         }
         return {};
+    }
+
+    std::vector<std::string> skeleton_classes(RoutingMode mode)
+    {
+        // Arterials loaded across the whole bbox during tiered loading.
+        if (mode == RoutingMode::Car)
+            return {"motorway", "trunk", "primary", "secondary", "tertiary"};
+        return {"primary", "secondary", "tertiary", "trunk"};
+    }
+
+    std::vector<std::string> detail_classes(RoutingMode mode)
+    {
+        // Everything in the canonical taxonomy that isn't a skeleton class —
+        // derived so the partition stays in lockstep with valid_classes(mode).
+        auto const all = valid_classes(mode);
+        auto const skeleton = skeleton_classes(mode);
+        std::unordered_set<std::string> const skeleton_set(
+            skeleton.begin(), skeleton.end());
+
+        std::vector<std::string> detail;
+        detail.reserve(all.size());
+        for (auto const &cls : all)
+            if (skeleton_set.find(cls) == skeleton_set.end())
+                detail.push_back(cls);
+        return detail;
     }
 
     double buffer_distance(RequestConfig const &cfg)

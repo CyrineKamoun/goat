@@ -437,6 +437,16 @@ class ToolDatabaseService:
             return row["id"]
         return None
 
+    async def get_project_layer_name_by_id(
+        self: Self, layer_project_id: int
+    ) -> str | None:
+        """Layer name (customer.layer_project.name) by the project-layer PK."""
+        row = await self.pool.fetchrow(
+            f"SELECT name FROM {self.schema}.layer_project WHERE id = $1",
+            int(layer_project_id),
+        )
+        return row["name"] if row and row["name"] else None
+
     async def get_scenario_features(
         self: Self,
         scenario_id: str,

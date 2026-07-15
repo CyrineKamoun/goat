@@ -4,6 +4,7 @@
 #include <chrono>
 
 #include "pipeline.h"
+#include "preprocessing/access_egress_table.h"
 #include "types.h"
 
 namespace py = pybind11;
@@ -153,8 +154,33 @@ PYBIND11_MODULE(_routing, m)
         .def_readwrite("sensitivity",     &routing::HeatmapConfig::sensitivity)
         .def_readwrite("max_sensitivity", &routing::HeatmapConfig::max_sensitivity)
         .def_readwrite("closest_k",       &routing::HeatmapConfig::closest_k)
+        // PT (mode == PublicTransport)
+        .def_readwrite("timetable_path",  &routing::HeatmapConfig::timetable_path)
+        .def_readwrite("arrival_time",    &routing::HeatmapConfig::arrival_time)
+        .def_readwrite("max_transfers",   &routing::HeatmapConfig::max_transfers)
+        .def_readwrite("transit_modes",   &routing::HeatmapConfig::transit_modes)
+        .def_readwrite("access_mode",     &routing::HeatmapConfig::access_mode)
+        .def_readwrite("egress_mode",     &routing::HeatmapConfig::egress_mode)
+        .def_readwrite("access_max_time", &routing::HeatmapConfig::access_max_time)
+        .def_readwrite("egress_max_time", &routing::HeatmapConfig::egress_max_time)
+        .def_readwrite("transfer_cost",   &routing::HeatmapConfig::transfer_cost)
+        .def_readwrite("access_table_path", &routing::HeatmapConfig::access_table_path)
+        .def_readwrite("egress_table_path", &routing::HeatmapConfig::egress_table_path)
+        .def_readwrite("connectivity_output_resolution", &routing::HeatmapConfig::connectivity_output_resolution)
         // Output
         .def_readwrite("output_path",     &routing::HeatmapConfig::output_path);
+
+    py::class_<routing::preprocessing::AccessEgressConfig>(m, "AccessEgressConfig")
+        .def(py::init<>())
+        .def_readwrite("timetable_path", &routing::preprocessing::AccessEgressConfig::timetable_path)
+        .def_readwrite("edge_dir",       &routing::preprocessing::AccessEgressConfig::edge_dir)
+        .def_readwrite("node_dir",       &routing::preprocessing::AccessEgressConfig::node_dir)
+        .def_readwrite("output_path",    &routing::preprocessing::AccessEgressConfig::output_path)
+        .def_readwrite("mode",           &routing::preprocessing::AccessEgressConfig::mode)
+        .def_readwrite("max_min",        &routing::preprocessing::AccessEgressConfig::max_min)
+        .def_readwrite("speed_km_h",     &routing::preprocessing::AccessEgressConfig::speed_km_h)
+        .def_readwrite("chunk_size",     &routing::preprocessing::AccessEgressConfig::chunk_size)
+        .def_readwrite("spacing_m",      &routing::preprocessing::AccessEgressConfig::spacing_m);
 
     m.def("compute_catchment",
           [elapsed_ms](routing::RequestConfig const &config)
@@ -186,4 +212,19 @@ PYBIND11_MODULE(_routing, m)
           py::arg("config"),
           "Compute per-origin accessibility heatmap (Gravity / ClosestAverage) "
           "against a fixed opportunity layer");
+
+    m.def("build_access_egress_table",
+          [elapsed_ms](routing::preprocessing::AccessEgressConfig const &config)
+          {
+              auto t0 = std::chrono::steady_clock::now();
+              auto out = routing::preprocessing::build_access_egress_table(config);
+              auto t1 = std::chrono::steady_clock::now();
+              py::print("[routing] build_access_egress_table total_ms=",
+                        elapsed_ms(t0, t1));
+              return out;
+          },
+          py::arg("config"),
+          "Precompute a PT access/egress lookup table for one mode "
+          "(stop_idx, h3_index, cost_minutes). Writes ZSTD parquet to "
+          "config.output_path and returns the path");
 }
