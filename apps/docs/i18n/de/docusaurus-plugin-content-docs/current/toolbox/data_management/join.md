@@ -57,8 +57,8 @@ Wenn ein Ziel-Feature mehreren Features im Join-Layer entspricht, enthält das E
 
 Eine räumliche Verknüpfung verbindet Features basierend auf ihrer geometrischen Beziehung — kein gemeinsames Feld ist erforderlich. Jedes Feature im Ziel-Layer wird mit Features im Join-Layer abgeglichen, die die ausgewählte räumliche Beziehung erfüllen.
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/data_management/join/spatial_relationships_de.png').default} alt="Arten räumlicher Beziehungen" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: "32px", marginBottom: "32px" }}>
+  <img src={require('/img/toolbox/data_management/join/spatial_relationships_de.png').default} alt="Arten räumlicher Beziehungen" style={{ maxHeight: "auto", maxWidth: "70%", objectFit: "cover"}}/>
 </div>
 
 **Verfügbare räumliche Beziehungen:**

@@ -57,8 +57,8 @@ When one target feature matches multiple features in the Join Layer, the result 
 
 A Spatial Join links features based on their geometric relationship — no shared field is needed. Each feature in the Target Layer is matched to features in the Join Layer that satisfy the selected spatial relationship.
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/data_management/join/spatial_relationships.png').default} alt="Spatial Relationship Types" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: "32px", marginBottom: "32px" }}>
+  <img src={require('/img/toolbox/data_management/join/spatial_relationships.png').default} alt="Spatial Relationship Types" style={{ maxHeight: "auto", maxWidth: "70%", objectFit: "cover"}}/>
 </div>
 
 **Available spatial relationships:**
