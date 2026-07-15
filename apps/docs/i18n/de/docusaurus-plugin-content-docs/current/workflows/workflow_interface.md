@@ -85,7 +85,11 @@ Dieser Tab enthält kategorisierte Werkzeuge, die für die Workflow-Konstruktion
 
 - **Daten I/O**
   - <code>+ Datensatz hinzufügen</code>: Erstellt Datensatz-Knoten
-  - <code>Als Datensatz speichern</code>: Speichert Workflow-Ergebnisse als permanente Datensätze
+  - <code>Als Datensatz speichern</code>: Speichert Workflow-Ergebnisse als permanente Datensätze. Konfigurieren Sie den **Dataset-Namen**, aktivieren Sie **Zum Projekt hinzufügen**, um das Ergebnis automatisch zur Projektlayerliste hinzuzufügen, und aktivieren Sie **Bei erneutem Ausführen überschreiben**, um das zuvor exportierte Dataset bei jeder Ausführung des Workflows zu ersetzen, anstatt einen neuen Datensatz zu erstellen.
+
+:::tip Gute Praxis
+Vergeben Sie für jeden **Als Datensatz speichern**-Knoten einen aussagekräftigen Namen und aktivieren Sie **Bei erneutem Ausführen überschreiben**, wenn Sie denselben Workflow mehrfach ausführen — so bleibt Ihr Projekt übersichtlich und es entstehen keine doppelten Layer nach jeder Ausführung.
+:::
 
 - **Erreichbarkeitsindikatoren**
   - Alle Werkzeuge, die im Abschnitt [Erreichbarkeitsindikatoren](../category/accessibility-indicators) der Toolbox verfügbar sind

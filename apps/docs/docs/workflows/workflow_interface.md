@@ -85,7 +85,11 @@ This tab contains categorized tools available for workflow construction, similar
 
 - **Data I/O**
   - <code>+ Add Dataset</code>: Create dataset nodes
-  - <code>Save as Dataset</code>: Save workflow results as permanent datasets
+  - <code>Save as Dataset</code>: Save workflow results as permanent datasets. Configure the **Dataset name**, toggle **Add to project** to automatically add the result to the project layer list, and enable **Overwrite on re-run** to replace the previously exported dataset each time the workflow runs instead of creating a new one.
+
+:::tip Good practice
+Give each **Save as Dataset** node a descriptive name and enable **Overwrite on re-run** when running the same workflow repeatedly — this keeps your project clean by avoiding duplicate layers after each run.
+:::
 
 - **Accessibility Indicators**
   - All tools available in the [Accessibility Indicators](../category/accessibility-indicators) section of the Toolbox
