@@ -62,52 +62,7 @@ If you need analyses beyond these regions, feel free to [contact us](https://pla
 </div>
 
 <Tabs>
-<TabItem value="walk" label="Walk" default className="tabItemBox">
-
-**Considers all paths accessible by foot.**
-
-<div class="step">
-  <div class="step-number">3</div>
-  <div class="content">Choose whether to calculate the catchment area based on <code>Time</code> or <code>Distance</code>, and set the corresponding limit. If choosing <code>Time</code>, you can also configure the <code>Speed</code>.</div>
-</div>
-
-:::tip Hint
-
-For suitable travel time limits by amenity type, see the [Location Tool](https://www.chemnitz.de/chemnitz/media/unsere-stadt/verkehr/verkehrsplanung/vep2040_standortwerkzeug.pdf) from the City of Chemnitz.
-
-:::
-
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Choose the <code>Catchment area shape</code>. If choosing: <ul><li><code>Polygon</code> or <code>Network</code>: you can select the <code>Steps</code> and <code>Step sizes</code>.</li><li><code>Hexagonal grid</code>: no further configuration is necessary.</li><li><code>Point grid</code>: you need to select the <code>Point grid layer</code> where the values will be applied.</li></ul></div>
-</div>
-</TabItem>
-
-<TabItem value="cycling" label="Bicycle/Pedelec" className="tabItemBox">
-
-**Considers all bicycle-accessible paths.** This routing mode accounts for surface, smoothness, and slope while computing accessibility. For Pedelec, slopes have lower impedance than standard bicycles.
-
-<div class="step">
-  <div class="step-number">3</div>
-  <div class="content">Choose whether to calculate the catchment area based on <code>Time</code> or <code>Distance</code>, and set the corresponding limit. If choosing <code>Time</code>, you can also configure the <code>Speed</code>.</div>
-</div>
-
-:::tip Hint
-
-For suitable travel time limits by amenity type, see the [Location Tool](https://www.chemnitz.de/chemnitz/media/unsere-stadt/verkehr/verkehrsplanung/vep2040_standortwerkzeug.pdf) from the City of Chemnitz.
-
-:::
-
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Choose the <code>Catchment area shape</code>. If choosing: <ul><li><code>Polygon</code> or <code>Network</code>: you can select the <code>Steps</code> and <code>Step sizes</code>.</li><li><code>Hexagonal grid</code>: no further configuration is necessary.</li><li><code>Point grid</code>: you need to select the <code>Point grid layer</code> where the values will be applied.</li></ul></div>
-</div>
-
-</TabItem>
-
-<TabItem value="car" label="Car" className="tabItemBox">
-
-**Considers all car-accessible paths.** This routing mode accounts for speed limits and one-way restrictions while computing accessibility.
+<TabItem value="active-car" label="Walk / Bicycle / Pedelec / Car" default className="tabItemBox">
 
 <div class="step">
   <div class="step-number">3</div>
@@ -225,21 +180,8 @@ For each mode, configure the **maximum travel time or distance** and the **trave
 </div>
 
 
-### Scenario (Optional)
-
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Optionally, expand the <code>Scenario</code> section and select a scenario to apply network modifications (e.g., new roads or paths) to the routing calculation.</div>
-</div>
-
-:::tip Hint
-
-Scenarios let you model infrastructure changes and immediately see how they affect accessibility. See [Scenarios](../../Scenarios/Scenarios.md) to learn how to create and edit scenarios.
-
-:::
-
-<div class="step">
-  <div class="step-number">8</div>
   <div class="content">Click on <code>Run</code> to start the calculation.</div>
 </div>
 
