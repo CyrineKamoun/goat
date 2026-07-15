@@ -102,7 +102,7 @@ Weitere Details finden Sie unter [Widgets](../category/widgets).
 
 ## Einstellungen
 
-In den Einstellungen können Sie <b>Werkzeuge</b>, <b>Bedienelemente</b> und <b>Ansichtsoptionen</b> für Ihr Dashboard aktivieren oder deaktivieren.
+In den Einstellungen können Sie die **Karte**, das **Branding**, die **Social-Sharing**-Optionen, **Allgemeine** Einstellungen und **Interaktionen** für Ihr Dashboard konfigurieren. Weitere Details finden Sie unter [Einstellungen](../settings).
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
   <img src={require('/img/builder/interface_settings_de.webp').default} alt="Dragging a widget to the panel" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>

@@ -101,7 +101,7 @@ For more details, see [Widgets](../category/widgets).
 
 ## Settings
 
-In the settings you can enable or disable <b>Tools</b>, <b>Controls</b> and <b>View options</b> for your dashboard. See [Settings](builder/settings.md) for more details.
+In the settings you can configure the **Map** controls, **Branding**, **Social sharing**, **General** options, and **Interactions** for your dashboard. See [Settings](../settings) for more details.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
   <img src={require('/img/builder/interface_settings.webp').default} alt="Dragging a widget to the panel" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>

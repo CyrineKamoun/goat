@@ -4,13 +4,13 @@ sidebar_position: 4
 
 # Expressions
 
-This page helps you to understand how **to use the expressions** in the Dashboard widgets. You can enter expressions in the **Numbers, Categories,** and **Pie chart widgets.** We're listing and describing the expressions that you could use in GOAT.
+This page helps you to understand how **to use the expressions** in the Dashboard widgets. You can enter expressions in the **Numbers, Categories, Pie chart,** and **Rich Text widgets.** We're listing and describing the expressions that you could use in GOAT.
 
 **They work the same way as in QGIS, and by combining them you can compute more complex calculations or filter your data.**
 
 :::info
 
-When referring to a field, insert it only in paratheses: **(FieldName)**.
+When referring to a field, insert it only in parentheses: **(FieldName)**.
 
 :::
 
@@ -26,9 +26,9 @@ The following functions work with number fields only. The input and the output w
 | **ln(x)**       | natural logarithm (base *e*) of *x*, inverse of *exp* | <button>ln(10)</button> = 2.303...         |
 | **log10(x)**    | logarithm base 10 of *x*                              | <button>log10(100)</button> = 2            |
 | **round(x, n)** | rounds a number *x* to *n* decimal places             | <button>round(1.235813, 2)</button> = 1.24 |
-| **ceil(x)**     | rounds *up* to the next whole numer                   | <button>ceil(1.3))</button> = 2            |
-| **floor(x)**    | rounds *down* to the previous whole numer             | <button>floor(1.3)</button> = 1            |
-| **pi**          | returns the value of *Ï€*                             | <button>Ï€</button> = 3.142....            |
+| **ceil(x)**     | rounds *up* to the next whole number                  | <button>ceil(1.3))</button> = 2            |
+| **floor(x)**    | rounds *down* to the previous whole number            | <button>floor(1.3)</button> = 1            |
+| **pi**          | returns the value of *π*                              | <button>π</button> = 3.142....             |
 | **sin(x)**      | returns the sine of *x* (radians)                     | <button>sin(1)</button> = 0.841...         |
 | **cos(x)**      | returns the cosine of *x* (radians)                   | <button>cos(1)</button> = 0.541...         |
 | **tan(x)**      | returns the tangent of *x* (radians)                  | <button>tan(0.75)</button> = 0.932...      |
@@ -54,8 +54,8 @@ The following functions work with text fields only. The input and the output wil
 | **substr(string, start, length)**                | returns a substring starting at *start* position with optional *length*                   | <button>substr(mobility, 1, 3)</button> = mob                  |
 | **substring(string, start, length)**             | returns a substring starting at *start* position with optional *length*                   | <button>substring(mobility, 1, 3)</button> = mob               |
 | **left(string, n)**                              | returns the *leftmost n characters*                                                       | <button>left(accessibility, 4)</button> = acce                 |
-| **right(string, n)**                             | retunrs the *rightmost n characters*                                                      | <button>right(accessibility, 4)</button> = lity                |
-| **replace(string, search, replace_with)**        | replaces *all occurences of one substring with another*                                   | <button>replace(bike_lane, _ , )</button> = bike lane          |
+| **right(string, n)**                             | returns the *rightmost n characters*                                                      | <button>right(accessibility, 4)</button> = lity                |
+| **replace(string, search, replace_with)**        | replaces *all occurrences of one substring with another*                                  | <button>replace(bike_lane, _ , )</button> = bike lane          |
 | **regexp_replace(string, pattern, replacement)** | uses *regular expressions to find and replace part of a text*                             | <button>regexp_replace(BusStop12, 0-9+, #)</button> = BusStop# |
 | **regexp_substr(string, pattern)**               | extracts the *first substring that matches a regular expression pattern*                  | <button>regexp_substr(StopID: 45B, 0-9+)</button> = 45         |
 | **strpos(string, substring)**                    | returns the *position (index) where a substring first appears* and returns 0 if not found | <button>strops(WalkScore, Score)</button> = 5                  |
@@ -71,7 +71,7 @@ The following functions work with date/time fields only. The input and the outpu
 | **age(date1, date2)**                                      | returns the *time interval* between two dates                                      | <button>age(now(), birth_date)</button> = 25 years 3 mons 12 days                            |
 | **extract(part, date)**                                    | extracts a specific component from a date (year, month, day, hour, minute, second) | <button>extract('year', "survey_date")</button> = 2025                                       |
 | **date_part(part, date)**                                  | similar to *extract* returns the specified part of a date                          | <button>date_part('month', "survey_date")</button> = 10                                      |
-| **mmake_date(year, month, day)**                           | creates a date from numeric year, month, day                                       | <button>make_date(2025, 10, 8)</button> = 2025-10-08                                         |
+| **make_date(year, month, day)**                            | creates a date from numeric year, month, day                                       | <button>make_date(2025, 10, 8)</button> = 2025-10-08                                         |
 | **make_time(hour, minute, second)**                        | creates a time from numeric hour, minute, second                                   | <button>make_time(14, 30, 0)</button> =  14:30:00                                            |
 | **make_timestamp(year, month, day, hour, minute, second)** | combines date and time into a timestamp                                            | <button>make_timestamp(2025, 10, 8, 14, 30, 0)</button> = 2025-10-08 14:30:00                |
 | **to_date(string, format)**                                | converts a text string to a date using the given format                            | <button>to_date('08/10/2025','DD/MM/YYYY')</button> = 2025-10-08                             |
@@ -159,10 +159,6 @@ The following functions work with any type of field. The input and the output wi
 | **ST_YMin(geometry)**       | same as `ymin()`, **PostGIS version**                                         | <button>ST_YMin($geometry)</button> = 52.45                                |
 | **ymax(geometry)**          | returns the **maximum Y-coordinate** (top boundary) of a geometry             | <button>ymax($geometry)</button> = 52.55                                   |
 | **ST_YMax(geometry)**       | same as `ymax()`, **PostGIS version**                                         | <button>ST_YMax($geometry)</button> = 52.55                                |
-
-
-Here are some examples of combined expressions for more complex calculations:
-https://github.com/plan4better/goat/blob/main/apps/core/src/core/expression_converter.py 
 
 
 :::tip
