@@ -98,3 +98,11 @@ Der Dark-Matter-Stil von Carto bietet eine dunkle, minimalistische Grundkarte, d
 ```
 https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
 ```
+
+:::tip Weitere Anbieter
+Eine umfangreichere Liste kompatibler Grundkartenanbieter und Verbindungsanleitungen finden Sie im [GOAT-Blogbeitrag zu Grundkarten](https://www.plan4better.de/en/post/where-to-find-basemaps).
+:::
+
+## Grundkarten in geteilten Dashboards
+
+Wenn Sie ein Projekt als öffentliches Dashboard teilen, können Sie im **Dashboard** festlegen, zwischen welchen Grundkarten die Betrachter wechseln dürfen. Öffnen Sie im **Dashboard** den Tab **Einstellungen** und suchen Sie das Feld **Erlaubte Hintergrundkarten**. Wählen Sie die gewünschten Grundkarten aus — wenn keine Einschränkung festgelegt ist, werden alle Grundkarten für die Betrachter angezeigt.

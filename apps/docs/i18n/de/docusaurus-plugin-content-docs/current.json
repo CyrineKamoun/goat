@@ -158,5 +158,45 @@
   "sidebar.tutorialSidebar.category.Technical Insights.link.generated-index.description": {
     "message": "Hier finden Sie technische Einblicke und Details über die Software-Architektur von GOAT.",
     "description": "Die generierte Indexseitenbeschreibung für die Kategorie Technische Einblicke in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Widgets": {
+    "message": "Widgets",
+    "description": "Das Label für die Kategorie Widgets in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Widgets.link.generated-index.description": {
+    "message": "Widgets sind die Bausteine des Dashboards. Sie ermöglichen es Ihnen, verschiedene Arten von Daten und Informationen optisch ansprechend darzustellen. Jedes Widget kann an Ihre Bedürfnisse angepasst werden, egal ob Sie Zahlen, Diagramme oder Projektelemente wie Text und Bilder anzeigen möchten.",
+    "description": "Die generierte Beschreibung der Indexseite für die Kategorie Widgets in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Dashboard": {
+    "message": "Dashboard",
+    "description": "Das Label für die Kategorie Dashboard in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Dashboard.link.generated-index.description": {
+    "message": "Der Dashboard-Modus ermöglicht es Ihnen, angepasste Karten und interaktive Dashboards zu erstellen. Wählen Sie aus verschiedenen Indikatoren, Layern und visuellen Einstellungen, um eine Ansicht zu erstellen, die zu Ihrem Projekt passt.",
+    "description": "Die generierte Beschreibung der Indexseite für die Kategorie Dashboard in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Layouts": {
+    "message": "Layouts",
+    "description": "Das Label für die Kategorie Layouts in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Layouts.link.generated-index.description": {
+    "message": "Erstellen Sie professionelle Kartenberichte und exportieren Sie diese als PDF- oder PNG-Dateien.",
+    "description": "Die generierte Beschreibung der Indexseite für die Kategorie Layouts in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Sharing": {
+    "message": "Teilen",
+    "description": "Das Label für die Kategorie Sharing in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Sharing.link.generated-index.description": {
+    "message": "GOAT bietet zwei Möglichkeiten zum Teilen von Karten: Mit Teams & Mitglieder können andere Mitglieder gleichzeitig Ihre Datensätze oder Projekte bearbeiten und/oder ansehen; Öffentlich & Eingebettete Karten ermöglichen es jedem, Ihre Karte ohne GOAT-Konto anzusehen.",
+    "description": "Die generierte Beschreibung der Indexseite für die Kategorie Teilen in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Workflows": {
+    "message": "Workflows",
+    "description": "Das Label für die Kategorie Workflows in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Workflows.link.generated-index.description": {
+    "message": "Erstellen Sie visuelle Analyse-Workflows durch das Verbinden von Datensätzen, Werkzeugen und Export-Knoten. Bauen Sie komplexe räumliche Analysepipelines mit Drag-and-Drop-Einfachheit auf, führen Sie Workflows schrittweise aus und verketten Sie mehrere Werkzeuge für anspruchsvolle räumliche Analysen.",
+    "description": "Die generierte Beschreibung der Indexseite für die Kategorie Workflows in der Seitenleiste tutorialSidebar"
   }
 }

@@ -98,3 +98,11 @@ Carto's Dark Matter style offers a dark, minimal basemap well suited to data-hea
 ```
 https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
 ```
+
+:::tip More providers
+For a broader list of compatible basemap providers and connection guides, see the [GOAT blog post on where to find basemaps](https://www.plan4better.de/en/post/where-to-find-basemaps).
+:::
+
+## Basemaps in shared dashboards
+
+When you share a project as a public dashboard via the **Dashboard**, you can control which basemaps viewers are allowed to switch between. In the **Dashboard**, open the **Settings** tab and find the **Allowed basemaps** field. Select the basemaps you want to make available — if no restriction is set, all basemaps are shown to viewers.
