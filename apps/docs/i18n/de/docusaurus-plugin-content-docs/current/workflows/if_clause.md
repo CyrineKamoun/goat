@@ -14,12 +14,12 @@ Der **Bedingung**-Knoten leitet eine Eingabeebene basierend auf einer definierte
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Im rechten Panel unter dem Tab <strong>Werkzeuge</strong> den Bereich <strong>Steuerung</strong> aufrufen und die Karte <strong>Bedingung</strong> auf die Leinwand ziehen.</div>
+  <div class="content">Öffnen Sie im rechten Panel den Tab <strong>Werkzeuge</strong>, suchen Sie den Bereich <strong>Steuerung</strong> und ziehen Sie die Karte <strong>Bedingung</strong> auf die Leinwand.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Einen vorgelagerten Datensatz- oder Werkzeug-Knoten mit dem Eingabe-Handle des Bedingung-Knotens verbinden.</div>
+  <div class="content">Verbinden Sie einen vorgelagerten Datensatz- oder Werkzeug-Knoten mit dem Eingabe-Handle des Bedingung-Knotens.</div>
 </div>
 
 <div class="step">
@@ -27,7 +27,7 @@ Der **Bedingung**-Knoten leitet eine Eingabeebene basierend auf einer definierte
   <div class="content">Klicken Sie auf den Bedingung-Knoten, um die Konfiguration zu öffnen. Klicken Sie auf <strong>Ausdruck hinzufügen</strong> und wählen Sie einen Ausdruckstyp:
     <ul>
       <li><strong>Logischer Ausdruck</strong> — Wählen Sie ein Feld aus der vorgelagerten Ebene, einen Operator (z. B. größer als, enthält) und geben Sie einen Wert ein.</li>
-      <li><strong>Statistischer Ausdruck</strong> — Wählen Sie eine Aggregationsmethode (<code>count</code>, <code>sum</code>, <code>mean</code>, <code>median</code>, <code>min</code>, <code>max</code>), optional ein numerisches Feld, einen Vergleichsoperator und einen Schwellenwert.</li>
+      <li><strong>Statistischer Ausdruck</strong> — Wählen Sie eine Aggregationsmethode (<code>count</code>, <code>sum</code>, <code>mean</code>, <code>median</code>, <code>min</code>, <code>max</code>), sowie optional ein numerisches Feld, einen Vergleichsoperator und einen Schwellenwert.</li>
     </ul>
   </div>
 </div>
