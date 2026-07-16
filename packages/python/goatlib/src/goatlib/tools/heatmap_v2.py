@@ -1,13 +1,17 @@
 """Heatmap V2 tool for Windmill — on-the-fly via local C++ routing.
 
-Supports walking, bicycle, pedelec, and car modes (PT dropped pending a
-stop-walk precomputed matrix redesign). Per-opportunity max_cost drives
-the routing budget; the resolver turns layer IDs into parquet paths.
+Supports walking, bicycle, pedelec, car, and public-transport modes. PT
+uses an arrive-by reverse-RAPTOR pipeline with precomputed per-mode
+access/egress lookup tables (resolved from settings). Per-opportunity
+max_cost drives the routing budget; the resolver turns layer IDs into
+parquet paths.
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime, timedelta, timezone
+from datetime import time as time_of_day
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Literal, Self
@@ -15,23 +19,36 @@ from typing import Any, Literal, Self
 from pydantic import ConfigDict, Field
 
 from goatlib.analysis.accessibility import HeatmapV2Tool
+from goatlib.analysis.schemas.catchment_area import WEEKDAY_LABELS
 from goatlib.analysis.schemas.catchment_area_v2 import (
+    AccessEgressMode,
     CostType,
+    PTMode,
     RoutingMode,
+    Weekday,
 )
 from goatlib.analysis.schemas.heatmap import (
-    PotentialExpression,
-    PotentialType,
     ROUTING_MODE_ICONS,
     ROUTING_MODE_LABELS,
-    SensitivityValue,
+    PotentialExpression,
+    PotentialType,
 )
 from goatlib.analysis.schemas.heatmap_v2 import (
+    N_DESTINATIONS_MAX,
+    N_DESTINATIONS_MIN,
+    SENSITIVITY_MAX,
+    SENSITIVITY_MIN,
     GravityDecay,
     HeatmapType,
     HeatmapV2Params,
     OpportunityV2,
 )
+from goatlib.analysis.schemas.ui import (
+    UISection,
+    ui_field,
+    ui_sections,
+)
+from goatlib.models.io import DatasetMetadata
 from goatlib.tools._routing_limits import (
     ACTIVE_DISTANCE_LIMIT_MSG,
     ACTIVE_TIME_LIMIT_MSG,
@@ -41,21 +58,21 @@ from goatlib.tools._routing_limits import (
     DEFAULT_MAX_DISTANCE_CAR_M,
     DEFAULT_MAX_TIME_ACTIVE_MIN,
     DEFAULT_MAX_TIME_CAR_MIN,
+    DEFAULT_MAX_TIME_PT_MIN,
     MAX_DISTANCE_ACTIVE_M,
     MAX_DISTANCE_CAR_M,
     MAX_TIME_ACTIVE_MIN,
     MAX_TIME_CAR_MIN,
+    MAX_TIME_PT_MIN,
+    PT_TIME_LIMIT_MSG,
 )
-from goatlib.analysis.schemas.ui import (
-    UISection,
-    ui_field,
-    ui_sections,
-)
-from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.catchment_area_v2 import (
+    ACCESS_EGRESS_MODE_ICONS,
+    ACCESS_EGRESS_MODE_LABELS,
     COST_TYPE_ICONS,
     COST_TYPE_LABELS,
+    PT_MODE_LABELS,
     SECTION_CONFIGURATION,
 )
 from goatlib.tools.schemas import (
@@ -68,15 +85,28 @@ logger = logging.getLogger(__name__)
 
 
 class HeatmapRoutingMode(StrEnum):
-    """Routing modes supported by heatmap v2. PT is intentionally not
-    listed — PT support will return in a future rewrite with the
-    stop-walk precomputed matrix approach.
+    """Routing modes supported by heatmap v2.
+
+    PT uses an arrive-by reverse-RAPTOR pipeline with precomputed per-mode
+    access/egress lookup tables (the access/egress mode selects which table is
+    loaded; only the walk table is generated so far, others resolve once built).
     """
 
     walking = "walking"
     bicycle = "bicycle"
     pedelec = "pedelec"
     car = "car"
+    pt = "pt"
+
+
+# Routing-mode icons/labels for the heatmap form. Extends the street-mode
+# maps from the heatmap schema with a PT entry (matching catchment v2). The
+# base street maps (without PT) are reused directly for the connectivity tile.
+HM_ROUTING_MODE_ICONS: dict[str, str] = {**ROUTING_MODE_ICONS, "pt": "bus"}
+HM_ROUTING_MODE_LABELS: dict[str, str] = {
+    **ROUTING_MODE_LABELS,
+    "pt": "routing_modes.pt",
+}
 
 
 # =========================================================================
@@ -154,6 +184,14 @@ class OpportunityV2PointBase(OpportunityV2):
         ),
     )
 
+    layer_project_id: int | None = Field(
+        default=None,
+        description="Project-layer id of the opportunity layer (auto-populated).",
+        json_schema_extra=ui_field(
+            section="opportunities", field_order=1, hidden=True
+        ),
+    )
+
     # Hide the inherited analysis-layer scalar `max_cost`. The runner sets
     # it via resolve_max_cost(cost_type) before handing the opportunity to
     # the analysis layer.
@@ -185,6 +223,7 @@ class OpportunityV2PointBase(OpportunityV2):
                         "bicycle": DEFAULT_MAX_TIME_ACTIVE_MIN,
                         "pedelec": DEFAULT_MAX_TIME_ACTIVE_MIN,
                         "car": DEFAULT_MAX_TIME_CAR_MIN,
+                        "pt": DEFAULT_MAX_TIME_PT_MIN,
                     },
                 },
                 "max_value_from": {
@@ -208,6 +247,11 @@ class OpportunityV2PointBase(OpportunityV2):
                             "value": MAX_TIME_CAR_MIN,
                             "when": {"routing_mode": "car"},
                             "message": CAR_TIME_LIMIT_MSG,
+                        },
+                        {
+                            "value": MAX_TIME_PT_MIN,
+                            "when": {"routing_mode": "pt"},
+                            "message": PT_TIME_LIMIT_MSG,
                         },
                     ],
                     "min": 1,
@@ -273,8 +317,10 @@ class OpportunityV2PointBase(OpportunityV2):
 
     # Hide all formula-specific extras from the base. The two formula
     # subclasses below re-declare the fields they need as visible.
-    sensitivity: SensitivityValue = Field(
-        default=300000,
+    sensitivity: float = Field(
+        default=300000.0,
+        ge=SENSITIVITY_MIN,
+        le=SENSITIVITY_MAX,
         json_schema_extra=ui_field(section="opportunities", hidden=True),
     )
     potential_type: PotentialType = Field(
@@ -312,12 +358,22 @@ class OpportunityV2PointBase(OpportunityV2):
 class OpportunityV2PointGravity(OpportunityV2PointBase):
     """Gravity opportunity card: re-exposes sensitivity + potential_* fields."""
 
-    sensitivity: SensitivityValue = Field(
-        default=300000,
-        description="Sensitivity parameter for gravity decay function.",
+    sensitivity: float = Field(
+        default=300000.0,
+        ge=SENSITIVITY_MIN,
+        le=SENSITIVITY_MAX,
+        description="Sensitivity parameter for gravity decay function "
+                    "(larger = slower decay / wider reach).",
         json_schema_extra=ui_field(
             section="opportunities",
             field_order=10,
+            label_key="sensitivity",
+            widget="number",
+            widget_options={
+                "min": SENSITIVITY_MIN,
+                "max": SENSITIVITY_MAX,
+                "step": 1000,
+            },
             visible_when={"input_path": {"$ne": None}},
         ),
     )
@@ -384,13 +440,23 @@ class OpportunityV2PointGravity(OpportunityV2PointBase):
 class OpportunityV2PointClosestAverage(OpportunityV2PointBase):
     """Closest-Average opportunity card: re-exposes n_destinations."""
 
-    n_destinations: Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10] = Field(
+    n_destinations: int = Field(
         default=1,
         title="Number of Destinations",
         description="Number of closest destinations to average",
         json_schema_extra=ui_field(
             section="opportunities",
             field_order=5,
+            label_key="n_destinations",
+            widget="number",
+            # min/max live in widget_options (not ge/le) so the field renders
+            # as a number input rather than a slider; the 1–10 bound is
+            # enforced server-side by the analysis-layer schema.
+            widget_options={
+                "min": N_DESTINATIONS_MIN,
+                "max": N_DESTINATIONS_MAX,
+                "step": 1,
+            },
             visible_when={"input_path": {"$ne": None}},
         ),
     )
@@ -444,8 +510,22 @@ class HeatmapV2WindmillParams(ToolInputBase):
             section="routing",
             field_order=1,
             label_key="routing_mode",
-            enum_icons=ROUTING_MODE_ICONS,
-            enum_labels=ROUTING_MODE_LABELS,
+            enum_icons=HM_ROUTING_MODE_ICONS,
+            enum_labels=HM_ROUTING_MODE_LABELS,
+        ),
+    )
+
+    # PT transit-mode filter (only the listed PT classes are used). Mirrors
+    # catchment v2's pt_modes. Visible only for PT.
+    pt_modes: list[PTMode] | None = Field(
+        default=list(PTMode),
+        description="Public transport modes to include.",
+        json_schema_extra=ui_field(
+            section="routing",
+            field_order=2,
+            label_key="choose_pt_mode",
+            enum_labels=PT_MODE_LABELS,
+            visible_when={"routing_mode": "pt"},
         ),
     )
 
@@ -476,6 +556,182 @@ class HeatmapV2WindmillParams(ToolInputBase):
             enum_labels=COST_TYPE_LABELS,
             enum_icons=COST_TYPE_ICONS,
             inline_group="cost_config",
+            # PT is always time-based (total journey minutes); hide the
+            # time/distance selector for PT.
+            visible_when={
+                "routing_mode": {"$in": ["walking", "bicycle", "pedelec", "car"]}
+            },
+        ),
+    )
+
+    # =========================================================================
+    # PT (routing_mode == pt) — arrive-by reverse RAPTOR.
+    #
+    # Unlike catchment (departure), the PT heatmap is anchored on an ARRIVAL
+    # time: every reachable cell's score reflects a journey arriving by this
+    # time. Access/egress mode + time budget mirror catchment (see below);
+    # the budget is capped at the lookup table's built max (20 min). The
+    # per-opportunity max_cost is the total journey budget.
+    # =========================================================================
+
+    pt_day: Weekday = Field(
+        default=Weekday.weekday,
+        description="Day type for PT schedule.",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=3,
+            label_key="weekday",
+            enum_labels=WEEKDAY_LABELS,
+            visible_when={"routing_mode": "pt"},
+        ),
+    )
+    pt_arrival_time: int = Field(
+        default=32400,  # 09:00
+        ge=0,
+        le=86399,
+        description="Arrive-by time of day (seconds from midnight).",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=4,
+            label_key="arrival_time",
+            widget="time-picker",
+            visible_when={"routing_mode": "pt"},
+        ),
+    )
+    # Access & egress legs — mirrors catchment_area_v2's PT access/egress
+    # (mode selector + per-leg budget, grouped, under Advanced). Unlike
+    # catchment, the legs are served by precomputed per-mode lookup tables
+    # (minutes, mode speed baked in), so there's no speed/distance override
+    # and the budget is capped at the table's built max (20 min). The mode
+    # selects which lookup table is loaded.
+    # Access/egress legs are walk-only for PT heatmaps: only the walk
+    # access/egress lookup table is precomputed. The mode selector stays visible
+    # for consistency with the other legs/config, but is restricted to the
+    # single "walk" option (== AccessEgressMode.walk) via the Literal type.
+    pt_access_mode: Literal["walk"] = Field(
+        default="walk",
+        description="Mode to reach transit stops (walk-only for PT heatmaps).",
+        # Literal keeps validation walk-only (emits `const`); the explicit
+        # `enum` makes the frontend render it as a (single-option) dropdown,
+        # since it derives options from schema `enum`, not `const`.
+        json_schema_extra={
+            **ui_field(
+                section="configuration",
+                field_order=20,
+                label_key="access_mode",
+                group_label="groups.access_leg",
+                enum_icons=ACCESS_EGRESS_MODE_ICONS,
+                enum_labels=ACCESS_EGRESS_MODE_LABELS,
+                visible_when={
+                    "$and": [
+                        {"routing_mode": "pt"},
+                        {"show_advanced": True},
+                    ]
+                },
+            ),
+            "enum": [AccessEgressMode.walk.value],
+        },
+    )
+    pt_access_max_time: int = Field(
+        default=DEFAULT_MAX_TIME_ACTIVE_MIN,
+        # No ge/le: bounds come from widget_options.max_value_from (a plain
+        # number input). Pydantic ge+le would emit schema min+max, which the
+        # form renders as a slider — catchment avoids this the same way.
+        description="Access leg budget in minutes (≤ the lookup table max).",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=21,
+            label_key="time_limit",
+            inline_group="pt_access_cost",
+            inline_flex="1 0 0",
+            visible_when={
+                "$and": [
+                    {"routing_mode": "pt"},
+                    {"show_advanced": True},
+                ]
+            },
+            widget_options={
+                "max_value_from": {
+                    "fields": [],
+                    "message": "pt_access_time_limit_message",
+                    "max": 20,
+                    "min": 1,
+                },
+            },
+        ),
+    )
+    pt_egress_mode: Literal["walk"] = Field(
+        default="walk",
+        description="Mode from transit stops to the opportunity "
+                    "(walk-only for PT heatmaps).",
+        # See pt_access_mode: Literal for validation + explicit enum so the
+        # frontend renders a (single-option) dropdown.
+        json_schema_extra={
+            **ui_field(
+                section="configuration",
+                field_order=22,
+                label_key="pt_egress_mode",
+                group_label="groups.egress_leg",
+                enum_icons=ACCESS_EGRESS_MODE_ICONS,
+                enum_labels=ACCESS_EGRESS_MODE_LABELS,
+                visible_when={
+                    "$and": [
+                        {"routing_mode": "pt"},
+                        {"show_advanced": True},
+                    ]
+                },
+            ),
+            "enum": [AccessEgressMode.walk.value],
+        },
+    )
+    pt_egress_max_time: int = Field(
+        default=DEFAULT_MAX_TIME_ACTIVE_MIN,
+        # No ge/le — see pt_access_max_time (avoids the slider; number input).
+        description="Egress leg budget in minutes (≤ the lookup table max).",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=23,
+            label_key="time_limit",
+            inline_group="pt_egress_cost",
+            inline_flex="1 0 0",
+            visible_when={
+                "$and": [
+                    {"routing_mode": "pt"},
+                    {"show_advanced": True},
+                ]
+            },
+            widget_options={
+                "max_value_from": {
+                    "fields": [],
+                    "message": "pt_egress_time_limit_message",
+                    "max": 20,
+                    "min": 1,
+                },
+            },
+        ),
+    )
+    pt_max_transfers: int = Field(
+        default=5,
+        # No ge/le — see pt_access_max_time (avoids the slider; number input).
+        description="Maximum number of transit transfers.",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=17,
+            label_key="max_transfers",
+            visible_when={
+                "$and": [
+                    {"routing_mode": "pt"},
+                    {"show_advanced": True},
+                ]
+            },
+            widget_options={
+                "max_value_from": {
+                    "fields": [],
+                    "message": "max_transfers_limit_message",
+                    "max": 5,
+                    "min": 0,
+                },
+            },
         ),
     )
 
@@ -538,7 +794,10 @@ class HeatmapV2WindmillParams(ToolInputBase):
         description="Layer ID for the reference area polygon.",
         json_schema_extra=ui_field(
             section="configuration",
-            field_order=21,
+            # Top of the advanced options — right after the show_advanced
+            # toggle (15) and before the PT access/egress groups (20-23), so
+            # it isn't pulled into the access leg group.
+            field_order=16,
             label_key="reference_area_path",
             widget="layer-selector",
             widget_options={"geometry_types": ["Polygon", "MultiPolygon"]},
@@ -549,7 +808,7 @@ class HeatmapV2WindmillParams(ToolInputBase):
         None,
         description="CQL2-JSON filter to apply to the reference area layer.",
         json_schema_extra=ui_field(
-            section="configuration", field_order=22, hidden=True
+            section="configuration", field_order=16, hidden=True
         ),
     )
 
@@ -798,6 +1057,11 @@ class HeatmapClosestAverageV2WindmillParams(HeatmapV2WindmillParams):
 class HeatmapConnectivityV2WindmillParams(HeatmapV2WindmillParams):
     """Total area reachable within max travel cost."""
 
+    # routing_mode is inherited from the base (full mode set incl. PT). PT
+    # connectivity runs through the same arrive-by reverse-RAPTOR pipeline as
+    # gravity/closest-average; the inherited PT fields (arrival time,
+    # access/egress, transfers) surface via their routing_mode == pt guards.
+
     # Hide the heatmap_type selector and pre-bind to connectivity
     heatmap_type: HeatmapType = Field(
         default=HeatmapType.connectivity,
@@ -846,6 +1110,7 @@ class HeatmapConnectivityV2WindmillParams(HeatmapV2WindmillParams):
                         "bicycle": DEFAULT_MAX_TIME_ACTIVE_MIN,
                         "pedelec": DEFAULT_MAX_TIME_ACTIVE_MIN,
                         "car": DEFAULT_MAX_TIME_CAR_MIN,
+                        "pt": DEFAULT_MAX_TIME_PT_MIN,
                     },
                 },
                 "max_value_from": {
@@ -869,6 +1134,11 @@ class HeatmapConnectivityV2WindmillParams(HeatmapV2WindmillParams):
                             "value": MAX_TIME_CAR_MIN,
                             "when": {"routing_mode": "car"},
                             "message": CAR_TIME_LIMIT_MSG,
+                        },
+                        {
+                            "value": MAX_TIME_PT_MIN,
+                            "when": {"routing_mode": "pt"},
+                            "message": PT_TIME_LIMIT_MSG,
                         },
                     ],
                     "min": 1,
@@ -971,7 +1241,37 @@ _ROUTING_MODE_MAP: dict[HeatmapRoutingMode, RoutingMode] = {
     HeatmapRoutingMode.bicycle: RoutingMode.bicycle,
     HeatmapRoutingMode.pedelec: RoutingMode.pedelec,
     HeatmapRoutingMode.car: RoutingMode.car,
+    HeatmapRoutingMode.pt: RoutingMode.pt,
 }
+
+# PT access/egress mode (catchment-style "walk" naming) → analysis RoutingMode.
+# The analysis layer resolves the per-mode lookup table from this.
+_ACCESS_EGRESS_MODE_MAP: dict[AccessEgressMode, RoutingMode] = {
+    AccessEgressMode.walk: RoutingMode.walking,
+    AccessEgressMode.bicycle: RoutingMode.bicycle,
+    AccessEgressMode.pedelec: RoutingMode.pedelec,
+    AccessEgressMode.car: RoutingMode.car,
+}
+
+# Anchor dates per weekday type — must match catchment v2's
+# `_pt_departure_unix_minutes` so PT routing resolves against the same
+# representative service days.
+_PT_WEEKDAY_DATES: dict[str, date] = {
+    "weekday": date(2026, 6, 16),
+    "saturday": date(2026, 6, 20),
+    "sunday": date(2026, 6, 21),
+}
+
+
+def _pt_arrival_unix_minutes(pt_day: Weekday, seconds_of_day: int) -> int:
+    """Convert a weekday type + time-of-day into a unix-minute arrival
+    anchor (UTC), mirroring catchment v2's departure conversion."""
+    day_value = pt_day.value if hasattr(pt_day, "value") else str(pt_day)
+    anchor = _PT_WEEKDAY_DATES.get(day_value, _PT_WEEKDAY_DATES["weekday"])
+    arrival_dt = datetime.combine(
+        anchor, time_of_day.min, tzinfo=timezone.utc
+    ) + timedelta(seconds=seconds_of_day)
+    return int(arrival_dt.timestamp() // 60)
 
 
 class HeatmapV2ToolRunner(BaseToolRunner[HeatmapV2WindmillParams]):
@@ -1077,10 +1377,19 @@ class HeatmapV2ToolRunner(BaseToolRunner[HeatmapV2WindmillParams]):
         # fields into the analysis-layer OpportunityV2.max_cost (resolved
         # against the form's outer routing_mode + cost_type), then swap
         # layer UUIDs for parquet paths.
+        # Name the result column after the project layer. Set before
+        # resolve_layer_paths, which fills the dataset name when name is unset.
         resolved = params.resolved_opportunities()
-        return self.resolve_layer_paths(
-            resolved, params.user_id, "input_path"
-        )
+        named = []
+        for opp, card in zip(resolved, params.opportunities):
+            if not opp.name:
+                proj_name = self.get_project_layer_name_by_id(
+                    getattr(card, "layer_project_id", None)
+                )
+                if proj_name:
+                    opp = opp.model_copy(update={"name": proj_name})
+            named.append(opp)
+        return self.resolve_layer_paths(named, params.user_id, "input_path")
 
     def _resolve_reference_area(
         self: Self, params: HeatmapV2WindmillParams
@@ -1116,11 +1425,20 @@ class HeatmapV2ToolRunner(BaseToolRunner[HeatmapV2WindmillParams]):
             [] if is_connectivity else self._resolve_opportunities(params)
         )
 
+        # routing_mode is HeatmapRoutingMode across all heatmap types; normalise
+        # via value to be robust to a raw string coming from Windmill.
+        mode = HeatmapRoutingMode(
+            params.routing_mode.value
+            if hasattr(params.routing_mode, "value")
+            else params.routing_mode
+        )
+        is_pt = mode == HeatmapRoutingMode.pt
+
         analysis_params = HeatmapV2Params(
             # Study area
             h3_resolution=params.h3_resolution,
             # Routing
-            routing_mode=_ROUTING_MODE_MAP[params.routing_mode],
+            routing_mode=_ROUTING_MODE_MAP[mode],
             cost_type=params.cost_type,
             max_cost=params.aggregate_max_cost(),
             speed=params.speed,
@@ -1131,6 +1449,24 @@ class HeatmapV2ToolRunner(BaseToolRunner[HeatmapV2WindmillParams]):
             # Opportunities + optional reference-area clip
             opportunities=resolved_opportunities,
             reference_area_path=reference_area_path,
+            # PT (arrive-by reverse RAPTOR). access/egress modes select the
+            # per-mode lookup table (walk/bicycle/pedelec/car); the analysis
+            # layer resolves the table path and errors if it isn't built yet.
+            arrival_time=(
+                _pt_arrival_unix_minutes(params.pt_day, params.pt_arrival_time)
+                if is_pt
+                else None
+            ),
+            transit_modes=(
+                [m.value for m in params.pt_modes]
+                if is_pt and params.pt_modes
+                else None
+            ),
+            max_transfers=params.pt_max_transfers,
+            access_mode=_ACCESS_EGRESS_MODE_MAP[params.pt_access_mode],
+            egress_mode=_ACCESS_EGRESS_MODE_MAP[params.pt_egress_mode],
+            access_max_time=params.pt_access_max_time,
+            egress_max_time=params.pt_egress_max_time,
             # Output
             output_path=str(output_path),
         )

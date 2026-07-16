@@ -36,24 +36,35 @@ GOAT supports multiple file formats for upload: **GeoPackage**, **GeoJSON**, **S
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Select the file from your local device using the file browser.</div>
+  <div class="content">In the <strong>Select File</strong> step, choose the file from your local device. Supported formats are listed at the bottom of the dialog. Click <code>Next</code>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">
-    <p>Configure your dataset:</p>
-    <ul> 
-      <li><strong>Destination Folder</strong> - Choose where to organize your dataset</li>
-      <li><strong>Name</strong> - Give your dataset a descriptive name</li>
-      <li><strong>Description</strong> (optional) - Add details about your dataset's content and purpose</li>
+  <div class="content"><strong>CSV and XLSX files only — Preview &amp; Configure step:</strong> GOAT shows a preview of your tabular data so you can verify it before import.
+    <ul>
+      <li><code>Worksheet</code> — For XLSX files with multiple sheets, select which sheet to import.</li>
+      <li><code>First row is header</code> — Toggle on (default) if your file's first row contains column names. Toggle off if the first row is data — column names will be auto-generated and you can rename them later in the layer settings.</li>
     </ul>
+    The preview table shows the first rows of your file. Click <code>Next</code> when ready.
   </div>
 </div>
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Click <code>Upload</code> to add the dataset to your workspace.</div>
+  <div class="content">In the <strong>Destination &amp; Metadata</strong> step, configure your dataset:
+    <ul>
+      <li><strong>Destination Folder</strong> — Choose where to organize your dataset</li>
+      <li><strong>Name</strong> — Give your dataset a descriptive name</li>
+      <li><strong>Description</strong> (optional) — Add details about your dataset's content and purpose</li>
+    </ul>
+    Click <code>Next</code>.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-number">6</div>
+  <div class="content">Review your configuration in the <strong>Confirmation</strong> step and click <code>Upload</code> to add the dataset to your workspace.</div>
 </div>
 
 ### External data sources
@@ -151,7 +162,7 @@ Organize your datasets into folders for better structure and easier navigation.
 Click the <img src={require('/img/icons/3dots.png').default} alt="Options" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>More Options</code> icon next to any folder:
 
 - <code>Rename</code> — Change the folder name
-- <code>Share</code> — Open the <strong>Manage access</strong> dialog to grant access by <strong>Organization</strong> or per <strong>Team</strong>. Set the access level for each and click <code>Save</code>.
+- <code>Share</code> — Open the <strong>Manage access</strong> dialog with two tabs: <strong>Organization</strong> (share with your entire organization) and <strong>Teams</strong> (share with specific teams). These are mutually exclusive — granting access to the organization clears any team grants, and vice versa. For each entry, set the access level to <strong>Editor</strong> (can edit) or <strong>Viewer</strong> (read-only), or <strong>No Access</strong> to revoke. Click <code>Save</code> to apply. All datasets inside a shared folder automatically inherit the folder's access — inherited access is shown as <code>Via folder</code> in those items' own share dialogs and cannot be changed there directly.
 - <code>Delete</code> — Remove the folder
 
 <p></p>
@@ -187,6 +198,13 @@ Access comprehensive dataset management options through the <img src={require('/
 - <code>Update</code> - Update datasets with new data
 - <code>Share</code> - Collaborate by sharing datasets with team members or your organization
 - <code>Delete</code> - Remove datasets you no longer need
+
+#### Downloading datasets
+
+When downloading a spatial dataset, a dialog lets you choose:
+
+- **Download Type** — the export file format (e.g. GeoPackage, GeoJSON, Shapefile).
+- **Coordinate Reference System (CRS)** — the CRS to reproject the data into before download. GOAT automatically suggests CRS options based on the dataset's geographic extent: global options (WGS 84, Web Mercator) are always available, plus the matching UTM zone and any relevant national or regional CRS. The default is **WGS 84 (EPSG:4326)**.
 
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

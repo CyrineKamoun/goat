@@ -21,16 +21,10 @@ RUN apt-get update && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/*
 
 # ==== STAGE 2: Python environment ====
+# core depends only on goatlib's light base (auth helpers), not the full
+# geospatial stack, so no GDAL headers or build toolchain are required — every
+# remaining dependency ships a manylinux wheel.
 FROM linux-base AS python-base
-
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    build-essential \
-    cmake \
-    gettext \
-    gdal-bin \
-    libgdal-dev \
-    python3-gdal \
-    && rm -rf /var/lib/apt/lists/*
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:0.9.2 /uv /usr/local/bin/uv
@@ -39,24 +33,14 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.2 /uv /usr/local/bin/uv
 COPY apps/core /app/apps/core
 COPY packages/python/goatlib /app/packages/python/goatlib
 COPY packages/python/goatobs /app/packages/python/goatobs
-COPY packages/cpp/routing /app/packages/cpp/routing
 COPY pyproject.toml uv.lock /app/
 WORKDIR /app
 
 # Install project dependencies
-RUN uv sync --all-extras --frozen --no-dev --no-editable --package=core
-
-# Copy GDAL Python bindings from system to venv
-RUN cp -r /usr/lib/python3/dist-packages/osgeo* $UV_PROJECT_ENVIRONMENT/lib/python3.11/site-packages/
+RUN uv sync --frozen --no-dev --no-editable --package=core
 
 # ==== STAGE 3: Webapp environment ====
 FROM linux-base AS webapp
-
-# Install GDAL runtime libraries
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    gdal-bin \
-    libgdal32 \
-    && rm -rf /var/lib/apt/lists/*
 
 # Copy python, virtual env and app
 COPY --from=python-base $UV_PYTHON_INSTALL_DIR $UV_PYTHON_INSTALL_DIR
@@ -72,3 +56,4 @@ WORKDIR /app
 EXPOSE 8000
 
 CMD ["fastapi", "run", "apps/core/src/core/main.py"]
+

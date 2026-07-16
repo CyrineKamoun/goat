@@ -173,14 +173,12 @@ class AggregatePolygonTool(AnalysisTool):
             f"COALESCE(t.{col}, 0) AS {col}" for col, _ in agg_specs
         )
 
-        area_columns = self.con.execute(f"""
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name = '{area_view}'
-            AND column_name != '{area_geom}'
-            AND column_name != 'bbox'
-        """).fetchall()
-        area_col_names = [col[0] for col in area_columns]
+        # DESCRIBE reads only this view; unqualified information_schema
+        # spans every attached catalog and lazily loads all lake tables.
+        area_columns = self.con.execute(f'DESCRIBE "{area_view}"').fetchall()
+        area_col_names = [
+            row[0] for row in area_columns if row[0] not in (area_geom, "bbox")
+        ]
         area_select_with_prefix = ", ".join([f'a."{col}"' for col in area_col_names])
 
         self.con.execute(f"""

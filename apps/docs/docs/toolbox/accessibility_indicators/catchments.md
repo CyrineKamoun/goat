@@ -34,7 +34,7 @@ Catchment Area computation is available in specific regions.
 
 When selecting a `Routing type`, GOAT displays a map overlay showing coverage.
 For `Walk`, `Bicycle`, `Pedelec`, and `Car`: **over 30 European countries** are supported.
-For `Public Transport`: Germany is supported.
+For `Public Transport`: Germany, Switzerland, and the Haut-Rhin region of France are supported.
 
 If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/) and we'll discuss further options.
 :::
@@ -62,52 +62,7 @@ If you need analyses beyond these regions, feel free to [contact us](https://pla
 </div>
 
 <Tabs>
-<TabItem value="walk" label="Walk" default className="tabItemBox">
-
-**Considers all paths accessible by foot.**
-
-<div class="step">
-  <div class="step-number">3</div>
-  <div class="content">Choose whether to calculate the catchment area based on <code>Time</code> or <code>Distance</code>, and set the corresponding limit. If choosing <code>Time</code>, you can also configure the <code>Speed</code>.</div>
-</div>
-
-:::tip Hint
-
-For suitable travel time limits by amenity type, see the [Location Tool](https://www.chemnitz.de/chemnitz/media/unsere-stadt/verkehr/verkehrsplanung/vep2040_standortwerkzeug.pdf) from the City of Chemnitz.
-
-:::
-
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Choose the <code>Catchment area shape</code>. If choosing: <ul><li><code>Polygon</code> or <code>Network</code>: you can select the <code>Steps</code> and <code>Step sizes</code>.</li><li><code>Hexagonal grid</code>: no further configuration is necessary.</li><li><code>Point grid</code>: you need to select the <code>Point grid layer</code> where the values will be applied.</li></ul></div>
-</div>
-</TabItem>
-
-<TabItem value="cycling" label="Bicycle/Pedelec" className="tabItemBox">
-
-**Considers all bicycle-accessible paths.** This routing mode accounts for surface, smoothness, and slope while computing accessibility. For Pedelec, slopes have lower impedance than standard bicycles.
-
-<div class="step">
-  <div class="step-number">3</div>
-  <div class="content">Choose whether to calculate the catchment area based on <code>Time</code> or <code>Distance</code>, and set the corresponding limit. If choosing <code>Time</code>, you can also configure the <code>Speed</code>.</div>
-</div>
-
-:::tip Hint
-
-For suitable travel time limits by amenity type, see the [Location Tool](https://www.chemnitz.de/chemnitz/media/unsere-stadt/verkehr/verkehrsplanung/vep2040_standortwerkzeug.pdf) from the City of Chemnitz.
-
-:::
-
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Choose the <code>Catchment area shape</code>. If choosing: <ul><li><code>Polygon</code> or <code>Network</code>: you can select the <code>Steps</code> and <code>Step sizes</code>.</li><li><code>Hexagonal grid</code>: no further configuration is necessary.</li><li><code>Point grid</code>: you need to select the <code>Point grid layer</code> where the values will be applied.</li></ul></div>
-</div>
-
-</TabItem>
-
-<TabItem value="car" label="Car" className="tabItemBox">
-
-**Considers all car-accessible paths.** This routing mode accounts for speed limits and one-way restrictions while computing accessibility.
+<TabItem value="active-car" label="Walk / Bicycle / Pedelec / Car" default className="tabItemBox">
 
 <div class="step">
   <div class="step-number">3</div>
@@ -162,14 +117,23 @@ For suitable travel time limits by amenity type, see the [Location Tool](https:/
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Optionally, click on <code>Advanced Options</code> to set the <code>Steps style</code>.</div>
+  <div class="content">Optionally, click on <code>Advanced Options</code> to configure additional settings.</div>
 </div>
+
+#### Shape style
+
+*(Walk, Bicycle, and Pedelec only — visible when Catchment area shape is set to Polygon)*
+
+Choose how polygons are shaped when there are multiple starting points:
+
+- **Combined across origins** *(default)* — all starting points are merged into a single shared catchment polygon per step.
+- **Separated by origin** — each starting point gets its own individual catchment polygon per step.
 
 #### Steps style
 
 Choose how the isochrone steps are displayed:
 
-- **Separate steps** — each step shows only the area reachable *between* that step and the previous one.
+- **Separated steps** — each step shows only the area reachable *between* that step and the previous one.
 - **Cumulative steps** — each step shows the *full area reachable up to* that travel cost.
 
 <p></p>
@@ -216,21 +180,20 @@ For each mode, configure the **maximum travel time or distance** and the **trave
 </div>
 
 
-### Scenario (Optional)
+### Result Layer
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Optionally, expand the <code>Scenario</code> section and select a scenario to apply network modifications (e.g., new roads or paths) to the routing calculation.</div>
+  <div class="content">Set the <code>Result layer name</code> for the output catchment area layer.</div>
 </div>
-
-:::tip Hint
-
-Scenarios let you model infrastructure changes and immediately see how they affect accessibility. See [Scenarios](../../Scenarios/Scenarios.md) to learn how to create and edit scenarios.
-
-:::
 
 <div class="step">
   <div class="step-number">8</div>
+  <div class="content">Set the <code>Starting points layer name</code> for the output starting points layer.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">9</div>
   <div class="content">Click on <code>Run</code> to start the calculation.</div>
 </div>
 
@@ -257,13 +220,15 @@ The result layer is automatically styled with a color scale ranging from the sho
 
 | Routing mode | Maximum starting points |
 | --- | --- |
-| Walk / Bicycle / Pedelec | 1,000 |
-| Car | 50 |
-| Public Transport | 5 |
+| Walk / Bicycle / Pedelec / Car | 1,000 |
+| Public Transport | 100 |
 
 ### Visualization
 
-The catchment shape is derived from the routing grid using the [Marching Squares contour line algorithm](https://en.wikipedia.org/wiki/Marching_squares), a computer graphics algorithm generating 2D contour lines from rectangular value arrays ([de Queiroz Neto et al. 2016](#6-references)). This transforms the routing grid from a 2D array into smooth polygon contours for visualization and spatial analysis.
+The algorithm used to derive the catchment shape depends on the routing mode:
+
+- **Walk, Bicycle, Pedelec, and Public Transport** — the shape is derived from the routing grid using the [Marching Squares contour line algorithm](https://en.wikipedia.org/wiki/Marching_squares), a computer graphics algorithm generating 2D contour lines from rectangular value arrays ([de Queiroz Neto et al. 2016](#6-references)). This transforms the routing grid from a 2D array into smooth polygon contours for visualization and spatial analysis.
+- **Car** — the shape is derived using DuckDB's [`ST_ConcaveHull`](https://duckdb.org/docs/current/core_extensions/spatial/functions#st_concavehull) function, which wraps tightly around the set of reachable points to produce the catchment polygon. A dynamic concavity ratio is applied based on the number of reached nodes: `0.5` for fewer than 10,000 nodes, `0.3` for fewer than 50,000, and `0.2` otherwise — lower values produce tighter, more concave shapes for large catchments, while higher values yield smoother outlines for small ones.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/toolbox/accessibility_indicators/catchments/wiki.png').default} alt="Marching Squares illustration" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "contain"}}/>

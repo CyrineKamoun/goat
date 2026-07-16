@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -5,6 +6,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.params import Query
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
+from keycloak.exceptions import KeycloakError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +25,8 @@ from core.schemas.common import OrderEnum
 from core.schemas.user import UserProfileUpdate, UserRead, UserUpdate, request_examples
 from core.services.s3 import s3_service
 from core.utils.other import decode_base64_file, get_image_extension_from_base64
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -256,10 +260,25 @@ async def update_profile(
         if user.email and user.email != db_user.email:
             keycloak_payload["email"] = user.email
             keycloak_payload["emailVerified"] = False
-        admin.update_user(
-            user_id=user_id,
-            payload=keycloak_payload,
-        )
+        # Only touch Keycloak when a Keycloak-managed field actually changed, so
+        # avatar-only edits never depend on the service account's write access.
+        # A failed write (e.g. the service account lacks manage-users) surfaces
+        # as a clean error and stops the request before the DB is updated, so
+        # name/email never desync from the identity provider.
+        if keycloak_payload:
+            try:
+                admin.update_user(
+                    user_id=user_id,
+                    payload=keycloak_payload,
+                )
+            except KeycloakError:
+                logger.warning(
+                    "keycloak profile write failed for %s", user_id, exc_info=True
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Name and email can't be updated right now. Other profile changes are unaffected.",
+                )
     if user.avatar and user.avatar.startswith("data:image"):
         extension = get_image_extension_from_base64(user.avatar)
         now = datetime.now()

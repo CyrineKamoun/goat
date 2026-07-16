@@ -68,9 +68,10 @@ class InMemoryNetworkProcessor(AnalysisTool):
         Explicitly cleans all generated tables, keeping only the original network table.
         This allows for manual memory management during long, complex workflows.
         """
-        all_tables = self.con.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
-        ).fetchall()
+        # SHOW TABLES scopes to the current database's current schema only —
+        # information_schema spans every attached catalog (would lazily load
+        # all lake tables, and its 'main' rows would match lake.main too).
+        all_tables = self.con.execute("SHOW TABLES").fetchall()
         for (table_name,) in all_tables:
             # Do not drop the main table or DuckDB's internal spatial reference table
             if table_name not in [self.network_table_name, "spatial_ref_sys"]:
@@ -79,9 +80,7 @@ class InMemoryNetworkProcessor(AnalysisTool):
 
     def get_available_tables(self) -> list[str]:
         """Get list of available table names in the database."""
-        tables = self.con.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
-        ).fetchall()
+        tables = self.con.execute("SHOW TABLES").fetchall()
         return [table[0] for table in tables]
 
     def apply_sql_query(self, sql_query: str) -> str:

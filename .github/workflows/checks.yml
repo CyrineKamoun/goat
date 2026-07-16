@@ -114,6 +114,7 @@ jobs:
                 - 'apps/processes/**'
                 - 'packages/python/goatlib/**'
                 - 'packages/python/goatobs/**'
+                - 'packages/cpp/routing/**'
                 - 'pyproject.toml'
                 - 'uv.lock'
 

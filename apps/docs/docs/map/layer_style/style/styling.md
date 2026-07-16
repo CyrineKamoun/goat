@@ -17,7 +17,7 @@ sidebar_position: 1
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Choose the styling category you want to modify: <code>Fill color</code>, <code>Stroke color</code>, <code>Stroke width</code>, <code>Clustering</code>, <code>Custom Marker</code> and <code>Point settings</code> (if point data).</div>
+  <div class="content">Choose the styling category you want to modify: <code>Fill color</code>, <code>Stroke color</code>, <code>Stroke width</code>, <code>Line style</code> (line layers only), <code>Clustering</code>, <code>Custom Marker</code> and <code>Point settings</code> (point layers only).</div>
 </div>
 
 ### Fill color
@@ -50,6 +50,44 @@ Stroke color applies to the outlines and edges of map features. It helps disting
 <div class="step">
   <div class="step-number">6</div>
   <div class="content">  On <code>Stroke width</code> move the slider to <strong>adjust the thickness</strong> of lines and feature outlines.</div>
+</div>
+
+### Line style
+
+The **Line style** section is available for **line layers only** and controls the pattern and decoration of lines.
+
+**Pattern:**
+
+<div class="step">
+  <div class="step-number">7</div>
+  <div class="content">Under <code>Pattern</code>, choose how the line is drawn: <code>Solid</code>, <code>Dashed</code>, <code>Dotted</code>, or <code>Dash-dot</code>. When a non-solid pattern is selected, a <code>Density</code> dropdown appears with options <code>Tight</code>, <code>Normal</code>, or <code>Loose</code>.</div>
+</div>
+
+**Arrows:**
+
+<div class="step">
+  <div class="step-number">8</div>
+  <div class="content">Under <code>Arrows</code>, choose the arrowhead direction: <code>None</code>, <code>Forward</code>, <code>Backward</code>, or <code>Both</code>. When any direction is selected, additional controls appear:
+    <ul>
+      <li><code>Placement</code> — where the arrows are placed: <code>Repeat along line</code>, <code>Start of line</code>, <code>End of line</code>, <code>Both ends</code>, or <code>Center (one per line)</code>.</li>
+      <li><code>Arrow size</code> — slider to control the arrowhead size.</li>
+      <li><code>Arrow spacing</code> — slider to control the distance between repeated arrows (only visible when Placement is <code>Repeat along line</code>).</li>
+      <li><code>Allow overlap</code> — checkbox to prevent arrows from being hidden when they overlap.</li>
+    </ul>
+  </div>
+</div>
+
+**Advanced Options** (expand to access):
+
+<div class="step">
+  <div class="step-number">9</div>
+  <div class="content">Expand <code>Advanced Options</code> to configure:
+    <ul>
+      <li><code>Cap</code> — how line endpoints are rendered: <code>Butt</code>, <code>Round</code>, or <code>Square</code>.</li>
+      <li><code>Join</code> — how corners between line segments look: <code>Bevel</code>, <code>Round</code>, or <code>Miter</code>.</li>
+      <li><code>Offset</code> — shifts the line visually left or right of its actual geometry. Useful for parallel roads or directional lanes. Note: this is a visual shift only — hit-testing and snapping still use the original geometry.</li>
+    </ul>
+  </div>
 </div>
 
 ### Clustering

@@ -13,6 +13,14 @@ This task runs the canonical DuckLake maintenance flow:
        the catalog state changes — no parquet files are deleted yet.
     2. ``ducklake_cleanup_old_files`` — deletes parquet files that are
        no longer referenced by any retained snapshot.
+    3. Prune ``ducklake_schema_versions`` — ``ducklake_expire_snapshots``
+       never deletes rows from this table (verified on catalog formats 0.3
+       and 1.0), so per-table schema-version history accumulates forever:
+       at 12k tables that is thousands of unreachable rows per
+       schema-changing day. A row applies from its ``begin_snapshot`` until
+       the table's next row, so any row older than the table's newest row
+       at-or-before the oldest live snapshot can never be resolved by any
+       query — those are deleted directly in the Postgres catalog.
 
 Key safety property (worth re-stating because the global retention scares
 people the first time): expire + cleanup NEVER deletes the active data of a
@@ -38,6 +46,21 @@ from goatlib.storage import BaseDuckLakeManager
 from goatlib.tools.base import ToolSettings
 
 logger = logging.getLogger(__name__)
+
+# Rows of ducklake_schema_versions that no surviving snapshot can resolve to.
+# Schema-version rows are per-table ranges: a row applies from its
+# begin_snapshot until the same table's next row, so lookups for any live
+# snapshot can only ever land on the table's newest row at-or-before the
+# oldest live snapshot, or later. Everything older is unreachable.
+_SV_PRUNE_PREDICATE = (
+    "FROM pg.ducklake.ducklake_schema_versions sv "
+    "WHERE sv.begin_snapshot < ("
+    " SELECT max(sv2.begin_snapshot)"
+    " FROM pg.ducklake.ducklake_schema_versions sv2"
+    " WHERE sv2.table_id = sv.table_id"
+    " AND sv2.begin_snapshot <="
+    " (SELECT min(snapshot_id) FROM pg.ducklake.ducklake_snapshot))"
+)
 
 
 def _human_bytes(n: int) -> str:
@@ -128,6 +151,15 @@ class DuckLakeMaintenanceParams(BaseModel):
             "bad expire_snapshots (e.g., retention_days=0 expired the "
             "current snapshot too) or catalog corruption. Set to 100 to "
             "disable the guard."
+        ),
+    )
+    prune_schema_versions: bool = Field(
+        default=True,
+        description=(
+            "After expiring snapshots, delete ducklake_schema_versions rows "
+            "that no surviving snapshot can resolve to (expire_snapshots "
+            "leaves them behind). Runs directly against the Postgres "
+            "catalog; removes only provably unreachable history."
         ),
     )
     dry_run: bool = Field(
@@ -237,13 +269,25 @@ class DuckLakeMaintenanceTask:
                     if params.delete_orphans
                     else []
                 )
+                would_prune = 0
+                if params.prune_schema_versions:
+                    uri = self.settings.ducklake_postgres_uri  # type: ignore[union-attr]
+                    con.execute(
+                        f"ATTACH IF NOT EXISTS 'postgres:{uri}' AS pg (READ_ONLY)"
+                    )
+                    prune_row = con.execute(
+                        f"SELECT count(*) {_SV_PRUNE_PREDICATE}"
+                    ).fetchone()
+                    would_prune = int(prune_row[0]) if prune_row else 0
                 logger.info(
                     "DRY RUN: would expire %d snapshots, "
                     "delete %d catalog-tracked orphans, "
-                    "delete %d filesystem orphans",
+                    "delete %d filesystem orphans, "
+                    "prune %d schema-version rows",
                     would_expire,
                     len(preview_paths),
                     len(preview_orphans),
+                    would_prune,
                 )
                 return {
                     "dry_run": True,
@@ -253,6 +297,7 @@ class DuckLakeMaintenanceTask:
                     "would_expire_snapshots": int(would_expire),
                     "would_delete_files": len(preview_paths),
                     "would_delete_orphans": len(preview_orphans),
+                    "would_prune_schema_versions": would_prune,
                 }
 
             # ---- Real run -------------------------------------------------
@@ -273,10 +318,10 @@ class DuckLakeMaintenanceTask:
             # cleanup will actually free (the catalog-tracked metric
             # tracked_bytes doesn't change because superseded files
             # aren't counted there).
+            # Read-write: the schema-versions prune below deletes catalog
+            # rows directly (no DuckLake function exposes this).
             uri = self.settings.ducklake_postgres_uri  # type: ignore[union-attr]
-            con.execute(
-                f"ATTACH IF NOT EXISTS 'postgres:{uri}' AS pg (READ_ONLY)"
-            )
+            con.execute(f"ATTACH IF NOT EXISTS 'postgres:{uri}' AS pg")
 
             files_deleted = 0
             cleanup_bytes_freed = 0
@@ -331,8 +376,7 @@ class DuckLakeMaintenanceTask:
                 ).fetchone()
                 cleanup_bytes_freed = int(bytes_row[0]) if bytes_row else 0
                 deleted_rows = con.execute(
-                    "CALL ducklake_cleanup_old_files('lake', "
-                    "cleanup_all => true)"
+                    "CALL ducklake_cleanup_old_files('lake', " "cleanup_all => true)"
                 ).fetchall()
                 files_deleted = len(deleted_rows)
                 logger.info(
@@ -410,14 +454,21 @@ class DuckLakeMaintenanceTask:
                     tracked_file_count,
                 )
 
+            sv_rows_pruned = 0
+            if params.prune_schema_versions:
+                prune_row = con.execute(f"DELETE {_SV_PRUNE_PREDICATE}").fetchone()
+                sv_rows_pruned = int(prune_row[0]) if prune_row else 0
+                logger.info(
+                    "Pruned %d unreachable schema-version rows "
+                    "(expire_snapshots leaves them behind)",
+                    sv_rows_pruned,
+                )
+
             after = self._measure(con)
-            tracked_bytes_change = (
-                before["tracked_bytes"] - after["tracked_bytes"]
-            )
+            tracked_bytes_change = before["tracked_bytes"] - after["tracked_bytes"]
             total_bytes_freed = cleanup_bytes_freed + orphan_bytes_freed
             logger.info(
-                "After: snapshots=%d, tracked_bytes=%s "
-                "(actually freed %s on disk)",
+                "After: snapshots=%d, tracked_bytes=%s " "(actually freed %s on disk)",
                 after["snapshots"],
                 _human_bytes(after["tracked_bytes"]),
                 _human_bytes(total_bytes_freed),
@@ -432,6 +483,7 @@ class DuckLakeMaintenanceTask:
                 "snapshots_expired": int(expired),
                 "files_deleted": int(files_deleted),
                 "orphans_deleted": int(orphans_deleted),
+                "schema_versions_pruned": sv_rows_pruned,
                 # Actual disk space reclaimed (sum of deleted-file sizes),
                 # both raw and human-readable. This is the number most
                 # operators want; tracked_bytes_change reports the change

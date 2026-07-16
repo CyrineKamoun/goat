@@ -34,24 +34,35 @@ GOAT unterstützt mehrere Dateiformate zum Hochladen: **GeoPackage**, **GeoJSON*
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Wählen Sie die Datei von Ihrem lokalen Gerät über den Dateibrowser aus.</div>
+  <div class="content">Im Schritt <strong>Datei auswählen</strong> wählen Sie die Datei von Ihrem lokalen Gerät aus. Die unterstützten Formate sind unten im Dialog aufgelistet. Klicken Sie auf <code>Weiter</code>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">
-    <p>Konfigurieren Sie Ihren Datensatz:</p>
-    <ul> 
-      <li><strong>Zielordner</strong> - Wählen Sie, wo Sie Ihren Datensatz organisieren möchten</li>
-      <li><strong>Name</strong> - Geben Sie Ihrem Datensatz einen beschreibenden Namen</li>
-      <li><strong>Beschreibung</strong> (optional) - Fügen Sie Details über den Inhalt und Zweck Ihres Datensatzes hinzu</li>
+  <div class="content"><strong>Nur für CSV- und XLSX-Dateien — Schritt Vorschau &amp; Konfiguration:</strong> GOAT zeigt eine Vorschau Ihrer tabellarischen Daten an, damit Sie diese vor dem Import überprüfen können.
+    <ul>
+      <li><code>Arbeitsblatt</code> — Bei XLSX-Dateien mit mehreren Blättern wählen Sie aus, welches Blatt importiert werden soll.</li>
+      <li><code>Erste Zeile ist Kopfzeile</code> — Aktivieren (Standard), wenn die erste Zeile Ihrer Datei Spaltennamen enthält. Deaktivieren, wenn die erste Zeile Daten enthält — Spaltennamen werden dann automatisch generiert und können später in den Layer-Einstellungen umbenannt werden.</li>
     </ul>
+    Die Vorschau-Tabelle zeigt die ersten Zeilen Ihrer Datei. Klicken Sie auf <code>Weiter</code>, wenn Sie fertig sind.
   </div>
 </div>
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Klicken Sie auf <code>Hochladen</code>, um den Datensatz zu Ihrem Workspace hinzuzufügen.</div>
+  <div class="content">Im Schritt <strong>Ziel &amp; Metadaten</strong> konfigurieren Sie Ihren Datensatz:
+    <ul>
+      <li><strong>Zielordner</strong> — Wählen Sie, wo Sie Ihren Datensatz organisieren möchten</li>
+      <li><strong>Name</strong> — Geben Sie Ihrem Datensatz einen beschreibenden Namen</li>
+      <li><strong>Beschreibung</strong> (optional) — Fügen Sie Details über den Inhalt und Zweck Ihres Datensatzes hinzu</li>
+    </ul>
+    Klicken Sie auf <code>Weiter</code>.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-number">6</div>
+  <div class="content">Überprüfen Sie Ihre Konfiguration im Schritt <strong>Bestätigung</strong> und klicken Sie auf <code>Hochladen</code>, um den Datensatz zu Ihrem Workspace hinzuzufügen.</div>
 </div>
 
 ### Externe Datenquellen
@@ -149,7 +160,7 @@ Organisieren Sie Ihre Datensätze in Ordnern für bessere Struktur und einfacher
 Klicken Sie auf das <img src={require('/img/icons/3dots.png').default} alt="Optionen" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Weitere Optionen</code>-Symbol neben einem Ordner:
 
 - <code>Umbenennen</code> — Ordnernamen ändern
-- <code>Teilen</code> — Den Dialog <strong>Zugriff verwalten</strong> öffnen, um den Zugriff nach <strong>Organisation</strong> oder pro <strong>Team</strong> zu vergeben. Zugriffsebene festlegen und auf <code>Speichern</code> klicken.
+- <code>Teilen</code> — Den Dialog <strong>Zugriff verwalten</strong> öffnen, der zwei Tabs enthält: <strong>Organisation</strong> (Zugriff für die gesamte Organisation) und <strong>Teams</strong> (Zugriff für bestimmte Teams). Diese schließen sich gegenseitig aus — wird der Organisation Zugriff gewährt, werden alle Team-Freigaben entfernt und umgekehrt. Für jeden Eintrag die Zugriffsebene auf <strong>Editor</strong> (kann bearbeiten) oder <strong>Viewer</strong> (nur lesen) setzen, oder <strong>Kein Zugriff</strong>, um den Zugriff zu entziehen. Auf <code>Speichern</code> klicken, um die Änderungen zu übernehmen. Alle Datensätze innerhalb eines geteilten Ordners erben automatisch den Ordnerzugriff — geerbter Zugriff wird in den Freigabe-Dialogen der jeweiligen Elemente als <code>Über Ordner</code> angezeigt und kann dort nicht direkt geändert werden.
 - <code>Löschen</code> — Ordner entfernen
 
 <p></p>
@@ -185,6 +196,13 @@ Greifen Sie auf umfassende Datensatz-Verwaltungsoptionen über das <img src={req
 - <code>Aktualisieren</code> - Datensatz mit neuen Daten aktualisieren
 - <code>Teilen</code> - Zusammenarbeiten durch Teilen mit Teammitgliedern oder Organisation
 - <code>Löschen</code> - Datensätze entfernen, die Sie nicht mehr benötigen
+
+#### Datensätze herunterladen
+
+Beim Herunterladen eines räumlichen Datensatzes können Sie im Dialog Folgendes auswählen:
+
+- **Download-Typ** — das Exportdateiformat (z. B. GeoPackage, GeoJSON, Shapefile).
+- **Koordinatenreferenzsystem** — das KRS, in das die Daten vor dem Download umprojiziert werden. GOAT schlägt automatisch KRS-Optionen basierend auf der geografischen Ausdehnung des Datensatzes vor: Globale Optionen (WGS 84, Web Mercator) sind immer verfügbar, zusätzlich die passende UTM-Zone sowie relevante nationale oder regionale KRS. Der Standardwert ist **WGS 84 (EPSG:4326)**.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/workspace/datasets/managing_datasets.png').default} alt="Datensatz-Verwaltungsoptionen" style={{ maxHeight: "300px", maxWidth: "300px"}}/>

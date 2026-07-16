@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # Attributbasiertes Styling
 
-**Sie können Layer basierend auf Daten-Attributen gestalten, um Unterschiede und Trends leicht zu identifizieren.** Jeder Visualisierungsaspekt—Füllfarbe, Strichfarbe, Benutzerdefinierte Marker und Labels—kann nach jedem Feld in den Daten Ihres Layers gestaltet werden.
+**Sie können Layer basierend auf Daten-Attributen gestalten, um Unterschiede und Trends leicht zu identifizieren.** Jeder Visualisierungsaspekt—Füllfarbe, Strichfarbe, Strichbreite, Benutzerdefinierte Marker und Punkteinstellungen—kann nach jedem Feld in den Daten Ihres Layers gestaltet werden.
 
 <iframe width="100%" height="500" src="https://www.youtube.com/embed/cLIPMCOu4FQ?si=aydSJN_Pf0fusO9x" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
@@ -33,12 +33,17 @@ import TabItem from '@theme/TabItem';
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Jetzt können Sie zu <code>Palette</code> gehen und eine <strong>Farbpalette</strong> wählen oder die Standardpalette behalten. Erfahren Sie mehr im Abschnitt [Farbpalette](#farbpalette) unten.</div>
+  <div class="content">Jetzt können Sie zu <code>Palette</code> gehen und eine <strong>Farbpalette</strong> wählen oder die Standardpalette behalten. Erfahren Sie mehr im Abschnitt <a href="#farbpalette">Farbpalette</a> unten.</div>
 </div>
 
 <div class="step">
   <div class="step-number">5</div>
   <div class="content">In <code>Farbskala</code> wählen Sie Ihre <strong>Datenklassifizierungsmethode</strong>. Alle Methoden finden Sie im Abschnitt <a href="#datenklassifizierungsmethoden">Datenklassifizierungsmethoden</a>.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">6</div>
+  <div class="content">Am Ende des <code>Farbskala</code>-Panels können Sie <code>Keine Daten</code> aktivieren, um Features, bei denen das gewählte Feld keinen Wert hat, eine Farbe zuzuweisen. Die Standardfarbe ist Grau (<code>#CCCCCC</code>). Klicken Sie auf das Farbfeld, um sie zu ändern.</div>
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
@@ -60,12 +65,17 @@ import TabItem from '@theme/TabItem';
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Jetzt können Sie zu <code>Palette</code> gehen und eine <strong>Farbpalette</strong> wählen oder die Standardpalette behalten. Erfahren Sie mehr im Abschnitt [Farbpalette](#farbpalette) unten.</div>
+  <div class="content">Jetzt können Sie zu <code>Palette</code> gehen und eine <strong>Farbpalette</strong> wählen oder die Standardpalette behalten. Erfahren Sie mehr im Abschnitt <a href="#farbpalette">Farbpalette</a> unten.</div>
 </div>
 
 <div class="step">
   <div class="step-number">5</div>
   <div class="content">In <code>Farbskala</code>, wählen Sie Ihre <strong>Datenklassifizierungsmethode</strong>. Alle Methoden finden Sie im Abschnitt <a href="#datenklassifizierungsmethoden">Datenklassifizierungsmethoden</a>.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">6</div>
+  <div class="content">Am Ende des <code>Farbskala</code>-Panels können Sie <code>Keine Daten</code> aktivieren, um Features, bei denen das gewählte Feld keinen Wert hat, eine Farbe zuzuweisen. Die Standardfarbe ist Grau (<code>#CCCCCC</code>). Klicken Sie auf das Farbfeld, um sie zu ändern.</div>
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
@@ -87,12 +97,71 @@ import TabItem from '@theme/TabItem';
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Bei <code>Ordinale Marker</code> können Sie den Marker wählen, den Sie für jeden Schritt verwenden möchten. Sie können ihn entweder aus der Bibliothek wählen oder Ihren eigenen hochladen. </div>
+  <div class="content">Bei <code>Ordinale Marker</code> wählen Sie den Marker für jeden Kategoriewert — aus der Bibliothek oder durch Hochladen eines eigenen Markers.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Unter <code>Marker-Einstellungen</code> passen Sie den <code>Größe</code>-Schieberegler an, um die Basisgröße des Markers festzulegen, und nutzen Sie <code>Position</code>, um die Verankerung des Icons relativ zum Kartenpunkt zu steuern (Mitte, Oben, Unten, Links, Rechts).</div>
+</div>
+
+<div class="step">
+  <div class="step-number">6</div>
+  <div class="content">Aktivieren Sie <code>Überlappung zulassen</code>, damit Marker nicht ausgeblendet werden, wenn sie sich auf der Karte überlappen.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">7</div>
+  <div class="content">Optional: Erweitern Sie die <code>Erweiterte Optionen</code> unter den Marker-Einstellungen und setzen Sie <code>Markergröße basierend auf</code> auf ein numerisches Feld, um die Markergröße pro Feature zu variieren. Weitere Details zur Größenklassifizierung finden Sie im Tab <a href="#punkteinstellungen">Punkteinstellungen</a>.</div>
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
   <img src={require('/img/map/styling/attribute-based-custom-marker.gif').default} alt="Benutzerdefinierte Marker Styling" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
 </div>
+
+</TabItem>
+<TabItem value="stroke-width" label="Strichbreite">
+
+<div class="step">
+  <div class="step-number">2</div>
+  <div class="content">Bei <code>Strichbreite</code> klicken Sie auf <code>Optionen <img src={require('/img/icons/options.png').default} alt="Optionen-Symbol" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/></code> und weitere Einstellungen erscheinen.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">In <code>Strich basierend auf</code> wählen Sie das <strong>numerische Feld</strong> aus, das die Strichbreite steuern soll.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Klicken Sie auf <code>Größenskala</code>, um das Klassifizierungsfenster zu öffnen. Wählen Sie eine <strong>Klassifizierungsmethode</strong> und legen Sie die Anzahl der <strong>Schritte</strong> fest (2–10). Jeder Schritt zeigt eine Breitenvorschau neben dem Wertebereich.</div>
+</div>
+
+:::note
+Die attributbasierte Strichbreite gilt für **Linien, Polygone und Punkte**.
+:::
+
+</TabItem>
+<TabItem value="point-settings" label="Punkteinstellungen">
+
+<div class="step">
+  <div class="step-number">2</div>
+  <div class="content">Bei <code>Punkteinstellungen</code> klicken Sie auf <code>Optionen <img src={require('/img/icons/options.png').default} alt="Optionen-Symbol" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/></code> und weitere Einstellungen erscheinen.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">In <code>Radius basierend auf</code> wählen Sie das <strong>numerische Feld</strong> aus, das den Punktradius steuern soll.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Klicken Sie auf <code>Größenskala</code>, um das Klassifizierungsfenster zu öffnen. Wählen Sie eine <strong>Klassifizierungsmethode</strong> und legen Sie die Anzahl der <strong>Schritte</strong> fest (2–10). Jeder Schritt zeigt eine Größenvorschau neben dem Wertebereich. Es stehen dieselben Methoden wie bei der Farbklassifizierung zur Verfügung: Quantil, Standardabweichung, Gleiches Intervall, Heads and Tails, Benutzerdefinierte Breaks und Benutzerdefiniert Ordinal.</div>
+</div>
+
+:::note
+Punkteinstellungen sind nur für **Punkt-Layer ohne Benutzerdefinierte Marker** verfügbar. Für Punkt-Layer mit einem Benutzerdefinierten Marker verwenden Sie <code>Markergröße basierend auf</code> im Tab Benutzerdefinierte Marker.
+:::
 
 </TabItem>
 </Tabs> 

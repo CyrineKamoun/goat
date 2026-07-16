@@ -4,12 +4,22 @@ version = "2.0.0"
 requires-python = ">3.10,<3.12"
 description = "GOAT Library"
 authors = [{ name = "Plan4Better GmbH", email = "dev@plan4better.de" }]
+# Base dependencies are intentionally minimal: only what the light, cross-service
+# surface (goatlib.auth) imports. Consumers that need the analytics/IO stack
+# (geoapi, processes, workers) install the "full" extra. This lets core depend on
+# goatlib without pulling GDAL and the rest of the geospatial toolchain.
 dependencies = [
+  "requests>=2.32.0",
+  "python-jose[cryptography]>=3.4.0",
+]
+
+[project.optional-dependencies]
+full = [
   "routing>=0.1.0",
   "asyncpg>=0.29.0",
   "boto3>=1.35.0",
   "cachetools>=5.0.0",
-  "duckdb>=1.4.3",
+  "duckdb>=1.5.4",
   "gdal>=3.6.0,<3.7.0",
   "geopandas>=1.0.0",
   "pandas>=2.0.0,<3.0.0",

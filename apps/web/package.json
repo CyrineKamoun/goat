@@ -54,8 +54,6 @@
     "@p4b/types": "workspace:*",
     "@p4b/ui": "workspace:*",
     "@reduxjs/toolkit": "^1.9.5",
-    "@sentry/nextjs": "^8",
-    "@sentry/utils": "^8.55.0",
     "@tiptap/core": "3.3.1",
     "@tiptap/extension-color": "3.3.1",
     "@tiptap/extension-font-family": "3.3.1",

@@ -15,22 +15,47 @@ This section contains **widgets that provide information about your project** la
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Click on the <code>Layer</code> widget, and then the Layer settings on the right will appear. Here you can add a <code>title</code> and a <code>description</code>.</div>
+  <div class="content">Click on the <code>Layers</code> widget to open the <b>Layers - Settings</b> panel on the right.</div>
 </div>
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">
-    By clicking on the <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: "18px", maxWidth: "18px", verticalAlign: "middle", marginRight: "4px" }}/> <code>more options</code> icon next to the layer name, users can click on: <code>Zoom to layer</code>, <code>Data source info</code>, and <code>Hide/Show layer</code>. There is also the option to <code>Download</code>, but it is not available for all viewers.
+  <div class="content">Under <code>Info</code>, add a <code>Title</code> and optional <code>Description</code> for the widget.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Under <code>Layers</code>, select which layers to show in the widget using the checkboxes. For each layer, click the ⋮ icon to access per-layer settings:
+  <ul>
+    <li><code>Show in legend</code> — toggle whether the layer's legend is shown</li>
+    <li><code>Download</code> — allow viewers to download this layer's data</li>
+  </ul>
+  For groups, click the icon to <code>Change icon</code>, and click the ⓘ button to add or edit group info text (Markdown supported).
   </div>
 </div>
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/builder/widget_drag.gif').default} alt="recent datasets" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
-</div> 
+<div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Under <code>Layout</code>, configure how the layer list is displayed:
+  <ul>
+    <li><code>Layout style</code>: <code>Tree</code> (hierarchical list) or <code>Tabs</code> (tabbed navigation)</li>
+    <li><code>Visibility toggle</code>: icon style for the show/hide control — <code>Eye</code>, <code>Checkbox</code>, or <code>Switch</code></li>
+    <li><code>Visibility position</code>: <code>Left</code> or <code>Right</code></li>
+    <li><code>Show search bar</code>: add a search box above the layer list</li>
+    <li>When <code>Layout style</code> is set to <code>Tabs</code>: additional options appear — <code>Show group name</code>, <code>Show group icons</code>, and <code>Show all toggle</code>. When <code>Show all toggle</code> is enabled, a <strong>Show all</strong> row appears above the layer list in each tab, allowing viewers to toggle all layers in the active tab on or off at once. The toggle uses the same style (Eye, Checkbox, or Switch) as the per-layer visibility control.</li>
+    <li><code>Hide field names</code>: hide field name labels in the widget</li>
+  </ul>
+  </div>
+</div>
 
-<p></p>
+<div class="step">
+  <div class="step-number">6</div>
+  <div class="content">Under <code>Zoom Behavior</code>, set what happens when a layer is outside its zoom range: <code>Hide layers</code> or <code>Show greyed out</code>.</div>
+</div>
 
-::::info
-Viewers can hide/show the pre-selected layers, but once the dashboard is **reloaded**, they will **set back to the original visibility.**
-::::
+<div class="step">
+  <div class="step-number">7</div>
+  <div class="content">Under <code>Layer actions</code>, choose the <code>Action mode</code> — <code>Compact menu</code> (actions hidden behind a ⋮ icon) or <code>Direct actions</code> (actions shown inline) — and select which actions viewers can perform per layer: <code>Style</code>, <code>View data</code>, <code>Properties</code>, <code>Zoom to</code>.</div>
+</div>
+
+

@@ -83,3 +83,94 @@ Im Menü **Abrechnung** können Sie Ihren aktuellen Plan sowie verfügbare Plän
 Bitte zögern Sie nicht, jederzeit den **[Support](https://plan4better.de/en/contact/ "Support kontaktieren")** zu kontaktieren, falls Sie Fragen zu Ihrem Plan haben. 
 
 :::
+
+<p>
+</p>
+
+## White Label
+
+Unter **White Label** können Sie Dashboards auf Ihrer eigenen Domain veröffentlichen und Analytics-Tracking für veröffentlichte Dashboards konfigurieren. White-Label-Einstellungen gelten für die gesamte Organisation und sind für Organisationsinhaber zugänglich.
+
+### Eigene Domains
+
+**Veröffentlichen Sie Ihre Dashboards unter Ihrer eigenen Domain.** Jede Domain bedient ein veröffentlichtes Projekt. Um eine Domain einem Projekt zuzuweisen, verwenden Sie den Teilen-Dialog im Dashboard-Builder.
+
+**So fügen Sie eine eigene Domain hinzu:**
+
+<div class="step">
+  <div class="step-number">1</div>
+  <div class="content">Klicken Sie auf <code>Erste Domain hinzufügen</code> (Leer-Zustand) oder auf <code>+ Eigene Domain hinzufügen</code>.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">2</div>
+  <div class="content">Geben Sie im Dialog <strong>Eigene Domain hinzufügen</strong> Ihren <code>Domainnamen</code> ein — entweder eine Subdomain (z. B. <code>dashboards.example.com</code>) oder eine Apex-Domain (z. B. <code>example.com</code>). Klicken Sie auf <code>Weiter</code>.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Der Schritt <strong>DNS konfigurieren</strong> öffnet sich und zeigt den genauen Eintrag, den Sie bei Ihrem DNS-Anbieter erstellen müssen. Der Eintragstyp hängt von Ihrer Domain ab:
+    <br/><br/>
+    <strong>Subdomain</strong> (z. B. <code>maps.example.com</code>):
+    <table><thead><tr><th>Typ</th><th>Host</th><th>Ziel</th><th>TTL</th></tr></thead><tbody><tr><td>CNAME</td><td>maps</td><td>cname.goat.plan4better.de</td><td>3600</td></tr></tbody></table>
+    <br/>
+    <strong>Apex-Domain</strong> (z. B. <code>example.com</code>):
+    <table><thead><tr><th>Typ</th><th>Host</th><th>Ziel</th><th>TTL</th></tr></thead><tbody><tr><td>A</td><td>@</td><td>46.225.38.48</td><td>3600</td></tr></tbody></table>
+    <br/>
+    Der Dialog enthält Kopierschaltflächen für jeden Wert. GOAT prüft die DNS-Propagierung automatisch alle 30 Sekunden. Klicken Sie auf <code>Jetzt erneut prüfen</code> für eine sofortige Prüfung oder auf <code>Fertig</code>, um den Dialog zu schließen und im Hintergrund zu warten.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Sobald DNS verifiziert ist, zeigt der Dialog eine <strong>DNS verifiziert</strong>-Bestätigung und GOAT stellt automatisch ein SSL-Zertifikat von <strong>Let's Encrypt</strong> aus — meist in unter 2 Minuten. Der Domain-Status wechselt zu <strong>Zertifikat wird ausgestellt</strong> und danach zu <strong>Aktiv</strong>.</div>
+</div>
+
+**Domain-Status in der Liste:**
+
+| Status | Beschreibung | Verfügbare Aktionen |
+| --- | --- | --- |
+| Warte auf DNS | DNS-Eintrag noch nicht erkannt | DNS anzeigen, Erneut prüfen |
+| Zertifikat wird ausgestellt | DNS verifiziert, SSL-Zertifikat wird ausgestellt | Details |
+| Aktiv | Domain ist aktiv und bedient Dashboards | Zuweisung aufheben (wenn zugewiesen), Löschen |
+| Fehlgeschlagen | DNS- oder Zertifikat-Provisioning fehlgeschlagen | Details, Erneut versuchen, Löschen |
+
+Um DNS-Eintragsdetails anzuzeigen oder eine fehlgeschlagene Domain zu analysieren, klicken Sie auf **Details** oder **DNS anzeigen**, um die Domain-Detailansicht zu öffnen. Diese zeigt den aktuellen DNS- und Zertifikatstatus sowie eine Schaltfläche **Jetzt erneut prüfen**.
+
+Um eine Domain von einem Projekt zu entfernen, ohne sie zu löschen, verwenden Sie den **Teilen**-Dialog des Projekts. Die Schaltfläche **Zuweisung aufheben** in der Domain-Liste wird nur angezeigt, wenn die Domain aktiv und zugewiesen ist.
+
+### Analytics
+
+**Konfigurieren Sie Analytics-Tracking für Ihre veröffentlichten Dashboards.** Sie können mehrere Analytics-Instanzen hinzufügen — eine pro Matomo-Site. Das Tracking erfolgt per Opt-in pro Dashboard über den Teilen-Dialog.
+
+GOAT unterstützt derzeit **Matomo** als Analytics-Anbieter.
+
+**So fügen Sie eine Analytics-Instanz hinzu:**
+
+<div class="step">
+  <div class="step-number">1</div>
+  <div class="content">Klicken Sie auf <code>+ Analytics hinzufügen</code>.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">2</div>
+  <div class="content">Füllen Sie im Dialog <strong>Analytics hinzufügen</strong> folgende Felder aus:
+    <ul>
+      <li><code>Name</code> — ein Label zur Unterscheidung der Instanzen, z. B. <code>Client XY Matomo</code>.</li>
+      <li><code>Anbieter</code> — wählen Sie <code>Matomo</code>.</li>
+      <li><code>Matomo-URL</code> — die URL Ihrer Matomo-Instanz inklusive abschließendem Schrägstrich (z. B. <code>https://matomo.example.org/</code>).</li>
+      <li><code>Site-ID</code> — zu finden in Matomo → Administration → Websites.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Klicken Sie auf <code>Speichern</code>.</div>
+</div>
+
+Jede Instanz in der Liste zeigt die Matomo-URL, Site-ID und wie viele veröffentlichte Dashboards sie verwenden. Über die Symbole rechts können Sie eine Instanz **bearbeiten** oder **entfernen**. Mit **Dashboards verwalten** können Sie Dashboards einer Analytics-Instanz zuweisen oder die Zuweisung aufheben.
+
+:::tip
+Fügen Sie jede Ihrer eigenen Domains zur URL-Liste Ihrer Matomo-Site hinzu und konfigurieren Sie benutzerdefinierte Dimension 1 als "Project ID", damit eine projektweise Auswertung in Matomo funktioniert.
+:::

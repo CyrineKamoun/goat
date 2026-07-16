@@ -349,6 +349,17 @@ class LayerService:
         # Get column information from DuckLake schema
         columns = await self._get_layer_columns(layer_info)
 
+        if not columns:
+            # Every layer geoapi serves is DuckLake-backed, so a table with
+            # zero columns almost always means the pinned read connection's
+            # snapshot predates this layer's table (e.g. a just-created
+            # layer) rather than a genuinely column-less table. Force the
+            # pin to the latest snapshot and try once more before deciding.
+            from geoapi.ducklake import ducklake_manager
+
+            if ducklake_manager.force_pin_refresh():
+                columns = await self._get_layer_columns(layer_info)
+
         # Detect geometry column from columns (None if no geometry)
         geometry_column = None
         for col in columns:
@@ -373,6 +384,17 @@ class LayerService:
             geometry_column=geometry_column,
         )
 
+        if not columns:
+            # Still empty after a pin refresh (or the manager is unpinned):
+            # don't poison the shared cache with an empty-columns result.
+            # Skip writing so the next request re-resolves from DuckLake.
+            logger.warning(
+                "Layer %s resolved zero DuckLake columns; not caching so the "
+                "next request retries",
+                cache_key,
+            )
+            return metadata
+
         # Cache the metadata
         _metadata_cache[cache_key] = metadata
         logger.debug("Cached metadata for layer %s", cache_key)
@@ -389,20 +411,16 @@ class LayerService:
         columns = []
         try:
             with ducklake_manager.connection() as con:
-                # Get column info from DuckDB for the 'lake' attached catalog
+                # DESCRIBE loads only this table's metadata;
+                # information_schema.columns would lazily load every table
+                # in the catalog to answer.
                 result = con.execute(
-                    f"""
-                    SELECT column_name, data_type
-                    FROM information_schema.columns
-                    WHERE table_catalog = 'lake'
-                    AND table_schema = '{layer_info.schema_name}'
-                    AND table_name = '{layer_info.table_name}'
-                    ORDER BY ordinal_position
-                    """
+                    f'DESCRIBE lake."{layer_info.schema_name}"'
+                    f'."{layer_info.table_name}"'
                 ).fetchall()
 
                 for row in result:
-                    col_name, col_type = row
+                    col_name, col_type = row[0], row[1]
                     # Map DuckDB types to JSON schema types
                     json_type = self._duckdb_to_json_type(col_type)
                     col_meta: dict[str, Any] = {

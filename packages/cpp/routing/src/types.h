@@ -202,6 +202,34 @@ namespace routing
         double max_sensitivity = 1000000.0;
         int closest_k = 3;          // ClosestAverage only
 
+        // --- PT heatmap (mode == PublicTransport) ---
+        // Reverse (arrive-by) RAPTOR + precomputed access/egress lookup tables.
+        std::string timetable_path;
+        int64_t arrival_time = 0;       // unix minutes since epoch (arrive-by)
+        int max_transfers = 5;
+        std::vector<std::string> transit_modes;
+        // Access (home→boarding stop) and egress (alighting stop→opp) legs:
+        // each a routing mode whose precomputed
+        // (stop_idx, h3_index, cost_minutes) lookup table is loaded from the
+        // given parquet and capped at the given minutes (≤ the table's max).
+        RoutingMode access_mode = RoutingMode::Walking;
+        RoutingMode egress_mode = RoutingMode::Walking;
+        int access_max_time = 20;       // minutes
+        int egress_max_time = 20;       // minutes
+        // Penalty (minutes) added at the access→transit and transit→egress
+        // boundaries, matching the catchment PT pipeline (RequestConfig).
+        double transfer_cost = 2.0;
+        std::string access_table_path;  // accessegress parquet for access_mode
+        std::string egress_table_path;  // accessegress parquet for egress_mode
+
+        // PT connectivity only: H3 resolution of the output cells, which MUST
+        // equal the resolution the caller rasterized the AOI opportunities at
+        // (they are the same cells). The egress lookup runs at res-9, so the
+        // res-9 group cell is rolled up to this parent resolution for the
+        // output. Single source of truth lives caller-side; keep in sync.
+        // Default matches the caller-side fallback (finest = egress-lookup res).
+        int connectivity_output_resolution = 9;
+
         // Output
         std::string output_path;    // parquet: (h3_index BIGINT, score DOUBLE)
     };

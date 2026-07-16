@@ -1,5 +1,5 @@
 ---
-sidebar_position: 5
+sidebar_position: 7
 ---
 
 
@@ -17,28 +17,10 @@ Der ÖV-Güteklassen Indikator **klassifiziert die Qualität der öffentlichen V
 
 Der ÖV-Güteklassen-Indikator ist entscheidend und kann verwendet werden, um Defizite im öffentlichen Verkehrsangebot hervorzuheben und gut versorgte Standorte als attraktive Entwicklungsgebiete zu identifizieren.
 
-import MapViewer from '@site/src/components/MapViewer';
-
 :::info
-Die Berechnung der ÖV-Güteklassen ist nur für Gebiete verfügbar, in denen das Verkehrsnetz in GOAT integriert ist.
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <MapViewer
-      geojsonUrls={[
-        "https://assets.plan4better.de/other/geofence/geofence_gtfs.geojson"
-      ]}
-      styleOptions={{
-        fillColor: "#808080",
-        outlineColor: "#808080",
-        fillOpacity: 0.8
-      }}
-      legendItems={[
-        { label: "Abdeckung für ÖV-Güteklassen", color: "#ffffff" }
-      ]}
-  />
-</div>
+Die Berechnung der ÖV-Güteklassen ist für Gebiete verfügbar, in denen GTFS-Daten des öffentlichen Verkehrs in GOAT integriert sind. Derzeit unterstützte Regionen umfassen **Deutschland, Österreich und die Schweiz**. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns gerne](https://plan4better.de/de/contact/) — wir prüfen, was möglich ist.
 
-Falls Sie eine Analyse außerhalb dieses Geofence durchführen müssen, kontaktieren Sie bitte den [Support](https://plan4better.de/de/contact/ "Support kontaktieren") und wir prüfen, was möglich ist.
 :::
 
 ## 2. Anwendungsbeispiele
@@ -51,7 +33,7 @@ Falls Sie eine Analyse außerhalb dieses Geofence durchführen müssen, kontakti
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Klicken Sie auf <code>Werkzeugleiste</code> <img src={require('/img/icons/toolbox.png').default} alt="Options" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>. </div>
+  <div class="content">Klicken Sie auf <code>Werkzeuge</code> <img src={require('/img/icons/toolbox.png').default} alt="Options" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>. </div>
 </div>
 
 <div class="step">
@@ -66,28 +48,43 @@ Falls Sie eine Analyse außerhalb dieses Geofence durchführen müssen, kontakti
   <div class="content">Setzen Sie <code>Tag</code>, <code>Startzeit</code> und <code>Endzeit</code> für Ihre Analyse.</div>
 </div>
 
-### Referenz-Layer
+### Konfiguration
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Wählen Sie den <code>Referenz-Layer</code> (Polygon-Feature-Layer) für das Gebiet aus, das Sie analysieren möchten.</div>
-</div>
-
-### Einstellungen
-
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Wählen Sie den <code>Einzugsgebietstyp</code>: <b>Puffer</b>.</div>
+  <div class="content">Wählen Sie den <code>Einzugsgebietstyp</code>: <b>Buffer</b>.</div>
 </div>
 
 :::info
 
-**Pufferzonen** stellen Bereiche rund um öffentliche Verkehrsstationen dar, gemessen „in Luftlinie“.
+**Buffer** stellen Bereiche rund um öffentliche Verkehrsstationen dar, gemessen in Luftlinie.
 
 :::
 
 <div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Wählen Sie das <code>Referenzgebiet</code> — einen Polygon-Layer, der das Untersuchungsgebiet definiert.</div>
+</div>
+
+<div class="step">
   <div class="step-number">6</div>
+  <div class="content">Optional: Klicken Sie auf <code>Haltestellenkonfiguration</code>, um die Klassifizierungsgrenzen und Pufferabstände für Stationskategorien anzupassen.</div>
+</div>
+
+### Ergebnis-Layer
+
+<div class="step">
+  <div class="step-number">7</div>
+  <div class="content">Legen Sie den <code>Name der Ergebnislayer</code> für den Ausgabe-ÖV-Güteklassen-Layer fest.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">8</div>
+  <div class="content">Legen Sie den <code>Name des Stationen-Layer</code> für den Ausgabe-Stationen-Layer fest.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">9</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Berechnung zu starten.</div>
 </div>
 
@@ -101,7 +98,7 @@ Wenn Sie auf ein ÖV-Güteklassen-Ergebnis klicken, sehen Sie weitere Details wi
 
 Wenn Sie auf eine beliebige Station klicken, können Sie Details wie den **Haltestellennamen**, die **durchschnittliche Frequenz** und die **Stationskategorie** sehen.
 
-<img src={require('/img/toolbox/accessibility_indicators/gueteklassen/gueteklassen_calculation.gif').default} alt="Berechnung - ÖV-Güteklassen" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+
 
 ## 4. Technische Details
 

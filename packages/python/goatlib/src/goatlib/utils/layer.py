@@ -44,6 +44,10 @@ class DuckDBConnection(Protocol):
 class DuckLakeManagerProtocol(Protocol):
     """Protocol for DuckLake manager objects."""
 
+    @property
+    def postgres_uri(self: "DuckLakeManagerProtocol") -> str | None: ...
+    @property
+    def catalog_schema(self: "DuckLakeManagerProtocol") -> str | None: ...
     def connection(self: "DuckLakeManagerProtocol") -> DuckDBConnection: ...
     def reconnect(self: "DuckLakeManagerProtocol") -> None: ...
 
@@ -121,7 +125,11 @@ def get_schema_for_layer(
 ) -> str:
     """Get schema name for a layer ID, with caching.
 
-    Queries DuckDB's information_schema for the attached DuckLake catalog.
+    Resolves via one indexed query on the DuckLake catalog's own Postgres
+    tables (ducklake_table ⋈ ducklake_schema). Querying the attached lake
+    catalog's metadata instead (information_schema / duckdb_tables) would
+    lazily load every table in the catalog on DuckLake 1.5.x — ~45 s at
+    12k tables (duckdb/ducklake#1269).
 
     Args:
         layer_id: Normalized layer ID (UUID format with hyphens)
@@ -138,11 +146,14 @@ def get_schema_for_layer(
     if layer_id in _schema_cache:
         return _schema_cache[layer_id]
 
-    # Query DuckDB catalog for the 'lake' attached database
     table_name = layer_id_to_table_name(layer_id)
+    catalog_schema = ducklake_manager.catalog_schema
     query = (
-        "SELECT table_schema FROM information_schema.tables "
-        "WHERE table_catalog = 'lake' AND table_name = ?"
+        f"SELECT s.schema_name "
+        f"FROM pgmeta.{catalog_schema}.ducklake_table t "
+        f"JOIN pgmeta.{catalog_schema}.ducklake_schema s "
+        f"ON s.schema_id = t.schema_id AND s.end_snapshot IS NULL "
+        f"WHERE t.table_name = ? AND t.end_snapshot IS NULL"
     )
 
     last_error = None
@@ -151,6 +162,11 @@ def get_schema_for_layer(
     for attempt in range(max_retries + 1):
         try:
             with ducklake_manager.connection() as con:
+                con.execute(
+                    "ATTACH IF NOT EXISTS "
+                    f"'postgres:{ducklake_manager.postgres_uri}' "
+                    "AS pgmeta (READ_ONLY)"
+                )
                 result = con.execute(query, [table_name]).fetchone()
             break
         except Exception as e:

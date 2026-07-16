@@ -3,6 +3,7 @@ import useSWR from "swr";
 import { API_BASE_URL } from "@/lib/constants";
 
 import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
+import { useAuthedSWR } from "@/lib/api/useAuthedSWR";
 import type { InvitationPaginated } from "@/lib/validations/invitation";
 import type { Organization } from "@/lib/validations/organization";
 import type { GetInvitationsQueryParams, User, UserUpdate } from "@/lib/validations/user";
@@ -12,7 +13,7 @@ export const USERS_API_BASE_URL = new URL("api/v2/users", API_BASE_URL).href;
 // Hooks
 
 export const useOrganization = () => {
-  const { data, isLoading, error, mutate, isValidating } = useSWR<Organization>(
+  const { data, isLoading, error, mutate, isValidating } = useAuthedSWR<Organization>(
     `${USERS_API_BASE_URL}/organization`,
     fetcher
   );
@@ -26,7 +27,7 @@ export const useOrganization = () => {
 };
 
 export const useUserProfile = () => {
-  const { data, isLoading, error, mutate, isValidating } = useSWR<User>(
+  const { data, isLoading, error, mutate, isValidating } = useAuthedSWR<User>(
     `${USERS_API_BASE_URL}/profile`,
     fetcher
   );

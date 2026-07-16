@@ -1,7 +1,6 @@
 // lib/api/system.ts
-import useSWR from "swr";
-
 import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
+import { useAuthedSWR } from "@/lib/api/useAuthedSWR";
 import type { SystemSettings, SystemSettingsUpdate } from "@/lib/validations/system";
 
 export const SYSTEM_API_BASE_URL = new URL("api/v2/system", process.env.NEXT_PUBLIC_API_URL).href;
@@ -10,7 +9,7 @@ export const SYSTEM_API_BASE_URL = new URL("api/v2/system", process.env.NEXT_PUB
  * SWR hook that fetches the logged‑in user's system settings from FastAPI
  */
 export const useSystemSettings = () => {
-  const { data, isLoading, error, mutate, isValidating } = useSWR<SystemSettings>(
+  const { data, isLoading, error, mutate, isValidating } = useAuthedSWR<SystemSettings>(
     `${SYSTEM_API_BASE_URL}/settings`,
     fetcher
   );

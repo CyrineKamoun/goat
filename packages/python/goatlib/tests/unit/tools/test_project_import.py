@@ -267,9 +267,9 @@ class TestProjectImportRunner:
         """Layers without a workflow_export stamp pass through untouched."""
         assert runner._remap_layer_other_properties(None, {}) is None
         assert runner._remap_layer_other_properties({}, {}) == {}
-        assert runner._remap_layer_other_properties(
-            {"foo": "bar"}, {"x": "y"}
-        ) == {"foo": "bar"}
+        assert runner._remap_layer_other_properties({"foo": "bar"}, {"x": "y"}) == {
+            "foo": "bar"
+        }
 
     def test_remap_layer_other_properties_orphan_workflow(
         self, runner: ProjectImportRunner
@@ -371,9 +371,9 @@ class TestProjectImportRunner:
 
         # Old keys must NOT linger after remap.
         for old_gid in group_id_map:
-            assert f"group_icon_{old_gid}" not in opts, (
-                f"group_icon_{old_gid} should have been renamed: {opts}"
-            )
+            assert (
+                f"group_icon_{old_gid}" not in opts
+            ), f"group_icon_{old_gid} should have been renamed: {opts}"
 
         # group_info: known keys remapped, unknown left as-is.
         assert info["69"] == "Parking description", info
@@ -381,6 +381,71 @@ class TestProjectImportRunner:
         assert info["999"] == "Stale description", info
         assert "220" not in info, info
         assert "227" not in info, info
+
+    def test_remap_basemap_layer_config_remaps_targets(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        """Vector-basemap layer_config targets must be remapped to new link IDs.
+
+        Regression: custom_basemaps were dropped entirely on export/import, and
+        once restored their per-layer `target` still pointed at source-project
+        layer_project link IDs. A non-"all" target must be rewritten via the
+        link map; an unmapped target falls back to "all"; "all" is preserved.
+        Solid basemaps (no layer_config) pass through untouched.
+        """
+        lp_id_map: dict[int, int] = {66: 201, 67: 202}
+        custom_basemaps = [
+            {
+                "id": "11111111-1111-1111-1111-111111111111",
+                "type": "vector",
+                "name": "Streets",
+                "layer_config": {
+                    "roads": {"visible": True, "relation": "below", "target": "66"},
+                    "labels": {"visible": True, "relation": "above", "target": "all"},
+                    "orphan": {"visible": True, "relation": "below", "target": "999"},
+                },
+            },
+            {
+                "id": "22222222-2222-2222-2222-222222222222",
+                "type": "solid",
+                "name": "Grey",
+                "color": "#cccccc",
+            },
+        ]
+
+        result = runner._remap_basemap_layer_config(custom_basemaps, lp_id_map)
+
+        cfg = result[0]["layer_config"]
+        assert cfg["roads"]["target"] == "201", cfg
+        assert cfg["labels"]["target"] == "all", cfg
+        # Unmapped non-"all" target falls back to "all".
+        assert cfg["orphan"]["target"] == "all", cfg
+        # Non-target settings preserved.
+        assert cfg["roads"]["relation"] == "below"
+        # Solid basemap (no layer_config) untouched.
+        assert result[1] == custom_basemaps[1]
+
+    def test_export_project_metadata_preserves_custom_basemaps(self) -> None:
+        """project.json contract must carry custom_basemaps end-to-end.
+
+        Regression: ExportProjectMetadata had no custom_basemaps field and
+        `extra="ignore"` silently dropped it, so imported projects always got
+        an empty basemap library even when the archive contained one.
+        """
+        from goatlib.tools.project_schemas import ExportProjectMetadata
+
+        basemaps = [
+            {
+                "id": "11111111-1111-1111-1111-111111111111",
+                "type": "raster",
+                "name": "Aerial",
+                "url": "https://tiles.example.com/{z}/{x}/{y}.png",
+            }
+        ]
+        meta = ExportProjectMetadata.model_validate(
+            {"name": "P", "custom_basemaps": basemaps}
+        )
+        assert meta.custom_basemaps == basemaps
 
     def test_cleanup_on_failure(self, runner: ProjectImportRunner) -> None:
         """DuckLake tables dropped, S3 objects deleted."""
@@ -614,9 +679,7 @@ class TestProjectImportRunner:
             }
             layer_index = {"layers": [layer_meta]}
             layer_groups = {
-                "groups": [
-                    {"id": 76, "name": "Laden", "order": 0, "parent_id": None}
-                ]
+                "groups": [{"id": 76, "name": "Laden", "order": 0, "parent_id": None}]
             }
             # Two links to the same layer, both attached to group 76 in the
             # source. The import must remap 76 -> new serial and stamp it on
@@ -727,9 +790,9 @@ class TestProjectImportRunner:
         # Layer_project insert signature (see _insert_pg_records):
         # (layer_uuid, project_uuid, name, order, properties,
         #  other_properties, query, charts, group_serial)
-        assert len(lp_insert_args) == 2, (
-            f"Expected 2 layer_project inserts, got {len(lp_insert_args)}"
-        )
+        assert (
+            len(lp_insert_args) == 2
+        ), f"Expected 2 layer_project inserts, got {len(lp_insert_args)}"
         for args in lp_insert_args:
             group_serial = args[8]
             assert group_serial == new_group_serial, (
@@ -737,9 +800,7 @@ class TestProjectImportRunner:
                 f" got {group_serial!r}. Full args: {args}"
             )
 
-    def test_import_duplicate_layer_links(
-        self, runner: ProjectImportRunner
-    ) -> None:
+    def test_import_duplicate_layer_links(self, runner: ProjectImportRunner) -> None:
         """A 1.1 archive with 2 links to the same layer creates 2 layer_project rows.
 
         Regression: previously the import iterated the layer index and inserted
@@ -814,9 +875,7 @@ class TestProjectImportRunner:
                 zf.writestr(f"layers/{layer_id}/metadata.json", meta_bytes)
                 zf.writestr(f"layers/{layer_id}/data.parquet", b"FAKE_PARQUET")
                 zf.writestr("layer_project_links.json", links_bytes)
-                zf.writestr(
-                    "manifest.json", json.dumps(manifest, indent=2).encode()
-                )
+                zf.writestr("manifest.json", json.dumps(manifest, indent=2).encode())
 
             zip_bytes = zip_path.read_bytes()
 
@@ -899,8 +958,7 @@ class TestProjectImportRunner:
         assert result["layer_count"] == 1
         # Unique dataset inserted once.
         assert layer_inserts == 1, (
-            f"Expected 1 layer insert, got {layer_inserts}. "
-            f"Queries: {execute_log}"
+            f"Expected 1 layer insert, got {layer_inserts}. " f"Queries: {execute_log}"
         )
         # Both layer_project links inserted.
         assert layer_project_inserts == 2, (

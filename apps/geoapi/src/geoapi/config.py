@@ -65,7 +65,16 @@ class Settings(BaseSettings):
 
     # Connection pool size for concurrent tile requests
     # Lower values reduce memory usage and idle connections that can go stale
-    DUCKLAKE_POOL_SIZE: int = int(os.getenv("GEOAPI_DUCKLAKE_POOL_SIZE", "2"))
+    DUCKLAKE_POOL_SIZE: int = int(os.getenv("GEOAPI_DUCKLAKE_POOL_SIZE", "4"))
+
+    # Pin read connections to a DuckLake snapshot and refresh off the request
+    # path. Kill-switch: DUCKLAKE_PIN_SNAPSHOT=false restores unpinned reads.
+    DUCKLAKE_PIN_SNAPSHOT: bool = (
+        os.getenv("DUCKLAKE_PIN_SNAPSHOT", "true").lower() == "true"
+    )
+    DUCKLAKE_SNAPSHOT_REFRESH_SECONDS: float = float(
+        os.getenv("DUCKLAKE_SNAPSHOT_REFRESH_SECONDS", "5")
+    )
 
     # DuckDB memory limit per connection (e.g., "1GB", "512MB")
     # Total potential memory = DUCKLAKE_POOL_SIZE * DUCKDB_MEMORY_LIMIT
@@ -99,10 +108,24 @@ class Settings(BaseSettings):
     # CORS settings
     CORS_ORIGINS: list[str] = ["*"]
 
+    # Direct PostgreSQL host for DuckLake attaches. These sessions are
+    # long-lived and idle-in-transaction, so routing them through a
+    # transaction pooler only burns its slots; point this at the primary
+    # (e.g. the CNPG rw service) to keep the pooler for app queries.
+    # Unset = same host as POSTGRES_SERVER.
+    DUCKLAKE_POSTGRES_SERVER: str = os.getenv(
+        "DUCKLAKE_POSTGRES_SERVER", ""
+    ) or os.getenv("POSTGRES_SERVER", "localhost")
+
     @property
     def POSTGRES_DATABASE_URI(self) -> str:
         """Construct PostgreSQL URI."""
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+    @property
+    def DUCKLAKE_POSTGRES_DATABASE_URI(self) -> str:
+        """PostgreSQL URI for DuckLake catalog attaches (direct, unpooled)."""
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DUCKLAKE_POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     model_config = {"env_prefix": "GEOAPI_", "case_sensitive": True}
 

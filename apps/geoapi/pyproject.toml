@@ -8,19 +8,17 @@ dependencies = [
     "fastapi[standard]>=0.115.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "duckdb>=1.4.3",
+    "duckdb>=1.5.4",
     "asyncpg>=0.29.0",
     "pygeofilter>=0.2.0",
-    "sentry-sdk>=2.0.0",
+    "sqlglot>=26.0.0",
     "goatlib",
     "goatobs",
     "cachetools",
-    "wmill>=1.0.0",
     "python-jose[cryptography]>=3.3.0",
     "requests>=2.25.0",
     "pmtiles>=3.5.0",
     "redis>=5.0.0",
-    "psutil>=5.9.0",
 ]
 
 [build-system]

@@ -265,13 +265,15 @@ class BufferTool(AnalysisTool):
         Returns a SQL expression for partitioning in window functions.
         Falls back to using all non-geometry columns if no id column exists.
         """
-        result = con.execute(
-            f"SELECT column_name FROM information_schema.columns "
-            f"WHERE table_name = '{table_name}' "
-            f"AND column_name NOT IN ('geometry', 'geom', 'buffer_distance')"
-        ).fetchall()
+        # DESCRIBE reads only this table; unqualified information_schema
+        # spans every attached catalog and lazily loads all lake tables.
+        result = con.execute(f'DESCRIBE "{table_name}"').fetchall()
 
-        columns = [row[0] for row in result]
+        columns = [
+            row[0]
+            for row in result
+            if row[0] not in ("geometry", "geom", "buffer_distance")
+        ]
 
         # Look for common ID column names
         id_cols = [c for c in columns if c.lower() in ("id", "fid", "gid", "ogc_fid")]

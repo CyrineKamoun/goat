@@ -1,15 +1,12 @@
 ---
-sidebar_position: 2
+sidebar_position: 4
 
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 import MathJax from 'react-mathjax';
 
-# Heatmap - Connectivity
-Der Heatmap - Connectivity Indikator **erstellt eine farbkodierte Karte zur Visualisierung der Konnektivität von Orten innerhalb eines Interessengebiets** ([**AOI**](../../further_reading/glossary#area-of-interest-aoi "Was ist ein AOI?")).
+# Heatmap - Konnektivität
+Der Heatmap - Konnektivität Indikator **erstellt eine farbkodierte Karte zur Visualisierung der Konnektivität von Orten innerhalb eines Interessengebiets** ([**AOI**](../../further_reading/glossary#area-of-interest-aoi "Was ist ein AOI?")).
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
 <iframe width="674" height="378" src="https://www.youtube.com/embed/A8f32ai4ddQ?si=PKUBBKu0vvEFLdEs&amp;start=46" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
@@ -17,32 +14,12 @@ Der Heatmap - Connectivity Indikator **erstellt eine farbkodierte Karte zur Visu
 
 ## 1. Erklärung
 
-Die Heatmap verwendet ein farbkodiertes sechseckiges Gitter, um **zu zeigen, wie gut verschiedene Gebiete miteinander verbunden sind.** Als Eingabeparameter werden ein **Interessengebiet** (AOI), ein **Routing-Typ** (zu Fuß, Radfahren usw.) und ein **Reisezeitlimit** benötigt. Unter Berücksichtigung der realen Verkehrs- und Straßennetze berechnet sie die Konnektivität jedes Sechsecks innerhalb der AOI.
-
-import MapViewer from '@site/src/components/MapViewer';
-
-:::info 
-
-Heatmaps sind in bestimmten Regionen verfügbar. Bei der Auswahl eines `Routing-Typs` wird auf der Karte ein **Geofence** angezeigt, um die unterstützten Regionen hervorzuheben.
-
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <MapViewer
-      geojsonUrls={[
-        "https://assets.plan4better.de/other/geofence/geofence_heatmap.geojson"
-      ]}
-      styleOptions={{
-        fillColor: "#808080",
-        outlineColor: "#808080",
-        fillOpacity: 0.8
-      }}
-      legendItems={[
-        { label: "Abdeckung für konnektivitätsbasierte Heatmaps", color: "#ffffff" }
-      ]}
-  />
-</div>
+Die Heatmap verwendet ein farbkodiertes sechseckiges Gitter, um **zu zeigen, wie gut verschiedene Gebiete miteinander verbunden sind.** Als Eingabeparameter werden ein **Interessengebiet** (AOI), ein **Verkehrsmittel** (zu Fuß, Radfahren usw.) und ein **Reisezeitlimit** benötigt. Unter Berücksichtigung der realen Verkehrs- und Straßennetze berechnet sie die Konnektivität jedes Sechsecks innerhalb der AOI.
 
 
-Wenn Sie Analysen über diesen Geofence hinaus durchführen möchten, wenden Sie sich bitte an uns. Wir besprechen mit Ihnen gerne weitere Möglichkeiten. [Kontaktieren Sie uns](https://plan4better.de/en/contact/ "Kontaktieren Sie uns").
+:::info
+
+Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns](https://plan4better.de/en/contact/) gerne.
 
 :::
 
@@ -62,58 +39,27 @@ Wenn Sie Analysen über diesen Geofence hinaus durchführen möchten, wenden Sie
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Unter dem <code>Erreichbarkeitsindikatoren</code> Menü klicken Sie auf <code>Heatmap Connectivity</code>.</div>
+  <div class="content">Unter dem <code>Erreichbarkeitsindikatoren</code> Menü klicken Sie auf <code>Heatmap Konnektivität</code>.</div>
 </div>
 
 ### Routing 
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Wählen Sie den <code>Routing-Typ</code>, den Sie für die Heatmap verwenden möchten:</div>
+  <div class="content">Wählen Sie das <code>Verkehrsmittel</code> für die Heatmap.</div>
 </div>
 
-### Konfiguration 
-
-<div style={{ marginLeft: '60px' }}>
-<Tabs>
-
-<TabItem value="walk" label="Walk" default className="tabItemBox">
-
-**Berücksichtigt alle zu Fuß begehbaren Wege**. Für Heatmaps wird eine Gehgeschwindigkeit von 5 km/h angenommen.
-
-</TabItem>
-  
-<TabItem value="cycling" label="Bicycle" className="tabItemBox">
-
-**Berücksichtigt alle mit dem Fahrrad befahrbaren Wege**. Dieser Routing-Modus berücksichtigt bei der Berechnung der Erreichbarkeit die Oberfläche, Glätte und Steigung der Straßen. Für Heatmaps wird eine Fahrradgeschwindigkeit von 15 km/h angenommen.
-
-</TabItem>
-
-<TabItem value="pedelec" label="Pedelec" className="tabItemBox">
-
-**Berücksichtigt alle mit dem Pedelec befahrbaren Wege**. Dieser Routing-Modus berücksichtigt bei der Berechnung der Erreichbarkeit die Oberfläche und Glätte der Straßen. Für Heatmaps wird eine Pedelec-Geschwindigkeit von 23 km/h angenommen.
-
-</TabItem>
-
-<TabItem value="car" label="Auto" className="tabItemBox">
-
-**Berücksichtigt alle mit dem Auto befahrbaren Wege**. Dieser Routing-Modus berücksichtigt bei der Berechnung der Erreichbarkeit Geschwindigkeitsbegrenzungen und Einbahnstraßenbeschränkungen.
-
-</TabItem>
-
-</Tabs>
-</div>
-
-:::tip Hinweis
-
-Für weitere Einblicke in den Routing-Algorithmus besuchen Sie [Routing](../../category/routing). Darüber hinaus können Sie diese [Publikation](https://doi.org/10.1016/j.jtrangeo.2021.103080) lesen.
-
-:::
+| Verkehrsmittel | Berücksichtigt | Angenommene Geschwindigkeit |
+|----------------|----------------|----------------------------|
+| Zu Fuß | Alle zu Fuß begehbaren Wege | 5 km/h |
+| Fahrrad | Alle mit dem Fahrrad befahrbaren Wege (Oberfläche, Glätte, Steigung) | 15 km/h |
+| Pedelec | Alle mit dem Pedelec befahrbaren Wege (Oberfläche, Glätte) | 23 km/h |
+| Auto | Alle mit dem Auto befahrbaren Wege (Tempolimits, Einbahnstraßen) | — |
 
 <div class="step">
   <div class="step-number">4</div>
   <div class="content">
-  Wählen Sie ein <code>Reisezeitlimit</code> für Ihre Heatmap. Dies wird im Kontext Ihres zuvor ausgewählten <code>Routing-Typs</code> verwendet.
+  Wählen Sie ein <code>Reisezeitlimit</code> für Ihre Heatmap. Dies wird im Kontext des zuvor ausgewählten <code>Verkehrsmittels</code> verwendet.
   </div>
 </div>
 
@@ -124,18 +70,25 @@ Benötigen Sie Hilfe bei der Auswahl eines geeigneten Reisezeitlimits für versc
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Wählen Sie den <code>Referenz-Layer</code> (Layer, der Ihre AOI enthält) **für den Sie die Heatmap berechnen möchten**. Dies kann jeder Polygon-Feature-Layer sein.</div>
+  <div class="content">Wählen Sie ein <code>Referenzgebiet</code> — einen Polygon-Layer, der Ihr Interessengebiet (AOI) definiert, für das die Heatmap berechnet werden soll.</div>
 </div>
 
 
+### Ergebnis-Layer
+
 <div class="step">
   <div class="step-number">6</div>
+  <div class="content">Legen Sie den <code>Name der Ergebnislayer</code> für den Ausgabe-Heatmap-Layer fest.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">7</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Berechnung der Heatmap zu beginnen.</div>
 </div>
 
 ### Ergebnisse 
 
-Sobald die Berechnung abgeschlossen ist, wird ein Ergebnislayer zur Karte hinzugefügt. Dieser Heatmap Connectivity Layer enthält Ihre farbkodierte Heatmap. **Durch Klicken auf eine der sechseckigen Zellen der Heatmap wird der berechnete Konnektivitätswert für diese Zelle angezeigt.**
+Sobald die Berechnung abgeschlossen ist, wird ein Ergebnislayer zur Karte hinzugefügt. Dieser Heatmap Konnektivität Layer enthält Ihre farbkodierte Heatmap. **Durch Klicken auf eine der sechseckigen Zellen der Heatmap wird der berechnete Konnektivitätswert für diese Zelle angezeigt.**
 
 <img src={require('/img/toolbox/accessibility_indicators/heatmaps/connectivity_based/connectivity_calculation.gif').default} alt="Connectivity-basierte Heatmap Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 
@@ -168,45 +121,16 @@ Die Konnektivitäts-Formel berechnet die Gesamtfläche (in Quadratmetern), von d
 
 ### Rasterzellen 
 
-Heatmaps in GOAT nutzen **[Ubers H3-rasterbasierte](../../further_reading/glossary#h3-grid)** Lösung für effiziente Berechnungen und leicht verständliche Visualisierung. Im Hintergrund wird eine vorberechnete Reisezeitmatrix für jeden *Routing-Typ* abgefragt und in Echtzeit weiterverarbeitet, um die Erreichbarkeit zu berechnen und eine endgültige Heatmap zu erstellen.
+Heatmaps in GOAT nutzen **[Ubers H3-rasterbasierte](../../further_reading/glossary#h3-grid)** Lösung für effiziente Berechnungen und leicht verständliche Visualisierung. Im Hintergrund wird eine vorberechnete Reisezeitmatrix für jeden *Verkehrsmittel* abgefragt und in Echtzeit weiterverarbeitet, um die Erreichbarkeit zu berechnen und eine endgültige Heatmap zu erstellen.
 
-Die Auflösung und Abmessungen des verwendeten sechseckigen Rasters hängen vom gewählten *Routing-Typ* ab:
+Die Auflösung und Abmessungen des verwendeten sechseckigen Rasters hängen vom gewählten *Verkehrsmittel* ab:
 
-<div style={{ marginLeft: '20px' }}>
-
-<Tabs>
-
-<TabItem value="walk" label="Walk" default className="tabItemBox">
-
-<li parentName="ul">{`Auflösung: 10`}</li>
-<li parentName="ul">{`Durchschnittliche Sechseckfläche: 11285.6 m²`}</li>
-<li parentName="ul">{`Durchschnittliche Sechseck-Kantenlänge: 65.9 m`}</li>
-</TabItem>
-  
-<TabItem value="cycling" label="Bicycle" className="tabItemBox">
-
-<li parentName="ul">{`Auflösung: 9`}</li>
-<li parentName="ul">{`Durchschnittliche Sechseckfläche: 78999.4 m²`}</li>
-<li parentName="ul">{`Durchschnittliche Sechseck-Kantenlänge: 174.4 m`}</li>
-</TabItem>
-
-<TabItem value="pedelec" label="Pedelec" className="tabItemBox">
-
-<li parentName="ul">{`Auflösung: 9`}</li>
-<li parentName="ul">{`Durchschnittliche Sechseckfläche: 78999.4 m²`}</li>
-<li parentName="ul">{`Durchschnittliche Sechseck-Kantenlänge: 174.4 m`}</li> 
-</TabItem>
-
-<TabItem value="car" label="Car" className="tabItemBox">
-
-<li parentName="ul">{`Auflösung: 8`}</li>
-<li parentName="ul">{`Durchschnittliche Sechseckfläche: 552995.7 m²`}</li>
-<li parentName="ul">{`Durchschnittliche Sechseck-Kantenlänge: 461.4 m`}</li>
-
-</TabItem>
-
-</Tabs>
-</div>
+| Verkehrsmittel | Auflösung | Durchschnittliche Sechseckfläche | Durchschnittliche Kantenlänge |
+|----------------|-----------|----------------------------------|-------------------------------|
+| Walk | 10 | 11.285,6 m² | 65,9 m |
+| Bicycle | 9 | 78.999,4 m² | 174,4 m |
+| Pedelec | 9 | 78.999,4 m² | 174,4 m |
+| Car | 8 | 552.995,7 m² | 461,4 m |
 
 :::tip Tipp
 

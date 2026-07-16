@@ -5,7 +5,7 @@ import json
 import logging
 import time
 import uuid
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Header, HTTPException, Path, Query, Request, Response
 
@@ -54,6 +54,38 @@ def bump_layer_version(layer_id: str) -> None:
 def get_layer_version(layer_id: str) -> int:
     """Return current version for a layer (0 if never bumped)."""
     return _layer_versions.get(layer_id.replace("-", ""), 0)
+
+
+def build_tile_etag_seed(
+    layer_id: str,
+    layer_ver: int,
+    cql_filter: dict[str, Any] | None = None,
+    bbox: list[float] | None = None,
+    decoration: str | None = None,
+    pinned_snapshot_id: int | None = None,
+) -> str:
+    """Build the seed string hashed into a dynamic tile's ETag.
+
+    `layer_ver` is bumped synchronously on write, but the pinned pool's
+    snapshot refresh is asynchronous (~1-2s behind). Without
+    `pinned_snapshot_id`, a request in that window would render the OLD
+    snapshot's data but stamp the NEW version's ETag, so the browser would
+    304 against a tile it never actually received.
+
+    When `pinned_snapshot_id` is None (pool unpinned, or an unpinned
+    manager), the seed is byte-for-byte what it was before this field
+    existed, so existing ETags don't all bust on deploy.
+    """
+    etag_seed = f"{layer_id}:{layer_ver}"
+    if cql_filter:
+        etag_seed += f":f={json.dumps(cql_filter, sort_keys=True)}"
+    if bbox:
+        etag_seed += f":b={bbox}"
+    if decoration:
+        etag_seed += f":d={decoration}"
+    if pinned_snapshot_id is not None:
+        etag_seed += f":s={pinned_snapshot_id}"
+    return etag_seed
 
 
 router = APIRouter(tags=["Tiles"])
@@ -199,15 +231,20 @@ async def get_tile(
         raise HTTPException(status_code=400, detail="Collection has no geometry column")
 
     # --- ETag check: skip tile generation if client already has current version ---
+    from geoapi.ducklake_pool import ducklake_pool
+
     layer_ver = get_layer_version(layer_id)
-    # Include filter/bbox in the ETag so different queries are cached separately
-    etag_seed = f"{layer_id}:{layer_ver}"
-    if cql_filter:
-        etag_seed += f":f={json.dumps(cql_filter, sort_keys=True)}"
-    if bbox:
-        etag_seed += f":b={bbox}"
-    if decoration:
-        etag_seed += f":d={decoration}"
+    # Include filter/bbox/pinned-snapshot in the ETag so different queries
+    # are cached separately and a pre-refresh tile isn't served with a
+    # post-write ETag (see build_tile_etag_seed docstring).
+    etag_seed = build_tile_etag_seed(
+        layer_id,
+        layer_ver,
+        cql_filter=cql_filter,
+        bbox=bbox,
+        decoration=decoration,
+        pinned_snapshot_id=ducklake_pool.pinned_snapshot_id,
+    )
     etag = f'W/"{hashlib.md5(etag_seed.encode()).hexdigest()[:16]}"'
 
     if if_none_match and if_none_match.strip() == etag:

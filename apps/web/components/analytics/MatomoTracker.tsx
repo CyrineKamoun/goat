@@ -6,9 +6,9 @@ import Script from "next/script";
  * Injects the customer's Matomo tracker on a public dashboard.
  *
  * Defence-in-depth on the URL/site_id: the backend already validates
- * https-only, no path, and numeric site IDs. We re-validate here at the
- * trust boundary so a malformed or hostile JSONB row from the DB can't
- * end up in a <script> tag.
+ * https-only, no query/fragment, and numeric site IDs. We re-validate here
+ * at the trust boundary so a malformed or hostile JSONB row from the DB
+ * can't end up in a <script> tag.
  *
  * Sends:
  *   - setDocumentTitle(projectName)        — readable in Matomo's UI
@@ -34,8 +34,10 @@ function isSafeMatomoUrl(u: string): boolean {
   try {
     const parsed = new URL(u);
     if (parsed.protocol !== "https:") return false;
-    if (parsed.search || parsed.hash) return false;
-    return parsed.pathname === "/" || parsed.pathname === "";
+    // A pathname is allowed — self-hosted Matomo often lives under one
+    // (e.g. https://host.de/matomo/); the base is normalized to a trailing
+    // slash before matomo.php/matomo.js are appended.
+    return !parsed.search && !parsed.hash;
   } catch {
     return false;
   }

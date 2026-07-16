@@ -3,6 +3,7 @@ import useSWR from "swr";
 import { API_BASE_URL } from "@/lib/constants";
 
 import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
+import { useAuthedSWR } from "@/lib/api/useAuthedSWR";
 import type { Team, TeamBase, TeamMember, TeamUpdate } from "@/lib/validations/team";
 
 export const TEAMS_API_BASE_URL = new URL("api/v2/teams", API_BASE_URL).href;
@@ -10,7 +11,7 @@ export const TEAMS_API_BASE_URL = new URL("api/v2/teams", API_BASE_URL).href;
 // Hooks
 
 export const useTeams = () => {
-  const { data, isLoading, error, mutate, isValidating } = useSWR<Team[]>(
+  const { data, isLoading, error, mutate, isValidating } = useAuthedSWR<Team[]>(
     `${TEAMS_API_BASE_URL}`,
     fetcher
   );

@@ -6,11 +6,21 @@ Processes API only reads data for sync analytics - all writes happen through the
 
 from goatlib.storage import BaseDuckLakeManager
 
+from processes.config import settings
+
 # Singleton instance for analytics queries (histogram, aggregation-stats, etc.)
 # This allows processes and core to run concurrently without lock conflicts
-ducklake_manager = BaseDuckLakeManager(read_only=True)
+ducklake_manager = BaseDuckLakeManager(
+    read_only=True,
+    pin_snapshot=settings.DUCKLAKE_PIN_SNAPSHOT,
+    refresh_interval=settings.DUCKLAKE_SNAPSHOT_REFRESH_SECONDS,
+)
 
 # Separate singleton for preview-sql queries.
 # preview_sql runs arbitrary user SQL of unknown duration, so it must not share
 # the analytics lock — a slow or complex query would block all other analytics.
-preview_ducklake_manager = BaseDuckLakeManager(read_only=True)
+preview_ducklake_manager = BaseDuckLakeManager(
+    read_only=True,
+    pin_snapshot=settings.DUCKLAKE_PIN_SNAPSHOT,
+    refresh_interval=settings.DUCKLAKE_SNAPSHOT_REFRESH_SECONDS,
+)

@@ -5,7 +5,7 @@ sidebar_position: 4
 
 # Ausdrücke
 
-**Diese Seite hilft Ihnen zu verstehen, wie Sie Ausdrücke im [Dashboard-Builder](../category/widgets) verwenden.** Sie können Ausdrücke in den Widgets **Zahlen, Kategorien** und **Kreisdiagramm** eingeben. Wir listen und beschreiben die Ausdrücke, die Sie in GOAT verwenden können.
+**Diese Seite hilft Ihnen zu verstehen, wie Sie Ausdrücke im [Dashboard-Builder](../category/widgets) verwenden.** Sie können Ausdrücke in den Widgets **Zahlen, Kategorien**, **Kreisdiagramm** und **Rich Text** eingeben. Wir listen und beschreiben die Ausdrücke, die Sie in GOAT verwenden können.
 
 <b>Sie funktionieren genauso wie in QGIS, und durch ihre Kombination können Sie komplexere Berechnungen durchführen oder Ihre Daten filtern.</b>
 <p></p>
@@ -156,11 +156,6 @@ Die folgenden Funktionen arbeiten mit jedem Feldtyp. Die Eingabe und die Ausgabe
 | **ST_YMin(geometry)**       | dasselbe wie `ymin()`, **PostGIS-Version**                                           | <button>ST_YMin($geometry)</button> = 52.45                                |
 | **ymax(geometry)**          | gibt die **maximale Y-Koordinate** (obere Grenze) einer Geometrie zurück             | <button>ymax($geometry)</button> = 52.55                                   |
 | **ST_YMax(geometry)**       | dasselbe wie `ymax()`, **PostGIS-Version**                                           | <button>ST_YMax($geometry)</button> = 52.55                                |
-
-
-Hier sind einige Beispiele für kombinierte Ausdrücke für komplexere Berechnungen:
-https://github.com/plan4better/goat/blob/main/apps/core/src/core/expression_converter.py 
-
 
 
 :::tip

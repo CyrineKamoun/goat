@@ -324,7 +324,10 @@ class TestLayerExportRunner:
 
     def test_has_geometry_column_true(self, runner):
         """Test geometry column detection - has geometry."""
-        runner._duckdb_con.execute.return_value.fetchone.return_value = ("geometry",)
+        runner._duckdb_con.execute.return_value.fetchall.return_value = [
+            ("id", "BIGINT", "YES", None, None, None),
+            ("geometry", "GEOMETRY", "YES", None, None, None),
+        ]
 
         result = runner._has_geometry_column("lake.user_xxx.t_yyy")
 
@@ -332,7 +335,9 @@ class TestLayerExportRunner:
 
     def test_has_geometry_column_false(self, runner):
         """Test geometry column detection - no geometry."""
-        runner._duckdb_con.execute.return_value.fetchone.return_value = None
+        runner._duckdb_con.execute.return_value.fetchall.return_value = [
+            ("id", "BIGINT", "YES", None, None, None),
+        ]
 
         result = runner._has_geometry_column("lake.user_xxx.t_yyy")
 

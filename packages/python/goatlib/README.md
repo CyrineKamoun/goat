@@ -48,3 +48,4 @@ equivalent must be installed to build them. Only the WFS and converter paths
 in `io/` import `osgeo`, and they do so lazily, so the other services install
 the workspace with `--no-install-package gdal` in CI and skip the system
 dependency entirely.
+

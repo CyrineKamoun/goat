@@ -17,6 +17,7 @@ from goatlib.computed_columns import (
 )
 from pydantic import ValidationError
 
+from geoapi.catalog_events import notify_catalog_changed
 from geoapi.dependencies import LayerInfo, LayerInfoDep
 from geoapi.deps.auth import get_user_id
 from geoapi.models import (
@@ -98,6 +99,9 @@ def _invalidate_caches(layer_id: str) -> None:
     # per-pod hint used only for ETag freshness; PMTiles existence (the
     # real source of truth) lives on the shared volume.
     bump_layer_version(layer_id)
+
+    # DuckLake reads are snapshot-pinned; bump local pins and nudge other pods
+    notify_catalog_changed()
 
     logger.debug("Caches invalidated for layer %s", layer_id)
 
@@ -515,7 +519,9 @@ async def update_column(
                         col_types = feature_write_service.get_column_types(layer_info)
                         duckdb_type = col_types.get(columnName, "")
                         json_type = layer_service._duckdb_to_json_type(duckdb_type)
-                        kind = "number" if json_type in ("number", "integer") else "string"
+                        kind = (
+                            "number" if json_type in ("number", "integer") else "string"
+                        )
                         entry["kind"] = kind
                         entry.setdefault("is_computed", False)
                         entry.setdefault("depends_on", [])

@@ -415,11 +415,14 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
               }}
             />
           </Stack>
-          <AttributionControl
-            extraAttribution={
-              activeBasemap.source === "custom" ? activeBasemap.attribution : null
-            }
-          />
+          {/* -10px cancels the right-overlay's 10px bottom inset (height: calc(100% - toolbarHeight - 20px) at top: toolbarHeight+10) so the strip sits flush to the map's bottom edge. */}
+          <Box sx={{ mb: "-10px" }}>
+            <AttributionControl
+              extraAttribution={
+                activeBasemap.source === "custom" ? activeBasemap.attribution : null
+              }
+            />
+          </Box>
         </Stack>
       </Stack>
       {/* Right panel + measure results — rendered separately when data panel is open so controls can be to the left */}

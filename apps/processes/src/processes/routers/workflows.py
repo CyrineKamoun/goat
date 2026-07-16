@@ -345,43 +345,29 @@ def _get_layer_schema_from_ducklake(layer_id: str) -> dict[str, str]:
         Dict mapping column name -> DuckDB type string
     """
     try:
-        # Normalize layer_id (remove hyphens)
-        layer_id_clean = layer_id.replace("-", "")
-        # DuckLake tables use t_ prefix (not l_)
-        table_name = f"t_{layer_id_clean}"
+        from goatlib.utils.layer import (
+            LayerNotFoundError,
+            get_schema_for_layer,
+            layer_id_to_table_name,
+            normalize_layer_id,
+        )
+
+        layer_id_norm = normalize_layer_id(layer_id)
+        table_name = layer_id_to_table_name(layer_id_norm)
+        try:
+            schema_name = get_schema_for_layer(layer_id_norm, ducklake_manager)
+        except LayerNotFoundError:
+            logger.warning(f"Layer not found in DuckLake: {layer_id}")
+            return {}
 
         with ducklake_manager.connection() as con:
-            # Query information_schema to find the layer's schema and columns
-            # First, find which user schema contains this table
-            schema_result = con.execute(
-                f"""
-                SELECT table_schema
-                FROM information_schema.tables
-                WHERE table_catalog = 'lake'
-                AND table_name = '{table_name}'
-                LIMIT 1
-                """
-            ).fetchone()
-
-            if not schema_result:
-                logger.warning(f"Layer not found in DuckLake: {layer_id}")
-                return {}
-
-            schema_name = schema_result[0]
-
-            # Get column info
+            # DESCRIBE loads only this table's metadata;
+            # information_schema.columns would lazily load every table
+            # in the catalog to answer.
             columns_result = con.execute(
-                f"""
-                SELECT column_name, data_type
-                FROM information_schema.columns
-                WHERE table_catalog = 'lake'
-                AND table_schema = '{schema_name}'
-                AND table_name = '{table_name}'
-                ORDER BY ordinal_position
-                """
+                f'DESCRIBE lake."{schema_name}"."{table_name}"'
             ).fetchall()
-
-            return {col_name: col_type for col_name, col_type in columns_result}
+            return {row[0]: row[1] for row in columns_result}
 
     except Exception as e:
         logger.warning(f"Failed to get layer schema from DuckLake: {e}")

@@ -145,8 +145,12 @@ class TestLayerDeleteRunner:
 
     def test_delete_ducklake_table_not_exists(self, runner):
         """Test DuckLake table deletion when table doesn't exist."""
-        # Mock table doesn't exist
-        runner._duckdb_con.execute.return_value.fetchone.return_value = (0,)
+        # DESCRIBE probe raises CatalogException when the table is missing
+        import duckdb
+
+        runner._duckdb_con.execute.side_effect = duckdb.CatalogException(
+            "Table does not exist"
+        )
 
         result = runner._delete_ducklake_table(
             layer_id="00000000-0000-0000-0000-000000000002",

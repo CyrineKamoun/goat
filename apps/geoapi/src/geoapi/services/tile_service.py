@@ -1403,7 +1403,7 @@ class TileService:
                     FROM {table}, bounds
                     WHERE {bbox_filter}
                       AND ST_Intersects("{geom_col}", bounds.bbox4326){extra_where_sql}
-                    QUALIFY ROW_NUMBER() OVER (ORDER BY random()) <= {limit}
+                    LIMIT {limit}
                 )
                 SELECT ST_AsMVT(
                     struct_pack({struct_pack_args}),
@@ -1426,7 +1426,7 @@ class TileService:
                     SELECT {select_clause}
                     FROM {table}, bounds
                     WHERE ST_Intersects("{geom_col}", bounds.bbox4326){extra_where_sql}
-                    QUALIFY ROW_NUMBER() OVER (ORDER BY random()) <= {limit}
+                    LIMIT {limit}
                 )
                 SELECT ST_AsMVT(
                     struct_pack({struct_pack_args}),

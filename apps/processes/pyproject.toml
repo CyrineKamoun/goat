@@ -4,21 +4,32 @@ version = "1.0.0"
 description = "GOAT Processes API - OGC API Processes implementation for GOAT tools"
 authors = [{ name = "Plan4Better GmbH", email = "dev@plan4better.de" }]
 requires-python = ">=3.11"
+# processes imports the analytics stack to build OGC tool schemas, but never GDAL
+# or routing — those are lazy, executed only on the Windmill worker image. So it
+# depends on base goatlib + the libs it actually imports, not goatlib[full].
 dependencies = [
     "fastapi[standard]>=0.115.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "duckdb>=1.4.3",
+    "duckdb>=1.5.4",
     "asyncpg>=0.29.0",
     "pygeofilter>=0.2.0",
-    "sentry-sdk>=2.0.0",
+    "sqlglot>=26.0.0",
+    "boto3>=1.35.0",
+    "httpx>=0.27.0",
+    "pytz>=2024.1",
+    "geopandas>=1.0.0",
+    "numba>=0.60.0",
+    "pandas>=2.0.0,<3.0.0",
+    "pyarrow>=20.0.0",
+    "pyproj>=3.6.0",
+    "shapely>=2.0.0",
     "goatlib",
     "goatobs",
     "cachetools",
     "wmill>=1.0.0",
     "python-jose[cryptography]>=3.3.0",
     "requests>=2.25.0",
-    "aiohttp>=3.9.0",
 ]
 
 [build-system]

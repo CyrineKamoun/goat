@@ -31,6 +31,25 @@ import TabItem from '@theme/TabItem';
   <img src={require('/img/map/styling/legend.webp').default} alt="Legend configuration with caption settings" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div>
 
+## Custom legend labels for color steps
+
+When using attribute-based styling with a color scale (numeric or custom classification), you can add a custom label to each color step. These labels replace the raw data values in the map legend with human-readable descriptions.
+
+<div class="step">
+  <div class="step-number">1</div>
+  <div class="content">Open <code>Layer design</code> <img src={require('/img/icons/styling.png').default} alt="Styling Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> and navigate to the <code>Color scale</code> panel under attribute-based styling.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">2</div>
+  <div class="content">Below each color step row you will see a text input with the placeholder <code>Legend label</code>. Type a custom label — for example <code>Low</code>, <code>Medium</code>, or <code>High</code> — to replace the numeric value in the legend.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Leave the field empty to show the default numeric value in the legend.</div>
+</div>
+
 ## Best practices
 
 - **Use clear, descriptive captions** that explain what the layer represents

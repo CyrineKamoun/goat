@@ -12,6 +12,7 @@ import { shallowEqual, useSelector } from "react-redux";
 import { usePublicProject } from "@/lib/api/projects";
 import { DrawProvider } from "@/lib/providers/DrawProvider";
 import { MeasureProvider } from "@/lib/providers/MeasureProvider";
+import { PublicProjectProvider } from "@/lib/providers/PublicProjectProvider";
 import type { RootState } from "@/lib/store";
 import { selectFilteredProjectLayers, selectProjectLayers } from "@/lib/store/layer/selectors";
 import { setProjectLayerGroups, setProjectLayers } from "@/lib/store/layer/slice";
@@ -84,6 +85,10 @@ export default function MapPage({ params: { projectId } }) {
     }
   }, [_project]);
 
+  const mapView = project?.builder_config?.settings?.map_view;
+  const minZoom = mapView?.min_zoom ?? undefined;
+  const maxZoom = mapView?.max_zoom ?? undefined;
+
   useEffect(() => {
     if (projectLayers && project) {
       dispatch(setProjectLayers(projectLayers as ProjectLayer[]));
@@ -115,7 +120,7 @@ export default function MapPage({ params: { projectId } }) {
       ?.tracking_require_consent ?? true;
 
   return (
-    <>
+    <PublicProjectProvider>
       {isLoading && <LoadingPage />}
       {!isLoading && !projectError && project && (
         <>
@@ -174,6 +179,8 @@ export default function MapPage({ params: { projectId } }) {
                   mapRef={mapRef}
                   touchZoomRotate
                   maxExtent={project?.max_extent || undefined}
+                  minZoom={minZoom}
+                  maxZoom={maxZoom}
                   initialViewState={{
                     zoom: urlLoc?.zoom ?? initialView?.zoom ?? 3,
                     latitude: urlLoc?.latitude ?? initialView?.latitude ?? 48.13,
@@ -196,6 +203,6 @@ export default function MapPage({ params: { projectId } }) {
         </MapProvider>
         </>
       )}
-    </>
+    </PublicProjectProvider>
   );
 }

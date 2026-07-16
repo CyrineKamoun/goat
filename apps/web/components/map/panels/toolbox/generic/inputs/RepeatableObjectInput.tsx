@@ -125,11 +125,18 @@ export function processObjectProperties(
 }
 
 /**
- * Get default values for a new object item
+ * Get default values for a new object item.
+ *
+ * `parentValues` are the enclosing form's current values. They let a nested
+ * field's `default_by_field` (keyed off a parent field such as `routing_mode`)
+ * resolve when the item is created — otherwise it would silently fall back to
+ * the schema default (e.g. a PT opportunity would default to the walking
+ * time-limit instead of the PT one).
  */
 export function getObjectDefaults(
   objectSchema: OGCInputSchema,
-  schemaDefs?: Record<string, OGCInputSchema>
+  schemaDefs?: Record<string, OGCInputSchema>,
+  parentValues?: Record<string, unknown>
 ): Record<string, unknown> {
   const defaults: Record<string, unknown> = {};
   const properties = objectSchema.properties || {};
@@ -148,6 +155,21 @@ export function getObjectDefaults(
     if (resolvedSchema.default !== undefined) {
       defaults[propName] = resolvedSchema.default;
     }
+
+    // default_by_field: derive the initial value from a parent field's value
+    // (mirrors getDefaultValues for top-level fields).
+    const dbf = (
+      resolvedSchema["x-ui"] as
+        | { widget_options?: { default_by_field?: { field: string; values: Record<string, unknown> } } }
+        | undefined
+    )?.widget_options?.default_by_field;
+    if (dbf && parentValues) {
+      const sourceVal = parentValues[dbf.field];
+      if (sourceVal !== undefined && sourceVal !== null) {
+        const dynamic = dbf.values[String(sourceVal)];
+        if (dynamic !== undefined) defaults[propName] = dynamic;
+      }
+    }
   }
 
   return defaults;
@@ -160,7 +182,7 @@ export default function RepeatableObjectInput({
   onNestedFiltersChange,
   disabled,
   schemaDefs,
-  formValues: _formValues = {},
+  formValues = {},
   layerDatasetIds,
   predictedColumns,
 }: RepeatableObjectInputProps) {
@@ -222,7 +244,7 @@ export default function RepeatableObjectInput({
     if (!itemSchema || minItems <= 0) return;
     const currentLength = value?.length ?? 0;
     if (currentLength < minItems) {
-      const defaults = getObjectDefaults(itemSchema, schemaDefs);
+      const defaults = getObjectDefaults(itemSchema, schemaDefs, formValues);
       const padded = [...(value || [])];
       for (let i = currentLength; i < minItems; i++) {
         padded.push({ ...defaults, _id: uuidv4() });
@@ -236,7 +258,7 @@ export default function RepeatableObjectInput({
   // Add new item
   const handleAdd = useCallback(() => {
     if (items.length >= maxItems || !itemSchema) return;
-    const defaults = getObjectDefaults(itemSchema, schemaDefs);
+    const defaults = getObjectDefaults(itemSchema, schemaDefs, formValues);
     const newItems = [...items, { ...defaults, _id: uuidv4() }];
     onChange(newItems);
   }, [items, maxItems, itemSchema, schemaDefs, onChange]);
@@ -265,7 +287,7 @@ export default function RepeatableObjectInput({
         // If changing a layer input, reset all other fields to defaults (except _id)
         const isLayerInput = layerInputNames.includes(propName);
         if (isLayerInput && itemSchema) {
-          const defaults = getObjectDefaults(itemSchema, schemaDefs);
+          const defaults = getObjectDefaults(itemSchema, schemaDefs, formValues);
           return {
             ...defaults,
             _id: (item as Record<string, unknown>)._id,
@@ -335,7 +357,7 @@ export default function RepeatableObjectInput({
       {items.map((item, index) => {
         const itemValues = item as Record<string, unknown>;
         // Merge parent form values with item values so visible_when conditions
-        const mergedValues = { ..._formValues, ...itemValues };
+        const mergedValues = { ...formValues, ...itemValues };
         const visibleInputs = getVisibleInputs(itemInputs, mergedValues);
 
         // Calculate excluded layer IDs for this item's layer inputs
@@ -380,7 +402,7 @@ export default function RepeatableObjectInput({
                       : undefined
                   }
                   disabled={disabled}
-                  formValues={{ ..._formValues, ...itemValues }}
+                  formValues={{ ...formValues, ...itemValues }}
                   schemaDefs={schemaDefs}
                   excludedLayerIds={getExcludedLayerIds(inputDef.name)}
                   layerDatasetIds={layerDatasetIds}

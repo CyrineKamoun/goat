@@ -128,6 +128,7 @@ async def extended_test_schemas(postgres_pool: Any, test_schemas: None) -> None:
         # Add missing columns to project
         for col_def in [
             ("basemap", "TEXT"),
+            ("custom_basemaps", "JSONB"),
             ("max_extent", "FLOAT[]"),
             ("builder_config", "JSONB"),
         ]:

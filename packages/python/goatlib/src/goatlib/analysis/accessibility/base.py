@@ -239,12 +239,10 @@ class HeatmapToolBase(AnalysisTool):
                 f"Failed to register OD matrix from '{od_matrix_path}': {e}"
             )
 
-        # Inspect columns
-        result = self.con.execute(f"""
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name = '{view_name}'
-        """).fetchall()
+        # Inspect columns. DESCRIBE reads only this view; unqualified
+        # information_schema spans every attached catalog and lazily
+        # loads all lake tables.
+        result = self.con.execute(f'DESCRIBE "{view_name}"').fetchall()
         actual_columns = {row[0] for row in result}
         required_columns = {"orig_id", "dest_id", "cost"}
         if not required_columns.issubset(actual_columns):

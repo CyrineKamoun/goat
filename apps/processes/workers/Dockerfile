@@ -79,6 +79,12 @@ COPY pyproject.toml uv.lock /app/
 WORKDIR /app
 RUN uv sync --all-extras --frozen --no-dev --no-editable --package=goatlib
 
+# Bake DuckDB REPOSITORY extensions (spatial/httpfs/postgres/ducklake) into the
+# image so the runtime never fetches them from extensions.duckdb.org — removes
+# the egress/TLS dependency and speeds cold start. (linux-base already carries
+# ca-certificates + egress here.)
+RUN python -c "import duckdb; from goatlib.storage.ducklake import REQUIRED_DUCKDB_EXTENSIONS as X; con=duckdb.connect(config={'extension_directory':'/opt/duckdb-extensions'}); [con.execute(f'INSTALL {e}') for e in X]"
+
 # =============================================================================
 # Stage: Worker Base - shared base for tools/print workers with goatlib
 # =============================================================================
@@ -98,10 +104,15 @@ COPY --from=python-build $UV_PYTHON_INSTALL_DIR $UV_PYTHON_INSTALL_DIR
 COPY --from=python-build $UV_PROJECT_ENVIRONMENT $UV_PROJECT_ENVIRONMENT
 COPY --from=python-build /app /app
 
+# DuckDB extensions baked at build time; goatlib loads them from here at runtime
+# (DUCKDB_EXTENSION_DIRECTORY), so no extension is ever downloaded.
+COPY --from=python-build /opt/duckdb-extensions /opt/duckdb-extensions
+
 WORKDIR ${APP}
 
 ENV DISABLE_SERVER=true \
-    PYTHON_PATH="$UV_PROJECT_ENVIRONMENT/bin/python"
+    PYTHON_PATH="$UV_PROJECT_ENVIRONMENT/bin/python" \
+    DUCKDB_EXTENSION_DIRECTORY=/opt/duckdb-extensions
 
 CMD ["windmill"]
 

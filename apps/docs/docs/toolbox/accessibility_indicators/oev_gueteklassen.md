@@ -16,28 +16,10 @@ The ÖV-Güteklassen indicator **classifies the quality of public transport serv
 
 The ÖV-Güteklassen indicator is decisive and can be used to highlight deficits in the public transport offer and to identify well-serviced locations as attractive areas for development.
 
-import MapViewer from '@site/src/components/MapViewer';
+:::info
 
-:::info 
-The calculation of the public transport quality classes is only available for areas where the transport network is integrated into GOAT.
+ÖV-Güteklassen computation is available for areas where public transport GTFS data is integrated into GOAT. Currently supported regions include **Germany, Austria, and Switzerland**. If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/) and we'll check what is possible.
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <MapViewer
-      geojsonUrls={[
-        "https://assets.plan4better.de/other/geofence/geofence_gtfs.geojson"
-      ]}
-      styleOptions={{
-        fillColor: "#808080",
-        outlineColor: "#808080",
-        fillOpacity: 0.8
-      }}
-      legendItems={[
-        { label: "Coverage for ÖV-Güteklassen", color: "#ffffff" }
-      ]}
-  />
-</div> 
-
-In case you need to perform analysis beyond this geofence, feel free to contact the [Support](https://plan4better.de/en/contact/ "Contact Support") and we will check what is possible. 
 :::
 
 ## 2. Example use cases
@@ -65,17 +47,10 @@ In case you need to perform analysis beyond this geofence, feel free to contact 
   <div class="content">Set the <code>Day</code>, <code>Start Time</code>, and <code>End Time</code> for your analysis.</div>
 </div>
 
-### Reference Layer
-
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Select the <code>Reference Layer</code> (polygon feature layer) for the area you want to analyze.</div>
-</div>
-
 ### Configuration
 
 <div class="step">
-  <div class="step-number">5</div>
+  <div class="step-number">4</div>
   <div class="content">Choose the <code>Catchment area type</code>: <b>Buffer</b>.</div>
 </div>
 
@@ -86,7 +61,29 @@ In case you need to perform analysis beyond this geofence, feel free to contact 
 :::
 
 <div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Select the <code>Reference Area Layer</code> — a polygon layer defining the study area boundary.</div>
+</div>
+
+<div class="step">
   <div class="step-number">6</div>
+  <div class="content">Optional: Click <code>Station Configuration</code> to customize the classification thresholds and buffer distances for station categories.</div>
+</div>
+
+### Result Layer
+
+<div class="step">
+  <div class="step-number">7</div>
+  <div class="content">Set the <code>Result layer name</code> for the output ÖV-Güteklassen layer.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">8</div>
+  <div class="content">Set the <code>Station layer name</code> for the output stations layer.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">9</div>
   <div class="content">Click <code>Run</code> to start the calculation.</div>
 </div>
 
@@ -101,9 +98,6 @@ If you click on a ÖV-Güteklassen result **your will see the further details, s
 
 If you click on any station, **you can see details such as the stop name, average frequency, and station category**. 
 
-<div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/gueteklassen/gueteklassen_calculation.gif').default} alt="Calculation - Public Transport Quality Classes" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
-</div>
 
 ## 4. Technical details
 

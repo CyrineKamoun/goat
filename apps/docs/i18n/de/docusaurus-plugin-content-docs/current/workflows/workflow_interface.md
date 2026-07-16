@@ -61,14 +61,14 @@ Der Leinwand-Arbeitsbereich ist der Ort, wo Sie Knoten per Drag-and-Drop bewegen
 - <img src={require('/img/icons/text-card.png').default} alt="Textkarte" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Textkarte</code>: <strong>Fügen Sie Textanmerkungen hinzu</strong> zur Dokumentation von Workflow-Schritten
 - <img src={require('/img/icons/redo.png').default} alt="Wiederholen" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Wiederholen</code>: <strong>Stellt die letzte rückgängig gemachte Aktion wieder her</strong>
 - <img src={require('/img/icons/undo.png').default} alt="Rückgängig" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Rückgängig</code>: <strong>Macht die letzte Aktion rückgängig</strong>
-- <img src={require('/img/icons/variables.png').default} alt="Variablen" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Variablen</code>: <strong>Erstellen und verwalten Sie</strong> [Workflow-Variablen](variables.md) für wiederverwendbare Parameter
+- <img src={require('/img/icons/variables.png').default} alt="Variablen" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Variablen</code>: <strong>Erstellen und verwalten Sie</strong> <a href="variables">Workflow-Variablen</a> für wiederverwendbare Parameter
 - <img src={require('/img/icons/play.png').default} alt="Ausführen" style={{ maxHeight: "40px", maxWidth: "40px", objectFit: "cover"}}/> <code>Ausführen</code>: <strong>Führt den gesamten Workflow aus</strong>
 
 **Minimap**: Befindet sich in der unteren rechten Ecke der Leinwand und bietet einen Übersichtsnavigator für komplexe Workflows.
 
-**Datenansicht-Steuerung**: Befindet sich am unteren Rand der Leinwand:
-- <code>Tabelle anzeigen</code>: Zeigt Attributdaten für ausgewählte Knotenergebnisse an
-- <code>Karte anzeigen</code>: Visualisiert räumliche Daten für ausgewählte Knotenausgaben
+**Datenansicht-Steuerung**: Befindet sich am unteren Rand der Leinwand. Wählen Sie einen Knoten aus, um das Panel zu aktivieren — es zeigt die Daten des Layers dieses Knotens:
+- <code>Tabelle</code>: Öffnet die Attributtabelle des ausgewählten Knotens
+- <code>Karte</code>: Öffnet eine Kartenvorschau des Layers des ausgewählten Knotens (nur verfügbar, wenn der Layer Geometrie enthält)
 
 ### Werkzeuge und Konfigurations-Panel
 Das rechte Panel ändert sich je nachdem, ob ein Knoten ausgewählt ist oder nicht. Wenn kein Knoten ausgewählt ist, wird das **Werkzeuge und Verlauf Panel** sichtbar. Wenn ein Werkzeug-Knoten ausgewählt ist, erscheint das **Konfigurations-Panel**, und wenn ein Datensatz-Knoten ausgewählt ist, erscheint das **Datensatz-Panel**.
@@ -83,9 +83,13 @@ Das rechte Panel ändert sich je nachdem, ob ein Knoten ausgewählt ist oder nic
 
 Dieser Tab enthält kategorisierte Werkzeuge, die für die Workflow-Konstruktion verfügbar sind, ähnlich der Karten-Modus-Toolbox. Ziehen Sie Werkzeuge per Drag-and-Drop auf die Leinwand, um sie zu Ihrem Workflow hinzuzufügen. Die Werkzeuge sind in die folgenden Kategorien unterteilt:
 
-- **Import**
+- **Daten I/O**
   - <code>+ Datensatz hinzufügen</code>: Erstellt Datensatz-Knoten
-  - <code>Datensatz speichern</code>: Speichert Workflow-Ergebnisse als permanente Datensätze
+  - <code>Als Datensatz speichern</code>: Speichert Workflow-Ergebnisse als permanente Datensätze. Konfigurieren Sie den **Dataset-Namen**, aktivieren Sie **Zum Projekt hinzufügen**, um das Ergebnis automatisch zur Projektlayerliste hinzuzufügen, und aktivieren Sie **Bei erneutem Ausführen überschreiben**, um das zuvor exportierte Dataset bei jeder Ausführung des Workflows zu ersetzen, anstatt einen neuen Datensatz zu erstellen.
+
+:::tip Gute Praxis
+Vergeben Sie für jeden **Als Datensatz speichern**-Knoten einen aussagekräftigen Namen und aktivieren Sie **Bei erneutem Ausführen überschreiben**, wenn Sie denselben Workflow mehrfach ausführen — so bleibt Ihr Projekt übersichtlich und es entstehen keine doppelten Layer nach jeder Ausführung.
+:::
 
 - **Erreichbarkeitsindikatoren**
   - Alle Werkzeuge, die im Abschnitt [Erreichbarkeitsindikatoren](../category/accessibility-indicators) der Toolbox verfügbar sind
@@ -97,8 +101,11 @@ Dieser Tab enthält kategorisierte Werkzeuge, die für die Workflow-Konstruktion
   - Alle Werkzeuge, die im Abschnitt [Geoprozessierung](../category/geoprocessing) der Toolbox verfügbar sind
   
 - **Datenmanagement**
-  - [Verknüpfen](../toolbox/data_management/join.md) und andere Datenmanipulations-Werkzeuge
+  - [Verknüpfen](../toolbox/data_management/join.md), [Zusammenführen](../toolbox/data_management/merge.md) und andere Datenmanipulations-Werkzeuge
   - [Benutzerdefinierte SQL](custom_sql.md): Erweiterte Datenverarbeitung mit SQL-Abfragen
+
+- **Steuerung**
+  - <code>Bedingung</code>: Fügt einen Verzweigungsknoten hinzu, der den Layer basierend auf definierten Bedingungen in einen <strong>Wahr</strong>- oder <strong>Falsch</strong>-Pfad weiterleitet. Siehe <a href="if_clause">Bedingung</a>.
 
 **Verlauf Tab**
 Hier können Sie Folgendes sehen:
@@ -193,7 +200,7 @@ Beginnen Sie mit einfachen 2-3 Knoten-Workflows, um die Benutzeroberfläche zu v
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content"><strong>Ergebnisse überprüfen</strong>: Verwenden Sie die Schaltflächen <code>Tabelle anzeigen</code> und <code>Karte anzeigen</code>, um die endgültigen Ergebnisse zu inspizieren, sobald der Workflow abgeschlossen ist.</div>
+  <div class="content"><strong>Ergebnisse überprüfen</strong>: Verwenden Sie die Schaltflächen <code>Tabelle</code> und <code>Karte</code> am unteren Rand der Leinwand, um die Ergebnisse des ausgewählten Knotens zu inspizieren, sobald der Workflow abgeschlossen ist.</div>
 </div>
 
 <div class="step">
@@ -214,3 +221,7 @@ Die erfolgreiche Nutzung der Workflow-Benutzeroberfläche bietet:
 :::info Auto-Speicher-Feature
 Workflows speichern Änderungen automatisch, während Sie sie erstellen. Das System bewahrt alle Konfigurationen, Verbindungen und Ausführungszustände auf.
 :::
+
+## 4. Workflows aus der Kartenansicht ausführen
+
+Workflows können auch direkt aus der **Kartenansicht** ausgeführt werden, ohne den Workflow-Editor zu öffnen. Öffnen Sie die **Toolbox**, klicken Sie auf den Tab **Workflows** und wählen Sie einen Workflow aus der Liste. Wenn der Workflow [Variablen](variables.md#workflows-mit-variablen-aus-der-kartenansicht-ausf%C3%BChren) enthält, erscheint ein Abschnitt **Variablen**, in dem Sie Werte vor der Ausführung festlegen können.

@@ -1,145 +1,84 @@
 # Variablen
 
-**Workflow-Variablen** ermöglichen es Ihnen, wiederverwendbare, parametrisierte [Workflows](../further_reading/glossary.md#workflows) zu erstellen, indem Sie dynamische Werte definieren, die geändert werden können, ohne die Workflow-Struktur zu modifizieren. Diese mächtige Funktion macht Ihre Analyse anpassungsfähig und teilbar.
+**Workflow-Variablen** ermöglichen es Ihnen, wiederverwendbare Werte zu definieren, die zur Laufzeit gesetzt werden können, ohne den Workflow zu bearbeiten. Nutzen Sie sie, um Ihre Analyse flexibel und teilbar zu machen — Mitarbeitende können denselben Workflow mit anderen Parametern ausführen, ohne die Workflow-Struktur zu ändern.
+
+Variablen verwenden die Syntax `{{@variable_name}}` und können in die meisten Werkzeugparameter eingefügt werden.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workflows/variables_de.webp').default} alt="Kartenoberfläche Übersicht" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
-</div> 
-
-## Übersicht
-
-Variablen ermöglichen es Ihnen:
-
-- Vorlagen für wiederholte Analysen mit verschiedenen Parametern zu erstellen  
-- Workflows zu erstellen, die andere ohne technische Kenntnisse anpassen können
-- Verschiedene Szenarien zu testen, indem Sie Schlüsselwerte einfach ändern
-- Standardisierte analytische Prozesse projektübergreifend zu teilen
-
-Variablen verwenden die Syntax `{{@variable_name}}` und können in den meisten Werkzeugparametern in Ihrem Workflow verwendet werden.
+  <img src={require('/img/workflows/variables_de.webp').default} alt="Workflow-Variablen" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+</div>
 
 ## Variablentypen
 
-GOAT unterstützt mehrere Variablentypen, um verschiedenen Parameteranforderungen zu entsprechen:
+| Typ | Verwendung |
+|---|---|
+| **Text** | Textwerte — Namen, Beschriftungen, Filterkriterien |
+| **Zahl** | Numerische Werte — Entfernungen, Schwellenwerte, Zählungen |
 
-### Text-Variablen
-Für Zeichenkettenwerte wie Datensatznamen, Beschriftungen oder Filterkriterien:
-```
-Variablenname: district_name
-Typ: Text  
-Standardwert: Innenstadt
-Verwendung: {{@district_name}}
-```
-
-### Zahlen-Variablen  
-Für numerische Parameter wie Entfernungen, Schwellenwerte oder Berechnungen:
-```
-Variablenname: buffer_distance
-Typ: Zahl
-Standardwert: 500
-Verwendung: {{@buffer_distance}}
-```
-
-### Boolean-Variablen
-Für wahr/falsch-Optionen und Schalter:
-```  
-Variablenname: include_residential  
-Typ: Boolean
-Standardwert: true
-Verwendung: {{@include_residential}}
-```
-
-### Listen-Variablen
-Für Dropdown-Auswahlen aus vordefinierten Optionen:
-```
-Variablenname: amenity_type
-Typ: Liste
-Optionen: [restaurant, school, hospital, park]  
-Standardwert: restaurant
-Verwendung: {{@amenity_type}}
-```
-
-## Erstellen von Variablen
-
-### Verwenden des Variablen-Panels
+## Variablen erstellen
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Öffnen Sie das <strong>Variablen-Panel</strong> auf der rechten Seite der Workflow-Benutzeroberfläche.</div>
+  <div class="content">Klicken Sie auf das <code>{"{}"}</code>-Symbol <strong>Variablen</strong> in der Werkzeugleiste am unteren Rand der Leinwand, um den Variablen-Dialog zu öffnen.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Klicken Sie auf die Schaltfläche <strong>Variable hinzufügen</strong>, um eine neue Variable zu erstellen.</div>
+  <div class="content">Klicken Sie auf <strong>Variable hinzufügen</strong>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Konfigurieren Sie die Variableneigenschaften:
-    <ul>
-      <li><strong>Name</strong>: Verwenden Sie beschreibende Namen wie <code>search_radius</code> oder <code>poi_type</code></li>
-      <li><strong>Typ</strong>: Wählen Sie den entsprechenden Datentyp aus</li>  
-      <li><strong>Standardwert</strong>: Setzen Sie einen vernünftigen Standard für den Parameter</li>
-    </ul>
-  </div>
+  <div class="content">Geben Sie einen <strong>Namen</strong> ein. Namen müssen mit einem Buchstaben oder Unterstrich beginnen und dürfen nur Buchstaben, Ziffern und Unterstriche enthalten — keine Leerzeichen (z. B. <code>puffer_abstand</code>, nicht <code>puffer abstand</code>).</div>
 </div>
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Klicken Sie auf <strong>Speichern</strong>, um die Variable zu Ihrem Workflow hinzuzufügen.</div>
+  <div class="content">Wählen Sie einen <strong>Typ</strong>: <code>Text</code> oder <code>Zahl</code>.</div>
 </div>
 
-### Variablen-Management
+<div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Geben Sie optional einen <strong>Standardwert</strong> ein.</div>
+</div>
 
-**Variablen bearbeiten**: Klicken Sie auf eine beliebige Variable im Variablen-Panel, um ihre Eigenschaften zu ändern.
+<div class="step">
+  <div class="step-number">6</div>
+  <div class="content">Klicken Sie auf <strong>Fertig</strong>, um zu speichern. Um eine Variable zu löschen, klicken Sie auf das Löschen-Symbol daneben.</div>
+</div>
 
-**Variablen löschen**: Verwenden Sie die Löschen-Schaltfläche, um ungebrauchte Variablen zu entfernen.
+## Variablen in Werkzeugparametern verwenden
 
-## Verwendung von Variablen in Workflows
+Klicken Sie auf das <code>{"{}"}</code>-Symbol in einem kompatiblen Parameterfeld und wählen Sie die gewünschte Variable aus dem Menü. Nach dem Einfügen zeigt das Feld den Variablenverweis (z. B. <code>{"{{@variable_name}}"}</code>) grün hervorgehoben an — das signalisiert, dass das Feld durch eine Variable gesteuert wird.
 
-### In Werkzeug-Parametern
-
-Variablen können in vielen Konfigurationsfeldern verwendet werden:
-
-**Puffer-Analyse**: Setzen Sie dynamische Pufferentfernungen
-```
-Pufferentfernung: {{@analysis_radius}}
-```
-
-**Filter**: Erstellen Sie flexible Filterkriterien  
-```
-Annehmlichkeitstyp: {{@selected_amenity}}
-Bevölkerungsschwellenwert: {{@min_population}}
-```
-
-**Benutzerdefinierte SQL**: Parametrisieren Sie Abfragen
-```sql
-SELECT * FROM input_1 
-WHERE category = '{{@category_filter}}'
-  AND value > {{@threshold_value}}
-```
-
-### Variablen-Syntax-Regeln
-
-- **Format**: Verwenden Sie immer die Syntax `{{@variable_name}}`
-- **Groß-/Kleinschreibung beachten**: Variablennamen sind groß-/kleinschreibungssensitiv
-- **Keine Leerzeichen**: Verwenden Sie Unterstriche anstelle von Leerzeichen (z.B. `max_distance` nicht `max distance`)  
-- **Beschreibende Namen**: Verwenden Sie klare, beschreibende Namen, die den Zweck des Parameters erklären
-
-## Bewährte Praktiken
-
-### Variablen-Design
-
-:::tip Aussagekräftige Namen
-Verwenden Sie beschreibende Variablennamen, die ihren Zweck klar angeben: `search_radius` anstelle von `radius`, `poi_type` anstelle von `type`.
+:::tip
+Verwenden Sie beschreibende Namen, die den Zweck des Parameters klar angeben: `puffer_abstand` statt `abstand`, `poi_typ` statt `typ`.
 :::
 
-:::tip Vernünftige Standards  
-Setzen Sie Standardwerte, die für häufige Anwendungsfälle funktionieren, sodass Benutzer Workflows sofort ausführen können, während Anpassungen weiterhin möglich sind.
+## Workflows mit Variablen aus der Kartenansicht ausführen
+
+Workflows mit Variablen können direkt aus der Kartenansicht ausgeführt werden, ohne den Workflow-Editor zu öffnen.
+
+<div class="step">
+  <div class="step-number">1</div>
+  <div class="content">Öffnen Sie die <code>Toolbox</code> und klicken Sie auf den Tab <strong>Workflows</strong>.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">2</div>
+  <div class="content">Klicken Sie auf einen Workflow aus der Liste, um ihn zu öffnen.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Ein Abschnitt <strong>Variablen</strong> zeigt alle im Workflow definierten Variablen. Geben Sie die gewünschten Werte für diesen Durchlauf ein.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Klicken Sie auf <strong>Ausführen</strong>. Der Workflow wird mit den eingegebenen Werten ausgeführt. Klicken Sie auf <strong>Zurücksetzen</strong>, um die Standardwerte wiederherzustellen.</div>
+</div>
+
+:::info
+Die hier eingegebenen Werte gelten nur für diesen Durchlauf. Beim nächsten Öffnen des Workflows werden die Standardwerte wiederhergestellt.
 :::
-
-## Einschränkungen
-
-- Variablennamen müssen innerhalb eines Workflows eindeutig sein
-- Einige erweiterte Werkzeugparameter unterstützen möglicherweise keine Variablen
-- Variablenwerte werden mit dem Workflow gespeichert, nicht global
-- Listen-Variablen sind auf vordefinierte Optionen beschränkt

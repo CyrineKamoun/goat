@@ -30,6 +30,7 @@ import {
 import { MapSidebarItemID } from "@/types/map/common";
 
 import { useDashboardFont } from "@/hooks/dashboard/useDashboardFont";
+import { useDashboardLanguageOverride } from "@/hooks/dashboard/useDashboardLanguageOverride";
 import { useLayerStyleChange } from "@/hooks/map/LayerStyleHooks";
 import { useBasemap } from "@/hooks/map/MapHooks";
 import { useCustomBasemapMutations } from "@/hooks/map/useCustomBasemapMutations";
@@ -78,17 +79,8 @@ const PublicProjectLayout = ({
   const dispatch = useAppDispatch();
 
   // Apply dashboard language override only for public/shared view
-  const dashboardLanguage = project?.builder_config?.settings?.language;
+  useDashboardLanguageOverride(project?.builder_config?.settings?.language, viewOnly);
   const dashboardFont = useDashboardFont(project);
-  useEffect(() => {
-    if (viewOnly && dashboardLanguage && dashboardLanguage !== "auto" && dashboardLanguage !== i18n.language) {
-      const prevLang = i18n.language;
-      i18n.changeLanguage(dashboardLanguage);
-      return () => {
-        i18n.changeLanguage(prevLang);
-      };
-    }
-  }, [viewOnly, dashboardLanguage, i18n]);
 
   // Layer style change hook
   const { handleStyleChange } = useLayerStyleChange(projectLayers, viewOnly);
@@ -778,11 +770,14 @@ const PublicProjectLayout = ({
               transition: "all 0.3s",
             }}>
             {controlsByCorner["bottom-right"].map((c) => renderControl(c, "bottom-right"))}
-            <AttributionControl
-              extraAttribution={
-                activeBasemap.source === "custom" ? activeBasemap.attribution : null
-              }
-            />
+            {/* -8px pulls the strip down to sit flush with the map's bottom edge (cancels the residual bottom inset of this bottom-right control box). */}
+            <Box sx={{ mb: "-8px" }}>
+              <AttributionControl
+                extraAttribution={
+                  activeBasemap.source === "custom" ? activeBasemap.attribution : null
+                }
+              />
+            </Box>
           </Box>
 
           {/* Scalebar — bottom-left is reserved exclusively for the scalebar */}

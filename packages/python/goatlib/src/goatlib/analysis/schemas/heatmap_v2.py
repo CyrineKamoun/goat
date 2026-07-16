@@ -9,7 +9,7 @@ underlying semantics are identical to keep cross-tool consistency.
 """
 
 from enum import StrEnum
-from typing import Literal, Self
+from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -18,6 +18,18 @@ from goatlib.analysis.schemas.catchment_area_v2 import (
     RoutingMode,
 )
 from goatlib.analysis.schemas.heatmap import OpportunityGravity
+
+# Validation bounds for the gravity sensitivity (β). V2 exposes this as a free
+# numeric field (rather than the v1 fixed dropdown), bounded to the range the
+# decay kernel is calibrated for.
+SENSITIVITY_MIN = 1_000
+SENSITIVITY_MAX = 1_000_000
+
+# Validation bounds for the ClosestAverage k (number of nearest destinations to
+# average). V2 exposes this as a free numeric input rather than the v1 fixed
+# dropdown, bounded to a sensible range.
+N_DESTINATIONS_MIN = 1
+N_DESTINATIONS_MAX = 10
 
 
 class HeatmapType(StrEnum):
@@ -50,8 +62,21 @@ class OpportunityV2(OpportunityGravity):
             "cost_type=time, meters when cost_type=distance."
         ),
     )
-    n_destinations: Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10] = Field(
+    # Override the v1 Literal dropdown with a free numeric value (validated
+    # range). V2-only — leaves the v1 OpportunityGravity schema untouched.
+    sensitivity: float = Field(
+        default=300000.0,
+        ge=SENSITIVITY_MIN,
+        le=SENSITIVITY_MAX,
+        description="Gravity decay sensitivity (β); larger = slower decay / wider reach.",
+    )
+    # Free numeric value (validated range), mirroring the sensitivity override
+    # above — replaces the v1 Literal dropdown so the tool can expose it as a
+    # number input.
+    n_destinations: int = Field(
         default=1,
+        ge=N_DESTINATIONS_MIN,
+        le=N_DESTINATIONS_MAX,
         description="Number of closest destinations to average (closest_average only).",
     )
 
@@ -86,6 +111,38 @@ class HeatmapV2Params(BaseModel):
     speed: float | None = Field(
         default=None, ge=0.0, le=60.0,
         description="Travel speed in km/h. None for PT/Car (mode default).",
+    )
+
+    # ---- Public transport (routing_mode == pt) -------------------------------
+    # Arrive-by reverse RAPTOR + precomputed per-mode access/egress lookup
+    # tables. access/egress modes pick which table is loaded; their max times
+    # are capped at the table's built max (20 min). Ignored for street modes.
+    arrival_time: int | None = Field(
+        default=None,
+        description="Arrive-by time, unix minutes since epoch (PT only).",
+    )
+    access_mode: RoutingMode = Field(
+        default=RoutingMode.walking,
+        description="Access leg mode (home→boarding stop); selects its lookup table.",
+    )
+    egress_mode: RoutingMode = Field(
+        default=RoutingMode.walking,
+        description="Egress leg mode (alighting stop→opportunity); selects its lookup table.",
+    )
+    access_max_time: int = Field(
+        default=15, ge=1, le=20,
+        description="Max access-leg minutes (≤ the access table's built max).",
+    )
+    egress_max_time: int = Field(
+        default=15, ge=1, le=20,
+        description="Max egress-leg minutes (≤ the egress table's built max).",
+    )
+    transit_modes: list[str] | None = Field(
+        default=None,
+        description="Allowed PT classes (bus, tram, rail, …). None = all.",
+    )
+    max_transfers: int = Field(
+        default=5, ge=0, le=5, description="Max PT transfers."
     )
 
     # ---- Heatmap formula -----------------------------------------------------

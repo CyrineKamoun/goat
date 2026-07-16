@@ -2,8 +2,6 @@
 sidebar_position: 6
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 import MathJax from 'react-mathjax';
 
 # Huff-Modell
@@ -23,40 +21,20 @@ Das Modell funktioniert nach einem einfachen Prinzip: **Die Wahrscheinlichkeit, 
 
 Das Ergebnis ist ein **Wahrscheinlichkeitswert für jeden Angebotsstandort**, der den Anteil der Gesamtnachfrage darstellt, den er aus dem Referenzgebiet auf sich zieht. Dies ermöglicht einen direkten Vergleich, wie gut verschiedene Einrichtungen um denselben Kundenstamm konkurrieren.
 
-Sie können den Routing-Modus, die Ziele-Layer (mit Kapazitätsfeldern), den Bedarfs-Layer (mit Bevölkerungsfeld), das Referenzgebiet und Reisezeitlimits konfigurieren und Ihr Modell kalibrieren.
+Sie können das Verkehrsmittel, den Gelegenheiten-Layer (mit Kapazitätsfeldern), den Nachfrage-Layer (mit Bevölkerungsfeld), das Referenzgebiet und Reisezeitlimits konfigurieren und Ihr Modell kalibrieren.
 
-- **Referenzgebiet** — Ein Polygon, das das Untersuchungsgebiet definiert. Nur Nachfrage und Ziele innerhalb dieses Gebiets werden berücksichtigt.
+- **Referenzgebiet** — Ein Polygon, das das Untersuchungsgebiet definiert. Nur Nachfrage und Gelegenheiten innerhalb dieses Gebiets werden berücksichtigt.
 
-- Die **Ziele-Layer enthalten Einrichtungsdaten** mit einem Attraktivitätsattribut (z. B. Anzahl der Krankenhausbetten, Quadratmeter Verkaufsfläche, Schulplätze).
+- Der **Gelegenheiten-Layer enthält Einrichtungsdaten** mit einem Attraktivitätsattribut (z. B. Anzahl der Krankenhausbetten, Quadratmeter Verkaufsfläche, Schulplätze).
 
-- Der **Bedarfs-Layer enthält Bevölkerungs- oder Nutzerdaten** (z. B. Einwohnerzahl, potenzielle Kunden), die die Nachfrage nach den Einrichtungen darstellen.
+- Der **Nachfrage-Layer enthält Bevölkerungs- oder Nutzerdaten** (z. B. Einwohnerzahl, potenzielle Kunden), die die Nachfrage nach den Einrichtungen darstellen.
 
 
 **Wesentlicher Unterschied:** Im Gegensatz zu Heatmaps, die die Erreichbarkeit pro Rasterzelle visualisieren, erzeugt das *Huff-Modell* eine **Wahrscheinlichkeit pro Angebotsstandort** – und zeigt, welchen Anteil der Gesamtnachfrage jede Einrichtung erfasst.
 
-import MapViewer from '@site/src/components/MapViewer';
+:::info
 
-:::info 
-
-Das Huff-Modell ist in bestimmten Regionen verfügbar. Bei Auswahl eines `Routing-Modus` wird ein **Geofence** auf der Karte angezeigt, um die unterstützten Regionen hervorzuheben.
-
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <MapViewer
-      geojsonUrls={[
-        "https://assets.plan4better.de/other/geofence/geofence_heatmap.geojson"
-      ]}
-      styleOptions={{
-        fillColor: "#808080",
-        outlineColor: "#808080",
-        fillOpacity: 0.8
-      }}
-      legendItems={[
-        { label: "Abdeckung für Huff-Modell", color: "#ffffff" }
-      ]}
-  />
-</div> 
-
-Wenn Sie Analysen über diesen Geofence hinaus durchführen möchten, können Sie uns gerne [kontaktieren](https://plan4better.de/kontakt/ "Kontaktieren Sie uns"). Wir besprechen gerne weitere Optionen.
+Das Huff-Modell ist in bestimmten Regionen verfügbar. Nach Auswahl eines `Verkehrsmittels` zeigt GOAT eine Kartenüberlagerung mit der unterstützten Abdeckung an. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns](https://plan4better.de/kontakt/ "Kontaktieren Sie uns") gerne.
 
 :::
 
@@ -86,36 +64,15 @@ Wenn Sie Analysen über diesen Geofence hinaus durchführen möchten, können Si
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Wählen Sie den <code>Routing-Modus</code>, den Sie für die Analyse verwenden möchten.</div>
+  <div class="content">Wählen Sie das <code>Verkehrsmittel</code>, das Sie für die Analyse verwenden möchten.</div>
 </div>
 
-<Tabs>
-
-<TabItem value="walk" label="Zu Fuß" default className="tabItemBox">
-
-**Berücksichtigt alle zu Fuß erreichbaren Wege**. Es wird eine Gehgeschwindigkeit von 5 km/h angenommen.
-
-</TabItem>
-  
-<TabItem value="cycling" label="Fahrrad" className="tabItemBox">
-
-**Berücksichtigt alle mit dem Fahrrad befahrbaren Wege**. Dieser Routing-Modus berücksichtigt bei der Berechnung der Erreichbarkeit die Oberfläche, Ebenheit und Steigung von Straßen. Es wird eine Fahrradgeschwindigkeit von 15 km/h angenommen.
-
-</TabItem>
-
-<TabItem value="pedelec" label="Pedelec" className="tabItemBox">
-
-**Berücksichtigt alle mit dem Pedelec befahrbaren Wege**. Dieser Routing-Modus berücksichtigt bei der Berechnung der Erreichbarkeit die Oberfläche und Ebenheit von Straßen. Es wird eine Pedelec-Geschwindigkeit von 23 km/h angenommen.
-
-</TabItem>
-
-<TabItem value="car" label="Auto" className="tabItemBox">
-
-**Berücksichtigt alle mit dem Auto befahrbaren Wege**. Dieser Routing-Modus berücksichtigt bei der Berechnung der Erreichbarkeit Geschwindigkeitsbegrenzungen und Einbahnstraßenbeschränkungen.
-
-</TabItem>
-
-</Tabs>
+| Verkehrsmittel | Berücksichtigt | Angenommene Geschwindigkeit |
+|----------------|----------------|----------------------------|
+| Zu Fuß | Alle zu Fuß begehbaren Wege | 5 km/h |
+| Fahrrad | Alle mit dem Fahrrad befahrbaren Wege (Oberfläche, Glätte, Steigung) | 15 km/h |
+| Pedelec | Alle mit dem Pedelec befahrbaren Wege (Oberfläche, Glätte) | 23 km/h |
+| Auto | Alle mit dem Auto befahrbaren Wege (Tempolimits, Einbahnstraßen) | — |
 
 ### Konfiguration
 
@@ -135,23 +92,23 @@ Benötigen Sie Hilfe bei der Auswahl einer geeigneten Reisezeitgrenze für versc
 
 :::
 
-### Bedarf
+### Nachfrage
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Wählen Sie Ihren <code>Bedarfs-Layer</code> aus dem Dropdown-Menü. Dieser Layer sollte Bevölkerungs- oder Verbraucherdaten enthalten (z. B. Zensusdaten mit Einwohnerzahlen, Kundenstandorte).</div>
+  <div class="content">Wählen Sie Ihren <code>Nachfrage-Layer</code> aus dem Dropdown-Menü. Dieser Layer sollte Bevölkerungs- oder Verbraucherdaten enthalten (z. B. Zensusdaten mit Einwohnerzahlen, Kundenstandorte).</div>
 </div>
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Wählen Sie das <code>Nachfragefeld</code> – ein numerisches Feld aus Ihrem Bedarfs-Layer, das die Anzahl potenzieller Verbraucher darstellt (z. B. Bevölkerung, Anzahl der Haushalte).</div>
+  <div class="content">Wählen Sie das <code>Nachfragefeld</code> – ein numerisches Feld aus Ihrem Nachfrage-Layer, das die Anzahl potenzieller Verbraucher darstellt (z. B. Bevölkerung, Anzahl der Haushalte).</div>
 </div>
 
-### Ziele
+### Gelegenheiten
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Wählen Sie Ihren <code>Ziele-Layer</code> aus dem Dropdown-Menü. Dieser Layer sollte Standorte von Einrichtungen oder Geschäften enthalten, die um die Nachfrage konkurrieren.</div>
+  <div class="content">Wählen Sie Ihren <code>Gelegenheiten-Layer</code> aus dem Dropdown-Menü. Dieser Layer sollte Standorte von Einrichtungen oder Geschäften enthalten, die um die Nachfrage konkurrieren.</div>
 </div>
 
 <div class="step">
@@ -168,7 +125,7 @@ Benötigen Sie Hilfe bei der Auswahl einer geeigneten Reisezeitgrenze für versc
 
 <div class="step">
   <div class="step-number">11</div>
-  <div class="content">Passen Sie optional den Parameter <code>Distanzabfall</code> (Standard: 2,0) an, um zu steuern, wie stark die Reisezeit die Attraktivität einer Einrichtung verringert. Höhere Werte bedeuten, dass Menschen weniger bereit sind, weit zu reisen.</div>
+  <div class="content">Passen Sie optional den Parameter <code>Entfernungsabnahme</code> (Standard: 2,0) an, um zu steuern, wie stark die Reisezeit die Attraktivität einer Einrichtung verringert. Höhere Werte bedeuten, dass Menschen weniger bereit sind, weit zu reisen.</div>
 </div>
 
 :::info Modellkalibrierung
@@ -180,8 +137,15 @@ Idealerweise sammeln Sie Daten zu tatsächlichen Kundenbesuchen oder Marktanteil
 
 :::
 
+### Ergebnisse
+
 <div class="step">
   <div class="step-number">12</div>
+  <div class="content">Legen Sie den <code>Name der Ergebnislayer</code> für den Ausgabe-Huff-Modell-Layer fest.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">13</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Berechnung zu starten.</div>
 </div>
 

@@ -524,21 +524,33 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
               }
             }
 
+            // If the item schema declares `layer_project_id`, forward the
+            // selected project-layer id before it's converted to a dataset UUID.
+            const hasLayerProjectIdField = Boolean(
+              (resolvedItemSchema.properties as Record<string, unknown>)?.layer_project_id
+            );
+
             // Convert layer IDs in each array item and inject filters
             if (layerFieldNames.length > 0) {
               const items = visibleValues[input.name] as Record<string, unknown>[];
               const itemFilters = nestedLayerFilters[input.name] || [];
-              
+
               visibleValues[input.name] = items.map((item, itemIndex) => {
                 const convertedItem = { ...item };
                 for (const fieldName of layerFieldNames) {
                   if (convertedItem[fieldName]) {
+                    if (hasLayerProjectIdField && convertedItem.layer_project_id == null) {
+                      const pid = parseInt(convertedItem[fieldName] as string, 10);
+                      if (!isNaN(pid)) {
+                        convertedItem.layer_project_id = pid;
+                      }
+                    }
                     const layerId = convertProjectLayerIdToLayerId(convertedItem[fieldName] as string);
                     if (layerId) {
                       convertedItem[fieldName] = layerId;
                     }
                   }
-                  
+
                   // Inject filter for this layer field using the mapped filter field name
                   const filterFieldName = layerToFilterMap[fieldName];
                   const filter = itemFilters[itemIndex]?.[fieldName];

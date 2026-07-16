@@ -2,8 +2,6 @@
 sidebar_position: 3
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
 import MathJax from 'react-mathjax';
 
 # Heatmap - Closest Average
@@ -23,31 +21,10 @@ The heatmap displays a color-coded hexagonal grid **showing average travel times
 
 **Key difference:** Heatmaps show *access* from many origins to specific destinations, while catchment areas show *reach* from specific origins to many destinations.
 
-import MapViewer from '@site/src/components/MapViewer';
 
-:::info 
+:::info
 
-Heatmaps are available in certain regions. Upon selecting a `Routing type`, a **geofence** will be displayed on the map to highlight supported regions.
-
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <MapViewer
-      geojsonUrls={[
-        "https://assets.plan4better.de/other/geofence/geofence_heatmap.geojson"
-      ]}
-      styleOptions={{
-        fillColor: "#808080",
-        outlineColor: "#808080",
-        fillOpacity: 0.8
-      }}
-      legendItems={[
-        { label: "Coverage for Closest-average-based Heatmaps", color: "#ffffff" }
-      ]}
-  />
-
-</div> 
-
-
-If you would like to perform analyses beyond this geofence, feel free to [contact us](https://plan4better.de/en/contact/ "Contact us"). We would be happy to discuss further options.
+Heatmap computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/) and we'll discuss further options.
 
 :::
 
@@ -77,44 +54,27 @@ If you would like to perform analyses beyond this geofence, feel free to [contac
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Pick the <code>Routing Type</code> you would like to use for the heatmap.</div>
+  <div class="content">Pick the <code>Transport mode</code> you would like to use for the heatmap.</div>
 </div>
 
-<Tabs>
-<TabItem value="walk" label="Walk" default className="tabItemBox">
+| Mode | Considers | Speed assumed |
+|------|-----------|---------------|
+| Walk | All paths accessible by foot | 5 km/h |
+| Bicycle | All paths accessible by bicycle (surface, smoothness, slope) | 15 km/h |
+| Pedelec | All paths accessible by pedelec (surface, smoothness) | 23 km/h |
+| Car | All paths accessible by car (speed limits, one-way restrictions) | — |
 
-#### Walk
-
-**Considers all paths accessible by foot**. For heatmaps, a walking speed of 5 km/h is assumed.
-</TabItem>
-  
-<TabItem value="cycling" label="Bicycle" className="tabItemBox">
-
-**Considers all paths accessible by bicycle**. This routing mode takes into account the surface, smoothness and slope of streets while computing accessibility. For heatmaps, a cycling speed of 15 km/h is assumed.
-
-</TabItem>
-<TabItem value="pedelec" label="Pedelec" className="tabItemBox">
-
-**Considers all paths accessible by pedelec**. This routing mode takes into account the surface and smoothness of streets while computing accessibility. For heatmaps, a pedelec speed of 23 km/h is assumed.
-
-</TabItem>
-<TabItem value="car" label="Car" className="tabItemBox">
-
-**Considers all paths accessible by car**. This routing mode takes into account speed limits and one-way access restrictions while computing accessibility.
-
-</TabItem>
-</Tabs>
 
 ### Opportunities
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Select your <code>Opportunity Layer</code> from the drop-down menu. This can be any previously created layer containing point-based data.</div>
+  <div class="content">Select your <code>Input Layer</code> from the drop-down menu. This can be any previously created layer containing point-based data.</div>
 </div>
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Choose a <code>Travel Time Limit</code> for your heatmap. This will be used in the context of your previously selected <code>Routing Type</code>.</div>
+  <div class="content">Choose a <code>Travel Time Limit</code> for your heatmap. This will be used in the context of your previously selected <code>Transport mode</code>.</div>
 </div>
 
 :::tip Hint
@@ -130,11 +90,23 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">(Optional) Click <code>+ Add Opportunity</code> to include additional point layers. Each layer can have different travel time limits and destination counts for multi-criteria analysis.</div>
+  <div class="content">Optionally, click <code>+ Add Opportunities</code> to include additional opportunity layers. Each layer can have different travel time limits and destination counts for multi-criteria analysis.</div>
 </div>
 
 <div class="step">
   <div class="step-number">8</div>
+  <div class="content">Optionally, expand <code>Advanced Options</code> and select a <code>Reference Area</code> — a polygon layer that defines the full study area. When set, the heatmap extends to cover all H3 cells within that polygon, with cells outside the computed reach shown as <code>NULL</code> to expose coverage gaps and underserved areas.</div>
+</div>
+
+### Result Layer
+
+<div class="step">
+  <div class="step-number">9</div>
+  <div class="content">Set the <code>Result layer name</code> for the output heatmap layer.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">10</div>
   <div class="content">Click <code>Run</code> to start the calculation of the heatmap.</div>
 </div>
 
@@ -173,41 +145,12 @@ Heatmaps in GOAT utilize **[Uber's H3 grid-based](../../further_reading/glossary
 
 The resolution and dimensions of the hexagonal grid used depend on the selected *routing type*:
 
-<div style={{ marginLeft: '20px' }}>
-
-<Tabs>
-
-<TabItem value="walk" label="Walk" default className="tabItemBox">
-
-<li parentName="ul">{`Resolution: 10`}</li>
-<li parentName="ul">{`Average hexagon area: 11285.6 m²`}</li>
-<li parentName="ul">{`Average hexagon edge length: 65.9 m`}</li>
-</TabItem>
-  
-<TabItem value="cycling" label="Bicycle" className="tabItemBox">
-
-<li parentName="ul">{`Resolution: 9`}</li>
-<li parentName="ul">{`Average hexagon area: 78999.4 m²`}</li>
-<li parentName="ul">{`Average hexagon edge length: 174.4 m`}</li>
-</TabItem>
-
-<TabItem value="pedelec" label="Pedelec" className="tabItemBox">
-
-<li parentName="ul">{`Resolution: 9`}</li>
-<li parentName="ul">{`Average hexagon area: 78999.4 m²`}</li>
-<li parentName="ul">{`Average hexagon edge length: 174.4 m`}</li> 
-</TabItem>
-
-<TabItem value="car" label="Car" className="tabItemBox">
-
-<li parentName="ul">{`Resolution: 8`}</li>
-<li parentName="ul">{`Average hexagon area: 552995.7 m²`}</li>
-<li parentName="ul">{`Average hexagon edge length: 461.4 m`}</li>
-
-</TabItem>
-
-</Tabs>
-</div>
+| Mode | Resolution | Average hexagon area | Average hexagon edge length |
+|------|-----------|----------------------|-----------------------------|
+| Walk | 10 | 11,285.6 m² | 65.9 m |
+| Bicycle | 9 | 78,999.4 m² | 174.4 m |
+| Pedelec | 9 | 78,999.4 m² | 174.4 m |
+| Car | 8 | 552,995.7 m² | 461.4 m |
 
 
 :::tip Hint

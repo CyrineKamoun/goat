@@ -37,7 +37,38 @@ import TabItem from '@theme/TabItem';
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Under <code>Appearance</code>, set the <code>Popup position</code> (<code>In place</code> or <code>Fixed</code>), and toggle <code>Show layer name header</code> and <code>Highlight active feature</code> as needed.</div>
+  <div class="content">Under <code>Appearance</code>, configure the following options:
+  <ul>
+    <li><code>Layout</code>: choose <code>Popup</code> or <code>Pinned</code></li>
+    <li><code>Width</code>: set a fixed width in px, or leave as <code>Auto</code></li>
+    <li><code>Max height</code>: set a maximum height in px to enable scrolling for long content</li>
+    <li><code>Header</code>: choose <code>Standard</code>, <code>Compact</code>, or <code>None</code></li>
+    <li><code>Highlight active feature</code>: toggle to highlight the selected feature on the map</li>
+  </ul>
+  </div>
+</div>
+
+## HTML mode
+
+For full control over the popup design, switch to **HTML** mode under `Content`. This lets you write custom HTML and CSS to create rich, branded popups — with images, styled cards, custom fonts, and dynamic field values.
+
+<div class="step">
+  <div class="step-number">1</div>
+  <div class="content">Under <code>Content</code>, click the <code>HTML</code> tab.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">2</div>
+  <div class="content">Click <code>Edit</code> to open the HTML editor and write your custom markup.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Use <code>{"{{field_name}}"}</code> placeholders to inject feature attribute values dynamically into your HTML.</div>
+</div>
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
+  <img src={require('/img/map/styling/popup_html.webp').default} alt="Custom HTML popup in GOAT" style={{ maxHeight: "400px", maxWidth: "100%", objectFit: "cover"}}/>
 </div>
 
 ## Best practices

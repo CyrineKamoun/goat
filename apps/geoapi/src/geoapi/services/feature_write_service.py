@@ -332,7 +332,9 @@ class FeatureWriteService:
         values: list[Any] = []
 
         if geometry and geometry_column:
-            set_clauses.append(f'"{geometry_column}" = ST_MakeValid(ST_GeomFromGeoJSON(?))')
+            set_clauses.append(
+                f'"{geometry_column}" = ST_MakeValid(ST_GeomFromGeoJSON(?))'
+            )
             values.append(json.dumps(geometry))
 
         for col_name, col_value in properties.items():
@@ -434,32 +436,26 @@ class FeatureWriteService:
     # --- Column Management ---
 
     def get_column_names(self, layer_info: LayerInfo) -> list[str]:
-        """Get current column names for a layer."""
+        """Get current column names for a layer.
+
+        DESCRIBE loads only this table's metadata; information_schema.columns
+        would lazily load every table in the catalog to answer.
+        """
         with ducklake_write_manager.connection() as con:
             result = con.execute(
-                f"""
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_catalog = 'lake'
-                AND table_schema = '{layer_info.schema_name}'
-                AND table_name = '{layer_info.table_name}'
-                ORDER BY ordinal_position
-                """
+                f'DESCRIBE lake."{layer_info.schema_name}"."{layer_info.table_name}"'
             ).fetchall()
             return [row[0] for row in result]
 
     def get_column_types(self, layer_info: LayerInfo) -> dict[str, str]:
-        """Get column name -> data_type mapping for a layer."""
+        """Get column name -> data_type mapping for a layer.
+
+        DESCRIBE loads only this table's metadata; information_schema.columns
+        would lazily load every table in the catalog to answer.
+        """
         with ducklake_write_manager.connection() as con:
             result = con.execute(
-                f"""
-                SELECT column_name, data_type
-                FROM information_schema.columns
-                WHERE table_catalog = 'lake'
-                AND table_schema = '{layer_info.schema_name}'
-                AND table_name = '{layer_info.table_name}'
-                ORDER BY ordinal_position
-                """
+                f'DESCRIBE lake."{layer_info.schema_name}"."{layer_info.table_name}"'
             ).fetchall()
             return {row[0]: row[1] for row in result}
 

@@ -51,6 +51,46 @@ DEFAULT_H3_RESOLUTION: dict[RoutingMode, int] = {
     RoutingMode.bicycle: 9,
     RoutingMode.pedelec: 9,
     RoutingMode.car: 8,
+    RoutingMode.pt: 9,
+}
+
+# PT access/egress lookup tables are precomputed per mode at a fixed H3
+# resolution and built max-time, named `accessegress_{mode}_r{res}_{max}min`
+# and stored beside the nigiri timetable (gtfs.bin). The runtime
+# access/egress max-time params filter rows from these tables; they cannot
+# exceed the built max. RoutingMode → table mode-name follows the precompute
+# tool's CLI (walking is spelled "walk").
+_PT_ACCESSEGRESS_RES = 9
+_PT_ACCESSEGRESS_MAX_MIN = 20
+
+# PT connectivity rasterizes the reference area to H3 cells, and each cell is a
+# reverse-RAPTOR group — so the cell count (≈ AOI area / cell area) drives cost.
+# The resolution is therefore chosen *dynamically* from the AOI's area: the
+# finest resolution whose estimated cell count stays under the target. Small
+# AOIs land at res-9 (== the egress-lookup resolution, so no coarsening at all);
+# larger AOIs step coarser to keep the RAPTOR run count bounded. The same chosen
+# resolution is used both to rasterize (here) and to key the C++ output cells
+# (cfg.connectivity_output_resolution), so opportunity and output cells align.
+_PT_CONNECTIVITY_MIN_RES = 8   # coarsest (large AOI)
+_PT_CONNECTIVITY_MAX_RES = 9   # finest (== egress-lookup res; small AOI)
+_PT_CONNECTIVITY_TARGET_CELLS = 6000  # headroom under MAX_OPPORTUNITIES_PER_LAYER
+
+# Average H3 cell area (m²) by resolution — used to size the AOI raster.
+_H3_CELL_AREA_M2: dict[int, float] = {
+    8: 737_327.0,
+    9: 105_332.0,
+}
+_PT_TABLE_MODE_NAME: dict[RoutingMode, str] = {
+    RoutingMode.walking: "walk",
+    RoutingMode.bicycle: "bicycle",
+    RoutingMode.pedelec: "pedelec",
+    RoutingMode.car: "car",
+}
+_PT_TABLE_MODE_NAME: dict[RoutingMode, str] = {
+    RoutingMode.walking: "walk",
+    RoutingMode.bicycle: "bicycle",
+    RoutingMode.pedelec: "pedelec",
+    RoutingMode.car: "car",
 }
 
 # Hard cap on opportunity points per layer (and on AOI cells synthesised
@@ -82,6 +122,21 @@ class HeatmapV2Tool(HeatmapToolBase):
         super().__init__()
         self._edge_dir = settings.routing.street_network_edges_base_path
         self._node_dir = settings.routing.street_network_nodes_base_path
+        # PT: the nigiri timetable and the per-mode access/egress lookup
+        # tables live in the same directory (gtfs.bin's parent).
+        self._timetable_path = str(settings.routing.pt_network_base_path)
+        self._pt_network_dir = str(Path(self._timetable_path).parent)
+
+    def _accessegress_table_path(self: Self, mode: RoutingMode) -> str:
+        """Resolve the precomputed access/egress lookup parquet for a mode."""
+        name = _PT_TABLE_MODE_NAME.get(mode)
+        if name is None:
+            raise ValueError(f"Unsupported PT access/egress mode: {mode}")
+        fname = (
+            f"accessegress_{name}_r{_PT_ACCESSEGRESS_RES}"
+            f"_{_PT_ACCESSEGRESS_MAX_MIN}min.parquet"
+        )
+        return str(Path(self._pt_network_dir) / fname)
 
     # --------------------------------------------------------- opportunities
 
@@ -203,6 +258,7 @@ class HeatmapV2Tool(HeatmapToolBase):
             RoutingMode.bicycle: routing.RoutingMode.Bicycle,
             RoutingMode.pedelec: routing.RoutingMode.Pedelec,
             RoutingMode.car: routing.RoutingMode.Car,
+            RoutingMode.pt: routing.RoutingMode.PublicTransport,
         }
         htype_map = {
             HeatmapType.gravity: routing.HeatmapType.Gravity,
@@ -243,18 +299,91 @@ class HeatmapV2Tool(HeatmapToolBase):
         cfg.max_sensitivity = params.max_sensitivity
         cfg.closest_k = closest_k
         cfg.output_path = output_path
+
+        # PT: arrive-by reverse RAPTOR + precomputed access/egress lookup
+        # tables. max_cost here is the total journey budget (minutes). The
+        # timetable and per-mode lookup tables are resolved from settings
+        # (mirrors how catchment v2 resolves its timetable).
+        if params.routing_mode == RoutingMode.pt:
+            if params.arrival_time is None:
+                raise ValueError("PT heatmap requires an arrival_time.")
+            cfg.timetable_path = self._timetable_path
+            cfg.arrival_time = int(params.arrival_time)
+            cfg.max_transfers = params.max_transfers
+            cfg.transit_modes = list(params.transit_modes or [])
+            cfg.access_mode = routing_mode_map[params.access_mode]
+            cfg.egress_mode = routing_mode_map[params.egress_mode]
+            cfg.access_max_time = params.access_max_time
+            cfg.egress_max_time = params.egress_max_time
+            cfg.access_table_path = self._accessegress_table_path(
+                params.access_mode
+            )
+            cfg.egress_table_path = self._accessegress_table_path(
+                params.egress_mode
+            )
+            # Connectivity keys its output at the same resolution the AOI was
+            # rasterized to (chosen dynamically in _resolve_opportunity_layers),
+            # so the C++ output cells align with the opportunity cells.
+            cfg.connectivity_output_resolution = getattr(
+                self, "_pt_connectivity_res", _PT_CONNECTIVITY_MAX_RES
+            )
+
         return cfg
 
     # ----------------------- connectivity helpers ----------------------------
 
+    def _pick_pt_connectivity_resolution(
+        self: Self,
+        aoi_table: str,
+        aoi_meta: object,
+    ) -> int:
+        """Choose the finest H3 resolution whose estimated AOI cell count stays
+        under the target, so PT connectivity's per-cell reverse-RAPTOR run count
+        is bounded and scales with the reference area.
+
+        Probes at the coarsest resolution (cheap even for huge AOIs) and
+        extrapolates the finer-resolution counts by H3 cell area.
+        """
+        probe = self._process_table_to_h3(
+            aoi_table, aoi_meta, _PT_CONNECTIVITY_MIN_RES,
+            "aoi_probe", h3_column="probe_cell",
+        )
+        n_probe = self.con.execute(f"SELECT COUNT(*) FROM {probe}").fetchone()[0]
+        if not n_probe:
+            return _PT_CONNECTIVITY_MAX_RES
+        area_m2 = n_probe * _H3_CELL_AREA_M2[_PT_CONNECTIVITY_MIN_RES]
+        chosen = _PT_CONNECTIVITY_MIN_RES
+        for res in range(_PT_CONNECTIVITY_MIN_RES + 1, _PT_CONNECTIVITY_MAX_RES + 1):
+            if area_m2 / _H3_CELL_AREA_M2[res] <= _PT_CONNECTIVITY_TARGET_CELLS:
+                chosen = res
+            else:
+                break
+        logger.info(
+            "[Heatmap] PT connectivity: AOI ~%.0f km² → res-%d "
+            "(~%d cells; probe %d cells @res-%d)",
+            area_m2 / 1e6, chosen,
+            round(area_m2 / _H3_CELL_AREA_M2[chosen]), n_probe,
+            _PT_CONNECTIVITY_MIN_RES,
+        )
+        return chosen
+
     def _rasterize_aoi_to_opportunities(
         self: Self,
         reference_area_path: str,
-        h3_resolution: int,
-    ) -> list[tuple[float, float, float]]:
-        """Rasterize reference AOI polygon to H3 cells; return centroid points in EPSG:3857 with weight=1.0."""
+        h3_resolution: int | None,
+    ) -> tuple[list[tuple[float, float, float]], int]:
+        """Rasterize reference AOI polygon to H3 cells.
+
+        Returns (centroid points in EPSG:3857 with weight=1.0, resolution used).
+        When ``h3_resolution`` is None the resolution is chosen dynamically from
+        the AOI area (PT connectivity); otherwise the given fixed resolution is
+        used (street connectivity).
+        """
         # Register the AOI
         aoi_meta, aoi_table = self.import_input(reference_area_path, table_name="aoi_input")
+
+        if h3_resolution is None:
+            h3_resolution = self._pick_pt_connectivity_resolution(aoi_table, aoi_meta)
 
         # Convert to H3 cells (parent helper)
         aoi_cells_table = self._process_table_to_h3(
@@ -279,7 +408,7 @@ class HeatmapV2Tool(HeatmapToolBase):
             "Rasterized AOI to %d H3 cells at resolution %d",
             len(rows), h3_resolution,
         )
-        return [(float(x), float(y), 1.0) for x, y in rows]
+        return [(float(x), float(y), 1.0) for x, y in rows], h3_resolution
 
     # ----------------------- opportunity-layer resolution -------------------
 
@@ -293,10 +422,21 @@ class HeatmapV2Tool(HeatmapToolBase):
         that layer's compute_heatmap call.
         """
         if params.heatmap_type == HeatmapType.connectivity:
-            h3_res = DEFAULT_H3_RESOLUTION[params.routing_mode]
-            opp_points = self._rasterize_aoi_to_opportunities(
-                params.reference_area_path, h3_res
+            # PT connectivity picks its rasterization resolution dynamically from
+            # the AOI area (h3_resolution=None) so the per-cell reverse-RAPTOR run
+            # count stays bounded; street uses the fixed per-mode default. The
+            # chosen PT resolution is stashed for _build_heatmap_cfg so the C++
+            # output cells key at the same resolution.
+            fixed_res = (
+                None
+                if params.routing_mode == RoutingMode.pt
+                else DEFAULT_H3_RESOLUTION[params.routing_mode]
             )
+            opp_points, used_res = self._rasterize_aoi_to_opportunities(
+                params.reference_area_path, fixed_res
+            )
+            if params.routing_mode == RoutingMode.pt:
+                self._pt_connectivity_res = used_res
             if not opp_points:
                 raise ValueError(
                     "The reference area is empty or invalid. "
@@ -337,9 +477,11 @@ class HeatmapV2Tool(HeatmapToolBase):
                     "Filter the layer or pick a smaller dataset."
                 )
             label = self._opportunity_label(opp, idx)
-            sensitivity = opp.sensitivity or 300000.0
+            # OpportunityV2 declares both fields with validated defaults, so
+            # read them directly (no fallback needed).
+            sensitivity = opp.sensitivity
             layer_max_cost = float(opp.max_cost)
-            n_destinations = getattr(opp, "n_destinations", 1)
+            n_destinations = opp.n_destinations
             layers.append((label, opp_points, sensitivity, layer_max_cost, n_destinations))
         return layers
 
@@ -419,22 +561,36 @@ class HeatmapV2Tool(HeatmapToolBase):
     # ----------------------------------------------------------- join across layers
 
     def _join_layer_scores(
-        self: Self, score_tables: list[tuple[str, str]]
+        self: Self,
+        score_tables: list[tuple[str, str]],
+        heatmap_type: HeatmapType,
     ) -> str:
-        """FULL OUTER JOIN the per-layer score tables on h3_index. Missing
-        per-layer scores COALESCE to 0; total_accessibility = sum across
-        layers (rounded). Materialises `heatmap_v2_results` and returns the
-        table name."""
+        """FULL OUTER JOIN the per-layer score tables on h3_index into
+        total_accessibility. Gravity totals are a sum (cells not reaching every
+        layer are dropped); closest-average totals are the mean of reached
+        layers' costs. Unreached layers stay NULL. Materialises
+        `heatmap_v2_results`."""
         select_cols = ", ".join(
-            f"COALESCE(s{idx}.{col}_accessibility, 0.0) AS {col}_accessibility"
+            f"s{idx}.{col}_accessibility AS {col}_accessibility"
             for idx, (col, _) in enumerate(score_tables)
         )
-        total_expr = " + ".join(
-            f"COALESCE(s{idx}.{col}_accessibility, 0.0)"
+        sum_expr = " + ".join(
+            f"s{idx}.{col}_accessibility"
             for idx, (col, _) in enumerate(score_tables)
         )
-        # Build a left-deep FULL OUTER JOIN chain; each successive table
-        # joins ON its h3_index equaling COALESCE(s0.h3_index, …, s_{i-1}.h3_index).
+        if heatmap_type == HeatmapType.closest_average:
+            cnt_expr = " + ".join(
+                f"(s{idx}.{col}_accessibility IS NOT NULL)::INT"
+                for idx, (col, _) in enumerate(score_tables)
+            )
+            total_select = (
+                f"ROUND(({sum_expr}) / NULLIF({cnt_expr}, 0), 2) AS total_accessibility"
+            )
+            drop_null_total = False
+        else:
+            total_select = f"ROUND({sum_expr}, 2) AS total_accessibility"
+            drop_null_total = True
+
         from_clause = f"{score_tables[0][1]} s0"
         for i in range(1, len(score_tables)):
             prev_coalesce = "COALESCE(" + ", ".join(
@@ -448,15 +604,17 @@ class HeatmapV2Tool(HeatmapToolBase):
             f"s{idx}.h3_index" for idx in range(len(score_tables))
         ) + ")"
 
+        inner_select = (
+            f"SELECT {h3_coalesce} AS h3_index, {select_cols}, {total_select} "
+            f"FROM {from_clause}"
+        )
+        body = (
+            f"SELECT * FROM ({inner_select}) WHERE total_accessibility IS NOT NULL"
+            if drop_null_total
+            else inner_select
+        )
         self.con.execute(
-            f"""
-            CREATE OR REPLACE TEMP TABLE heatmap_v2_results AS
-            SELECT
-                {h3_coalesce} AS h3_index,
-                {select_cols},
-                ROUND({total_expr}, 2) AS total_accessibility
-            FROM {from_clause}
-            """
+            f"CREATE OR REPLACE TEMP TABLE heatmap_v2_results AS {body}"
         )
         return "heatmap_v2_results"
 
@@ -517,7 +675,9 @@ class HeatmapV2Tool(HeatmapToolBase):
                 score_tables.append((col, table))
             last_t = time.perf_counter()  # per-layer prints already accounted for time
 
-            results_table = self._join_layer_scores(score_tables)
+            results_table = self._join_layer_scores(
+                score_tables, params.heatmap_type
+            )
             n_cells = self.con.execute(
                 f"SELECT count(*) FROM {results_table}"
             ).fetchone()[0]

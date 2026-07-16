@@ -1,7 +1,5 @@
 # Standard library imports
 import asyncio
-import json
-import math
 import os
 import random
 import re
@@ -12,27 +10,19 @@ import time
 import zipfile
 from functools import wraps
 from typing import Any, AsyncIterator, Callable, TypeVar, cast
-from uuid import UUID
 
 import aiohttp
 
 # Third party imports
-import numpy as np
 from fastapi import UploadFile
 from geoalchemy2.shape import to_shape
 from geojson import Feature, FeatureCollection
 from geojson import loads as geojsonloads
-from numba import njit
-from numpy.typing import NDArray
-from pydantic import BaseModel
-from pygeofilter.backends.sql import to_sql_where
-from pygeofilter.parsers.cql2_json import parse as cql2_json_parser
 from rich import print as print
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.core.config import settings
-from core.schemas.common import CQLQuery, CQLQueryObject
 from core.utils.partial import optional  # canonical single impl (re-exported)
 
 
@@ -46,194 +36,6 @@ async def table_exists(db: AsyncSession, schema_name: str, table_name: str) -> b
     table_exists = await db.execute(sql_check_table, params)
     result = table_exists.scalar()
     return result is not None and result > 0
-
-
-def encode_r5_grid(grid_data: Any) -> bytes:
-    """
-    Encode raster grid data
-    """
-    grid_type = "ACCESSGR"
-    grid_type_binary = str.encode(grid_type)
-    array = np.array(
-        [
-            grid_data["version"],
-            grid_data["zoom"],
-            grid_data["west"],
-            grid_data["north"],
-            grid_data["width"],
-            grid_data["height"],
-            grid_data["depth"],
-        ],
-        dtype=np.int32,
-    )
-    header_bin = array.tobytes()
-    # - reshape the data
-    grid_size = grid_data["width"] * grid_data["height"]
-    if len(grid_data["data"]) == 0:
-        data = np.array([], dtype=np.int32)
-    else:
-        data = grid_data["data"].reshape(grid_data["depth"], grid_size)
-        reshaped_data = np.array([])
-        for i in range(grid_data["depth"]):
-            reshaped_data = np.append(reshaped_data, np.diff(data[i], prepend=0))
-        data = reshaped_data.astype(np.int32)
-    z_diff_bin = data.tobytes()
-
-    # - encode metadata
-    metadata = {
-        "accessibility": grid_data.get("accessibility", {}),
-        "errors": grid_data.get("errors", []),
-        "warnings": grid_data.get("warnings", []),
-        "pathSummaries": grid_data.get("pathSummaries", []),
-        "scenarioApplicationWarnings": grid_data.get("scenarioApplicationWarnings", []),
-        "scenarioApplicationInfo": grid_data.get("scenarioApplicationInfo", []),
-    }
-    metadata_bin = json.dumps(metadata).encode("utf-8")
-
-    binary_output = b"".join([grid_type_binary, header_bin, z_diff_bin, metadata_bin])
-    return binary_output
-
-
-def decode_r5_grid(grid_data_buffer: bytes) -> dict[str, Any]:
-    """
-    Decode R5 grid data
-    """
-    current_version = 0
-    header_entries = 7
-    header_length = 9  # type + entries
-    times_grid_type = "ACCESSGR"
-
-    # -- PARSE HEADER
-    ## - get header type
-    header = {}
-    header_data = np.frombuffer(grid_data_buffer, count=8, dtype=np.byte)
-    header_type = "".join(map(chr, header_data))
-    if header_type != times_grid_type:
-        raise ValueError("Invalid grid type")
-    ## - get header data
-    header_raw = np.frombuffer(
-        grid_data_buffer, count=header_entries, offset=8, dtype=np.int32
-    )
-    version = header_raw[0]
-    if version != current_version:
-        raise ValueError("Invalid grid version")
-    header["zoom"] = header_raw[1]
-    header["west"] = header_raw[2]
-    header["north"] = header_raw[3]
-    header["width"] = header_raw[4]
-    header["height"] = header_raw[5]
-    header["depth"] = header_raw[6]
-    header["version"] = version
-
-    # -- PARSE DATA --
-    grid_size = header["width"] * header["height"]
-    # - skip the header
-    data = np.frombuffer(
-        grid_data_buffer,
-        offset=header_length * 4,
-        count=grid_size * header["depth"],
-        dtype=np.int32,
-    )
-    # - reshape the data
-    data = data.reshape(header["depth"], grid_size)
-    reshaped_data = np.array([], dtype=np.int32)
-    for i in range(header["depth"]):
-        reshaped_data = np.append(reshaped_data, data[i].cumsum())
-    data = reshaped_data
-    # - decode metadata
-    raw_metadata = np.frombuffer(
-        grid_data_buffer,
-        offset=(header_length + header["width"] * header["height"] * header["depth"])
-        * 4,
-        dtype=np.int8,
-    )
-    metadata = json.loads(raw_metadata.tobytes())
-
-    return dict(header | metadata | {"data": data, "errors": [], "warnings": []})
-
-
-def compute_r5_surface(
-    grid: dict[str, Any], percentile: int
-) -> NDArray[np.uint16] | None:
-    """
-    Compute single value surface from the grid
-    """
-    if (
-        grid["data"] is None
-        or grid["width"] is None
-        or grid["height"] is None
-        or grid["depth"] is None
-    ):
-        return None
-    travel_time_percentiles = [5, 25, 50, 75, 95]
-    percentile_index = travel_time_percentiles.index(percentile)
-
-    if grid["depth"] == 1:
-        # if only one percentile is requested, return the grid as is
-        surface: NDArray[Any] = grid["data"]
-    else:
-        grid_percentiles = np.reshape(grid["data"], (grid["depth"], -1))
-        surface = grid_percentiles[percentile_index]
-
-    return surface.astype(np.uint16)
-
-
-@njit(cache=True)
-def z_scale(z: int) -> int:
-    """
-    2^z represents the tile number. Scale that by the number of pixels in each tile.
-    """
-    pixels_per_tile = 256
-    return int(2**z * pixels_per_tile)
-
-
-@njit(cache=True)
-def pixel_to_longitude(pixel_x: float, zoom: int) -> float:
-    """
-    Convert pixel x coordinate to longitude
-    """
-    return float((pixel_x / z_scale(zoom)) * 360 - 180)
-
-
-@njit(cache=True)
-def pixel_to_latitude(pixel_y: float, zoom: int) -> float:
-    """
-    Convert pixel y coordinate to latitude
-    """
-    lat_rad = math.atan(math.sinh(math.pi * (1 - (2 * pixel_y) / z_scale(zoom))))
-    return lat_rad * 180 / math.pi
-
-
-@njit(cache=True)
-def pixel_x_to_web_mercator_x(x: float, zoom: int) -> float:
-    return float(x * (40075016.68557849 / (z_scale(zoom))) - (40075016.68557849 / 2.0))
-
-
-@njit(cache=True)
-def pixel_y_to_web_mercator_y(y: float, zoom: int) -> float:
-    return float(
-        y * (40075016.68557849 / (-1 * z_scale(zoom))) + (40075016.68557849 / 2.0)
-    )
-
-
-@njit(cache=True)
-def coordinate_from_pixel(
-    input: list[float], zoom: int, round_int: bool = False, web_mercator: bool = False
-) -> list[float]:
-    """
-    Convert pixel coordinate to longitude and latitude
-    """
-    if web_mercator:
-        x = pixel_x_to_web_mercator_x(input[0], zoom)
-        y = pixel_y_to_web_mercator_y(input[1], zoom)
-    else:
-        x = pixel_to_longitude(input[0], zoom)
-        y = pixel_to_latitude(input[1], zoom)
-    if round_int:
-        x = round(x)
-        y = round(y)
-
-    return [x, y]
 
 
 def delete_file(file_path: str) -> None:
@@ -437,55 +239,6 @@ def get_result_column(
     else:
         # If the base name and no numbered variants were found, return the base name
         return {mapped_column: base_column_name}
-
-
-def build_where(
-    id: UUID,
-    table_name: str,
-    query: None | str | CQLQueryObject,
-    attribute_mapping: dict[str, Any],
-    return_basic_filter: bool = True,
-) -> str | None:
-    """Builds a PostgreSQL WHERE clause based on a CQL query and layer ID."""
-
-    if query is None:
-        if return_basic_filter:
-            return f"{table_name}.layer_id = '{str(id)}'"
-        return None
-    else:
-        if isinstance(query, str):
-            query_dict = {"cql": json.loads(query)}
-        else:
-            query_dict = {"cql": query.cql}
-
-        query_obj = CQLQuery(query=query_dict)
-        assert query_obj.query is not None
-        ast = cql2_json_parser(query_obj.query.cql)
-        attribute_mapping = {value: key for key, value in attribute_mapping.items()}
-        # Add id to attribute mapping
-        attribute_mapping["id"] = "id"
-        attribute_mapping["geometry"] = "geom"
-        attribute_mapping["geom"] = "geom"
-        where = f"{table_name}.layer_id = '{str(id)}' AND "
-        converted_cql = to_sql_where(ast, attribute_mapping)
-        converted_cql = re.sub(r'(?<=\(|\s|,)"', f'{table_name}."', converted_cql)
-        # Fixing issue with pygeofilter https://github.com/geopython/pygeofilter/pull/54
-        converted_cql = converted_cql.replace(
-            "ST_GeomFromWKB(x'", "ST_GeomFromWKB(E'\\\\x"
-        )
-        # Add SRID to ST_GeomFromWKB otherwise it will be 0 and operations won't work
-        converted_cql = re.sub(
-            r"(ST_GeomFromWKB\((.*?)\))", r"ST_SetSRID(\1, 4326)", converted_cql
-        )
-        where = where + converted_cql
-        # Cast all columns subject to a likeliness check to TEXT, ensuring it succeeds
-        where = re.sub(
-            r'("([^"]*)")(?=\s+LIKE)',
-            r"\1::TEXT",
-            where,
-        )
-        where = where.replace("LIKE", "ILIKE")
-        return where
 
 
 def build_where_clause(queries: list[str]) -> str:

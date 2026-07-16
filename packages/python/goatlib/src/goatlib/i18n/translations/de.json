@@ -287,6 +287,14 @@
       "label": "Endzeit",
       "description": "Ende des Analysezeitraums"
     },
+    "arrival_time": {
+      "label": "Ankunftszeit",
+      "description": "Uhrzeit, bis zu der die Fahrt ankommen soll. Jede Zelle wird anhand der besten ÖV-Fahrt bewertet, die die Gelegenheiten bis zu dieser Zeit erreicht."
+    },
+    "time_limit": {
+      "label": "Zeitlimit (Min.)",
+      "description": "Maximale Reisezeit in Minuten"
+    },
     "catchment_type": {
       "label": "Einzugsgebietstyp",
       "description": "Methode zur Berechnung der Einzugsgebiete"

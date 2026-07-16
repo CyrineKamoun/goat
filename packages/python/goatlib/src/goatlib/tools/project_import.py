@@ -298,6 +298,39 @@ class ProjectImportRunner(SimpleToolRunner):
             remapped = self._remap_group_ids_in_config(remapped, group_id_map)
         return remapped  # type: ignore[no-any-return]
 
+    def _remap_basemap_layer_config(
+        self: Self,
+        custom_basemaps: list[dict[str, Any]],
+        lp_id_map: dict[int, int],
+    ) -> list[dict[str, Any]]:
+        """Rewrite custom_basemaps layer_config targets to new link IDs.
+
+        A vector basemap's `layer_config` entries carry a `target` that is
+        either "all" or a layer_project link ID (as a string). Link IDs are
+        regenerated on import, so a non-"all" target is remapped via lp_id_map;
+        an unmapped target falls back to "all". Mirrors the project-copy path
+        (`crud_project_copy._remap_basemap_layer_config`).
+        """
+        remapped: list[dict[str, Any]] = []
+        for basemap in custom_basemaps:
+            config = basemap.get("layer_config")
+            if not config:
+                remapped.append(basemap)
+                continue
+            new_config: dict[str, Any] = {}
+            for layer_key, setting in config.items():
+                target = setting.get("target", "all")
+                if target != "all":
+                    try:
+                        old_id = int(target)
+                    except (TypeError, ValueError):
+                        old_id = None
+                    new_id = lp_id_map.get(old_id) if old_id is not None else None
+                    target = str(new_id) if new_id is not None else "all"
+                new_config[layer_key] = {**setting, "target": target}
+            remapped.append({**basemap, "layer_config": new_config})
+        return remapped
+
     def _remap_group_ids_in_config(
         self: Self,
         node: Any,
@@ -329,12 +362,12 @@ class ProjectImportRunner(SimpleToolRunner):
                         value, group_id_map
                     )
                 else:
-                    new_dict[key] = self._remap_group_ids_in_config(
-                        value, group_id_map
-                    )
+                    new_dict[key] = self._remap_group_ids_in_config(value, group_id_map)
             return new_dict
         if isinstance(node, list):
-            return [self._remap_group_ids_in_config(item, group_id_map) for item in node]
+            return [
+                self._remap_group_ids_in_config(item, group_id_map) for item in node
+            ]
         return node
 
     @staticmethod
@@ -493,9 +526,10 @@ class ProjectImportRunner(SimpleToolRunner):
                     f"""
                     INSERT INTO {schema}.project
                         (id, user_id, folder_id, name, description, basemap,
-                         max_extent, tags, created_at, updated_at)
+                         custom_basemaps, max_extent, tags,
+                         created_at, updated_at)
                     VALUES
-                        ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+                        ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
                     """,
                     uuid.UUID(new_project_id),
                     uuid.UUID(new_user_id),
@@ -503,6 +537,7 @@ class ProjectImportRunner(SimpleToolRunner):
                     project_data.name,
                     project_data.description,
                     project_data.basemap,
+                    project_data.custom_basemaps or [],
                     project_data.max_extent,
                     project_data.tags,
                 )
@@ -703,9 +738,7 @@ class ProjectImportRunner(SimpleToolRunner):
                 # 4c. Update builder_config with remapped layer_project IDs
                 # and remapped group IDs (the latter affects widget keys like
                 # `group_icon_<id>` and `group_info` dictionaries).
-                needs_remap = bool(layer_project_id_map) or bool(
-                    group_old_int_to_new
-                )
+                needs_remap = bool(layer_project_id_map) or bool(group_old_int_to_new)
                 if project_data.builder_config and needs_remap:
                     remapped_config = self._remap_builder_config(
                         project_data.builder_config,
@@ -715,6 +748,22 @@ class ProjectImportRunner(SimpleToolRunner):
                     await conn.execute(
                         f"UPDATE {schema}.project SET builder_config = $1 WHERE id = $2",
                         remapped_config,
+                        uuid.UUID(new_project_id),
+                    )
+
+                # 4d. Remap custom_basemaps layer_config targets. A vector
+                # basemap's per-layer settings can target a layer_project link
+                # ID, which is regenerated on import — rewrite it the same way
+                # builder_config references are rewritten. The basemaps were
+                # already inserted (step 1) so a solid/raster library survives
+                # even when there are no links to remap.
+                if project_data.custom_basemaps and layer_project_id_map:
+                    remapped_basemaps = self._remap_basemap_layer_config(
+                        project_data.custom_basemaps, layer_project_id_map
+                    )
+                    await conn.execute(
+                        f"UPDATE {schema}.project SET custom_basemaps = $1 WHERE id = $2",
+                        remapped_basemaps,
                         uuid.UUID(new_project_id),
                     )
 

@@ -57,8 +57,8 @@ When one target feature matches multiple features in the Join Layer, the result 
 
 A Spatial Join links features based on their geometric relationship — no shared field is needed. Each feature in the Target Layer is matched to features in the Join Layer that satisfy the selected spatial relationship.
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/data_management/join/spatial_relationships.png').default} alt="Spatial Relationship Types" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: "32px", marginBottom: "32px" }}>
+  <img src={require('/img/toolbox/data_management/join/spatial_relationships.png').default} alt="Spatial Relationship Types" style={{ maxHeight: "auto", maxWidth: "70%", objectFit: "cover"}}/>
 </div>
 
 **Available spatial relationships:**
@@ -175,7 +175,13 @@ In this example, population data is joined to Berlin districts using both condit
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Optionally, enable <code>Add Join Fields</code> to select which fields from the Join Layer to include in the output, and/or enable <code>Calculate Statistics</code> to compute aggregated values for matched features.</div>
+  <div class="content">Optionally, enable <code>Add Join Fields</code> to select which fields from the Join Layer to include in the output, and/or enable <code>Calculate Statistics</code> to compute aggregated values when multiple Join Layer records match a single Target Layer feature. When <code>Calculate Statistics</code> is enabled, configure the statistic:
+  <ul>
+    <li><code>Select operation</code> — choose one of: <code>Count</code>, <code>Sum</code>, <code>Min</code>, <code>Max</code>, <code>Mean</code>, or <code>Standard Deviation</code>.</li>
+    <li><code>Select field</code> — choose the numeric field from the Join Layer to aggregate (hidden when operation is <code>Count</code>).</li>
+    <li><code>Result column name</code> (optional) — name for the output column. Leave empty to use the default name (e.g. <code>count</code> or <code>fieldname_operation</code>).</li>
+  </ul>
+  </div>
 </div>
 
 <div class="step">

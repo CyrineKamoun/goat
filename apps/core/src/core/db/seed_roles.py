@@ -492,9 +492,9 @@ RESOURCES_PERMISSIONS = [
         "plan_names": ["goat_professional", "goat_enterprise"],
     },
     # ---------------------------------------------------------------
-    # White-label: organization-level analytics configuration + per-project
-    # tracking opt-in. Read is org-wide; mutations require update-organization.
-    # The per-project tracking toggle gates on project ownership instead.
+    # White-label: organization analytics instances + per-project tracking
+    # opt-in. Reads are org-wide; mutations require update-organization. The
+    # per-project tracking selection gates on project ownership instead.
     # ---------------------------------------------------------------
     {
         "url_pattern": "organizations/{organization_id}/analytics",
@@ -503,12 +503,22 @@ RESOURCES_PERMISSIONS = [
     },
     {
         "url_pattern": "organizations/{organization_id}/analytics",
-        "method": ["PUT"],
+        "method": ["POST"],
         "permissions": ["update-organization"],
     },
     {
-        "url_pattern": "organizations/{organization_id}/analytics",
-        "method": ["DELETE"],
+        "url_pattern": "organizations/{organization_id}/analytics/{analytics_id}",
+        "method": ["PUT", "DELETE"],
+        "permissions": ["update-organization"],
+    },
+    {
+        "url_pattern": "organizations/{organization_id}/analytics/dashboards",
+        "method": ["GET"],
+        "permissions": ["read-organization"],
+    },
+    {
+        "url_pattern": "organizations/{organization_id}/analytics/{analytics_id}/dashboards",
+        "method": ["PUT"],
         "permissions": ["update-organization"],
     },
     {

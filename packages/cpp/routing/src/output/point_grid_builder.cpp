@@ -1,5 +1,7 @@
 #include "point_grid_builder.h"
 
+#include "sql_export.h"
+
 #include "../kernel/kdtree.h"
 
 #include <cmath>
@@ -23,20 +25,6 @@ struct SamplePoint
     double y;
     double cost;
 };
-
-std::string sql_escape(std::string const &s)
-{
-    std::string out;
-    out.reserve(s.size() + 8);
-    for (char c : s)
-    {
-        if (c == '\'')
-            out += "''";
-        else
-            out.push_back(c);
-    }
-    return out;
-}
 
 int64_t count_rows(duckdb::Connection &con, std::string const &table)
 {

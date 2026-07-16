@@ -19,6 +19,7 @@ for task G1 / D2.
 from __future__ import annotations
 
 import json
+import tempfile
 from contextlib import contextmanager
 from typing import Any, Generator
 from unittest.mock import patch
@@ -108,9 +109,17 @@ def _setup_db() -> tuple[duckdb.DuckDBPyConnection, LayerInfo]:
     """
     con = duckdb.connect(":memory:")
     con.execute("INSTALL spatial; LOAD spatial;")
-    # Attach a second in-memory DB as the 'lake' catalog so that
-    # three-part names (lake.<schema>.<table>) resolve correctly.
-    con.execute("ATTACH ':memory:' AS lake;")
+    con.execute("INSTALL ducklake; LOAD ducklake;")
+    # Attach a file-backed DuckLake as the 'lake' catalog so that
+    # three-part names (lake.<schema>.<table>) resolve correctly AND
+    # rowid semantics match production: DuckLake keeps logical row ids
+    # stable across UPDATEs, while a plain attached DuckDB database
+    # moves rows to new rowids on full-row rewrites (duckdb >= 1.5).
+    tmpdir = tempfile.mkdtemp(prefix="goat_test_lake_")
+    con.execute(
+        f"ATTACH 'ducklake:{tmpdir}/meta.ducklake' AS lake "
+        f"(DATA_PATH '{tmpdir}/data');"
+    )
     con.execute("CREATE SCHEMA lake.test_schema;")
     con.execute(
         """

@@ -630,7 +630,6 @@ services:
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       NEXTAUTH_URL: ${NEXTAUTH_URL}
-      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN}
       # Same AUTH flag as the backend services: NEXT_PUBLIC_AUTH is substituted
       # into the client bundle by entrypoint.sh; AUTH is read by the middleware.
       NEXT_PUBLIC_AUTH: ${AUTH:-True}

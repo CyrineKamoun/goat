@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 2
 ---
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -23,36 +23,18 @@ You can specify the **routing type**, **opportunity layer**, **travel time limit
 
 - The **Sensitivity controls how quickly accessibility decreases with increasing travel time**, while the **Destination potential lets you give more weight to destinations with higher capacity or quality** (e.g., a larger supermarket or a bus stop with more departures). Together with the chosen **Impedance function, these settings define how accessibility is calculated**.
 
+- The **Potential Type** determines how each opportunity's weight is derived: use **Constant** to apply the same value to all opportunities, or **Field** to use a numeric attribute from the input layer (e.g., number of departures, seats, or capacity).
+
 - Using **Destination potential helps prioritize certain opportunities over others**. For example, a larger but farther supermarket can be valued more than a smaller nearby one. This allows you to include qualitative information—such as size, frequency, or service level—when computing accessibility, resulting in a more realistic heatmap.
 
 Influenced by all these properties, **the accessibility of a point can model complex real-world human behavior** and is a powerful measure for transport and accessibility planning.
 
 **Key difference:** Unlike the *Closest-Average* heatmap, which measures travel effort, the *Gravity-based Heatmap* measures **attractiveness** — showing how accessible and appealing destinations are when both distance and quality are considered.
 
-import MapViewer from '@site/src/components/MapViewer';
 
-:::info 
+:::info
 
-Heatmaps are available in certain regions. Upon selecting a `Routing type`, a **geofence** will be displayed on the map to highlight supported regions.
-
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <MapViewer
-      geojsonUrls={[
-        "https://assets.plan4better.de/other/geofence/geofence_heatmap.geojson"
-      ]}
-      styleOptions={{
-        fillColor: "#808080",
-        outlineColor: "#808080",
-        fillOpacity: 0.8
-      }}
-      legendItems={[
-        { label: "Coverage for Gravity-based Heatmaps", color: "#ffffff" }
-      ]}
-  />
-</div> 
-
-
-If you would like to perform analyses beyond this geofence, feel free to [contact us](https://plan4better.de/en/contact/ "Contact us"). We would be happy to discuss further options.
+Heatmap computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/) and we'll discuss further options.
 
 :::
 
@@ -82,36 +64,15 @@ If you would like to perform analyses beyond this geofence, feel free to [contac
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Pick the <code>Routing Type</code> you would like to use for the heatmap.</div>
+  <div class="content">Pick the <code>Transport mode</code> you would like to use for the heatmap.</div>
 </div>
 
-<Tabs>
-
-<TabItem value="walk" label="Walk" default className="tabItemBox">
-
-**Considers all paths accessible by foot**. For heatmaps, a walking speed of 5 km/h is assumed.
-
-</TabItem>
-  
-<TabItem value="cycling" label="Bicycle" className="tabItemBox">
-
-**Considers all paths accessible by bicycle**. This routing mode takes into account the surface, smoothness and slope of streets while computing accessibility. For heatmaps, a cycling speed of 15 km/h is assumed.
-
-</TabItem>
-
-<TabItem value="pedelec" label="Pedelec" className="tabItemBox">
-
-**Considers all paths accessible by pedelec**. This routing mode takes into account the surface and smoothness of streets while computing accessibility. For heatmaps, a pedelec speed of 23 km/h is assumed.
-
-</TabItem>
-
-<TabItem value="car" label="Car" className="tabItemBox">
-
-**Considers all paths accessible by car**. This routing mode takes into account speed limits and one-way access restrictions while computing accessibility.
-
-</TabItem>
-
-</Tabs>
+| Mode | Considers | Speed assumed |
+|------|-----------|---------------|
+| Walk | All paths accessible by foot | 5 km/h |
+| Bicycle | All paths accessible by bicycle (surface, smoothness, slope) | 15 km/h |
+| Pedelec | All paths accessible by pedelec (surface, smoothness) | 23 km/h |
+| Car | All paths accessible by car (speed limits, one-way restrictions) | — |
 
 ### Configuration
 
@@ -132,29 +93,17 @@ This function calculates accessibilities based on a Gaussian curve, which is inf
 
 This function maintains a direct correlation between travel time and accessibility, which is modulated by the `destination_potential` you specify. For a more in-depth understanding, refer to the [Technical details](./gravity#4-technical-details) section.
 
-:::info Note
-This feature is currently under development. 🧑🏻‍💻
-:::
-
 </TabItem>
 
 <TabItem value="exponential" label="Exponential" default className="tabItemBox">
 
 This function calculates accessibilities based on an exponential curve, which is influenced by the `sensitivity` and `destination_potential` you define. For a more in-depth understanding, refer to the [Technical details](./gravity#4-technical-details) section.
 
-:::info Note
-This feature is currently under development. 🧑🏻‍💻
-:::
-
 </TabItem>
 
 <TabItem value="power" label="Power" default className="tabItemBox">
 
 This function calculates accessibilities based on a power curve, which is influenced by the `sensitivity` and `destination_potential` you define. For a more in-depth understanding, refer to the [Technical details](./gravity#4-technical-details) section.
-
-:::info Note
-This feature is currently under development. 🧑🏻‍💻
-:::
 
 </TabItem>
 
@@ -164,12 +113,12 @@ This feature is currently under development. 🧑🏻‍💻
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Select your <code>Opportunity Layer</code> from the drop-down menu. This can be any previously created layer containing point-based data.</div>
+  <div class="content">Select your <code>Input Layer</code> from the drop-down menu. This can be any previously created layer containing point-based data.</div>
 </div>
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Choose a <code>Travel Time Limit</code> for your heatmap. This will be used in the context of your previously selected <i>Routing Type</i>.</div>
+  <div class="content">Choose a <code>Travel Time Limit</code> for your heatmap. This will be used in the context of your previously selected <i>Transport mode</i>.</div>
 </div>
 
 :::tip Hint
@@ -180,7 +129,12 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">If required, choose a <code>Destination Potential Field</code>. This must be a numeric field from your <i>Opportunity Layer</i> which will be used as a coefficient by the accessibility function.</div>
+  <div class="content">Choose a <code>Potential Type</code> to define how each opportunity is weighted:
+    <ul>
+      <li><b>Constant</b> — all opportunities have the same weight. Enter a numeric value (default: 1.0).</li>
+      <li><b>Field</b> — use a numeric field from the <i>Input Layer</i> as the weight (e.g. number of departures, seats, or capacity).</li>
+    </ul>
+  </div>
 </div>
 
 
@@ -205,6 +159,18 @@ For a visual explanation of how sensitivity affects the calculation, see the **[
 
 <div class="step">
   <div class="step-number">9</div>
+  <div class="content">Optionally, expand <code>Advanced Options</code> and select a <code>Reference Area</code> — a polygon layer that defines the full study area. When set, the heatmap extends to cover all H3 cells within that polygon, with cells outside the computed reach shown as <code>NULL</code> to expose coverage gaps and underserved areas.</div>
+</div>
+
+### Result Layer
+
+<div class="step">
+  <div class="step-number">10</div>
+  <div class="content">Set the <code>Result layer name</code> for the output heatmap layer.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">11</div>
   <div class="content">Click <code>Run</code> to start the calculation of the heatmap.</div>
 </div>
 
@@ -340,41 +306,12 @@ Heatmaps in GOAT utilize **[Uber's H3 grid-based](../../further_reading/glossary
 
 The resolution and dimensions of the hexagonal grid used depend on the selected *routing type*:
 
-<Tabs>
-
-<TabItem value="walk" label="Walk" default className="tabItemBox">
-
-- Resolution: 10
-- Average hexagon area: 11285.6 m²
-- Average hexagon edge length: 65.9 m
-
-</TabItem>
-  
-<TabItem value="bicycle" label="Bicycle" className="tabItemBox">
-
-- Resolution: 9
-- Average hexagon area: 78999.4 m²
-- Average hexagon edge length: 174.4 m
-
-</TabItem>
-
-<TabItem value="pedelec" label="Pedelec" className="tabItemBox">
-
-- Resolution: 9
-- Average hexagon area: 78999.4 m²
-- Average hexagon edge length: 174.4 m
-
-</TabItem>
-
-<TabItem value="car" label="Car" className="tabItemBox">
-
-- Resolution: 8
-- Average hexagon area: 552995.7 m²
-- Average hexagon edge length: 461.4 m
-
-</TabItem>
-
-</Tabs>
+| Mode | Resolution | Average hexagon area | Average hexagon edge length |
+|------|-----------|----------------------|-----------------------------|
+| Walk | 10 | 11,285.6 m² | 65.9 m |
+| Bicycle | 9 | 78,999.4 m² | 174.4 m |
+| Pedelec | 9 | 78,999.4 m² | 174.4 m |
+| Car | 8 | 552,995.7 m² | 461.4 m |
 
 :::tip Hint
 

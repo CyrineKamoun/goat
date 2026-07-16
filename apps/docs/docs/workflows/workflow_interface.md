@@ -61,14 +61,14 @@ The canvas workspace is where you can drag and drop nodes, zoom, pan, and select
 - <img src={require('/img/icons/text-card.png').default} alt="Text Card" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Text Card</code>: <strong>Add text annotations</strong> to document workflow steps
 - <img src={require('/img/icons/redo.png').default} alt="Redo" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Redo</code>: <strong>Restore the last undone action</strong>
 - <img src={require('/img/icons/undo.png').default} alt="Undo" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Undo</code>: <strong>Reverse the last action</strong>
-- <img src={require('/img/icons/variables.png').default} alt="Variables" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Variables</code>: <strong>Create and manage</strong> [workflow variables](variables.md) for reusable parameters
+- <img src={require('/img/icons/variables.png').default} alt="Variables" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Variables</code>: <strong>Create and manage</strong> <a href="variables">workflow variables</a> for reusable parameters
 - <img src={require('/img/icons/play.png').default} alt="Run" style={{ maxHeight: "40px", maxWidth: "40px", objectFit: "cover"}}/> <code>Run</code>: <strong>Execute the entire workflow</strong>
 
 **Minimap**: Located in the bottom right corner of the canvas, providing an overview navigator for complex workflows.
 
-**Data View Controls**: Located at the bottom of the canvas:
-- <code>Show Table</code>: Display attribute data for selected node results
-- <code>Show Map</code>: Visualize spatial data for selected node outputs
+**Data View Controls**: Located at the bottom of the canvas. Select a node to activate the panel — it shows the data of that node's layer:
+- <code>Table</code>: Opens the attribute table of the selected node's layer
+- <code>Map</code>: Opens a map preview of the selected node's layer (only available if the layer has geometry)
 
 ### Tools and Configuration panel
 The right panel changes depending if there is a node selected or not. If no node is selected then the **Tools and History panel** will be visible. If a tool node is selected, the **Configuration panel** will appear, and if a dataset node is selected the **Dataset panel** will appear.
@@ -83,9 +83,13 @@ The right panel changes depending if there is a node selected or not. If no node
 
 This tab contains categorized tools available for workflow construction, similar to the Map Mode Toolbox. Drag and drop tools onto the canvas to add them to your workflow. The tools are organized into the following categories:
 
-- **Import**
+- **Data I/O**
   - <code>+ Add Dataset</code>: Create dataset nodes
-  - <code>Save Dataset</code>: Save workflow results as permanent datasets
+  - <code>Save as Dataset</code>: Save workflow results as permanent datasets. Configure the **Dataset name**, toggle **Add to project** to automatically add the result to the project layer list, and enable **Overwrite on re-run** to replace the previously exported dataset each time the workflow runs instead of creating a new one.
+
+:::tip Good practice
+Give each **Save as Dataset** node a descriptive name and enable **Overwrite on re-run** when running the same workflow repeatedly — this keeps your project clean by avoiding duplicate layers after each run.
+:::
 
 - **Accessibility Indicators**
   - All tools available in the [Accessibility Indicators](../category/accessibility-indicators) section of the Toolbox
@@ -97,8 +101,11 @@ This tab contains categorized tools available for workflow construction, similar
   - All tools available in the [Geoprocessing](../category/geoprocessing) section of the Toolbox
   
 - **Data Management**
-  - [Join](../toolbox/data_management/join.md) and other data manipulation tools
+  - [Join](../toolbox/data_management/join.md), [Merge](../toolbox/data_management/merge.md), and other data manipulation tools
   - [Custom SQL](custom_sql.md): Advanced data processing with SQL queries
+
+- **Control**
+  - <code>Conditional</code>: Add a branching node that routes the layer to a <strong>True</strong> or <strong>False</strong> path based on defined conditions. See <a href="if_clause">Conditional</a>.
 
 
 **History Tab**
@@ -195,7 +202,7 @@ Begin with simple 2-3 node workflows to understand the interface, then gradually
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content"><strong>Review Results</strong>: Use <code>Show table</code> and <code>Show map</code> buttons to inspect the final results once the workflow completes.</div>
+  <div class="content"><strong>Review Results</strong>: Use the <code>Table</code> and <code>Map</code> buttons at the bottom of the canvas to inspect the selected node's results once the workflow completes.</div>
 </div>
 
 <div class="step">
@@ -216,6 +223,10 @@ Successfully using the workflow interface provides:
 :::info Auto-Save Feature
 Workflows automatically save changes as you build them. The system preserves all configurations, connections, and execution states.
 :::
+
+## 4. Running workflows from the Map view
+
+Workflows can also be run directly from the **Map view** without opening the workflow editor. Open the **Toolbox**, click the **Workflows** tab, and select a workflow from the list. If the workflow has [variables](variables.md#running-workflows-with-variables-from-the-map-view), a **Variables** section appears where you can set values before running.
 
 
 

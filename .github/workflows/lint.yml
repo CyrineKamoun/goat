@@ -69,7 +69,7 @@ jobs:
       # gdal is sdist-only and needs libgdal to build; ruff/mypy don't need
       # it installed.
       - name: 🐍 Install Dependencies
-        run: uv sync --frozen --all-packages --no-install-package gdal
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
         working-directory: ${{ github.workspace }}
 
       # REQUIRED: ruff lint on the packages that are clean. Keeps them clean and

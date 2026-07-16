@@ -55,10 +55,22 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = int(os.getenv("POSTGRES_PORT", "5432"))
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "goat")
 
+    # Direct PostgreSQL host for DuckLake attaches (long-lived,
+    # idle-in-transaction sessions that waste transaction-pooler slots).
+    # Unset = same host as POSTGRES_SERVER.
+    DUCKLAKE_POSTGRES_SERVER: str = os.getenv(
+        "DUCKLAKE_POSTGRES_SERVER", ""
+    ) or os.getenv("POSTGRES_SERVER", "localhost")
+
     @property
     def POSTGRES_DATABASE_URI(self) -> str:
         """Construct PostgreSQL connection URI for DuckLake."""
         return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+
+    @property
+    def DUCKLAKE_POSTGRES_DATABASE_URI(self) -> str:
+        """PostgreSQL URI for DuckLake catalog attaches (direct, unpooled)."""
+        return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.DUCKLAKE_POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     # Schema settings
     CUSTOMER_SCHEMA: str = os.getenv("CUSTOMER_SCHEMA", "customer")
@@ -82,6 +94,15 @@ class Settings(BaseSettings):
     DUCKLAKE_S3_BUCKET: Optional[str] = os.getenv("DUCKLAKE_S3_BUCKET")
     DUCKLAKE_S3_ACCESS_KEY: Optional[str] = os.getenv("DUCKLAKE_S3_ACCESS_KEY")
     DUCKLAKE_S3_SECRET_KEY: Optional[str] = os.getenv("DUCKLAKE_S3_SECRET_KEY")
+
+    # Pin read connections to a DuckLake snapshot and refresh off the request
+    # path. Kill-switch: DUCKLAKE_PIN_SNAPSHOT=false restores unpinned reads.
+    DUCKLAKE_PIN_SNAPSHOT: bool = (
+        os.getenv("DUCKLAKE_PIN_SNAPSHOT", "true").lower() == "true"
+    )
+    DUCKLAKE_SNAPSHOT_REFRESH_SECONDS: float = float(
+        os.getenv("DUCKLAKE_SNAPSHOT_REFRESH_SECONDS", "5")
+    )
 
     # DuckDB memory limit (e.g., "1.5GB", "512MB")
     DUCKDB_MEMORY_LIMIT: str = os.getenv("PROCESSES_DUCKDB_MEMORY_LIMIT", "1.2GB")

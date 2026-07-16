@@ -8,7 +8,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
 
 # --- DuckDB (pre-built release binary) ---
-set(DUCKDB_VERSION "v1.4.4")
+# MUST match the Python `duckdb` pin in goatlib/pyproject.toml — the routing
+# module and the Python process share one address space, so two different
+# libduckdb versions collide (symbol/ABI clash → memory corruption, crashes).
+set(DUCKDB_VERSION "v1.5.4")
 
 # Detect platform for pre-built binary
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
@@ -145,6 +148,9 @@ ${NIGIRI_SDK_DIR}/lib/libabsl_bad_variant_access.a"
 # --- pybind11 ---
 find_package(pybind11 CONFIG REQUIRED)
 
+# std::thread (reverse-RAPTOR parallelism) needs the platform thread library.
+find_package(Threads REQUIRED)
+
 file(GLOB_RECURSE SOURCES
     src/input/*.cpp
     src/data/*.cpp
@@ -153,6 +159,8 @@ file(GLOB_RECURSE SOURCES
     src/geometry/*.cpp
     src/output/*.cpp
     src/heatmap/*.cpp
+    src/network/*.cpp
+    src/preprocessing/*.cpp
     src/pipeline.cpp
 )
 
@@ -162,6 +170,6 @@ pybind11_add_module(_routing
 )
 
 target_include_directories(_routing PRIVATE src)
-target_link_libraries(_routing PRIVATE duckdb nigiri)
+target_link_libraries(_routing PRIVATE duckdb nigiri Threads::Threads)
 
 install(TARGETS _routing LIBRARY DESTINATION routing)

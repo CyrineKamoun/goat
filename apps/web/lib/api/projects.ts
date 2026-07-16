@@ -2,6 +2,7 @@ import useSWR from "swr";
 
 import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
 import { PROCESSES_API_BASE_URL } from "@/lib/api/processes";
+import { useAuthedSWR } from "@/lib/api/useAuthedSWR";
 import type { GetContentQueryParams } from "@/lib/validations/common";
 import type {
   AggregationStatsQueryParams,
@@ -50,7 +51,7 @@ export const useProject = (projectId?: string) => {
 };
 
 export const useProjectLayers = (projectId?: string) => {
-  const { data, isLoading, error, mutate, isValidating } = useSWR<ProjectLayer[]>(
+  const { data, isLoading, error, mutate, isValidating } = useAuthedSWR<ProjectLayer[]>(
     () => (projectId ? [`${PROJECTS_API_BASE_URL}/${projectId}/layer`] : null),
     fetcher
   );

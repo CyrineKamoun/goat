@@ -1,9 +1,9 @@
 ---
-sidebar_position: 6
+sidebar_position: 8
 ---
 
 
-# Abfahrten ÖPNV
+# Anzahl Abfahrten
 
 Dieser Indikator zeigt die **durchschnittliche Anzahl der Abfahrten öffentlicher Verkehrsmittel** pro Stunde für jede Haltestelle des öffentlichen Verkehrs an.
 
@@ -13,32 +13,14 @@ Dieser Indikator zeigt die **durchschnittliche Anzahl der Abfahrten öffentliche
 
 ## 1. Erklärung
 
-Die ÖPNV-Abfahrten zeigen die **durchschnittliche Anzahl der Abfahrten pro Stunde für ein ausgewähltes Zeitintervall an jeder Haltestelle des öffentlichen Verkehrs**. Sie können die Summe für alle Verkehrsmittel anzeigen oder sich auf ein bestimmtes Verkehrsmittel konzentrieren (z.B. Bus, Straßenbahn, U-Bahn, Bahn).
+**Anzahl Abfahrten** zeigt die **durchschnittliche Anzahl der Abfahrten pro Stunde für ein ausgewähltes Zeitintervall an jeder Haltestelle des öffentlichen Verkehrs**. Sie können die Summe für alle Verkehrsmittel anzeigen oder sich auf ein bestimmtes Verkehrsmittel konzentrieren (z.B. Bus, Straßenbahn, U-Bahn, Bahn).
 
 Dieser Indikator ist die Grundlage für die [ÖV-Güteklassen](./oev_gueteklassen.md) und ist nützlich für **Schwachstellenanalysen von lokalen Verkehrsplänen** (siehe unter anderem [Richtlinie für die Nahverkehrsplanung in Bayern](https://www.demografie-leitfaden-bayern.de/index.html)).
 
-import MapViewer from '@site/src/components/MapViewer';
+:::info
 
-:::info 
-Die ÖPNV-Abfahrten sind nur in Gebieten verfügbar, in denen das Verkehrsnetz in GOAT integriert ist.
+Die Berechnung der Anzahl Abfahrten ist für Gebiete verfügbar, in denen GTFS-Daten des öffentlichen Verkehrs in GOAT integriert sind. Derzeit unterstützte Regionen umfassen **Deutschland, Österreich und die Schweiz**. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns gerne](https://plan4better.de/de/contact/) — wir prüfen, was möglich ist.
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-    <MapViewer
-      geojsonUrls={[
-        "https://assets.plan4better.de/other/geofence/geofence_gtfs.geojson"
-      ]}
-      styleOptions={{
-        fillColor: "#808080",
-        outlineColor: "#808080",
-        fillOpacity: 0.8
-      }}
-      legendItems={[
-        { label: "Abdeckung für die Berechnung der ÖPNV-Abfahrten", color: "#ffffff" }
-      ]}
-    />
-</div> 
-
-Falls Sie Analysen außerhalb dieses Geofences durchführen müssen, kontaktieren Sie bitte den [Support](https://plan4better.de/de/contact/ "Contact Support") und wir werden prüfen, was möglich ist.
 :::
 
 ## 2. Anwendungsbeispiele
@@ -56,7 +38,7 @@ Falls Sie Analysen außerhalb dieses Geofences durchführen müssen, kontaktiere
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Unter <code>Erreichbarkeitsindikatoren</code> wählen Sie <code>Abfahrten ÖPNV</code>, um das Einstellungsmenü zu öffnen.</div>
+  <div class="content">Unter <code>Erreichbarkeitsindikatoren</code> wählen Sie <code>Anzahl Abfahrten</code>, um das Einstellungsmenü zu öffnen.</div>
 </div>
 
 ### Berechnungszeit
@@ -66,15 +48,22 @@ Falls Sie Analysen außerhalb dieses Geofences durchführen müssen, kontaktiere
   <div class="content">Wählen Sie <code>Tag</code>, <code>Startzeit</code> und <code>Endzeit</code> für Ihre Analyse.</div>
 </div>
 
-### Referenz-Layer
+### Konfiguration
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Wählen Sie den <code>Referenz-Layer</code> (Polygon-Feature-Layer) für das Gebiet aus, das Sie analysieren möchten.</div>
+  <div class="content">Wählen Sie das <code>Referenzgebiet</code> — einen Polygon-Layer, der das Untersuchungsgebiet definiert.</div>
 </div>
+
+### Ergebnis-Layer
 
 <div class="step">
   <div class="step-number">5</div>
+  <div class="content">Legen Sie den <code>Name der Ergebnislayer</code> für den Ausgabe-Layer fest.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">6</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Berechnung zu starten.</div>
 </div>
 
@@ -84,7 +73,7 @@ Nach Abschluss der Berechnung wird ein neuer Layer namens <b>"Trip Count Station
 
 Klicken Sie auf Stationen, um Details anzuzeigen, einschließlich **Stationsname**, **Gesamtanzahl der Abfahrten** und **Abfahrten pro Verkehrsmittel**.
 
-<img src={require('/img/toolbox/accessibility_indicators/trip_count/trip_count_calculation.gif').default} alt="Menu Overview for Public Transport Trip Count" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+
 
 :::tip Tipp
 

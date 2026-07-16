@@ -1,5 +1,5 @@
 ---
-sidebar_position: 4
+sidebar_position: 2
 ---
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
@@ -24,31 +24,18 @@ Sie können das **Verkehrsmittel**, den **Ziel-Layer**, das **Reisezeitlimit** s
 
 - Die **Sensitivität steuert, wie schnell die Erreichbarkeit mit zunehmender Reisezeit abnimmt**, während das **Destinationspotenzial es ermöglicht, Zielen mit höherer Kapazität oder Qualität mehr Gewicht zu geben** (z. B. ein größerer Supermarkt oder eine Haltestelle mit mehr Abfahrten). Zusammen mit der gewählten **Widerstandsfunktion definieren diese Einstellungen, wie die Erreichbarkeit berechnet wird**.
 
+- Der **Potenzialtyp** bestimmt, wie das Gewicht jedes Ziels abgeleitet wird: Mit **Constant** wird allen Zielen der gleiche Wert zugewiesen, oder mit **Field** wird ein numerisches Attribut aus dem Eingabe-Layer verwendet (z. B. Abfahrten, Sitzplätze oder Kapazität).
+
 - Mit dem **Destinationspotenzial können bestimmte Ziele priorisiert werden**. Zum Beispiel kann ein größerer, aber weiter entfernter Supermarkt höher bewertet werden als ein kleinerer in der Nähe. So können qualitative Informationen – wie Größe, Frequenz oder Servicelevel – in die Berechnung einfließen, was zu einer realistischeren Heatmap führt.
 
 Beeinflusst durch all diese Eigenschaften kann **die Erreichbarkeit eines Punktes komplexes reales menschliches Verhalten modellieren** und ist ein leistungsfähiges Maß für Verkehrs- und Erreichbarkeitsplanung.
 
 **Wichtiger Unterschied:** Im Gegensatz zur *Heatmap Durchschnitt Reisezeit*, die den Reiseaufwand misst, zeigt die *Gravity-basierte Heatmap* die **Attraktivität** – also wie erreichbar und anziehend Ziele sind, wenn sowohl Entfernung als auch Qualität berücksichtigt werden.
 
-import MapViewer from '@site/src/components/MapViewer';
 
-:::info 
+:::info
 
-Heatmaps sind in bestimmten Regionen verfügbar. Nach Auswahl eines `Verkehrsmittels` wird eine **Geofence** auf der Karte angezeigt, um unterstützte Regionen hervorzuheben.
-
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <MapViewer
-      geojsonUrls={["https://assets.plan4better.de/other/geofence/geofence_heatmap.geojson"]}
-      styleOptions={{
-        fillColor: "#808080",
-        outlineColor: "#808080",
-        fillOpacity: 0.8
-      }}
-      legendItems={[{ label: "Abdeckung für Gravity-basierte Heatmaps", color: "#ffffff" }]}
-  />
-</div> 
-
-Wenn Sie Analysen außerhalb dieses Geofence durchführen möchten, [kontaktieren Sie uns](https://plan4better.de/en/contact/ "Kontakt"). Wir besprechen gerne weitere Optionen.
+Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns](https://plan4better.de/en/contact/) gerne.
 
 :::
 
@@ -81,33 +68,12 @@ Wenn Sie Analysen außerhalb dieses Geofence durchführen möchten, [kontaktiere
   <div class="content">Wählen Sie das <code>Verkehrsmittel</code> für die Heatmap aus.</div>
 </div>
 
-<Tabs>
-
-<TabItem value="walk" label="Zu Fuß" default className="tabItemBox">
-
-**Berücksichtigt alle Wege, die zu Fuß erreichbar sind.** Für Heatmaps wird eine Gehgeschwindigkeit von 5 km/h angenommen.
-
-</TabItem>
-  
-<TabItem value="cycling" label="Fahrrad" className="tabItemBox">
-
-**Berücksichtigt alle Wege, die mit dem Fahrrad erreichbar sind.** Dieser Modus berücksichtigt Oberfläche, Glätte und Steigung der Straßen. Für Heatmaps wird eine Geschwindigkeit von 15 km/h angenommen.
-
-</TabItem>
-
-<TabItem value="pedelec" label="Pedelec" className="tabItemBox">
-
-**Berücksichtigt alle Wege, die mit dem Pedelec erreichbar sind.** Dieser Modus berücksichtigt Oberfläche und Glätte der Straßen. Für Heatmaps wird eine Geschwindigkeit von 23 km/h angenommen.
-
-</TabItem>
-
-<TabItem value="car" label="Auto" className="tabItemBox">
-
-**Berücksichtigt alle Wege, die mit dem Auto erreichbar sind.** Dieser Modus berücksichtigt Tempolimits und Einbahnstraßenregelungen.
-
-</TabItem>
-
-</Tabs>
+| Verkehrsmittel | Berücksichtigt | Angenommene Geschwindigkeit |
+|----------------|----------------|----------------------------|
+| Zu Fuß | Alle zu Fuß begehbaren Wege | 5 km/h |
+| Fahrrad | Alle mit dem Fahrrad befahrbaren Wege (Oberfläche, Glätte, Steigung) | 15 km/h |
+| Pedelec | Alle mit dem Pedelec befahrbaren Wege (Oberfläche, Glätte) | 23 km/h |
+| Auto | Alle mit dem Auto befahrbaren Wege (Tempolimits, Einbahnstraßen) | — |
 
 ### Konfiguration
 
@@ -128,29 +94,17 @@ Diese Funktion berechnet die Erreichbarkeit basierend auf einer Gaußschen Kurve
 
 Diese Funktion hält eine direkte Korrelation zwischen Reisezeit und Erreichbarkeit aufrecht, die durch das von Ihnen angegebene `Destinationspotenzial` moduliert wird. Für weitere Details siehe den Abschnitt [Technische Details](#4-technische-details).
 
-:::info Hinweis
-Diese Funktion befindet sich derzeit in Entwicklung. 🧑🏻‍💻
-:::
-
 </TabItem>
 
 <TabItem value="exponential" label="Exponential" default className="tabItemBox">
 
 Diese Funktion berechnet die Erreichbarkeit basierend auf einer exponentiellen Kurve, die von der `Sensitivität` und dem `Destinationspotenzial` beeinflusst wird. Für weitere Details siehe den Abschnitt [Technische Details](#4-technische-details).
 
-:::info Hinweis
-Diese Funktion befindet sich derzeit in Entwicklung. 🧑🏻‍💻
-:::
-
 </TabItem>
 
 <TabItem value="power" label="Potenz" default className="tabItemBox">
 
 Diese Funktion berechnet die Erreichbarkeit basierend auf einer Potenzkurve, die von der `Sensitivität` und dem `Destinationspotenzial` beeinflusst wird. Für weitere Details siehe den Abschnitt [Technische Details](#4-technische-details).
-
-:::info Hinweis
-Diese Funktion befindet sich derzeit in Entwicklung. 🧑🏻‍💻
-:::
 
 </TabItem>
 
@@ -160,7 +114,7 @@ Diese Funktion befindet sich derzeit in Entwicklung. 🧑🏻‍💻
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Wählen Sie Ihren <code>Ziel-Layer</code> aus dem Dropdown-Menü. Dies kann jeder zuvor erstellte Layer mit punktbasierten Daten sein.</div>
+  <div class="content">Wählen Sie Ihren <code>Eingabe-Layer</code> aus dem Dropdown-Menü. Dies kann jeder zuvor erstellte Layer mit punktbasierten Daten sein.</div>
 </div>
 
 <div class="step">
@@ -176,7 +130,12 @@ Benötigen Sie Hilfe bei der Wahl eines geeigneten Reisezeitlimits für verschie
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Falls erforderlich, wählen Sie ein <code>Destinationspotenzial-Feld</code>. Dies muss ein numerisches Feld aus Ihrem <i>Ziel-Layer</i> sein und wird als Koeffizient von der Erreichbarkeitsfunktion verwendet.</div>
+  <div class="content">Wählen Sie den <code>Potenzialtyp</code>, um zu bestimmen, wie jedes Ziel gewichtet wird:
+    <ul>
+      <li><b>Constant</b> — alle Ziele erhalten das gleiche Gewicht. Geben Sie einen numerischen Wert ein (Standard: 1.0).</li>
+      <li><b>Field</b> — verwenden Sie ein numerisches Feld aus dem <i>Eingabe-Layer</i> als Gewicht (z. B. Anzahl der Abfahrten, Sitzplätze oder Kapazität).</li>
+    </ul>
+  </div>
 </div>
 
 <div class="step">
@@ -199,6 +158,18 @@ Eine visuelle Erklärung, wie die Sensitivität die Berechnung beeinflusst, find
 
 <div class="step">
   <div class="step-number">9</div>
+  <div class="content">Optional können Sie unter <code>Erweiterte Optionen</code> ein <code>Referenzgebiet</code> auswählen — einen Polygon-Layer, der das vollständige Untersuchungsgebiet definiert. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; Zellen außerhalb der berechneten Erreichbarkeit werden als <code>NULL</code> dargestellt und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
+</div>
+
+### Ergebnis-Layer
+
+<div class="step">
+  <div class="step-number">10</div>
+  <div class="content">Legen Sie den <code>Name der Ergebnislayer</code> für den Ausgabe-Heatmap-Layer fest.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">11</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Berechnung der Heatmap zu starten.</div>
 </div>
 
@@ -332,41 +303,12 @@ Heatmaps in GOAT nutzen die **[Uber H3 grid-basierte](../../further_reading/glos
 
 Die Auflösung und Dimensionen des verwendeten hexagonalen Rasters hängen vom gewählten *Verkehrsmittel* ab:
 
-<Tabs>
-
-<TabItem value="walk" label="Zu Fuß" default className="tabItemBox">
-
-- Auflösung: 10
-- Durchschnittliche Hexagonfläche: 11.285,6 m²
-- Durchschnittliche Hexagonkantenlänge: 65,9 m
-
-</TabItem>
-  
-<TabItem value="bicycle" label="Fahrrad" className="tabItemBox">
-
-- Auflösung: 9
-- Durchschnittliche Hexagonfläche: 78.999,4 m²
-- Durchschnittliche Hexagonkantenlänge: 174,4 m
-
-</TabItem>
-
-<TabItem value="pedelec" label="Pedelec" className="tabItemBox">
-
-- Auflösung: 9
-- Durchschnittliche Hexagonfläche: 78.999,4 m²
-- Durchschnittliche Hexagonkantenlänge: 174,4 m
-
-</TabItem>
-
-<TabItem value="car" label="Auto" className="tabItemBox">
-
-- Auflösung: 8
-- Durchschnittliche Hexagonfläche: 552.995,7 m²
-- Durchschnittliche Hexagonkantenlänge: 461,4 m
-
-</TabItem>
-
-</Tabs>
+| Verkehrsmittel | Auflösung | Durchschnittliche Sechseckfläche | Durchschnittliche Kantenlänge |
+|----------------|-----------|----------------------------------|-------------------------------|
+| Walk | 10 | 11.285,6 m² | 65,9 m |
+| Bicycle | 9 | 78.999,4 m² | 174,4 m |
+| Pedelec | 9 | 78.999,4 m² | 174,4 m |
+| Car | 8 | 552.995,7 m² | 461,4 m |
 
 :::tip Hinweis
 

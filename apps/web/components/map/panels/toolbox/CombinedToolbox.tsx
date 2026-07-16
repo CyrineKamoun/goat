@@ -250,8 +250,12 @@ function ToolsTabContent({ onSelectTool }: ToolsTabContentProps) {
                           minWidth: 28,
                           px: 0.625,
                           borderRadius: "4px",
-                          bgcolor: isDark ? "#999999" : "#666666",
-                          color: isDark ? "#1A1A1A" : "#E3E3E3",
+                          // Muted, inverted pill that adapts to the theme
+                          // (text.secondary is a mode-aware foreground; paper
+                          // is the surface behind it) instead of hardcoded hex
+                          // that read as a glaring light-grey chip in dark mode.
+                          bgcolor: theme.palette.text.secondary,
+                          color: theme.palette.background.paper,
                           fontSize: "8px",
                           fontWeight: 700,
                           fontFamily: "Arial, sans-serif",

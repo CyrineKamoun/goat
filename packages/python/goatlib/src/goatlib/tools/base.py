@@ -253,13 +253,26 @@ class ToolSettings:
             f"postgresql://{pg_user}:{pg_password}@{pg_server}:{pg_port}/{pg_db}"
         )
 
+        # DuckLake attaches hold idle-in-transaction sessions for the whole
+        # job, which pins transaction-pooler slots for nothing. When
+        # DUCKLAKE_POSTGRES_SERVER is set they connect straight to that host
+        # (e.g. the CNPG primary); otherwise behavior is unchanged.
+        ducklake_pg_server = cls._get_secret("DUCKLAKE_POSTGRES_SERVER", "")
+        if ducklake_pg_server:
+            ducklake_uri = (
+                f"postgresql://{pg_user}:{pg_password}"
+                f"@{ducklake_pg_server}:{pg_port}/{pg_db}"
+            )
+        else:
+            ducklake_uri = cls._get_secret("POSTGRES_DATABASE_URI", default_uri)
+
         return cls(
             postgres_server=pg_server,
             postgres_port=int(pg_port),
             postgres_user=pg_user,
             postgres_password=pg_password,
             postgres_db=pg_db,
-            ducklake_postgres_uri=cls._get_secret("POSTGRES_DATABASE_URI", default_uri),
+            ducklake_postgres_uri=ducklake_uri,
             ducklake_catalog_schema=cls._get_secret(
                 "DUCKLAKE_CATALOG_SCHEMA", "ducklake"
             ),
@@ -384,7 +397,15 @@ class SimpleToolRunner:
         # which trigger serializable-isolation failures (40001) when many workers
         # connect simultaneously.
         self._ensure_lake_option(con, "parquet_compression", PARQUET_COMPRESSION)
-        self._ensure_lake_option(con, "parquet_version", PARQUET_VERSION)
+        # parquet_version only accepts numeric input ('2') but is stored in
+        # canonical form ('V2'); compare against the stored form or the guard
+        # re-writes on every connection.
+        self._ensure_lake_option(
+            con,
+            "parquet_version",
+            PARQUET_VERSION,
+            stored_value=f"V{PARQUET_VERSION}",
+        )
         self._ensure_lake_option(
             con, "parquet_row_group_size", str(PARQUET_ROW_GROUP_SIZE)
         )
@@ -395,19 +416,26 @@ class SimpleToolRunner:
         self: Self,
         con: duckdb.DuckDBPyConnection,
         key: str,
-        expected_value: str,
+        value: str,
+        stored_value: str | None = None,
     ) -> None:
-        """Set a DuckLake option only if its current value differs.
+        """Set a DuckLake option only if its stored value differs.
 
         Every `CALL lake.set_option` is an UPSERT against the PostgreSQL
         `ducklake_metadata` table. When many worker connections issue the same
         writes simultaneously, they race on serializable isolation
         (`could not serialize access due to concurrent update`, SQLSTATE 40001).
         Reading first means steady-state reconnects skip the write entirely.
+
+        Some options are stored in a canonical form that differs from the
+        accepted input form (e.g. parquet_version: input '2', stored 'V2');
+        pass `stored_value` for those so the comparison matches what DuckLake
+        actually persists. `set_option` always receives `value`.
         """
         if self.settings is None:
             raise RuntimeError("Settings not initialized")
         schema = self.settings.ducklake_catalog_schema
+        expected = value if stored_value is None else stored_value
         try:
             rows = con.execute(
                 f"SELECT value FROM __ducklake_metadata_lake.{schema}.ducklake_metadata "  # noqa: S608
@@ -422,9 +450,21 @@ class SimpleToolRunner:
             )
             rows = None
 
-        if rows and all(row[0] == expected_value for row in rows):
+        if rows and all(row[0] == expected for row in rows):
             return
-        con.execute(f"CALL lake.set_option('{key}', '{expected_value}')")
+        try:
+            con.execute(f"CALL lake.set_option('{key}', '{value}')")
+        except Exception as e:
+            # All connections write the same constants, so losing the race to
+            # a concurrent writer leaves the option in the desired state.
+            if "could not serialize access" in str(e):
+                logger.warning(
+                    "Concurrent writer already set DuckLake option %s: %s",
+                    key,
+                    e,
+                )
+                return
+            raise
 
     def _is_retriable_ducklake_error(self: Self, error: Exception) -> bool:
         """Check if a DuckLake error is retriable (connection/transaction issues)."""
@@ -1277,6 +1317,23 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
             else:
                 resolved.append(item)
         return resolved
+
+    def get_project_layer_name_by_id(
+        self: Self, layer_project_id: int | None
+    ) -> str | None:
+        """Layer name by the project-layer PK, or None. Best-effort."""
+        if layer_project_id is None:
+            return None
+        try:
+            return _get_or_create_event_loop().run_until_complete(
+                self.db_service.get_project_layer_name_by_id(int(layer_project_id))
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                "Could not resolve project layer name by id %s: %s",
+                layer_project_id, e,
+            )
+            return None
 
     def run(self: Self, params: TParams) -> dict[str, Any]:
         """Main entry point - runs the full tool workflow.

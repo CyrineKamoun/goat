@@ -57,8 +57,8 @@ Wenn ein Ziel-Feature mehreren Features im Join-Layer entspricht, enthält das E
 
 Eine räumliche Verknüpfung verbindet Features basierend auf ihrer geometrischen Beziehung — kein gemeinsames Feld ist erforderlich. Jedes Feature im Ziel-Layer wird mit Features im Join-Layer abgeglichen, die die ausgewählte räumliche Beziehung erfüllen.
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/data_management/join/spatial_relationships_de.png').default} alt="Arten räumlicher Beziehungen" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: "32px", marginBottom: "32px" }}>
+  <img src={require('/img/toolbox/data_management/join/spatial_relationships_de.png').default} alt="Arten räumlicher Beziehungen" style={{ maxHeight: "auto", maxWidth: "70%", objectFit: "cover"}}/>
 </div>
 
 **Verfügbare räumliche Beziehungen:**
@@ -175,7 +175,13 @@ In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüp
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Aktivieren Sie optional <code>Verknüpfungsfelder hinzufügen</code>, um festzulegen, welche Felder aus dem Join-Layer in die Ausgabe aufgenommen werden sollen, und/oder aktivieren Sie <code>Statistiken berechnen</code>, um aggregierte Werte für übereinstimmende Features zu berechnen.</div>
+  <div class="content">Aktivieren Sie optional <code>Verknüpfungsfelder hinzufügen</code>, um festzulegen, welche Felder aus dem Join-Layer in die Ausgabe aufgenommen werden sollen, und/oder aktivieren Sie <code>Statistiken berechnen</code>, um aggregierte Werte zu berechnen, wenn mehrere Join-Layer-Datensätze einem einzelnen Ziel-Layer-Feature entsprechen. Wenn <code>Statistiken berechnen</code> aktiviert ist, konfigurieren Sie die Statistik:
+  <ul>
+    <li><code>Operation auswählen</code> — wählen Sie eine der folgenden Optionen: <code>Anzahl</code>, <code>Summe</code>, <code>Min</code>, <code>Max</code>, <code>Durchschnitt</code> oder <code>Standardabweichung</code>.</li>
+    <li><code>Feld auswählen</code> — wählen Sie das numerische Feld aus dem Join-Layer, das aggregiert werden soll (ausgeblendet bei <code>Anzahl</code>).</li>
+    <li><code>Name der Ergebnisspalte</code> (optional) — Name für die Ausgabespalte. Leer lassen für Standardname (z. B. <code>count</code> oder <code>Feldname_Operation</code>).</li>
+  </ul>
+  </div>
 </div>
 
 <div class="step">

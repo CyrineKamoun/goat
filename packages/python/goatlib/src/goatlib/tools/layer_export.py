@@ -147,7 +147,9 @@ class LayerExportRunner(SimpleToolRunner):
     Extends SimpleToolRunner for shared infrastructure (DuckDB, S3, settings, logging).
     """
 
-    def _get_table_name(self: Self, layer_id: str, user_id: str, layer_owner_id: str | None = None) -> str:
+    def _get_table_name(
+        self: Self, layer_id: str, user_id: str, layer_owner_id: str | None = None
+    ) -> str:
         """Build DuckLake table name for the layer owner.
 
         Uses layer_owner_id when provided (e.g., for shared/catalog layers).
@@ -176,15 +178,18 @@ class LayerExportRunner(SimpleToolRunner):
         return f"lake.{user_schema}.{table_name}"
 
     def _get_column_names(self: Self, table_name: str) -> list[str]:
-        """Get column names for a table."""
+        """Get column names for a table.
+
+        DESCRIBE loads only this table's metadata; information_schema.columns
+        would lazily load every table in the catalog to answer.
+        """
+        schema, table = table_name.replace("lake.", "").split(".", 1)
         result = self.duckdb_con.execute(
-            f"SELECT column_name FROM information_schema.columns WHERE table_schema || '.' || table_name = '{table_name.replace('lake.', '')}'"
+            f'DESCRIBE lake."{schema}"."{table}"'
         ).fetchall()
         return [row[0] for row in result]
 
-    def _get_exportable_columns(
-        self: Self, table_name: str
-    ) -> list[tuple[str, str]]:
+    def _get_exportable_columns(self: Self, table_name: str) -> list[tuple[str, str]]:
         """Get column names and types that can be exported to OGR formats.
 
         Excludes STRUCT and other complex types not supported by GDAL/OGR.
@@ -195,16 +200,25 @@ class LayerExportRunner(SimpleToolRunner):
         Returns:
             List of (column_name, data_type) tuples safe for OGR export
         """
-        # Get columns with their types
+        # Get columns with their types (DESCRIBE loads only this table's
+        # metadata; information_schema would lazily load the whole catalog)
+        schema, table = table_name.replace("lake.", "").split(".", 1)
         result = self.duckdb_con.execute(
-            f"SELECT column_name, data_type FROM information_schema.columns "
-            f"WHERE table_schema || '.' || table_name = '{table_name.replace('lake.', '')}'"
+            f'DESCRIBE lake."{schema}"."{table}"'
         ).fetchall()
 
         # Filter out complex/binary types not supported by OGR
-        unsupported_prefixes = ("STRUCT", "MAP", "UNION", "LIST", "ARRAY", "BLOB", "BIT")
+        unsupported_prefixes = (
+            "STRUCT",
+            "MAP",
+            "UNION",
+            "LIST",
+            "ARRAY",
+            "BLOB",
+            "BIT",
+        )
         exportable = []
-        for col_name, col_type in result:
+        for col_name, col_type, *_ in result:
             if not col_type.upper().startswith(unsupported_prefixes):
                 exportable.append((col_name, col_type.upper()))
             else:
@@ -274,12 +288,11 @@ class LayerExportRunner(SimpleToolRunner):
         Returns:
             True if table has a geometry column
         """
+        schema, table = table_name.replace("lake.", "").split(".", 1)
         result = self.duckdb_con.execute(
-            f"SELECT column_name FROM information_schema.columns "
-            f"WHERE table_schema || '.' || table_name = '{table_name.replace('lake.', '')}' "
-            f"AND column_name = 'geometry'"
-        ).fetchone()
-        return result is not None
+            f'DESCRIBE lake."{schema}"."{table}"'
+        ).fetchall()
+        return any(row[0] == "geometry" for row in result)
 
     def _export_to_file(
         self: Self,
