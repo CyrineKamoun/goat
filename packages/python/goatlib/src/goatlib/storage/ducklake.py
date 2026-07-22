@@ -303,6 +303,10 @@ class BaseDuckLakeManager:
         con.execute("SET allocator_flush_threshold='64MB'")
         # Enable background threads for memory cleanup
         con.execute("SET allocator_background_threads=true")
+        # Temporal semantics must not depend on the host OS timezone: naive
+        # datetime literals in filters and epoch() on TIMESTAMPTZ are resolved
+        # against the session tz. GLOBAL so cursors of this instance inherit.
+        con.execute("SET GLOBAL TimeZone='UTC'")
         self._install_extensions(con)
         self._load_extensions(con)
         self._setup_s3(con)
@@ -347,6 +351,7 @@ class BaseDuckLakeManager:
         so the connection can query DuckLake tables directly without
         copying data into memory.
         """
+        con.execute("SET GLOBAL TimeZone='UTC'")
         self._install_extensions(con)
         self._load_extensions(con)
         self._setup_s3(con)
@@ -1031,6 +1036,10 @@ class DuckLakePool:
         # Configure allocator to release memory back to OS more aggressively
         con.execute("SET allocator_flush_threshold='64MB'")
         con.execute("SET allocator_background_threads=true")
+
+        # Temporal semantics must not depend on the host OS timezone; GLOBAL
+        # so cursors drawn from this base inherit it.
+        con.execute("SET GLOBAL TimeZone='UTC'")
 
         # Point at baked extensions (prod images) so nothing is downloaded; in
         # local dev this is a no-op and we fall back to INSTALL. Install ALL
