@@ -4,7 +4,8 @@ import { Box, Collapse, IconButton, Skeleton } from "@mui/material";
 import { Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";
 import React, { useMemo, useState } from "react";
 
-import type { DatasetCollectionItems } from "@/lib/validations/layer";
+import type { DatasetCollectionItems, FieldKind } from "@/lib/validations/layer";
+import { formatFieldValue } from "@/lib/utils/formatFieldValue";
 
 import { FieldTypeTag, fieldTagKey } from "@/components/map/common/LayerFieldSelector";
 import NoValuesFound from "@/components/map/common/NoValuesFound";
@@ -21,12 +22,18 @@ const TWO_LINE_CLAMP_SX = {
   maxHeight: "2.5em",
 };
 
-const formatCellValue = (value: unknown): string => {
+const formatCellValue = (
+  value: unknown,
+  field?: { kind?: string; display_config?: Record<string, unknown> }
+): string => {
   if (value === null || value === undefined) {
     return "";
   }
   if (typeof value === "object") {
     return JSON.stringify(value);
+  }
+  if (field?.kind && field.kind !== "string") {
+    return formatFieldValue(value, field.kind as FieldKind, field.display_config ?? {});
   }
   return String(value);
 };
@@ -51,7 +58,7 @@ const Row = ({ row, fields }) => {
         {primitiveFields.map((field, fieldIndex) => (
           <TableCell key={fieldIndex}>
             <Typography variant="body2" sx={TWO_LINE_CLAMP_SX}>
-              {formatCellValue(row.properties[field.name])}
+              {formatCellValue(row.properties[field.name], field)}
             </Typography>
           </TableCell>
         ))}

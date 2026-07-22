@@ -9,7 +9,9 @@ import { previewSql } from "@/lib/api/expressions";
 import { apiRequestAuth } from "@/lib/api/fetcher";
 import { useDatasetCollectionItems } from "@/lib/api/layers";
 import { PROCESSES_API_BASE_URL } from "@/lib/api/processes";
+import { formatFieldValue } from "@/lib/utils/formatFieldValue";
 import { formatNumber } from "@/lib/utils/format-number";
+import type { FieldKind } from "@/lib/validations/layer";
 import type { DatasetCollectionItems, GetCollectionItemsQueryParams } from "@/lib/validations/layer";
 import type { AggregationStatsQueryParams, ProjectLayer } from "@/lib/validations/project";
 import { aggregationStatsQueryParams } from "@/lib/validations/project";
@@ -205,6 +207,26 @@ export const TableDataWidget = ({
   const recordNumericFieldNames = useMemo(() => {
     return new Set(visibleFields.filter((f) => f.type === "number").map((f) => f.name));
   }, [visibleFields]);
+
+  // Field kind + display_config per column, for kind-aware value formatting
+  // (datetime/boolean) of record cells and grouped labels.
+  const fieldMetaByName = useMemo(() => {
+    const meta: Record<string, { kind?: string; display_config?: Record<string, unknown> }> = {};
+    for (const f of layerFields) {
+      meta[f.name] = { kind: f.kind, display_config: f.display_config };
+    }
+    return meta;
+  }, [layerFields]);
+
+  const formatByKind = useCallback(
+    (columnKey: string, value: unknown): string | null => {
+      const meta = fieldMetaByName[columnKey];
+      if (!meta?.kind || meta.kind === "string" || meta.kind === "number") return null;
+      if (value === null || value === undefined || typeof value === "object") return null;
+      return formatFieldValue(value, meta.kind as FieldKind, meta.display_config ?? {});
+    },
+    [fieldMetaByName]
+  );
 
   const recordsQueryParams = useMemo(() => {
     if (!recordsLayerId || isGroupedMode || isSqlMode || !isRecordsColumnsConfigured) return undefined;
@@ -924,14 +946,25 @@ export const TableDataWidget = ({
           return formatNumber(parsed, getColumnFormat(columnKey), i18n.language);
         }
       }
+      const byKind = formatByKind(columnKey, value);
+      if (byKind !== null) return byKind;
       if (typeof value === "object") return JSON.stringify(value);
       return String(value);
     },
-    [getColumnFormat, i18n.language, recordNumericFieldNames]
+    [formatByKind, getColumnFormat, i18n.language, recordNumericFieldNames]
   );
 
   const formatGroupedCell = useCallback(
     (columnKey: string, value: unknown, row?: Record<string, unknown>) => {
+      // Group labels come from the group-by columns — format datetime/boolean
+      // values by their field kind (formatFieldValue falls back to String for
+      // anything that doesn't parse, e.g. the synthetic "Total" row).
+      const primaryColumn = config?.setup?.group_by_column_name;
+      const secondaryColumn = config?.setup?.group_by_secondary_column_name;
+      const groupLabel = (v: unknown, column?: string): string => {
+        if (v === null || v === undefined) return "-";
+        return (column ? formatByKind(column, v) : null) ?? String(v);
+      };
       if (columnKey === "grouped_value") {
         if (isCollapsibleMode && row?._isParent) {
           const isExpanded = row._isExpanded as boolean;
@@ -940,7 +973,7 @@ export const TableDataWidget = ({
           return (
             <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
               <ArrowIcon sx={{ fontSize: 18, color: "text.secondary", flexShrink: 0 }} />
-              <Box component="span" sx={{ fontWeight: 600 }}>{String(value ?? "-")}</Box>
+              <Box component="span" sx={{ fontWeight: 600 }}>{groupLabel(value, primaryColumn)}</Box>
               <Box component="span" sx={{ color: "text.disabled", fontSize: "0.75rem", ml: 0.25 }}>
                 ({childCount})
               </Box>
@@ -950,21 +983,21 @@ export const TableDataWidget = ({
         if (isCollapsibleMode && row?._isSubHeader) {
           return (
             <Box component="span" sx={{ pl: 3.5, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
-              {String(value ?? "-")}
+              {groupLabel(value, secondaryColumn ?? primaryColumn)}
             </Box>
           );
         }
         if (isCollapsibleMode && row?._isChild) {
           return (
             <Box component="span" sx={{ pl: 3.5 }}>
-              {String(value ?? "-")}
+              {groupLabel(value, secondaryColumn ?? primaryColumn)}
             </Box>
           );
         }
-        return String(value ?? "-");
+        return groupLabel(value, primaryColumn);
       }
       if (columnKey === "grouped_secondary_value") {
-        return String(value ?? "-");
+        return groupLabel(value, secondaryColumn);
       }
       if (columnKey.startsWith("metric_")) {
         if (isCollapsibleMode && row?._isSubHeader) {
@@ -980,7 +1013,15 @@ export const TableDataWidget = ({
       }
       return String(value ?? "-");
     },
-    [getColumnFormat, i18n.language, isCollapsibleMode, showSubtotals]
+    [
+      config?.setup?.group_by_column_name,
+      config?.setup?.group_by_secondary_column_name,
+      formatByKind,
+      getColumnFormat,
+      i18n.language,
+      isCollapsibleMode,
+      showSubtotals,
+    ]
   );
 
   const sqlTableColumns = useMemo(
