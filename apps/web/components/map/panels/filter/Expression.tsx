@@ -89,7 +89,9 @@ const Expression: React.FC<ExpressionProps> = (props) => {
       expression.expression === "is_empty_string" ||
       expression.expression === "is_not_empty_string" ||
       expression.expression === "is_blank" ||
-      expression.expression === "is_not_blank"
+      expression.expression === "is_not_blank" ||
+      expression.expression === "is_true" ||
+      expression.expression === "is_false"
     ) {
       hasValue = true;
     }

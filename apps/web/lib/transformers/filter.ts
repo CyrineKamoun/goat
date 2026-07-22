@@ -1,6 +1,8 @@
 import dayjs from "dayjs";
 import { v4 } from "uuid";
 
+import { TEMPORAL_VALUE_FORMAT } from "@p4b/ui/components/temporalFormats";
+
 import { type Expression, FilterType } from "@/lib/validations/filter";
 
 export const comparisonAndInclussionOpperators = {
@@ -63,6 +65,14 @@ export function does_not_contains_the_text(key: string, value: string) {
   return createNestedCondition("not", key, `%${value}%`, "like");
 }
 
+export function is_true(key: string) {
+  return `{"op":"=","args":[{"property":"${key}"},true]}`;
+}
+
+export function is_false(key: string) {
+  return `{"op":"=","args":[{"property":"${key}"},false]}`;
+}
+
 export function is_blank(key: string) {
   return `{
     "op": "isNull",
@@ -115,13 +125,35 @@ export function s_intersects(geom: string, geomProperty: string = "geom") {
 }
 
 function formatDateLiteral(d: dayjs.Dayjs): string {
-  return d.format("YYYY-MM-DDTHH:mm:ss");
+  return d.format(TEMPORAL_VALUE_FORMAT);
 }
 
 export function toIsoLiteral(value: string): string {
   const d = dayjs(value);
   if (!d.isValid()) return value;
   return formatDateLiteral(d);
+}
+
+// "is on" for temporal values means "on that calendar day", not equality on
+// the exact second — exact equality would almost never match timestamp data.
+export function date_is_on(key: string, value: string) {
+  const d = dayjs(value);
+  if (!d.isValid()) return is(key, value);
+  return date_is_between(
+    key,
+    formatDateLiteral(d.startOf("day")),
+    formatDateLiteral(d.endOf("day"))
+  );
+}
+
+export function date_is_not_on(key: string, value: string) {
+  const d = dayjs(value);
+  if (!d.isValid()) return is_not(key, value);
+  return date_is_not_between(
+    key,
+    formatDateLiteral(d.startOf("day")),
+    formatDateLiteral(d.endOf("day"))
+  );
 }
 
 export function date_is_between(key: string, from: string, to: string) {
@@ -207,6 +239,10 @@ export function createTheCQLBasedOnExpression(
           } else {
             return excludes(expression.attribute, expression.value.map(Number));
           }
+        case "is_true":
+          return is_true(expression.attribute);
+        case "is_false":
+          return is_false(expression.attribute);
         case "is_blank":
           return is_blank(expression.attribute);
         case "is_not_blank":
@@ -220,9 +256,9 @@ export function createTheCQLBasedOnExpression(
         case "does_not_contains_the_text":
           return does_not_contains_the_text(expression.attribute, expression.value);
         case "is_on":
-          return is(expression.attribute, toIsoLiteral(expression.value));
+          return date_is_on(expression.attribute, expression.value);
         case "is_not_on":
-          return is_not(expression.attribute, toIsoLiteral(expression.value));
+          return date_is_not_on(expression.attribute, expression.value);
         case "is_before":
           return createComparisonCondition(
             "<",
