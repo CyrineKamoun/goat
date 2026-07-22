@@ -4,7 +4,9 @@ All endpoints require authentication and verify layer ownership.
 After writes, tile cache and metadata cache are invalidated.
 """
 
+import asyncio
 import logging
+import threading
 from typing import Annotated, Any, cast
 from uuid import UUID
 
@@ -17,7 +19,7 @@ from goatlib.computed_columns import (
 )
 from pydantic import ValidationError
 
-from geoapi.catalog_events import notify_catalog_changed
+from geoapi.catalog_events import notify_catalog_changed, refresh_local_pins
 from geoapi.dependencies import LayerInfo, LayerInfoDep
 from geoapi.deps.auth import get_user_id
 from geoapi.models import (
@@ -121,6 +123,34 @@ async def _load_field_config(layer_info: LayerInfo) -> dict[str, Any]:
             cast("asyncpg.Connection[asyncpg.Record]", conn),
             UUID(layer_info.layer_id),
         )
+
+
+async def _settle_schema_caches(layer_id: str) -> None:
+    """Make column DDL immediately visible to schema reads.
+
+    ``_invalidate_caches`` pops the layer-metadata cache but bumps the
+    snapshot pins on a background thread — a queryables request racing that
+    refresh re-caches the pre-DDL column set for the full TTL (it survives
+    page reloads, and the *next* DDL then surfaces the *previous* change).
+    Refresh this pod's pins synchronously so the next read resolves the new
+    schema, re-pop the cache in case a racing read already poisoned it, and
+    pop once more after the poll window so an entry cached by another pod
+    (whose pins refresh asynchronously) clears as well.
+    """
+    from geoapi.config import settings
+
+    await asyncio.to_thread(refresh_local_pins)
+
+    layer_id_clean = layer_id.replace("-", "")
+
+    def _pop() -> None:
+        _metadata_cache.pop(layer_id_clean, None)
+        _metadata_cache.pop(layer_id, None)
+
+    _pop()
+    timer = threading.Timer(settings.DUCKLAKE_SNAPSHOT_REFRESH_SECONDS + 1.0, _pop)
+    timer.daemon = True
+    timer.start()
 
 
 async def _invalidate_caches_and_pmtiles(layer_info: LayerInfo) -> None:
@@ -458,6 +488,7 @@ async def add_column(
                 await write_field_config(conn, layer_info.layer_id, current)
 
         await _invalidate_caches_and_pmtiles(layer_info)
+        await _settle_schema_caches(layer_info.layer_id)
         return ColumnResponse(name=body.name, type=body.kind or body.type or "")
     except HTTPException:
         raise
@@ -541,6 +572,7 @@ async def update_column(
         # or schema in DuckLake, so existing tiles stay valid.
         if body.new_name:
             await _invalidate_caches_and_pmtiles(layer_info)
+            await _settle_schema_caches(layer_info.layer_id)
         final_name = body.new_name or columnName
         msg = "renamed" if body.new_name else "updated"
         return ColumnResponse(name=final_name, type="", message=msg)
@@ -583,6 +615,7 @@ async def delete_column(
                     await write_field_config(conn, layer_info.layer_id, current)
 
         await _invalidate_caches_and_pmtiles(layer_info)
+        await _settle_schema_caches(layer_info.layer_id)
         return ColumnResponse(name=columnName, type="", message="deleted")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
