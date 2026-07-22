@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from collections import defaultdict
 from datetime import date
 from datetime import datetime as dt_mod
@@ -24,18 +25,14 @@ _COLLECTION_TITLE = "GOAT Catalog Datasets"
 _COLLECTION_DESCRIPTION = (
     "Open geospatial datasets available in the GOAT catalog, "
     "harvested from CKAN and other sources. "
-    "Each record represents a dataset with one or more distributions (layers)."
+    "Each record is a dataset; a grouped dataset links its member layers via "
+    'rel="item".'
 )
 
 # Representative-layer columns shared by the items + single-item queries.
-# extent is returned as four bbox floats (no geometry decoding needed) for the
-# no-record_jsonb fallback path in _build_record.
 _REP_COLS = (
-    "id, name, description, tags, language_code, created_at, updated_at, "
-    "distributor_name, distributor_email, license, data_category, data_reference_year, "
-    "type, feature_layer_geometry_type, thumbnail_url, record_jsonb, "
-    "ST_XMin(extent::geometry) AS ext_w, ST_YMin(extent::geometry) AS ext_s, "
-    "ST_XMax(extent::geometry) AS ext_e, ST_YMax(extent::geometry) AS ext_n"
+    "id, name, type, feature_layer_geometry_type, thumbnail_url, record_jsonb, "
+    "ST_AsGeoJSON(ST_Envelope(extent::geometry)) AS extent_geojson"
 )
 
 
@@ -49,17 +46,6 @@ def _loads(v: Any) -> Any:
         return json.loads(v)
     except (TypeError, ValueError):
         return None
-
-
-def _bbox_and_coords(
-    w: Any, s: Any, e: Any, n: Any
-) -> tuple[list[float] | None, list[list[list[float]]] | None]:
-    """Build bbox [w,s,e,n] and a polygon ring from extent min/max floats."""
-    if w is None or s is None or e is None or n is None:
-        return None, None
-    bbox = [w, s, e, n]
-    coords = [[[w, s], [e, s], [e, n], [w, n], [w, s]]]
-    return bbox, coords
 
 
 def _parse_bbox_floats(bbox_str: str) -> list[float] | None:
@@ -97,35 +83,24 @@ def _build_filters(
         params.append(value)
         return f"${len(params)}"
 
-    if q:
-        # Prefix tsquery: "park platz" → "park:* & platz:*"
-        q_terms = [t.strip() for t in q.split() if t.strip()]
-        q_prefix = " & ".join(f"{t}:*" for t in q_terms) if q_terms else q
-        q_ph = add(q_prefix)
-        q_like = add(f"%{q.lower()}%")
+    # Prefix tsquery; \W+ split mirrors the 'simple' tokenizer and blocks
+    # tsquery-syntax injection (punctuation-only input → no text filter).
+    q_terms = [t for t in re.split(r"\W+", q) if t] if q else []
+    if q_terms:
+        q_ph = add(" & ".join(f"{t}:*" for t in q_terms))
         filters.append(
             f"""
-            (
-                cl.record_jsonb IS NOT NULL AND (
-                    to_tsvector('simple',
-                        coalesce(cl.record_jsonb->'properties'->>'title', '') || ' ' ||
-                        coalesce(cl.record_jsonb->'properties'->>'description', '') || ' ' ||
-                        coalesce(
-                            (SELECT string_agg(kw->>'value', ' ')
-                             FROM jsonb_array_elements(
-                                 coalesce(cl.record_jsonb->'properties'->'keywords', '[]'::jsonb)
-                             ) AS kw),
-                            ''
-                        )
-                    ) @@ to_tsquery('simple', {q_ph})
+            to_tsvector('simple',
+                coalesce(cl.record_jsonb->'properties'->>'title', '') || ' ' ||
+                coalesce(cl.record_jsonb->'properties'->>'description', '') || ' ' ||
+                coalesce(
+                    (SELECT string_agg(kw, ' ')
+                     FROM jsonb_array_elements_text(
+                         coalesce(cl.record_jsonb->'properties'->'keywords', '[]'::jsonb)
+                     ) AS kw),
+                    ''
                 )
-                OR (
-                    cl.record_jsonb IS NULL AND (
-                        lower(cl.name) LIKE {q_like}
-                        OR lower(coalesce(cl.description, '')) LIKE {q_like}
-                    )
-                )
-            )
+            ) @@ to_tsquery('simple', {q_ph})
             """
         )
 
@@ -143,21 +118,20 @@ def _build_filters(
     if language:
         lang_list = [v.strip() for v in language.split(",") if v.strip()]
         filters.append(
-            f"cl.record_jsonb->'properties'->>'language' = ANY({add(lang_list)})"
+            f"cl.record_jsonb->'properties'->'language'->>'code' = ANY({add(lang_list)})"
         )
 
     if year:
         filters.append(
-            "cl.record_jsonb IS NOT NULL AND "
-            "(cl.record_jsonb->'properties'->'extent'->'temporal'->'interval'->0->0)::int = "
+            "substring(cl.record_jsonb->'time'->'interval'->0->>0 from 1 for 4)::int = "
             f"{add(year)}"
         )
 
     if source_format:
-        filters.append(
-            "cl.record_jsonb IS NOT NULL AND "
-            f"cl.record_jsonb->'properties'->>'source_format' = {add(source_format)}"
-        )
+        # Provenance lives in the flat column (e.g. 'harvesting_opencatalog');
+        # legacy value 'dcat' maps to the harvester.
+        sf = "harvesting_opencatalog" if source_format == "dcat" else source_format
+        filters.append(f"cl.upload_file_type = {add(sf)}")
 
     if license_:
         lic_list = [v.strip() for v in license_.split(",") if v.strip()]
@@ -168,7 +142,7 @@ def _build_filters(
     if publisher:
         pub_list = [v.strip() for v in publisher.split(",") if v.strip()]
         filters.append(
-            f"cl.record_jsonb->'properties'->'publisher'->>'name' = ANY({add(pub_list)})"
+            f"cl.record_jsonb->'properties'->'contacts'->0->>'name' = ANY({add(pub_list)})"
         )
 
     if type_:
@@ -178,7 +152,7 @@ def _build_filters(
     if geographical_code:
         geo_list = [v.strip() for v in geographical_code.split(",") if v.strip()]
         filters.append(
-            f"cl.record_jsonb->'properties'->>'geographical_code' = ANY({add(geo_list)})"
+            f"cl.record_jsonb->'properties'->>'goat:geographical_code' = ANY({add(geo_list)})"
         )
 
     if datetime_:
@@ -235,13 +209,6 @@ def _build_filters(
     return " AND ".join(filters), params
 
 
-def _enum_str(v: Any) -> str | None:
-    """Return the string value of an Enum, or the value itself if already a str."""
-    if v is None:
-        return None
-    return v.value if hasattr(v, "value") else str(v)
-
-
 def _thumbnail_url(key: Optional[str]) -> Optional[str]:
     """Presign an S3 thumbnail key; pass through full URLs; None otherwise."""
     if not key:
@@ -268,58 +235,26 @@ def _build_record(
     dataset metadata source. Falls back to the representative layer's
     record_jsonb, then to flat columns.
     """
-    source_jsonb = package_record_jsonb or _loads(rep["record_jsonb"])
-    if source_jsonb:
-        # record_jsonb is the single source of truth for catalog layers.
-        record = copy.deepcopy(source_jsonb)
-        record["id"] = record_id
-        props = record.get("properties") or {}
-    else:
-        bbox, coords = _bbox_and_coords(
-            rep["ext_w"], rep["ext_s"], rep["ext_e"], rep["ext_n"]
-        )
-        geometry = {"type": "Polygon", "coordinates": coords} if coords else None
-        keywords: List[str] = list(rep["tags"] or [])
-        props = {
-            "type": "dataset",
-            "title": rep["name"],
-            "description": rep["description"],
-            "keywords": keywords,
-            "language": rep["language_code"],
-            "created": rep["created_at"].isoformat() if rep["created_at"] else None,
-            "updated": rep["updated_at"].isoformat() if rep["updated_at"] else None,
-            "publisher": (
-                {"name": rep["distributor_name"], "email": rep["distributor_email"]}
-                if rep["distributor_name"]
-                else None
-            ),
-            "license": _enum_str(rep["license"]),
-            "themes": (
-                [{"concepts": [{"id": _enum_str(rep["data_category"])}]}]
-                if rep["data_category"]
-                else []
-            ),
-            "extent": {
-                "spatial": {"bbox": [bbox]} if bbox else None,
-                "temporal": (
-                    {"interval": [[rep["data_reference_year"], None]]}
-                    if rep["data_reference_year"]
-                    else None
-                ),
-            },
-            "goat_layer_id": str(rep["id"]),
-        }
-        record = {
-            "id": record_id,
+    # Defensive stub: only for rows written outside the app (record-first).
+    source_jsonb = (
+        package_record_jsonb
+        or _loads(rep["record_jsonb"])
+        or {
             "type": "Feature",
-            "geometry": geometry,
-            "properties": props,
+            "geometry": None,
+            "properties": {"type": "dataset", "title": rep["name"]},
         }
+    )
+    record = copy.deepcopy(source_jsonb)
+    record["id"] = record_id
+    # geometry + goat:* are stored (trigger/harvest); serve only fills gaps.
+    props = record.get("properties") or {}
 
-    # Always inject thumbnail (presigned) and distributions
     if rep["thumbnail_url"]:
         props["thumbnail_url"] = _thumbnail_url(rep["thumbnail_url"])
-    props["distributions"] = distributions
+    props.setdefault("goat:layerType", rep["type"])
+    props.setdefault("goat:geometryType", rep["feature_layer_geometry_type"])
+    props.pop("distributions", None)  # superseded by rel="item" links
 
     links: List[Dict[str, Any]] = [
         {
@@ -335,8 +270,25 @@ def _build_record(
             "href": base_url,
         },
     ]
-    existing = [lk for lk in props.get("links", []) if lk.get("rel") == "enclosure"]
-    props["links"] = links + existing
+    # Member layers → rel="item" links; a standalone layer gets no item link.
+    for d in distributions:
+        if str(d.get("layer_id")) == str(record_id):
+            continue
+        links.append(
+            {
+                "rel": "item",
+                "type": "application/geo+json",
+                "title": d.get("name"),
+                "href": f"{base_url}/{d.get('layer_id')}",
+                "goat:layerType": d.get("type"),
+                "goat:geometryType": d.get("geometry_type"),
+            }
+        )
+    # Keep stored via/enclosure links (the actual DCAT distributions);
+    # tolerate legacy records that still carry properties.links.
+    stored = record.get("links") or props.pop("links", None) or []
+    existing = [lk for lk in stored if lk.get("rel") in ("enclosure", "via")]
+    record["links"] = links + existing
     record["properties"] = props
     return record
 
@@ -511,14 +463,12 @@ async def search_records(
         rep_ids = [g["representative_id"] for g in page_groups]
         group_keys = [g["group_key"] for g in page_groups]
 
-        # Representative layer rows
         rep_rows = await conn.fetch(
             f"SELECT {_REP_COLS} FROM customer.layer WHERE id = ANY($1::uuid[])",
             rep_ids,
         )
         rep_layers = {str(r["id"]): r for r in rep_rows}
 
-        # Sibling layers (distributions)
         siblings_rows = await conn.fetch(
             f"""
             SELECT cl.id,
@@ -580,7 +530,13 @@ async def search_records(
         )
         pkg_rj = group_records.get(group["group_id"]) if group["group_id"] else None
         features.append(
-            _build_record(rep, dists, base_url, record_id, package_record_jsonb=pkg_rj)
+            _build_record(
+                rep,
+                dists,
+                base_url,
+                record_id,
+                package_record_jsonb=pkg_rj,
+            )
         )
 
     links: List[Dict[str, Any]] = [
@@ -615,75 +571,64 @@ async def search_records(
 async def get_record(
     pool: asyncpg.Pool, item_id: str, *, base_url: str
 ) -> Optional[Dict[str, Any]]:
-    """Return a single dataset record by group id or layer UUID, or None if absent."""
-    from_sql, group_expr, group_id_expr, child_name_expr = _get_group_sql()
+    """Return a single record. A group id resolves to the group (members as
+    rel="item" links); a layer id resolves to that layer's own record."""
     cs = "customer"
 
     async with pool.acquire() as conn:
-        group = await conn.fetchrow(
-            f"""
-            SELECT DISTINCT ON ({group_expr})
-                cl.id AS representative_id,
-                {group_expr} AS group_key,
-                {group_id_expr} AS group_id
-            {from_sql}
-            WHERE cl.in_catalog = TRUE
-              AND ({group_id_expr} = $1 OR cl.id::text = $1)
-            ORDER BY {group_expr}, cl.updated_at DESC
-            LIMIT 1
-            """,
-            item_id,
+        is_group = await conn.fetchval(
+            f"SELECT 1 FROM {cs}.layer_group WHERE id::text = $1", item_id
         )
-        if group is None:
-            return None
-
-        rep = await conn.fetchrow(
-            f"SELECT {_REP_COLS} FROM {cs}.layer WHERE id = $1",
-            group["representative_id"],
-        )
-        if rep is None:
-            return None
-
-        siblings_rows = await conn.fetch(
-            f"""
-            SELECT cl.id,
-                   {child_name_expr} AS name,
-                   cl.type,
-                   cl.feature_layer_geometry_type
-            {from_sql}
-            WHERE cl.in_catalog = TRUE
-              AND {group_expr} = $1
-            ORDER BY name
-            """,
-            group["group_key"],
-        )
-        distributions = [
-            {
-                "layer_id": str(row["id"]),
-                "name": row["name"],
-                "type": row["type"],
-                "geometry_type": row["feature_layer_geometry_type"],
-            }
-            for row in siblings_rows
-        ]
-
-        pkg_rj = None
-        if group["group_id"]:
+        if is_group:
+            rep = await conn.fetchrow(
+                f"SELECT {_REP_COLS} FROM {cs}.layer"
+                f" WHERE layer_group_id::text = $1 AND in_catalog = TRUE"
+                f" ORDER BY updated_at DESC LIMIT 1",
+                item_id,
+            )
+            if rep is None:
+                return None
+            siblings_rows = await conn.fetch(
+                f"SELECT id, name, type, feature_layer_geometry_type FROM {cs}.layer"
+                f" WHERE in_catalog = TRUE AND layer_group_id::text = $1 ORDER BY name",
+                item_id,
+            )
+            distributions = [
+                {
+                    "layer_id": str(row["id"]),
+                    "name": row["name"],
+                    "type": row["type"],
+                    "geometry_type": row["feature_layer_geometry_type"],
+                }
+                for row in siblings_rows
+            ]
+            pkg_rj = None
             try:
                 pkg_row = await conn.fetchrow(
                     f"SELECT record_jsonb FROM {cs}.layer_group"
                     f" WHERE id = $1::uuid AND record_jsonb IS NOT NULL",
-                    group["group_id"],
+                    item_id,
                 )
                 if pkg_row and pkg_row["record_jsonb"]:
                     pkg_rj = _loads(pkg_row["record_jsonb"])
             except Exception:
                 pass
+            return _build_record(
+                rep,
+                distributions,
+                base_url,
+                item_id,
+                package_record_jsonb=pkg_rj,
+            )
 
-    record_id = group["group_id"] or str(group["representative_id"])
-    return _build_record(
-        rep, distributions, base_url, record_id, package_record_jsonb=pkg_rj
-    )
+        # A layer id (standalone or a group member) → its own record, no members.
+        rep = await conn.fetchrow(
+            f"SELECT {_REP_COLS} FROM {cs}.layer WHERE id::text = $1 AND in_catalog = TRUE",
+            item_id,
+        )
+        if rep is None:
+            return None
+        return _build_record(rep, [], base_url, str(rep["id"]))
 
 
 async def search_nuts(

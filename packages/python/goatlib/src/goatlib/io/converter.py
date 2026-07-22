@@ -63,7 +63,6 @@ class IOConverter:
         self.con.execute("INSTALL httpfs; LOAD httpfs;")
         limit = getattr(settings, "DUCKDB_MEMORY_LIMIT", None) or "4GB"
         self.con.execute(f"SET memory_limit='{limit}'")
-        self.con.execute("SET temp_directory='/tmp/duckdb_spill'")
 
         io = settings.io
         self.con.execute("SET s3_region = $1;", [io.s3_region])

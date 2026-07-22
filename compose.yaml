@@ -477,7 +477,7 @@ services:
     environment:
       <<: *env-goatdata
     volumes:
-      - ../goat-data/src/datacatalog:/venv/lib/python3.11/site-packages/datacatalog:ro
+      - ../goat-data/src/opencatalog:/venv/lib/python3.11/site-packages/opencatalog:ro
       - goat-data:/app/data
 
   # ===========================================================================

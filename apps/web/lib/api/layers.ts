@@ -64,6 +64,7 @@ const buildOgcQuery = (
     payload.distributor_name?.forEach((v) => qs.append("publisher", v));
     if (payload.spatial_search) qs.append("bbox", payload.spatial_search);
     if (payload.spatial_boost) qs.append("bbox_boost", payload.spatial_boost);
+    if (payload.datetime) qs.append("datetime", payload.datetime);
   }
   if (pagination) {
     const size = pagination.size ?? 10;
@@ -86,20 +87,39 @@ const buildOgcQuery = (
   return qs;
 };
 
-const featureDistributions = (feature: Record<string, unknown>): CatalogLayerSummary[] => {
-  const props = (feature.properties as Record<string, unknown>) ?? {};
-  const dists = (props.distributions as Array<Record<string, unknown>>) ?? [];
-  return dists.map((d) => ({
-    id: String(d.layer_id ?? ""),
-    name: String(d.name ?? ""),
-    type: (d.type as string) ?? null,
-    feature_layer_geometry_type: (d.geometry_type as string) ?? null,
-  }));
+type ItemLink = {
+  rel?: string;
+  href?: string;
+  title?: string;
+  "goat:layerType"?: string;
+  "goat:geometryType"?: string;
 };
+// Group members are rel="item" links (OGC-standard). The layer id is the last
+// path segment of the href.
+const featureDistributions = (feature: Record<string, unknown>): CatalogLayerSummary[] => {
+  const links = (feature.links as ItemLink[] | undefined) ?? [];
+  return links
+    .filter((l) => l.rel === "item")
+    .map((l) => ({
+      id: (l.href ?? "").split("/").pop() ?? "",
+      name: String(l.title ?? ""),
+      type: l["goat:layerType"] ?? null,
+      feature_layer_geometry_type: l["goat:geometryType"] ?? null,
+    }));
+};
+
+type RecordContact = { name?: string; roles?: string[]; emails?: { value?: string }[] };
+const publisherOf = (props: Record<string, unknown>): RecordContact | undefined => {
+  const contacts = (props.contacts as RecordContact[] | undefined) ?? [];
+  return contacts.find((c) => (c.roles ?? []).includes("publisher")) ?? contacts[0];
+};
+const languageCodeOf = (props: Record<string, unknown>): string | null =>
+  ((props.language as { code?: string } | undefined)?.code ??
+    (typeof props.language === "string" ? props.language : null)) as string | null;
 
 const featureToLayer = (feature: Record<string, unknown>): Layer => {
   const props = (feature.properties as Record<string, unknown>) ?? {};
-  const publisher = props.publisher as { name?: string; email?: string } | undefined;
+  const publisher = publisherOf(props);
   const themes = props.themes as Array<{ concepts?: Array<{ id?: string }> }> | undefined;
   const distributions = featureDistributions(feature);
   const firstDist = distributions[0] ?? ({} as CatalogLayerSummary);
@@ -108,12 +128,15 @@ const featureToLayer = (feature: Record<string, unknown>): Layer => {
     name: (props.title as string) ?? "",
     description: (props.description as string) ?? null,
     thumbnail_url: (props.thumbnail_url as string) ?? null,
-    type: firstDist.type ?? "feature",
-    feature_layer_geometry_type: firstDist.feature_layer_geometry_type ?? null,
+    // Standalone layer: operational type/geometry ride as goat: extras (no item
+    // links). Group: fall back to the first member.
+    type: (props["goat:layerType"] as string) ?? firstDist.type ?? "feature",
+    feature_layer_geometry_type:
+      (props["goat:geometryType"] as string) ?? firstDist.feature_layer_geometry_type ?? null,
     data_category: themes?.[0]?.concepts?.[0]?.id ?? null,
     distributor_name: publisher?.name ?? null,
-    geographical_code: (props.geographical_code as string) ?? null,
-    language_code: (props.language as string) ?? null,
+    geographical_code: ((props["goat:geographical_code"] ?? props.geographical_code) as string) ?? null,
+    language_code: languageCodeOf(props),
     license: (props.license as string) ?? null,
     tags: (props.keywords as string[]) ?? [],
     other_properties: { ...props, distributions },
@@ -124,7 +147,7 @@ const featureToLayer = (feature: Record<string, unknown>): Layer => {
 
 const featureToGroup = (feature: Record<string, unknown>): CatalogDatasetGrouped => {
   const props = (feature.properties as Record<string, unknown>) ?? {};
-  const publisher = props.publisher as { name?: string } | undefined;
+  const publisher = publisherOf(props);
   const themes = props.themes as Array<{ concepts?: Array<{ id?: string }> }> | undefined;
   return {
     package_id: String(feature.id ?? ""),
@@ -132,9 +155,13 @@ const featureToGroup = (feature: Record<string, unknown>): CatalogDatasetGrouped
     description: (props.description as string) ?? null,
     data_category: themes?.[0]?.concepts?.[0]?.id ?? null,
     distributor_name: publisher?.name ?? null,
-    language_code: (props.language as string) ?? null,
+    language_code: languageCodeOf(props),
     license: (props.license as string) ?? null,
-    record_jsonb: { properties: props },
+    record_jsonb: {
+      properties: props,
+      links: (feature.links as unknown[]) ?? undefined,
+      time: (feature.time as unknown) ?? undefined,
+    },
     layers: featureDistributions(feature),
   };
 };
@@ -176,7 +203,14 @@ const ogcAggregatesFetcher = async ([url, payload]: [
     err.status = res.status;
     throw err;
   }
-  return res.json();
+  // OGC API - Records - Part 2: Facets shape → flat {field: [{value,count}]}.
+  const json = (await res.json()) as {
+    facets?: Record<string, { buckets?: { value: string; count: number }[] }>;
+  };
+  const facets = json.facets ?? {};
+  const out: Record<string, { value: string; count: number }[]> = {};
+  for (const [key, facet] of Object.entries(facets)) out[key] = facet.buckets ?? [];
+  return out as unknown as DatasetMetadataAggregated;
 };
 
 /**

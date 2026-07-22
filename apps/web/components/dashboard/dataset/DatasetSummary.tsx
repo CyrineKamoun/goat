@@ -152,35 +152,51 @@ const DatasetSummary: React.FC<DatasetSummaryProps> = ({
   // columns are a legacy fallback that harvested layers leave empty. Resolve each
   // display field from record_jsonb.properties first, then the flat column — same
   // pattern as DatasetGroupOverview, so the detail page matches the catalog cards.
-  const props = (dataset as { record_jsonb?: { properties?: Record<string, unknown> } }).record_jsonb
-    ?.properties;
+  const record = (dataset as {
+    record_jsonb?: {
+      properties?: Record<string, unknown>;
+      links?: { rel?: string; href?: string }[];
+      time?: { interval?: unknown[][] };
+    };
+  }).record_jsonb;
+  const props = record?.properties;
+  type Contact = { name?: string; roles?: string[]; emails?: { value?: string }[]; links?: { href?: string }[] };
+  const publisherContact = (): Contact | undefined => {
+    const contacts = (props?.contacts as Contact[] | undefined) ?? [];
+    return contacts.find((c) => (c.roles ?? []).includes("publisher")) ?? contacts[0];
+  };
   const fromRecord = (field: string): unknown => {
     if (!props) return undefined;
     switch (field) {
       case "data_category":
         return (props.themes as { concepts?: { id?: string }[] }[] | undefined)?.[0]?.concepts?.[0]?.id;
       case "language_code":
-        return props.language;
-      case "data_reference_year":
-        return ((props.extent as { temporal?: { interval?: unknown[][] } } | undefined)?.temporal
-          ?.interval)?.[0]?.[0];
+        return (props.language as { code?: string } | undefined)?.code ?? props.language;
+      case "data_reference_year": {
+        // recordGeoJSON: temporal extent is top-level `time` (RFC 3339 date)
+        const t0 = record?.time?.interval?.[0]?.[0];
+        return typeof t0 === "string" ? t0.slice(0, 4) : t0;
+      }
       case "distributor_name":
-        return (props.publisher as { name?: string } | undefined)?.name;
+        return publisherContact()?.name;
       case "distributor_email":
-        return (props.publisher as { email?: string } | undefined)?.email;
+        return publisherContact()?.emails?.[0]?.value;
       case "distribution_url": {
-        // "Datengeber-URL" = the data provider's URL. Prefer the publisher (Datengeber)
-        // URL; only when it's missing fall back to the CKAN package page ("via"), then a
-        // resource download (enclosure). So it's not always the CKAN aggregator link.
-        const links = (props.links as { rel?: string; href?: string }[] | undefined) ?? [];
+        // Prefer the CKAN source dataset page ("via"), then a direct download
+        // ("enclosure"), and only fall back to the publisher homepage. Links
+        // are top-level.
+        const links = record?.links ?? [];
         return (
-          (props.publisher as { url?: string } | undefined)?.url ??
           links.find((l) => l.rel === "via")?.href ??
-          links.find((l) => l.rel === "enclosure")?.href
+          links.find((l) => l.rel === "enclosure")?.href ??
+          publisherContact()?.links?.[0]?.href
         );
       }
+      case "attribution":
+        return props.rights ?? props.attribution;
       default:
-        return props[field]; // description, license, geographical_code, lineage, attribution, …
+        if (field === "geographical_code") return props["goat:geographical_code"] ?? props.geographical_code;
+        return props[field]; // description, license, lineage, …
     }
   };
   const getField = (field: string): string => {

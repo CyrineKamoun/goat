@@ -22,6 +22,8 @@ from typing import Any, Protocol
 import asyncpg
 import duckdb
 
+from goatlib.utils.layer import is_valid_wgs84_wkt
+
 logger = logging.getLogger(__name__)
 
 
@@ -193,6 +195,14 @@ class LayerReplaceMixin:
                                 f"POLYGON(({min_x} {min_y}, {max_x} {min_y}, "
                                 f"{max_x} {max_y}, {min_x} {max_y}, {min_x} {min_y}))"
                             )
+                            # Same WGS84 guard as BaseToolRunner._get_table_info.
+                            if not is_valid_wgs84_wkt(extent_wkt):
+                                logger.warning(
+                                    "Extent outside WGS84 bounds for %s; storing no extent",
+                                    table_name,
+                                )
+                                extent = None
+                                extent_wkt = None
                     except (ValueError, IndexError) as e:
                         logger.warning("Failed to parse extent: %s", e)
 
@@ -206,9 +216,7 @@ class LayerReplaceMixin:
             "geometry_type": geometry_type,
         }
 
-    def _delete_old_pmtiles(
-        self: _HasReplaceDeps, user_id: str, layer_id: str
-    ) -> bool:
+    def _delete_old_pmtiles(self: _HasReplaceDeps, user_id: str, layer_id: str) -> bool:
         """Delete existing PMTiles file for a layer before regenerating."""
         if self.settings is None:
             return False
@@ -233,7 +241,9 @@ class LayerReplaceMixin:
         snapshot_id: int | None = None,
     ) -> None:
         """Generate fresh PMTiles from an updated DuckLake table."""
-        if self.settings is None or not getattr(self.settings, "pmtiles_enabled", False):
+        if self.settings is None or not getattr(
+            self.settings, "pmtiles_enabled", False
+        ):
             return
 
         geom_col = table_info.get("geometry_column") or "geometry"
@@ -264,7 +274,9 @@ class LayerReplaceMixin:
                 snapshot_id=snapshot_id,
             )
             if pmtiles_path:
-                logger.info("Generated PMTiles for layer %s: %s", layer_id, pmtiles_path)
+                logger.info(
+                    "Generated PMTiles for layer %s: %s", layer_id, pmtiles_path
+                )
         except Exception as e:
             logger.warning("PMTiles generation failed for layer %s: %s", layer_id, e)
 

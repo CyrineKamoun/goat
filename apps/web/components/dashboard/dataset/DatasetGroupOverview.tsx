@@ -32,18 +32,23 @@ export default function DatasetGroupOverview({ group }: DatasetGroupOverviewProp
   const title = (props?.title as string) || group.name;
   const description = (props?.description as string) || "";
   const license = (props?.license as string) || group.license || "";
+  const contacts = (props?.contacts as { name?: string; roles?: string[] }[] | undefined) ?? [];
   const publisher =
-    ((props?.publisher as Record<string, unknown>)?.name as string) ||
+    (contacts.find((c) => (c.roles ?? []).includes("publisher")) ?? contacts[0])?.name ||
     group.distributor_name ||
     "";
-  const language = (props?.language as string) || group.language_code || "";
+  const language =
+    ((props?.language as { code?: string } | undefined)?.code as string) ||
+    (typeof props?.language === "string" ? (props.language as string) : "") ||
+    group.language_code ||
+    "";
   const category = group.data_category || "";
 
-  // Temporal extent year
-  const temporalInterval = (
-    (props?.extent as Record<string, unknown>)?.temporal as Record<string, unknown>
-  )?.interval as unknown[][] | undefined;
-  const year = temporalInterval?.[0]?.[0] as number | undefined;
+  // Temporal extent year — recordGeoJSON keeps it in top-level `time`
+  const temporalInterval = ((record?.time as Record<string, unknown>)?.interval ??
+    undefined) as unknown[][] | undefined;
+  const t0 = temporalInterval?.[0]?.[0];
+  const year = (typeof t0 === "string" ? t0.slice(0, 4) : t0) as number | string | undefined;
 
   // Unique types and geometry types across layers
   const layerSummary = useMemo(() => {

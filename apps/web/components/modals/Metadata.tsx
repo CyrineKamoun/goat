@@ -30,6 +30,40 @@ import { RhfAutocompleteField } from "@/components/common/form-inputs/Autocomple
 
 interface MetadataDialogProps extends ContentDialogBaseProps {}
 
+type RecordJsonb = {
+  time?: { interval?: unknown[][] };
+  links?: { rel?: string; href?: string }[];
+  properties?: Record<string, unknown>;
+};
+
+// Published layers keep their record-owned columns NULL — the record is the
+// metadata truth, so the edit form prefills from it (columns as fallback).
+const recordDefaults = (content: Record<string, unknown>): Partial<LayerMetadata> => {
+  const record = content.record_jsonb as RecordJsonb | undefined;
+  const props = record?.properties;
+  if (!props) return {};
+  const contacts = (props.contacts as { name?: string; roles?: string[]; emails?: { value?: string }[] }[]) ?? [];
+  const publisher = contacts.find((c) => (c.roles ?? []).includes("publisher")) ?? contacts[0];
+  const t0 = record?.time?.interval?.[0]?.[0];
+  const themes = props.themes as { concepts?: { id?: string }[] }[] | undefined;
+  const enclosure = record?.links?.find((l) => l.rel === "enclosure")?.href;
+  const out = {
+    description: props.description,
+    license: props.license,
+    language_code: (props.language as { code?: string } | undefined)?.code,
+    distributor_name: publisher?.name,
+    distributor_email: publisher?.emails?.[0]?.value,
+    distribution_url: enclosure,
+    data_reference_year: typeof t0 === "string" ? Number(t0.slice(0, 4)) : undefined,
+    tags: props.keywords,
+    data_category: themes?.[0]?.concepts?.[0]?.id,
+    geographical_code: props["goat:geographical_code"],
+  };
+  return Object.fromEntries(
+    Object.entries(out).filter(([, v]) => v !== undefined && v !== null)
+  ) as Partial<LayerMetadata>;
+};
+
 const Metadata: React.FC<MetadataDialogProps> = ({ open, onClose, content, type }) => {
   const { t } = useTranslation("common");
   const [isBusy, setIsBusy] = useState(false);
@@ -41,7 +75,7 @@ const Metadata: React.FC<MetadataDialogProps> = ({ open, onClose, content, type 
   } = useForm<LayerMetadata>({
     mode: "onChange",
     resolver: zodResolver(layerMetadataSchema),
-    defaultValues: { ...content },
+    defaultValues: { ...content, ...recordDefaults(content as Record<string, unknown>) },
   });
 
   const { dataCategoryOptions, geographicalCodeOptions, licenseOptions, languageCodeOptions } =

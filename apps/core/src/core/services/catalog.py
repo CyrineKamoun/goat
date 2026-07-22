@@ -1,100 +1,26 @@
-"""Catalog metadata service — manages record_jsonb on Layer objects.
+"""Catalog metadata service — builds and edits record_jsonb on Layer objects.
 
-For catalog layers: record_jsonb is the single source of truth (OGC-compliant).
-User edits flow into datacatalog.record_overrides with source='user' (priority 100)
-so they are preserved when the pipeline re-harvests. merge_record_overrides rebuilds
-layer.record_jsonb by applying harvest < ai_* < user in priority order.
-
-For user-uploaded layers: record_jsonb is built from flat columns on create,
-then updated incrementally on edit.
+Record-first: while a record exists it owns the descriptive metadata (the flat
+columns stay NULL); publish materializes it, native withdrawal dissolves it.
 """
 
 from __future__ import annotations
 
 import copy
-import json
 import re
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Dict, List, Union
-from uuid import UUID
-
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from core.core.config import settings
+from typing import TYPE_CHECKING, Any, Dict, List
 
 if TYPE_CHECKING:
     from core.db.models.layer import Layer
 
 
-def update_record_jsonb(layer: "Layer") -> Dict[str, Any]:
-    """Update record_jsonb by merging user-editable flat columns into
-    the existing record_jsonb. Preserves harvested fields the user didn't change.
-
-    Called on every layer update (PUT /api/v2/layer/{id}).
-    """
-    existing = layer.record_jsonb
-    if not existing or not isinstance(existing, dict):
-        # No existing record_jsonb — build from scratch (user-uploaded layer)
-        return layer_to_record_jsonb(layer)
-
-    record = copy.deepcopy(existing)
-    props = record.setdefault("properties", {})
-
-    # Merge user-editable fields — only overwrite if the flat column has a value
-    if layer.name:
-        props["title"] = layer.name
-    if layer.description is not None:
-        props["description"] = layer.description or ""
-    if layer.language_code:
-        props["language"] = layer.language_code
-    if layer.data_category:
-        themes = [{"concepts": [{"id": layer.data_category.value}]}]
-        props["themes"] = themes
-    if layer.distributor_name:
-        pub = props.get("publisher") or {}
-        pub["name"] = layer.distributor_name
-        if layer.distributor_email:
-            pub["email"] = str(layer.distributor_email)
-        props["publisher"] = pub
-    if layer.license:
-        props["license"] = layer.license.value
-    if layer.data_reference_year is not None:
-        extent = props.setdefault("extent", {})
-        extent["temporal"] = {"interval": [[layer.data_reference_year, None]]}
-    if layer.tags:
-        props["keywords"] = [{"value": t} for t in layer.tags]
-    if layer.distribution_url:
-        # Update or add enclosure link
-        links = [lk for lk in (props.get("links") or []) if lk.get("rel") != "enclosure"]
-        links.append({
-            "rel": "enclosure",
-            "type": "application/octet-stream",
-            "title": "Download",
-            "href": str(layer.distribution_url),
-        })
-        props["links"] = links
-
-    # Update extent geometry from actual data extent
-    geometry, bbox_list = _geometry_from_extent(str(layer.extent) if layer.extent else None)
-    if geometry:
-        record["geometry"] = geometry
-        extent = props.setdefault("extent", {})
-        extent["spatial"] = {"bbox": bbox_list}
-
-    # Update timestamp
-    props["updated"] = datetime.now(timezone.utc).isoformat()
-    props["goat_layer_id"] = str(layer.id)
-
-    return record
-
-
 def layer_to_record_jsonb(layer: "Layer") -> Dict[str, Any]:
-    """Build record_jsonb from flat columns only (for new/user-uploaded layers).
+    """Build a record from the flat columns — the native publish builder.
 
-    For catalog layers, the pipeline writes richer metadata via
-    dcat_to_record() or iso19139_to_record(). This function is only
-    the fallback for layers without existing record_jsonb.
+    Called when a user adds their own layer to the catalog
+    (crud_layer._publish_to_catalog) and by the record-first migration.
+    Harvested layers never come through here: the pipeline materializes
+    their records via dcat_to_record().
     """
     geometry, bbox = _geometry_from_extent(str(layer.extent) if layer.extent else None)
 
@@ -109,37 +35,36 @@ def layer_to_record_jsonb(layer: "Layer") -> Dict[str, Any]:
             }
         )
 
+    contacts: list[Dict[str, Any]] = []
+    if layer.distributor_name:
+        _pub: Dict[str, Any] = {"name": layer.distributor_name, "roles": ["publisher"]}
+        if layer.distributor_email:
+            _pub["emails"] = [{"value": str(layer.distributor_email)}]
+        contacts.append(_pub)
+
     return {
         "id": str(layer.id),
         "type": "Feature",
         "geometry": geometry,
+        "time": {"interval": [[f"{layer.data_reference_year}-01-01", None]]}
+        if layer.data_reference_year
+        else None,
+        "links": links,
         "properties": {
             "type": "dataset",
             "title": layer.name or "",
             "description": layer.description or "",
-            "keywords": [{"value": t} for t in (layer.tags or [])],
+            "keywords": list(layer.tags or []),
             "themes": [{"concepts": [{"id": layer.data_category.value}]}]
             if layer.data_category
             else [],
-            "language": layer.language_code,
+            "language": {"code": layer.language_code} if layer.language_code else None,
             "created": layer.created_at.isoformat() if layer.created_at else None,
             "updated": layer.updated_at.isoformat() if layer.updated_at else None,
-            "publisher": {
-                "name": layer.distributor_name,
-                "email": str(layer.distributor_email) if layer.distributor_email else None,
-            }
-            if layer.distributor_name
-            else None,
+            "contacts": contacts,
             "license": layer.license.value if layer.license else None,
-            "extent": {
-                "spatial": {"bbox": bbox} if bbox else None,
-                "temporal": {"interval": [[layer.data_reference_year, None]]}
-                if layer.data_reference_year
-                else None,
-            },
-            "links": links,
-            "source_format": "layer_model",
-            "goat_layer_id": str(layer.id),
+            "rights": None,
+            "externalIds": [],
         },
     }
 
@@ -162,20 +87,18 @@ def _geometry_from_extent(
     return {"type": "Polygon", "coordinates": coords}, [[w, s, e, n]]
 
 
-# ---------------------------------------------------------------------------
-# record_overrides: user edit overlay + merge (OGC-compliant catalog flow)
-# ---------------------------------------------------------------------------
-
-# Maps edit-form layer fields to their position in record_jsonb.properties
+# Maps edit-form layer fields to their position in the record (root-relative;
+# recordGeoJSON: descriptive fields under properties, time/links top-level).
 FIELD_TO_JSONB_PATH: Dict[str, List[Any]] = {
-    "name":                ["title"],
-    "description":         ["description"],
-    "license":             ["license"],
-    "language_code":       ["language"],
-    "distributor_name":    ["publisher", "name"],
-    "distributor_email":   ["publisher", "email"],
-    "distribution_url":    ["distribution_url"],
-    "data_reference_year": ["extent", "temporal", "interval", 0, 0],
+    "name": ["properties", "title"],
+    "description": ["properties", "description"],
+    "license": ["properties", "license"],
+    "language_code": ["properties", "language", "code"],
+    "distributor_name": ["properties", "contacts", 0, "name"],
+    "distributor_email": ["properties", "contacts", 0, "emails", 0, "value"],
+    "data_reference_year": ["time", "interval", 0, 0],
+    "tags": ["properties", "keywords"],
+    "geographical_code": ["properties", "goat:geographical_code"],
 }
 
 
@@ -235,135 +158,75 @@ def _remove_nested(d: Dict[str, Any], path: List[Any]) -> bool:
     return False
 
 
-def _deep_merge(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
-    """Recursively merge overlay into base. Overlay leaf values win; None is skipped."""
-    result = dict(base)
-    for key, val in overlay.items():
-        if val is None:
-            continue
-        if key in result and isinstance(result[key], dict) and isinstance(val, dict):
-            result[key] = _deep_merge(result[key], val)
-        else:
-            result[key] = val
-    return result
-
-
-async def get_record_override(
-    session: AsyncSession, layer_id: Union[UUID, str], source: str
-) -> Dict[str, Any] | None:
-    """Fetch the overrides_jsonb for a (layer_id, source) pair, or None if absent."""
-    res = await session.execute(
-        text(
-            f"SELECT overrides_jsonb FROM {settings.CATALOG_SCHEMA}.record_overrides"
-            f" WHERE layer_id = :lid AND source = :src LIMIT 1"
-        ),
-        {"lid": str(layer_id), "src": source},
-    )
-    row = res.fetchone()
-    return row.overrides_jsonb if row else None
-
-
-async def upsert_record_override(
-    session: AsyncSession,
-    layer_id: Union[UUID, str],
-    source: str,
-    priority: int,
-    overrides_jsonb: Dict[str, Any],
-) -> None:
-    """Write or update a record_overrides row."""
-    await session.execute(
-        text(
-            f"""
-            INSERT INTO {settings.CATALOG_SCHEMA}.record_overrides
-                (layer_id, source, priority, overrides_jsonb, updated_at)
-            VALUES (:lid, :src, :pri, CAST(:ov AS jsonb), now())
-            ON CONFLICT (layer_id, source) DO UPDATE SET
-                overrides_jsonb = EXCLUDED.overrides_jsonb,
-                priority = EXCLUDED.priority,
-                updated_at = now()
-            """
-        ),
-        {
-            "lid": str(layer_id),
-            "src": source,
-            "pri": priority,
-            "ov": json.dumps(overrides_jsonb),
-        },
-    )
-
-
-async def merge_record_overrides(
-    session: AsyncSession, layer_id: Union[UUID, str]
-) -> Dict[str, Any] | None:
-    """Rebuild merged record_jsonb from all overrides, in priority order (lowest first)."""
-    res = await session.execute(
-        text(
-            f"SELECT source, priority, overrides_jsonb"
-            f" FROM {settings.CATALOG_SCHEMA}.record_overrides"
-            f" WHERE layer_id = :lid"
-            f" ORDER BY priority ASC, updated_at ASC"
-        ),
-        {"lid": str(layer_id)},
-    )
-    merged: Dict[str, Any] = {}
-    for row in res.fetchall():
-        overlay = row.overrides_jsonb
-        if isinstance(overlay, dict):
-            merged = _deep_merge(merged, overlay)
-    return merged or None
-
-
-def compute_user_override_diff(
-    current_record_jsonb: Dict[str, Any] | None,
-    existing_user_override: Dict[str, Any] | None,
+def apply_user_edits(
+    record_jsonb: Dict[str, Any] | None,
     layer_in: Dict[str, Any],
 ) -> tuple[Dict[str, Any], bool]:
-    """Compute the updated user override based on what changed in layer_in.
+    """Write edited flat fields directly into a copy of ``record_jsonb``.
 
-    For each editable field in layer_in:
-    - If submitted value differs from current effective value → set in override
-    - If submitted value is empty → remove from override (revert to harvest/AI)
-    - If unchanged → do nothing
-
-    Returns (updated_user_override, changed: bool).
+    Record-first: core owns ``customer.layer.record_jsonb`` and edits it in
+    place — no contribution overlay, no datacatalog. On re-harvest the harvester
+    is responsible for not clobbering these edits. Returns (updated_record,
+    changed). An empty submitted value removes the field (revert to source).
     """
-    current_props = ((current_record_jsonb or {}).get("properties")) or {}
-    user_override = copy.deepcopy(existing_user_override) if existing_user_override else {"properties": {}}
-    user_props = user_override.setdefault("properties", {})
+    record = copy.deepcopy(record_jsonb) if record_jsonb else {}
+    props = record.setdefault("properties", {})
     changed = False
 
     for src_field, path in FIELD_TO_JSONB_PATH.items():
         if src_field not in layer_in:
             continue
         new_val = layer_in[src_field]
-        current_val = _get_nested(current_props, path)
-
+        if src_field == "data_reference_year" and new_val not in (None, ""):
+            new_val = f"{int(new_val)}-01-01"
+        current_val = _get_nested(record, path)
         if new_val in (None, ""):
-            if _remove_nested(user_props, path):
+            if _remove_nested(record, path):
                 changed = True
         elif new_val != current_val:
-            _set_nested(user_props, path, new_val)
+            _set_nested(record, path, new_val)
             changed = True
 
-    # Special case: data_category → themes[0].concepts[0].id
+    if "distribution_url" in layer_in:
+        new_url = layer_in["distribution_url"]
+        cur_links = record.get("links") or []
+        cur_enc = next(
+            (lk.get("href") for lk in cur_links if lk.get("rel") == "enclosure"), None
+        )
+        keep = [lk for lk in cur_links if lk.get("rel") != "enclosure"]
+        if new_url in (None, ""):
+            if len(keep) != len(cur_links):
+                record["links"] = keep
+                changed = True
+        elif str(new_url) != cur_enc:
+            record["links"] = keep + [
+                {
+                    "rel": "enclosure",
+                    "type": "application/octet-stream",
+                    "title": "Download",
+                    "href": str(new_url),
+                }
+            ]
+            changed = True
+
     if "data_category" in layer_in:
         new_cat = layer_in["data_category"]
-        current_themes = current_props.get("themes") or []
-        current_cat = None
-        if current_themes and isinstance(current_themes[0], dict):
-            concepts = current_themes[0].get("concepts") or []
+        cur_themes = props.get("themes") or []
+        cur_cat = None
+        if cur_themes and isinstance(cur_themes[0], dict):
+            concepts = cur_themes[0].get("concepts") or []
             if concepts and isinstance(concepts[0], dict):
-                current_cat = concepts[0].get("id")
-
+                cur_cat = concepts[0].get("id")
         if new_cat in (None, ""):
-            if "themes" in user_props:
-                user_props.pop("themes")
+            if props.pop("themes", None) is not None:
                 changed = True
-        elif new_cat != current_cat:
-            user_props["themes"] = [{
-                "concepts": [{"id": new_cat}],
-                "scheme": "https://goat.plan4better.de/data-categories",
-            }]
+        elif new_cat != cur_cat:
+            props["themes"] = [
+                {
+                    "concepts": [{"id": new_cat}],
+                    "scheme": "https://goat.plan4better.de/data-categories",
+                }
+            ]
             changed = True
 
-    return user_override, changed
+    return record, changed

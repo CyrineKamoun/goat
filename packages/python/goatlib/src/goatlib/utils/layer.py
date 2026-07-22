@@ -188,3 +188,28 @@ __all__ = [
     "get_schema_for_layer",
     "clear_schema_cache",
 ]
+
+
+_WKT_FLOAT_RE = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
+
+
+def is_valid_wgs84_wkt(wkt: str | None) -> bool:
+    """True iff every coordinate in ``wkt`` lies within WGS84 bounds.
+
+    CRS detection silently defaults to EPSG:4326 when source metadata is
+    missing, so UTM/Mercator coordinates can get tagged as 4326. Such extents
+    break the frontend's fitBounds — callers should store NULL instead.
+    """
+    if not wkt:
+        return False
+    nums = _WKT_FLOAT_RE.findall(wkt)
+    if len(nums) < 2 or len(nums) % 2 != 0:
+        return False
+    try:
+        for i in range(0, len(nums), 2):
+            x, y = float(nums[i]), float(nums[i + 1])
+            if not (-180.0 <= x <= 180.0 and -90.0 <= y <= 90.0):
+                return False
+    except ValueError:
+        return False
+    return True

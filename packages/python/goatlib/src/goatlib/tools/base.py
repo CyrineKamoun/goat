@@ -54,6 +54,7 @@ from goatlib.io.config import (
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.db import ToolDatabaseService
 from goatlib.tools.schemas import ToolInputBase, ToolOutputBase
+from goatlib.utils.layer import is_valid_wgs84_wkt
 
 logger = logging.getLogger(__name__)
 
@@ -1600,6 +1601,9 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
                         geom_col = col_name
                         break
 
+                if geom_col:
+                    self._assert_finite_extent(con, parquet_path, geom_col)
+
                 # Create table from parquet with Hilbert ordering for spatial locality
                 # This ensures spatially-close rows are stored together in row groups,
                 # enabling efficient bbox-based row group pruning during queries
@@ -1652,6 +1656,25 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
                     time.sleep(0.5)
                     continue
                 raise
+
+    @staticmethod
+    def _assert_finite_extent(
+        con: duckdb.DuckDBPyConnection, parquet_path: Path, geom_col: str
+    ) -> None:
+        """Refuse ingestion when the extent contains inf/nan (must run BEFORE the
+        CREATE TABLE commit: a nonfinite extent serialises invalid geo-stats JSON
+        into the DuckLake catalog and breaks every subsequent commit)."""
+        row = con.execute(
+            f"SELECT COUNT(*) FROM read_parquet('{parquet_path}') "
+            f'WHERE "{geom_col}" IS NOT NULL AND ('
+            f'NOT isfinite(ST_XMin("{geom_col}")) OR NOT isfinite(ST_YMin("{geom_col}")) '
+            f'OR NOT isfinite(ST_XMax("{geom_col}")) OR NOT isfinite(ST_YMax("{geom_col}")))'
+        ).fetchone()
+        if row and row[0]:
+            raise ValueError(
+                f"nonfinite_geometry_extent: refusing DuckLake write "
+                f"({row[0]} feature(s) with inf/nan coordinates)"
+            )
 
     def _get_table_info(
         self: Self, con: duckdb.DuckDBPyConnection, table_name: str
@@ -1711,6 +1734,15 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
                     f"{extent[2]} {extent[3]}, {extent[0]} {extent[3]}, "
                     f"{extent[0]} {extent[1]}))"
                 )
+                # A CRS-less source silently assumed 4326 yields out-of-range
+                # coords; a stored bad extent breaks the frontend's fitBounds.
+                if not is_valid_wgs84_wkt(extent_wkt):
+                    logger.warning(
+                        "Extent outside WGS84 bounds for %s; storing no extent",
+                        table_name,
+                    )
+                    extent = None
+                    extent_wkt = None
 
         return {
             "columns": columns,

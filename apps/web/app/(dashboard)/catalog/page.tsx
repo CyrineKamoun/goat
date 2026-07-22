@@ -14,6 +14,7 @@ import {
   Paper,
   Skeleton,
   Stack,
+  TextField,
   Typography,
   debounce,
   useTheme,
@@ -56,6 +57,8 @@ const Catalog = () => {
   const [searchText, setSearchText] = useQueryState("search", parseAsString);
   const [bbox, setBbox] = useQueryState("bbox", parseAsString);
   const [bboxLabel, setBboxLabel] = useQueryState("bbox_label", parseAsString);
+  const [dateFrom, setDateFrom] = useQueryState("date_from", parseAsString);
+  const [dateTo, setDateTo] = useQueryState("date_to", parseAsString);
 
   const filterOptions = useMemo(
     () => ({
@@ -97,13 +100,15 @@ const Catalog = () => {
     const keys = CATALOG_FILTER_ORDER;
     const base: GetDatasetSchema = { in_catalog: true };
     if (bbox) base.spatial_search = bbox;
+    if (dateFrom || dateTo) base.datetime = `${dateFrom || ".."}/${dateTo || ".."}`;
     return keys.reduce((acc, key) => {
-      if (filterOptions[key].value && filterOptions[key].value.length > 0) {
-        acc[key] = filterOptions[key].value;
+      const value = filterOptions[key].value;
+      if (value && value.length > 0) {
+        (acc as Record<string, unknown>)[key] = value;
       }
       return acc;
     }, base);
-  }, [filterOptions, bbox]);
+  }, [filterOptions, bbox, dateFrom, dateTo]);
 
   const [queryParamPage, setQueryParamPage] = useQueryState("page", parseAsInteger.withDefault(1));
 
@@ -177,6 +182,25 @@ const Catalog = () => {
     [datasetSchema, resetPage, setBbox, setBboxLabel]
   );
 
+  // Apply the date filter debounced (like search) so typing a date doesn't
+  // fire an items + aggregates request per keystroke.
+  const debouncedApplyDates = debounce((from: string | null, to: string | null) => {
+    resetPage();
+    const newDatasetSchema = { ...datasetSchema };
+    if (from || to) {
+      newDatasetSchema.datetime = `${from || ".."}/${to || ".."}`;
+    } else {
+      delete newDatasetSchema.datetime;
+    }
+    setDatasetSchema(newDatasetSchema);
+  }, 500);
+
+  const handleDateChange = (from: string | null, to: string | null) => {
+    setDateFrom(from || null);
+    setDateTo(to || null);
+    debouncedApplyDates(from, to);
+  };
+
   return (
     <Container sx={{ py: 10, px: 10 }} maxWidth="xl">
       <Box
@@ -214,6 +238,44 @@ const Catalog = () => {
                     bboxLabel={bboxLabel || ""}
                     onBboxChange={handleBboxChange}
                   />
+                </AccordionDetails>
+              </Accordion>
+              <Divider sx={{ py: 0, my: 0 }} />
+              <Accordion elevation={0} disableGutters defaultExpanded>
+                <AccordionSummary
+                  expandIcon={<ExpandMoreIcon />}
+                  aria-controls="date-panel-content"
+                  id="date-panel-header">
+                  <Stack direction="row" sx={{ py: 0, pl: 1 }} alignItems="center" spacing={4}>
+                    <Icon
+                      sx={{ ml: 2 }}
+                      iconName={ICON_NAME.CLOCK}
+                      fontSize="small"
+                      htmlColor={theme.palette.text.secondary}
+                    />
+                    <Typography variant="body1">{t("date_range")}</Typography>
+                  </Stack>
+                </AccordionSummary>
+                <Divider sx={{ my: 0, py: 0 }} />
+                <AccordionDetails sx={{ p: 2 }}>
+                  <Stack spacing={2}>
+                    <TextField
+                      size="small"
+                      type="date"
+                      label={t("date_from")}
+                      InputLabelProps={{ shrink: true }}
+                      value={dateFrom || ""}
+                      onChange={(e) => handleDateChange(e.target.value || null, dateTo)}
+                    />
+                    <TextField
+                      size="small"
+                      type="date"
+                      label={t("date_to")}
+                      InputLabelProps={{ shrink: true }}
+                      value={dateTo || ""}
+                      onChange={(e) => handleDateChange(dateFrom, e.target.value || null)}
+                    />
+                  </Stack>
                 </AccordionDetails>
               </Accordion>
               <Divider sx={{ py: 0, my: 0 }} />

@@ -60,26 +60,38 @@ def _pool() -> Any:
 def _trim_feature(feature: Dict[str, Any]) -> Dict[str, Any]:
     """Reduce a full OGC record to the fields useful for an LLM, to save tokens."""
     props = feature.get("properties") or {}
-    extent = props.get("extent") or {}
-    spatial = extent.get("spatial") or {}
-    bbox_list = spatial.get("bbox")
-    bbox = bbox_list[0] if isinstance(bbox_list, list) and bbox_list else None
-    publisher = props.get("publisher")
-    publisher_name = publisher.get("name") if isinstance(publisher, dict) else publisher
+    # bbox from top-level geometry (recordGeoJSON) — records carry no extent.
+    geom = feature.get("geometry") or {}
+    bbox = None
+    if geom.get("type") == "Polygon" and geom.get("coordinates"):
+        ring = geom["coordinates"][0]
+        xs = [pt[0] for pt in ring]
+        ys = [pt[1] for pt in ring]
+        bbox = [min(xs), min(ys), max(xs), max(ys)]
+    contacts = [c for c in props.get("contacts") or [] if isinstance(c, dict)]
+    publisher = next(
+        (c for c in contacts if "publisher" in (c.get("roles") or [])),
+        contacts[0] if contacts else None,
+    )
+    # Member layers ride as rel="item" links; a single-layer dataset has none
+    # (the record itself is the layer).
+    item_links = [lk for lk in feature.get("links") or [] if lk.get("rel") == "item"]
     return {
         "id": feature.get("id"),
         "link": _dataset_link(feature.get("id")),
         "title": props.get("title"),
         "description": props.get("description"),
         "type": props.get("type"),
-        "publisher": publisher_name,
+        "publisher": publisher.get("name") if publisher else None,
         "license": props.get("license"),
         "keywords": props.get("keywords"),
         "themes": props.get("themes"),
-        "language": props.get("language"),
+        "language": (props.get("language") or {}).get("code")
+        if isinstance(props.get("language"), dict)
+        else props.get("language"),
         "updated": props.get("updated"),
         "bbox": bbox,
-        "distribution_count": len(props.get("distributions") or []),
+        "layer_count": len(item_links) or 1,
     }
 
 
@@ -132,7 +144,7 @@ async def search_catalog(
 ) -> Dict[str, Any]:
     """Search the GOAT data catalog and return matching datasets.
 
-    Datasets are grouped (one record per dataset, multiple distributions/layers).
+    Datasets are grouped (one record per dataset; member layers as rel="item" links).
     Results are trimmed; use get_catalog_record(id) for the full record.
 
     Args:
@@ -142,7 +154,7 @@ async def search_catalog(
         themes: Comma-separated data categories: transportation, landuse, environment, places, people, imagery, boundary, basemap, other.
         language: ISO 639-1 code, e.g. 'de' or 'en'.
         year: Data reference year, e.g. 2023.
-        source_format: One of iso19139, dcat, synthetic, layer_model.
+        source_format: Provenance filter: 'dcat' (or 'harvesting_opencatalog') for harvested open-data; user uploads match their file type (e.g. 'geojson', 'gpkg', 'shp').
         license: Comma-separated licenses, e.g. 'CC_BY,CC_BY_SA'.
         publisher: Comma-separated publisher/distributor names.
         type: Comma-separated layer types: feature, raster, table.
@@ -183,7 +195,9 @@ async def search_catalog(
 async def get_catalog_record(item_id: str) -> Dict[str, Any]:
     """Return the full catalog record for a dataset id (from search_catalog results).
 
-    Includes all distributions (individual layers/files) and complete metadata.
+    Member layers appear as rel="item" links (title, goat:layerType/goat:geometryType;
+    the link href ends with the layer UUID). A single-layer dataset has no item links —
+    its record id is the layer id.
     """
     record = await catalog_search.get_record(_pool(), item_id, base_url=_BASE_URL)
     if record is None:
@@ -217,14 +231,15 @@ async def get_layer_geojson(
 ) -> str:
     """Return a layer's features as a GeoJSON FeatureCollection (JSON string) for inline maps.
 
-    Use the `layer_id` from a dataset's distributions (get_catalog_record), NOT the dataset id.
+    Use a layer UUID from the dataset's rel="item" links (get_catalog_record; last path
+    segment of the link href) — or the record id itself for a single-layer dataset.
     Parse the returned JSON and embed it directly into a MapLibre GL JS artifact as a `geojson`
     source — do NOT use tile/style URLs (the artifact sandbox blocks external tiles → blank map).
     ALWAYS clip to the study area with `bbox` and keep `limit` modest. The result is hard-capped
     in size and `truncated` is set true when features were dropped; if so, use a smaller bbox.
 
     Args:
-        layer_id: The layer UUID (a distribution's layer_id, not the dataset id).
+        layer_id: The layer UUID (from an item link; for a single-layer dataset the dataset id).
         bbox: Optional 'west,south,east,north' (WGS84) to clip features to the study area.
         limit: Max features to fetch (capped at 5000; the byte cap may keep fewer).
     """

@@ -111,13 +111,13 @@ async def landing_page(request: Request) -> LandingPage:
                 title="Landing page",
             ),
             Link(
-                href=f"{base_url}/api",
+                href=f"{base_url}/api/openapi.json",
                 rel="service-desc",
                 type="application/vnd.oai.openapi+json;version=3.0",
                 title="OpenAPI definition",
             ),
             Link(
-                href=f"{base_url}/api.html",
+                href=f"{base_url}/api/docs",
                 rel="service-doc",
                 type="text/html",
                 title="API documentation",

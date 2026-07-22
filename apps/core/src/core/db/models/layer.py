@@ -59,6 +59,7 @@ class FileUploadType(str, Enum):
     kml = "kml"
     zip = "zip"  # Commonly used for shapefiles
     parquet = "parquet"  # GeoParquet files
+    harvesting_opencatalog = "harvesting_opencatalog"  # layer ingested by the opencatalog harvester
 
 
 class RasterDataType(str, Enum):

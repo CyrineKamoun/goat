@@ -146,7 +146,7 @@ const CatalogDatasetCard = ({
                         htmlColor={theme.palette.text.secondary}
                       />
                       <Typography variant="body2" fontWeight={600}>
-                        {getMetadataValueTranslation(key, getCatalogValue(key))}
+                        {getMetadataValueTranslation(key, String(getCatalogValue(key) ?? ""))}
                       </Typography>
                     </Stack>
                   </Grid>

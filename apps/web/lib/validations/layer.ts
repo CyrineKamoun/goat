@@ -713,6 +713,7 @@ export const getDatasetSchema = z.object({
   in_catalog: z.boolean().optional(),
   spatial_search: z.string().optional(),
   spatial_boost: z.string().optional(),
+  datetime: z.string().optional(),
 });
 
 export const datasetMetadataValue = z.object({

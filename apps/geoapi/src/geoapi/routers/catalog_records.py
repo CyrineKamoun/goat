@@ -4,21 +4,24 @@ Exposes catalog layers as an OGC API Records collection so that external
 systems (CSW clients, AI agents, discovery portals) **and the GOAT frontend**
 can consume structured geospatial metadata.
 
-Records are grouped by dataset (layer_group): one record per dataset, with
-individual layers listed as ``distributions`` inside ``properties``.
+Records are grouped by dataset (layer_group): one record per dataset (a
+recordGeoJSON Feature). Member layers of a grouped dataset are exposed as
+``rel="item"`` links; ``enclosure``/``via`` links carry the downloads/source.
 
 Spec reference: https://ogcapi.ogc.org/records/
 
 This is the READ/serving side of the catalog. It reads PostgreSQL metadata only
 (``customer.layer``, ``customer.layer_group``, ``basic.nuts``) via geoapi's
 asyncpg pool (``layer_service._pool``) — no DuckLake. The metadata WRITE path
-(record_overrides → record_jsonb) lives in the ``core`` service.
+(opencatalog_record_contribution → record_jsonb) lives in the ``core`` service.
 
 The query logic is shared with the MCP server via ``geoapi.services.catalog_search``.
 
 Extension parameters (beyond OGC core):
 - ``bbox_boost``: spatial ranking without exclusion
-- ``license``, ``publisher``, ``type``: additional faceted filters
+- ``themes``/``license``/``language``/``year``/``publisher``/``type``/
+  ``geographical_code``: faceted filters
+- ``/items/aggregates``: facet value counts (OGC API Records Part 2: Facets shape)
 """
 
 from __future__ import annotations
@@ -26,7 +29,13 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from goatlib.models import ConformanceDeclaration
 
+from geoapi.models.records import (
+    RecordCollection,
+    RecordCollectionsResponse,
+    RecordsLandingPage,
+)
 from geoapi.services.catalog_search import (
     _COLLECTION_DESCRIPTION,
     _COLLECTION_ID,
@@ -58,13 +67,14 @@ def _records_base(request: Request) -> str:
 @router.get(
     "",
     summary="OGC API Records — landing page",
-    response_model=Dict[str, Any],
+    response_model=RecordsLandingPage,
     status_code=200,
     include_in_schema=True,
 )
 async def ogc_records_landing(request: Request) -> Dict[str, Any]:
     """OGC API Records landing page with conformance classes and collection links."""
     base = _records_base(request)
+    app_base = str(request.base_url).rstrip("/")  # OpenAPI lives at the app root
     return {
         "title": "GOAT Catalog — OGC API Records",
         "description": (
@@ -77,6 +87,18 @@ async def ogc_records_landing(request: Request) -> Dict[str, Any]:
                 "type": "application/json",
                 "title": "This document",
                 "href": base,
+            },
+            {
+                "rel": "service-desc",
+                "type": "application/vnd.oai.openapi+json;version=3.0",
+                "title": "OpenAPI definition",
+                "href": f"{app_base}/api/openapi.json",
+            },
+            {
+                "rel": "service-doc",
+                "type": "text/html",
+                "title": "API documentation",
+                "href": f"{app_base}/api/docs",
             },
             {
                 "rel": "conformance",
@@ -93,7 +115,11 @@ async def ogc_records_landing(request: Request) -> Dict[str, Any]:
         ],
         "conformsTo": [
             "http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/core",
-            "http://www.opengis.net/spec/ogcapi-records-1/1.0/conf/core",
+            "http://www.opengis.net/spec/ogcapi-common-1/1.0/conf/landingPage",
+            "http://www.opengis.net/spec/ogcapi-records-1/1.0/conf/record-core",
+            "http://www.opengis.net/spec/ogcapi-records-1/1.0/conf/record-collection",
+            "http://www.opengis.net/spec/ogcapi-records-1/1.0/conf/record-core-query-parameters",
+            "http://www.opengis.net/spec/ogcapi-records-1/1.0/conf/sorting",
             "http://www.opengis.net/spec/ogcapi-records-1/1.0/conf/json",
         ],
     }
@@ -102,9 +128,8 @@ async def ogc_records_landing(request: Request) -> Dict[str, Any]:
 @router.get(
     "/conformance",
     summary="OGC API Records — conformance classes",
-    response_model=Dict[str, Any],
+    response_model=ConformanceDeclaration,
     status_code=200,
-    include_in_schema=False,
 )
 async def ogc_records_conformance() -> Dict[str, Any]:
     return {
@@ -119,13 +144,21 @@ async def ogc_records_conformance() -> Dict[str, Any]:
 @router.get(
     "/collections",
     summary="OGC API Records — available collections",
-    response_model=Dict[str, Any],
+    response_model=RecordCollectionsResponse,
     status_code=200,
-    include_in_schema=False,
 )
 async def ogc_records_collections(request: Request) -> Dict[str, Any]:
-    base = f"{_records_base(request)}/collections/{_COLLECTION_ID}"
+    records_base = _records_base(request)
+    base = f"{records_base}/collections/{_COLLECTION_ID}"
     return {
+        "links": [
+            {
+                "rel": "self",
+                "type": "application/json",
+                "title": "Collections",
+                "href": f"{records_base}/collections",
+            },
+        ],
         "collections": [
             {
                 "id": _COLLECTION_ID,
@@ -140,16 +173,15 @@ async def ogc_records_collections(request: Request) -> Dict[str, Any]:
                     },
                 ],
             }
-        ]
+        ],
     }
 
 
 @router.get(
     f"/collections/{_COLLECTION_ID}",
     summary="OGC API Records — collection metadata",
-    response_model=Dict[str, Any],
+    response_model=RecordCollection,
     status_code=200,
-    include_in_schema=False,
 )
 async def ogc_records_collection(request: Request) -> Dict[str, Any]:
     base = f"{_records_base(request)}/collections/{_COLLECTION_ID}"
@@ -248,8 +280,8 @@ async def ogc_records_items(
 ) -> Dict[str, Any]:
     """Return catalog datasets as an OGC API Records GeoJSON FeatureCollection.
 
-    Records are **grouped by dataset (layer_group)** — one record per dataset
-    with a ``distributions`` array listing individual layers/files.
+    Records are **grouped by dataset (layer_group)** — one record per dataset;
+    a grouped dataset's member layers are ``rel="item"`` links.
     """
     base_url = f"{_records_base(request)}/collections/{_COLLECTION_ID}/items"
     return await search_records(
@@ -332,27 +364,42 @@ async def ogc_records_aggregates(
             f" GROUP BY value ORDER BY count DESC"
         ),
         "geographical_code": (
-            f"SELECT cl.record_jsonb->'properties'->>'geographical_code' AS value,"
+            f"SELECT cl.record_jsonb->'properties'->>'goat:geographical_code' AS value,"
             f" COUNT(*) AS count"
             f" FROM {cs}.layer cl WHERE {where_sql}"
-            f" AND cl.record_jsonb->'properties'->>'geographical_code' IS NOT NULL"
+            f" AND cl.record_jsonb->'properties'->>'goat:geographical_code' IS NOT NULL"
             f" GROUP BY value ORDER BY count DESC"
         ),
-        "language_code": f"SELECT cl.record_jsonb->'properties'->>'language' AS value, COUNT(*) AS count FROM {cs}.layer cl WHERE {where_sql} AND cl.record_jsonb->'properties'->>'language' IS NOT NULL GROUP BY value ORDER BY count DESC",
-        "distributor_name": f"SELECT cl.record_jsonb->'properties'->'publisher'->>'name' AS value, COUNT(*) AS count FROM {cs}.layer cl WHERE {where_sql} AND cl.record_jsonb->'properties'->'publisher'->>'name' IS NOT NULL GROUP BY value ORDER BY count DESC",
+        "language_code": f"SELECT cl.record_jsonb->'properties'->'language'->>'code' AS value, COUNT(*) AS count FROM {cs}.layer cl WHERE {where_sql} AND cl.record_jsonb->'properties'->'language'->>'code' IS NOT NULL GROUP BY value ORDER BY count DESC",
+        "distributor_name": f"SELECT cl.record_jsonb->'properties'->'contacts'->0->>'name' AS value, COUNT(*) AS count FROM {cs}.layer cl WHERE {where_sql} AND cl.record_jsonb->'properties'->'contacts'->0->>'name' IS NOT NULL GROUP BY value ORDER BY count DESC",
         "license": f"SELECT cl.record_jsonb->'properties'->>'license' AS value, COUNT(*) AS count FROM {cs}.layer cl WHERE {where_sql} AND cl.record_jsonb->'properties'->>'license' IS NOT NULL GROUP BY value ORDER BY count DESC",
     }
 
-    result: Dict[str, List[Dict[str, Any]]] = {}
+    # Source property path per facet (OGC API - Records - Part 2: Facets shape).
+    facet_property = {
+        "type": "type",
+        "data_category": "properties.themes",
+        "geographical_code": "properties.goat:geographical_code",
+        "language_code": "properties.language.code",
+        "distributor_name": "properties.contacts.name",
+        "license": "properties.license",
+    }
+
+    facets: Dict[str, Any] = {}
     pool = _pool()
     async with pool.acquire() as conn:
         for key, query in agg_queries.items():
             rows = await conn.fetch(query, *params)
-            result[key] = [
-                {"value": row["value"], "count": row["count"]} for row in rows
-            ]
+            facets[key] = {
+                "type": "term",
+                "property": facet_property.get(key, key),
+                "buckets": [
+                    {"value": row["value"], "count": row["count"]} for row in rows
+                ],
+                "more": False,
+            }
 
-    return result
+    return {"facets": facets}
 
 
 @router.get(
