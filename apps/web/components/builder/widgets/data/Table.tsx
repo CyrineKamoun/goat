@@ -16,6 +16,7 @@ import { PROCESSES_API_BASE_URL } from "@/lib/api/processes";
 import { appendUniqueFeatures } from "@/lib/utils/features";
 import { formatFieldValue } from "@/lib/utils/formatFieldValue";
 import { formatNumber } from "@/lib/utils/format-number";
+import { resolveProjectLayer } from "@/lib/utils/map/layer";
 import type { FieldKind } from "@/lib/validations/layer";
 import { resolveDisplayKind } from "@/lib/validations/layer";
 import type { DatasetCollectionItems, GetCollectionItemsQueryParams } from "@/lib/validations/layer";
@@ -67,7 +68,7 @@ export const TableDataWidget = ({
   onConfigChange,
 }: TableDataWidgetProps) => {
   const { t, i18n } = useTranslation("common");
-  const { config, queryParams, cqlFilter, layerId } = useChartWidget(rawConfig, tableDataConfigSchema, aggregationStatsQueryParams);
+  const { config, queryParams, cqlFilter, layerId, isLayerLocked } = useChartWidget(rawConfig, tableDataConfigSchema, aggregationStatsQueryParams);
   const rowsShownSetting = Math.max(1, Math.min(20, Number(config?.options?.page_size ?? 10)));
 
   const queryMode = config?.setup?.query_mode ?? tableQueryModeTypes.Values.builder;
@@ -157,13 +158,18 @@ export const TableDataWidget = ({
     setInteractiveSort(null);
   }, [config?.setup?.layer_project_id, config?.setup?.query_mode, mode]);
 
-  const selectedLayer = useMemo(() => {
-    return projectLayers.find((layer) => layer.id === config?.setup?.layer_project_id);
-  }, [projectLayers, config?.setup?.layer_project_id]);
+  // D7: resolved the same locked-refusing way as `useChartWidget`'s own
+  // `layerId` below — `projectLayers` here is the widget's own prop, a
+  // second, independent lookup of `layer_project_id` that must not leak a
+  // locked layer's dataset id through the "prefer the prop" fallback.
+  const selectedLayerId = useMemo(
+    () => resolveProjectLayer(projectLayers, config?.setup?.layer_project_id).layerId,
+    [projectLayers, config?.setup?.layer_project_id]
+  );
 
   // Prefer explicit selected layer from props, but fall back to hook-resolved layer id.
   // This avoids SQL mode becoming "not configured" when projectLayers is temporarily stale.
-  const recordsLayerId = selectedLayer?.layer_id || layerId;
+  const recordsLayerId = selectedLayerId || layerId;
 
   const tableMetrics = useMemo(() => {
     if (!isGroupedMode || isSqlMode) return [] as GroupedMetricConfig[];
@@ -1781,6 +1787,7 @@ export const TableDataWidget = ({
               : isRecordsLoading && !displayRecordsData
         }
         isNotConfigured={isSqlMode ? !isSqlConfigured : isGroupedMode ? !isGroupedConfigured : !isRecordsConfigured}
+        isNotConfiguredMessage={isLayerLocked ? t("layer_locked_hint") : undefined}
         isError={isSqlMode ? !!sqlError : isGroupedMode ? !!groupedError : !!isRecordsError}
         height={140}
       />

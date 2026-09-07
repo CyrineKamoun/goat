@@ -5,6 +5,7 @@ import { ICON_NAME } from "@p4b/ui/components/Icon";
 import { useTranslation } from 'react-i18next'
 
 import { useProjectLayers } from "@/lib/api/projects";
+import { resolveProjectLayer } from "@/lib/utils/map/layer";
 import { statisticOperationEnum } from "@/lib/validations/common";
 import type { LayerFieldType } from "@/lib/validations/layer";
 import {
@@ -297,13 +298,12 @@ export const useLayerByGeomType = (
 
 export const useLayerDatasetId = (layerId: number | undefined, projectId: string) => {
   const { layers } = useProjectLayers(projectId as string);
-  const layerDatasetId = useMemo(() => {
-    if (!layerId || !layers) {
-      return undefined;
-    }
-    const layer = layers.find((layer) => layer.id === layerId);
-    return layer?.layer_id;
-  }, [layerId, layers]);
+  // D7: refuses a locked layer — every caller uses the returned id to fetch
+  // feature data/fields from geoapi for that dataset.
+  const layerDatasetId = useMemo(
+    () => resolveProjectLayer(layers, layerId).layerId,
+    [layerId, layers]
+  );
 
   return layerDatasetId;
 };

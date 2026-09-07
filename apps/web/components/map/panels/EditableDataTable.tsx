@@ -143,6 +143,10 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     isProjectEditor: isEditor,
     inCatalog: projectLayer.in_catalog,
     inBundle: !!bundleForLayer,
+    // D7: the table should never actually open for a locked layer (the tree
+    // offers no Table action for one), but this keeps every write path here
+    // closed even if it were reached some other way.
+    locked: projectLayer.locked,
   };
   const canEditFields = canEditLayerFields(layerPermissionArgs);
   const canEditFeatures = canEditLayerFeatures({

@@ -1,13 +1,8 @@
-import { LoadingButton } from "@mui/lab";
 import type { SelectChangeEvent } from "@mui/material";
 import {
   Avatar,
   Box,
-  Button,
-  Dialog,
-  DialogContent,
   DialogContentText,
-  DialogTitle,
   FormControl,
   InputLabel,
   ListItemAvatar,
@@ -15,14 +10,17 @@ import {
   MenuItem,
   Select,
   Stack,
-  Typography,
   useTheme,
 } from "@mui/material";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
 import { createTeamMember } from "@/lib/api/teams";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 interface TeamMemberInviteDialogProps {
   onClose: () => void;
@@ -58,61 +56,56 @@ const TeamMemberInviteModal: React.FC<TeamMemberInviteDialogProps> = ({ open, on
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t("common:add_member")}</DialogTitle>
-      <DialogContent sx={{ pb: 2 }}>
-        <DialogContentText>{t("common:select_an_organization_member")}</DialogContentText>
-        <Box>
-          <Stack
-            spacing={theme.spacing(6)}
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      icon={ICON_NAME.ADD_USER}
+      title={t("common:add_member")}
+      maxWidth={600}
+      footer={
+        <AppDialogFooter
+          onCancel={onClose}
+          primaryLabel={t("common:add")}
+          onPrimary={() => void onTeamMemberInvite()}
+          primaryDisabled={isBusy || !selectedMember}
+          primaryLoading={isBusy}
+        />
+      }>
+      <DialogContentText>{t("common:select_an_organization_member")}</DialogContentText>
+      <Box>
+        <Stack
+          spacing={theme.spacing(6)}
+          sx={{
+            mt: 4,
+          }}
+        />
+        <FormControl fullWidth>
+          <InputLabel id="demo-simple-select-disabled-label">{t("member")}</InputLabel>
+          <Select
+            value={selectedMember}
+            label={t("common:member")}
+            size="medium"
+            fullWidth
             sx={{
-              mt: 4,
+              "& .MuiSelect-select": {
+                ...(selectedMember ? { py: 1 } : {}),
+              },
             }}
-          />
-          <FormControl fullWidth>
-            <InputLabel id="demo-simple-select-disabled-label">{t("member")}</InputLabel>
-            <Select
-              value={selectedMember}
-              label={t("common:member")}
-              size="medium"
-              fullWidth
-              sx={{
-                "& .MuiSelect-select": {
-                  ...(selectedMember ? { py: 1 } : {}),
-                },
-              }}
-              onChange={onSelectedMemberChange}>
-              {members.map((member) => (
-                <MenuItem key={member.id} value={member.id}>
-                  <Stack direction="row" alignItems="center">
-                    <ListItemAvatar>
-                      <Avatar alt={`${member.firstname} ${member.lastname}`} src={member.avatar} />
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={`${member.firstname} ${member.lastname}`}
-                      secondary={member.email}
-                    />
-                  </Stack>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
-          <Stack direction="row" justifyContent="flex-end" alignItems="center" sx={{ mt: 8, mb: 0 }}>
-            <Button onClick={onClose} variant="text" sx={{ borderRadius: 0 }}>
-              <Typography variant="body2" fontWeight="bold">
-                {t("common:cancel")}
-              </Typography>
-            </Button>
-            <LoadingButton type="submit" variant="text" loading={isBusy} disabled={isBusy || !selectedMember}>
-              <Typography variant="body2" fontWeight="bold" color="inherit" onClick={onTeamMemberInvite}>
-                {t("common:add")}
-              </Typography>
-            </LoadingButton>
-          </Stack>
-        </Box>
-      </DialogContent>
-    </Dialog>
+            onChange={onSelectedMemberChange}>
+            {members.map((member) => (
+              <MenuItem key={member.id} value={member.id}>
+                <Stack direction="row" alignItems="center">
+                  <ListItemAvatar>
+                    <Avatar alt={`${member.firstname} ${member.lastname}`} src={member.avatar} />
+                  </ListItemAvatar>
+                  <ListItemText primary={`${member.firstname} ${member.lastname}`} secondary={member.email} />
+                </Stack>
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+    </AppDialog>
   );
 };
 

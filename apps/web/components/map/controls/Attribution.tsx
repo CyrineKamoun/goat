@@ -1,11 +1,13 @@
-import { Box, Dialog, DialogContent, DialogTitle, IconButton, Link, Typography, debounce } from "@mui/material";
+import { Box, Link, Typography, debounce } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useMap } from "react-map-gl/maplibre";
 
-import { Icon, ICON_NAME } from "@p4b/ui/components/Icon";
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
+import AppDialog from "@/components/common/AppDialog";
 
 interface AttributionControlProps {
   compact?: boolean;
@@ -30,7 +32,7 @@ export interface AttributionParts {
 export function buildAttributionParts(
   customAttribution: string | string[],
   extraAttribution: string | null | undefined,
-  sourceAttributions: string[],
+  sourceAttributions: string[]
 ): AttributionParts {
   const madeWith = (Array.isArray(customAttribution) ? customAttribution : [customAttribution])
     .map((s) => String(s).trim())
@@ -74,10 +76,7 @@ const linkSx = {
   "&:hover": { textDecoration: "underline" },
 } as const;
 
-const AttributionControl: React.FC<AttributionControlProps> = ({
-  customAttribution,
-  extraAttribution,
-}) => {
+const AttributionControl: React.FC<AttributionControlProps> = ({ customAttribution, extraAttribution }) => {
   const { t } = useTranslation("common");
   /**
    * `current` first: it is the map this control is mounted *inside*, so it is right
@@ -179,28 +178,25 @@ const AttributionControl: React.FC<AttributionControlProps> = ({
         )}
       </Container>
 
-      <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          {t("attributions")}
-          <IconButton size="small" onClick={() => setModalOpen(false)}>
-            <Icon iconName={ICON_NAME.XCLOSE} fontSize="inherit" htmlColor="inherit" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          {parts.dataSources.length > 0 && (
-            <>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                {t("data_from")}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ "& a": { color: "primary.main" } }}
-                dangerouslySetInnerHTML={{ __html: parts.dataSources.join("<br/>") }}
-              />
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <AppDialog
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        icon={ICON_NAME.INFO}
+        title={t("attributions")}
+        maxWidth={444}>
+        {parts.dataSources.length > 0 && (
+          <>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              {t("data_from")}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ "& a": { color: "primary.main" } }}
+              dangerouslySetInnerHTML={{ __html: parts.dataSources.join("<br/>") }}
+            />
+          </>
+        )}
+      </AppDialog>
     </>
   );
 };

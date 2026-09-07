@@ -1,23 +1,14 @@
-import CloseIcon from "@mui/icons-material/Close";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import type { PopupPlacement, PopupSize, PopupType } from "@/lib/validations/widget";
 
 import MarkdownContentEditor from "@/components/builder/widgets/common/MarkdownContentEditor";
 import PopupSettingsControls from "@/components/builder/widgets/common/PopupSettingsControls";
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 export interface LinkPopupValues {
   popup_content?: string;
@@ -73,45 +64,36 @@ const LinkPopupEditDialog = ({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ pr: 6, display: "flex", alignItems: "center", gap: 1 }}>
-        <InfoOutlinedIcon sx={{ fontSize: 20, color: "primary.main", opacity: 0.85 }} />
-        <Typography variant="h6" sx={{ flex: 1 }}>
-          {t("edit_popup_content")}
-        </Typography>
-        <IconButton size="small" onClick={handleClose} sx={{ position: "absolute", right: 12, top: 12 }}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent sx={{ pt: 2 }}>
-        <Stack spacing={2}>
-          <PopupSettingsControls
-            popupType={popupType}
-            placement={placement}
-            size={size}
-            onPopupTypeChange={setPopupType}
-            onPlacementChange={setPlacement}
-            onSizeChange={setSize}
-          />
+    <AppDialog
+      open={open}
+      onClose={handleClose}
+      icon={ICON_NAME.LINK}
+      title={t("edit_popup_content")}
+      maxWidth={600}
+      bodySx={{ pt: 2 }}
+      footer={<AppDialogFooter primaryLabel={t("done", { defaultValue: "Done" })} onPrimary={handleClose} />}>
+      <Stack spacing={2}>
+        <PopupSettingsControls
+          popupType={popupType}
+          placement={placement}
+          size={size}
+          onPopupTypeChange={setPopupType}
+          onPlacementChange={setPlacement}
+          onSizeChange={setSize}
+        />
 
-          <Box>
-            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mb: 0.5, display: "block" }}>
-              {t("info_text", { defaultValue: "Info text" })}
-            </Typography>
-            <MarkdownContentEditor
-              value={content}
-              onChange={setContent}
-              plainText={popupType === "tooltip"}
-            />
-          </Box>
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button onClick={handleClose} variant="contained" size="small">
-          {t("done", { defaultValue: "Done" })}
-        </Button>
-      </DialogActions>
-    </Dialog>
+        <Box>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            fontWeight={600}
+            sx={{ mb: 0.5, display: "block" }}>
+            {t("info_text", { defaultValue: "Info text" })}
+          </Typography>
+          <MarkdownContentEditor value={content} onChange={setContent} plainText={popupType === "tooltip"} />
+        </Box>
+      </Stack>
+    </AppDialog>
   );
 };
 

@@ -29,6 +29,10 @@ export interface ReportsLayoutProps {
   projectLayers?: ProjectLayer[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onProjectUpdate?: (key: string, value: any, refresh?: boolean) => void;
+  /** A template result's `?layout=<id>` (T7), parsed by the map page's
+   * useMapUrlIntent — preferred over `reportLayouts[0]` by the panel's
+   * auto-select-on-load effect when present and found in the list. */
+  initialLayoutId?: string | null;
 }
 
 // Dragging element preview (shown during drag)
@@ -88,6 +92,7 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
   project,
   projectLayers = [],
   onProjectUpdate: _onProjectUpdate,
+  initialLayoutId = null,
 }) => {
   const { t } = useTranslation("common");
   // Shared state for the selected report layout
@@ -115,10 +120,7 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
   // Persist report changes: sync SWR cache and save to API
   const persistReport = useCallback(
     (report: ReportLayout) => {
-      mutateLayouts(
-        (cached) => cached?.map((r) => (r.id === report.id ? report : r)),
-        { revalidate: false }
-      );
+      mutateLayouts((cached) => cached?.map((r) => (r.id === report.id ? report : r)), { revalidate: false });
       updateReportLayout(report.project_id, report.id, {
         config: report.config,
       }).catch((error) => {
@@ -224,15 +226,13 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
                   : elementType === "legend"
                     ? {
                         title: { text: t("legend") },
-                        mapElementId:
-                          prev.config.elements?.find((el) => el.type === "map")?.id ?? null,
+                        mapElementId: prev.config.elements?.find((el) => el.type === "map")?.id ?? null,
                       }
-                  : elementType === "north_arrow" || elementType === "scalebar"
-                    ? {
-                        mapElementId:
-                          prev.config.elements?.find((el) => el.type === "map")?.id ?? null,
-                      }
-                    : {},
+                    : elementType === "north_arrow" || elementType === "scalebar"
+                      ? {
+                          mapElementId: prev.config.elements?.find((el) => el.type === "map")?.id ?? null,
+                        }
+                      : {},
               style: {
                 padding: 0,
                 opacity: 1,
@@ -353,6 +353,7 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
           projectLayers={projectLayers}
           selectedReport={selectedReport}
           onSelectReport={handleSelectReport}
+          initialLayoutId={initialLayoutId}
         />
 
         {/* Middle Section - Canvas */}

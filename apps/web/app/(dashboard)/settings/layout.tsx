@@ -12,7 +12,6 @@ import {
   ListItemText,
   Paper,
   Skeleton,
-  Typography,
   useTheme,
 } from "@mui/material";
 import NextLink from "next/link";
@@ -23,6 +22,8 @@ import { useTranslation } from "react-i18next";
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { useAuthZ } from "@/hooks/auth/AuthZ";
+
+import PageHeader from "@/components/dashboard/common/PageHeader";
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
@@ -88,7 +89,7 @@ const SettingsLayout = (props: SettingsLayoutProps) => {
           alignItems: "center",
           mb: 8,
         }}>
-        <Typography variant="h6">{t("settings")}</Typography>
+        <PageHeader title={t("settings")} />
       </Box>
       <Grid container justifyContent="space-between" spacing={4}>
         <Grid

@@ -35,6 +35,11 @@ export interface BaseTreeItem {
   isSelectable?: boolean;
   isVisible?: boolean; // Add this property for visibility styling
   labelInfo?: string; // Add missing property
+  /** Replaces the icon + label (and the labelInfo caption) with a single
+   *  custom node — e.g. a locked project layer's row, which has no
+   *  geometry-preview icon to draw and shows its hint inline instead of as
+   *  a caption. Leaves the prefix, expand chevron and actions unaffected. */
+  contentOverride?: React.ReactNode;
   canExpand?: boolean; // Add missing property
   /** Item cannot be dragged (e.g. a bundle group's member layers). */
   dragDisabled?: boolean;
@@ -421,10 +426,18 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
             sx={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
             <Box sx={{ ml: `${baseIndent}px` }} />
             {renderPrefix && <Box onClick={(e) => e.stopPropagation()}>{renderPrefix(item)}</Box>}
-            <LeftIconContainer>{LeftIconContent}</LeftIconContainer>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <TruncatedLabel label={item.label} />
-            </Box>
+            {item.contentOverride ? (
+              <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center" }}>
+                {item.contentOverride}
+              </Box>
+            ) : (
+              <>
+                <LeftIconContainer>{LeftIconContent}</LeftIconContainer>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <TruncatedLabel label={item.label} />
+                </Box>
+              </>
+            )}
 
             {/* Actions container - always fully visible */}
             <ActionsContainer className="tree-row-actions">
@@ -448,7 +461,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
           </Box>
 
           {/* Caption row - part of the same tree item */}
-          {item.labelInfo && (
+          {item.labelInfo && !item.contentOverride && (
             <Box
               sx={{
                 ml: `${baseIndent + 28}px`, // Align with label text (indent + icon container width + margin)

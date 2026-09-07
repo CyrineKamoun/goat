@@ -1,6 +1,6 @@
 "use client";
 
-import { parseAsArrayOf, parseAsInteger, parseAsString, useQueryStates } from "nuqs";
+import { parseAsArrayOf, parseAsInteger, parseAsString, parseAsStringEnum, useQueryStates } from "nuqs";
 import { useCallback, useMemo } from "react";
 
 import type { CatalogSearchParams } from "@/lib/api/catalog";
@@ -22,10 +22,16 @@ export { CATALOG_PAGE_SIZE };
 
 export type CatalogView = "list" | "grid";
 
+/** The Catalog page's own top-level tab — datasets or the Templates shelf
+ * (T4). Kept in the URL like every other filter so `/catalog?tab=templates`
+ * (the Home band's link target) survives a reload. */
+export type CatalogTab = "datasets" | "templates";
+
 /** Non-facet URL parameters. */
 const baseParsers = {
   q: parseAsString,
   sortby: parseAsString.withDefault("-updated"),
+  tab: parseAsStringEnum<CatalogTab>(["datasets", "templates"]).withDefault("datasets"),
   /** A NUTS region id — filtered server-side by that region's geometry. */
   nuts: parseAsString,
   /** `lng,lat,km`: a buffered point. See `lib/catalog/spatial`. */
@@ -49,10 +55,7 @@ export const useCatalogSearchState = ({ aggregations }: UseCatalogSearchStateOpt
    * is not a facet and carries no parameter.
    */
   const facetParams = useMemo(
-    () =>
-      aggregations
-        .map((a) => a["goat:filter_param"])
-        .filter((param): param is string => Boolean(param)),
+    () => aggregations.map((a) => a["goat:filter_param"]).filter((param): param is string => Boolean(param)),
     [aggregations]
   );
 
@@ -98,19 +101,17 @@ export const useCatalogSearchState = ({ aggregations }: UseCatalogSearchStateOpt
   const toggleFacet = useCallback(
     (param: string, value: string) => {
       const current = (state[param] as string[] | null) ?? [];
-      const next = current.includes(value)
-        ? current.filter((v) => v !== value)
-        : [...current, value];
+      const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
       setState({ [param]: next.length ? next : null, page: 1 });
     },
     [state, setState]
   );
 
-  const setQ = useCallback(
-    (value: string) => setState({ q: value || null, page: 1 }),
-    [setState]
-  );
+  const setQ = useCallback((value: string) => setState({ q: value || null, page: 1 }), [setState]);
   const setSort = useCallback((value: string) => setState({ sortby: value, page: 1 }), [setState]);
+  /** The dataset grid's own paging/filters stay put underneath — switching
+   * tabs shouldn't reset a search the user may switch right back to. */
+  const setTab = useCallback((tab: CatalogTab) => setState({ tab }), [setState]);
   const setPage = useCallback((page: number) => setState({ page }), [setState]);
   const setView = useCallback((view: CatalogView) => setState({ view }), [setState]);
   const setDateRange = useCallback(
@@ -122,8 +123,7 @@ export const useCatalogSearchState = ({ aggregations }: UseCatalogSearchStateOpt
    * a time — so this always writes all three parameters and `null` clears.
    */
   const setSpatial = useCallback(
-    (filter: CatalogSpatialFilter | null) =>
-      setState({ ...encodeSpatial(filter), page: 1 }),
+    (filter: CatalogSpatialFilter | null) => setState({ ...encodeSpatial(filter), page: 1 }),
     [setState]
   );
 
@@ -152,15 +152,13 @@ export const useCatalogSearchState = ({ aggregations }: UseCatalogSearchStateOpt
     [state.page, state.sortby, state.q, spatial, state.from, state.to, facetSelections]
   );
 
-  const facetQueryParams = useMemo<CatalogSearchParams>(
-    () => buildFacetParams(searchParams),
-    [searchParams]
-  );
+  const facetQueryParams = useMemo<CatalogSearchParams>(() => buildFacetParams(searchParams), [searchParams]);
 
   return {
     state,
     view: (state.view === "grid" ? "grid" : "list") as CatalogView,
     page: state.page,
+    tab: state.tab,
     /** The spatial filter in force, decoded from the URL. */
     spatial,
     facetParams,
@@ -174,6 +172,7 @@ export const useCatalogSearchState = ({ aggregations }: UseCatalogSearchStateOpt
     setView,
     setDateRange,
     setSpatial,
+    setTab,
     toggleFacet,
     clearAll,
   };

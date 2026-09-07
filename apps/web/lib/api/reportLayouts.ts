@@ -1,9 +1,31 @@
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 
 import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
 import type { ReportLayout, ReportLayoutCreate, ReportLayoutUpdate } from "@/lib/validations/reportLayout";
 
 import { PROJECTS_API_BASE_URL } from "./projects";
+
+// ============================================================================
+// SWR keys
+// ============================================================================
+
+/** SWR key of the report layout list of one project. */
+const reportLayoutListKey = (projectId: string) => [`${PROJECTS_API_BASE_URL}/${projectId}/report-layout`];
+
+/** SWR key of one report layout, including its stored config. The read hooks
+ * key on an array, so an invalidation only matches when it uses the same
+ * shape. */
+const reportLayoutKey = (projectId: string, layoutId: string) => [
+  `${PROJECTS_API_BASE_URL}/${projectId}/report-layout/${layoutId}`,
+];
+
+/** Invalidate one report layout so every consumer of its stored config — the
+ * "Save as template" dialog, the print page — reads what the server now holds.
+ * `updateReportLayout` calls this itself; the layout list key stays with the
+ * callers, several of which update it optimistically without revalidating to
+ * keep unsaved editor state. */
+export const refreshReportLayout = (projectId: string, layoutId: string) =>
+  mutate(reportLayoutKey(projectId, layoutId));
 
 // ============================================================================
 // Hooks
@@ -14,7 +36,7 @@ import { PROJECTS_API_BASE_URL } from "./projects";
  */
 export const useReportLayouts = (projectId?: string) => {
   const { data, isLoading, error, mutate, isValidating } = useSWR<ReportLayout[]>(
-    () => (projectId ? [`${PROJECTS_API_BASE_URL}/${projectId}/report-layout`] : null),
+    () => (projectId ? reportLayoutListKey(projectId) : null),
     fetcher
   );
 
@@ -32,8 +54,7 @@ export const useReportLayouts = (projectId?: string) => {
  */
 export const useReportLayout = (projectId?: string, layoutId?: string) => {
   const { data, isLoading, error, mutate, isValidating } = useSWR<ReportLayout>(
-    () =>
-      projectId && layoutId ? [`${PROJECTS_API_BASE_URL}/${projectId}/report-layout/${layoutId}`] : null,
+    () => (projectId && layoutId ? reportLayoutKey(projectId, layoutId) : null),
     fetcher
   );
 
@@ -88,7 +109,9 @@ export const updateReportLayout = async (
   if (!response.ok) {
     throw new Error("Failed to update report layout");
   }
-  return await response.json();
+  const updated = await response.json();
+  refreshReportLayout(projectId, layoutId);
+  return updated;
 };
 
 /**

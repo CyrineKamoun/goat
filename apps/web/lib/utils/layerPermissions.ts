@@ -20,6 +20,10 @@ export type CanEditLayerFieldsArgs = {
    *  only; geoapi 403s every per-feature/column write to them. Callers with
    *  their own bundle-aware path (the map editor) pass nothing here. */
   inBundle?: boolean | null;
+  /** D7: the current user has no access of their own to this layer — the
+   *  backend whitelists the row to a handful of fields and blanks its
+   *  style/data, so there is nothing here to edit. */
+  locked?: boolean | null;
 };
 
 export type CanEditLayerFeaturesArgs = CanEditLayerFieldsArgs & {
@@ -43,6 +47,10 @@ export type CanEditLayerFeaturesArgs = CanEditLayerFieldsArgs & {
  * the project owner". That under-approximates: a layer contributed by another
  * collaborator shows no edit action even though the server would allow it.
  * Erring this way hides an action rather than surfacing one that 403s.
+ *
+ * A `locked` layer (D7) refuses unconditionally: the row it renders from
+ * carries no `properties`/`query`/owner the server didn't already blank, so
+ * there is nothing to edit and every write would 403 anyway.
  */
 export function canEditLayerFields({
   currentUserId,
@@ -51,8 +59,9 @@ export function canEditLayerFields({
   isProjectEditor,
   inCatalog,
   inBundle,
+  locked,
 }: CanEditLayerFieldsArgs): boolean {
-  if (!isProjectEditor || inCatalog || inBundle) return false;
+  if (!isProjectEditor || inCatalog || inBundle || locked) return false;
   if (!currentUserId || !layerOwnerId) return false;
 
   if (layerOwnerId === currentUserId) return true;

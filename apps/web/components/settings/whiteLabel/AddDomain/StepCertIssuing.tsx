@@ -1,13 +1,11 @@
 "use client";
 
-import { Alert, Button, Stack, Typography } from "@mui/material";
+import { Alert, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
 
-interface StepCertIssuingProps {
-  onClose: () => void;
-}
-
-export function StepCertIssuing({ onClose }: StepCertIssuingProps) {
+/** The cert-issuing notice alone — "Close" now lives in the dialog's shared
+ * footer. */
+export function StepCertIssuing() {
   const { t } = useTranslation("common");
   return (
     <Stack spacing={3}>
@@ -19,13 +17,6 @@ export function StepCertIssuing({ onClose }: StepCertIssuingProps) {
           )}
         </Typography>
       </Alert>
-      <Stack direction="row" justifyContent="flex-end">
-        <Button variant="contained" onClick={onClose}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("close", "Close")}
-          </Typography>
-        </Button>
-      </Stack>
     </Stack>
   );
 }

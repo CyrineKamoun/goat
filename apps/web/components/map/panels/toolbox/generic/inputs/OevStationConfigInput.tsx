@@ -1,12 +1,8 @@
 import {
   Autocomplete,
-  Button,
   Box,
+  Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   FormControl,
   Radio,
   TextField,
@@ -16,15 +12,17 @@ import {
 import { type CSSProperties, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  getOevStationConfigPreset,
-  type OevConfigPresetKey,
-} from "@/lib/constants/oev-gueteklassen";
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
+import { type OevConfigPresetKey, getOevStationConfigPreset } from "@/lib/constants/oev-gueteklassen";
 import { stationConfigSchema } from "@/lib/validations/tools";
 
-import type { ProcessedInput } from "@/types/map/ogc-processes";
 import type { SelectorItem } from "@/types/map/common";
+import type { ProcessedInput } from "@/types/map/ogc-processes";
 
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
+import FormLabelHelper from "@/components/common/FormLabelHelper";
+import Selector from "@/components/map/panels/common/Selector";
 import {
   classLabelToNumber,
   classNumberToLabel,
@@ -35,8 +33,7 @@ import {
   updateClassificationCell,
   withFrequencies,
 } from "@/components/map/panels/toolbox/generic/inputs/oevGueteklassenUtils";
-import Selector from "@/components/map/panels/common/Selector";
-import FormLabelHelper from "@/components/common/FormLabelHelper";
+
 interface OevStationConfigInputProps {
   input: Pick<ProcessedInput, "name" | "title">;
   value: unknown;
@@ -120,18 +117,12 @@ const stationConfigEquals = (first: unknown, second: unknown): boolean => {
   return JSON.stringify(sortObject(first)) === JSON.stringify(sortObject(second));
 };
 
-export default function OevStationConfigInput({
-  value,
-  onChange,
-  disabled,
-}: OevStationConfigInputProps) {
+export default function OevStationConfigInput({ value, onChange, disabled }: OevStationConfigInputProps) {
   const theme = useTheme();
   const { t } = useTranslation("common");
 
   const parsedValue = stationConfigSchema.safeParse(value);
-  const stationConfig = parsedValue.success
-    ? parsedValue.data
-    : getOevStationConfigPreset(DEFAULT_PRESET);
+  const stationConfig = parsedValue.success ? parsedValue.data : getOevStationConfigPreset(DEFAULT_PRESET);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draftConfig, setDraftConfig] = useState(stationConfig);
@@ -148,11 +139,7 @@ export default function OevStationConfigInput({
 
   const parseFrequencyTokens = (tokens: string[]): number[] => {
     return sanitizeFrequencies(
-      tokens.flatMap((token) =>
-        token
-          .split(/[\s,;]+/)
-          .map((item) => Number(item.trim()))
-      )
+      tokens.flatMap((token) => token.split(/[\s,;]+/).map((item) => Number(item.trim())))
     );
   };
 
@@ -334,7 +321,9 @@ export default function OevStationConfigInput({
       return;
     }
 
-    setDraftConfig((current) => updateClassificationCell(current, categoryId, distance, String(stationClass)));
+    setDraftConfig((current) =>
+      updateClassificationCell(current, categoryId, distance, String(stationClass))
+    );
   };
 
   const handleClassificationInputCommit = (categoryId: string, distance: number) => {
@@ -346,7 +335,9 @@ export default function OevStationConfigInput({
 
     const stationClass = classLabelToNumber(rawValue);
     if (stationClass) {
-      setDraftConfig((current) => updateClassificationCell(current, categoryId, distance, String(stationClass)));
+      setDraftConfig((current) =>
+        updateClassificationCell(current, categoryId, distance, String(stationClass))
+      );
     }
 
     setClassificationInputDrafts((current) => {
@@ -368,278 +359,274 @@ export default function OevStationConfigInput({
           Haltestellenkonfiguration
         </Button>
 
-        <Dialog open={dialogOpen} onClose={handleCloseDialog} fullWidth maxWidth="lg">
-          <DialogTitle>Haltestellenkonfiguration</DialogTitle>
-          <DialogContent dividers sx={{ mb: 2 }}>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.75, pt: 0.5 }}>
-              <Selector
-                selectedItems={selectedDraftPresetItem}
-                setSelectedItems={handleDialogPresetChange}
-                items={presetItems}
-                  label="Konfigurationsprofil"
-                  placeholder="Profil auswählen"
+        <AppDialog
+          open={dialogOpen}
+          onClose={handleCloseDialog}
+          icon={ICON_NAME.SETTINGS}
+          title="Haltestellenkonfiguration"
+          maxWidth={1200}
+          bodySx={{ mb: 2 }}
+          footer={
+            <AppDialogFooter
+              onCancel={handleCloseDialog}
+              primaryLabel={t("apply")}
+              onPrimary={handleApplyDialog}
+              primaryDisabled={!isDraftValid}
+            />
+          }>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.75, pt: 0.5 }}>
+            <Selector
+              selectedItems={selectedDraftPresetItem}
+              setSelectedItems={handleDialogPresetChange}
+              items={presetItems}
+              label="Konfigurationsprofil"
+              placeholder="Profil auswählen"
+              disabled={disabled}
+            />
+
+            <FormControl size="small" fullWidth>
+              <FormLabelHelper label="Taktgrenzen (Minuten)" color={theme.palette.text.secondary} />
+              <Autocomplete
+                multiple
+                freeSolo
+                size="small"
                 disabled={disabled}
-              />
-
-              <FormControl size="small" fullWidth>
-                <FormLabelHelper
-                  label="Taktgrenzen (Minuten)"
-                  color={theme.palette.text.secondary}
-                />
-                <Autocomplete
-                  multiple
-                  freeSolo
-                  size="small"
-                  disabled={disabled}
-                  options={COMMON_FREQUENCY_OPTIONS.map(String)}
-                  value={draftConfig.time_frequency.map(String)}
-                  inputValue={draftFrequencyInput}
-                  onInputChange={(_event, nextInput) => {
-                    setDraftFrequencyInput(nextInput);
-                  }}
-                  onChange={(_event, nextValues) => {
-                    const parsed = parseFrequencyTokens(nextValues);
-                    if (!parsed.length) {
-                      return;
-                    }
-                    setDraftConfig((current) => withFrequencies(current, parsed));
-                    setDraftFrequencyInput("");
-                  }}
-                  renderTags={(value, getTagProps) =>
-                    value.map((option, index) => (
-                      <Chip
-                        {...getTagProps({ index })}
-                        key={`${option}-${index}`}
-                        label={`${option} Min.`}
-                        size="small"
-                      />
-                    ))
+                options={COMMON_FREQUENCY_OPTIONS.map(String)}
+                value={draftConfig.time_frequency.map(String)}
+                inputValue={draftFrequencyInput}
+                onInputChange={(_event, nextInput) => {
+                  setDraftFrequencyInput(nextInput);
+                }}
+                onChange={(_event, nextValues) => {
+                  const parsed = parseFrequencyTokens(nextValues);
+                  if (!parsed.length) {
+                    return;
                   }
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      placeholder="Wert in Minuten eingeben + Enter"
-                      onBlur={() => {
-                        if (!draftFrequencyInput.trim()) {
-                          return;
-                        }
-                        const parsedDraft = parseFrequencyTokens([
-                          ...draftConfig.time_frequency.map(String),
-                          draftFrequencyInput,
-                        ]);
-                        if (!parsedDraft.length) {
-                          return;
-                        }
-                        setDraftConfig((current) => withFrequencies(current, parsedDraft));
-                        setDraftFrequencyInput("");
-                      }}
+                  setDraftConfig((current) => withFrequencies(current, parsed));
+                  setDraftFrequencyInput("");
+                }}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      {...getTagProps({ index })}
+                      key={`${option}-${index}`}
+                      label={`${option} Min.`}
+                      size="small"
                     />
-                  )}
-                />
-              </FormControl>
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder="Wert in Minuten eingeben + Enter"
+                    onBlur={() => {
+                      if (!draftFrequencyInput.trim()) {
+                        return;
+                      }
+                      const parsedDraft = parseFrequencyTokens([
+                        ...draftConfig.time_frequency.map(String),
+                        draftFrequencyInput,
+                      ]);
+                      if (!parsedDraft.length) {
+                        return;
+                      }
+                      setDraftConfig((current) => withFrequencies(current, parsedDraft));
+                      setDraftFrequencyInput("");
+                    }}
+                  />
+                )}
+              />
+            </FormControl>
 
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", md: "minmax(280px, 0.95fr) minmax(360px, 1.05fr)" },
-                  gap: 1.25,
-                  alignItems: "start",
-                }}>
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                  <Typography variant="subtitle2" sx={sectionHeadingSx}>
-                    Verkehrsmittelgruppen
-                  </Typography>
-                  <Box
-                    sx={{
-                      border: `1px solid ${theme.palette.divider}`,
-                      borderRadius: 1,
-                      maxWidth: "100%",
-                      overflowX: "auto",
-                      overflowY: "hidden",
-                    }}>
-                    <table style={{ width: "max-content", borderCollapse: "collapse" }}>
-                      <colgroup>
-                        <col style={{ width: 130 }} />
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", md: "minmax(280px, 0.95fr) minmax(360px, 1.05fr)" },
+                gap: 1.25,
+                alignItems: "start",
+              }}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                <Typography variant="subtitle2" sx={sectionHeadingSx}>
+                  Verkehrsmittelgruppen
+                </Typography>
+                <Box
+                  sx={{
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: 1,
+                    maxWidth: "100%",
+                    overflowX: "auto",
+                    overflowY: "hidden",
+                  }}>
+                  <table style={{ width: "max-content", borderCollapse: "collapse" }}>
+                    <colgroup>
+                      <col style={{ width: 130 }} />
+                      {groupKeys.map((groupKey) => (
+                        <col key={`mode-col-${groupKey}`} style={{ width: 38 }} />
+                      ))}
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th style={tableHeaderCellStyle}>Verkehrsmittel</th>
                         {groupKeys.map((groupKey) => (
-                          <col key={`mode-col-${groupKey}`} style={{ width: 38 }} />
+                          <th key={`mode-group-header-${groupKey}`} style={tableHeaderCellStyle}>
+                            {groupKey}
+                          </th>
                         ))}
-                      </colgroup>
-                      <thead>
-                        <tr>
-                          <th style={tableHeaderCellStyle}>Verkehrsmittel</th>
-                          {groupKeys.map((groupKey) => (
-                            <th key={`mode-group-header-${groupKey}`} style={tableHeaderCellStyle}>
-                              {groupKey}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {MODE_GROUP_OPTIONS.map((option) => {
-                          const selectedGroup = getModeGroupValue(draftConfig, option);
-                          return (
-                            <tr key={option.id}>
-                              <td style={{ ...tableCellStyle, padding: "2px 4px" }}>{option.label}</td>
-                              {groupKeys.map((groupKey) => (
-                                <td
-                                  key={`${option.id}-${groupKey}`}
-                                  style={{ ...matrixCellCenterStyle, padding: "1px 4px" }}>
-                                  <Radio
-                                    size="small"
-                                    checked={selectedGroup === groupKey}
-                                    disabled={disabled}
-                                    onChange={() => handleModeGroupChange(option, groupKey)}
-                                    sx={{ p: 0.25 }}
-                                  />
-                                </td>
-                              ))}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </Box>
-                </Box>
-
-                <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                  <Typography variant="subtitle2" sx={sectionHeadingSx}>
-                    Haltestellenkategorien
-                  </Typography>
-                  <Box
-                    sx={{
-                      maxWidth: "100%",
-                      overflowX: "auto",
-                      overflowY: "hidden",
-                      border: `1px solid ${theme.palette.divider}`,
-                      borderRadius: 1,
-                    }}>
-                    <table style={{ width: "max-content", borderCollapse: "collapse" }}>
-                      <colgroup>
-                        <col style={{ width: 180 }} />
-                        <col style={{ width: 66 }} />
-                        <col style={{ width: 66 }} />
-                        <col style={{ width: 66 }} />
-                      </colgroup>
-                      <thead>
-                        <tr>
-                          <th style={tableHeaderCellStyle}>Taktintervall</th>
-                          <th style={tableHeaderCellStyle}>A</th>
-                          <th style={tableHeaderCellStyle}>B</th>
-                          <th style={tableHeaderCellStyle}>C</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {draftConfig.categories.map((row, rowIndex) => (
-                          <tr key={`category-row-${rowIndex}`}>
-                            <td style={tableCellStyle}>{intervalLabels[rowIndex] || `#${rowIndex + 1}`}</td>
-                            {(["A", "B", "C"] as const).map((group) => (
-                              <td key={`category-${rowIndex}-${group}`} style={tableCellStyle}>
-                                <TextField
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {MODE_GROUP_OPTIONS.map((option) => {
+                        const selectedGroup = getModeGroupValue(draftConfig, option);
+                        return (
+                          <tr key={option.id}>
+                            <td style={{ ...tableCellStyle, padding: "2px 4px" }}>{option.label}</td>
+                            {groupKeys.map((groupKey) => (
+                              <td
+                                key={`${option.id}-${groupKey}`}
+                                style={{ ...matrixCellCenterStyle, padding: "1px 4px" }}>
+                                <Radio
                                   size="small"
-                                  type="number"
-                                  value={row[group] ?? ""}
-                                  inputProps={{ min: 1 }}
+                                  checked={selectedGroup === groupKey}
                                   disabled={disabled}
-                                  onChange={(event) => {
-                                    const category = Number(event.target.value);
-                                    if (!Number.isFinite(category) || category <= 0) {
-                                      return;
-                                    }
-                                    setDraftConfig((current) =>
-                                      updateCategoryCell(current, rowIndex, group, category)
-                                    );
-                                  }}
-                                  sx={compactNumberInputSx}
+                                  onChange={() => handleModeGroupChange(option, groupKey)}
+                                  sx={{ p: 0.25 }}
                                 />
                               </td>
                             ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </Box>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </Box>
               </Box>
 
-              <Typography variant="subtitle2" sx={sectionHeadingSx}>
-                Distanzklassen
-              </Typography>
-              <Box
-                sx={{
-                  maxWidth: "100%",
-                  overflowX: "auto",
-                  overflowY: "hidden",
-                  border: `1px solid ${theme.palette.divider}`,
-                  borderRadius: 1,
-                }}>
-                <table style={{ width: "max-content", borderCollapse: "collapse" }}>
-                  <colgroup>
-                    <col style={{ width: 110 }} />
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                <Typography variant="subtitle2" sx={sectionHeadingSx}>
+                  Haltestellenkategorien
+                </Typography>
+                <Box
+                  sx={{
+                    maxWidth: "100%",
+                    overflowX: "auto",
+                    overflowY: "hidden",
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: 1,
+                  }}>
+                  <table style={{ width: "max-content", borderCollapse: "collapse" }}>
+                    <colgroup>
+                      <col style={{ width: 180 }} />
+                      <col style={{ width: 66 }} />
+                      <col style={{ width: 66 }} />
+                      <col style={{ width: 66 }} />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th style={tableHeaderCellStyle}>Taktintervall</th>
+                        <th style={tableHeaderCellStyle}>A</th>
+                        <th style={tableHeaderCellStyle}>B</th>
+                        <th style={tableHeaderCellStyle}>C</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {draftConfig.categories.map((row, rowIndex) => (
+                        <tr key={`category-row-${rowIndex}`}>
+                          <td style={tableCellStyle}>{intervalLabels[rowIndex] || `#${rowIndex + 1}`}</td>
+                          {(["A", "B", "C"] as const).map((group) => (
+                            <td key={`category-${rowIndex}-${group}`} style={tableCellStyle}>
+                              <TextField
+                                size="small"
+                                type="number"
+                                value={row[group] ?? ""}
+                                inputProps={{ min: 1 }}
+                                disabled={disabled}
+                                onChange={(event) => {
+                                  const category = Number(event.target.value);
+                                  if (!Number.isFinite(category) || category <= 0) {
+                                    return;
+                                  }
+                                  setDraftConfig((current) =>
+                                    updateCategoryCell(current, rowIndex, group, category)
+                                  );
+                                }}
+                                sx={compactNumberInputSx}
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Box>
+              </Box>
+            </Box>
+
+            <Typography variant="subtitle2" sx={sectionHeadingSx}>
+              Distanzklassen
+            </Typography>
+            <Box
+              sx={{
+                maxWidth: "100%",
+                overflowX: "auto",
+                overflowY: "hidden",
+                border: `1px solid ${theme.palette.divider}`,
+                borderRadius: 1,
+              }}>
+              <table style={{ width: "max-content", borderCollapse: "collapse" }}>
+                <colgroup>
+                  <col style={{ width: 110 }} />
+                  {distanceKeys.map((distance) => (
+                    <col key={`distance-col-${distance}`} style={{ width: 82 }} />
+                  ))}
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th style={tableHeaderCellStyle}>Kategorie</th>
                     {distanceKeys.map((distance) => (
-                      <col key={`distance-col-${distance}`} style={{ width: 82 }} />
+                      <th key={`distance-${distance}`} style={tableHeaderCellStyle}>
+                        {distance} m
+                      </th>
                     ))}
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th style={tableHeaderCellStyle}>Kategorie</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categoryIds.map((categoryId) => (
+                    <tr key={`classification-row-${categoryId}`}>
+                      <td style={tableCellStyle}>{categoryId}</td>
                       {distanceKeys.map((distance) => (
-                        <th key={`distance-${distance}`} style={tableHeaderCellStyle}>
-                          {distance} m
-                        </th>
+                        <td key={`classification-${categoryId}-${distance}`} style={tableCellStyle}>
+                          <TextField
+                            size="small"
+                            value={getClassificationDisplayValue(categoryId, distance)}
+                            inputProps={{ style: { textTransform: "uppercase" } }}
+                            disabled={disabled}
+                            onChange={(event) => {
+                              handleClassificationInputChange(categoryId, distance, event.target.value);
+                            }}
+                            onFocus={(event) => event.target.select()}
+                            onBlur={() => handleClassificationInputCommit(categoryId, distance)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                handleClassificationInputCommit(categoryId, distance);
+                              }
+                            }}
+                            sx={compactNumberInputSx}
+                          />
+                        </td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {categoryIds.map((categoryId) => (
-                      <tr key={`classification-row-${categoryId}`}>
-                        <td style={tableCellStyle}>{categoryId}</td>
-                        {distanceKeys.map((distance) => (
-                          <td key={`classification-${categoryId}-${distance}`} style={tableCellStyle}>
-                            <TextField
-                              size="small"
-                              value={getClassificationDisplayValue(categoryId, distance)}
-                              inputProps={{ style: { textTransform: "uppercase" } }}
-                              disabled={disabled}
-                              onChange={(event) => {
-                                handleClassificationInputChange(categoryId, distance, event.target.value);
-                              }}
-                              onFocus={(event) => event.target.select()}
-                              onBlur={() => handleClassificationInputCommit(categoryId, distance)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  handleClassificationInputCommit(categoryId, distance);
-                                }
-                              }}
-                              sx={compactNumberInputSx}
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Box>
-
-              {!isDraftValid ? (
-                <Typography color="error" variant="caption">
-                  {stationConfigValidation.error.issues[0]?.message}
-                </Typography>
-              ) : null}
+                  ))}
+                </tbody>
+              </table>
             </Box>
-          </DialogContent>
-          <DialogActions sx={{ px: 3, py: 2 }}>
-            <Button onClick={handleCloseDialog} variant="text">
-              <Typography variant="body2" fontWeight="bold">
-                {t("cancel")}
+
+            {!isDraftValid ? (
+              <Typography color="error" variant="caption">
+                {stationConfigValidation.error.issues[0]?.message}
               </Typography>
-            </Button>
-            <Button onClick={handleApplyDialog} variant="contained" disabled={!isDraftValid}>
-              <Typography variant="body2" fontWeight="bold" color="inherit">
-                {t("apply")}
-              </Typography>
-            </Button>
-          </DialogActions>
-        </Dialog>
+            ) : null}
+          </Box>
+        </AppDialog>
       </Box>
     </Box>
   );

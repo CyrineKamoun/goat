@@ -1,16 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LoadingButton } from "@mui/lab";
 import {
   Alert,
   Box,
   Button,
   Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
   FormControlLabel,
   FormGroup,
@@ -49,7 +44,12 @@ import type {
 } from "@/lib/validations/organizationAnalytics";
 import { organizationAnalyticsCreateSchema } from "@/lib/validations/organizationAnalytics";
 
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 import ConfirmModal from "@/components/modals/Confirm";
+
+/** The `<form>` the analytics dialog's footer Save button submits via
+ * `primaryForm` — the button lives in the shared footer, outside this form. */
+const ANALYTICS_FORM_ID = "white-label-analytics-form";
 
 const EMPTY_FORM: OrganizationAnalyticsCreate = {
   name: "",
@@ -62,8 +62,7 @@ const WhiteLabelAnalyticsPage = () => {
   const { t } = useTranslation("common");
   const { organization, isLoading: isOrgLoading } = useOrganization();
   const orgId = organization?.id;
-  const { analyticsList, isLoading: isAnalyticsLoading, mutate } =
-    useOrganizationAnalytics(orgId);
+  const { analyticsList, isLoading: isAnalyticsLoading, mutate } = useOrganizationAnalytics(orgId);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<OrganizationAnalytics | null>(null);
@@ -143,9 +142,7 @@ const WhiteLabelAnalyticsPage = () => {
       } else {
         await createOrganizationAnalytics(orgId, data);
       }
-      toast.success(
-        t("white_label_analytics_save_success", "Analytics configuration saved")
-      );
+      toast.success(t("white_label_analytics_save_success", "Analytics configuration saved"));
       await mutate();
       dismissForm();
     } catch {
@@ -160,9 +157,7 @@ const WhiteLabelAnalyticsPage = () => {
     setIsRemoveBusy(true);
     try {
       await deleteOrganizationAnalytics(orgId, removing.id);
-      toast.success(
-        t("white_label_analytics_remove_success", "Analytics configuration removed")
-      );
+      toast.success(t("white_label_analytics_remove_success", "Analytics configuration removed"));
       setRemoving(null);
       await mutate();
     } catch {
@@ -175,9 +170,7 @@ const WhiteLabelAnalyticsPage = () => {
   const openManage = (instance: OrganizationAnalytics) => {
     setManaging(instance);
     setDashboardFilter("");
-    setCheckedIds(
-      dashboards.filter((d) => d.analytics_id === instance.id).map((d) => d.project_id)
-    );
+    setCheckedIds(dashboards.filter((d) => d.analytics_id === instance.id).map((d) => d.project_id));
   };
 
   const closeManage = () => {
@@ -198,14 +191,10 @@ const WhiteLabelAnalyticsPage = () => {
       const updated = await setAnalyticsDashboards(orgId, managing.id, checkedIds);
       await mutateDashboards(updated, { revalidate: false });
       await mutate();
-      toast.success(
-        t("white_label_analytics_dashboards_save_success", "Dashboard assignments saved")
-      );
+      toast.success(t("white_label_analytics_dashboards_save_success", "Dashboard assignments saved"));
       setManaging(null);
     } catch {
-      toast.error(
-        t("white_label_analytics_dashboards_save_error", "Failed to save dashboard assignments")
-      );
+      toast.error(t("white_label_analytics_dashboards_save_error", "Failed to save dashboard assignments"));
     } finally {
       setIsDashboardsSaveBusy(false);
     }
@@ -249,7 +238,7 @@ const WhiteLabelAnalyticsPage = () => {
             <Alert severity="info" icon={<Icon iconName={ICON_NAME.INFO} fontSize="small" />}>
               {t(
                 "white_label_analytics_setup_hints",
-                "Add each of your custom domains to your Matomo site's URL list, and configure Custom Dimension 1 as \"Project ID\" so per-dashboard breakdown works in Matomo."
+                'Add each of your custom domains to your Matomo site\'s URL list, and configure Custom Dimension 1 as "Project ID" so per-dashboard breakdown works in Matomo.'
               )}
             </Alert>
 
@@ -289,8 +278,7 @@ const WhiteLabelAnalyticsPage = () => {
                         }
                       />
                       <ListItemSecondaryAction>
-                        <Tooltip
-                          title={t("white_label_analytics_manage_dashboards", "Manage dashboards")}>
+                        <Tooltip title={t("white_label_analytics_manage_dashboards", "Manage dashboards")}>
                           <span>
                             <IconButton
                               size="small"
@@ -306,10 +294,7 @@ const WhiteLabelAnalyticsPage = () => {
                           </IconButton>
                         </Tooltip>
                         <Tooltip title={t("white_label_analytics_remove", "Remove")}>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => setRemoving(instance)}>
+                          <IconButton size="small" color="error" onClick={() => setRemoving(instance)}>
                             <Icon iconName={ICON_NAME.TRASH} style={{ fontSize: 16 }} />
                           </IconButton>
                         </Tooltip>
@@ -324,88 +309,83 @@ const WhiteLabelAnalyticsPage = () => {
         )}
       </Stack>
 
-      <Dialog open={formOpen} onClose={closeForm} fullWidth maxWidth="sm">
-        <Box component="form" onSubmit={handleSubmit(onSubmit)}>
-          <DialogTitle>
-            {editing
-              ? t("edit", "Edit")
-              : t("white_label_analytics_add", "Add analytics")}
-          </DialogTitle>
-          <DialogContent>
-            <Stack spacing={theme.spacing(6)} sx={{ mt: 2 }}>
-              <TextField
-                required
-                label={t("white_label_analytics_name", "Name")}
-                placeholder="Client XY Matomo"
-                size="medium"
-                disabled={isSaveBusy}
-                helperText={
-                  errors.name?.message ??
-                  t(
-                    "white_label_analytics_name_help",
-                    'A label to tell instances apart, e.g. "Client XY Matomo".'
-                  )
-                }
-                error={Boolean(errors.name)}
-                {...register("name")}
-              />
-              <TextField
-                select
-                label={t("white_label_analytics_provider", "Provider")}
-                size="medium"
-                defaultValue="matomo"
-                disabled={isSaveBusy}
-                {...register("provider")}>
-                <MenuItem value="matomo">Matomo</MenuItem>
-              </TextField>
-              <TextField
-                required
-                label={t("white_label_analytics_matomo_url", "Matomo URL")}
-                placeholder="https://matomo.example.org/"
-                size="medium"
-                disabled={isSaveBusy}
-                helperText={
-                  errors.config?.url?.message ??
-                  t(
-                    "white_label_analytics_matomo_url_help",
-                    "Your Matomo instance, including trailing slash."
-                  )
-                }
-                error={Boolean(errors.config?.url)}
-                {...register("config.url")}
-              />
-              <TextField
-                required
-                label={t("white_label_analytics_site_id", "Site ID")}
-                placeholder="5"
-                size="medium"
-                disabled={isSaveBusy}
-                helperText={
-                  errors.config?.site_id?.message ??
-                  t(
-                    "white_label_analytics_site_id_help",
-                    "Found in Matomo → Administration → Websites."
-                  )
-                }
-                error={Boolean(errors.config?.site_id)}
-                {...register("config.site_id")}
-              />
-            </Stack>
-          </DialogContent>
-          <DialogActions disableSpacing sx={{ pb: 2 }}>
-            <Button onClick={closeForm} variant="text" disabled={isSaveBusy} sx={{ borderRadius: 0 }}>
-              <Typography variant="body2" fontWeight="bold">
-                {t("cancel", "Cancel")}
-              </Typography>
-            </Button>
-            <LoadingButton type="submit" variant="text" loading={isSaveBusy} disabled={!isValid}>
-              <Typography variant="body2" fontWeight="bold" color="inherit">
-                {t("save", "Save")}
-              </Typography>
-            </LoadingButton>
-          </DialogActions>
-        </Box>
-      </Dialog>
+      <AppDialog
+        open={formOpen}
+        onClose={closeForm}
+        icon={ICON_NAME.CHART}
+        title={editing ? t("edit", "Edit") : t("white_label_analytics_add", "Add analytics")}
+        maxWidth={600}
+        closeDisabled={isSaveBusy}
+        footer={
+          <AppDialogFooter
+            onCancel={closeForm}
+            cancelDisabled={isSaveBusy}
+            primaryLabel={t("save", "Save")}
+            onPrimary={handleSubmit(onSubmit)}
+            primaryType="submit"
+            primaryForm={ANALYTICS_FORM_ID}
+            primaryDisabled={!isValid}
+            primaryLoading={isSaveBusy}
+          />
+        }>
+        <Stack
+          component="form"
+          id={ANALYTICS_FORM_ID}
+          onSubmit={handleSubmit(onSubmit)}
+          spacing={theme.spacing(6)}>
+          <TextField
+            required
+            label={t("white_label_analytics_name", "Name")}
+            placeholder="Client XY Matomo"
+            size="medium"
+            disabled={isSaveBusy}
+            helperText={
+              errors.name?.message ??
+              t(
+                "white_label_analytics_name_help",
+                'A label to tell instances apart, e.g. "Client XY Matomo".'
+              )
+            }
+            error={Boolean(errors.name)}
+            {...register("name")}
+          />
+          <TextField
+            select
+            label={t("white_label_analytics_provider", "Provider")}
+            size="medium"
+            defaultValue="matomo"
+            disabled={isSaveBusy}
+            {...register("provider")}>
+            <MenuItem value="matomo">Matomo</MenuItem>
+          </TextField>
+          <TextField
+            required
+            label={t("white_label_analytics_matomo_url", "Matomo URL")}
+            placeholder="https://matomo.example.org/"
+            size="medium"
+            disabled={isSaveBusy}
+            helperText={
+              errors.config?.url?.message ??
+              t("white_label_analytics_matomo_url_help", "Your Matomo instance, including trailing slash.")
+            }
+            error={Boolean(errors.config?.url)}
+            {...register("config.url")}
+          />
+          <TextField
+            required
+            label={t("white_label_analytics_site_id", "Site ID")}
+            placeholder="5"
+            size="medium"
+            disabled={isSaveBusy}
+            helperText={
+              errors.config?.site_id?.message ??
+              t("white_label_analytics_site_id_help", "Found in Matomo → Administration → Websites.")
+            }
+            error={Boolean(errors.config?.site_id)}
+            {...register("config.site_id")}
+          />
+        </Stack>
+      </AppDialog>
 
       <ConfirmModal
         open={removing !== null}
@@ -427,89 +407,79 @@ const WhiteLabelAnalyticsPage = () => {
         confirmText={t("white_label_analytics_remove", "Remove")}
       />
 
-      <Dialog open={managing !== null} onClose={closeManage} fullWidth maxWidth="sm">
-        <DialogTitle>
-          {t("white_label_analytics_manage_dashboards", "Manage dashboards")}
-          {managing ? ` — ${managing.name}` : ""}
-        </DialogTitle>
-        <DialogContent sx={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          {dashboards.length === 0 && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {t(
-                "white_label_analytics_dashboards_empty",
-                "No published dashboards yet. Publish a project to assign analytics."
-              )}
-            </Typography>
-          )}
-          {dashboards.length > 0 && (
-            <>
-              <TextField
-                size="small"
-                placeholder={t("white_label_analytics_dashboards_filter", "Filter by name…")}
-                value={dashboardFilter}
-                onChange={(e) => setDashboardFilter(e.target.value)}
-                sx={{ mt: 1, mb: 4, flexShrink: 0 }}
-              />
-              <Box sx={{ overflowY: "auto" }}>
-                <FormGroup>
-                  {visibleDashboards.map((d) => {
-                    const otherName =
-                      d.analytics_id && managing && d.analytics_id !== managing.id
-                        ? instanceNameById.get(d.analytics_id)
-                        : undefined;
-                    return (
-                      <FormControlLabel
-                        key={d.project_id}
-                        control={
-                          <Checkbox
-                            checked={checkedIds.includes(d.project_id)}
-                            disabled={isDashboardsSaveBusy}
-                            onChange={() => toggleDashboard(d.project_id)}
-                          />
-                        }
-                        label={
-                          <Stack>
-                            <Typography variant="body2">{d.name}</Typography>
-                            {otherName && (
-                              <Typography variant="caption" color="text.secondary">
-                                {t(
-                                  "white_label_analytics_currently_assigned",
-                                  "currently: {{name}}",
-                                  { name: otherName }
-                                )}
-                              </Typography>
-                            )}
-                          </Stack>
-                        }
-                      />
-                    );
-                  })}
-                </FormGroup>
-              </Box>
-            </>
-          )}
-        </DialogContent>
-        <DialogActions disableSpacing sx={{ pb: 2 }}>
-          <Button
-            onClick={closeManage}
-            variant="text"
-            disabled={isDashboardsSaveBusy}
-            sx={{ borderRadius: 0 }}>
-            <Typography variant="body2" fontWeight="bold">
-              {t("cancel", "Cancel")}
-            </Typography>
-          </Button>
-          <LoadingButton
-            variant="text"
-            loading={isDashboardsSaveBusy}
-            disabled={dashboards.length === 0}
-            onClick={handleManageSave}>
-            <Typography variant="body2" fontWeight="bold" color="inherit">
-              {t("save", "Save")}
-            </Typography>
-          </LoadingButton>
-        </DialogActions>
-      </Dialog>
+      <AppDialog
+        open={managing !== null}
+        onClose={closeManage}
+        icon={ICON_NAME.MAP}
+        title={t("white_label_analytics_manage_dashboards", "Manage dashboards")}
+        subtitle={managing?.name}
+        maxWidth={600}
+        closeDisabled={isDashboardsSaveBusy}
+        bodySx={{ display: "flex", flexDirection: "column", overflow: "hidden" }}
+        footer={
+          <AppDialogFooter
+            onCancel={closeManage}
+            cancelDisabled={isDashboardsSaveBusy}
+            primaryLabel={t("save", "Save")}
+            onPrimary={() => void handleManageSave()}
+            primaryDisabled={dashboards.length === 0}
+            primaryLoading={isDashboardsSaveBusy}
+          />
+        }>
+        {dashboards.length === 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {t(
+              "white_label_analytics_dashboards_empty",
+              "No published dashboards yet. Publish a project to assign analytics."
+            )}
+          </Typography>
+        )}
+        {dashboards.length > 0 && (
+          <>
+            <TextField
+              size="small"
+              placeholder={t("white_label_analytics_dashboards_filter", "Filter by name…")}
+              value={dashboardFilter}
+              onChange={(e) => setDashboardFilter(e.target.value)}
+              sx={{ mt: 1, mb: 4, flexShrink: 0 }}
+            />
+            <Box sx={{ overflowY: "auto" }}>
+              <FormGroup>
+                {visibleDashboards.map((d) => {
+                  const otherName =
+                    d.analytics_id && managing && d.analytics_id !== managing.id
+                      ? instanceNameById.get(d.analytics_id)
+                      : undefined;
+                  return (
+                    <FormControlLabel
+                      key={d.project_id}
+                      control={
+                        <Checkbox
+                          checked={checkedIds.includes(d.project_id)}
+                          disabled={isDashboardsSaveBusy}
+                          onChange={() => toggleDashboard(d.project_id)}
+                        />
+                      }
+                      label={
+                        <Stack>
+                          <Typography variant="body2">{d.name}</Typography>
+                          {otherName && (
+                            <Typography variant="caption" color="text.secondary">
+                              {t("white_label_analytics_currently_assigned", "currently: {{name}}", {
+                                name: otherName,
+                              })}
+                            </Typography>
+                          )}
+                        </Stack>
+                      }
+                    />
+                  );
+                })}
+              </FormGroup>
+            </Box>
+          </>
+        )}
+      </AppDialog>
     </Box>
   );
 };

@@ -36,6 +36,7 @@ export const shareLayerWithTeamOrOrganizationSchema = z.object({
 export const shareLayerSchema = z.object({
   teams: z.array(shareLayerWithTeamOrOrganizationSchema).optional(),
   organizations: z.array(shareLayerWithTeamOrOrganizationSchema).optional(),
+  users: z.array(z.object({ id: z.string(), role: layerShareRoleEnum })).optional(),
 });
 
 const HexColor = z.string();

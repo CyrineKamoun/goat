@@ -4,10 +4,10 @@ import type { DragOverEvent, DragStartEvent } from "@dnd-kit/core";
 import { DndContext, DragOverlay } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import { Box, GlobalStyles, Stack, debounce, useTheme } from "@mui/material";
-import dynamic from "next/dynamic";
 import { ThemeProvider } from "@mui/material/styles";
 import "maplibre-gl/dist/maplibre-gl.css";
-import React, { useCallback, useEffect, useMemo, useRef, useState, use } from "react";
+import dynamic from "next/dynamic";
+import React, { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { MapRef, ViewStateChangeEvent } from "react-map-gl/maplibre";
 import { MapProvider } from "react-map-gl/maplibre";
@@ -31,7 +31,12 @@ import { createSnapToCursorModifier } from "@/lib/utils/dnd-modifier";
 import { orderLayersByTree } from "@/lib/utils/map/layerTreeOrder";
 import { getLocFromUrl, writeLocToUrl, writeMapLocToUrl } from "@/lib/utils/map/loc-url";
 import type { FeatureLayerPointProperties } from "@/lib/validations/layer";
-import { type BuilderWidgetSchema, type CustomBasemap, builderWidgetSchema, projectSchema } from "@/lib/validations/project";
+import {
+  type BuilderWidgetSchema,
+  type CustomBasemap,
+  builderWidgetSchema,
+  projectSchema,
+} from "@/lib/validations/project";
 import { widgetSchemaMap } from "@/lib/validations/widget";
 
 import { useAuthZ } from "@/hooks/auth/AuthZ";
@@ -39,15 +44,18 @@ import { useBrandedTheme } from "@/hooks/dashboard/useBrandedTheme";
 import { JobStatusWatcher } from "@/hooks/jobs/JobStatus";
 import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 import { useBasemap } from "@/hooks/map/MapHooks";
+import { useMapUrlIntent } from "@/hooks/map/useMapUrlIntent";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { DraggableItem } from "@/components/builder/widgets/common/DraggableItem";
 import { LoadingPage } from "@/components/common/LoadingPage";
 import Header from "@/components/header/Header";
+import MapDropTarget from "@/components/map/MapDropTarget";
 import MapViewer from "@/components/map/MapViewer";
 import DataProjectLayout from "@/components/map/layouts/desktop/DataProjectLayout";
 import PublicProjectLayout from "@/components/map/layouts/desktop/PublicProjectLayout";
 import DataPanel from "@/components/map/panels/DataPanel";
+import TransferToasts from "@/components/uploads/TransferToasts";
 
 const BuilderConfigPanel = dynamic(() => import("@/components/builder/ConfigPanel"), { ssr: false });
 const ReportsLayout = dynamic(() => import("@/components/reports").then((m) => m.ReportsLayout), {
@@ -57,15 +65,10 @@ const WorkflowsLayout = dynamic(() => import("@/components/workflows/WorkflowsLa
 
 const UPDATE_VIEW_STATE_DEBOUNCE_TIME = 200;
 
-import MapDropTarget from "@/components/map/MapDropTarget";
-import TransferToasts from "@/components/uploads/TransferToasts";
-
 export default function MapPage(props: { params: Promise<{ projectId: string }> }) {
   const params = use(props.params);
 
-  const {
-    projectId
-  } = params;
+  const { projectId } = params;
 
   const theme = useTheme();
   const { t, i18n } = useTranslation("common");
@@ -74,6 +77,13 @@ export default function MapPage(props: { params: Promise<{ projectId: string }> 
   const urlLoc = useMemo(() => getLocFromUrl(), []);
   const mapMode = useAppSelector((state) => state.map.mapMode);
   const dispatch = useAppDispatch();
+
+  // A template result (T7) can land here as `?mode=workflows&workflow=<id>` /
+  // `?mode=reports&layout=<id>` — see templateResultHref in
+  // hooks/templates/useUseTemplate.ts. Workflow selection is handled inside
+  // the hook (Redux); layoutId is threaded down to ReportsLayout below since
+  // the Reports panel keeps its selection in local component state.
+  const { layoutId } = useMapUrlIntent(projectId);
 
   const {
     project: _project,
@@ -144,9 +154,7 @@ export default function MapPage(props: { params: Promise<{ projectId: string }> 
   const activeBasemapLayerConfigKey = useMemo(() => {
     const customs = (project?.custom_basemaps as CustomBasemap[] | undefined) ?? [];
     const active = customs.find((c) => c.id === activeBasemapValue);
-    return JSON.stringify(
-      active && active.type === "vector" ? (active.layer_config ?? null) : null
-    );
+    return JSON.stringify(active && active.type === "vector" ? (active.layer_config ?? null) : null);
   }, [project?.custom_basemaps, activeBasemapValue]);
   useEffect(() => {
     if (activeBasemapValue) setActiveBasemap(activeBasemapValue);
@@ -278,12 +286,8 @@ export default function MapPage(props: { params: Promise<{ projectId: string }> 
     valueOrRefresh?: any,
     refresh = false
   ) => {
-    const partial =
-      typeof keyOrPartial === "string"
-        ? { [keyOrPartial]: valueOrRefresh }
-        : keyOrPartial;
-    const refreshFlag =
-      typeof keyOrPartial === "string" ? refresh : valueOrRefresh ?? false;
+    const partial = typeof keyOrPartial === "string" ? { [keyOrPartial]: valueOrRefresh } : keyOrPartial;
+    const refreshFlag = typeof keyOrPartial === "string" ? refresh : (valueOrRefresh ?? false);
     try {
       const projectToUpdate = JSON.parse(JSON.stringify(project));
       Object.assign(projectToUpdate, partial);
@@ -499,11 +503,7 @@ export default function MapPage(props: { params: Promise<{ projectId: string }> 
         <MapProvider>
           <DrawProvider>
             <MeasureProvider>
-              <Stack
-                component="div"
-                width="100%"
-                height="100%"
-                overflow="hidden">
+              <Stack component="div" width="100%" height="100%" overflow="hidden">
                 {isProjectEditor && (
                   <>
                     <MapDropTarget projectId={projectId} />
@@ -534,16 +534,14 @@ export default function MapPage(props: { params: Promise<{ projectId: string }> 
                     onDragEnd={handleDragEnd}
                     autoScroll>
                     {mapMode === "data" && (
-                      <DataProjectLayout
-                        project={project}
-                        onProjectUpdate={handleProjectUpdate}
-                      />
+                      <DataProjectLayout project={project} onProjectUpdate={handleProjectUpdate} />
                     )}
                     {mapMode === "reports" && (
                       <ReportsLayout
                         project={project}
                         projectLayers={projectLayers}
                         onProjectUpdate={handleProjectUpdate}
+                        initialLayoutId={layoutId}
                       />
                     )}
                     {mapMode === "workflows" && (
@@ -566,29 +564,32 @@ export default function MapPage(props: { params: Promise<{ projectId: string }> 
                         }}>
                         <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
                           <ThemeProvider theme={mapMode === "builder" ? brandedTheme : theme}>
-                          <MapViewer
-                            containerSx={{ zIndex: 0 }}
-                            layers={projectLayers}
-                            mapRef={mapRef}
-                            maxExtent={project?.max_extent || undefined}
-                            initialViewState={{
-                              zoom: urlLoc?.zoom ?? initialView?.zoom ?? 3,
-                              latitude: urlLoc?.latitude ?? initialView?.latitude ?? 48.13,
-                              longitude: urlLoc?.longitude ?? initialView?.longitude ?? 11.57,
-                              pitch: urlLoc?.pitch ?? initialView?.pitch ?? 0,
-                              bearing: urlLoc?.bearing ?? initialView?.bearing ?? 0,
-                              fitBoundsOptions: {
-                                minZoom: initialView?.min_zoom ?? 0,
-                                maxZoom: initialView?.max_zoom ?? 24,
-                              },
-                            }}
-                            mapStyle={mapStyle}
-                            onMoveEnd={handleMoveEnd}
-                            onLoad={handleMapLoaded}
+                            <MapViewer
+                              containerSx={{ zIndex: 0 }}
+                              layers={projectLayers}
+                              mapRef={mapRef}
+                              maxExtent={project?.max_extent || undefined}
+                              initialViewState={{
+                                zoom: urlLoc?.zoom ?? initialView?.zoom ?? 3,
+                                latitude: urlLoc?.latitude ?? initialView?.latitude ?? 48.13,
+                                longitude: urlLoc?.longitude ?? initialView?.longitude ?? 11.57,
+                                pitch: urlLoc?.pitch ?? initialView?.pitch ?? 0,
+                                bearing: urlLoc?.bearing ?? initialView?.bearing ?? 0,
+                                fitBoundsOptions: {
+                                  minZoom: initialView?.min_zoom ?? 0,
+                                  maxZoom: initialView?.max_zoom ?? 24,
+                                },
+                              }}
+                              mapStyle={mapStyle}
+                              onMoveEnd={handleMoveEnd}
+                              onLoad={handleMapLoaded}
+                              isEditor={isProjectEditor}
+                            />
+                          </ThemeProvider>
+                          <DataPanel
+                            projectLayers={allProjectLayersIncludingTables}
                             isEditor={isProjectEditor}
                           />
-                          </ThemeProvider>
-                          <DataPanel projectLayers={allProjectLayersIncludingTables} isEditor={isProjectEditor} />
                         </Box>
                         {mapMode === "builder" && (
                           <Box

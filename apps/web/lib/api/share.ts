@@ -1,6 +1,8 @@
+import useSWR from "swr";
+
 import { API_BASE_URL } from "@/lib/constants";
 
-import { apiRequestAuth } from "@/lib/api/fetcher";
+import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
 import type { LayerSharedWith } from "@/lib/validations/layer";
 import type { ProjectSharedWith } from "@/lib/validations/project";
 
@@ -40,4 +42,12 @@ export const shareProject = async (projectId: string, payload: ProjectSharedWith
 
 export const shareLayer = async (layerId: string, payload: LayerSharedWith) => {
   return shareItem("layer", layerId, payload);
+};
+
+export const useItemShares = (type: "layer" | "project", id: string | null) => {
+  const { data, isLoading, error, mutate } = useSWR<ProjectSharedWith | LayerSharedWith>(
+    id ? `${SHARE_API_BASE_URL}/${type}/${id}` : null,
+    fetcher
+  );
+  return { shares: data, isLoading, isError: error, mutate };
 };

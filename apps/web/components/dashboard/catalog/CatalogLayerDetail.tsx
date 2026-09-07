@@ -8,26 +8,26 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { useCatalogPreview } from "@/lib/api/catalog";
 import { catalogKindOf } from "@/lib/catalog/kind";
-import type { CatalogCollection, CatalogItem } from "@/lib/validations/catalog";
-
 import { datasetPeriod, itemPeriod } from "@/lib/catalog/period";
+import type { CatalogCollection, CatalogItem } from "@/lib/validations/catalog";
 
 import { describedBy, linkHref, useCatalogLabels } from "@/hooks/catalog/useCatalogLabels";
 
+import CatalogFeatureTable from "@/components/dashboard/catalog/CatalogFeatureTable";
+import CatalogFootprintMap from "@/components/dashboard/catalog/CatalogFootprintMap";
+import CatalogProviderCard from "@/components/dashboard/catalog/CatalogProviderCard";
 import {
   BUNDLE_ACCENT,
   DetailHeader,
   DetailTabs,
   KeywordSection,
   LicenseBadge,
+  type MetaField,
   MetaSidebar,
   SectionCard,
-  type MetaField,
-} from "@/components/dashboard/catalog/CatalogDetailChrome";
-import CatalogFeatureTable from "@/components/dashboard/catalog/CatalogFeatureTable";
-import CatalogFootprintMap from "@/components/dashboard/catalog/CatalogFootprintMap";
-import CatalogProviderCard from "@/components/dashboard/catalog/CatalogProviderCard";
-import CatalogSchemaTable from "@/components/dashboard/catalog/CatalogSchemaTable";
+} from "@/components/dashboard/common/DetailChrome";
+import SchemaTable from "@/components/dashboard/common/SchemaTable";
+import { surfaceShadows } from "@/components/dashboard/common/surfaceShadows";
 
 /** One dataset: description, keywords and a map, metadata beside them, columns on a second tab. */
 
@@ -67,9 +67,7 @@ const CatalogLayerDetail = ({
   const title = inBundle ? props.title : collection?.title || props.title;
   // `other` is STAC's "unknown", not a licence — see `licenseLabel`.
   const licenseLabel = labels.licenseLabel(props.license);
-  const periodField = labels.periodField(
-    inBundle ? itemPeriod(item) : datasetPeriod(collection, [item])
-  );
+  const periodField = labels.periodField(inBundle ? itemPeriod(item) : datasetPeriod(collection, [item]));
 
   /** How big the dataset is, beside the sample that shows a slice of it — the two numbers a reader needs to judge what the rows below them represent. */
   const datasetSize = useMemo(() => {
@@ -86,9 +84,7 @@ const CatalogLayerDetail = ({
   }, [props, columns.length, t]);
 
   const tabs = useMemo(() => {
-    const list: { id: TabId; label: string }[] = [
-      { id: "summary", label: t("summary") },
-    ];
+    const list: { id: TabId; label: string }[] = [{ id: "summary", label: t("summary") }];
     if (columns.length > 0) {
       // No count on the tab. The table below it lists the columns, so the badge
       // repeated a number nobody was going to act on.
@@ -193,11 +189,7 @@ const CatalogLayerDetail = ({
 
       <DetailTabs<TabId> tabs={tabs} active={tab} onChange={setTab} />
 
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={6}
-        alignItems="flex-start"
-        sx={{ mb: 10 }}>
+      <Stack direction={{ xs: "column", md: "row" }} spacing={6} alignItems="flex-start" sx={{ mb: 10 }}>
         <Stack spacing={4} sx={{ flex: 1, minWidth: 0, alignSelf: "stretch" }}>
           {tab === "summary" && (
             <>
@@ -224,7 +216,7 @@ const CatalogLayerDetail = ({
                     borderRadius: 2.5,
                     overflow: "hidden",
                     border: `1px solid ${theme.palette.divider}`,
-                    boxShadow: theme.shadows[6],
+                    boxShadow: surfaceShadows(theme).rest,
                   }}>
                   <CatalogFootprintMap item={item} fill />
                 </Box>
@@ -246,7 +238,7 @@ const CatalogLayerDetail = ({
               )}
               {/* No subtitle: the heading and the column headers underneath it already say what this is. */}
               <SectionCard title={t("catalog_columns")}>
-                <CatalogSchemaTable columns={columns} />
+                <SchemaTable columns={columns} />
               </SectionCard>
             </>
           )}

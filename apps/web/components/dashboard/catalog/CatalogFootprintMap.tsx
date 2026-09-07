@@ -9,16 +9,16 @@ import { Layer as MapLayer, Map as MapLibre, Source } from "react-map-gl/maplibr
 import { useCatalogPreview, useCatalogStyle } from "@/lib/api/catalog";
 import { catalogPaint } from "@/lib/catalog/style";
 import { getHightlightStyleSpec } from "@/lib/transformers/layer";
+import { detailPopupConfig } from "@/lib/utils/map/detailPopup";
 import type { CatalogItem } from "@/lib/validations/catalog";
 import type { PopupProperties } from "@/lib/validations/layer";
 
 import { useCatalogBasemapStyle } from "@/hooks/catalog/useCatalogBasemapStyle";
 
-import CatalogMapAttribution from "@/components/dashboard/catalog/CatalogMapAttribution";
+import DetailMapAttribution from "@/components/dashboard/common/DetailMapAttribution";
 import { LayerLegendPanel } from "@/components/map/panels/layer/legend/LayerLegend";
-import type { LayerField } from "@/components/map/popover/formatFeatureProperties";
 import { MapFeaturePopover } from "@/components/map/popover/MapFeaturePopover";
-import { EDGE_GAP } from "@/components/map/popover/PopupFixedHost";
+import type { LayerField } from "@/components/map/popover/formatFeatureProperties";
 
 /** Where the dataset is, and — where the deployment allows it — what it contains. */
 
@@ -35,11 +35,7 @@ type PickedFeature = {
 };
 
 const STYLED_LAYER = "catalog-geometry-styled";
-const PLAIN_LAYERS = [
-  "catalog-geometry-fill",
-  "catalog-geometry-line",
-  "catalog-geometry-point",
-];
+const PLAIN_LAYERS = ["catalog-geometry-fill", "catalog-geometry-line", "catalog-geometry-point"];
 
 const CatalogFootprintMap = ({
   item,
@@ -115,37 +111,7 @@ const CatalogFootprintMap = ({
 
   /** A popup configuration for a dataset that has none. */
   const popup = useMemo<PopupProperties>(
-    () =>
-      ({
-        enabled: true,
-        // The same behaviour the project map gives this value: hover previews (transient), click pins (sticky, and hovers stop changing it).
-        trigger: "click_and_hover",
-        mode: "simple",
-        blocks: [
-          {
-            id: "catalog-fields",
-            type: "fieldList",
-            layout: "table",
-            attributes: fields.map((field) => ({
-              name: field.name,
-              type: field.type === "number" ? "number" : "string",
-            })),
-            collapse_after: null,
-          },
-        ],
-        html: "",
-        // Pinned to a corner: an in-place popover sized for a full-screen map
-        // covers most of a card-sized one.
-        layout: "pinned",
-        anchor: "top_right",
-        // The page title above the map already names the dataset, and a pan or a
-        // click off the features closes the panel, so it needs no close control.
-        header: "none",
-        width: 300,
-        // The map's height, less the host's gap above, the credit strip below, and
-        // the same gap again between the two.
-        max_height: Math.max(160, panelHeight - EDGE_GAP * 2 - attributionRoom),
-      }) as unknown as PopupProperties,
+    () => detailPopupConfig(fields, panelHeight, attributionRoom),
     [fields, panelHeight, attributionRoom]
   );
 
@@ -161,9 +127,7 @@ const CatalogFootprintMap = ({
     const wanted = styledSample ? [STYLED_LAYER] : PLAIN_LAYERS;
     // Read from `getStyle()`: `getLayer()` returns nothing through react-map-gl's
     // wrapper, and querying a layer the style has yet to add logs an error.
-    const present = new Set(
-      (event.target.getStyle()?.layers ?? []).map((layer) => layer.id)
-    );
+    const present = new Set((event.target.getStyle()?.layers ?? []).map((layer) => layer.id));
     const layers = wanted.filter((id) => present.has(id));
     if (!layers.length) return undefined;
     const { x, y } = event.point;
@@ -322,9 +286,7 @@ const CatalogFootprintMap = ({
                 // A hover preview must not take the pointer: it opens over the
                 // features being swept, and the `mouseout` that follows would clear
                 // the hover and flicker the panel. Pinned, it becomes interactive.
-                ...(picked
-                  ? null
-                  : { "&, & *": { pointerEvents: "none !important" } }),
+                ...(picked ? null : { "&, & *": { pointerEvents: "none !important" } }),
               }}>
               <MapFeaturePopover
                 fields={fields}
@@ -340,7 +302,7 @@ const CatalogFootprintMap = ({
           )}
 
           {/* Capped: the legend owns the bottom-left of this map. */}
-          <CatalogMapAttribution maxWidth={styledSample ? "62%" : "100%"} />
+          <DetailMapAttribution maxWidth={styledSample ? "62%" : "100%"} />
         </MapLibre>
 
         {/* The dataset's legend, drawn by the Layers panel's own component from the
@@ -365,10 +327,7 @@ const CatalogFootprintMap = ({
               zIndex: 2,
             }}>
             {/* Headings kept: they read "Fill color based on: measure", which is what turns a column of swatches into an explanation. */}
-            <LayerLegendPanel
-              properties={style as Record<string, unknown>}
-              geometryType={geometryType}
-            />
+            <LayerLegendPanel properties={style as Record<string, unknown>} geometryType={geometryType} />
           </Paper>
         )}
       </Box>

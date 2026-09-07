@@ -24,18 +24,20 @@ export const useSystemSettings = () => {
 };
 
 /**
- * Update system settings (PUT /settings)
+ * Update system settings (PUT /settings). `token` is optional: `apiRequestAuth`
+ * already resolves the caller's session token on its own (used by callers,
+ * e.g. `lib/api/preferences.ts`, that don't have a `useSession()` token to
+ * hand in); pass it explicitly only when the caller already has one on hand.
  */
 export const updateSystemSettings = async (
   body: SystemSettingsUpdate,
-  token: string
+  token?: string
 ): Promise<SystemSettings | null> => {
-  if (!token) return null;
   const res = await apiRequestAuth(`${SYSTEM_API_BASE_URL}/settings`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
   });

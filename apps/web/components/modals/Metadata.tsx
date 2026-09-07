@@ -1,29 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LoadingButton } from "@mui/lab";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Box, Divider, Stack, TextField, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 import { mutate } from "swr";
 
-import {
-  type BundleDatasetMetadata,
-  isBundleTile,
-  updateBundle,
-  useBundle,
-} from "@/lib/api/bundles";
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
+import { type BundleDatasetMetadata, isBundleTile, updateBundle, useBundle } from "@/lib/api/bundles";
 import { matchesContentListKey } from "@/lib/api/datasets";
 import { updateDataset } from "@/lib/api/layers";
 import { PROJECTS_API_BASE_URL, updateProject } from "@/lib/api/projects";
@@ -34,6 +19,7 @@ import type { ContentDialogBaseProps } from "@/types/dashboard/content";
 
 import { useContentMetadataHooks } from "@/hooks/map/ContentMetadataHooks";
 
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 import { RhfAutocompleteField } from "@/components/common/form-inputs/AutocompleteField";
 
 interface MetadataDialogProps extends ContentDialogBaseProps {}
@@ -109,9 +95,7 @@ const Metadata: React.FC<MetadataDialogProps> = ({ open, onClose, content, type 
       );
       const identity = {
         ...(cleanedData.name !== undefined ? { name: cleanedData.name as string } : {}),
-        ...(cleanedData.description !== undefined
-          ? { description: cleanedData.description as string }
-          : {}),
+        ...(cleanedData.description !== undefined ? { description: cleanedData.description as string } : {}),
       };
       if (isBundle) {
         await updateBundle(content.id, {
@@ -144,147 +128,137 @@ const Metadata: React.FC<MetadataDialogProps> = ({ open, onClose, content, type 
     }
   };
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t("edit_metadata")}</DialogTitle>
-      <DialogContent>
-        <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 1, maxHeight: "500px" }}>
-          <Stack spacing={4}>
-            {type === "layer" && (
-              <>
-                <Divider />
-                <Box>
-                  <Typography variant="body1" fontWeight="bold">
-                    {t("common:metadata.heading_titles.basic")}
-                  </Typography>
-                </Box>
-                <Divider />
-              </>
-            )}
+    <AppDialog
+      open={open}
+      onClose={() => onClose?.()}
+      icon={ICON_NAME.EDITPEN}
+      title={t("edit_metadata")}
+      maxWidth={600}
+      footer={
+        <AppDialogFooter
+          onCancel={onClose}
+          primaryLabel={t("update")}
+          onPrimary={handleSubmit(onSubmit)}
+          primaryDisabled={!isValid}
+          primaryLoading={isBusy}
+        />
+      }>
+      <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ mt: 1, maxHeight: "500px" }}>
+        <Stack spacing={4}>
+          {type === "layer" && (
+            <>
+              <Divider />
+              <Box>
+                <Typography variant="body1" fontWeight="bold">
+                  {t("common:metadata.heading_titles.basic")}
+                </Typography>
+              </Box>
+              <Divider />
+            </>
+          )}
 
-            <TextField
-              fullWidth
-              label={t("name")}
-              {...register("name")}
-              error={!!errors.name}
-              helperText={errors.name?.message}
-            />
-            <TextField
-              fullWidth
-              multiline
-              rows={6}
-              label={t("description")}
-              {...register("description")}
-              error={!!errors.description}
-              helperText={errors.description?.message}
-            />
-            {isBundle && (
-              <>
-                <RhfAutocompleteField
-                  options={geographicalCodeOptions}
-                  control={control}
-                  name="geographical_code"
-                  label={t("common:metadata.headings.geographical_code")}
-                />
-                <TextField
-                  fullWidth
-                  label={t("common:metadata.headings.data_reference_year")}
-                  type="number"
-                  {...register("data_reference_year", {
-                    setValueAs: (v) => (v === "" ? undefined : parseInt(v, 10)),
-                  })}
-                  error={!!errors.data_reference_year}
-                  helperText={errors.data_reference_year?.message}
-                />
-                <Divider />
-                <Box>
-                  <Typography variant="body1" fontWeight="bold">
-                    {t("common:metadata.heading_titles.data_quality")}
-                  </Typography>
-                </Box>
-                <Divider />
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={6}
-                  label={t("common:metadata.headings.lineage")}
-                  {...register("lineage")}
-                  error={!!errors.lineage}
-                  helperText={errors.lineage?.message}
-                />
-                <Divider />
-                <Box>
-                  <Typography variant="body1" fontWeight="bold">
-                    {t("common:metadata.heading_titles.distribution")}
-                  </Typography>
-                </Box>
-                <Divider />
-                <TextField
-                  fullWidth
-                  label={t("common:metadata.headings.distributor_name")}
-                  {...register("distributor_name")}
-                  error={!!errors.distributor_name}
-                  helperText={errors.distributor_name?.message}
-                />
-                <TextField
-                  fullWidth
-                  label={t("common:metadata.headings.distributor_email")}
-                  {...register("distributor_email", {
-                    setValueAs: (v) => (!v ? undefined : v),
-                  })}
-                  error={!!errors.distributor_email}
-                  helperText={errors.distributor_email?.message}
-                />
-                <TextField
-                  fullWidth
-                  label={t("common:metadata.headings.distribution_url")}
-                  {...register("distribution_url", {
-                    setValueAs: (v) => (!v ? undefined : v),
-                  })}
-                  error={!!errors.distribution_url}
-                  helperText={errors.distribution_url?.message}
-                />
-                <TextField
-                  fullWidth
-                  label={t("common:metadata.headings.license")}
-                  placeholder="DL-DE-BY-2.0"
-                  {...register("license")}
-                  error={!!errors.license}
-                  helperText={errors.license?.message}
-                />
-                <TextField
-                  fullWidth
-                  label={t("common:metadata.headings.attribution")}
-                  {...register("attribution")}
-                  error={!!errors.attribution}
-                  helperText={errors.attribution?.message}
-                />
-              </>
-            )}
-          </Stack>
-        </Box>
-      </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          pb: 2,
-          mt: 4,
-        }}>
-        <Button onClick={onClose} variant="text">
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-        <LoadingButton
-          variant="contained"
-          disabled={!isValid}
-          loading={isBusy}
-          onClick={handleSubmit(onSubmit)}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("update")}
-          </Typography>
-        </LoadingButton>
-      </DialogActions>
-    </Dialog>
+          <TextField
+            fullWidth
+            label={t("name")}
+            {...register("name")}
+            error={!!errors.name}
+            helperText={errors.name?.message}
+          />
+          <TextField
+            fullWidth
+            multiline
+            rows={6}
+            label={t("description")}
+            {...register("description")}
+            error={!!errors.description}
+            helperText={errors.description?.message}
+          />
+          {isBundle && (
+            <>
+              <RhfAutocompleteField
+                options={geographicalCodeOptions}
+                control={control}
+                name="geographical_code"
+                label={t("common:metadata.headings.geographical_code")}
+              />
+              <TextField
+                fullWidth
+                label={t("common:metadata.headings.data_reference_year")}
+                type="number"
+                {...register("data_reference_year", {
+                  setValueAs: (v) => (v === "" ? undefined : parseInt(v, 10)),
+                })}
+                error={!!errors.data_reference_year}
+                helperText={errors.data_reference_year?.message}
+              />
+              <Divider />
+              <Box>
+                <Typography variant="body1" fontWeight="bold">
+                  {t("common:metadata.heading_titles.data_quality")}
+                </Typography>
+              </Box>
+              <Divider />
+              <TextField
+                fullWidth
+                multiline
+                rows={6}
+                label={t("common:metadata.headings.lineage")}
+                {...register("lineage")}
+                error={!!errors.lineage}
+                helperText={errors.lineage?.message}
+              />
+              <Divider />
+              <Box>
+                <Typography variant="body1" fontWeight="bold">
+                  {t("common:metadata.heading_titles.distribution")}
+                </Typography>
+              </Box>
+              <Divider />
+              <TextField
+                fullWidth
+                label={t("common:metadata.headings.distributor_name")}
+                {...register("distributor_name")}
+                error={!!errors.distributor_name}
+                helperText={errors.distributor_name?.message}
+              />
+              <TextField
+                fullWidth
+                label={t("common:metadata.headings.distributor_email")}
+                {...register("distributor_email", {
+                  setValueAs: (v) => (!v ? undefined : v),
+                })}
+                error={!!errors.distributor_email}
+                helperText={errors.distributor_email?.message}
+              />
+              <TextField
+                fullWidth
+                label={t("common:metadata.headings.distribution_url")}
+                {...register("distribution_url", {
+                  setValueAs: (v) => (!v ? undefined : v),
+                })}
+                error={!!errors.distribution_url}
+                helperText={errors.distribution_url?.message}
+              />
+              <TextField
+                fullWidth
+                label={t("common:metadata.headings.license")}
+                placeholder="DL-DE-BY-2.0"
+                {...register("license")}
+                error={!!errors.license}
+                helperText={errors.license?.message}
+              />
+              <TextField
+                fullWidth
+                label={t("common:metadata.headings.attribution")}
+                {...register("attribution")}
+                error={!!errors.attribution}
+                helperText={errors.attribution?.message}
+              />
+            </>
+          )}
+        </Stack>
+      </Box>
+    </AppDialog>
   );
 };
 

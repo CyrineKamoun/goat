@@ -1,16 +1,9 @@
-import { LoadingButton } from "@mui/lab";
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Typography,
-} from "@mui/material";
+import { DialogContentText } from "@mui/material";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
+
+import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import {
   deleteInvitation as deleteOrganizationInvitation,
@@ -20,6 +13,8 @@ import { deleteMember as deleteTeamMember } from "@/lib/api/teams";
 import { invitationStatusEnum } from "@/lib/validations/invitation";
 
 import type { MemberDialogBaseProps } from "@/types/dashboard/settings";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 interface DeleteMemberDialogProps extends MemberDialogBaseProps {
   disabled?: boolean;
@@ -62,38 +57,28 @@ const DeleteMemberModal: React.FC<DeleteMemberDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>{t("delete_member")}</DialogTitle>
-      <DialogContent>
-        <DialogContentText>
-          {t("delete_member_description")}
-          <br />
-          <b>{member?.email}</b>
-        </DialogContentText>
-      </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          pb: 2,
-        }}>
-        <Button onClick={onClose} variant="text" sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-        <LoadingButton
-          onClick={handleDelete}
-          loading={isBusy}
-          variant="text"
-          color="error"
-          disabled={disabled}
-          sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("remove")}
-          </Typography>
-        </LoadingButton>
-      </DialogActions>
-    </Dialog>
+    <AppDialog
+      open={open}
+      onClose={() => onClose?.()}
+      icon={ICON_NAME.TRASH}
+      tone="warning"
+      title={t("delete_member")}
+      footer={
+        <AppDialogFooter
+          onCancel={onClose}
+          primaryLabel={t("remove")}
+          onPrimary={() => void handleDelete()}
+          primaryColor="error"
+          primaryDisabled={disabled}
+          primaryLoading={isBusy}
+        />
+      }>
+      <DialogContentText>
+        {t("delete_member_description")}
+        <br />
+        <b>{member?.email}</b>
+      </DialogContentText>
+    </AppDialog>
   );
 };
 

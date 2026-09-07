@@ -1,22 +1,14 @@
-import { LoadingButton } from "@mui/lab";
-import {
-  Alert,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Alert, DialogContentText, Stack, TextField, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Trans } from "react-i18next";
 import { toast } from "react-toastify";
 
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
 import type { ProjectLayerTreeNode } from "@/lib/validations/project";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 type LayerGroupModalMode = "create" | "rename" | "delete";
 
@@ -141,80 +133,74 @@ const ProjectLayerGroupModal = ({
   const { layers: childLayers, groups: childGroups } = getGroupChildren();
   const hasChildren = childLayers.length > 0 || childGroups.length > 0;
 
+  const isDelete = mode === "delete";
+
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
-      <DialogTitle>{getDialogTitle()}</DialogTitle>
-      <DialogContent>
-        {mode === "delete" ? (
-          <>
-            <DialogContentText>
-              <Trans
-                i18nKey="common:are_you_sure_to_delete_group"
-                values={{ group: existingGroup?.name }}
-                components={{ b: <b /> }}
-              />
-            </DialogContentText>
-            {hasChildren && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                <Stack>
-                  <Trans
-                    i18nKey="common:group_delete_warning"
-                    values={{
-                      layerCount: childLayers.length,
-                      groupCount: childGroups.length,
-                    }}
-                    components={{ b: <b /> }}
-                  />
-                  {childLayers.length > 0 && (
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                      <b>{t("layers")}:</b> {childLayers.map((layer) => layer.name).join(", ")}
-                    </Typography>
-                  )}
-                  {childGroups.length > 0 && (
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                      <b>{t("subgroups")}:</b> {childGroups.map((group) => group.name).join(", ")}
-                    </Typography>
-                  )}
-                </Stack>
-              </Alert>
-            )}
-          </>
-        ) : (
-          <Stack spacing={3} sx={{ mt: 1 }}>
-            <TextField
-              fullWidth
-              name="name"
-              label={t("group_name")}
-              value={name}
-              onChange={handleNameChange}
-              placeholder={t("enter_group_name")}
-              autoFocus
+    <AppDialog
+      open={open}
+      onClose={handleClose}
+      icon={isDelete ? ICON_NAME.TRASH : ICON_NAME.LAYERS}
+      tone={isDelete ? "warning" : "primary"}
+      title={getDialogTitle()}
+      closeDisabled={isLoading}
+      footer={
+        <AppDialogFooter
+          onCancel={handleClose}
+          cancelDisabled={isLoading}
+          primaryLabel={getSubmitButtonText()}
+          onPrimary={() => void handleSubmit()}
+          primaryColor={isDelete ? "error" : "primary"}
+          primaryLoading={isLoading}
+        />
+      }>
+      {isDelete ? (
+        <>
+          <DialogContentText>
+            <Trans
+              i18nKey="common:are_you_sure_to_delete_group"
+              values={{ group: existingGroup?.name }}
+              components={{ b: <b /> }}
             />
-          </Stack>
-        )}
-      </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          pb: 2,
-        }}>
-        <Button onClick={handleClose} variant="text" sx={{ borderRadius: 0 }} disabled={isLoading}>
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-        <LoadingButton
-          onClick={handleSubmit}
-          loading={isLoading}
-          variant="text"
-          color={mode === "delete" ? "error" : "primary"}
-          sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {getSubmitButtonText()}
-          </Typography>
-        </LoadingButton>
-      </DialogActions>
-    </Dialog>
+          </DialogContentText>
+          {hasChildren && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              <Stack>
+                <Trans
+                  i18nKey="common:group_delete_warning"
+                  values={{
+                    layerCount: childLayers.length,
+                    groupCount: childGroups.length,
+                  }}
+                  components={{ b: <b /> }}
+                />
+                {childLayers.length > 0 && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                    <b>{t("layers")}:</b> {childLayers.map((layer) => layer.name).join(", ")}
+                  </Typography>
+                )}
+                {childGroups.length > 0 && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                    <b>{t("subgroups")}:</b> {childGroups.map((group) => group.name).join(", ")}
+                  </Typography>
+                )}
+              </Stack>
+            </Alert>
+          )}
+        </>
+      ) : (
+        <Stack spacing={3} sx={{ mt: 1 }}>
+          <TextField
+            fullWidth
+            name="name"
+            label={t("group_name")}
+            value={name}
+            onChange={handleNameChange}
+            placeholder={t("enter_group_name")}
+            autoFocus
+          />
+        </Stack>
+      )}
+    </AppDialog>
   );
 };
 

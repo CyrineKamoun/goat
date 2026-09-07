@@ -1,18 +1,12 @@
 "use client";
 
-import { LoadingButton } from "@mui/lab";
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Stack, TextField, Typography } from "@mui/material";
 import React, { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 interface SaveDatasetDialogProps {
   open: boolean;
@@ -66,59 +60,50 @@ const SaveDatasetDialog: React.FC<SaveDatasetDialogProps> = ({
   );
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t("save_dataset")}</DialogTitle>
-      <DialogContent>
-        <Stack sx={{ pt: 1 }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            {t("save_dataset_description")}
-          </Typography>
-          <TextField
-            autoFocus
-            fullWidth
-            size="small"
-            inputProps={{
-              style: {
-                fontSize: "0.875rem",
-                fontWeight: "bold",
-              },
-            }}
-            placeholder={t("dataset_name")}
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setError(null);
-            }}
-            onKeyDown={handleKeyDown}
-            error={!!error}
-            helperText={error}
-            disabled={isSaving}
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          pb: 2,
-        }}>
-        <Button onClick={onClose} disabled={isSaving} variant="text" sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-        <LoadingButton
-          onClick={handleSave}
-          loading={isSaving}
-          variant="text"
-          color="primary"
-          disabled={!name.trim()}
-          sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("save")}
-          </Typography>
-        </LoadingButton>
-      </DialogActions>
-    </Dialog>
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      icon={ICON_NAME.SAVE}
+      title={t("save_dataset")}
+      maxWidth={600}
+      closeDisabled={isSaving}
+      footer={
+        <AppDialogFooter
+          onCancel={onClose}
+          cancelDisabled={isSaving}
+          primaryLabel={t("save")}
+          onPrimary={() => void handleSave()}
+          primaryDisabled={!name.trim()}
+          primaryLoading={isSaving}
+        />
+      }>
+      <Stack sx={{ pt: 1 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          {t("save_dataset_description")}
+        </Typography>
+        <TextField
+          autoFocus
+          fullWidth
+          size="small"
+          inputProps={{
+            style: {
+              fontSize: "0.875rem",
+              fontWeight: "bold",
+            },
+          }}
+          placeholder={t("dataset_name")}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            setError(null);
+          }}
+          onKeyDown={handleKeyDown}
+          error={!!error}
+          helperText={error}
+          disabled={isSaving}
+        />
+      </Stack>
+    </AppDialog>
   );
 };
 

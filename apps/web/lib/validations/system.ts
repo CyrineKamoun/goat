@@ -7,7 +7,11 @@ const unitEnum = z.enum(["metric", "imperial"]);
 export const systemSettingsSchemaBase = z.object({
   client_theme: clientThemeEnum,
   preferred_language: preferredLanguageEnum,
-  unit: unitEnum.default("metric")
+  unit: unitEnum.default("metric"),
+  // Home (H10): per-user UI state carried on the same settings row.
+  onboarding_skipped_at: z.string().nullable().optional(),
+  releases_seen_at: z.string().nullable().optional(),
+  spotlight_seen: z.array(z.string()).default([]),
 });
 
 export const systemSettingsSchema = systemSettingsSchemaBase.extend({

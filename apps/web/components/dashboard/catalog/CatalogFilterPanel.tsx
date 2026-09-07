@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
+import { surfaceShadows } from "@/components/dashboard/common/surfaceShadows";
 import TextFieldInput from "@/components/map/panels/common/TextFieldInput";
 
 /** The filter sidebar: a "Filters / Clear (n)" header, then favourites, the spatial filter, a date
@@ -151,8 +152,7 @@ const FacetOptions = ({
   // a filter you cannot remove.
   const visible = needle
     ? options.filter(
-        (option) =>
-          option.label.toLowerCase().includes(needle) || selected.includes(option.value)
+        (option) => option.label.toLowerCase().includes(needle) || selected.includes(option.value)
       )
     : options;
   const scrolls = visible.length > SCROLLABLE_FROM;
@@ -220,39 +220,35 @@ const FacetOptions = ({
               }
             : undefined
         }>
-      {visible.map((option) => {
-        const on = selected.includes(option.value);
-        const disabled = option.count === 0 && !on;
-        return (
-          <Box
-            key={option.value}
-            component="label"
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 2.5,
-              px: 2,
-              py: 1.5,
-              borderRadius: 1,
-              cursor: disabled ? "not-allowed" : "pointer",
-              opacity: disabled ? 0.45 : 1,
-              backgroundColor: on ? theme.palette.action.selected : "transparent",
-              "&:hover": disabled || on ? undefined : { backgroundColor: theme.palette.action.hover },
-            }}>
-            <FilterCheckbox
-              checked={on}
-              disabled={disabled}
-              onChange={() => onToggle(option.value)}
-            />
-            <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap title={option.label}>
-              {option.label}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {option.count}
-            </Typography>
-          </Box>
-        );
-      })}
+        {visible.map((option) => {
+          const on = selected.includes(option.value);
+          const disabled = option.count === 0 && !on;
+          return (
+            <Box
+              key={option.value}
+              component="label"
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 2.5,
+                px: 2,
+                py: 1.5,
+                borderRadius: 1,
+                cursor: disabled ? "not-allowed" : "pointer",
+                opacity: disabled ? 0.45 : 1,
+                backgroundColor: on ? theme.palette.action.selected : "transparent",
+                "&:hover": disabled || on ? undefined : { backgroundColor: theme.palette.action.hover },
+              }}>
+              <FilterCheckbox checked={on} disabled={disabled} onChange={() => onToggle(option.value)} />
+              <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }} noWrap title={option.label}>
+                {option.label}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {option.count}
+              </Typography>
+            </Box>
+          );
+        })}
       </Box>
       {visible.length === 0 && (
         <Typography variant="caption" color="text.secondary" sx={{ px: 2 }}>
@@ -325,7 +321,7 @@ const CatalogFilterPanel = ({
       sx={{
         borderRadius: flush ? 0 : 2.5,
         border: flush ? "none" : `1px solid ${theme.palette.divider}`,
-        boxShadow: flush ? "none" : theme.shadows[6],
+        boxShadow: flush ? "none" : surfaceShadows(theme).rest,
         overflow: "hidden",
         backgroundColor: flush ? "transparent" : undefined,
       }}>
@@ -338,56 +334,56 @@ const CatalogFilterPanel = ({
           {t("filter")}
         </Typography>
         <Stack direction="row" alignItems="center" spacing={3}>
-        {activeFilterCount > 0 && (
-          <Typography
-            component="button"
-            variant="caption"
-            onClick={onClearAll}
-            sx={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: theme.palette.primary.main,
-              fontWeight: 600,
-              // `fontFamily`, never the `font` shorthand: the shorthand also resets
-              // font-size, which threw away caption's 12px and made this row grow.
-              fontFamily: "inherit",
-              p: 0,
-            }}>
-            {t("catalog_clear_n", { count: activeFilterCount })}
-          </Typography>
-        )}
-        {headerAction}
+          {activeFilterCount > 0 && (
+            <Typography
+              component="button"
+              variant="caption"
+              onClick={onClearAll}
+              sx={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: theme.palette.primary.main,
+                fontWeight: 600,
+                // `fontFamily`, never the `font` shorthand: the shorthand also resets
+                // font-size, which threw away caption's 12px and made this row grow.
+                fontFamily: "inherit",
+                p: 0,
+              }}>
+              {t("catalog_clear_n", { count: activeFilterCount })}
+            </Typography>
+          )}
+          {headerAction}
         </Stack>
       </Stack>
 
       {/* Favourites: a filter, not a facet — it has no buckets to count. */}
       {onToggleFavourites && (
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={2.5}
-        // A label, like the facet rows: the row click forwards to the checkbox
-        // natively, so there is exactly one toggle — a row onClick PLUS the
-        // checkbox's own onChange fired twice and cancelled out.
-        component="label"
-        sx={{
-          px: inset,
-          py: 3,
-          cursor: "pointer",
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          backgroundColor: favouritesOnly ? theme.palette.action.selected : "transparent",
-        }}>
-        <FilterCheckbox checked={!!favouritesOnly} onChange={onToggleFavourites} />
-        <Icon
-          iconName={ICON_NAME.STAR}
-          style={{ fontSize: 14 }}
-          htmlColor={favouritesOnly ? theme.palette.primary.main : theme.palette.text.secondary}
-        />
-        <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
-          {t("catalog_show_my_favourites")}
-        </Typography>
-      </Stack>
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={2.5}
+          // A label, like the facet rows: the row click forwards to the checkbox
+          // natively, so there is exactly one toggle — a row onClick PLUS the
+          // checkbox's own onChange fired twice and cancelled out.
+          component="label"
+          sx={{
+            px: inset,
+            py: 3,
+            cursor: "pointer",
+            borderBottom: `1px solid ${theme.palette.divider}`,
+            backgroundColor: favouritesOnly ? theme.palette.action.selected : "transparent",
+          }}>
+          <FilterCheckbox checked={!!favouritesOnly} onChange={onToggleFavourites} />
+          <Icon
+            iconName={ICON_NAME.STAR}
+            style={{ fontSize: 14 }}
+            htmlColor={favouritesOnly ? theme.palette.primary.main : theme.palette.text.secondary}
+          />
+          <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
+            {t("catalog_show_my_favourites")}
+          </Typography>
+        </Stack>
       )}
 
       {spatialFilter}
@@ -409,23 +405,23 @@ const CatalogFilterPanel = ({
         </Section>
       ))}
       {onChangeDates && (
-      <Section icon={ICON_NAME.CALENDAR} label={t("catalog_datetime")} inset={inset}>
-        {/* The app's own input (`TextFieldInput`, as the attribute-field editor uses) rather than a bare MUI `TextField`: same 40px height, same floating label treatment, same clear affordance as every other field in the product. */}
-        <Stack spacing={2} sx={{ px: inset ? 2 : 0 }}>
-          <TextFieldInput
-            type="date"
-            label={t("catalog_date_from")}
-            value={dateFrom ?? ""}
-            onChange={(value) => onChangeDates({ from: value || null, to: dateTo })}
-          />
-          <TextFieldInput
-            type="date"
-            label={t("catalog_date_to")}
-            value={dateTo ?? ""}
-            onChange={(value) => onChangeDates({ from: dateFrom, to: value || null })}
-          />
-        </Stack>
-      </Section>
+        <Section icon={ICON_NAME.CALENDAR} label={t("catalog_datetime")} inset={inset}>
+          {/* The app's own input (`TextFieldInput`, as the attribute-field editor uses) rather than a bare MUI `TextField`: same 40px height, same floating label treatment, same clear affordance as every other field in the product. */}
+          <Stack spacing={2} sx={{ px: inset ? 2 : 0 }}>
+            <TextFieldInput
+              type="date"
+              label={t("catalog_date_from")}
+              value={dateFrom ?? ""}
+              onChange={(value) => onChangeDates({ from: value || null, to: dateTo })}
+            />
+            <TextFieldInput
+              type="date"
+              label={t("catalog_date_to")}
+              value={dateTo ?? ""}
+              onChange={(value) => onChangeDates({ from: dateFrom, to: value || null })}
+            />
+          </Stack>
+        </Section>
       )}
     </Paper>
   );

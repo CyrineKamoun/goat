@@ -1,19 +1,4 @@
-import CloseIcon from "@mui/icons-material/Close";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Fab,
-  IconButton,
-  Stack,
-  Tooltip,
-  Typography,
-  useTheme,
-} from "@mui/material";
+import { Box, Fab, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +10,7 @@ import type { PopupPlacement, PopupSize, PopupType } from "@/lib/validations/wid
 import MarkdownContentEditor from "@/components/builder/widgets/common/MarkdownContentEditor";
 import PopupContentRenderer from "@/components/builder/widgets/common/PopupContentRenderer";
 import PopupSettingsControls from "@/components/builder/widgets/common/PopupSettingsControls";
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 interface ProjectInfoProps {
   project: Project;
@@ -111,44 +97,39 @@ export function ProjectInfo({ project, viewOnly, onProjectUpdate }: ProjectInfoP
   // LinkPopupEditDialog.
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ pr: 6, display: "flex", alignItems: "center", gap: 1 }}>
-          <InfoOutlinedIcon sx={{ fontSize: 20, color: "primary.main", opacity: 0.85 }} />
-          <Typography variant="h6" sx={{ flex: 1 }}>
-            {t("edit_popup_content")}
-          </Typography>
-          <IconButton size="small" onClick={onClose} sx={{ position: "absolute", right: 12, top: 12 }}>
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <Stack spacing={2}>
-            <PopupSettingsControls
-              popupType={popupType}
-              placement={popupPlacement}
-              size={popupSize}
-              onPopupTypeChange={(v) => updateSetting("project_info_popup_type", v)}
-              onPlacementChange={(v) => updateSetting("project_info_popup_placement", v)}
-              onSizeChange={(v) => updateSetting("project_info_popup_size", v)}
+      <AppDialog
+        open={open}
+        onClose={onClose}
+        icon={ICON_NAME.INFO}
+        title={t("edit_popup_content")}
+        maxWidth={600}
+        bodySx={{ pt: 2 }}
+        footer={<AppDialogFooter primaryLabel={t("done", { defaultValue: "Done" })} onPrimary={onClose} />}>
+        <Stack spacing={2}>
+          <PopupSettingsControls
+            popupType={popupType}
+            placement={popupPlacement}
+            size={popupSize}
+            onPopupTypeChange={(v) => updateSetting("project_info_popup_type", v)}
+            onPlacementChange={(v) => updateSetting("project_info_popup_placement", v)}
+            onSizeChange={(v) => updateSetting("project_info_popup_size", v)}
+          />
+          <Box>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              fontWeight={600}
+              sx={{ mb: 0.5, display: "block" }}>
+              {t("info_text", { defaultValue: "Info text" })}
+            </Typography>
+            <MarkdownContentEditor
+              value={infoContent}
+              onChange={(v) => updateSetting("project_info_content", v)}
+              plainText={popupType === "tooltip"}
             />
-            <Box>
-              <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mb: 0.5, display: "block" }}>
-                {t("info_text", { defaultValue: "Info text" })}
-              </Typography>
-              <MarkdownContentEditor
-                value={infoContent}
-                onChange={(v) => updateSetting("project_info_content", v)}
-                plainText={popupType === "tooltip"}
-              />
-            </Box>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={onClose} variant="contained" size="small">
-            {t("done", { defaultValue: "Done" })}
-          </Button>
-        </DialogActions>
-      </Dialog>
+          </Box>
+        </Stack>
+      </AppDialog>
 
       {fab}
     </>

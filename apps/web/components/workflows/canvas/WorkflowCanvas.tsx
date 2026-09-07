@@ -67,9 +67,9 @@ import DeletableEdge from "../edges/DeletableEdge";
 import DatasetNode from "../nodes/DatasetNode";
 import ExportNode from "../nodes/ExportNode";
 import IfNode from "../nodes/IfNode";
-import { AnimatedEdgeStyles, BorderAnglePropertyStyles } from "../nodes/shared";
 import TextAnnotationNode from "../nodes/TextAnnotationNode";
 import ToolNode from "../nodes/ToolNode";
+import { AnimatedEdgeStyles, BorderAnglePropertyStyles } from "../nodes/shared";
 import CanvasToolbar from "./CanvasToolbar";
 
 const CanvasContainer = styled(Box)(({ theme }) => ({
@@ -251,6 +251,9 @@ interface WorkflowCanvasProps {
   // Execution props
   isExecuting?: boolean;
   canExecute?: boolean;
+  /** At least one dataset node still needs a layer (a template's unresolved
+   * "ask" input) — the run button stays disabled and explains why. */
+  hasUnresolvedInputs?: boolean;
   onRun?: () => void;
   onStop?: () => void;
 }
@@ -260,6 +263,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
   onDragOver,
   isExecuting = false,
   canExecute = false,
+  hasUnresolvedInputs = false,
   onRun,
   onStop,
 }) => {
@@ -743,6 +747,7 @@ const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         onStop={onStop}
         isRunning={isExecuting}
         canRun={canExecute && localNodes.length > 0}
+        hasUnresolvedInputs={hasUnresolvedInputs}
         onVariablesClick={() => setVariablesDialogOpen(true)}
       />
 

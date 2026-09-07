@@ -1,6 +1,6 @@
 "use client";
 
-import { Add as AddIcon, Description as ReportIcon } from "@mui/icons-material";
+import { Description as ReportIcon } from "@mui/icons-material";
 import {
   Alert,
   Box,
@@ -24,9 +24,11 @@ import {
 import { styled } from "@mui/material/styles";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { toast } from "react-toastify";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
+import { useLayerQueryables } from "@/lib/api/layers";
 import {
   createReportLayout,
   deleteReportLayout,
@@ -34,8 +36,6 @@ import {
   updateReportLayout,
   useReportLayouts,
 } from "@/lib/api/reportLayouts";
-import { useLayerQueryables } from "@/lib/api/layers";
-import { useProjectInitialViewState } from "@/lib/api/projects";
 import { PAGE_SIZES, type PageSize } from "@/lib/print/units";
 import type { Project, ProjectLayer } from "@/lib/validations/project";
 import type {
@@ -45,12 +45,16 @@ import type {
   ReportLayout,
   ReportLayoutConfig,
 } from "@/lib/validations/reportLayout";
+import { createEmptyReportLayoutConfig } from "@/lib/validations/reportLayout";
+import type { TemplateRead, TemplateUseResult } from "@/lib/validations/template";
+
 import type { SelectorItem } from "@/types/map/common";
 
 import { useAtlasFeatures } from "@/hooks/reports/useAtlasFeatures";
 import { usePrintConfig } from "@/hooks/reports/usePrintConfig";
 import { type ExportFormat, useExportReport } from "@/hooks/useExportReport";
 
+import NewMenuButton from "@/components/common/NewMenuButton";
 import MoreMenu from "@/components/common/PopperMenu";
 import type { PopperMenuItem } from "@/components/common/PopperMenu";
 import { SIDE_PANEL_WIDTH, SidePanelContainer } from "@/components/common/SidePanel";
@@ -59,7 +63,9 @@ import SectionOptions from "@/components/map/panels/common/SectionOptions";
 import Selector from "@/components/map/panels/common/Selector";
 import ConfirmModal from "@/components/modals/Confirm";
 import ReportLayoutRenameModal from "@/components/modals/ReportLayoutRename";
-import ReportTemplatePickerModal, { type ReportTemplate } from "@/components/modals/ReportTemplatePicker";
+import SaveTemplateDialog from "@/components/templates/SaveTemplateDialog";
+import TemplateBrowser from "@/components/templates/TemplateBrowser";
+import UseTemplateFlow from "@/components/templates/UseTemplateFlow";
 
 const PanelContainer = styled(SidePanelContainer)(({ theme }) => ({
   width: SIDE_PANEL_WIDTH,
@@ -80,6 +86,10 @@ interface ReportsConfigPanelProps {
   projectLayers?: ProjectLayer[];
   selectedReport: ReportLayout | null;
   onSelectReport: (report: ReportLayout | null) => void;
+  /** A template result's `?layout=<id>` (T7), threaded down from the map
+   * page's useMapUrlIntent via ReportsLayout. Preferred over `reportLayouts[0]`
+   * by the auto-select-on-load effect below when it matches a loaded layout. */
+  initialLayoutId?: string | null;
 }
 
 const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
@@ -87,20 +97,17 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
   projectLayers = [],
   selectedReport,
   onSelectReport,
+  initialLayoutId = null,
 }) => {
   const { t } = useTranslation("common");
 
   // Fetch report layouts from API
   const { reportLayouts, isLoading, mutate } = useReportLayouts(project?.id);
 
-  // Fetch project's initial view state for template maps
-  const { initialView } = useProjectInitialViewState(project?.id ?? "");
-
   // Selected report ID (local, synced with parent)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
 
   // Loading states
-  const [isCreating, setIsCreating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   // Section collapsed state
@@ -129,11 +136,13 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
   // Modal states
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [renameModalOpen, setRenameModalOpen] = useState(false);
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [templateBrowserOpen, setTemplateBrowserOpen] = useState(false);
+  const [templateForFlow, setTemplateForFlow] = useState<TemplateRead | null>(null);
+  const [templateSaveLayout, setTemplateSaveLayout] = useState<ReportLayout | null>(null);
   const [actionLayoutId, setActionLayoutId] = useState<string | null>(null);
   const [actionLayoutName, setActionLayoutName] = useState<string>("");
 
-  // Track if we've already shown the template picker automatically
+  // Track if we've already shown the template browser automatically
   const hasShownTemplatePickerRef = useRef(false);
 
   // Memoized selector items
@@ -265,49 +274,66 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
     }
   }, [selectedReportId, reportLayouts, onSelectReport]);
 
-  // Auto-select first report when layouts load, or show template picker if none exist
+  // Auto-select first report when layouts load, or show the template browser if none exist.
+  // A template result's `?layout=<id>` (initialLayoutId) wins over `reportLayouts[0]` when it
+  // matches one of the loaded layouts; otherwise this falls back to today's behavior.
   useEffect(() => {
     if (reportLayouts && reportLayouts.length > 0 && !selectedReportId) {
-      setSelectedReportId(reportLayouts[0].id);
+      const preferred = initialLayoutId
+        ? reportLayouts.find((report) => report.id === initialLayoutId)
+        : undefined;
+      setSelectedReportId((preferred ?? reportLayouts[0]).id);
     } else if (
       reportLayouts &&
       reportLayouts.length === 0 &&
       !isLoading &&
       !hasShownTemplatePickerRef.current
     ) {
-      // No layouts exist, show template picker automatically
+      // No layouts exist, open the template browser automatically
       hasShownTemplatePickerRef.current = true;
-      setTemplatePickerOpen(true);
+      setTemplateBrowserOpen(true);
     }
-  }, [reportLayouts, selectedReportId, isLoading]);
+  }, [reportLayouts, selectedReportId, isLoading, initialLayoutId]);
 
-  // Handle template selection - create layout from template
-  const handleSelectTemplate = useCallback(
-    async (template: ReportTemplate) => {
-      if (!project?.id) return;
+  // A template picked from the browser hands off to UseTemplateFlow, which
+  // inserts the layout into this project (T7: layouts carry no ask inputs,
+  // so that flow has no steps of its own here).
+  const handleUseTemplate = useCallback((template: TemplateRead) => {
+    setTemplateBrowserOpen(false);
+    setTemplateForFlow(template);
+  }, []);
 
-      setIsCreating(true);
-      try {
-        const newLayout = await createReportLayout(project.id, {
-          name: `${template.name} ${(reportLayouts?.length || 0) + 1}`,
-          is_default: false,
-          config: template.config,
-        });
-        await mutate();
-        setSelectedReportId(newLayout.id);
-      } catch (error) {
-        console.error("Failed to create report layout from template:", error);
-      } finally {
-        setIsCreating(false);
-      }
+  const handleTemplateFlowDone = useCallback(
+    async (result: TemplateUseResult) => {
+      setTemplateForFlow(null);
+      await mutate();
+      if (result.layout_id) setSelectedReportId(result.layout_id);
     },
-    [project?.id, reportLayouts?.length, mutate]
+    [mutate]
   );
 
-  const handleAddReport = useCallback(async () => {
-    // Show template picker instead of creating blank layout directly
-    setTemplatePickerOpen(true);
+  const handleAddReport = useCallback(() => {
+    setTemplateBrowserOpen(true);
   }, []);
+
+  const [isCreatingLayout, setIsCreatingLayout] = useState(false);
+  const handleCreateBlankLayout = useCallback(async () => {
+    if (!project?.id) return;
+    setIsCreatingLayout(true);
+    try {
+      const layout = await createReportLayout(project.id, {
+        name: `${t("layout")} ${(reportLayouts?.length || 0) + 1}`,
+        is_default: false,
+        config: createEmptyReportLayoutConfig(),
+      });
+      await mutate();
+      setSelectedReportId(layout.id);
+    } catch (error) {
+      console.error("Failed to create layout:", error);
+    } finally {
+      setIsCreatingLayout(false);
+    }
+  }, [project?.id, reportLayouts?.length, mutate, t]);
 
   const handleDeleteReport = useCallback(
     async (reportId: string) => {
@@ -392,9 +418,7 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
         });
         // Optimistic cache update to avoid re-fetch replacing parent's local state
         mutate(
-          reportLayouts?.map((r) =>
-            r.id === selectedReport.id ? updatedReport : r
-          ),
+          reportLayouts?.map((r) => (r.id === selectedReport.id ? updatedReport : r)),
           { revalidate: false }
         );
         // Notify parent so selectedReport stays in sync
@@ -449,9 +473,7 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
         });
         // Optimistic cache update to avoid re-fetch replacing parent's local state
         mutate(
-          reportLayouts?.map((r) =>
-            r.id === selectedReport.id ? updatedReport : r
-          ),
+          reportLayouts?.map((r) => (r.id === selectedReport.id ? updatedReport : r)),
           { revalidate: false }
         );
         // Notify parent so selectedReport stays in sync
@@ -562,8 +584,11 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
     ];
     if (atlasPageName) {
       items.push(
-        { label: `${t("layout_name")} + ${t("page_name")}`, value: `{{@layout_name}}_{{@feature.${atlasPageName}}}` },
-        { label: t("page_name_only"), value: `{{@feature.${atlasPageName}}}` },
+        {
+          label: `${t("layout_name")} + ${t("page_name")}`,
+          value: `{{@layout_name}}_{{@feature.${atlasPageName}}}`,
+        },
+        { label: t("page_name_only"), value: `{{@feature.${atlasPageName}}}` }
       );
     }
     items.push({ label: t("custom"), value: CUSTOM_TEMPLATE_VALUE });
@@ -646,6 +671,12 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
         onClick: () => handleDuplicateReport(report.id),
       },
       {
+        id: "save_as_template",
+        label: t("save_as_template"),
+        icon: ICON_NAME.SAVE,
+        onClick: () => setTemplateSaveLayout(report),
+      },
+      {
         id: "delete",
         label: t("delete"),
         icon: ICON_NAME.TRASH,
@@ -667,12 +698,15 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
   const { atlasMaxPages } = usePrintConfig();
 
   // Get atlas info for print job and UI display
-  const { totalPages: atlasTotalPages, wasTruncated: atlasWasTruncated, totalFeatureCount: atlasTotalFeatureCount } =
-    useAtlasFeatures({
-      atlasConfig: selectedReport?.config?.atlas,
-      projectLayers,
-      atlasMaxPages,
-    });
+  const {
+    totalPages: atlasTotalPages,
+    wasTruncated: atlasWasTruncated,
+    totalFeatureCount: atlasTotalFeatureCount,
+  } = useAtlasFeatures({
+    atlasConfig: selectedReport?.config?.atlas,
+    projectLayers,
+    atlasMaxPages,
+  });
 
   // Example preview for the active template
   const templatePreview = useMemo(() => {
@@ -686,7 +720,16 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
       .replace(/\{\{@total_pages\}\}/g, String(atlasTotalPages || 10))
       .replace(/\{\{@feature\.[^}]+\}\}/g, sampleAttr || "value");
     return example ? `${example}.${exportFormat}` : "";
-  }, [atlasFileNameTemplate, customTemplateInput, isCustomTemplate, exportFormat, selectedReport?.name, atlasTotalPages, atlasPageName, CUSTOM_TEMPLATE_VALUE]);
+  }, [
+    atlasFileNameTemplate,
+    customTemplateInput,
+    isCustomTemplate,
+    exportFormat,
+    selectedReport?.name,
+    atlasTotalPages,
+    atlasPageName,
+    CUSTOM_TEMPLATE_VALUE,
+  ]);
 
   const handlePrintReport = useCallback(async () => {
     if (!project?.id || !selectedReport) return;
@@ -729,15 +772,24 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
           <Typography variant="subtitle1" fontWeight={600}>
             {t("reports")}
           </Typography>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={isCreating ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
-            onClick={handleAddReport}
-            disabled={isCreating || !project?.id}
-            sx={{ textTransform: "none" }}>
-            {t("add_layout")}
-          </Button>
+          <NewMenuButton
+            disabled={!project?.id}
+            loading={isCreatingLayout}
+            items={[
+              {
+                key: "blank",
+                label: t("from_scratch"),
+                icon: ICON_NAME.REPORT,
+                onSelect: handleCreateBlankLayout,
+              },
+              {
+                key: "template",
+                label: t("from_template"),
+                icon: ICON_NAME.CLONE,
+                onSelect: handleAddReport,
+              },
+            ]}
+          />
         </Stack>
 
         {/* Layouts List - Scrollable */}
@@ -1031,7 +1083,9 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                               disabled={!selectedReport || isSaving || atlasHiddenCoverageLayer}
                             />
                           }
-                          label={<Typography variant="body2">{t("atlas_filter_to_current_feature")}</Typography>}
+                          label={
+                            <Typography variant="body2">{t("atlas_filter_to_current_feature")}</Typography>
+                          }
                           sx={{ ml: 0 }}
                         />
                         <FormControlLabel
@@ -1072,13 +1126,15 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                               />
                             )}
                             {templatePreview && (
-                              <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ fontStyle: "italic" }}>
                                 {t("example")}: {templatePreview}
                               </Typography>
                             )}
                           </Stack>
                         )}
-
                       </>
                     )}
 
@@ -1096,8 +1152,7 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                           {t("atlas_page_limit_warning", {
                             max: atlasMaxPages,
                             count: atlasTotalFeatureCount,
-                          })}
-                          {" "}
+                          })}{" "}
                           {t("atlas_filter_hint")}
                         </Typography>
                       </Alert>
@@ -1185,13 +1240,43 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
         onRename={handleRenameReport}
       />
 
-      {/* Template Picker Modal */}
-      <ReportTemplatePickerModal
-        open={templatePickerOpen}
-        onClose={() => setTemplatePickerOpen(false)}
-        onSelectTemplate={handleSelectTemplate}
-        initialViewState={initialView}
-      />
+      {/* Template Browser — "Add layout" and the auto-open-when-empty case.
+       * Mounted only while open, so its template/space/pin requests don't
+       * run on every panel mount. */}
+      {templateBrowserOpen && (
+        <TemplateBrowser
+          mode="dialog"
+          open
+          onClose={() => setTemplateBrowserOpen(false)}
+          lockedKind="layout"
+          initialSource="goat"
+          onUse={handleUseTemplate}
+        />
+      )}
+
+      {/* Inserts the picked template's layout into this project */}
+      {templateForFlow && project?.id && (
+        <UseTemplateFlow
+          template={templateForFlow}
+          context={{ kind: "in_project", projectId: project.id }}
+          onClose={() => setTemplateForFlow(null)}
+          onDone={handleTemplateFlowDone}
+        />
+      )}
+
+      {/* Kebab "Save as template" */}
+      {templateSaveLayout && project?.id && (
+        <SaveTemplateDialog
+          source={{ kind: "layout", project_id: project.id, layout_id: templateSaveLayout.id }}
+          defaultName={templateSaveLayout.name}
+          defaultThumbnailUrl={templateSaveLayout.thumbnail_url}
+          onClose={() => setTemplateSaveLayout(null)}
+          onSaved={(savedTemplate) => {
+            setTemplateSaveLayout(null);
+            toast.success(t("template_saved_as", { name: savedTemplate.name }));
+          }}
+        />
+      )}
     </PanelContainer>
   );
 };

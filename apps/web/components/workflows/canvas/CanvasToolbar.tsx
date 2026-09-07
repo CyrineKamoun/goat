@@ -1,13 +1,13 @@
 "use client";
 
 import {
-  DataObject as VariablesIcon,
   Redo as RedoIcon,
   PlayArrow as RunIcon,
   NearMe as SelectIcon,
   Stop as StopIcon,
   StickyNote2 as TextIcon,
   Undo as UndoIcon,
+  DataObject as VariablesIcon,
 } from "@mui/icons-material";
 import { Box, Button, IconButton, Tooltip } from "@mui/material";
 import { styled } from "@mui/material/styles";
@@ -111,6 +111,9 @@ interface CanvasToolbarProps {
   onStop?: () => void;
   isRunning?: boolean;
   canRun?: boolean;
+  /** At least one dataset node still needs a layer — shows why Run is
+   * disabled instead of leaving the button unexplained. */
+  hasUnresolvedInputs?: boolean;
   onVariablesClick?: () => void;
 }
 
@@ -125,6 +128,7 @@ const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
   onStop,
   isRunning = false,
   canRun = true,
+  hasUnresolvedInputs = false,
   onVariablesClick,
 }) => {
   const { t } = useTranslation("common");
@@ -187,6 +191,14 @@ const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
           disableElevation>
           {t("stop")}
         </StopButton>
+      ) : hasUnresolvedInputs ? (
+        <Tooltip title={t("workflow_run_disabled_unresolved")} placement="top">
+          <span>
+            <RunButton disabled startIcon={<RunIcon />} variant="contained" disableElevation>
+              {t("workflow_run")}
+            </RunButton>
+          </span>
+        </Tooltip>
       ) : (
         <RunButton
           disabled={!canRun}

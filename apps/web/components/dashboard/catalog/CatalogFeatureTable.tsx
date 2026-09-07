@@ -1,28 +1,21 @@
 "use client";
 
 import { Box, Typography, useTheme } from "@mui/material";
-import { type Theme, emphasize } from "@mui/material/styles";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import type { DatasetCollectionItems } from "@/lib/validations/layer";
 import type { CatalogColumn } from "@/lib/validations/catalog";
+import type { DatasetCollectionItems } from "@/lib/validations/layer";
 
-import FeatureTable, { type FeatureTableField } from "@/components/common/FeatureTable";
+import type { FeatureTableField } from "@/components/common/FeatureTable";
+import FeatureTableFrame from "@/components/dashboard/common/FeatureTableFrame";
 
 /** The dataset's actual rows — the preview sample, one line per feature. */
 
 /** Columns that are the feature's shape rather than its attributes. */
 const STRUCTURAL = new Set(["geometry", "geom", "bbox"]);
-
-/** Tall enough to read a dozen records in, short enough to leave the dictionary
- * below it reachable. */
-const MAX_HEIGHT = 420;
-
-/** The header's surface: a touch lighter than the card. */
-const HEADER_BG = (theme: Theme) => emphasize(theme.palette.background.paper, 0.03);
 
 const CatalogFeatureTable = ({
   features,
@@ -39,24 +32,9 @@ const CatalogFeatureTable = ({
   const { t } = useTranslation("common");
   const theme = useTheme();
 
-  /** How tall the header is, so the strip beside it can be painted to match — see the band on the scrolling box. */
-  const scrollBox = useRef<HTMLDivElement | null>(null);
-  const [headHeight, setHeadHeight] = useState(0);
-  useEffect(() => {
-    const head = scrollBox.current?.querySelector("thead");
-    if (!head) return;
-    const measure = () => setHeadHeight(head.getBoundingClientRect().height);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(head);
-    return () => observer.disconnect();
-  }, [columns, features]);
-
   /** Declared columns first, then anything the data carries beyond them. */
   const fields = useMemo<FeatureTableField[]>(() => {
-    const declared = columns.filter(
-      (column) => !!column.name && !STRUCTURAL.has(column.name)
-    );
+    const declared = columns.filter((column) => !!column.name && !STRUCTURAL.has(column.name));
     const seen = new Set(declared.map((column) => column.name));
     const extra: FeatureTableField[] = [];
     for (const feature of features) {
@@ -68,10 +46,7 @@ const CatalogFeatureTable = ({
         }
       }
     }
-    return [
-      ...declared.map((column) => ({ name: column.name, type: column.type ?? "string" })),
-      ...extra,
-    ];
+    return [...declared.map((column) => ({ name: column.name, type: column.type ?? "string" })), ...extra];
   }, [columns, features]);
 
   /** The sample as the table's own page shape. */
@@ -96,51 +71,28 @@ const CatalogFeatureTable = ({
   if (!fields.length || !features.length) return null;
 
   return (
-    <Box
-      sx={{
-        border: `1px solid ${theme.palette.divider}`,
-        borderRadius: 2,
-        overflow: "hidden",
-      }}>
-      <Box
-        ref={scrollBox}
-        sx={{
-          overflow: "auto",
-          maxHeight: MAX_HEIGHT,
-          /** The platform's own scrollbar, deliberately unstyled. */
-          backgroundImage: `linear-gradient(${HEADER_BG(theme)} 0 ${headHeight}px, transparent ${headHeight}px)`,
-        }}>
-        {/* `bordered` for the column dividers: a sample can run to 40 columns and scrolls sideways. */}
-        <FeatureTable
-          fields={fields}
-          data={data}
-          variant="bordered"
-          headerColor={HEADER_BG(theme)}
-        />
-      </Box>
-      {/* Why the table stops where it does, in the footer of the frame it applies to rather than as a sentence underneath it. */}
-      {truncated && (
-        <Box
-          sx={{
-            px: 3,
-            py: 2,
-            borderTop: `1px solid ${theme.palette.divider}`,
-            backgroundColor: theme.palette.action.hover,
-          }}>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Icon
-              iconName={ICON_NAME.TABLE}
-              style={{ fontSize: 11 }}
-              htmlColor={theme.palette.text.secondary}
-            />
-            {t("catalog_preview_limited", { count: features.length })}
-          </Typography>
-        </Box>
-      )}
-    </Box>
+    <FeatureTableFrame
+      fields={fields}
+      data={data}
+      /* Why the table stops where it does, in the footer of the frame it applies to rather than as a sentence underneath it. */
+      footer={
+        truncated ? (
+          <Box sx={{ px: 3, py: 2 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Icon
+                iconName={ICON_NAME.TABLE}
+                style={{ fontSize: 11 }}
+                htmlColor={theme.palette.text.secondary}
+              />
+              {t("catalog_preview_limited", { count: features.length })}
+            </Typography>
+          </Box>
+        ) : undefined
+      }
+    />
   );
 };
 

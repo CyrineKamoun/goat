@@ -1,23 +1,10 @@
 import { ChevronRight, Close } from "@mui/icons-material";
-import {
-  Badge,
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  IconButton,
-  Stack,
-  Switch,
-  Typography,
-} from "@mui/material";
+import { Badge, Box, Button, Divider, IconButton, Stack, Switch, Typography } from "@mui/material";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { v4 } from "uuid";
 
-import { Icon, ICON_NAME } from "@p4b/ui/components/Icon";
+import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import type { InteractionRule } from "@/lib/validations/interaction";
 import type { BuilderPanelSchema, ProjectLayer, ProjectLayerGroup } from "@/lib/validations/project";
@@ -26,6 +13,7 @@ import type { TabsContainerSchema } from "@/lib/validations/widget";
 import type { SelectorItem } from "@/types/map/common";
 
 import CollapsibleConfigCard from "@/components/builder/widgets/common/CollapsibleConfigCard";
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 import Selector from "@/components/map/panels/common/Selector";
 
 // ---------------------------------------------------------------------------
@@ -59,7 +47,11 @@ function findTabsWidgets(panels: BuilderPanelSchema[]): TabsWidgetInfo[] {
 // Helper: get summary string for collapsed card
 // ---------------------------------------------------------------------------
 
-function getRuleSummary(rule: InteractionRule, tabsWidgets: TabsWidgetInfo[], t: (key: string) => string): string {
+function getRuleSummary(
+  rule: InteractionRule,
+  tabsWidgets: TabsWidgetInfo[],
+  t: (key: string) => string
+): string {
   if (rule.trigger.type === "group_activated") {
     const count = rule.mapping.length;
     const widget = tabsWidgets.find((w) => w.widgetId === rule.action.targetWidgetId);
@@ -128,17 +120,13 @@ const GroupToTabRuleForm: React.FC<GroupToTabRuleFormProps> = ({
 
   const handleGroupChange = (index: number, item: SelectorItem[] | SelectorItem | undefined) => {
     const groupId = !Array.isArray(item) && item ? Number(item.value) : 0;
-    const next = rule.mapping.map((m, i) =>
-      i === index ? { ...m, sourceId: groupId } : m
-    );
+    const next = rule.mapping.map((m, i) => (i === index ? { ...m, sourceId: groupId } : m));
     onChange({ ...rule, mapping: next });
   };
 
   const handleTabChange = (index: number, item: SelectorItem[] | SelectorItem | undefined) => {
     const tabId = !Array.isArray(item) && item ? String(item.value) : "";
-    const next = rule.mapping.map((m, i) =>
-      i === index ? { ...m, actionParams: { tabId } } : m
-    );
+    const next = rule.mapping.map((m, i) => (i === index ? { ...m, actionParams: { tabId } } : m));
     onChange({ ...rule, mapping: next });
   };
 
@@ -186,7 +174,9 @@ const GroupToTabRuleForm: React.FC<GroupToTabRuleFormProps> = ({
                     setSelectedItems={(item) => handleGroupChange(index, item)}
                   />
                 </Box>
-                <Typography color="text.disabled" sx={{ width: 24, textAlign: "center" }}>→</Typography>
+                <Typography color="text.disabled" sx={{ width: 24, textAlign: "center" }}>
+                  →
+                </Typography>
                 <Box sx={{ flex: 1 }}>
                   <Selector
                     placeholder={t("select")}
@@ -225,11 +215,7 @@ interface VisibilitySyncRuleFormProps {
   onChange: (updated: InteractionRule) => void;
 }
 
-const VisibilitySyncRuleForm: React.FC<VisibilitySyncRuleFormProps> = ({
-  rule,
-  projectLayers,
-  onChange,
-}) => {
+const VisibilitySyncRuleForm: React.FC<VisibilitySyncRuleFormProps> = ({ rule, projectLayers, onChange }) => {
   const { t } = useTranslation("common");
 
   const allLayerItems: SelectorItem[] = projectLayers
@@ -267,9 +253,7 @@ const VisibilitySyncRuleForm: React.FC<VisibilitySyncRuleFormProps> = ({
 
   const handleTargetChange = (index: number, item: SelectorItem[] | SelectorItem | undefined) => {
     const layerId = !Array.isArray(item) && item ? Number(item.value) : 0;
-    const next = rule.mapping.map((m, i) =>
-      i === index ? { ...m, sourceId: layerId } : m
-    );
+    const next = rule.mapping.map((m, i) => (i === index ? { ...m, sourceId: layerId } : m));
     onChange({ ...rule, mapping: next });
   };
 
@@ -383,7 +367,10 @@ const InteractionsModal: React.FC<InteractionsModalProps> = ({
     setExpandedId(newRule.id);
   };
 
-  const handleTriggerTypeChange = (rule: InteractionRule, item: SelectorItem[] | SelectorItem | undefined) => {
+  const handleTriggerTypeChange = (
+    rule: InteractionRule,
+    item: SelectorItem[] | SelectorItem | undefined
+  ) => {
     const value = !Array.isArray(item) && item ? String(item.value) : "group_activated";
     const triggerType = value as InteractionRule["trigger"]["type"];
     const actionType: InteractionRule["action"]["type"] =
@@ -399,93 +386,82 @@ const InteractionsModal: React.FC<InteractionsModalProps> = ({
   const triggerItems = triggerTypeOptions(t);
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="h6">{t("interactions")}</Typography>
-          <IconButton size="small" onClick={onClose}>
-            <Close fontSize="small" />
-          </IconButton>
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      icon={ICON_NAME.LINK}
+      title={t("interactions")}
+      maxWidth={600}
+      footer={<AppDialogFooter primaryLabel={t("add_interaction")} onPrimary={handleAddInteraction} />}>
+      {interactions.length === 0 ? (
+        <Stack alignItems="center" justifyContent="center" spacing={2} sx={{ py: 6 }}>
+          <Icon iconName={ICON_NAME.LINK} fontSize="large" htmlColor="action" />
+          <Typography variant="body1" fontWeight="bold">
+            {t("no_interactions_yet")}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" align="center" sx={{ maxWidth: 320 }}>
+            {t("no_interactions_description")}
+          </Typography>
         </Stack>
-      </DialogTitle>
+      ) : (
+        <Stack spacing={1.5}>
+          {interactions.map((rule) => {
+            const isExpanded = expandedId === rule.id;
+            const selectedTrigger = triggerItems.find((item) => item.value === rule.trigger.type);
+            const summary = getRuleSummary(rule, tabsWidgets, t);
 
-      <DialogContent dividers>
-        {interactions.length === 0 ? (
-          <Stack alignItems="center" justifyContent="center" spacing={2} sx={{ py: 6 }}>
-            <Icon iconName={ICON_NAME.LINK} fontSize="large" htmlColor="action" />
-            <Typography variant="body1" fontWeight="bold">
-              {t("no_interactions_yet")}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" align="center" sx={{ maxWidth: 320 }}>
-              {t("no_interactions_description")}
-            </Typography>
-          </Stack>
-        ) : (
-          <Stack spacing={1.5}>
-            {interactions.map((rule) => {
-              const isExpanded = expandedId === rule.id;
-              const selectedTrigger = triggerItems.find((item) => item.value === rule.trigger.type);
-              const summary = getRuleSummary(rule, tabsWidgets, t);
-
-              return (
-                <CollapsibleConfigCard
-                  key={rule.id}
-                  title={selectedTrigger?.label ?? rule.trigger.type}
-                  summary={summary}
-                  expanded={isExpanded}
-                  onToggle={() => handleToggle(rule.id)}
-                  onRemove={() => handleRemove(rule.id)}
-                  canRemove>
-                  <Stack spacing={2}>
-                    {/* Enable / disable switch */}
-                    <Stack direction="row" alignItems="center" justifyContent="space-between">
-                      <Typography variant="body2">{t("interaction_enabled")}</Typography>
-                      <Switch
-                        size="small"
-                        checked={rule.enabled}
-                        onChange={(e) => handleRuleChange({ ...rule, enabled: e.target.checked })}
-                      />
-                    </Stack>
-
-                    <Divider />
-
-                    {/* Trigger type selector */}
-                    <Selector
-                      label={t("when")}
-                      items={triggerItems}
-                      selectedItems={selectedTrigger}
-                      setSelectedItems={(item) => handleTriggerTypeChange(rule, item)}
+            return (
+              <CollapsibleConfigCard
+                key={rule.id}
+                title={selectedTrigger?.label ?? rule.trigger.type}
+                summary={summary}
+                expanded={isExpanded}
+                onToggle={() => handleToggle(rule.id)}
+                onRemove={() => handleRemove(rule.id)}
+                canRemove>
+                <Stack spacing={2}>
+                  {/* Enable / disable switch */}
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Typography variant="body2">{t("interaction_enabled")}</Typography>
+                    <Switch
+                      size="small"
+                      checked={rule.enabled}
+                      onChange={(e) => handleRuleChange({ ...rule, enabled: e.target.checked })}
                     />
-
-                    {/* Conditional form */}
-                    {rule.trigger.type === "group_activated" ? (
-                      <GroupToTabRuleForm
-                        rule={rule}
-                        tabsWidgets={tabsWidgets}
-                        projectLayerGroups={projectLayerGroups}
-                        onChange={handleRuleChange}
-                      />
-                    ) : (
-                      <VisibilitySyncRuleForm
-                        rule={rule}
-                        projectLayers={projectLayers}
-                        onChange={handleRuleChange}
-                      />
-                    )}
                   </Stack>
-                </CollapsibleConfigCard>
-              );
-            })}
-          </Stack>
-        )}
-      </DialogContent>
 
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button variant="contained" onClick={handleAddInteraction}>
-          {t("add_interaction")}
-        </Button>
-      </DialogActions>
-    </Dialog>
+                  <Divider />
+
+                  {/* Trigger type selector */}
+                  <Selector
+                    label={t("when")}
+                    items={triggerItems}
+                    selectedItems={selectedTrigger}
+                    setSelectedItems={(item) => handleTriggerTypeChange(rule, item)}
+                  />
+
+                  {/* Conditional form */}
+                  {rule.trigger.type === "group_activated" ? (
+                    <GroupToTabRuleForm
+                      rule={rule}
+                      tabsWidgets={tabsWidgets}
+                      projectLayerGroups={projectLayerGroups}
+                      onChange={handleRuleChange}
+                    />
+                  ) : (
+                    <VisibilitySyncRuleForm
+                      rule={rule}
+                      projectLayers={projectLayers}
+                      onChange={handleRuleChange}
+                    />
+                  )}
+                </Stack>
+              </CollapsibleConfigCard>
+            );
+          })}
+        </Stack>
+      )}
+    </AppDialog>
   );
 };
 

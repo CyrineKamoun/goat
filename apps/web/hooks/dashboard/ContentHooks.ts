@@ -69,7 +69,8 @@ export const useContentMoreMenu = () => {
       isOwner ||
       sw?.teams?.some((t) => t.role?.endsWith("-editor")) ||
       sw?.organizations?.some((o) => o.role?.endsWith("-editor")) ||
-      folderRole === "folder-editor";
+      folderRole === "folder-editor" ||
+      folderRole === "folder-owner";
 
     if (contentType === "layer") {
       const layerItem = item as Layer;

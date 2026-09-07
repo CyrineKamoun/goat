@@ -3,11 +3,15 @@ import * as z from "zod";
 export const folderSchema = z.object({
   name: z.string(),
   id: z.string().uuid(),
-  user_id: z.string().uuid(),
+  user_id: z.string().uuid().nullable().optional(),
+  parent_id: z.string().uuid().nullable().optional().default(null),
+  space_id: z.string().uuid().optional(),
+  depth: z.number().int().optional().default(0),
   is_owned: z.boolean().optional().default(true),
   role: z.string().optional().nullable(),
   shared_from_name: z.string().optional().nullable(),
   shared_with_ids: z.array(z.string().uuid()).optional().nullable(),
+  restricted: z.boolean().optional().default(false),
 });
 
 export const folderResponse = z.array(folderSchema);

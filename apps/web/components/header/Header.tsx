@@ -28,11 +28,14 @@ import EditableTypography from "@/components/common/EditableTypography";
 import type { PopperMenuItem } from "@/components/common/PopperMenu";
 import MoreMenu from "@/components/common/PopperMenu";
 import SlidingToggle from "@/components/common/SlidingToggle";
+import OnboardingTray from "@/components/header/OnboardingTray";
+import StatusDot from "@/components/header/StatusDot";
 import WhatsNewPopper from "@/components/header/WhatsNewPopper";
 import JobsPopper from "@/components/jobs/JobsPopper";
 import ContentDeleteModal from "@/components/modals/ContentDelete";
 import Metadata from "@/components/modals/Metadata";
 import ShareModal from "@/components/modals/Share";
+import SaveTemplateDialog from "@/components/templates/SaveTemplateDialog";
 
 import { Toolbar } from "./Toolbar";
 
@@ -65,6 +68,7 @@ export default function Header(props: HeaderProps) {
   const [isEditingProjectMetadata, setIsEditingProjectMetadata] = useState(false);
   const [showDeleteProjectDialog, setShowDeleteProjectDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showSaveTemplateDialog, setShowSaveTemplateDialog] = useState(false);
   const mapMode = useAppSelector((state) => state.map.mapMode);
 
   const mapMenuItems: PopperMenuItem[] = useMemo(() => {
@@ -85,6 +89,15 @@ export default function Header(props: HeaderProps) {
         group: "project",
         onClick: () => {
           setIsEditingProjectMetadata(true);
+        },
+      },
+      {
+        id: "save_project_as_template",
+        icon: ICON_NAME.SAVE,
+        label: t("common:save_project_as_template"),
+        group: "project",
+        onClick: () => {
+          setShowSaveTemplateDialog(true);
         },
       },
       {
@@ -188,6 +201,16 @@ export default function Header(props: HeaderProps) {
           onClose={() => setIsEditingProjectMetadata(false)}
           type="project"
           content={project}
+        />
+      )}
+
+      {project && showSaveTemplateDialog && (
+        <SaveTemplateDialog
+          source={{ kind: "project", project_id: project.id }}
+          defaultName={project.name}
+          defaultThumbnailUrl={project.thumbnail_url}
+          onClose={() => setShowSaveTemplateDialog(false)}
+          onSaved={() => setShowSaveTemplateDialog(false)}
         />
       )}
 
@@ -353,6 +376,8 @@ export default function Header(props: HeaderProps) {
                   </>
                 )}
 
+                {!props.mapHeader && <OnboardingTray />}
+                {!props.mapHeader && <StatusDot />}
                 {!props.mapHeader && <WhatsNewPopper />}
                 <Tooltip title={t("common:open_documentation")}>
                   <IconButton

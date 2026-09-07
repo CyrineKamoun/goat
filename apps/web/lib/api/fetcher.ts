@@ -82,28 +82,26 @@ export const clearTokenCache = () => {
   cacheExpiry = 0;
 };
 
+/** The query entries worth sending: `URLSearchParams` stringifies an unset
+ * value as the literal `undefined` (`?kind=undefined`), which a typed query
+ * parameter rejects, so an entry a caller left unset is dropped here. */
+const definedEntries = (queryParams): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(queryParams)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]): [string, string] => [key, String(value)])
+  );
+
 export const fetcher = async (params) => {
   let queryParams, url, payload;
-  const urlSearchParams = new URLSearchParams();
   if (Array.isArray(params)) {
     url = params[0];
     queryParams = params[1];
     payload = params[2];
-    if (queryParams) {
-      for (const key in queryParams) {
-        if (Array.isArray(queryParams[key])) {
-          queryParams[key].forEach((value) => {
-            urlSearchParams.append(key, value);
-          });
-        } else {
-          urlSearchParams.append(key, queryParams[key]);
-        }
-      }
-    }
   } else {
     url = params;
   }
-  const urlWithParams = queryParams ? `${url}?${new URLSearchParams(queryParams)}` : url;
+  const urlWithParams = queryParams ? `${url}?${new URLSearchParams(definedEntries(queryParams))}` : url;
   const options = {};
   if (payload) {
     options["method"] = "POST";

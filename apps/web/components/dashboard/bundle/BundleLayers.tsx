@@ -1,11 +1,15 @@
 import { Box, Chip, Paper, Skeleton, Stack, Typography, useTheme } from "@mui/material";
-import { useRouter } from "next/navigation";
-import React from "react";
+import dynamic from "next/dynamic";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import type { BundleMember } from "@/lib/api/bundles";
+
+const ContentPreviewDialog = dynamic(() => import("@/components/dashboard/content/ContentPreviewDialog"), {
+  ssr: false,
+});
 
 interface BundleLayersProps {
   members?: BundleMember[];
@@ -27,11 +31,11 @@ const memberIcon = (member: BundleMember): ICON_NAME => {
 };
 
 /** Member layers of a bundle. Membership is fixed by the bundle's spec, so this
- *  lists rather than edits — each row opens the layer's own detail page. */
+ *  lists rather than edits — each row opens the layer in the preview dialog. */
 const BundleLayers: React.FC<BundleLayersProps> = ({ members, isLoading }) => {
   const theme = useTheme();
-  const router = useRouter();
   const { t } = useTranslation("common");
+  const [previewLayerId, setPreviewLayerId] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -57,7 +61,7 @@ const BundleLayers: React.FC<BundleLayersProps> = ({ members, isLoading }) => {
         <Paper
           key={member.layer_id}
           elevation={1}
-          onClick={() => router.push(`/datasets/${member.layer_id}`)}
+          onClick={() => setPreviewLayerId(member.layer_id)}
           sx={{
             p: 3,
             cursor: "pointer",
@@ -78,6 +82,9 @@ const BundleLayers: React.FC<BundleLayersProps> = ({ members, isLoading }) => {
           </Stack>
         </Paper>
       ))}
+      {previewLayerId && (
+        <ContentPreviewDialog layerId={previewLayerId} onClose={() => setPreviewLayerId(null)} />
+      )}
     </Stack>
   );
 };

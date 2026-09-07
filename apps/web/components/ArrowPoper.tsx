@@ -165,17 +165,17 @@ export function ArrowPopper({
         ]}>
         {({ TransitionProps }) => (
           <Grow {...TransitionProps} timeout={150}>
-            <Paper
-              sx={{
-                boxShadow: "none",
-              }}>
+            {/* Structure only: the content brings its own Paper, so these two
+             * wrappers stay invisible — a painted wrapper shows as a square
+             * corner behind any content with a larger radius or a margin. */}
+            <Paper elevation={0} sx={{ backgroundColor: "transparent", backgroundImage: "none" }}>
               <ClickAwayListener
                 onClickAway={() => {
                   if (isClickAwayEnabled) {
                     onClose();
                   }
                 }}>
-                <Paper elevation={0}>
+                <Paper elevation={0} sx={{ backgroundColor: "transparent", backgroundImage: "none" }}>
                   {arrow ? <Arrow ref={setArrowRef} className="MuiPopper-arrow" /> : null}
                   <Box>{content}</Box>
                 </Paper>

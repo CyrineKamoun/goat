@@ -105,6 +105,20 @@ describe("canEditLayerFeatures", () => {
     ).toBe(false);
   });
 
+  it("denies editing a locked layer even on the user's own dataset", () => {
+    // D7: a locked row's properties/query are already blanked by the
+    // backend, so there is nothing here to edit and every write would 403.
+    expect(
+      canEditLayerFeatures({
+        currentUserId: USER,
+        layerOwnerId: USER,
+        projectOwnerId: PROJECT_OWNER,
+        isProjectEditor: true,
+        locked: true,
+      })
+    ).toBe(false);
+  });
+
   it("denies editing when the current user is not resolved yet", () => {
     expect(
       canEditLayerFeatures({
@@ -183,6 +197,18 @@ describe("canEditLayerFields", () => {
         layerOwnerId: USER,
         projectOwnerId: PROJECT_OWNER,
         isProjectEditor: false,
+      })
+    ).toBe(false);
+  });
+
+  it("refuses a locked layer", () => {
+    expect(
+      canEditLayerFields({
+        currentUserId: USER,
+        layerOwnerId: USER,
+        projectOwnerId: PROJECT_OWNER,
+        isProjectEditor: true,
+        locked: true,
       })
     ).toBe(false);
   });

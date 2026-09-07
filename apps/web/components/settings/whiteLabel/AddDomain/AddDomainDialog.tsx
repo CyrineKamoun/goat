@@ -1,18 +1,30 @@
 "use client";
 
-import { Dialog, DialogContent, DialogTitle } from "@mui/material";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { LoadingButton } from "@mui/lab";
+import { Typography } from "@mui/material";
 import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 
-import { createCustomDomain, useOrganizationDomain } from "@/lib/api/customDomains";
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
+import { createCustomDomain, recheckCustomDomain, useOrganizationDomain } from "@/lib/api/customDomains";
+import { customDomainCreateSchema } from "@/lib/validations/customDomain";
 import type { CustomDomain, CustomDomainCreate } from "@/lib/validations/customDomain";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 import { StepCertIssuing } from "./StepCertIssuing";
 import { StepConfigureDns } from "./StepConfigureDns";
 import { StepEnter } from "./StepEnter";
 
 type Step = "enter" | "configure_dns" | "cert_issuing";
+
+/** The `<form>` `StepEnter` renders, submitted by the footer's primary via
+ * `primaryForm` — the button lives outside it, in the shared footer. */
+const ENTER_FORM_ID = "add-domain-enter-form";
 
 interface AddDomainDialogProps {
   open: boolean;
@@ -22,16 +34,26 @@ interface AddDomainDialogProps {
   onCreated?: () => void;
 }
 
-export function AddDomainDialog({
-  open,
-  onClose,
-  organizationId,
-  onCreated,
-}: AddDomainDialogProps) {
+export function AddDomainDialog({ open, onClose, organizationId, onCreated }: AddDomainDialogProps) {
   const { t } = useTranslation("common");
   const [step, setStep] = useState<Step>("enter");
   const [createdDomain, setCreatedDomain] = useState<CustomDomain | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [isRechecking, setIsRechecking] = useState(false);
+
+  // Owned here rather than by `StepEnter` itself, since its Continue button
+  // now lives in the shared footer and needs `handleSubmit`/`isValid` to
+  // wire `onPrimary`/`primaryDisabled`.
+  const {
+    register,
+    handleSubmit,
+    reset: resetEnterFields,
+    formState: { errors, isValid },
+  } = useForm<CustomDomainCreate>({
+    mode: "onChange",
+    resolver: zodResolver(customDomainCreateSchema),
+    defaultValues: { base_domain: "" },
+  });
 
   // Poll the single-domain endpoint while the user is configuring DNS or
   // waiting on the cert. SWR ignores `null` keys, so we just gate on the
@@ -56,6 +78,8 @@ export function AddDomainDialog({
     setStep("enter");
     setCreatedDomain(null);
     setIsBusy(false);
+    setIsRechecking(false);
+    resetEnterFields();
   };
 
   const handleClose = () => {
@@ -64,7 +88,7 @@ export function AddDomainDialog({
     window.setTimeout(reset, 200);
   };
 
-  const handleSubmit = async (data: CustomDomainCreate) => {
+  const handleCreate = async (data: CustomDomainCreate) => {
     setIsBusy(true);
     try {
       const created = await createCustomDomain(organizationId, data.base_domain);
@@ -88,6 +112,20 @@ export function AddDomainDialog({
     }
   };
 
+  const handleRecheck = async () => {
+    if (!createdDomain) return;
+    setIsRechecking(true);
+    try {
+      await recheckCustomDomain(organizationId, createdDomain.id);
+      // The polled SWR hook will tick on its next interval; nothing else to
+      // do here.
+    } catch {
+      toast.error(t("white_label_add_domain_recheck_failed", "Failed to recheck DNS"));
+    } finally {
+      setIsRechecking(false);
+    }
+  };
+
   const title = (() => {
     switch (step) {
       case "enter":
@@ -99,27 +137,58 @@ export function AddDomainDialog({
     }
   })();
 
+  const footer = (() => {
+    if (step === "enter") {
+      return (
+        <AppDialogFooter
+          onCancel={handleClose}
+          primaryLabel={t("white_label_add_domain_continue", "Continue")}
+          onPrimary={handleSubmit(handleCreate)}
+          primaryType="submit"
+          primaryForm={ENTER_FORM_ID}
+          primaryDisabled={!isValid}
+          primaryLoading={isBusy}
+        />
+      );
+    }
+    if (step === "configure_dns") {
+      return (
+        <AppDialogFooter
+          primaryLabel={t("done", "Done")}
+          onPrimary={handleClose}
+          extra={
+            <LoadingButton variant="text" loading={isRechecking} onClick={() => void handleRecheck()}>
+              <Typography variant="body2" fontWeight="bold">
+                {t("white_label_add_domain_recheck_now", "Recheck now")}
+              </Typography>
+            </LoadingButton>
+          }
+        />
+      );
+    }
+    return <AppDialogFooter primaryLabel={t("close", "Close")} onPrimary={handleClose} />;
+  })();
+
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
-      <DialogTitle>{title}</DialogTitle>
-      <DialogContent sx={{ pt: 2 }}>
-        {step === "enter" && (
-          <StepEnter isBusy={isBusy} onCancel={handleClose} onSubmit={handleSubmit} />
-        )}
-        {step === "configure_dns" && createdDomain && (
-          <StepConfigureDns
-            organizationId={organizationId}
-            domain={createdDomain}
-            onDone={handleClose}
-            onRefresh={() => {
-              // The polled SWR hook will tick on its next interval; nothing
-              // to do here, but we expose the hook so child components can
-              // signal intent if needed in the future.
-            }}
-          />
-        )}
-        {step === "cert_issuing" && <StepCertIssuing onClose={handleClose} />}
-      </DialogContent>
-    </Dialog>
+    <AppDialog
+      open={open}
+      onClose={handleClose}
+      icon={ICON_NAME.LINK}
+      title={title}
+      maxWidth={600}
+      closeDisabled={isBusy}
+      bodySx={{ pt: 2 }}
+      footer={footer}>
+      {step === "enter" && (
+        <StepEnter
+          formId={ENTER_FORM_ID}
+          register={register}
+          errors={errors}
+          onSubmit={handleSubmit(handleCreate)}
+        />
+      )}
+      {step === "configure_dns" && createdDomain && <StepConfigureDns domain={createdDomain} />}
+      {step === "cert_issuing" && <StepCertIssuing />}
+    </AppDialog>
   );
 }

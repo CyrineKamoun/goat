@@ -405,7 +405,11 @@ export function Legend(props: LegendProps) {
   } = useLayerSettingsMoreMenu();
 
   const layersWithLegend = useMemo(() => {
-    return props.layers.filter((layer) => layer.properties?.legend?.show !== false);
+    // D7: a locked layer's `properties` are blanked by the backend — never
+    // request its legend (or its tiles/extent elsewhere).
+    return props.layers.filter(
+      (layer) => layer.properties?.legend?.show !== false && !layer.locked
+    );
   }, [props.layers]);
 
   return (

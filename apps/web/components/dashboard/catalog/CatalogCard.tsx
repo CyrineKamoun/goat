@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Checkbox, Collapse, IconButton, Paper, Stack, Typography, useTheme } from "@mui/material";
+import { Box, Checkbox, Collapse, IconButton, Stack, Typography, useTheme } from "@mui/material";
 import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -11,8 +11,10 @@ import type { CatalogCardModel } from "@/lib/catalog/card";
 import { useCatalogLabels } from "@/hooks/catalog/useCatalogLabels";
 
 import CatalogBundleMembers from "@/components/dashboard/catalog/CatalogBundleMembers";
-import { Meta, TypeTag } from "@/components/dashboard/catalog/CatalogCardParts";
-import CatalogThumbnail from "@/components/dashboard/catalog/CatalogThumbnail";
+import ContentThumbnail from "@/components/dashboard/common/ContentThumbnail";
+import MetaCell from "@/components/dashboard/common/MetaCell";
+import SurfaceCard from "@/components/dashboard/common/SurfaceCard";
+import TypeTag from "@/components/dashboard/common/TypeTag";
 
 /** One result: thumbnail with the kind tagged over it, title with a save star, two clamped lines of
  * description, and a meta row of publisher / licence / language / period. */
@@ -117,13 +119,6 @@ const CatalogCard = ({
     </IconButton>
   ) : null;
 
-  // One border colour for the card and for the layer list hanging under a tile, so
-  // an open bundle reads as one object.
-  const borderColor =
-    selection?.selected || selection?.indeterminate || hover
-      ? theme.palette.primary.main
-      : theme.palette.divider;
-
   /** A bundle's layers, listed the same way wherever they are shown. */
   const memberList = card.bundleId ? (
     <CatalogBundleMembers
@@ -151,22 +146,13 @@ const CatalogCard = ({
   ) : null;
 
   return (
-    <Paper
-      elevation={0}
+    <SurfaceCard
+      selected={!!selection?.selected || !!selection?.indeterminate}
       onClick={() => (selection ? selection.onToggle() : onClick?.())}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       sx={{
-        position: "relative",
         overflow: "hidden",
-        borderRadius: "12px",
-        border: `1.5px solid ${borderColor}`,
-        boxShadow: hover ? theme.shadows[4] : theme.shadows[6],
-        transform: hover ? "translateY(-2px)" : "none",
-        transition: theme.transitions.create(
-          ["transform", "box-shadow", "border-color"],
-          { duration: 140 }
-        ),
         cursor: onClick || selection ? "pointer" : "default",
         // A tile is a column with a floor, so a row of them stays even when one card
         // has little to show. The grid sizes the row to the tallest card in it — see
@@ -224,7 +210,7 @@ const CatalogCard = ({
             width: isGrid ? "100%" : "fit-content",
             flexShrink: 0,
           }}>
-          <CatalogThumbnail
+          <ContentThumbnail
             kind={kind}
             geometryType={card.geometryType}
             memberCount={memberCount}
@@ -330,7 +316,7 @@ const CatalogCard = ({
                 ...(twoUp && { gridTemplateColumns: "minmax(0, 1fr) auto" }),
               }}>
               {meta.map((cell, index) => (
-                <Meta
+                <MetaCell
                   key={`${cell.icon}-${cell.label}`}
                   icon={cell.icon}
                   label={cell.label}
@@ -409,7 +395,7 @@ const CatalogCard = ({
           </Collapse>
         </>
       )}
-    </Paper>
+    </SurfaceCard>
   );
 };
 

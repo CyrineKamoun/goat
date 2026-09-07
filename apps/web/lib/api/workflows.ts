@@ -1,4 +1,4 @@
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 
 import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
 import { PROCESSES_BASE_URL } from "@/lib/constants";
@@ -46,6 +46,27 @@ export interface WorkflowCleanupResponse {
 }
 
 // ============================================================================
+// SWR keys
+// ============================================================================
+
+/** SWR key of the workflow list of one project. */
+const workflowListKey = (projectId: string) => [`${PROJECTS_API_BASE_URL}/${projectId}/workflow`];
+
+/** SWR key of one workflow, including its stored config. The read hooks key on
+ * an array, so an invalidation only matches when it uses the same shape. */
+const workflowKey = (projectId: string, workflowId: string) => [
+  `${PROJECTS_API_BASE_URL}/${projectId}/workflow/${workflowId}`,
+];
+
+/** Invalidate one workflow so every consumer of its stored config — the
+ * "Save as template" dialog, the workflow runner, the print page — reads what
+ * the server now holds. `updateWorkflow` calls this itself; the workflow list
+ * key stays with the callers, several of which update it optimistically
+ * without revalidating to keep unsaved editor state. */
+export const refreshWorkflow = (projectId: string, workflowId: string) =>
+  mutate(workflowKey(projectId, workflowId));
+
+// ============================================================================
 // Hooks
 // ============================================================================
 
@@ -54,7 +75,7 @@ export interface WorkflowCleanupResponse {
  */
 export const useWorkflows = (projectId?: string) => {
   const { data, isLoading, error, mutate, isValidating } = useSWR<Workflow[]>(
-    () => (projectId ? [`${PROJECTS_API_BASE_URL}/${projectId}/workflow`] : null),
+    () => (projectId ? workflowListKey(projectId) : null),
     fetcher
   );
 
@@ -72,7 +93,7 @@ export const useWorkflows = (projectId?: string) => {
  */
 export const useWorkflow = (projectId?: string, workflowId?: string) => {
   const { data, isLoading, error, mutate, isValidating } = useSWR<Workflow>(
-    () => (projectId && workflowId ? [`${PROJECTS_API_BASE_URL}/${projectId}/workflow/${workflowId}`] : null),
+    () => (projectId && workflowId ? workflowKey(projectId, workflowId) : null),
     fetcher
   );
 
@@ -124,7 +145,9 @@ export const updateWorkflow = async (
   if (!response.ok) {
     throw new Error("Failed to update workflow");
   }
-  return await response.json();
+  const updated = await response.json();
+  refreshWorkflow(projectId, workflowId);
+  return updated;
 };
 
 /**

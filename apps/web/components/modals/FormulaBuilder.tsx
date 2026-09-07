@@ -3,13 +3,8 @@
 import {
   Alert,
   Box,
-  Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
   FormControl,
   IconButton,
@@ -30,17 +25,12 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import type { ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import dynamic from "next/dynamic";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { ReactCodeMirrorRef } from "@uiw/react-codemirror";
-
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
-
-import FieldKindIcon, { fieldIndicatorKind } from "@/components/common/FieldKindIcon";
-
-const SqlCodeEditor = dynamic(() => import("./SqlCodeEditor"), { ssr: false });
 
 import type {
   ExpressionPreviewResult,
@@ -57,6 +47,11 @@ import {
   validateExpression,
   validateSql,
 } from "@/lib/api/expressions";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
+import FieldKindIcon, { fieldIndicatorKind } from "@/components/common/FieldKindIcon";
+
+const SqlCodeEditor = dynamic(() => import("./SqlCodeEditor"), { ssr: false });
 
 // Operators definition for the formula builder
 const OPERATORS = [
@@ -204,7 +199,6 @@ function databaseTypeToSqlType(dbType: string): string {
   return "varchar";
 }
 
-
 // SQL table definition for SQL mode
 export interface SqlTable {
   alias: string; // e.g., "input_1", "buildings"
@@ -217,10 +211,7 @@ export interface SqlTable {
  * Replace {{@variable_name}} references with type-appropriate SQL placeholders
  * so that validation/preview queries don't fail on the {{ syntax.
  */
-function substituteVariablePlaceholders(
-  sqlQuery: string,
-  vars?: { name: string; type: string }[]
-): string {
+function substituteVariablePlaceholders(sqlQuery: string, vars?: { name: string; type: string }[]): string {
   if (!vars || vars.length === 0) return sqlQuery;
   return sqlQuery.replace(/\{\{@([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g, (_match, name: string) => {
     const v = vars.find((v) => v.name === name);
@@ -791,219 +782,224 @@ export default function FormulaBuilder({
   };
 
   return (
-    <Dialog
+    <AppDialog
       open={open}
       onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{
-        sx: {
-          maxHeight: "85vh",
-          // Clamped so the floor never exceeds maxHeight — otherwise the paper
-          // overflows the centering container and the actions fall off-screen.
-          minHeight: "min(600px, 85vh)",
-        },
-      }}>
-      <DialogTitle>{title || t("formula_builder")}</DialogTitle>
-
-      <DialogContent dividers sx={{ p: 2, pb: 2, overflow: "hidden" }}>
-        <Stack spacing={2}>
-          {/* Expression/SQL Input with inline validation */}
-          <Box sx={{ position: "relative" }}>
-            {isSqlMode ? (
-              <SqlCodeEditor
-                value={expression}
-                onChange={setExpression}
-                schema={cmSchema}
-                placeholder={t("sql_placeholder")}
-                error={isValid === false}
-                editorRef={editorRef}
-                variables={variables}
-              />
-            ) : (
-              <TextField
-                inputRef={inputRef}
-                fullWidth
-                multiline
-                rows={3}
-                value={expression}
-                onChange={(e) => setExpression(e.target.value)}
-                onSelect={handleInputSelect}
-                onClick={handleInputSelect}
-                placeholder={t("enter_expression_placeholder")}
-                sx={{
-                  "& .MuiInputBase-input": {
-                    fontFamily: "monospace",
-                    fontSize: "0.875rem",
-                  },
-                }}
-                error={isValid === false}
-              />
-            )}
-            {/* Validation indicator in top-right corner */}
-            <Box
+      icon={ICON_NAME.VARIABLE}
+      title={title || t("formula_builder")}
+      maxWidth={900}
+      // Clamped so the floor never exceeds the viewport — otherwise the paper
+      // overflows the centering container and the actions fall off-screen.
+      paperSx={{ minHeight: "min(600px, 85vh)", maxHeight: "85vh" }}
+      bodySx={{ p: 2, pb: 2, overflow: "hidden" }}
+      footer={
+        <AppDialogFooter
+          onCancel={onClose}
+          primaryLabel={t("apply")}
+          onPrimary={handleApply}
+          primaryDisabled={isValid === false}
+        />
+      }>
+      <Stack spacing={2}>
+        {/* Expression/SQL Input with inline validation */}
+        <Box sx={{ position: "relative" }}>
+          {isSqlMode ? (
+            <SqlCodeEditor
+              value={expression}
+              onChange={setExpression}
+              schema={cmSchema}
+              placeholder={t("sql_placeholder")}
+              error={isValid === false}
+              editorRef={editorRef}
+              variables={variables}
+            />
+          ) : (
+            <TextField
+              inputRef={inputRef}
+              fullWidth
+              multiline
+              rows={3}
+              value={expression}
+              onChange={(e) => setExpression(e.target.value)}
+              onSelect={handleInputSelect}
+              onClick={handleInputSelect}
+              placeholder={t("enter_expression_placeholder")}
               sx={{
-                position: "absolute",
-                top: 8,
-                right: 8,
-                display: "flex",
-                alignItems: "center",
-                zIndex: 5,
-              }}>
-              <ValidationIndicator />
-            </Box>
+                "& .MuiInputBase-input": {
+                  fontFamily: "monospace",
+                  fontSize: "0.875rem",
+                },
+              }}
+              error={isValid === false}
+            />
+          )}
+          {/* Validation indicator in top-right corner */}
+          <Box
+            sx={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              display: "flex",
+              alignItems: "center",
+              zIndex: 5,
+            }}>
+            <ValidationIndicator />
           </Box>
+        </Box>
 
-          {/* Validation error line (fixed height to avoid layout shift, full details on hover) */}
-          <Box sx={{ minHeight: 20, display: "flex", alignItems: "center" }}>
-            {isValid === false && !isValidating && validationErrors.length > 0 && (
-              <Typography variant="caption" color="error.main" noWrap sx={{ maxWidth: "100%" }}>
-                {validationErrors[0]?.message}
-              </Typography>
-            )}
-          </Box>
+        {/* Validation error line (fixed height to avoid layout shift, full details on hover) */}
+        <Box sx={{ minHeight: 20, display: "flex", alignItems: "center" }}>
+          {isValid === false && !isValidating && validationErrors.length > 0 && (
+            <Typography variant="caption" color="error.main" noWrap sx={{ maxWidth: "100%" }}>
+              {validationErrors[0]?.message}
+            </Typography>
+          )}
+        </Box>
 
-          {/* Tabs: Build / Preview */}
-          <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-            <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)}>
-              <Tab label={t("build")} />
-              <Tab label={t("preview")} />
-            </Tabs>
-          </Box>
+        {/* Tabs: Build / Preview */}
+        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+          <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)}>
+            <Tab label={t("build")} />
+            <Tab label={t("preview")} />
+          </Tabs>
+        </Box>
 
-          {/* BUILD TAB */}
-          {activeTab === 0 && (
-            <Stack spacing={2}>
-              {/* Main row: Fields & Functions on left, Function Help on right */}
-              <Stack direction="row" spacing={2} sx={{ height: 320, minHeight: 320 }}>
-                {/* Three-column layout: Categories | Items | Help */}
-                {/* Left: Categories */}
-                <Paper
-                  variant="outlined"
-                  sx={{ width: 120, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                  <Box sx={{ flex: 1, overflow: "auto" }}>
-                    <List dense disablePadding>
-                      {categories.map((cat) => (
-                        <ListItem key={cat.key} disablePadding>
-                          <ListItemButton
-                            selected={selectedCategory === cat.key}
-                            onClick={() => {
-                              setSelectedCategory(cat.key);
-                              // Clear hover states when switching categories
-                              setHoveredField(null);
-                              setHoveredOperator(null);
-                              setSelectedFunction(null);
-                            }}
-                            sx={{
-                              py: 0.75,
-                              px: 1.5,
-                              borderLeft: 3,
-                              borderColor: selectedCategory === cat.key ? "primary.main" : "transparent",
-                              bgcolor: selectedCategory === cat.key ? "action.selected" : "transparent",
-                            }}>
-                            <ListItemText
-                              primary={
-                                <Typography
-                                  variant="body2"
-                                  fontWeight={selectedCategory === cat.key ? "medium" : "normal"}>
-                                  {cat.label}
-                                </Typography>
-                              }
-                            />
-                          </ListItemButton>
-                        </ListItem>
-                      ))}
-                    </List>
-                  </Box>
-                </Paper>
-
-                {/* Middle: Items for selected category */}
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    overflow: "hidden",
-                    maxHeight: 320,
-                  }}>
-                  <Box sx={{ px: 1, py: 0.75, borderBottom: 1, borderColor: "divider" }}>
-                    <OutlinedInput
-                      size="small"
-                      fullWidth
-                      placeholder={t("search_items")}
-                      value={functionSearch}
-                      onChange={(e) => setFunctionSearch(e.target.value)}
-                      sx={{ fontSize: "0.875rem" }}
-                      startAdornment={
-                        <InputAdornment position="start" sx={{ mr: 1 }}>
-                          <Icon
-                            iconName={ICON_NAME.SEARCH}
-                            fontSize="inherit"
-                            sx={{ fontSize: "0.875rem" }}
+        {/* BUILD TAB */}
+        {activeTab === 0 && (
+          <Stack spacing={2}>
+            {/* Main row: Fields & Functions on left, Function Help on right */}
+            <Stack direction="row" spacing={2} sx={{ height: 320, minHeight: 320 }}>
+              {/* Three-column layout: Categories | Items | Help */}
+              {/* Left: Categories */}
+              <Paper
+                variant="outlined"
+                sx={{ width: 120, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <Box sx={{ flex: 1, overflow: "auto" }}>
+                  <List dense disablePadding>
+                    {categories.map((cat) => (
+                      <ListItem key={cat.key} disablePadding>
+                        <ListItemButton
+                          selected={selectedCategory === cat.key}
+                          onClick={() => {
+                            setSelectedCategory(cat.key);
+                            // Clear hover states when switching categories
+                            setHoveredField(null);
+                            setHoveredOperator(null);
+                            setSelectedFunction(null);
+                          }}
+                          sx={{
+                            py: 0.75,
+                            px: 1.5,
+                            borderLeft: 3,
+                            borderColor: selectedCategory === cat.key ? "primary.main" : "transparent",
+                            bgcolor: selectedCategory === cat.key ? "action.selected" : "transparent",
+                          }}>
+                          <ListItemText
+                            primary={
+                              <Typography
+                                variant="body2"
+                                fontWeight={selectedCategory === cat.key ? "medium" : "normal"}>
+                                {cat.label}
+                              </Typography>
+                            }
                           />
-                        </InputAdornment>
-                      }
-                    />
-                  </Box>
-                  <Box sx={{ flex: 1, overflow: "auto" }}>
-                    {functionsLoading ? (
-                      <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                        <CircularProgress size={24} />
-                      </Box>
-                    ) : functionsError ? (
-                      <Box sx={{ textAlign: "center", py: 2 }}>
-                        <Typography variant="body2" color="error">
-                          {t("error_loading_functions")}
-                        </Typography>
-                      </Box>
-                    ) : selectedCategory === "tables" && isSqlMode && tables ? (
-                      /* SQL mode: show tables as expandable groups */
-                      <List dense disablePadding>
-                        {tables.map((table) => {
-                          const isExpanded = expandedTable === table.alias;
-                          const filteredTableFields = functionSearch
-                            ? table.fields.filter((f) =>
-                                f.name.toLowerCase().includes(functionSearch.toLowerCase())
-                              )
-                            : table.fields;
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Box>
+              </Paper>
 
-                          return (
-                            <React.Fragment key={table.alias}>
-                              <ListItem disablePadding>
-                                <ListItemButton
-                                  onClick={() => setExpandedTable(isExpanded ? null : table.alias)}
-                                  sx={{
-                                    py: 0.75,
-                                    px: 1.5,
-                                    bgcolor: isExpanded ? "action.selected" : "transparent",
-                                  }}
-                                  dense>
-                                  <ListItemIcon sx={{ minWidth: 24 }}>
-                                    <Icon
-                                      iconName={ICON_NAME.TABLE}
-                                      sx={{ fontSize: "1rem" }}
-                                      color="primary"
-                                    />
-                                  </ListItemIcon>
-                                  <ListItemText
-                                    primary={
-                                      <Typography variant="body2" fontWeight="bold" fontFamily="monospace" fontSize="0.8rem">
-                                        {table.alias}
-                                      </Typography>
-                                    }
-                                    secondary={table.layerName ? (
+              {/* Middle: Items for selected category */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                  maxHeight: 320,
+                }}>
+                <Box sx={{ px: 1, py: 0.75, borderBottom: 1, borderColor: "divider" }}>
+                  <OutlinedInput
+                    size="small"
+                    fullWidth
+                    placeholder={t("search_items")}
+                    value={functionSearch}
+                    onChange={(e) => setFunctionSearch(e.target.value)}
+                    sx={{ fontSize: "0.875rem" }}
+                    startAdornment={
+                      <InputAdornment position="start" sx={{ mr: 1 }}>
+                        <Icon iconName={ICON_NAME.SEARCH} fontSize="inherit" sx={{ fontSize: "0.875rem" }} />
+                      </InputAdornment>
+                    }
+                  />
+                </Box>
+                <Box sx={{ flex: 1, overflow: "auto" }}>
+                  {functionsLoading ? (
+                    <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                      <CircularProgress size={24} />
+                    </Box>
+                  ) : functionsError ? (
+                    <Box sx={{ textAlign: "center", py: 2 }}>
+                      <Typography variant="body2" color="error">
+                        {t("error_loading_functions")}
+                      </Typography>
+                    </Box>
+                  ) : selectedCategory === "tables" && isSqlMode && tables ? (
+                    /* SQL mode: show tables as expandable groups */
+                    <List dense disablePadding>
+                      {tables.map((table) => {
+                        const isExpanded = expandedTable === table.alias;
+                        const filteredTableFields = functionSearch
+                          ? table.fields.filter((f) =>
+                              f.name.toLowerCase().includes(functionSearch.toLowerCase())
+                            )
+                          : table.fields;
+
+                        return (
+                          <React.Fragment key={table.alias}>
+                            <ListItem disablePadding>
+                              <ListItemButton
+                                onClick={() => setExpandedTable(isExpanded ? null : table.alias)}
+                                sx={{
+                                  py: 0.75,
+                                  px: 1.5,
+                                  bgcolor: isExpanded ? "action.selected" : "transparent",
+                                }}
+                                dense>
+                                <ListItemIcon sx={{ minWidth: 24 }}>
+                                  <Icon
+                                    iconName={ICON_NAME.TABLE}
+                                    sx={{ fontSize: "1rem" }}
+                                    color="primary"
+                                  />
+                                </ListItemIcon>
+                                <ListItemText
+                                  primary={
+                                    <Typography
+                                      variant="body2"
+                                      fontWeight="bold"
+                                      fontFamily="monospace"
+                                      fontSize="0.8rem">
+                                      {table.alias}
+                                    </Typography>
+                                  }
+                                  secondary={
+                                    table.layerName ? (
                                       <Typography variant="caption" color="text.secondary" noWrap>
                                         {table.layerName}
                                       </Typography>
-                                    ) : undefined}
-                                  />
-                                  <Typography variant="caption" color="text.secondary">
-                                    {table.fields.length}
-                                  </Typography>
-                                </ListItemButton>
-                              </ListItem>
-                              {isExpanded && filteredTableFields.map((field) => (
+                                    ) : undefined
+                                  }
+                                />
+                                <Typography variant="caption" color="text.secondary">
+                                  {table.fields.length}
+                                </Typography>
+                              </ListItemButton>
+                            </ListItem>
+                            {isExpanded &&
+                              filteredTableFields.map((field) => (
                                 <ListItem key={`${table.alias}.${field.name}`} disablePadding>
                                   <ListItemButton
                                     onClick={() => insertField(`${table.alias}.${field.name}`)}
@@ -1033,106 +1029,34 @@ export default function FormulaBuilder({
                                   </ListItemButton>
                                 </ListItem>
                               ))}
-                            </React.Fragment>
-                          );
-                        })}
-                      </List>
-                    ) : categoryItems.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
-                        {t("no_items_found")}
-                      </Typography>
-                    ) : (
-                      <List dense disablePadding>
-                        {categoryItems.map((item) => {
-                          if (item.type === "field") {
-                            const field = item.data as FormulaField;
-                            return (
-                              <ListItem key={field.name} disablePadding>
-                                <ListItemButton
-                                  onClick={() => insertField(field.name)}
-                                  onMouseEnter={() => setHoveredField(field)}
-                                  onMouseLeave={() => setHoveredField(null)}
-                                  sx={{ py: 0.5, px: 1.5 }}
-                                  dense>
-                                  <ListItemIcon sx={{ minWidth: 28 }}>
-                                    <FieldKindIcon kind={fieldIndicatorKind(field)} />
-                                  </ListItemIcon>
-                                  <ListItemText
-                                    primary={
-                                      <Typography variant="body2" fontFamily="monospace" fontSize="0.8rem">
-                                        {field.name}
-                                      </Typography>
-                                    }
-                                  />
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      fontSize: "0.75rem",
-                                      color: "text.disabled",
-                                      fontFamily: "monospace",
-                                    }}>
-                                    ↵
-                                  </Typography>
-                                </ListItemButton>
-                              </ListItem>
-                            );
-                          }
-
-                          if (item.type === "operator") {
-                            const op = item.data as (typeof OPERATORS)[number];
-                            return (
-                              <ListItem key={op.symbol} disablePadding>
-                                <ListItemButton
-                                  onClick={() => insertOperator(op.syntax)}
-                                  onMouseEnter={() => setHoveredOperator(op)}
-                                  onMouseLeave={() => setHoveredOperator(null)}
-                                  sx={{ py: 0.5, px: 1.5 }}
-                                  dense>
-                                  <ListItemIcon sx={{ minWidth: 24 }}>
-                                    <Typography
-                                      variant="body2"
-                                      fontFamily="monospace"
-                                      fontSize="0.8rem"
-                                      fontWeight="bold"
-                                      color="action">
-                                      {op.symbol}
-                                    </Typography>
-                                  </ListItemIcon>
-                                  <ListItemText
-                                    primary={
-                                      <Typography variant="body2" fontSize="0.8rem">
-                                        {op.label}
-                                      </Typography>
-                                    }
-                                  />
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      fontSize: "0.75rem",
-                                      color: "text.disabled",
-                                      fontFamily: "monospace",
-                                    }}>
-                                    ↵
-                                  </Typography>
-                                </ListItemButton>
-                              </ListItem>
-                            );
-                          }
-
-                          // Function
-                          const func = item.data as FunctionDoc;
+                          </React.Fragment>
+                        );
+                      })}
+                    </List>
+                  ) : categoryItems.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
+                      {t("no_items_found")}
+                    </Typography>
+                  ) : (
+                    <List dense disablePadding>
+                      {categoryItems.map((item) => {
+                        if (item.type === "field") {
+                          const field = item.data as FormulaField;
                           return (
-                            <ListItem key={func.name} disablePadding>
+                            <ListItem key={field.name} disablePadding>
                               <ListItemButton
-                                onClick={() => smartInsertFunction(func)}
-                                onMouseEnter={() => setSelectedFunction(func)}
-                                onMouseLeave={() => setSelectedFunction(null)}
+                                onClick={() => insertField(field.name)}
+                                onMouseEnter={() => setHoveredField(field)}
+                                onMouseLeave={() => setHoveredField(null)}
                                 sx={{ py: 0.5, px: 1.5 }}
                                 dense>
+                                <ListItemIcon sx={{ minWidth: 28 }}>
+                                  <FieldKindIcon kind={fieldIndicatorKind(field)} />
+                                </ListItemIcon>
                                 <ListItemText
                                   primary={
                                     <Typography variant="body2" fontFamily="monospace" fontSize="0.8rem">
-                                      {func.name}
+                                      {field.name}
                                     </Typography>
                                   }
                                 />
@@ -1148,459 +1072,508 @@ export default function FormulaBuilder({
                               </ListItemButton>
                             </ListItem>
                           );
+                        }
+
+                        if (item.type === "operator") {
+                          const op = item.data as (typeof OPERATORS)[number];
+                          return (
+                            <ListItem key={op.symbol} disablePadding>
+                              <ListItemButton
+                                onClick={() => insertOperator(op.syntax)}
+                                onMouseEnter={() => setHoveredOperator(op)}
+                                onMouseLeave={() => setHoveredOperator(null)}
+                                sx={{ py: 0.5, px: 1.5 }}
+                                dense>
+                                <ListItemIcon sx={{ minWidth: 24 }}>
+                                  <Typography
+                                    variant="body2"
+                                    fontFamily="monospace"
+                                    fontSize="0.8rem"
+                                    fontWeight="bold"
+                                    color="action">
+                                    {op.symbol}
+                                  </Typography>
+                                </ListItemIcon>
+                                <ListItemText
+                                  primary={
+                                    <Typography variant="body2" fontSize="0.8rem">
+                                      {op.label}
+                                    </Typography>
+                                  }
+                                />
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    fontSize: "0.75rem",
+                                    color: "text.disabled",
+                                    fontFamily: "monospace",
+                                  }}>
+                                  ↵
+                                </Typography>
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        }
+
+                        // Function
+                        const func = item.data as FunctionDoc;
+                        return (
+                          <ListItem key={func.name} disablePadding>
+                            <ListItemButton
+                              onClick={() => smartInsertFunction(func)}
+                              onMouseEnter={() => setSelectedFunction(func)}
+                              onMouseLeave={() => setSelectedFunction(null)}
+                              sx={{ py: 0.5, px: 1.5 }}
+                              dense>
+                              <ListItemText
+                                primary={
+                                  <Typography variant="body2" fontFamily="monospace" fontSize="0.8rem">
+                                    {func.name}
+                                  </Typography>
+                                }
+                              />
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  fontSize: "0.75rem",
+                                  color: "text.disabled",
+                                  fontFamily: "monospace",
+                                }}>
+                                ↵
+                              </Typography>
+                            </ListItemButton>
+                          </ListItem>
+                        );
+                      })}
+                    </List>
+                  )}
+                </Box>
+              </Paper>
+
+              {/* Right: Help Panel */}
+              <Paper variant="outlined" sx={{ width: 280, p: 1.5, display: "flex", flexDirection: "column" }}>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                  <Icon iconName={ICON_NAME.INFO} fontSize="small" color="primary" />
+                  <Typography variant="subtitle2">{t("help")}</Typography>
+                </Stack>
+                <Divider sx={{ mb: 1 }} />
+                <Box sx={{ flex: 1, overflow: "auto" }}>
+                  {/* Field Help */}
+                  {hoveredField ? (
+                    <>
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                        <FieldKindIcon kind={fieldIndicatorKind(hoveredField)} />
+                        <Typography variant="body2" fontWeight="bold" fontFamily="monospace">
+                          {hoveredField.name}
+                        </Typography>
+                      </Stack>
+                      <Chip
+                        label={hoveredField.type.toUpperCase()}
+                        size="small"
+                        sx={{ mb: 1.5, height: 20, fontSize: "0.7rem" }}
+                      />
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                        {t("field_help_description", { field: hoveredField.name, type: hoveredField.type })}
+                      </Typography>
+                    </>
+                  ) : hoveredOperator ? (
+                    /* Operator Help */
+                    <>
+                      <Typography
+                        variant="body2"
+                        fontWeight="bold"
+                        fontFamily="monospace"
+                        fontSize="1.25rem"
+                        sx={{ mb: 1 }}>
+                        {hoveredOperator.symbol}
+                      </Typography>
+                      <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
+                        {hoveredOperator.label}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {t(`operator_${hoveredOperator.symbol}_desc`, {
+                          defaultValue: t("operator_description", { symbol: hoveredOperator.symbol }),
                         })}
-                      </List>
-                    )}
-                  </Box>
-                </Paper>
-
-                {/* Right: Help Panel */}
-                <Paper
-                  variant="outlined"
-                  sx={{ width: 280, p: 1.5, display: "flex", flexDirection: "column" }}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                    <Icon iconName={ICON_NAME.INFO} fontSize="small" color="primary" />
-                    <Typography variant="subtitle2">{t("help")}</Typography>
-                  </Stack>
-                  <Divider sx={{ mb: 1 }} />
-                  <Box sx={{ flex: 1, overflow: "auto" }}>
-                    {/* Field Help */}
-                    {hoveredField ? (
-                      <>
-                        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-                          <FieldKindIcon kind={fieldIndicatorKind(hoveredField)} />
-                          <Typography variant="body2" fontWeight="bold" fontFamily="monospace">
-                            {hoveredField.name}
-                          </Typography>
-                        </Stack>
-                        <Chip
-                          label={hoveredField.type.toUpperCase()}
-                          size="small"
-                          sx={{ mb: 1.5, height: 20, fontSize: "0.7rem" }}
-                        />
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                          {t("field_help_description", { field: hoveredField.name, type: hoveredField.type })}
+                      </Typography>
+                    </>
+                  ) : selectedFunction ? (
+                    /* Function Help */
+                    <>
+                      {/* Function name and category */}
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        sx={{ mb: 0.5 }}>
+                        <Typography variant="body2" fontWeight="bold" color="primary.main">
+                          {selectedFunction.name.toUpperCase()}
                         </Typography>
-                      </>
-                    ) : hoveredOperator ? (
-                      /* Operator Help */
-                      <>
-                        <Typography
-                          variant="body2"
-                          fontWeight="bold"
-                          fontFamily="monospace"
-                          fontSize="1.25rem"
-                          sx={{ mb: 1 }}>
-                          {hoveredOperator.symbol}
-                        </Typography>
-                        <Typography variant="body2" fontWeight="medium" sx={{ mb: 1 }}>
-                          {hoveredOperator.label}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {t(`operator_${hoveredOperator.symbol}_desc`, {
-                            defaultValue: t("operator_description", { symbol: hoveredOperator.symbol }),
-                          })}
-                        </Typography>
-                      </>
-                    ) : selectedFunction ? (
-                      /* Function Help */
-                      <>
-                        {/* Function name and category */}
-                        <Stack
-                          direction="row"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          sx={{ mb: 0.5 }}>
-                          <Typography variant="body2" fontWeight="bold" color="primary.main">
-                            {selectedFunction.name.toUpperCase()}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              bgcolor: "action.hover",
-                              px: 0.75,
-                              py: 0.25,
-                              borderRadius: 0.5,
-                              textTransform: "capitalize",
-                            }}>
-                            {t(`category_${selectedFunction.category}`, {
-                              defaultValue: selectedFunction.category,
-                            })}
-                          </Typography>
-                        </Stack>
-
-                        {/* Syntax */}
-                        <Box
-                          sx={{
-                            mb: 1,
-                            p: 0.75,
-                            bgcolor: "action.hover",
-                            borderRadius: 0.5,
-                            border: 1,
-                            borderColor: "divider",
-                          }}>
-                          <Typography variant="body2" fontFamily="monospace" fontSize="0.8rem">
-                            {selectedFunction.syntax}
-                          </Typography>
-                        </Box>
-
-                        {/* Description */}
                         <Typography
                           variant="caption"
-                          color="text.secondary"
-                          sx={{ display: "block", mb: 1.5 }}>
-                          {t(`func_${selectedFunction.name}_desc`, {
-                            defaultValue: t(selectedFunction.description_key, {
-                              defaultValue: selectedFunction.description_key,
-                            }),
+                          sx={{
+                            bgcolor: "action.hover",
+                            px: 0.75,
+                            py: 0.25,
+                            borderRadius: 0.5,
+                            textTransform: "capitalize",
+                          }}>
+                          {t(`category_${selectedFunction.category}`, {
+                            defaultValue: selectedFunction.category,
                           })}
                         </Typography>
+                      </Stack>
 
-                        {/* Parameters */}
-                        {selectedFunction.parameters.length > 0 && (
-                          <Box sx={{ mb: 1.5 }}>
-                            <Typography
-                              variant="caption"
-                              fontWeight="bold"
-                              sx={{ display: "block", mb: 0.5 }}>
-                              {t("parameters")}:
-                            </Typography>
-                            {selectedFunction.parameters.map((param, idx) => (
-                              <Stack key={idx} direction="row" spacing={0.5} sx={{ mb: 0.25 }}>
-                                <Typography variant="caption" fontFamily="monospace" color="primary.main">
-                                  {param.name}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  ({param.type.toLowerCase()}){param.optional ? ` - ${t("optional")}` : ""}
-                                </Typography>
-                              </Stack>
-                            ))}
-                          </Box>
-                        )}
-
-                        {/* Example */}
-                        <Box sx={{ bgcolor: "action.hover", p: 1, borderRadius: 1 }}>
-                          <Typography variant="caption" color="text.secondary" fontWeight="bold">
-                            {t("example")}:
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            fontFamily="monospace"
-                            fontSize="0.75rem"
-                            sx={{ mt: 0.25 }}>
-                            {selectedFunction.example}
-                          </Typography>
-                        </Box>
-                      </>
-                    ) : (
-                      <Box sx={{ textAlign: "center", py: 4 }}>
-                        <Icon
-                          iconName={ICON_NAME.INFO}
-                          fontSize="large"
-                          sx={{ color: "action.disabled", mb: 1 }}
-                        />
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                          {t("hover_for_help")}
+                      {/* Syntax */}
+                      <Box
+                        sx={{
+                          mb: 1,
+                          p: 0.75,
+                          bgcolor: "action.hover",
+                          borderRadius: 0.5,
+                          border: 1,
+                          borderColor: "divider",
+                        }}>
+                        <Typography variant="body2" fontFamily="monospace" fontSize="0.8rem">
+                          {selectedFunction.syntax}
                         </Typography>
                       </Box>
-                    )}
-                  </Box>
-                </Paper>
-              </Stack>
 
-              {/* Group By Panel - single select (hidden in SQL mode) */}
-              {showGroupBy && !isSqlMode && (
-                <Paper variant="outlined" sx={{ p: 1.5 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                      sx={{ minWidth: 150, flexShrink: 0 }}>
-                      <Icon iconName={ICON_NAME.AGGREGATE} fontSize="small" color="primary" />
-                      <Typography variant="subtitle2">{t("group_by")}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        ({t("optional")})
+                      {/* Description */}
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+                        {t(`func_${selectedFunction.name}_desc`, {
+                          defaultValue: t(selectedFunction.description_key, {
+                            defaultValue: selectedFunction.description_key,
+                          }),
+                        })}
                       </Typography>
-                    </Stack>
-                    <FormControl fullWidth size="small">
-                      <Select
-                        displayEmpty
-                        value={groupByColumn}
-                        onChange={(e) => setGroupByColumn(e.target.value as string)}
-                        MenuProps={{
-                          PaperProps: {
-                            sx: { maxHeight: 300 },
-                          },
-                        }}
-                        renderValue={(selected) => {
-                          if (!selected) {
-                            return (
-                              <Typography variant="body2" color="text.secondary">
-                                {t("select_column")}
-                              </Typography>
-                            );
-                          }
-                          return (
-                            <Typography variant="body2" fontFamily="monospace">
-                              {selected}
-                            </Typography>
-                          );
-                        }}>
-                        <MenuItem value="">
-                          <Typography variant="body2" color="text.secondary">
-                            {t("none")}
+
+                      {/* Parameters */}
+                      {selectedFunction.parameters.length > 0 && (
+                        <Box sx={{ mb: 1.5 }}>
+                          <Typography variant="caption" fontWeight="bold" sx={{ display: "block", mb: 0.5 }}>
+                            {t("parameters")}:
                           </Typography>
-                        </MenuItem>
-                        {nonGeomFields.map((field) => (
-                          <MenuItem key={field.name} value={field.name}>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <FieldKindIcon kind={fieldIndicatorKind(field)} />
-                              <Typography variant="body2" fontFamily="monospace">
-                                {field.name}
+                          {selectedFunction.parameters.map((param, idx) => (
+                            <Stack key={idx} direction="row" spacing={0.5} sx={{ mb: 0.25 }}>
+                              <Typography variant="caption" fontFamily="monospace" color="primary.main">
+                                {param.name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                ({param.type.toLowerCase()}){param.optional ? ` - ${t("optional")}` : ""}
                               </Typography>
                             </Stack>
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                    {groupByColumn && (
-                      <IconButton size="small" onClick={() => setGroupByColumn("")} sx={{ flexShrink: 0 }}>
-                        <Icon iconName={ICON_NAME.XCLOSE} fontSize="small" />
-                      </IconButton>
-                    )}
-                  </Stack>
-                </Paper>
-              )}
-            </Stack>
-          )}
-
-          {/* PREVIEW TAB (auto-runs) */}
-          {activeTab === 1 && (
-            <Box sx={{ minHeight: 300 }}>
-              {isPreviewing && (
-                <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 8 }}>
-                  <CircularProgress />
-                </Box>
-              )}
-
-              {/* SQL mode preview - tabular results */}
-              {!isPreviewing && isSqlMode && sqlPreview && (
-                <>
-                  {sqlPreview.success && sqlPreview.columns.length > 0 ? (
-                    <Stack spacing={2}>
-                      {sqlPreview.total_count !== null && sqlPreview.total_count !== undefined && (
-                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
-                          {t("total_rows")}: {sqlPreview.total_count}
-                        </Typography>
+                          ))}
+                        </Box>
                       )}
-                      <Paper variant="outlined" sx={{ overflow: "auto", maxHeight: 300 }}>
-                        <Box component="table" sx={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem", fontFamily: "monospace" }}>
-                          <Box component="thead">
-                            <Box component="tr" sx={{ bgcolor: "action.hover" }}>
-                              {sqlPreview.columns.map((col) => (
-                                <Box
-                                  component="th"
-                                  key={col.name}
-                                  sx={{
-                                    px: 1.5,
-                                    py: 0.75,
-                                    textAlign: "left",
-                                    borderBottom: 1,
-                                    borderColor: "divider",
-                                    fontWeight: "bold",
-                                    whiteSpace: "nowrap",
-                                  }}>
-                                  {col.name}
-                                  <Typography
-                                    component="span"
-                                    variant="caption"
-                                    sx={{ display: "block", color: "text.secondary", fontSize: "0.65rem" }}>
-                                    {col.type}
-                                  </Typography>
-                                </Box>
-                              ))}
-                            </Box>
-                          </Box>
-                          <Box component="tbody">
-                            {sqlPreview.rows.map((row, rowIdx) => (
+
+                      {/* Example */}
+                      <Box sx={{ bgcolor: "action.hover", p: 1, borderRadius: 1 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight="bold">
+                          {t("example")}:
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontFamily="monospace"
+                          fontSize="0.75rem"
+                          sx={{ mt: 0.25 }}>
+                          {selectedFunction.example}
+                        </Typography>
+                      </Box>
+                    </>
+                  ) : (
+                    <Box sx={{ textAlign: "center", py: 4 }}>
+                      <Icon
+                        iconName={ICON_NAME.INFO}
+                        fontSize="large"
+                        sx={{ color: "action.disabled", mb: 1 }}
+                      />
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                        {t("hover_for_help")}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              </Paper>
+            </Stack>
+
+            {/* Group By Panel - single select (hidden in SQL mode) */}
+            {showGroupBy && !isSqlMode && (
+              <Paper variant="outlined" sx={{ p: 1.5 }}>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    sx={{ minWidth: 150, flexShrink: 0 }}>
+                    <Icon iconName={ICON_NAME.AGGREGATE} fontSize="small" color="primary" />
+                    <Typography variant="subtitle2">{t("group_by")}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      ({t("optional")})
+                    </Typography>
+                  </Stack>
+                  <FormControl fullWidth size="small">
+                    <Select
+                      displayEmpty
+                      value={groupByColumn}
+                      onChange={(e) => setGroupByColumn(e.target.value as string)}
+                      MenuProps={{
+                        PaperProps: {
+                          sx: { maxHeight: 300 },
+                        },
+                      }}
+                      renderValue={(selected) => {
+                        if (!selected) {
+                          return (
+                            <Typography variant="body2" color="text.secondary">
+                              {t("select_column")}
+                            </Typography>
+                          );
+                        }
+                        return (
+                          <Typography variant="body2" fontFamily="monospace">
+                            {selected}
+                          </Typography>
+                        );
+                      }}>
+                      <MenuItem value="">
+                        <Typography variant="body2" color="text.secondary">
+                          {t("none")}
+                        </Typography>
+                      </MenuItem>
+                      {nonGeomFields.map((field) => (
+                        <MenuItem key={field.name} value={field.name}>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <FieldKindIcon kind={fieldIndicatorKind(field)} />
+                            <Typography variant="body2" fontFamily="monospace">
+                              {field.name}
+                            </Typography>
+                          </Stack>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  {groupByColumn && (
+                    <IconButton size="small" onClick={() => setGroupByColumn("")} sx={{ flexShrink: 0 }}>
+                      <Icon iconName={ICON_NAME.XCLOSE} fontSize="small" />
+                    </IconButton>
+                  )}
+                </Stack>
+              </Paper>
+            )}
+          </Stack>
+        )}
+
+        {/* PREVIEW TAB (auto-runs) */}
+        {activeTab === 1 && (
+          <Box sx={{ minHeight: 300 }}>
+            {isPreviewing && (
+              <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 8 }}>
+                <CircularProgress />
+              </Box>
+            )}
+
+            {/* SQL mode preview - tabular results */}
+            {!isPreviewing && isSqlMode && sqlPreview && (
+              <>
+                {sqlPreview.success && sqlPreview.columns.length > 0 ? (
+                  <Stack spacing={2}>
+                    {sqlPreview.total_count !== null && sqlPreview.total_count !== undefined && (
+                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
+                        {t("total_rows")}: {sqlPreview.total_count}
+                      </Typography>
+                    )}
+                    <Paper variant="outlined" sx={{ overflow: "auto", maxHeight: 300 }}>
+                      <Box
+                        component="table"
+                        sx={{
+                          width: "100%",
+                          borderCollapse: "collapse",
+                          fontSize: "0.8rem",
+                          fontFamily: "monospace",
+                        }}>
+                        <Box component="thead">
+                          <Box component="tr" sx={{ bgcolor: "action.hover" }}>
+                            {sqlPreview.columns.map((col) => (
                               <Box
-                                component="tr"
-                                key={rowIdx}
-                                sx={{ bgcolor: rowIdx % 2 === 0 ? "transparent" : "action.hover" }}>
-                                {sqlPreview.columns.map((col) => (
-                                  <Box
-                                    component="td"
-                                    key={col.name}
-                                    sx={{
-                                      px: 1.5,
-                                      py: 0.5,
-                                      borderBottom: 1,
-                                      borderColor: "divider",
-                                      maxWidth: 200,
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      whiteSpace: "nowrap",
-                                    }}>
-                                    {row.values[col.name] !== null && row.values[col.name] !== undefined
-                                      ? String(row.values[col.name])
-                                      : <Typography component="span" variant="caption" color="text.disabled">NULL</Typography>
-                                    }
-                                  </Box>
-                                ))}
+                                component="th"
+                                key={col.name}
+                                sx={{
+                                  px: 1.5,
+                                  py: 0.75,
+                                  textAlign: "left",
+                                  borderBottom: 1,
+                                  borderColor: "divider",
+                                  fontWeight: "bold",
+                                  whiteSpace: "nowrap",
+                                }}>
+                                {col.name}
+                                <Typography
+                                  component="span"
+                                  variant="caption"
+                                  sx={{ display: "block", color: "text.secondary", fontSize: "0.65rem" }}>
+                                  {col.type}
+                                </Typography>
                               </Box>
                             ))}
                           </Box>
                         </Box>
+                        <Box component="tbody">
+                          {sqlPreview.rows.map((row, rowIdx) => (
+                            <Box
+                              component="tr"
+                              key={rowIdx}
+                              sx={{ bgcolor: rowIdx % 2 === 0 ? "transparent" : "action.hover" }}>
+                              {sqlPreview.columns.map((col) => (
+                                <Box
+                                  component="td"
+                                  key={col.name}
+                                  sx={{
+                                    px: 1.5,
+                                    py: 0.5,
+                                    borderBottom: 1,
+                                    borderColor: "divider",
+                                    maxWidth: 200,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}>
+                                  {row.values[col.name] !== null && row.values[col.name] !== undefined ? (
+                                    String(row.values[col.name])
+                                  ) : (
+                                    <Typography component="span" variant="caption" color="text.disabled">
+                                      NULL
+                                    </Typography>
+                                  )}
+                                </Box>
+                              ))}
+                            </Box>
+                          ))}
+                        </Box>
+                      </Box>
+                    </Paper>
+                    <Typography variant="caption" color="text.secondary">
+                      {t("showing_rows", { count: sqlPreview.rows.length })}
+                    </Typography>
+                  </Stack>
+                ) : (
+                  <Alert severity="error">
+                    <Typography variant="body2">{sqlPreview.error || t("no_results")}</Typography>
+                  </Alert>
+                )}
+              </>
+            )}
+
+            {/* Expression mode preview */}
+            {!isPreviewing && !isSqlMode && preview && (
+              <>
+                {!preview.error ? (
+                  <Stack spacing={2}>
+                    {/* Summary info */}
+                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
+                      {t("total_rows")}: {preview.total_count}
+                    </Typography>
+
+                    {/* Results display */}
+                    {groupByColumn && preview.items && preview.items.length > 0 ? (
+                      /* Grouped results - show as simple list */
+                      <Paper variant="outlined" sx={{ p: 2 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 2 }}>
+                          {t("result")} {t("grouped_by")} {groupByColumn}
+                        </Typography>
+                        <Stack spacing={1}>
+                          {preview.items.slice(0, 10).map((item, idx) => (
+                            <Stack
+                              key={idx}
+                              direction="row"
+                              justifyContent="space-between"
+                              alignItems="center"
+                              sx={{
+                                py: 0.5,
+                                px: 1,
+                                bgcolor: idx % 2 === 0 ? "action.hover" : "transparent",
+                                borderRadius: 1,
+                              }}>
+                              <Typography variant="body2" color="text.secondary">
+                                {item.grouped_value !== null ? String(item.grouped_value) : "NULL"}
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                fontWeight="bold"
+                                fontFamily="monospace"
+                                color="primary.main">
+                                {item.operation_value !== null ? String(item.operation_value) : "NULL"}
+                              </Typography>
+                            </Stack>
+                          ))}
+                        </Stack>
                       </Paper>
-                      <Typography variant="caption" color="text.secondary">
-                        {t("showing_rows", { count: sqlPreview.rows.length })}
-                      </Typography>
-                    </Stack>
-                  ) : (
-                    <Alert severity="error">
-                      <Typography variant="body2">{sqlPreview.error || t("no_results")}</Typography>
-                    </Alert>
-                  )}
-                </>
-              )}
+                    ) : (
+                      /* Single aggregated result */
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 4,
+                          textAlign: "center",
+                          bgcolor: "action.hover",
+                        }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                          {t("result")}
+                        </Typography>
+                        <Typography
+                          variant="h3"
+                          fontFamily="monospace"
+                          fontWeight="bold"
+                          color="primary.main">
+                          {preview.value !== null ? String(preview.value) : "NULL"}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+                          {t("aggregated_over_rows", { count: preview.total_count })}
+                        </Typography>
+                      </Paper>
+                    )}
+                  </Stack>
+                ) : (
+                  <Alert severity="error">
+                    <Typography variant="body2">{preview.error}</Typography>
+                  </Alert>
+                )}
+              </>
+            )}
 
-              {/* Expression mode preview */}
-              {!isPreviewing && !isSqlMode && preview && (
-                <>
-                  {!preview.error ? (
-                    <Stack spacing={2}>
-                      {/* Summary info */}
-                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: "right" }}>
-                        {t("total_rows")}: {preview.total_count}
-                      </Typography>
+            {!isPreviewing && !preview && !expression.trim() && (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  py: 8,
+                }}>
+                <Icon iconName={ICON_NAME.CODE} sx={{ fontSize: 48, color: "action.disabled", mb: 2 }} />
+                <Typography variant="body1" color="text.secondary">
+                  {t("enter_expression_to_preview")}
+                </Typography>
+              </Box>
+            )}
 
-                      {/* Results display */}
-                      {groupByColumn && preview.items && preview.items.length > 0 ? (
-                        /* Grouped results - show as simple list */
-                        <Paper variant="outlined" sx={{ p: 2 }}>
-                          <Typography variant="subtitle2" sx={{ mb: 2 }}>
-                            {t("result")} {t("grouped_by")} {groupByColumn}
-                          </Typography>
-                          <Stack spacing={1}>
-                            {preview.items.slice(0, 10).map((item, idx) => (
-                              <Stack
-                                key={idx}
-                                direction="row"
-                                justifyContent="space-between"
-                                alignItems="center"
-                                sx={{
-                                  py: 0.5,
-                                  px: 1,
-                                  bgcolor: idx % 2 === 0 ? "action.hover" : "transparent",
-                                  borderRadius: 1,
-                                }}>
-                                <Typography variant="body2" color="text.secondary">
-                                  {item.grouped_value !== null ? String(item.grouped_value) : "NULL"}
-                                </Typography>
-                                <Typography
-                                  variant="body2"
-                                  fontWeight="bold"
-                                  fontFamily="monospace"
-                                  color="primary.main">
-                                  {item.operation_value !== null ? String(item.operation_value) : "NULL"}
-                                </Typography>
-                              </Stack>
-                            ))}
-                          </Stack>
-                        </Paper>
-                      ) : (
-                        /* Single aggregated result */
-                        <Paper
-                          variant="outlined"
-                          sx={{
-                            p: 4,
-                            textAlign: "center",
-                            bgcolor: "action.hover",
-                          }}>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block", mb: 1 }}>
-                            {t("result")}
-                          </Typography>
-                          <Typography
-                            variant="h3"
-                            fontFamily="monospace"
-                            fontWeight="bold"
-                            color="primary.main">
-                            {preview.value !== null ? String(preview.value) : "NULL"}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block", mt: 1 }}>
-                            {t("aggregated_over_rows", { count: preview.total_count })}
-                          </Typography>
-                        </Paper>
-                      )}
-                    </Stack>
-                  ) : (
-                    <Alert severity="error">
-                      <Typography variant="body2">{preview.error}</Typography>
-                    </Alert>
-                  )}
-                </>
-              )}
-
-              {!isPreviewing && !preview && !expression.trim() && (
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    py: 8,
-                  }}>
-                  <Icon iconName={ICON_NAME.CODE} sx={{ fontSize: 48, color: "action.disabled", mb: 2 }} />
-                  <Typography variant="body1" color="text.secondary">
-                    {t("enter_expression_to_preview")}
-                  </Typography>
-                </Box>
-              )}
-
-              {!isPreviewing && !preview && expression.trim() && validation?.valid === false && (
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    py: 8,
-                  }}>
-                  <Icon iconName={ICON_NAME.XCLOSE} sx={{ fontSize: 48, color: "error.main", mb: 2 }} />
-                  <Typography variant="body1" color="text.secondary">
-                    {t("fix_expression_errors_to_preview")}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          )}
-        </Stack>
-      </DialogContent>
-
-      <DialogActions
-        disableSpacing
-        sx={{
-          mt: 2,
-          pb: 2,
-        }}>
-        <Button onClick={onClose} variant="text">
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-        <Button onClick={handleApply} variant="text" color="primary" disabled={isValid === false}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("apply")}
-          </Typography>
-        </Button>
-      </DialogActions>
-    </Dialog>
+            {!isPreviewing && !preview && expression.trim() && validation?.valid === false && (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  py: 8,
+                }}>
+                <Icon iconName={ICON_NAME.XCLOSE} sx={{ fontSize: 48, color: "error.main", mb: 2 }} />
+                <Typography variant="body1" color="text.secondary">
+                  {t("fix_expression_errors_to_preview")}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+      </Stack>
+    </AppDialog>
   );
 }

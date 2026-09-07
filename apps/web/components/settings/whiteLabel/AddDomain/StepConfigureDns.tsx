@@ -1,43 +1,20 @@
 "use client";
 
-import { LoadingButton } from "@mui/lab";
-import { Alert, Button, Stack, Typography } from "@mui/material";
-import { useState } from "react";
+import { Alert, Stack, Typography } from "@mui/material";
 import { useTranslation } from "react-i18next";
-import { toast } from "react-toastify";
 
-import { recheckCustomDomain } from "@/lib/api/customDomains";
 import type { CustomDomain } from "@/lib/validations/customDomain";
 
 import { DnsRecordCard } from "./DnsRecordCard";
 
 interface StepConfigureDnsProps {
-  organizationId: string;
   domain: CustomDomain;
-  onDone: () => void;
-  onRefresh: () => void;
 }
 
-export function StepConfigureDns({
-  organizationId,
-  domain,
-  onDone,
-  onRefresh,
-}: StepConfigureDnsProps) {
+/** The DNS instructions alone — "Recheck now" and "Done" now live in the
+ * dialog's shared footer. */
+export function StepConfigureDns({ domain }: StepConfigureDnsProps) {
   const { t } = useTranslation("common");
-  const [isRechecking, setIsRechecking] = useState(false);
-
-  const handleRecheck = async () => {
-    setIsRechecking(true);
-    try {
-      await recheckCustomDomain(organizationId, domain.id);
-      onRefresh();
-    } catch {
-      toast.error(t("white_label_add_domain_recheck_failed", "Failed to recheck DNS"));
-    } finally {
-      setIsRechecking(false);
-    }
-  };
 
   return (
     <Stack spacing={3}>
@@ -59,21 +36,6 @@ export function StepConfigureDns({
           {domain.dns_status_message}
         </Typography>
       )}
-      <Stack direction="row" spacing={1} justifyContent="flex-end">
-        <LoadingButton
-          variant="text"
-          loading={isRechecking}
-          onClick={handleRecheck}>
-          <Typography variant="body2" fontWeight="bold">
-            {t("white_label_add_domain_recheck_now", "Recheck now")}
-          </Typography>
-        </LoadingButton>
-        <Button variant="contained" onClick={onDone}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("done", "Done")}
-          </Typography>
-        </Button>
-      </Stack>
     </Stack>
   );
 }

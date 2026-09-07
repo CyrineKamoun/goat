@@ -7,6 +7,19 @@ afterEach(() => {
   cleanup();
 });
 
+// jsdom's CSS parser does not know `@container`, so every render of a
+// component that carries a container query raises "Could not parse CSS
+// stylesheet" through the virtual console. The rules are valid and are what
+// ships; only parsing them here is unsupported, so that one message is
+// dropped and every other error still prints.
+const printError = console.error;
+console.error = (...args: unknown[]) => {
+  const first = args[0];
+  const message = first instanceof Error ? first.message : String(first ?? "");
+  if (message.includes("Could not parse CSS stylesheet")) return;
+  printError(...args);
+};
+
 // Mock Next.js router
 vi.mock("next/navigation", () => ({
   useRouter: () => ({

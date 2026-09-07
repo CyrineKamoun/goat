@@ -1,119 +1,149 @@
 "use client";
 
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CardMedia,
-  IconButton,
-  Paper,
-  Stack,
-  Tooltip,
-  Typography,
-  useTheme,
-} from "@mui/material";
+import { Badge, Box, Button, IconButton, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
+import { patchPreferences, usePreferences } from "@/lib/api/preferences";
+import { RELEASES_FEED_URL, releasesIndexUrl, unreadCount, useReleases } from "@/lib/api/releases";
+import type { ReleaseEntry, ReleaseTag } from "@/lib/validations/home";
+
 import { ArrowPopper } from "@/components/ArrowPoper";
+import HeaderPopoverPaper, { HEADER_POPOVER_PLACEMENT } from "@/components/header/HeaderPopoverPaper";
 
-type ReleaseNote = {
-  title: string;
-  date: string;
-  thumbnail: string;
-  url: string;
+const TAG_LABEL_KEY: Record<ReleaseTag, string> = {
+  new: "release_new",
+  improved: "release_improved",
+  fixed: "release_fixed",
 };
 
-const releaseNotesEnglish: ReleaseNote = {
-  title: 'GOAT 2.4.0 "Toggenburg" is here',
-  date: "March 9, 2026",
-  thumbnail:
-    "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/69a80eca7103ae1f77222324_workflows_cover.webp",
-  url: "https://www.plan4better.de/en/post/goat-2-4-0-toggenburg-is-here",
+const TAG_COLOR: Record<ReleaseTag, "primary" | "info" | "success"> = {
+  new: "primary",
+  improved: "info",
+  fixed: "success",
 };
 
-const releaseNotesGerman: ReleaseNote = {
-  title: 'GOAT 2.4.0 „Toggenburg" ist da',
-  date: "9. März 2026",
-  thumbnail:
-    "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/69a80eca7103ae1f77222324_workflows_cover.webp",
-  url: "https://www.plan4better.de/de/post/goat-2-4-0-toggenburg-is-here",
-};
-
+/** H7's header surface for release notes: replaces the old hardcoded card
+ * with the real feed. Renders nothing when no feed URL is configured. */
 export default function WhatsNewPopper() {
   const { t, i18n } = useTranslation("common");
   const theme = useTheme();
   const [open, setOpen] = useState(false);
+  const locale = i18n.language === "de" ? "de" : "en";
 
-  const releaseNote = i18n.language === "de" ? releaseNotesGerman : releaseNotesEnglish;
+  const { entries } = useReleases(locale);
+  const { preferences, mutate } = usePreferences();
+
+  if (!RELEASES_FEED_URL) return null;
+
+  const unread = unreadCount(entries, preferences?.releases_seen_at ?? null);
+
+  const handleToggle = () => {
+    const next = !open;
+    setOpen(next);
+    if (next) {
+      void patchPreferences({ releases_seen_at: new Date().toISOString() }).then(() => mutate());
+    }
+  };
 
   return (
     <ArrowPopper
       open={open}
       onClose={() => setOpen(false)}
-      placement="bottom-end"
-      arrow
+      placement={HEADER_POPOVER_PLACEMENT}
+      arrow={false}
       content={
-        <Paper
-          sx={{
-            width: 320,
-            maxHeight: 400,
-            overflow: "hidden",
-          }}>
-          <Box sx={{ p: 3 }}>
-            <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
-              <Icon iconName={ICON_NAME.ROCKET} style={{ fontSize: 18, color: theme.palette.primary.main }} />
+        <HeaderPopoverPaper sx={{ maxHeight: 420 }}>
+          <Box sx={{ p: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1, pb: 1.5 }}>
+              <Icon
+                iconName={ICON_NAME.ROCKET}
+                style={{ fontSize: 16 }}
+                htmlColor={theme.palette.primary.main}
+              />
               <Typography variant="body1" fontWeight="bold">
                 {t("whats_new")}
               </Typography>
             </Stack>
-            <Card
-              sx={{
-                cursor: "pointer",
-                transition: "box-shadow 0.2s ease-in-out",
-                "&:hover": {
-                  boxShadow: theme.shadows[4],
-                },
-              }}
-              onClick={() => window.open(releaseNote.url, "_blank")}>
-              <CardMedia
-                component="img"
-                height="140"
-                image={releaseNote.thumbnail}
-                alt={releaseNote.title}
-                sx={{
-                  objectFit: "cover",
-                }}
-              />
-              <CardContent sx={{ p: 2 }}>
-                <Typography variant="body2" fontWeight="bold" gutterBottom>
-                  {releaseNote.title}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {releaseNote.date}
-                </Typography>
-              </CardContent>
-            </Card>
+            <Stack spacing={0.5} sx={{ maxHeight: 300, overflowY: "auto" }}>
+              {entries.map((entry) => (
+                <ReleaseListItem key={entry.id} entry={entry} />
+              ))}
+            </Stack>
             <Button
               fullWidth
               variant="text"
               size="small"
-              sx={{ mt: 2 }}
-              endIcon={<Icon iconName={ICON_NAME.EXTERNAL_LINK} style={{ fontSize: 12 }} />}
-              onClick={() => window.open(releaseNote.url, "_blank")}>
+              component="a"
+              href={releasesIndexUrl(RELEASES_FEED_URL)}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ mt: 1.5 }}
+              endIcon={<Icon iconName={ICON_NAME.EXTERNAL_LINK} style={{ fontSize: 12 }} />}>
               {t("view_all_updates")}
             </Button>
           </Box>
-        </Paper>
+        </HeaderPopoverPaper>
       }>
       <Tooltip title={t("whats_new")}>
-        <IconButton size="small" onClick={() => setOpen(!open)}>
-          <Icon iconName={ICON_NAME.ROCKET} fontSize="inherit" />
+        <IconButton size="small" onClick={handleToggle}>
+          <Badge color="error" badgeContent={unread} max={9} invisible={unread === 0}>
+            <Icon iconName={ICON_NAME.ROCKET} fontSize="inherit" />
+          </Badge>
         </IconButton>
       </Tooltip>
     </ArrowPopper>
   );
 }
+
+const ReleaseListItem = ({ entry }: { entry: ReleaseEntry }) => {
+  const { t } = useTranslation("common");
+  const theme = useTheme();
+
+  return (
+    <Box
+      component="a"
+      href={entry.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      sx={{
+        display: "block",
+        p: "8px 10px",
+        borderRadius: "8px",
+        textDecoration: "none",
+        color: "inherit",
+        "&:hover": { backgroundColor: theme.palette.action.hover },
+      }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+        <Typography
+          component="span"
+          sx={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: `${theme.palette[TAG_COLOR[entry.tag]].main}`,
+          }}>
+          {t(TAG_LABEL_KEY[entry.tag])}
+        </Typography>
+        <Typography component="span" variant="caption" color="text.secondary">
+          {entry.date}
+        </Typography>
+      </Stack>
+      <Typography variant="body2" fontWeight="bold" gutterBottom>
+        {entry.title}
+      </Typography>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}>
+        {entry.summary}
+      </Typography>
+    </Box>
+  );
+};

@@ -4,23 +4,18 @@ import { Box, Stack, Typography, useTheme } from "@mui/material";
 import bboxOf from "@turf/bbox";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useMemo, useState } from "react";
-import { Layer as MapLayer, Map as MapLibre, Source } from "react-map-gl/maplibre";
 import { useTranslation } from "react-i18next";
+import { Layer as MapLayer, Map as MapLibre, Source } from "react-map-gl/maplibre";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import {
-  type CatalogSpatialFilter,
-  formatBuffer,
-  spatialFeatures,
-} from "@/lib/catalog/spatial";
+import { type CatalogSpatialFilter, formatBuffer, spatialFeatures } from "@/lib/catalog/spatial";
 
 import { useCatalogBasemapStyle } from "@/hooks/catalog/useCatalogBasemapStyle";
-
-import CatalogMapAttribution from "@/components/dashboard/catalog/CatalogMapAttribution";
 import { useCatalogNutsGeometries } from "@/hooks/catalog/useCatalogNutsGeometries";
 
 import CatalogSpatialDialog from "@/components/dashboard/catalog/CatalogSpatialDialog";
+import DetailMapAttribution from "@/components/dashboard/common/DetailMapAttribution";
 
 /** The filter panel's Location section: a dashed call-to-action while empty; once set, a small map of
  * the shape with its label and an Edit affordance. */
@@ -129,7 +124,7 @@ const CatalogSpatialSection = ({
                     />
                   </Source>
                   {/* Credited even at this size: the tiles are MapTiler's and the data OpenStreetMap's whether the map is 96px or full screen. */}
-                  <CatalogMapAttribution />
+                  <DetailMapAttribution />
                 </MapLibre>
               ) : (
                 // A region whose outline has not arrived yet, or is unavailable.

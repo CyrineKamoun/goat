@@ -5,11 +5,6 @@ import {
   Box,
   Button,
   Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
   Slider,
   Stack,
   TextField,
@@ -19,8 +14,8 @@ import {
 import bboxOf from "@turf/bbox";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Layer as MapLayer, Map as MapLibre, type MapRef, Source } from "react-map-gl/maplibre";
 import { useTranslation } from "react-i18next";
+import { Layer as MapLayer, Map as MapLibre, type MapRef, Source } from "react-map-gl/maplibre";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
@@ -39,7 +34,8 @@ import type { CatalogNutsRegion } from "@/lib/validations/catalog";
 import { useCatalogBasemapStyle } from "@/hooks/catalog/useCatalogBasemapStyle";
 import { useCatalogNutsGeometries } from "@/hooks/catalog/useCatalogNutsGeometries";
 
-import CatalogMapAttribution from "@/components/dashboard/catalog/CatalogMapAttribution";
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
+import DetailMapAttribution from "@/components/dashboard/common/DetailMapAttribution";
 
 /** The spatial filter tool: search a place, buffer a point, or draw an area, on one editable map. */
 
@@ -75,9 +71,7 @@ const CatalogSpatialDialog = ({
 
   const [mode, setMode] = useState<Mode>(() => modeOf(initial));
   const [draft, setDraft] = useState<CatalogSpatialFilter | null>(initial);
-  const [bufferKm, setBufferKm] = useState(
-    initial?.kind === "point" ? initial.km : DEFAULT_BUFFER_KM
-  );
+  const [bufferKm, setBufferKm] = useState(initial?.kind === "point" ? initial.km : DEFAULT_BUFFER_KM);
   const [query, setQuery] = useState("");
 
   // Reopening the dialog must show what is actually in force, not the draft from
@@ -170,9 +164,7 @@ const CatalogSpatialDialog = ({
   // responds while dragging rather than only on the next click.
   useEffect(() => {
     setDraft((current) =>
-      current?.kind === "point" && current.km !== bufferKm
-        ? { ...current, km: bufferKm }
-        : current
+      current?.kind === "point" && current.km !== bufferKm ? { ...current, km: bufferKm } : current
     );
   }, [bufferKm]);
 
@@ -205,305 +197,277 @@ const CatalogSpatialDialog = ({
           : t("catalog_spatial_hint_polygon_progress", { count: polygonVertices });
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle sx={{ pb: 1 }}>
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={4}>
-          <Box>
-            <Typography variant="h6" fontWeight={700}>
-              {t("catalog_set_spatial_filter")}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, maxWidth: 520 }}>
-              {t("catalog_spatial_dialog_subtitle")}
-            </Typography>
-          </Box>
-          <IconButton onClick={onClose} size="small" aria-label={t("close")}>
-            <Icon iconName={ICON_NAME.XCLOSE} style={{ fontSize: 14 }} />
-          </IconButton>
-        </Stack>
-      </DialogTitle>
-
-      <DialogContent>
-        <Stack spacing={4} sx={{ pt: 1 }}>
-          <Box>
-            <Typography variant="caption" fontWeight={600} color="text.secondary">
-              {t("catalog_location")}
-            </Typography>
-            <Autocomplete
-              size="small"
-              sx={{ mt: 1.5 }}
-              options={regions}
-              loading={isLoading}
-              inputValue={query}
-              onInputChange={(_event, value) => setQuery(value)}
-              onChange={(_event, region) => addRegion(region)}
-              // Selections are the chips below, so the input returns to empty.
-              value={null}
-              blurOnSelect
-              clearOnBlur
-              getOptionLabel={(option) => option.nuts_name}
-              isOptionEqualToValue={(a, b) => a.nuts_id === b.nuts_id}
-              // The API already ranked and limited these.
-              filterOptions={(options) => options}
-              getOptionDisabled={(option) => regionIds.includes(option.nuts_id)}
-              noOptionsText={query.length < 2 ? t("catalog_region_hint") : t("no_results")}
-              renderOption={(props, option) => (
-                <Box component="li" {...props} key={option.nuts_id}>
-                  <Stack direction="row" spacing={2.5} alignItems="center">
-                    <Icon
-                      iconName={ICON_NAME.LOCATION}
-                      style={{ fontSize: 14 }}
-                      htmlColor={theme.palette.primary.main}
-                    />
-                    <Stack>
-                      <Typography variant="body2" fontWeight={600}>
-                        {option.nuts_name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {option.nuts_id}
-                        {LEVEL_LABEL_KEYS[option.level]
-                          ? ` · ${t(LEVEL_LABEL_KEYS[option.level])}`
-                          : ""}
-                      </Typography>
-                    </Stack>
-                  </Stack>
-                </Box>
-              )}
-              renderInput={(params) => (
-                <TextField {...params} placeholder={t("catalog_search_region")} />
-              )}
-            />
-            {regionIds.length > 0 && (
-              <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ mt: 2 }}>
-                {regionIds.map((id) => (
-                  <Chip
-                    key={id}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                    label={
-                      (draft?.kind === "region" && draft.names?.[id]) || names[id] || id
-                    }
-                    onDelete={() => removeRegion(id)}
-                  />
-                ))}
-              </Stack>
-            )}
-          </Box>
-
-          <Box>
-            <Typography variant="caption" fontWeight={600} color="text.secondary">
-              {t("catalog_selection_type")}
-            </Typography>
-            <Stack
-              direction="row"
-              sx={{
-                mt: 1.5,
-                borderRadius: 2.5,
-                overflow: "hidden",
-                border: `1.5px solid ${theme.palette.primary.main}`,
-              }}>
-              {(
-                [
-                  { id: "region" as Mode, label: t("catalog_mode_region"), icon: ICON_NAME.GLOBE },
-                  { id: "point" as Mode, label: t("catalog_mode_point"), icon: ICON_NAME.LOCATION },
-                  {
-                    id: "polygon" as Mode,
-                    label: t("catalog_mode_polygon"),
-                    icon: ICON_NAME.POLYGON_FEATURE,
-                  },
-                ] as const
-              ).map((tool, index) => (
-                <Box
-                  key={tool.id}
-                  component="button"
-                  type="button"
-                  onClick={() => switchMode(tool.id)}
-                  sx={{
-                    flex: 1,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 2.5,
-                    py: 3,
-                    px: 2.5,
-                    cursor: "pointer",
-                    font: "inherit",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    border: "none",
-                    borderLeft:
-                      index > 0 ? `1.5px solid ${theme.palette.primary.main}` : undefined,
-                    color: theme.palette.primary.main,
-                    backgroundColor:
-                      tool.id === mode ? theme.palette.action.selected : "transparent",
-                  }}>
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      icon={ICON_NAME.GLOBE}
+      title={t("catalog_set_spatial_filter")}
+      subtitle={t("catalog_spatial_dialog_subtitle")}
+      maxWidth={900}
+      footer={
+        <AppDialogFooter
+          onCancel={onClose}
+          primaryLabel={t("apply")}
+          onPrimary={() => onApply(canApply ? draft : null)}
+          // Enabled when there is a shape to apply, or an existing filter that
+          // clearing the draft would remove.
+          primaryDisabled={!canApply && !initial}
+          extra={
+            <Button
+              onClick={() => setDraft(null)}
+              disabled={!draft}
+              startIcon={<Icon iconName={ICON_NAME.TRASH} style={{ fontSize: 13 }} />}>
+              {t("clear_all")}
+            </Button>
+          }
+        />
+      }>
+      <Stack spacing={4} sx={{ pt: 1 }}>
+        <Box>
+          <Typography variant="caption" fontWeight={600} color="text.secondary">
+            {t("catalog_location")}
+          </Typography>
+          <Autocomplete
+            size="small"
+            sx={{ mt: 1.5 }}
+            options={regions}
+            loading={isLoading}
+            inputValue={query}
+            onInputChange={(_event, value) => setQuery(value)}
+            onChange={(_event, region) => addRegion(region)}
+            // Selections are the chips below, so the input returns to empty.
+            value={null}
+            blurOnSelect
+            clearOnBlur
+            getOptionLabel={(option) => option.nuts_name}
+            isOptionEqualToValue={(a, b) => a.nuts_id === b.nuts_id}
+            // The API already ranked and limited these.
+            filterOptions={(options) => options}
+            getOptionDisabled={(option) => regionIds.includes(option.nuts_id)}
+            noOptionsText={query.length < 2 ? t("catalog_region_hint") : t("no_results")}
+            renderOption={(props, option) => (
+              <Box component="li" {...props} key={option.nuts_id}>
+                <Stack direction="row" spacing={2.5} alignItems="center">
                   <Icon
-                    iconName={tool.icon}
-                    style={{ fontSize: 15 }}
+                    iconName={ICON_NAME.LOCATION}
+                    style={{ fontSize: 14 }}
                     htmlColor={theme.palette.primary.main}
                   />
-                  {tool.label}
-                </Box>
+                  <Stack>
+                    <Typography variant="body2" fontWeight={600}>
+                      {option.nuts_name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {option.nuts_id}
+                      {LEVEL_LABEL_KEYS[option.level] ? ` · ${t(LEVEL_LABEL_KEYS[option.level])}` : ""}
+                    </Typography>
+                  </Stack>
+                </Stack>
+              </Box>
+            )}
+            renderInput={(params) => <TextField {...params} placeholder={t("catalog_search_region")} />}
+          />
+          {regionIds.length > 0 && (
+            <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ mt: 2 }}>
+              {regionIds.map((id) => (
+                <Chip
+                  key={id}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  label={(draft?.kind === "region" && draft.names?.[id]) || names[id] || id}
+                  onDelete={() => removeRegion(id)}
+                />
               ))}
             </Stack>
-          </Box>
-
-          {mode === "point" && (
-            <Box>
-              <Stack direction="row" alignItems="baseline" justifyContent="space-between">
-                <Typography variant="body2" fontWeight={600}>
-                  {t("catalog_buffer_radius")}
-                </Typography>
-                <Chip size="small" color="primary" label={formatBuffer(bufferKm)} />
-              </Stack>
-              <Slider
-                size="small"
-                value={bufferKm}
-                min={MIN_BUFFER_KM}
-                max={MAX_BUFFER_KM}
-                step={BUFFER_STEP_KM}
-                onChange={(_event, value) => setBufferKm(value as number)}
-                sx={{ mt: 1 }}
-              />
-            </Box>
           )}
+        </Box>
 
+        <Box>
+          <Typography variant="caption" fontWeight={600} color="text.secondary">
+            {t("catalog_selection_type")}
+          </Typography>
           <Stack
             direction="row"
-            spacing={2.5}
-            alignItems="center"
             sx={{
-              px: 3.5,
-              py: 2.5,
-              borderRadius: 2,
-              border: `1px solid ${theme.palette.divider}`,
-              backgroundColor: theme.palette.action.hover,
-            }}>
-            <Icon
-              iconName={ICON_NAME.CIRCLEINFO}
-              style={{ fontSize: 14 }}
-              htmlColor={theme.palette.primary.main}
-            />
-            <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-              {hint}
-            </Typography>
-            {mode === "polygon" && polygonVertices > 0 && (
-              <Button size="small" onClick={undoVertex}>
-                {t("undo")}
-              </Button>
-            )}
-          </Stack>
-
-          <Box
-            sx={{
-              height: 380,
-              borderRadius: 2,
+              mt: 1.5,
+              borderRadius: 2.5,
               overflow: "hidden",
-              border: `1px solid ${theme.palette.divider}`,
-              cursor: mode === "region" ? "grab" : "crosshair",
+              border: `1.5px solid ${theme.palette.primary.main}`,
             }}>
-            <MapLibre
-              // A distinct id, because this map can share a `MapProvider` with the
-              // project map (the Add Layer modal opens over it) and react-map-gl
-              // registers every id-less map as "default" — two of those is a crash.
-              id="catalog-spatial-dialog"
-              ref={mapRef}
-              initialViewState={initialViewState}
-              onClick={handleMapClick}
-              style={{ width: "100%", height: "100%" }}
-              mapStyle={basemapStyle}
-              // Ours replaces it, at the end of the map's children.
-              attributionControl={false}>
-              <Source id="spatial-draft" type="geojson" data={features}>
+            {(
+              [
+                { id: "region" as Mode, label: t("catalog_mode_region"), icon: ICON_NAME.GLOBE },
+                { id: "point" as Mode, label: t("catalog_mode_point"), icon: ICON_NAME.LOCATION },
+                {
+                  id: "polygon" as Mode,
+                  label: t("catalog_mode_polygon"),
+                  icon: ICON_NAME.POLYGON_FEATURE,
+                },
+              ] as const
+            ).map((tool, index) => (
+              <Box
+                key={tool.id}
+                component="button"
+                type="button"
+                onClick={() => switchMode(tool.id)}
+                sx={{
+                  flex: 1,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2.5,
+                  py: 3,
+                  px: 2.5,
+                  cursor: "pointer",
+                  font: "inherit",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  border: "none",
+                  borderLeft: index > 0 ? `1.5px solid ${theme.palette.primary.main}` : undefined,
+                  color: theme.palette.primary.main,
+                  backgroundColor: tool.id === mode ? theme.palette.action.selected : "transparent",
+                }}>
+                <Icon iconName={tool.icon} style={{ fontSize: 15 }} htmlColor={theme.palette.primary.main} />
+                {tool.label}
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+
+        {mode === "point" && (
+          <Box>
+            <Stack direction="row" alignItems="baseline" justifyContent="space-between">
+              <Typography variant="body2" fontWeight={600}>
+                {t("catalog_buffer_radius")}
+              </Typography>
+              <Chip size="small" color="primary" label={formatBuffer(bufferKm)} />
+            </Stack>
+            <Slider
+              size="small"
+              value={bufferKm}
+              min={MIN_BUFFER_KM}
+              max={MAX_BUFFER_KM}
+              step={BUFFER_STEP_KM}
+              onChange={(_event, value) => setBufferKm(value as number)}
+              sx={{ mt: 1 }}
+            />
+          </Box>
+        )}
+
+        <Stack
+          direction="row"
+          spacing={2.5}
+          alignItems="center"
+          sx={{
+            px: 3.5,
+            py: 2.5,
+            borderRadius: 2,
+            border: `1px solid ${theme.palette.divider}`,
+            backgroundColor: theme.palette.action.hover,
+          }}>
+          <Icon
+            iconName={ICON_NAME.CIRCLEINFO}
+            style={{ fontSize: 14 }}
+            htmlColor={theme.palette.primary.main}
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+            {hint}
+          </Typography>
+          {mode === "polygon" && polygonVertices > 0 && (
+            <Button size="small" onClick={undoVertex}>
+              {t("undo")}
+            </Button>
+          )}
+        </Stack>
+
+        <Box
+          sx={{
+            height: 380,
+            borderRadius: 2,
+            overflow: "hidden",
+            border: `1px solid ${theme.palette.divider}`,
+            cursor: mode === "region" ? "grab" : "crosshair",
+          }}>
+          <MapLibre
+            // A distinct id, because this map can share a `MapProvider` with the
+            // project map (the Add Layer modal opens over it) and react-map-gl
+            // registers every id-less map as "default" — two of those is a crash.
+            id="catalog-spatial-dialog"
+            ref={mapRef}
+            initialViewState={initialViewState}
+            onClick={handleMapClick}
+            style={{ width: "100%", height: "100%" }}
+            mapStyle={basemapStyle}
+            // Ours replaces it, at the end of the map's children.
+            attributionControl={false}>
+            <Source id="spatial-draft" type="geojson" data={features}>
+              <MapLayer
+                id="spatial-draft-fill"
+                type="fill"
+                paint={{ "fill-color": SHAPE_COLOR, "fill-opacity": 0.18 }}
+              />
+              <MapLayer
+                id="spatial-draft-line"
+                type="line"
+                paint={{
+                  "line-color": SHAPE_COLOR,
+                  "line-width": 2,
+                  // An open ring is dashed: it says "not finished" without a label.
+                  "line-dasharray": mode === "polygon" && polygonVertices < 3 ? [2, 1.5] : [1],
+                }}
+              />
+            </Source>
+            {draft?.kind === "polygon" && (
+              <Source
+                id="spatial-draft-vertices"
+                type="geojson"
+                data={{
+                  type: "FeatureCollection",
+                  features: draft.ring.map((position) => ({
+                    type: "Feature",
+                    geometry: { type: "Point", coordinates: position },
+                    properties: {},
+                  })),
+                }}>
                 <MapLayer
-                  id="spatial-draft-fill"
-                  type="fill"
-                  paint={{ "fill-color": SHAPE_COLOR, "fill-opacity": 0.18 }}
-                />
-                <MapLayer
-                  id="spatial-draft-line"
-                  type="line"
+                  id="spatial-draft-vertex"
+                  type="circle"
                   paint={{
-                    "line-color": SHAPE_COLOR,
-                    "line-width": 2,
-                    // An open ring is dashed: it says "not finished" without a label.
-                    "line-dasharray": mode === "polygon" && polygonVertices < 3 ? [2, 1.5] : [1],
+                    "circle-radius": 4,
+                    "circle-color": "#FFFFFF",
+                    "circle-stroke-color": SHAPE_COLOR,
+                    "circle-stroke-width": 2,
                   }}
                 />
               </Source>
-              {draft?.kind === "polygon" && (
-                <Source
-                  id="spatial-draft-vertices"
-                  type="geojson"
-                  data={{
-                    type: "FeatureCollection",
-                    features: draft.ring.map((position) => ({
-                      type: "Feature",
-                      geometry: { type: "Point", coordinates: position },
-                      properties: {},
-                    })),
-                  }}>
-                  <MapLayer
-                    id="spatial-draft-vertex"
-                    type="circle"
-                    paint={{
-                      "circle-radius": 4,
-                      "circle-color": "#FFFFFF",
-                      "circle-stroke-color": SHAPE_COLOR,
-                      "circle-stroke-width": 2,
-                    }}
-                  />
-                </Source>
-              )}
-              {draft?.kind === "point" && (
-                <Source
-                  id="spatial-draft-centre"
-                  type="geojson"
-                  data={{
-                    type: "Feature",
-                    geometry: { type: "Point", coordinates: [draft.lng, draft.lat] },
-                    properties: {},
-                  }}>
-                  <MapLayer
-                    id="spatial-draft-centre-dot"
-                    type="circle"
-                    paint={{
-                      "circle-radius": 5,
-                      "circle-color": SHAPE_COLOR,
-                      "circle-stroke-color": "#FFFFFF",
-                      "circle-stroke-width": 2,
-                    }}
-                  />
-                </Source>
-              )}
-              <CatalogMapAttribution />
-            </MapLibre>
-          </Box>
-        </Stack>
-      </DialogContent>
-
-      <DialogActions sx={{ px: 6, pb: 5 }}>
-        <Button
-          onClick={() => setDraft(null)}
-          disabled={!draft}
-          startIcon={<Icon iconName={ICON_NAME.TRASH} style={{ fontSize: 13 }} />}>
-          {t("clear_all")}
-        </Button>
-        <Box sx={{ flex: 1 }} />
-        <Button onClick={onClose} color="inherit">
-          {t("cancel")}
-        </Button>
-        {/* Applying an empty draft clears the filter, so the dialog is also how a filter is removed without hunting for the section's Clear link. */}
-        <Button
-          variant="contained"
-          // Enabled when there is a shape to apply, or an existing filter that
-          // clearing the draft would remove.
-          disabled={!canApply && !initial}
-          onClick={() => onApply(canApply ? draft : null)}>
-          {t("apply")}
-        </Button>
-      </DialogActions>
-    </Dialog>
+            )}
+            {draft?.kind === "point" && (
+              <Source
+                id="spatial-draft-centre"
+                type="geojson"
+                data={{
+                  type: "Feature",
+                  geometry: { type: "Point", coordinates: [draft.lng, draft.lat] },
+                  properties: {},
+                }}>
+                <MapLayer
+                  id="spatial-draft-centre-dot"
+                  type="circle"
+                  paint={{
+                    "circle-radius": 5,
+                    "circle-color": SHAPE_COLOR,
+                    "circle-stroke-color": "#FFFFFF",
+                    "circle-stroke-width": 2,
+                  }}
+                />
+              </Source>
+            )}
+            <DetailMapAttribution />
+          </MapLibre>
+        </Box>
+      </Stack>
+    </AppDialog>
   );
 };
 

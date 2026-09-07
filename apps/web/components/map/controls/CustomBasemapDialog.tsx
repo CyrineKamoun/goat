@@ -8,10 +8,6 @@ import {
   Button,
   CircularProgress,
   Collapse,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
   FormControlLabel,
   FormHelperText,
@@ -33,19 +29,22 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMap } from "react-map-gl/maplibre";
 
-import { Icon, ICON_NAME } from "@p4b/ui/components/Icon";
+import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { useAppDispatch } from "@/hooks/store/ContextHooks";
 import { setBasemapLayerConfigOverride } from "@/lib/store/map/slice";
-import WidgetColorPicker from "@/components/builder/widgets/common/WidgetColorPicker";
-import TextFieldInput from "@/components/map/panels/common/TextFieldInput";
-import { classifyBasemapLayers, resolveTarget, type BasemapCategory } from "@/lib/utils/map/basemapLayers";
+import { type BasemapCategory, classifyBasemapLayers, resolveTarget } from "@/lib/utils/map/basemapLayers";
 import {
-  customBasemapSchema,
   type BasemapLayerConfig,
   type BasemapLayerSetting,
   type CustomBasemap,
+  customBasemapSchema,
 } from "@/lib/validations/project";
+
+import { useAppDispatch } from "@/hooks/store/ContextHooks";
+
+import WidgetColorPicker from "@/components/builder/widgets/common/WidgetColorPicker";
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
+import TextFieldInput from "@/components/map/panels/common/TextFieldInput";
 
 type DraftType = "vector" | "raster" | "solid";
 
@@ -98,13 +97,28 @@ const CATEGORY_ORDER: BasemapCategory[] = [
 // Per-category accent color + icon (project icons where available, MUI fallback
 // for water/land use). Rendered in a soft colored square next to the title.
 const CATEGORY_META: Record<BasemapCategory, { color: string; icon: React.ReactNode }> = {
-  labels: { color: "#3b82f6", icon: <Icon iconName={ICON_NAME.TEXT} fontSize="inherit" htmlColor="inherit" /> },
-  roads: { color: "#f59e0b", icon: <Icon iconName={ICON_NAME.STREET_NETWORK} fontSize="inherit" htmlColor="inherit" /> },
+  labels: {
+    color: "#3b82f6",
+    icon: <Icon iconName={ICON_NAME.TEXT} fontSize="inherit" htmlColor="inherit" />,
+  },
+  roads: {
+    color: "#f59e0b",
+    icon: <Icon iconName={ICON_NAME.STREET_NETWORK} fontSize="inherit" htmlColor="inherit" />,
+  },
   water: { color: "#06b6d4", icon: <WaterIcon sx={{ fontSize: 16 }} /> },
   landuse: { color: "#22c55e", icon: <ParkIcon sx={{ fontSize: 16 }} /> },
-  buildings: { color: "#8b5cf6", icon: <Icon iconName={ICON_NAME.HOUSE} fontSize="inherit" htmlColor="inherit" /> },
-  poi: { color: "#ef4444", icon: <Icon iconName={ICON_NAME.LOCATION_MARKER} fontSize="inherit" htmlColor="inherit" /> },
-  other: { color: "#94a3b8", icon: <Icon iconName={ICON_NAME.LAYERS} fontSize="inherit" htmlColor="inherit" /> },
+  buildings: {
+    color: "#8b5cf6",
+    icon: <Icon iconName={ICON_NAME.HOUSE} fontSize="inherit" htmlColor="inherit" />,
+  },
+  poi: {
+    color: "#ef4444",
+    icon: <Icon iconName={ICON_NAME.LOCATION_MARKER} fontSize="inherit" htmlColor="inherit" />,
+  },
+  other: {
+    color: "#94a3b8",
+    icon: <Icon iconName={ICON_NAME.LAYERS} fontSize="inherit" htmlColor="inherit" />,
+  },
 };
 
 function CategoryIcon({ category }: { category: BasemapCategory }) {
@@ -170,8 +184,7 @@ const TargetSelect = memo(function TargetSelect({
       ? "—"
       : value === "all"
         ? t("basemap_layer_all_my_layers")
-        : ((projectLayers ?? []).find((l) => String(l.id) === value)?.name ??
-          t("untitled_layer"));
+        : ((projectLayers ?? []).find((l) => String(l.id) === value)?.name ?? t("untitled_layer"));
 
   return (
     <Select
@@ -236,11 +249,7 @@ const LayerControls = memo(function LayerControls({
   const hasOverride = settings.some((s) => !isDefaultSetting(s));
 
   return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      spacing={1}
-      sx={{ ml: "auto", flexShrink: 0 }}>
+    <Stack direction="row" alignItems="center" spacing={1} sx={{ ml: "auto", flexShrink: 0 }}>
       {hidden ? (
         <Typography
           variant="body2"
@@ -303,18 +312,10 @@ const LayerControls = memo(function LayerControls({
   );
 });
 
-export function CustomBasemapDialog({
-  open,
-  initial,
-  onClose,
-  onSubmit,
-  onDelete,
-  projectLayers,
-}: Props) {
+export function CustomBasemapDialog({ open, initial, onClose, onSubmit, onDelete, projectLayers }: Props) {
   const { t } = useTranslation("common");
 
-  const initialTab: "basemap" | "solid" | "layers" =
-    initial?.type === "solid" ? "solid" : "basemap";
+  const initialTab: "basemap" | "solid" | "layers" = initial?.type === "solid" ? "solid" : "basemap";
   const initialKind: DraftType = initial?.type ?? "vector";
 
   const [tab, setTab] = useState<"basemap" | "solid" | "layers">(initialTab);
@@ -322,21 +323,15 @@ export function CustomBasemapDialog({
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [thumbnailUrl, setThumbnailUrl] = useState(initial?.thumbnail_url ?? "");
-  const [url, setUrl] = useState(
-    initial && initial.type !== "solid" ? initial.url : ""
-  );
+  const [url, setUrl] = useState(initial && initial.type !== "solid" ? initial.url : "");
   const [attribution, setAttribution] = useState(initial?.attribution ?? "");
-  const [color, setColor] = useState(
-    initial?.type === "solid" ? initial.color : "#888888"
-  );
+  const [color, setColor] = useState(initial?.type === "solid" ? initial.color : "#888888");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [layerConfig, setLayerConfig] = useState<BasemapLayerConfig>(() =>
     initial?.type === "vector" ? (initial.layer_config ?? {}) : {}
   );
-  const [expandedCategories, setExpandedCategories] = useState<Set<BasemapCategory>>(
-    new Set()
-  );
+  const [expandedCategories, setExpandedCategories] = useState<Set<BasemapCategory>>(new Set());
 
   // Signature of the basemap's style-layer SET (sorted ids). Used to reclassify
   // only when the layer set changes (basemap switch / ephemeral-preview load),
@@ -362,10 +357,7 @@ export function CustomBasemapDialog({
   }, [open, initial]);
 
   const placeholder = useMemo(
-    () =>
-      kind === "vector"
-        ? "https://example.com/style.json"
-        : "https://example.com/{z}/{x}/{y}.png",
+    () => (kind === "vector" ? "https://example.com/style.json" : "https://example.com/{z}/{x}/{y}.png"),
     [kind]
   );
 
@@ -427,9 +419,7 @@ export function CustomBasemapDialog({
     // A project layer's style id is its numeric id; its sublayers share its source.
     const projectIds = new Set((projectLayers ?? []).map((l) => String(l.id)));
     const projectSources = new Set(
-      styleLayers
-        .filter((l) => projectIds.has(l.id) && "source" in l)
-        .map((l) => l.source)
+      styleLayers.filter((l) => projectIds.has(l.id) && "source" in l).map((l) => l.source)
     );
     const basemapOnly = styleLayers.filter(
       (l) => !projectIds.has(l.id) && !("source" in l && projectSources.has(l.source))
@@ -447,9 +437,7 @@ export function CustomBasemapDialog({
         acc[cat] = basemapLayerInfos.filter(
           (info) =>
             info.category === cat &&
-            (!q ||
-              info.prettyName.toLowerCase().includes(q) ||
-              info.id.toLowerCase().includes(q))
+            (!q || info.prettyName.toLowerCase().includes(q) || info.id.toLowerCase().includes(q))
         );
         return acc;
       },
@@ -575,22 +563,57 @@ export function CustomBasemapDialog({
   };
 
   return (
-    <Dialog open={open} onClose={handleCancel} fullWidth maxWidth="sm">
-      <DialogTitle>{initial ? t("edit_basemap") : t("add_basemap")}</DialogTitle>
-      <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)}>
+    <AppDialog
+      open={open}
+      onClose={handleCancel}
+      icon={ICON_NAME.MAP}
+      title={initial ? t("edit_basemap") : t("add_basemap")}
+      maxWidth={600}
+      // The body lays out its own insets: the tab bar and each panel state
+      // the dialog-body padding themselves, so the tab rule can span the frame.
+      bleed
+      bodySx={{ display: "flex", flexDirection: "column", overflow: "hidden" }}
+      footer={
+        <AppDialogFooter
+          extra={
+            initial && onDelete ? (
+              <Button
+                onClick={async () => {
+                  try {
+                    setSubmitting(true);
+                    await onDelete();
+                    onClose();
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                variant="text"
+                color="error"
+                disabled={submitting}>
+                <Typography variant="body2" fontWeight="bold" color="inherit">
+                  {t("delete")}
+                </Typography>
+              </Button>
+            ) : undefined
+          }
+          onCancel={handleCancel}
+          primaryLabel={initial ? t("save") : t("add_basemap")}
+          onPrimary={() => void handleSubmit()}
+          primaryDisabled={submitting}
+        />
+      }>
+      <Box sx={{ borderBottom: 1, borderColor: "divider", flexShrink: 0 }}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 6 }}>
           <Tab value="basemap" label={t("basemap_tab_label")} />
           <Tab value="solid" label={t("solid_color")} />
-          {initial?.type === "vector" && (
-            <Tab value="layers" label={t("basemap_layers_tab")} />
-          )}
+          {initial?.type === "vector" && <Tab value="layers" label={t("basemap_layers_tab")} />}
         </Tabs>
       </Box>
-      <DialogContent
+      <Box
         sx={
           tab === "layers"
-            ? { p: 0, display: "flex", flexDirection: "column", overflow: "hidden" }
-            : { pt: 3 }
+            ? { display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }
+            : { px: 6, pt: 3, pb: 5, overflowY: "auto" }
         }>
         {tab === "basemap" && (
           <Stack spacing={2}>
@@ -599,16 +622,8 @@ export function CustomBasemapDialog({
               value={kind}
               onChange={(_, v) => setKind(v as DraftType)}
               sx={{ "& .MuiFormControlLabel-label": { fontSize: "0.8125rem" } }}>
-              <FormControlLabel
-                value="vector"
-                control={<Radio size="small" />}
-                label={t("vector_style")}
-              />
-              <FormControlLabel
-                value="raster"
-                control={<Radio size="small" />}
-                label={t("raster_tiles")}
-              />
+              <FormControlLabel value="vector" control={<Radio size="small" />} label={t("vector_style")} />
+              <FormControlLabel value="raster" control={<Radio size="small" />} label={t("raster_tiles")} />
             </RadioGroup>
             <TextFieldInput
               label={t("basemap_url")}
@@ -622,11 +637,7 @@ export function CustomBasemapDialog({
               </Typography>
             )}
             <TextFieldInput label={t("title")} value={name} onChange={setName} />
-            <TextFieldInput
-              label={t("attribution")}
-              value={attribution}
-              onChange={setAttribution}
-            />
+            <TextFieldInput label={t("attribution")} value={attribution} onChange={setAttribution} />
             <TextFieldInput
               label={t("short_description")}
               value={description}
@@ -646,11 +657,7 @@ export function CustomBasemapDialog({
           <Stack spacing={2}>
             <WidgetColorPicker label={t("color")} color={color} onChange={setColor} />
             <TextFieldInput label={t("title")} value={name} onChange={setName} />
-            <TextFieldInput
-              label={t("attribution")}
-              value={attribution}
-              onChange={setAttribution}
-            />
+            <TextFieldInput label={t("attribution")} value={attribution} onChange={setAttribution} />
             <TextFieldInput
               label={t("short_description")}
               value={description}
@@ -678,11 +685,7 @@ export function CustomBasemapDialog({
                 borderBottom: 1,
                 borderColor: "divider",
               }}>
-              <Stack
-                direction="row"
-                alignItems="flex-start"
-                justifyContent="space-between"
-                sx={{ mb: 1 }}>
+              <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 1 }}>
                 <Typography variant="body2" color="text.secondary" sx={{ flex: 1, pr: 2 }}>
                   {t("basemap_layers_description")}
                 </Typography>
@@ -714,140 +717,137 @@ export function CustomBasemapDialog({
 
             {/* Scrolling body: only this area shows the vertical scrollbar */}
             <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-            {styleLoading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-                <CircularProgress size={32} />
-              </Box>
-            ) : (
-              <Box sx={{ pb: 1 }}>
-                {CATEGORY_ORDER.map((cat) => {
-                  const infos = layersByCategory[cat];
-                  if (!infos || infos.length === 0) return null;
-                  const catIds = infos.map((i) => i.id);
-                  const isExpanded = expandedCategories.has(cat) || hasSearch;
-                  const catTitle = t(`basemap_layer_categories.${cat}.title`);
-                  const catSubtitle = t(`basemap_layer_categories.${cat}.subtitle`);
-                  const catHidden = catIds.every((id) => !settingFor(id).visible);
-                  const catVisible = catIds.filter((id) => settingFor(id).visible).length;
+              {styleLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                  <CircularProgress size={32} />
+                </Box>
+              ) : (
+                <Box sx={{ pb: 1 }}>
+                  {CATEGORY_ORDER.map((cat) => {
+                    const infos = layersByCategory[cat];
+                    if (!infos || infos.length === 0) return null;
+                    const catIds = infos.map((i) => i.id);
+                    const isExpanded = expandedCategories.has(cat) || hasSearch;
+                    const catTitle = t(`basemap_layer_categories.${cat}.title`);
+                    const catSubtitle = t(`basemap_layer_categories.${cat}.subtitle`);
+                    const catHidden = catIds.every((id) => !settingFor(id).visible);
+                    const catVisible = catIds.filter((id) => settingFor(id).visible).length;
 
-                  return (
-                    <Box key={cat}>
-                      <Divider />
-                      <Box sx={{ px: 2.5, py: 0.5 }}>
-                        {/* Category header row */}
-                        <Stack direction="row" alignItems="center" spacing={1.75}>
-                          <IconButton
-                            size="small"
-                            onClick={() => toggleCategory(cat)}
-                            sx={{ flexShrink: 0 }}>
-                            {isExpanded ? (
-                              <ExpandLessIcon fontSize="small" />
-                            ) : (
-                              <ExpandMoreIcon fontSize="small" />
-                            )}
-                          </IconButton>
-                          <Box sx={{ opacity: catHidden ? 0.5 : 1 }}>
-                            <CategoryIcon category={cat} />
-                          </Box>
-                          <Box sx={{ flex: 1, minWidth: 0, opacity: catHidden ? 0.5 : 1 }}>
-                            <Typography
-                              variant="body2"
-                              fontWeight="medium"
-                              noWrap
-                              color={catHidden ? "text.disabled" : undefined}
-                              sx={{ lineHeight: 1.3 }}>
-                              {catTitle}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              noWrap
-                              sx={{ display: "block", lineHeight: 1.2 }}>
-                              {catSubtitle} · {catVisible}/{infos.length}
-                            </Typography>
-                          </Box>
-                          <LayerControls
-                            ids={catIds}
-                            settingFor={settingFor}
-                            displayTarget={displayTarget}
-                            setSetting={setSetting}
-                            projectLayers={projectLayers}
-                            t={t}
-                          />
-                        </Stack>
-
-                        {/* Per-layer rows — tree line follows the children */}
-                        <Collapse in={isExpanded} unmountOnExit>
-                          <Stack
-                            spacing={0.5}
-                            sx={{
-                              mt: 0.5,
-                              ml: 2,
-                              pl: 3,
-                              borderLeft: "1px solid",
-                              borderColor: "divider",
-                            }}>
-                            {infos.map((info) => {
-                              const layerHidden = !settingFor(info.id).visible;
-                              return (
-                              <Stack
-                                key={info.id}
-                                direction="row"
-                                alignItems="center"
-                                spacing={1}
-                                sx={{
-                                  py: 0.25,
-                                  position: "relative",
-                                  // Horizontal connector from the vertical tree line to the row.
-                                  "&::before": {
-                                    content: '""',
-                                    position: "absolute",
-                                    left: (theme) => `-${theme.spacing(3)}`,
-                                    width: (theme) => theme.spacing(2),
-                                    top: "50%",
-                                    borderTop: "1px solid",
-                                    borderColor: "divider",
-                                  },
-                                }}>
-                                <Tooltip title={info.id} placement="top-start" enterDelay={400}>
-                                  <Box sx={{ flex: 1, minWidth: 0, pr: 1 }}>
-                                    <Typography
-                                      variant="body2"
-                                      noWrap
-                                      color={layerHidden ? "text.disabled" : undefined}>
-                                      {info.prettyName}
-                                    </Typography>
-                                  </Box>
-                                </Tooltip>
-                                <LayerControls
-                                  ids={[info.id]}
-                                  compact
-                                  settingFor={settingFor}
-                                  displayTarget={displayTarget}
-                                  setSetting={setSetting}
-                                  projectLayers={projectLayers}
-                                  t={t}
-                                />
-                              </Stack>
-                              );
-                            })}
+                    return (
+                      <Box key={cat}>
+                        <Divider />
+                        <Box sx={{ px: 2.5, py: 0.5 }}>
+                          {/* Category header row */}
+                          <Stack direction="row" alignItems="center" spacing={1.75}>
+                            <IconButton
+                              size="small"
+                              onClick={() => toggleCategory(cat)}
+                              sx={{ flexShrink: 0 }}>
+                              {isExpanded ? (
+                                <ExpandLessIcon fontSize="small" />
+                              ) : (
+                                <ExpandMoreIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                            <Box sx={{ opacity: catHidden ? 0.5 : 1 }}>
+                              <CategoryIcon category={cat} />
+                            </Box>
+                            <Box sx={{ flex: 1, minWidth: 0, opacity: catHidden ? 0.5 : 1 }}>
+                              <Typography
+                                variant="body2"
+                                fontWeight="medium"
+                                noWrap
+                                color={catHidden ? "text.disabled" : undefined}
+                                sx={{ lineHeight: 1.3 }}>
+                                {catTitle}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                noWrap
+                                sx={{ display: "block", lineHeight: 1.2 }}>
+                                {catSubtitle} · {catVisible}/{infos.length}
+                              </Typography>
+                            </Box>
+                            <LayerControls
+                              ids={catIds}
+                              settingFor={settingFor}
+                              displayTarget={displayTarget}
+                              setSetting={setSetting}
+                              projectLayers={projectLayers}
+                              t={t}
+                            />
                           </Stack>
-                        </Collapse>
-                      </Box>
-                    </Box>
-                  );
-                })}
 
-                {!hasVisibleLayers && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ textAlign: "center", py: 4 }}>
-                    {hasSearch ? t("basemap_layer_no_matches") : t("basemap_layer_no_layers")}
-                  </Typography>
-                )}
-              </Box>
-            )}
+                          {/* Per-layer rows — tree line follows the children */}
+                          <Collapse in={isExpanded} unmountOnExit>
+                            <Stack
+                              spacing={0.5}
+                              sx={{
+                                mt: 0.5,
+                                ml: 2,
+                                pl: 3,
+                                borderLeft: "1px solid",
+                                borderColor: "divider",
+                              }}>
+                              {infos.map((info) => {
+                                const layerHidden = !settingFor(info.id).visible;
+                                return (
+                                  <Stack
+                                    key={info.id}
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={1}
+                                    sx={{
+                                      py: 0.25,
+                                      position: "relative",
+                                      // Horizontal connector from the vertical tree line to the row.
+                                      "&::before": {
+                                        content: '""',
+                                        position: "absolute",
+                                        left: (theme) => `-${theme.spacing(3)}`,
+                                        width: (theme) => theme.spacing(2),
+                                        top: "50%",
+                                        borderTop: "1px solid",
+                                        borderColor: "divider",
+                                      },
+                                    }}>
+                                    <Tooltip title={info.id} placement="top-start" enterDelay={400}>
+                                      <Box sx={{ flex: 1, minWidth: 0, pr: 1 }}>
+                                        <Typography
+                                          variant="body2"
+                                          noWrap
+                                          color={layerHidden ? "text.disabled" : undefined}>
+                                          {info.prettyName}
+                                        </Typography>
+                                      </Box>
+                                    </Tooltip>
+                                    <LayerControls
+                                      ids={[info.id]}
+                                      compact
+                                      settingFor={settingFor}
+                                      displayTarget={displayTarget}
+                                      setSetting={setSetting}
+                                      projectLayers={projectLayers}
+                                      t={t}
+                                    />
+                                  </Stack>
+                                );
+                              })}
+                            </Stack>
+                          </Collapse>
+                        </Box>
+                      </Box>
+                    );
+                  })}
+
+                  {!hasVisibleLayers && (
+                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 4 }}>
+                      {hasSearch ? t("basemap_layer_no_matches") : t("basemap_layer_no_layers")}
+                    </Typography>
+                  )}
+                </Box>
+              )}
             </Box>
           </Box>
         )}
@@ -857,48 +857,7 @@ export function CustomBasemapDialog({
             {error}
           </FormHelperText>
         )}
-      </DialogContent>
-      <DialogActions disableSpacing sx={{ pb: 2, px: 2, justifyContent: "space-between" }}>
-        <Box>
-          {initial && onDelete && (
-            <Button
-              onClick={async () => {
-                try {
-                  setSubmitting(true);
-                  await onDelete();
-                  onClose();
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
-              variant="text"
-              color="error"
-              disabled={submitting}
-              sx={{ borderRadius: 0 }}>
-              <Typography variant="body2" fontWeight="bold" color="inherit">
-                {t("delete")}
-              </Typography>
-            </Button>
-          )}
-        </Box>
-        <Box sx={{ display: "flex" }}>
-          <Button onClick={handleCancel} variant="text" sx={{ borderRadius: 0 }}>
-            <Typography variant="body2" fontWeight="bold">
-              {t("cancel")}
-            </Typography>
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            variant="text"
-            color="primary"
-            disabled={submitting}
-            sx={{ borderRadius: 0 }}>
-            <Typography variant="body2" fontWeight="bold" color="inherit">
-              {initial ? t("save") : t("add_basemap")}
-            </Typography>
-          </Button>
-        </Box>
-      </DialogActions>
-    </Dialog>
+      </Box>
+    </AppDialog>
   );
 }

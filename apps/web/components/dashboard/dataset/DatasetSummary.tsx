@@ -1,15 +1,14 @@
-import { Box, Divider, Stack, Typography, styled, useTheme } from "@mui/material";
+import { Divider, Stack, Typography, styled, useTheme } from "@mui/material";
 import React from "react";
 import { useTranslation } from "react-i18next";
-import ReactMarkdown from "react-markdown";
 
 import { Icon } from "@p4b/ui/components/Icon";
 
+import { METADATA_HEADER_ICONS } from "@/lib/constants/metadataIcons";
 import type { Layer } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
 
-
-import { METADATA_HEADER_ICONS } from "@/lib/constants/metadataIcons";
+import MarkdownProse from "@/components/dashboard/common/MarkdownProse";
 
 interface DatasetSummaryProps {
   dataset: Layer | ProjectLayer;
@@ -51,33 +50,6 @@ const MainContentSection = styled("div")({
     flex: "1 1 100%",
   },
 });
-
-/**
- * Markdown at the app's text scale.
- *
- * `ReactMarkdown` emits plain `<p>`/`<ul>`/`<a>`, which inherit the document's
- * 16px rather than the 14px every other value here is set in — a description
- * and the publisher beside it rendered at two different sizes. `anywhere` is
- * what actually breaks the long unbroken strings these records carry: a
- * slash-joined authority name ("…/Tiefbauamt/Leitung/Dokumentation") or a bare
- * URL has no space to wrap at, so the panel scrolled sideways.
- */
-const PROSE_SX = {
-  overflowWrap: "anywhere",
-  typography: "body2",
-  /**
-   * Providers indent lines in their records, and CommonMark reads four spaces
-   * or a tab as an indented code block — so a paragraph of ordinary prose
-   * arrives as `<pre>`, which does not wrap at all. One harvested description
-   * in a thousand does this, and it scrolled the whole panel sideways.
-   * De-indenting the source instead would flatten the nested lists that make
-   * up most of the other cases.
-   */
-  "& pre": { whiteSpace: "pre-wrap", overflowWrap: "anywhere" },
-  "& :first-of-type": { marginTop: 0 },
-  "& :last-child": { marginBottom: 0 },
-  "& img": { maxWidth: "100%" },
-} as const;
 
 /** What the sidebar tiles summarise: the catalog record's own field names, each
  * paired with the key our translations and icons are filed under. */
@@ -151,29 +123,7 @@ const DatasetSummary: React.FC<DatasetSummaryProps> = ({
                       </Typography>
                     )}
                     {type === "markdown" && valueOf(field) && (
-                      <Box sx={PROSE_SX}>
-                        <ReactMarkdown
-                          components={{
-                            img: ({ node: _, ...props }) => {
-                              const hasSize =
-                                props.width !== undefined ||
-                                props.height !== undefined ||
-                                (props.style && (props.style.width || props.style.height));
-
-                              const style = hasSize ? props.style : { width: "100%" };
-
-                              // eslint-disable-next-line jsx-a11y/alt-text
-                              return <img {...props} style={style} />;
-                            },
-                            a: ({ node: _, href, children, ...props }) => (
-                              <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
-                                {children}
-                              </a>
-                            ),
-                          }}>
-                          {valueOf(field)}
-                        </ReactMarkdown>
-                      </Box>
+                      <MarkdownProse>{valueOf(field) as string}</MarkdownProse>
                     )}
                     {type === "text" && valueOf(field) && (
                       <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>

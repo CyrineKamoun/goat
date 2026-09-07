@@ -1,9 +1,8 @@
 "use client";
 
-import { Add as AddIcon, AccountTree as WorkflowIcon } from "@mui/icons-material";
+import { AccountTree as WorkflowIcon } from "@mui/icons-material";
 import {
   Box,
-  Button,
   CircularProgress,
   Divider,
   IconButton,
@@ -19,6 +18,7 @@ import {
 import { styled } from "@mui/material/styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
+import { toast } from "react-toastify";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
@@ -30,15 +30,20 @@ import {
   useWorkflows,
 } from "@/lib/api/workflows";
 import type { Project, ProjectLayer, ProjectLayerGroup } from "@/lib/validations/project";
+import type { TemplateRead, TemplateUseResult } from "@/lib/validations/template";
 import { createEmptyWorkflowConfig } from "@/lib/validations/workflow";
 import type { Workflow } from "@/lib/validations/workflow";
 
+import NewMenuButton from "@/components/common/NewMenuButton";
 import MoreMenu from "@/components/common/PopperMenu";
 import type { PopperMenuItem } from "@/components/common/PopperMenu";
 import { SIDE_PANEL_WIDTH, SidePanelContainer } from "@/components/common/SidePanel";
 import { AddLayerButton, ProjectLayerTree } from "@/components/map/panels/layer/ProjectLayerTree";
 import ConfirmModal from "@/components/modals/Confirm";
 import WorkflowRenameModal from "@/components/modals/WorkflowRename";
+import SaveTemplateDialog from "@/components/templates/SaveTemplateDialog";
+import TemplateBrowser from "@/components/templates/TemplateBrowser";
+import UseTemplateFlow from "@/components/templates/UseTemplateFlow";
 
 const PanelContainer = styled(SidePanelContainer)(({ theme }) => ({
   width: SIDE_PANEL_WIDTH,
@@ -90,6 +95,13 @@ const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
   const [actionWorkflowId, setActionWorkflowId] = useState<string | null>(null);
   const [actionWorkflowName, setActionWorkflowName] = useState<string>("");
 
+  // Template entry points (T7/T8): "Add workflow"'s split arrow menu opens the
+  // browser, whose pick hands off to UseTemplateFlow; the kebab's "Save as
+  // template" opens SaveTemplateDialog for the clicked workflow.
+  const [templateBrowserOpen, setTemplateBrowserOpen] = useState(false);
+  const [templateForFlow, setTemplateForFlow] = useState<TemplateRead | null>(null);
+  const [templateSaveWorkflow, setTemplateSaveWorkflow] = useState<Workflow | null>(null);
+
   // Sync selected workflow with parent - only when ID actually changes
   useEffect(() => {
     // Only notify parent if the workflow ID has actually changed
@@ -137,6 +149,23 @@ const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
       setIsCreating(false);
     }
   }, [project?.id, t, workflows?.length, mutate]);
+
+  // A template picked from the browser hands off to UseTemplateFlow, which
+  // inserts the workflow into this project and marks unresolved inputs on
+  // the canvas (T7).
+  const handleUseTemplate = useCallback((template: TemplateRead) => {
+    setTemplateBrowserOpen(false);
+    setTemplateForFlow(template);
+  }, []);
+
+  const handleTemplateFlowDone = useCallback(
+    async (result: TemplateUseResult) => {
+      setTemplateForFlow(null);
+      await mutate();
+      if (result.workflow_id) setSelectedWorkflowId(result.workflow_id);
+    },
+    [mutate]
+  );
 
   // Handle duplicate workflow
   const handleDuplicateWorkflow = useCallback(
@@ -216,6 +245,12 @@ const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
         onClick: () => handleDuplicateWorkflow(workflow.id),
       },
       {
+        id: "save_as_template",
+        label: t("save_as_template"),
+        icon: ICON_NAME.SAVE,
+        onClick: () => setTemplateSaveWorkflow(workflow),
+      },
+      {
         id: "delete",
         label: t("delete"),
         icon: ICON_NAME.TRASH,
@@ -250,15 +285,24 @@ const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
           <Typography variant="subtitle1" fontWeight={600}>
             {t("workflows")}
           </Typography>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={isCreating ? <CircularProgress size={16} color="inherit" /> : <AddIcon />}
-            onClick={handleCreateWorkflow}
-            disabled={isCreating || !project?.id}
-            sx={{ textTransform: "none" }}>
-            {t("add_workflow")}
-          </Button>
+          <NewMenuButton
+            disabled={!project?.id}
+            loading={isCreating}
+            items={[
+              {
+                key: "blank",
+                label: t("from_scratch"),
+                icon: ICON_NAME.WORKFLOW,
+                onSelect: handleCreateWorkflow,
+              },
+              {
+                key: "template",
+                label: t("from_template"),
+                icon: ICON_NAME.CLONE,
+                onSelect: () => setTemplateBrowserOpen(true),
+              },
+            ]}
+          />
         </Stack>
 
         {/* Workflows List - Scrollable */}
@@ -295,7 +339,7 @@ const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
                       disablePortal={false}
                       menuButton={
                         <Tooltip title={t("more_options")} placement="top">
-                          <IconButton edge="end" size="small">
+                          <IconButton edge="end" size="small" aria-label={t("more_options")}>
                             <Icon iconName={ICON_NAME.MORE_VERT} style={{ fontSize: "15px" }} />
                           </IconButton>
                         </Tooltip>
@@ -405,6 +449,42 @@ const WorkflowsConfigPanel: React.FC<WorkflowsConfigPanelProps> = ({
         }}
         onRename={handleRenameWorkflow}
       />
+
+      {/* Template Browser — "Add workflow"'s split arrow menu. Mounted only
+       * while open, so its template/space/pin requests don't run on every
+       * panel mount. */}
+      {templateBrowserOpen && (
+        <TemplateBrowser
+          mode="dialog"
+          open
+          onClose={() => setTemplateBrowserOpen(false)}
+          lockedKind="workflow"
+          onUse={handleUseTemplate}
+        />
+      )}
+
+      {/* Inserts the picked template's workflow into this project */}
+      {templateForFlow && project?.id && (
+        <UseTemplateFlow
+          template={templateForFlow}
+          context={{ kind: "in_project", projectId: project.id }}
+          onClose={() => setTemplateForFlow(null)}
+          onDone={handleTemplateFlowDone}
+        />
+      )}
+
+      {/* Kebab "Save as template" */}
+      {templateSaveWorkflow && project?.id && (
+        <SaveTemplateDialog
+          source={{ kind: "workflow", project_id: project.id, workflow_id: templateSaveWorkflow.id }}
+          defaultName={templateSaveWorkflow.name}
+          onClose={() => setTemplateSaveWorkflow(null)}
+          onSaved={(savedTemplate) => {
+            setTemplateSaveWorkflow(null);
+            toast.success(t("template_saved_as", { name: savedTemplate.name }));
+          }}
+        />
+      )}
     </PanelContainer>
   );
 };

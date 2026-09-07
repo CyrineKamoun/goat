@@ -13,6 +13,16 @@ export enum ContentActions {
   DELETE = "delete",
   TABLE = "table",
   UPDATE = "update",
+  OPEN = "open",
+  DETAILS = "details",
+  MOVE = "move",
+  RENAME = "rename",
+  TRANSFER = "transfer",
+  USE_TEMPLATE = "useTemplate",
+  UPDATE_TEMPLATE_FROM_SOURCE = "updateTemplateFromSource",
+  REGENERATE_THUMBNAIL = "regenerateThumbnail",
+  PUBLISH_TO_GOAT_CATALOG = "publishToGoatCatalog",
+  UNPUBLISH_FROM_GOAT_CATALOG = "unpublishFromGoatCatalog",
 }
 
 export enum MapLayerActions {
@@ -53,9 +63,3 @@ export type ResponseResult = {
   message: string;
   status?: "error" | "success";
 };
-
-/** The one source still handed off by name; the rest of the Add Layer flow is
- * driven by `components/addLayer/sources.ts`. */
-export enum AddLayerSourceType {
-  DatasourceExplorer,
-}

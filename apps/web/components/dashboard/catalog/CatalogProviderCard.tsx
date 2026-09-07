@@ -7,7 +7,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import type { CatalogCollection } from "@/lib/validations/catalog";
 
-import { SectionCard } from "@/components/dashboard/catalog/CatalogDetailChrome";
+import { SectionCard } from "@/components/dashboard/common/DetailChrome";
 
 /** Who produced the dataset, and where its own metadata record lives. */
 const CatalogProviderCard = ({
@@ -22,8 +22,7 @@ const CatalogProviderCard = ({
   const { t } = useTranslation("common");
   const theme = useTheme();
 
-  const producer =
-    providers?.find((provider) => provider.roles?.includes("producer")) ?? providers?.[0];
+  const producer = providers?.find((provider) => provider.roles?.includes("producer")) ?? providers?.[0];
   const name = producer?.name ?? publisher;
   if (!name) return null;
 
@@ -60,9 +59,7 @@ const CatalogProviderCard = ({
                 {name}
               </MuiLink>
             ) : (
-              <Typography sx={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}>
-                {name}
-              </Typography>
+              <Typography sx={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}>{name}</Typography>
             )}
             {/* The provider's own description often carries the contact address, which is the only route to a correction. */}
             {producer?.description && (

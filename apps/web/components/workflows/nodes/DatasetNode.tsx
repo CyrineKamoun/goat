@@ -6,7 +6,7 @@ import {
   ContentCopy as DuplicateIcon,
   FilterAlt as FilterIcon,
 } from "@mui/icons-material";
-import { Box, IconButton, Stack, Tooltip, Typography } from "@mui/material";
+import { Box, Button, IconButton, Stack, Tooltip, Typography } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { Handle, type NodeProps, NodeToolbar, Position } from "@xyflow/react";
 import { useParams } from "next/navigation";
@@ -21,7 +21,7 @@ import { useDatasetCollectionItems } from "@/lib/api/layers";
 import { useProjectLayers } from "@/lib/api/projects";
 import type { AppDispatch } from "@/lib/store";
 import { selectNodes } from "@/lib/store/workflow/selectors";
-import { addNode, removeNodes } from "@/lib/store/workflow/slice";
+import { addNode, removeNodes, selectNode } from "@/lib/store/workflow/slice";
 import { createTheCQLBasedOnExpression } from "@/lib/transformers/filter";
 import type { Expression } from "@/lib/validations/filter";
 import type { DatasetNodeData } from "@/lib/validations/workflow";
@@ -29,15 +29,17 @@ import type { DatasetNodeData } from "@/lib/validations/workflow";
 import useLayerFields from "@/hooks/map/CommonHooks";
 
 import { useWorkflowExecutionContext } from "../context/WorkflowExecutionContext";
-import { NodeParamsSection, IconStatusBadge } from "./shared";
+import { IconStatusBadge, NodeParamsSection } from "./shared";
 
 const NodeContainer = styled(Box, {
-  shouldForwardProp: (prop) => prop !== "selected",
-})<{ selected?: boolean }>(({ theme, selected }) => ({
+  shouldForwardProp: (prop) => prop !== "selected" && prop !== "unresolved",
+})<{ selected?: boolean; unresolved?: boolean }>(({ theme, selected, unresolved }) => ({
   padding: theme.spacing(1.5),
   borderRadius: theme.shape.borderRadius,
   backgroundColor: theme.palette.background.paper,
-  border: `2px solid ${selected ? theme.palette.primary.main : theme.palette.divider}`,
+  border: `2px solid ${
+    selected ? theme.palette.primary.main : unresolved ? theme.palette.warning.main : theme.palette.divider
+  }`,
   // Box-shadow for selection indicator (blue glow)
   boxShadow: selected
     ? `0 0 0 4px ${theme.palette.primary.main}40, 0 2px 8px rgba(0, 0, 0, 0.1)`
@@ -115,11 +117,22 @@ interface DatasetNodeProps extends NodeProps {
   data: DatasetNodeData;
 }
 
+/**
+ * `unresolved` is set by the backend when a template's "ask" slot isn't
+ * bound to a layer on use (`freeze_workflow_config`/`bind_workflow_config`
+ * in apps/core/src/core/templates/snapshot.py) and cleared once the user
+ * picks one. It travels through the workflow config as a plain dict — the
+ * client never runs it through `datasetNodeDataSchema` — so it is read here
+ * via a local cast rather than adding the field to lib/validations/workflow.ts.
+ */
+type DatasetNodeDataWithUnresolved = DatasetNodeData & { unresolved?: boolean };
+
 const DatasetNode: React.FC<DatasetNodeProps> = ({ id, data, selected }) => {
   const { t } = useTranslation("common");
   const dispatch = useDispatch<AppDispatch>();
   const nodes = useSelector(selectNodes);
   const { projectId } = useParams() as { projectId?: string };
+  const isUnresolved = (data as DatasetNodeDataWithUnresolved).unresolved === true;
 
   // Get execution status - dataset nodes are "completed" when any execution is active
   const { isExecuting: hasAnyExecution } = useWorkflowExecutionContext();
@@ -136,9 +149,7 @@ const DatasetNode: React.FC<DatasetNodeProps> = ({ id, data, selected }) => {
   const displayName = useMemo(() => {
     if (!data.layerId) return t("no_dataset");
     const byProjectLayerId =
-      data.projectLayerId != null
-        ? projectLayers?.find((pl) => pl.id === data.projectLayerId)
-        : undefined;
+      data.projectLayerId != null ? projectLayers?.find((pl) => pl.id === data.projectLayerId) : undefined;
     const byLayerId = byProjectLayerId
       ? undefined
       : projectLayers?.find((pl) => pl.layer_id === data.layerId);
@@ -231,6 +242,16 @@ const DatasetNode: React.FC<DatasetNodeProps> = ({ id, data, selected }) => {
     [id, dispatch]
   );
 
+  // Select this node so the sidebar opens on its Dataset settings panel — the
+  // same picker (from project / dataset explorer) used to fill it in normally.
+  const handlePickLayer = useCallback(
+    (event: React.MouseEvent) => {
+      event.stopPropagation();
+      dispatch(selectNode(id));
+    },
+    [id, dispatch]
+  );
+
   return (
     <>
       {/* NodeToolbar - automatically shown when selected */}
@@ -249,7 +270,7 @@ const DatasetNode: React.FC<DatasetNodeProps> = ({ id, data, selected }) => {
         </ToolbarContainer>
       </NodeToolbar>
 
-      <NodeContainer selected={selected}>
+      <NodeContainer selected={selected} unresolved={isUnresolved}>
         {/* Output handle - right */}
         <StyledHandle type="source" position={Position.Right} selected={selected} />
 
@@ -264,6 +285,31 @@ const DatasetNode: React.FC<DatasetNodeProps> = ({ id, data, selected }) => {
               <IconStatusBadge status="completed">
                 <CheckCircleIcon sx={{ fontSize: 12 }} />
               </IconStatusBadge>
+            )}
+            {/* Unresolved template input badge (T7) */}
+            {isUnresolved && (
+              <Tooltip title={t("unresolved_input")} placement="top" arrow>
+                <Box
+                  role="img"
+                  aria-label={t("unresolved_input")}
+                  sx={{
+                    position: "absolute",
+                    top: -6,
+                    right: -6,
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: "warning.main",
+                    color: "common.white",
+                    border: (theme) => `2px solid ${theme.palette.background.paper}`,
+                    zIndex: 2,
+                  }}>
+                  <Icon iconName={ICON_NAME.CIRCLEINFO} sx={{ fontSize: 11 }} />
+                </Box>
+              </Tooltip>
             )}
           </NodeIconWrapper>
           <Typography variant="caption" fontWeight={700} sx={{ wordBreak: "break-word" }}>
@@ -291,6 +337,23 @@ const DatasetNode: React.FC<DatasetNodeProps> = ({ id, data, selected }) => {
                 </Stack>
               </InfoRow>
             </Stack>
+          </NodeParamsSection>
+        )}
+
+        {/* Unresolved template input: send the user to the same picker used
+            when adding a dataset normally (the sidebar's Dataset settings) */}
+        {isUnresolved && (
+          <NodeParamsSection>
+            <Button
+              size="small"
+              variant="outlined"
+              color="warning"
+              fullWidth
+              startIcon={<Icon iconName={ICON_NAME.LAYERS} style={{ fontSize: 13 }} />}
+              onClick={handlePickLayer}
+              sx={{ textTransform: "none", fontSize: 11 }}>
+              {t("pick_a_layer")}
+            </Button>
           </NodeParamsSection>
         )}
       </NodeContainer>

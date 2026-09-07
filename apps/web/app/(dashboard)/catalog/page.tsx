@@ -25,20 +25,22 @@ import { useCatalogAggregations, useCatalogDatasets } from "@/lib/api/catalog";
 import { useFavoriteStars } from "@/lib/api/favorites";
 import { datasetCard } from "@/lib/catalog/card";
 import type { CatalogCollection } from "@/lib/validations/catalog";
+import type { TemplateRead, TemplateUseResult } from "@/lib/validations/template";
 
-import {
-  FACET_HIDDEN,
-  useCatalogFacetSections,
-} from "@/hooks/catalog/useCatalogFacetSections";
+import { FACET_HIDDEN, useCatalogFacetSections } from "@/hooks/catalog/useCatalogFacetSections";
 import { CATALOG_PAGE_SIZE, useCatalogSearchState } from "@/hooks/catalog/useCatalogSearchState";
+import { templateResultHref } from "@/hooks/templates/useUseTemplate";
 
-import EmptySection from "@/components/common/EmptySection";
 import CatalogActiveFilters from "@/components/dashboard/catalog/CatalogActiveFilters";
 import CatalogCard from "@/components/dashboard/catalog/CatalogCard";
 import CatalogFilterPanel from "@/components/dashboard/catalog/CatalogFilterPanel";
 import CatalogSpatialSection from "@/components/dashboard/catalog/CatalogSpatialSection";
 import CatalogTabs from "@/components/dashboard/catalog/CatalogTabs";
 import CatalogToolbar from "@/components/dashboard/catalog/CatalogToolbar";
+import EmptyState from "@/components/dashboard/common/EmptyState";
+import PageHeader from "@/components/dashboard/common/PageHeader";
+import TemplateBrowser from "@/components/templates/TemplateBrowser";
+import UseTemplateFlow from "@/components/templates/UseTemplateFlow";
 
 /**
  * The catalog: search, filter and browse the datasets served by the STAC API
@@ -118,6 +120,7 @@ const CatalogPage = () => {
   const {
     view,
     page,
+    tab,
     spatial,
     facetSelections,
     activeFilterCount,
@@ -129,10 +132,12 @@ const CatalogPage = () => {
     setView,
     setSpatial,
     setDateRange,
+    setTab,
     toggleFacet,
     clearAll,
     state,
   } = useCatalogSearchState({ aggregations });
+  const [templateInUse, setTemplateInUse] = useState<TemplateRead | null>(null);
 
   /**
    * The sidebar's sections, their labels and their bucket counts — shared with the
@@ -215,165 +220,179 @@ const CatalogPage = () => {
 
   return (
     <Container sx={{ py: 10, px: { xs: 4, sm: 10 } }} maxWidth="xl">
-      <Stack sx={{ mb: 8 }} spacing={1}>
-        <Typography variant="h6">{t("catalog")}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640 }}>
-          {t("catalog_subtitle")}
-        </Typography>
-      </Stack>
+      <Box sx={{ mb: 8 }}>
+        <PageHeader title={t("catalog")} subtitle={t("catalog_subtitle")} />
+      </Box>
 
-      <CatalogTabs active="datasets" onChange={() => undefined} datasetCount={total} />
+      <CatalogTabs active={tab} onChange={setTab} datasetCount={total} />
 
-      <Grid container justifyContent="space-between" spacing={4}>
-        {/* On a phone the sidebar moves into a drawer. Stacked above the results
+      {tab === "templates" ? (
+        <>
+          {/* The tab browses the GOAT shelf alone: inline mode fixes the
+            source, so there is none to pass and none to switch to. */}
+          <TemplateBrowser mode="inline" onUse={(template) => setTemplateInUse(template)} />
+          {templateInUse && (
+            <UseTemplateFlow
+              template={templateInUse}
+              context={{ kind: "new_project" }}
+              onClose={() => setTemplateInUse(null)}
+              onDone={(result: TemplateUseResult) => {
+                setTemplateInUse(null);
+                router.push(templateResultHref(templateInUse, result));
+              }}
+            />
+          )}
+        </>
+      ) : (
+        <Grid container justifyContent="space-between" spacing={4}>
+          {/* On a phone the sidebar moves into a drawer. Stacked above the results
             it would push every dataset below the fold behind eight collapsed
             filter sections — the results are what the page is for. */}
-        {!isCompact && (
-          <Grid item xs={12} md={3}>
-            {filterPanel}
-          </Grid>
-        )}
+          {!isCompact && (
+            <Grid item xs={12} md={3}>
+              {filterPanel}
+            </Grid>
+          )}
 
-        <Grid item xs={12} md={9}>
-          <Stack spacing={2}>
-            <CatalogToolbar
-              q={state.q ?? ""}
-              onChangeQ={debouncedSetQ}
-              view={view}
-              onChangeView={setView}
-              sort={state.sortby}
-              sortOptions={SORT_OPTIONS.map((option) => ({ ...option, label: t(option.labelKey) }))}
-              onChangeSort={setSort}
-              onOpenFilters={isCompact ? () => setFiltersOpen(true) : undefined}
-              activeFilterCount={totalActiveFilters}
-              compact={isPhone}
-            />
+          <Grid item xs={12} md={9}>
+            <Stack spacing={2}>
+              <CatalogToolbar
+                q={state.q ?? ""}
+                onChangeQ={debouncedSetQ}
+                view={view}
+                onChangeView={setView}
+                sort={state.sortby}
+                sortOptions={SORT_OPTIONS.map((option) => ({ ...option, label: t(option.labelKey) }))}
+                onChangeSort={setSort}
+                onOpenFilters={isCompact ? () => setFiltersOpen(true) : undefined}
+                activeFilterCount={totalActiveFilters}
+                compact={isPhone}
+              />
 
-            {/* Count and active filters share ONE row. As its own row above the
+              {/* Count and active filters share ONE row. As its own row above the
                 count, the chip strip appeared the moment a first filter was
                 selected and pushed everything below it down 32px — a measurable
                 jump on every tick. The row exists either way now. */}
-            <Stack
-              direction="row"
-              alignItems="center"
-              useFlexGap
-              flexWrap="wrap"
-              gap={2}
-              sx={{ minHeight: 32 }}>
-              <Typography variant="body2" fontWeight="bold">
-                {favouritesOnly
-                  ? t("catalog_n_favourites", { count: effectiveTotal ?? 0 })
-                  : total === undefined
-                    ? " "
-                    : total === 0
-                      ? t("n_datasets", { count: 0 })
-                      : t("catalog_result_range", {
-                          from: ((page - 1) * CATALOG_PAGE_SIZE + 1).toLocaleString(
-                            i18n.language
-                          ),
-                          to: Math.min(page * CATALOG_PAGE_SIZE, total).toLocaleString(
-                            i18n.language
-                          ),
-                          total: total.toLocaleString(i18n.language),
-                        })}
-              </Typography>
-              {isValidating && !showSkeletons && (
-                <Typography variant="caption" color="text.secondary">
-                  {t("loading")}
+              <Stack
+                direction="row"
+                alignItems="center"
+                useFlexGap
+                flexWrap="wrap"
+                gap={2}
+                sx={{ minHeight: 32 }}>
+                <Typography variant="body2" fontWeight="bold">
+                  {favouritesOnly
+                    ? t("catalog_n_favourites", { count: effectiveTotal ?? 0 })
+                    : total === undefined
+                      ? " "
+                      : total === 0
+                        ? t("n_datasets", { count: 0 })
+                        : t("catalog_result_range", {
+                            from: ((page - 1) * CATALOG_PAGE_SIZE + 1).toLocaleString(i18n.language),
+                            to: Math.min(page * CATALOG_PAGE_SIZE, total).toLocaleString(i18n.language),
+                            total: total.toLocaleString(i18n.language),
+                          })}
                 </Typography>
+                {isValidating && !showSkeletons && (
+                  <Typography variant="caption" color="text.secondary">
+                    {t("loading")}
+                  </Typography>
+                )}
+                <CatalogActiveFilters
+                  selections={facetSelections}
+                  facetLabel={facetLabel}
+                  optionLabel={facetOptionLabel}
+                  onRemove={toggleFacet}
+                />
+              </Stack>
+
+              {showSkeletons && (
+                <Stack spacing={4}>
+                  {Array.from({ length: CATALOG_PAGE_SIZE }).map((_, index) => (
+                    <Skeleton key={index} variant="rectangular" height={120} />
+                  ))}
+                </Stack>
               )}
-              <CatalogActiveFilters
-                selections={facetSelections}
-                facetLabel={facetLabel}
-                optionLabel={facetOptionLabel}
-                onRemove={toggleFacet}
-              />
-            </Stack>
 
-            {showSkeletons && (
-              <Stack spacing={4}>
-                {Array.from({ length: CATALOG_PAGE_SIZE }).map((_, index) => (
-                  <Skeleton key={index} variant="rectangular" height={120} />
-                ))}
-              </Stack>
-            )}
-
-            {/* "Nothing starred" is a different emptiness from "nothing
+              {/* "Nothing starred" is a different emptiness from "nothing
                 matched" — it gets its own message and skips the request. */}
-            {!showSkeletons && favouritesOnly && items.length === 0 && (
-              <Stack sx={{ mt: 10 }} alignItems="center" spacing={4}>
-                <EmptySection label={t("catalog_no_favourites")} icon={ICON_NAME.STAR} />
-                <Typography variant="body1">{t("catalog_no_favourites_hint")}</Typography>
-              </Stack>
-            )}
+              {!showSkeletons && favouritesOnly && items.length === 0 && (
+                <EmptyState
+                  icon={ICON_NAME.STAR}
+                  title={t("catalog_no_favourites")}
+                  hint={t("catalog_no_favourites_hint")}
+                />
+              )}
 
-            {!showSkeletons && !favouritesOnly && total === 0 && (
-              <Stack sx={{ mt: 10 }} alignItems="center" spacing={4}>
-                <EmptySection label={t("no_catalog_dataset_found")} icon={ICON_NAME.DATABASE} />
-                <Typography variant="body1">{t("try_different_filters")}</Typography>
-              </Stack>
-            )}
+              {!showSkeletons && !favouritesOnly && total === 0 && (
+                <EmptyState
+                  icon={ICON_NAME.DATABASE}
+                  title={t("no_catalog_dataset_found")}
+                  hint={t("try_different_filters")}
+                />
+              )}
 
-            {!showSkeletons && items.length > 0 && (
-              <>
-                {view === "grid" ? (
-                  <Box
-                    sx={{
-                      display: "grid",
-                      gridTemplateColumns: {
-                        xs: "1fr",
-                        sm: "repeat(2, minmax(0, 1fr))",
-                        lg: "repeat(3, minmax(0, 1fr))",
-                      },
-                      // Every row as tall as the tallest card in it. `auto` is not
-                      // the same thing here: where the grid has a height of its own,
-                      // as it does in the Add Layer picker, `auto` rows are sized to
-                      // fit that height and the cards are clipped instead.
-                      gridAutoRows: "max-content",
-                      gap: 4,
-                    }}>
-                    {items.map((dataset) => (
-                      <DatasetCard
-                        key={dataset.id}
-                        dataset={dataset}
-                        view="grid"
-                        compact={isPhone}
-                        starred={!!starred[dataset.id]}
-                        onToggleStar={toggleStar}
-                        onOpen={router.push}
+              {!showSkeletons && items.length > 0 && (
+                <>
+                  {view === "grid" ? (
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: {
+                          xs: "1fr",
+                          sm: "repeat(2, minmax(0, 1fr))",
+                          lg: "repeat(3, minmax(0, 1fr))",
+                        },
+                        // Every row as tall as the tallest card in it. `auto` is not
+                        // the same thing here: where the grid has a height of its own,
+                        // as it does in the Add Layer picker, `auto` rows are sized to
+                        // fit that height and the cards are clipped instead.
+                        gridAutoRows: "max-content",
+                        gap: 4,
+                      }}>
+                      {items.map((dataset) => (
+                        <DatasetCard
+                          key={dataset.id}
+                          dataset={dataset}
+                          view="grid"
+                          compact={isPhone}
+                          starred={!!starred[dataset.id]}
+                          onToggleStar={toggleStar}
+                          onOpen={router.push}
+                        />
+                      ))}
+                    </Box>
+                  ) : (
+                    <Stack spacing={4}>
+                      {items.map((dataset) => (
+                        <DatasetCard
+                          key={dataset.id}
+                          dataset={dataset}
+                          compact={isPhone}
+                          starred={!!starred[dataset.id]}
+                          onToggleStar={toggleStar}
+                          onOpen={router.push}
+                        />
+                      ))}
+                    </Stack>
+                  )}
+
+                  {pageCount > 1 && (
+                    <Stack direction="row" justifyContent="center" sx={{ p: 4 }}>
+                      <Pagination
+                        count={pageCount}
+                        page={page}
+                        size="large"
+                        onChange={(_event, next) => setPage(next)}
                       />
-                    ))}
-                  </Box>
-                ) : (
-                  <Stack spacing={4}>
-                    {items.map((dataset) => (
-                      <DatasetCard
-                        key={dataset.id}
-                        dataset={dataset}
-                        compact={isPhone}
-                        starred={!!starred[dataset.id]}
-                        onToggleStar={toggleStar}
-                        onOpen={router.push}
-                      />
-                    ))}
-                  </Stack>
-                )}
-
-                {pageCount > 1 && (
-                  <Stack direction="row" justifyContent="center" sx={{ p: 4 }}>
-                    <Pagination
-                      count={pageCount}
-                      page={page}
-                      size="large"
-                      onChange={(_event, next) => setPage(next)}
-                    />
-                  </Stack>
-                )}
-              </>
-            )}
-          </Stack>
+                    </Stack>
+                  )}
+                </>
+              )}
+            </Stack>
+          </Grid>
         </Grid>
-      </Grid>
+      )}
 
       <Drawer
         anchor="bottom"

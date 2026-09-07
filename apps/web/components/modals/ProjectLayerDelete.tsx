@@ -1,17 +1,4 @@
-import { LoadingButton } from "@mui/lab";
-import {
-  Alert,
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  FormControlLabel,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Alert, Checkbox, DialogContentText, FormControlLabel, Stack, Typography } from "@mui/material";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -19,14 +6,14 @@ import { Trans } from "react-i18next";
 import { toast } from "react-toastify";
 import { mutate } from "swr";
 
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
 import { matchesContentListKey } from "@/lib/api/datasets";
 import { deleteLayer, useDataset } from "@/lib/api/layers";
-import { useJobs } from "@/lib/api/processes";
 import { deleteProjectLayer, useProjectLayers } from "@/lib/api/projects";
-import { setRunningJobIds } from "@/lib/store/jobs/slice";
 import type { ProjectLayer } from "@/lib/validations/project";
 
-import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 interface ProjectLayerDeleteDialogProps {
   open: boolean;
@@ -47,9 +34,6 @@ const ProjectLayerDeleteModal: React.FC<ProjectLayerDeleteDialogProps> = ({
   const { dataset } = useDataset(projectLayer?.layer_id);
   const { mutate: mutateProjectLayers } = useProjectLayers(projectId);
   const [deleteSourceLayer, setDeleteSourceLayer] = useState(false);
-  const { mutate: mutateJobs } = useJobs({ read: false });
-  const dispatch = useAppDispatch();
-  const runningJobIds = useAppSelector((state) => state.jobs.runningJobIds);
 
   async function handleDelete() {
     try {
@@ -60,14 +44,10 @@ const ProjectLayerDeleteModal: React.FC<ProjectLayerDeleteDialogProps> = ({
       await deleteProjectLayer(projectId, projectLayer.id);
       mutateProjectLayers();
 
-      // If user also wants to delete the dataset, start the job in background
+      // If the user also wants to delete the dataset, soft-delete it too
       if (deleteSourceLayer && dataset) {
-        const job = await deleteLayer(dataset.id);
-        if (job?.jobID) {
-          mutateJobs();
-          dispatch(setRunningJobIds([...runningJobIds, job.jobID]));
-          toast.info(`"${t("delete_dataset_source")}" - ${t("job_started")}`);
-        }
+        await deleteLayer(dataset.id);
+        toast.success(t("delete_layer_success"));
         // Invalidate dataset layers cache
         mutate(matchesContentListKey);
       }
@@ -81,70 +61,59 @@ const ProjectLayerDeleteModal: React.FC<ProjectLayerDeleteDialogProps> = ({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t("delete_project_layer")}</DialogTitle>
-      <DialogContent>
-        <DialogContentText>
-          <Trans
-            i18nKey="common:are_you_sure_to_delete_layer"
-            values={{ layer: projectLayer?.name }}
-            components={{ b: <b /> }}
+    <AppDialog
+      open={open}
+      onClose={() => onClose?.()}
+      icon={ICON_NAME.TRASH}
+      tone="warning"
+      title={t("delete_project_layer")}
+      footer={
+        <AppDialogFooter
+          onCancel={onClose}
+          primaryLabel={t("delete")}
+          onPrimary={() => void handleDelete()}
+          primaryColor="error"
+          primaryLoading={isLoading}
+        />
+      }>
+      <DialogContentText>
+        <Trans
+          i18nKey="common:are_you_sure_to_delete_layer"
+          values={{ layer: projectLayer?.name }}
+          components={{ b: <b /> }}
+        />
+      </DialogContentText>
+      {!projectLayer.in_catalog && (
+        <Stack sx={{ mt: 2 }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                color="warning"
+                checked={deleteSourceLayer}
+                onChange={(e) => {
+                  setDeleteSourceLayer(e.target.checked);
+                }}
+              />
+            }
+            label={
+              <Typography variant="body2" fontWeight="bold">
+                {t("delete_dataset_source")}
+              </Typography>
+            }
           />
-        </DialogContentText>
-        {!projectLayer.in_catalog && (
-          <Stack sx={{ mt: 2 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  size="small"
-                  color="warning"
-                  checked={deleteSourceLayer}
-                  onChange={(e) => {
-                    setDeleteSourceLayer(e.target.checked);
-                  }}
-                />
-              }
-              label={
-                <Typography variant="body2" fontWeight="bold">
-                  {t("delete_dataset_source")}
-                </Typography>
-              }
-            />
-            {deleteSourceLayer && dataset && (
-              <Alert severity="warning" sx={{ mt: 2 }}>
-                <Trans
-                  i18nKey="common:dataset_delete_warning"
-                  values={{ datasetName: dataset?.name }}
-                  components={{ b: <b /> }}
-                />
-              </Alert>
-            )}
-          </Stack>
-        )}
-      </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          pb: 2,
-        }}>
-        <Button onClick={onClose} variant="text" sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-        <LoadingButton
-          onClick={handleDelete}
-          loading={isLoading}
-          variant="text"
-          color="error"
-          disabled={false}
-          sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("delete")}
-          </Typography>
-        </LoadingButton>
-      </DialogActions>
-    </Dialog>
+          {deleteSourceLayer && dataset && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              <Trans
+                i18nKey="common:dataset_delete_warning"
+                values={{ datasetName: dataset?.name }}
+                components={{ b: <b /> }}
+              />
+            </Alert>
+          )}
+        </Stack>
+      )}
+    </AppDialog>
   );
 };
 

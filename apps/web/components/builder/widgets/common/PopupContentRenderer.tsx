@@ -1,26 +1,15 @@
-import CloseIcon from "@mui/icons-material/Close";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import {
-  Box,
-  ClickAwayListener,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Fade,
-  IconButton,
-  Paper,
-  Popper,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Box, ClickAwayListener, Fade, Paper, Popper, Tooltip, Typography } from "@mui/material";
 import type { PopperPlacementType, TooltipProps } from "@mui/material";
 import { useEffect } from "react";
 import ReactMarkdown from "react-markdown";
+
+import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { stripMediaUrls } from "@/lib/utils/mediaEmbed";
 import type { PopupPlacement, PopupSize, PopupType } from "@/lib/validations/widget";
 
 import { popupMarkdownComponents } from "@/components/builder/widgets/common/markdownComponents";
+import AppDialog from "@/components/common/AppDialog";
 
 export type { PopupPlacement, PopupSize, PopupType };
 
@@ -34,7 +23,7 @@ interface PopupContentRendererProps {
   content: string;
   /** Optional URL rendered as a "Learn more" link. Only shown for popover type. */
   url?: string;
-  /** Visual size preset. Maps to pixel widths for tooltip/popover and to MUI Dialog maxWidth for dialog. */
+  /** Visual size preset. Maps to pixel widths for tooltip/popover and to the dialog's paper width. */
   size?: PopupSize;
 }
 
@@ -45,11 +34,11 @@ const POPOVER_MAX_WIDTH: Record<PopupSize, number> = {
   lg: 480,
 };
 
-/** MUI Dialog maxWidth values for the dialog type. */
-const DIALOG_MAX_WIDTH: Record<PopupSize, "xs" | "sm" | "md"> = {
-  sm: "xs",
-  md: "sm",
-  lg: "md",
+/** Paper widths for the dialog type, matching MUI's xs/sm/md breakpoints. */
+const DIALOG_MAX_WIDTH: Record<PopupSize, number> = {
+  sm: 444,
+  md: 600,
+  lg: 900,
 };
 
 /**
@@ -141,8 +130,7 @@ const PopupContentRenderer = ({
     // prevents overflow on the cross-axis. Plain MUI Popover with anchorOrigin
     // / transformOrigin only clamps to the viewport edge, which produces the
     // "stuck to the left" effect when the anchor is near the screen edge.
-    const popperPlacement: PopperPlacementType =
-      placement === "auto" ? "bottom" : placement;
+    const popperPlacement: PopperPlacementType = placement === "auto" ? "bottom" : placement;
     return (
       <Popper
         open
@@ -208,22 +196,11 @@ const PopupContentRenderer = ({
 
   // popup_type === "dialog"
   return (
-    <Dialog open onClose={onClose} maxWidth={dialogMaxWidth} fullWidth>
-      <DialogTitle sx={{ pr: 6 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <InfoOutlinedIcon sx={{ fontSize: 20, color: "primary.main", opacity: 0.75, flexShrink: 0 }} />
-          <Typography variant="h6">{title}</Typography>
-        </Box>
-        <IconButton size="small" onClick={onClose} sx={{ position: "absolute", right: 12, top: 12 }}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent dividers>
-        <Box sx={dialogMarkdownStyles}>
-          <ReactMarkdown components={popupMarkdownComponents}>{content}</ReactMarkdown>
-        </Box>
-      </DialogContent>
-    </Dialog>
+    <AppDialog open onClose={onClose} icon={ICON_NAME.INFO} title={title ?? ""} maxWidth={dialogMaxWidth}>
+      <Box sx={dialogMarkdownStyles}>
+        <ReactMarkdown components={popupMarkdownComponents}>{content}</ReactMarkdown>
+      </Box>
+    </AppDialog>
   );
 };
 

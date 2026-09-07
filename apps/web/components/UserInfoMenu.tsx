@@ -5,7 +5,6 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Paper,
   Stack,
   Typography,
   useTheme,
@@ -20,6 +19,7 @@ import { useOrganization, useUserProfile } from "@/lib/api/users";
 import { AUTH_DISABLED } from "@/lib/constants";
 
 import { ArrowPopper } from "@/components/ArrowPoper";
+import HeaderPopoverPaper, { HEADER_POPOVER_PLACEMENT } from "@/components/header/HeaderPopoverPaper";
 
 export default function UserInfoMenu() {
   const theme = useTheme();
@@ -31,12 +31,7 @@ export default function UserInfoMenu() {
     <>
       <ArrowPopper
         content={
-          <Paper
-            sx={{
-              width: 240,
-              overflow: "auto",
-              py: theme.spacing(2),
-            }}>
+          <HeaderPopoverPaper width={260} sx={{ py: theme.spacing(2) }}>
             <Stack
               spacing={2}
               sx={{
@@ -107,10 +102,11 @@ export default function UserInfoMenu() {
                 </>
               )}
             </Stack>
-          </Paper>
+          </HeaderPopoverPaper>
         }
         open={open}
-        placement="bottom"
+        placement={HEADER_POPOVER_PLACEMENT}
+        arrow={false}
         onClose={() => setOpen(false)}>
         <IconButton
           onClick={() => {

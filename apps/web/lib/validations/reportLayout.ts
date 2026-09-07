@@ -295,6 +295,11 @@ export const reportLayoutConfigSchema = z.object({
   atlas: atlasConfigSchema,
 });
 
+/** A layout with nothing on it yet: an A4 portrait page on the default grid,
+ * no elements, no atlas — what "Blank layout" creates. */
+export const createEmptyReportLayoutConfig = (): ReportLayoutConfig =>
+  reportLayoutConfigSchema.parse({ page: {}, layout: {}, elements: [], atlas: {} });
+
 // Full report layout schema (from API)
 export const reportLayoutSchema = z.object({
   id: z.string().uuid(),

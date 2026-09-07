@@ -3,11 +3,10 @@ import { useCallback, useMemo } from "react";
 import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
 import { useAuthedSWR } from "@/lib/api/useAuthedSWR";
 
-export const FAVORITES_API_BASE_URL = new URL("api/v2/favorite", process.env.NEXT_PUBLIC_API_URL)
-  .href;
+export const FAVORITES_API_BASE_URL = new URL("api/v2/favorite", process.env.NEXT_PUBLIC_API_URL).href;
 
 /** What can be favourited — mirrors the backend's FavoriteItemType. */
-export type FavoriteItemType = "catalog_item" | "workflow_template" | "project" | "dataset";
+export type FavoriteItemType = "catalog_item" | "workflow_template" | "project" | "dataset" | "template";
 
 export const setFavorite = async (
   itemType: FavoriteItemType,

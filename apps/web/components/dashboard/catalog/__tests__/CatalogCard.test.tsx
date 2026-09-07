@@ -18,7 +18,7 @@ vi.mock("@/hooks/catalog/useCatalogLabels", () => ({
 vi.mock("@/components/dashboard/catalog/CatalogBundleMembers", () => ({
   default: () => null,
 }));
-vi.mock("@/components/dashboard/catalog/CatalogThumbnail", () => ({ default: () => null }));
+vi.mock("@/components/dashboard/common/ContentThumbnail", () => ({ default: () => null }));
 
 /** The strip only renders for a bundle: `kind` decides, `bundleId` lists it. */
 const bundleCard = {

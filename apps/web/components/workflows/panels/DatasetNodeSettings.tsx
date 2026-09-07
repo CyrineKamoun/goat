@@ -4,7 +4,7 @@
  * Dataset Node Settings Panel
  *
  * Shows configuration for a selected dataset node with two tabs:
- * - SOURCE: Select/change the dataset from project layers, dataset explorer, or catalog
+ * - SOURCE: Select/change the dataset from project layers, my datasets, or catalog
  * - FILTER: Apply workflow-specific filters to the dataset (not persisted to project layer)
  */
 import {
@@ -39,9 +39,9 @@ import { selectActiveDataPanelView } from "@/lib/store/workflow/selectors";
 import { requestMapView, requestTableView, updateNode } from "@/lib/store/workflow/slice";
 import { parseCQLQueryToObject } from "@/lib/transformers/filter";
 import { layerType } from "@/lib/validations/common";
+import type { ContentItem } from "@/lib/validations/content";
 import type { Expression as ExpressionType } from "@/lib/validations/filter";
 import { FilterType } from "@/lib/validations/filter";
-import type { Layer } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
 import type { WorkflowNode } from "@/lib/validations/workflow";
 
@@ -50,11 +50,11 @@ import type { SelectorItem } from "@/types/map/common";
 import useLayerFields from "@/hooks/map/CommonHooks";
 import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 
+import DatasetPickerDialog from "@/components/addLayer/DatasetPickerDialog";
 import Container from "@/components/map/panels/Container";
 import Selector from "@/components/map/panels/common/Selector";
 import ToolsHeader from "@/components/map/panels/common/ToolsHeader";
 import Expression from "@/components/map/panels/filter/Expression";
-import DatasetExplorerModal from "@/components/modals/DatasetExplorer";
 
 // Tab panel component
 interface TabPanelProps {
@@ -88,7 +88,7 @@ function a11yProps(index: number) {
 // Dataset source type enum
 enum DatasetSourceType {
   FromProject = "from_project",
-  DatasetExplorer = "dataset_explorer",
+  MyDatasets = "my_datasets",
 }
 
 interface DatasetNodeSettingsProps {
@@ -128,7 +128,7 @@ export default function DatasetNodeSettings({ node, projectLayers = [], onBack }
   const menuOpen = Boolean(menuAnchorEl);
 
   // Modal states
-  const [datasetExplorerOpen, setDatasetExplorerOpen] = useState(false);
+  const [myDatasetsOpen, setMyDatasetsOpen] = useState(false);
 
   // Show layer selector (for "From project" option)
   const [showLayerSelector, setShowLayerSelector] = useState(false);
@@ -221,7 +221,7 @@ export default function DatasetNodeSettings({ node, projectLayers = [], onBack }
   // Menu items for "Add Dataset" dropdown
   const menuItems = [
     { type: DatasetSourceType.FromProject, icon: ICON_NAME.LAYERS, label: t("from_project") },
-    { type: DatasetSourceType.DatasetExplorer, icon: ICON_NAME.DATABASE, label: t("dataset_explorer") },
+    { type: DatasetSourceType.MyDatasets, icon: ICON_NAME.DATABASE, label: t("my_datasets") },
   ];
 
   // Handle tab change
@@ -246,8 +246,8 @@ export default function DatasetNodeSettings({ node, projectLayers = [], onBack }
       case DatasetSourceType.FromProject:
         setShowLayerSelector(true);
         break;
-      case DatasetSourceType.DatasetExplorer:
-        setDatasetExplorerOpen(true);
+      case DatasetSourceType.MyDatasets:
+        setMyDatasetsOpen(true);
         break;
     }
   };
@@ -278,6 +278,8 @@ export default function DatasetNodeSettings({ node, projectLayers = [], onBack }
       // Update node data with selected layer and inherited filter.
       // - projectLayerId (ProjectLayer.id) is the canonical reference used to render the live name
       // - layerId (dataset UUID) is kept for tile/feature API calls
+      // - `unresolved` (set outside datasetNodeDataSchema, see DatasetNode.tsx) is cleared: this is
+      //   the picker a template's unresolved "ask" slot sends the user to (T7).
       dispatch(
         updateNode({
           id: node.id,
@@ -293,6 +295,7 @@ export default function DatasetNodeSettings({ node, projectLayers = [], onBack }
               // Inherit filter from project layer (one-way copy)
               filter: inheritedFilter,
               filterInitialized: true,
+              unresolved: false,
             },
           },
         })
@@ -311,29 +314,32 @@ export default function DatasetNodeSettings({ node, projectLayers = [], onBack }
     [layers, node, dispatch, logicalOperators]
   );
 
-  // Handle layer selection from the Dataset Explorer (workflow-only, no project add)
-  const handleExplorerLayerSelect = useCallback(
-    (layer: Layer) => {
+  // Handle dataset selection from the dataset shelf (workflow-only, no project add)
+  const handleMyDatasetsPick = useCallback(
+    (item: ContentItem) => {
       if (node.type !== "dataset") return;
+      // A bundle is a set of layers, not an input a dataset node can read.
+      if (item.type !== "layer") return;
 
       // Update node data with selected layer (without adding to project).
       // No projectLayerId because this dataset is not part of the project — name lookup falls
-      // back to the snapshotted label.
+      // back to the snapshotted label. Also clears `unresolved` (see handleLayerSelect above).
       dispatch(
         updateNode({
           id: node.id,
           changes: {
             data: {
               ...node.data,
-              label: layer.name,
+              label: item.name,
               projectLayerId: undefined,
-              layerId: layer.id,
-              layerName: layer.name,
-              geometryType: layer.feature_layer_geometry_type || undefined,
-              layerType: (layer.type as "feature" | "table" | "raster") || undefined,
+              layerId: item.id,
+              layerName: item.name,
+              geometryType: item.feature_layer_geometry_type || undefined,
+              layerType: (item.layer_type as "feature" | "table" | "raster" | null) || undefined,
               // No filter inheritance for external datasets
               filter: undefined,
               filterInitialized: true,
+              unresolved: false,
             },
           },
         })
@@ -803,14 +809,11 @@ export default function DatasetNodeSettings({ node, projectLayers = [], onBack }
           </TabPanel>
 
           {/* Modals */}
-          {datasetExplorerOpen && (
-            <DatasetExplorerModal
-              open={datasetExplorerOpen}
-              onClose={() => setDatasetExplorerOpen(false)}
-              projectId={projectId as string}
-              onLayerSelect={handleExplorerLayerSelect}
-            />
-          )}
+          <DatasetPickerDialog
+            open={myDatasetsOpen}
+            onClose={() => setMyDatasetsOpen(false)}
+            onPick={handleMyDatasetsPick}
+          />
         </Box>
       }
     />

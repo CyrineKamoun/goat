@@ -5,26 +5,24 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import type { CatalogCollection, CatalogItem } from "@/lib/validations/catalog";
-
 import { layerCard } from "@/lib/catalog/card";
-
 import { datasetPeriod } from "@/lib/catalog/period";
+import type { CatalogCollection, CatalogItem } from "@/lib/validations/catalog";
 
 import { linkHref, useCatalogLabels } from "@/hooks/catalog/useCatalogLabels";
 
 import CatalogCard from "@/components/dashboard/catalog/CatalogCard";
+import CatalogProviderCard from "@/components/dashboard/catalog/CatalogProviderCard";
 import {
   BUNDLE_ACCENT,
   DetailHeader,
   DetailTabs,
   KeywordSection,
   LicenseBadge,
+  type MetaField,
   MetaSidebar,
   SectionCard,
-  type MetaField,
-} from "@/components/dashboard/catalog/CatalogDetailChrome";
-import CatalogProviderCard from "@/components/dashboard/catalog/CatalogProviderCard";
+} from "@/components/dashboard/common/DetailChrome";
 
 /** A bundle: the dataset's description, its layers as result cards, and the shared metadata beside them. */
 const CatalogBundleDetail = ({
@@ -78,9 +76,7 @@ const CatalogBundleDetail = ({
     !!licenseLabel && {
       icon: ICON_NAME.LICENSE,
       label: t("metadata.headings.license"),
-      value: (
-        <LicenseBadge license={licenseLabel} href={linkHref(collection.links, "license")} />
-      ),
+      value: <LicenseBadge license={licenseLabel} href={linkHref(collection.links, "license")} />,
     },
     // A Collection states its time as `extent.temporal`, and since 2026-08-04 it does so on every row — so the extent wins here and the fallback to the layers' own dates covers only a Collection that states nothing.
     !!dataDate && {
@@ -112,9 +108,7 @@ const CatalogBundleDetail = ({
                   <Icon
                     iconName={ICON_NAME.STAR}
                     style={{ fontSize: 13 }}
-                    htmlColor={
-                      allSaved ? theme.palette.primary.main : theme.palette.text.secondary
-                    }
+                    htmlColor={allSaved ? theme.palette.primary.main : theme.palette.text.secondary}
                   />
                 }
                 sx={allSaved ? { backgroundColor: theme.palette.action.hover } : undefined}>
@@ -135,13 +129,13 @@ const CatalogBundleDetail = ({
         }
       />
 
-      <DetailTabs tabs={[{ id: "summary", label: t("summary") }]} active="summary" onChange={() => undefined} />
+      <DetailTabs
+        tabs={[{ id: "summary", label: t("summary") }]}
+        active="summary"
+        onChange={() => undefined}
+      />
 
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={6}
-        alignItems="flex-start"
-        sx={{ mb: 10 }}>
+      <Stack direction={{ xs: "column", md: "row" }} spacing={6} alignItems="flex-start" sx={{ mb: 10 }}>
         <Stack spacing={4} sx={{ flex: 1, minWidth: 0 }}>
           <SectionCard title={t("metadata.headings.description")}>
             {collection.description ? (

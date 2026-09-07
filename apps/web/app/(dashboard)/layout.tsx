@@ -5,6 +5,7 @@ import { Box, Stack, useMediaQuery } from "@mui/material";
 import { useState } from "react";
 
 import DashboardSidebar from "@/components/dashboard/Sidebar";
+import StatusStrip from "@/components/dashboard/StatusStrip";
 import Header from "@/components/header/Header";
 
 const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
@@ -21,6 +22,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
           setNavVisible(!navVisible);
         }}
       />
+      <StatusStrip />
       <Stack direction="row" height="100%" sx={{ overflow: "hidden" }}>
         <DashboardSidebar
           hidden={hidden}

@@ -1,17 +1,5 @@
 import CloseIcon from "@mui/icons-material/Close";
-import { LoadingButton } from "@mui/lab";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Box, Button, IconButton, Stack, TextField, Typography } from "@mui/material";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Trans } from "react-i18next";
@@ -22,6 +10,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import { uploadAsset } from "@/lib/api/assets";
 import { ASSETS_MAX_FILE_SIZE_MB, assetTypeEnum } from "@/lib/validations/assets";
 
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 import SectionHeader from "@/components/map/panels/common/SectionHeader";
 import SectionOptions from "@/components/map/panels/common/SectionOptions";
 
@@ -93,103 +82,96 @@ export const UploadIconDialog = ({ open, onClose, onUploaded }: UploadIconDialog
   };
 
   return (
-    <Dialog open={open} onClose={handleOnClose} fullWidth>
-      <DialogTitle>{t("upload_icon")}</DialogTitle>
-      <DialogContent>
-        <SectionHeader
-          active
-          alwaysActive
-          label={t("add_icon")}
-          icon={ICON_NAME.CIRCLE}
-          disableAdvanceOptions
+    <AppDialog
+      open={open}
+      onClose={handleOnClose}
+      icon={ICON_NAME.UPLOAD}
+      title={t("upload_icon")}
+      maxWidth={600}
+      footer={
+        <AppDialogFooter
+          onCancel={handleOnClose}
+          primaryLabel={t("upload")}
+          onPrimary={() => void handleSubmit()}
+          primaryDisabled={!file || !displayName.trim()}
+          primaryLoading={isBusy}
         />
-        <SectionOptions
-          active={true}
-          baseOptions={
-            <>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                <Trans i18nKey="common:choose_icon_message" components={{ b: <b /> }} />
-              </Typography>
-              {/* Hidden file input */}
-              <input type="file" accept="image/*" hidden ref={fileInputRef} onChange={handleFileChange} />
-              {/* File picker section */}
-              {!file ? (
-                <Button
-                  variant="outlined"
-                  startIcon={<Icon iconName={ICON_NAME.IMAGE} />}
-                  onClick={() => fileInputRef.current?.click()}>
-                  {t("upload_icon")}
-                </Button>
-              ) : (
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  alignItems="center"
-                  justifyContent="space-between"
-                  sx={{ mb: 2 }}>
-                  {preview && (
-                    <Box
-                      component="img"
-                      src={preview}
-                      alt="preview"
-                      sx={{
-                        width: 60,
-                        height: 60,
-                        borderRadius: 1,
-                        border: "1px solid",
-                        borderColor: "divider",
-                      }}
-                    />
-                  )}
-                  <IconButton onClick={handleClearFile}>
-                    <CloseIcon />
-                  </IconButton>
-                </Stack>
-              )}
-            </>
-          }
-        />
-
-        <SectionHeader
-          active={!!file}
-          alwaysActive
-          label={t("assign_name")}
-          icon={ICON_NAME.CIRCLE}
-          disableAdvanceOptions
-        />
-        <SectionOptions
-          active={!!file}
-          baseOptions={
-            <Stack spacing={2} sx={{ py: 2 }}>
-              <TextField
-                label={t("name")}
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                fullWidth
-                required
-              />
-            </Stack>
-          }
-        />
-      </DialogContent>
-
-      <DialogActions disableSpacing sx={{ pt: 6, pb: 2, justifyContent: "flex-end" }}>
-        <Stack direction="row" spacing={2}>
-          <Button onClick={handleOnClose} variant="text">
-            <Typography variant="body2" fontWeight="bold">
-              {t("cancel")}
+      }>
+      <SectionHeader
+        active
+        alwaysActive
+        label={t("add_icon")}
+        icon={ICON_NAME.CIRCLE}
+        disableAdvanceOptions
+      />
+      <SectionOptions
+        active={true}
+        baseOptions={
+          <>
+            <Typography variant="body2" sx={{ mb: 2 }}>
+              <Trans i18nKey="common:choose_icon_message" components={{ b: <b /> }} />
             </Typography>
-          </Button>
-          <LoadingButton
-            loading={isBusy}
-            disabled={!file || !displayName.trim()}
-            variant="contained"
-            color="primary"
-            onClick={handleSubmit}>
-            {t("upload")}
-          </LoadingButton>
-        </Stack>
-      </DialogActions>
-    </Dialog>
+            {/* Hidden file input */}
+            <input type="file" accept="image/*" hidden ref={fileInputRef} onChange={handleFileChange} />
+            {/* File picker section */}
+            {!file ? (
+              <Button
+                variant="outlined"
+                startIcon={<Icon iconName={ICON_NAME.IMAGE} />}
+                onClick={() => fileInputRef.current?.click()}>
+                {t("upload_icon")}
+              </Button>
+            ) : (
+              <Stack
+                direction="row"
+                spacing={2}
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mb: 2 }}>
+                {preview && (
+                  <Box
+                    component="img"
+                    src={preview}
+                    alt="preview"
+                    sx={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: 1,
+                      border: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  />
+                )}
+                <IconButton onClick={handleClearFile}>
+                  <CloseIcon />
+                </IconButton>
+              </Stack>
+            )}
+          </>
+        }
+      />
+
+      <SectionHeader
+        active={!!file}
+        alwaysActive
+        label={t("assign_name")}
+        icon={ICON_NAME.CIRCLE}
+        disableAdvanceOptions
+      />
+      <SectionOptions
+        active={!!file}
+        baseOptions={
+          <Stack spacing={2} sx={{ py: 2 }}>
+            <TextField
+              label={t("name")}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              fullWidth
+              required
+            />
+          </Stack>
+        }
+      />
+    </AppDialog>
   );
 };

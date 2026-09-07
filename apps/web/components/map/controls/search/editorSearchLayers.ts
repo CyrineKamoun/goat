@@ -65,6 +65,11 @@ export function useEditorSearchLayers(projectLayers: ProjectLayer[], enabled: bo
     for (const layer of projectLayers) {
       if (layer.type !== "feature") continue;
       if (!(layer.properties?.visibility ?? true)) continue;
+      // D7: a locked layer's `properties` is `{}`, so the visibility check
+      // above defaults it to "visible" — exclude it explicitly, or its
+      // dataset's queryables (and then its features) would be requested
+      // from geoapi for a layer this viewer has no access to.
+      if (layer.locked) continue;
       if (seen.has(layer.layer_id)) continue;
       seen.add(layer.layer_id);
       visible.push(layer);

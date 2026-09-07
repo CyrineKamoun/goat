@@ -1,6 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import LoadingButton from "@mui/lab/LoadingButton";
-import { Box, Button, Dialog, DialogTitle, Stack, TextField, Typography } from "@mui/material";
+import { Stack, TextField } from "@mui/material";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -14,10 +13,11 @@ import { useFolders } from "@/lib/api/folders";
 import { executeProcessAsync } from "@/lib/api/processes";
 import { uploadFileToS3 } from "@/lib/services/s3";
 import { setRunningJobIds } from "@/lib/store/jobs/slice";
-
-import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import type { GetContentQueryParams } from "@/lib/validations/common";
 
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 import { MuiFileInput } from "@/components/common/FileInput";
 import { RhfAutocompleteField } from "@/components/common/form-inputs/AutocompleteField";
 
@@ -30,11 +30,20 @@ type ImportProjectForm = z.infer<typeof importProjectSchema>;
 
 interface ProjectImportModalProps {
   open: boolean;
+  /** Pre-selects the destination folder — the one the caller is browsing.
+   * Read once, at mount: a caller that needs it to follow the current folder
+   * mounts a fresh modal per open. */
+  defaultFolderId?: string;
   onClose?: () => void;
   onImportStarted?: () => void;
 }
 
-const ProjectImportModal: React.FC<ProjectImportModalProps> = ({ open, onClose, onImportStarted }) => {
+const ProjectImportModal: React.FC<ProjectImportModalProps> = ({
+  open,
+  defaultFolderId,
+  onClose,
+  onImportStarted,
+}) => {
   const { t } = useTranslation("common");
   const queryParams: GetContentQueryParams = {
     order: "descendent",
@@ -48,12 +57,9 @@ const ProjectImportModal: React.FC<ProjectImportModalProps> = ({ open, onClose, 
   const [fileError, setFileError] = useState<string | undefined>(undefined);
   const [projectName, setProjectName] = useState<string>("");
 
-  const {
-    watch,
-    reset,
-    control,
-  } = useForm<ImportProjectForm>({
+  const { watch, reset, control } = useForm<ImportProjectForm>({
     mode: "onChange",
+    defaultValues: { folder_id: defaultFolderId ?? "" },
     resolver: zodResolver(importProjectSchema),
   });
 
@@ -96,9 +102,7 @@ const ProjectImportModal: React.FC<ProjectImportModalProps> = ({ open, onClose, 
     return folders?.map((folder) => ({
       value: folder.id,
       label: folder.name,
-      icon: (
-        <Icon fontSize="small" iconName={folder.name === "home" ? ICON_NAME.HOUSE : ICON_NAME.FOLDER} />
-      ),
+      icon: <Icon fontSize="small" iconName={folder.name === "home" ? ICON_NAME.HOUSE : ICON_NAME.FOLDER} />,
     }));
   }, [folders]);
 
@@ -142,56 +146,50 @@ const ProjectImportModal: React.FC<ProjectImportModalProps> = ({ open, onClose, 
   };
 
   return (
-    <Dialog open={open} onClose={handleOnClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t("import_project")}</DialogTitle>
-      <Box sx={{ px: 4, pb: 2 }}>
-        <Stack direction="column" spacing={4} sx={{ my: 1 }}>
-          <RhfAutocompleteField
-            disabled={isBusy}
-            options={folderOptions ?? []}
-            control={control}
-            name="folder_id"
-            label={t("folder_location")}
-          />
-          <MuiFileInput
-            inputProps={{ accept: ".zip" }}
+    <AppDialog
+      open={open}
+      onClose={handleOnClose}
+      icon={ICON_NAME.UPLOAD}
+      title={t("import_project")}
+      maxWidth={600}
+      footer={
+        <AppDialogFooter
+          onCancel={handleOnClose}
+          primaryLabel={t("import")}
+          onPrimary={() => void handleImport()}
+          primaryDisabled={!allowSubmit}
+          primaryLoading={isBusy}
+        />
+      }>
+      <Stack direction="column" spacing={4} sx={{ my: 1 }}>
+        <RhfAutocompleteField
+          disabled={isBusy}
+          options={folderOptions ?? []}
+          control={control}
+          name="folder_id"
+          label={t("folder_location")}
+        />
+        <MuiFileInput
+          inputProps={{ accept: ".zip" }}
+          fullWidth
+          error={!!fileError}
+          helperText={fileError || t("accepts_zip_files")}
+          value={fileValue ?? null}
+          multiple={false}
+          onChange={handleFileChange}
+          placeholder={t("select_project_archive")}
+        />
+        {fileValue && (
+          <TextField
             fullWidth
-            error={!!fileError}
-            helperText={fileError || t("accepts_zip_files")}
-            value={fileValue ?? null}
-            multiple={false}
-            onChange={handleFileChange}
-            placeholder={t("select_project_archive")}
+            label={t("project_name")}
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            helperText={t("optional_rename_on_import")}
           />
-          {fileValue && (
-            <TextField
-              fullWidth
-              label={t("project_name")}
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-              helperText={t("optional_rename_on_import")}
-            />
-          )}
-        </Stack>
-        <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 4 }}>
-          <Button onClick={handleOnClose} variant="text" sx={{ borderRadius: 0 }}>
-            <Typography variant="body2" fontWeight="bold">
-              {t("cancel")}
-            </Typography>
-          </Button>
-          <LoadingButton
-            disabled={!allowSubmit}
-            loading={isBusy}
-            onClick={handleImport}
-            variant="contained"
-            color="primary">
-            <Typography variant="body2" fontWeight="bold" color="inherit">
-              {t("import")}
-            </Typography>
-          </LoadingButton>
-        </Stack>
-      </Box>
-    </Dialog>
+        )}
+      </Stack>
+    </AppDialog>
   );
 };
 

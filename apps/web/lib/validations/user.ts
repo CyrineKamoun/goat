@@ -24,6 +24,10 @@ export const userSchema = userSchemaBase.extend({
   updated_at: z.string(),
   enabled: z.boolean(),
   topt: z.boolean(),
+  /** Computed server-side from the `superuser` realm role (T4) — gates the
+   * GOAT-catalog publish/unpublish actions. The client never decodes the
+   * token itself. */
+  is_superuser: z.boolean().default(false),
 });
 
 export const publicUserSchema = userSchemaBase.extend({

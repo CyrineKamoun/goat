@@ -5,6 +5,7 @@ import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { useProjectLayers } from "@/lib/api/projects";
 import { SYSTEM_LAYERS_IDS } from "@/lib/constants";
+import { filterSelectableProjectLayers } from "@/lib/utils/map/layer";
 import type { LayerType } from "@/lib/validations/layer";
 import {
   featureLayerLinePropertiesSchema,
@@ -315,10 +316,12 @@ export const useFilteredProjectLayers = (
 ) => {
   const { layers: projectLayers, mutate, isLoading, isError, isValidating } = useProjectLayers(projectId);
   const sortedLayers = useMemo(() => {
-    if (!projectLayers) return [];
-
-    const filteredLayers = projectLayers.filter(
-      (layer) => !excludeLayerTypes.includes(layer.type) && !excludeLayerIds.includes(layer.layer_id)
+    // D7: a locked layer never appears in a picker — the user has no
+    // access of their own to it, so there is nothing to configure.
+    const filteredLayers = filterSelectableProjectLayers(
+      projectLayers,
+      excludeLayerTypes,
+      excludeLayerIds
     );
 
     return filteredLayers.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));

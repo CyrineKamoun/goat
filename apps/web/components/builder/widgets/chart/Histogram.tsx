@@ -51,7 +51,7 @@ const CustomTooltip = ({ active, payload, isHighlightMode }: CustomTooltipProps)
 export const HistogramChartWidget = ({ config: rawConfig }: { config: HistogramChartSchema }) => {
   const theme = useTheme();
   const { t, i18n } = useTranslation("common");
-  const { config, queryParams, baseQueryParams, layerId } = useChartWidget(
+  const { config, queryParams, baseQueryParams, layerId, isLayerLocked } = useChartWidget(
     rawConfig,
     histogramChartConfigSchema,
     histogramStatsQueryParams
@@ -192,7 +192,7 @@ export const HistogramChartWidget = ({ config: rawConfig }: { config: HistogramC
         isNotConfigured={!isChartConfigured}
         isError={isError}
         height={150}
-        isNotConfiguredMessage={t("please_configure_chart")}
+        isNotConfiguredMessage={isLayerLocked ? t("layer_locked_hint") : t("please_configure_chart")}
         errorMessage={t("cannot_render_chart_error")}
       />
 

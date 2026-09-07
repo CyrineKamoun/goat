@@ -6,7 +6,6 @@ import {
   CircularProgress,
   Divider,
   IconButton,
-  Paper,
   Stack,
   Tooltip,
   Typography,
@@ -21,6 +20,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import { type Job, dismissJob, useJobs } from "@/lib/api/processes";
 
 import { ArrowPopper as JobStatusMenu } from "@/components/ArrowPoper";
+import HeaderPopoverPaper, { HEADER_POPOVER_PLACEMENT } from "@/components/header/HeaderPopoverPaper";
 import JobProgressItem from "@/components/jobs/JobProgressItem";
 
 const StyledBadge = styled(Badge)(({ theme }) => ({
@@ -129,7 +129,9 @@ export default function JobsPopper() {
         jobs.jobs
           .filter(
             (job) =>
-              (job.processID === "layer_export" || job.processID === "print_report" || job.processID === "project_export") &&
+              (job.processID === "layer_export" ||
+                job.processID === "print_report" ||
+                job.processID === "project_export") &&
               job.status === "successful"
           )
           .map((job) => job.jobID)
@@ -144,7 +146,9 @@ export default function JobsPopper() {
       // 3. Were NOT already successful on initial load
       // 4. Haven't been downloaded yet in this session
       if (
-        (job.processID === "layer_export" || job.processID === "print_report" || job.processID === "project_export") &&
+        (job.processID === "layer_export" ||
+          job.processID === "print_report" ||
+          job.processID === "project_export") &&
         job.status === "successful" &&
         !initialSuccessfulJobsRef.current?.has(job.jobID) &&
         !downloadedJobsRef.current.has(job.jobID)
@@ -270,13 +274,7 @@ export default function JobsPopper() {
       {visibleJobs && visibleJobs.length > 0 && (
         <JobStatusMenu
           content={
-            <Paper
-              sx={{
-                width: "320px",
-                overflow: "auto",
-                pt: 4,
-                pb: 2,
-              }}>
+            <HeaderPopoverPaper sx={{ pt: 4, pb: 2 }}>
               <Box>
                 <Typography variant="body1" fontWeight="bold" sx={{ px: 4, py: 1 }}>
                   {t("job_status")}
@@ -311,10 +309,11 @@ export default function JobsPopper() {
                   })}
                 </Stack>
               </Box>
-            </Paper>
+            </HeaderPopoverPaper>
           }
           open={open}
-          placement="bottom"
+          placement={HEADER_POPOVER_PLACEMENT}
+          arrow={false}
           onClose={() => setOpen(false)}>
           {visibleJobs && visibleJobs.length > 0 ? (
             <Tooltip title={t("job_status")}>

@@ -1,21 +1,33 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("Workflow Management", () => {
-  test.beforeEach(async ({ page }) => {
-    // Create a fresh project for workflow tests
-    await page.goto("/projects");
-    await page.getByRole("button", { name: "New Project" }).click();
-    await expect(page.getByRole("heading", { name: "Create project" })).toBeVisible();
+import { deleteContentItem } from "../fixtures/content";
 
-    await page.getByLabel("Name").fill(`E2E Workflow Test ${Date.now()}`);
-    const folderField = page.getByLabel("Folder location");
-    await folderField.click();
-    const firstOption = page.getByRole("option").first();
-    await expect(firstOption).toBeVisible({ timeout: 5000 });
-    await firstOption.click();
-    await page.getByRole("button", { name: "Create" }).click();
+test.describe("Workflow Management", () => {
+  // Set by beforeEach, read by afterEach — safe as a describe-scoped
+  // variable because Playwright never runs two tests of the same describe
+  // concurrently within one worker.
+  let projectName: string;
+
+  test.beforeEach(async ({ page }) => {
+    // Create a fresh project for workflow tests. The old dedicated
+    // /projects page now redirects to /content; project creation lives
+    // behind its "Add new" menu instead.
+    await page.goto("/content");
+    await page.getByRole("button", { name: "Add new" }).click();
+    await page.getByRole("menuitem", { name: "New Project" }).click();
+    await expect(page.getByRole("heading", { name: "New Project" })).toBeVisible();
+
+    // The dialog asks for a name and nothing else — the destination is the
+    // folder being browsed.
+    projectName = `E2E Workflow Test ${Date.now()}`;
+    await page.getByLabel("New Project").fill(projectName);
+    await page.getByRole("button", { name: "Create project" }).click();
 
     await expect(page).toHaveURL(/\/map\//, { timeout: 30000 });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await deleteContentItem(page, projectName);
   });
 
   test("create a new workflow and see the canvas", async ({ page }) => {

@@ -1,15 +1,5 @@
 import { Delete } from "@mui/icons-material";
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Stack,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { IconButton, Tooltip } from "@mui/material";
 import type { GridColDef, GridRenderCellParams } from "@mui/x-data-grid";
 import { DataGrid } from "@mui/x-data-grid";
 import { useState } from "react";
@@ -21,6 +11,7 @@ import { ICON_NAME } from "@p4b/ui/components/Icon";
 import { deleteAsset, updateAsset } from "@/lib/api/assets";
 import type { Marker } from "@/lib/validations/layer";
 
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 import NoValuesFound from "@/components/map/common/NoValuesFound";
 
 type ManageIconsDialogProps = {
@@ -113,44 +104,45 @@ export const ManageIconsDialog = ({ open, onClose, markers, onDelete, onUpdate }
   ];
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t("manage_icons")}</DialogTitle>
-      <DialogContent sx={{ px: 0 }}>
-        {markers.length ? (
-          <div style={{ height: 400, width: "100%" }}>
-            <DataGrid
-              rows={markers}
-              columns={columns}
-              getRowId={(row) => row.id || row.url}
-              disableColumnMenu
-              hideFooter
-              density="compact"
-              loading={loading} // <-- shows LinearProgress automatically
-              processRowUpdate={async (newRow, oldRow) => {
-                if (loading) return oldRow; // block edits if busy
-                if (newRow.name !== oldRow.name) {
-                  await handleUpdate(newRow.id || newRow.url, "name", newRow.name);
-                }
-                if (newRow.category !== oldRow.category) {
-                  await handleUpdate(newRow.id || newRow.url, "category", newRow.category);
-                }
-                return newRow;
-              }}
-            />
-          </div>
-        ) : (
-          <NoValuesFound text={t("no_custom_icons")} icon={ICON_NAME.IMAGE} />
-        )}
-      </DialogContent>
-      <DialogActions disableSpacing sx={{ pt: 6, pb: 2, justifyContent: "flex-end" }}>
-        <Stack direction="row" spacing={2}>
-          <Button onClick={onClose} variant="text" disabled={loading}>
-            <Typography variant="body2" fontWeight="bold">
-              {t("cancel")}
-            </Typography>
-          </Button>
-        </Stack>
-      </DialogActions>
-    </Dialog>
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      icon={ICON_NAME.IMAGE}
+      title={t("manage_icons")}
+      maxWidth={600}
+      // The grid rules run to the frame's edges; only the vertical padding a
+      // dialog body has is kept.
+      bleed
+      bodySx={{ py: 5 }}
+      // Nothing to confirm — the edits are saved as they are made, so the row
+      // only holds the way out.
+      closeDisabled={loading}
+      footer={<AppDialogFooter onCancel={onClose} cancelDisabled={loading} />}>
+      {markers.length ? (
+        <div style={{ height: 400, width: "100%" }}>
+          <DataGrid
+            rows={markers}
+            columns={columns}
+            getRowId={(row) => row.id || row.url}
+            disableColumnMenu
+            hideFooter
+            density="compact"
+            loading={loading} // <-- shows LinearProgress automatically
+            processRowUpdate={async (newRow, oldRow) => {
+              if (loading) return oldRow; // block edits if busy
+              if (newRow.name !== oldRow.name) {
+                await handleUpdate(newRow.id || newRow.url, "name", newRow.name);
+              }
+              if (newRow.category !== oldRow.category) {
+                await handleUpdate(newRow.id || newRow.url, "category", newRow.category);
+              }
+              return newRow;
+            }}
+          />
+        </div>
+      ) : (
+        <NoValuesFound text={t("no_custom_icons")} icon={ICON_NAME.IMAGE} />
+      )}
+    </AppDialog>
   );
 };

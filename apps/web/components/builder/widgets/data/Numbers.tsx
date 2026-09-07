@@ -22,9 +22,9 @@ interface NumbersDataProps {
 }
 
 export const NumbersDataWidget = ({ config: rawConfig }: NumbersDataProps) => {
-  const { i18n } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   const theme = useTheme();
-  const { config, queryParams, layerId } = useChartWidget(
+  const { config, queryParams, layerId, isLayerLocked } = useChartWidget(
     rawConfig,
     numbersDataConfigSchema,
     aggregationStatsQueryParams
@@ -69,15 +69,20 @@ export const NumbersDataWidget = ({ config: rawConfig }: NumbersDataProps) => {
     return null;
   }, [config?.setup?.icon, theme.palette.mode]);
 
+  // D7: `layer_project_id` alone doesn't say whether the layer is locked
+  // for this viewer — `isLayerLocked` (from useChartWidget) does, and
+  // withholding it here is what shows the locked hint instead of a blank
+  // widget (queryParams itself doesn't depend on layerId).
   const isWidgetConfigured = useMemo(() => {
-    return config?.setup?.layer_project_id && queryParams;
-  }, [config, queryParams]);
+    return config?.setup?.layer_project_id && queryParams && !isLayerLocked;
+  }, [config, queryParams, isLayerLocked]);
 
   return (
     <>
       <WidgetStatusContainer
         isLoading={isLoading && !aggregationStats && !isError}
         isNotConfigured={!isWidgetConfigured}
+        isNotConfiguredMessage={isLayerLocked ? t("layer_locked_hint") : undefined}
         isError={isError}
         height={100}
       />
