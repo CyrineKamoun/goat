@@ -17,6 +17,7 @@ import type { CatalogSpatialFilter } from "@/lib/catalog/spatial";
 import type { CatalogAggregation, CatalogCollection } from "@/lib/validations/catalog";
 
 import type { FlowController } from "@/hooks/addLayer/flow";
+import { useShareNotice } from "@/hooks/addLayer/useShareNotice";
 import { FACET_HIDDEN } from "@/hooks/catalog/useCatalogFacetSections";
 
 /**
@@ -98,6 +99,7 @@ export const useCatalogFlow = ({
   viewport?: [number, number, number, number];
 }): CatalogFlow => {
   const { t } = useTranslation("common");
+  const notice = useShareNotice(projectId);
 
   const [favouritesOnly, setFavouritesOnly] = useState(false);
   const [q, setQValue] = useState("");
@@ -267,9 +269,10 @@ export const useCatalogFlow = ({
         : ids.length === 0
           ? t("catalog_select_datasets_first")
           : undefined,
+      notice,
       run: addSelection,
     }),
-    [ids.length, t, projectId, addSelection]
+    [ids.length, t, projectId, addSelection, notice]
   );
 
   return {

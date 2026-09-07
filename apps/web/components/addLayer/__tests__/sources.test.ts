@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
 import { ADD_LAYER_SOURCES, sourcesFor } from "@/components/addLayer/sources";
 
 /**
@@ -28,12 +30,18 @@ describe("sourcesFor", () => {
     ]);
   });
 
-  it("gives every source either a flow or a handoff, never neither", () => {
-    // A source with no flow and no handoff would open an empty dialog.
-    const withFlow = new Set(["upload", "create", "catalog"]);
-    for (const source of ADD_LAYER_SOURCES) {
-      expect(withFlow.has(source.id) || source.handoff !== undefined).toBe(true);
-    }
+  it("pins the datasets shelf's own entry", () => {
+    // Sized like the catalog picker — a spaces rail beside a grid of cards —
+    // and laying out its own edges, so the dialog must not pad it.
+    expect(ADD_LAYER_SOURCES.find((s) => s.id === "explorer")).toEqual({
+      id: "explorer",
+      labelKey: "my_datasets",
+      group: "existing",
+      icon: ICON_NAME.DATABASE,
+      needsProject: true,
+      wide: true,
+      width: "min(1360px, 94vw)",
+    });
   });
 
   it("keeps a label key for every source", () => {

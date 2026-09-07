@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock("@/lib/api/processes", () => ({ useJobs: () => ({ mutate: vi.fn() }) }));
+// useShareNotice's dependencies — no notice fixtures needed for this flow's tests.
+vi.mock("@/lib/api/projects", () => ({ useProject: () => ({ project: undefined, isLoading: false }) }));
+vi.mock("@/lib/api/teams", () => ({ useTeams: () => ({ teams: [], isLoading: false }) }));
 vi.mock("@/hooks/store/ContextHooks", () => ({
   useAppDispatch: () => vi.fn(),
   useAppSelector: () => [],

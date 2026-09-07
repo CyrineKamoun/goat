@@ -1,20 +1,11 @@
 "use client";
 
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Stack,
-  Typography,
-  useTheme,
-} from "@mui/material";
+import { Box } from "@mui/material";
 import { Trans, useTranslation } from "react-i18next";
 
-import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 /**
  * The panel a file's own settings open in, on top of whatever opened it.
@@ -36,77 +27,43 @@ const LayerSetupDialog = ({
   children,
 }: {
   open: boolean;
-  /** The file being set up, for the accessible name of the dialog. */
+  /** The file being set up: named in the header's second line, and the dialog's
+   * accessible name. */
   fileName: string;
   onClose: () => void;
   onSave: () => void;
   children: React.ReactNode;
 }) => {
   const { t } = useTranslation("common");
-  const theme = useTheme();
 
   return (
-    <Dialog
+    <AppDialog
       open={open}
       onClose={onClose}
-      aria-label={fileName}
-      maxWidth={false}
+      icon={ICON_NAME.TABLE}
+      title={t("upload_set_up_columns")}
+      // The file is named in the second line rather than in the title: that line wraps
+      // where a heading would be pushed out of the frame by an export named after the
+      // query that produced it.
+      subtitle={
+        <Box component="span" sx={{ display: "block", overflowWrap: "anywhere" }}>
+          <Trans
+            i18nKey="upload_set_up_intro"
+            t={t}
+            values={{ file: fileName }}
+            components={{ file: <Box component="span" sx={{ fontWeight: 700 }} /> }}
+          />
+        </Box>
+      }
+      // Named after the file being set up, which is what tells two of these apart.
+      ariaLabel={fileName}
       // Wider than the screen that opened it: a preview can run to dozens of columns, and
       // this is the one place they are meant to be read.
-      PaperProps={{ sx: { width: "min(1100px, 94vw)" } }}>
-      {/* `DialogTitle` with plain text, as every other dialog here does: the theme styles
-          it (padding included), so a custom `variant` and weight would make this the one
-          title that does not match. */}
-      <DialogTitle>
-        <Stack direction="row" alignItems="flex-start" spacing={3}>
-          <Stack spacing={1} sx={{ flex: 1, minWidth: 0 }}>
-            {t("upload_set_up_columns")}
-            {/* The file is named here rather than in the title: this is a sentence about
-                it, and body text wraps where a heading would be pushed out of the frame by
-                an export named after the query that produced it. */}
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ overflowWrap: "anywhere" }}>
-              <Trans
-                i18nKey="upload_set_up_intro"
-                t={t}
-                values={{ file: fileName }}
-                components={{ file: <Box component="span" sx={{ fontWeight: 700 }} /> }}
-              />
-            </Typography>
-          </Stack>
-          <IconButton size="small" onClick={onClose} aria-label={t("close")}>
-            <Icon iconName={ICON_NAME.XCLOSE} style={{ fontSize: 15 }} />
-          </IconButton>
-        </Stack>
-      </DialogTitle>
-
-      <DialogContent sx={{ pt: 3 }}>{children}</DialogContent>
-
-      <DialogActions
-        disableSpacing
-        sx={{
-          "&&.MuiDialogActions-root": {
-            borderTop: `1px solid ${theme.palette.divider}`,
-            py: 4,
-            px: 6,
-          },
-          justifyContent: "flex-end",
-          gap: 2,
-        }}>
-        <Button variant="text" onClick={onClose}>
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-        <Button variant="contained" color="primary" onClick={onSave}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("confirm")}
-          </Typography>
-        </Button>
-      </DialogActions>
-    </Dialog>
+      maxWidth="min(1100px, 94vw)"
+      bodySx={{ pt: 3 }}
+      footer={<AppDialogFooter onCancel={onClose} primaryLabel={t("confirm")} onPrimary={onSave} />}>
+      {children}
+    </AppDialog>
   );
 };
 

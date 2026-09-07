@@ -4,6 +4,7 @@ import { type FieldErrors, type UseFormRegister, useForm } from "react-hook-form
 import { useTranslation } from "react-i18next";
 
 import { type BundleTypeDef, detectBundleType } from "@/lib/api/bundles";
+import { refreshContentFeed } from "@/lib/api/content";
 import { getWritableFolders, useFolders } from "@/lib/api/folders";
 import { useProject } from "@/lib/api/projects";
 import {
@@ -20,6 +21,7 @@ import { layerMetadataSchema } from "@/lib/validations/layer";
 import { useDatasetImport } from "@/hooks/addLayer/useDatasetImport";
 
 import type { FlowController } from "@/hooks/addLayer/flow";
+import { useShareNotice } from "@/hooks/addLayer/useShareNotice";
 
 /**
  * Uploading a file as a dataset: state, validation and submit — no UI.
@@ -84,6 +86,7 @@ export const useUploadFlow = ({
   const { t } = useTranslation("common");
 
   const { project } = useProject(projectId);
+  const notice = useShareNotice(projectId);
   const { importDataset } = useDatasetImport();
   const queryParams: GetContentQueryParams = { order: "descendent", order_by: "updated_at" };
   const { folders: allFolders } = useFolders(queryParams);
@@ -242,6 +245,11 @@ export const useUploadFlow = ({
       ...(isTabular && sheet ? { sheetName: sheet } : {}),
     });
     reset();
+    // Also refreshed on job completion (`useJobStatus`, wired by the Content
+    // page) — this one is for anything the request already committed before
+    // the dialog closed, so the feed is never behind what the server already
+    // has by the time this call returns.
+    refreshContentFeed();
     onDone?.();
   }, [
     file,
@@ -289,9 +297,10 @@ export const useUploadFlow = ({
       label: t("upload"),
       // One screen, so one condition: a file, a name that validates, somewhere to put it.
       disabled: !file || !isValid || !selectedFolder,
+      notice,
       run: submit,
     }),
-    [file, isValid, selectedFolder, submit, t]
+    [file, isValid, selectedFolder, submit, t, notice]
   );
 
   return {

@@ -24,7 +24,11 @@ const addCatalogLayersToProject = vi.fn();
 vi.mock("@/lib/api/projects", () => ({
   addCatalogLayersToProject: (...args: unknown[]) => addCatalogLayersToProject(...args),
   projectLayersKey: (id: string) => `project-layers-${id}`,
+  // useShareNotice's dependency — no space/share fields in this flow's fixtures,
+  // so it never produces a notice here.
+  useProject: () => ({ project: undefined, isLoading: false }),
 }));
+vi.mock("@/lib/api/teams", () => ({ useTeams: () => ({ teams: [], isLoading: false }) }));
 
 import { useCatalogFlow } from "@/hooks/addLayer/useCatalogFlow";
 

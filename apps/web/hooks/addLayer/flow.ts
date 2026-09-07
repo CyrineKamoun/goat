@@ -10,6 +10,8 @@ export type FlowAction = {
   disabled: boolean;
   /** Shown as a tooltip when disabled, for reasons the label cannot carry. */
   reason?: string;
+  /** D7: who else the project belongs to or is shared with, when there is anyone. */
+  notice?: string;
   run: () => void | Promise<void>;
 };
 

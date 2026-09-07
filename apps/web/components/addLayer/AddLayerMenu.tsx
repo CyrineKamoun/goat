@@ -1,27 +1,13 @@
 "use client";
 
-import {
-  Divider,
-  ListItemIcon,
-  ListSubheader,
-  Menu,
-  MenuItem,
-  Typography,
-  useTheme,
-} from "@mui/material";
+import { Divider, ListItemIcon, ListSubheader, Menu, MenuItem, Typography, useTheme } from "@mui/material";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import type { AddLayerSourceType } from "@/types/common";
-
 import AddLayerDialog from "@/components/addLayer/AddLayerDialog";
-import {
-  ADD_LAYER_GROUPS,
-  type AddLayerSourceId,
-  sourcesFor,
-} from "@/components/addLayer/sources";
+import { ADD_LAYER_GROUPS, type AddLayerSourceId, sourcesFor } from "@/components/addLayer/sources";
 
 /**
  * Where a layer comes from: a menu of sources, and the dialog the chosen one opens.
@@ -45,7 +31,6 @@ const AddLayerMenu = ({
   placement = "bottom",
   extra,
   onSourceClose,
-  onOpenLegacy,
 }: {
   /** The trigger; the menu is open whenever this is set. */
   anchorEl: HTMLElement | null;
@@ -66,19 +51,14 @@ const AddLayerMenu = ({
    * what a source adds to — the datasets list — revalidates here.
    */
   onSourceClose?: () => void;
-  /**
-   * Opens the dialog a source still lives in. Without it, sources that have not been
-   * rebuilt are left out of the menu entirely.
-   */
-  onOpenLegacy?: (source: AddLayerSourceType) => void;
 }) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
   const [openSource, setOpenSource] = useState<AddLayerSourceId | null>(null);
 
-  const sources = sourcesFor({ hasProject: !!projectId })
-    .filter((entry) => entry.handoff === undefined || !!onOpenLegacy)
-    .filter((entry) => !allowed || allowed.includes(entry.id));
+  const sources = sourcesFor({ hasProject: !!projectId }).filter(
+    (entry) => !allowed || allowed.includes(entry.id)
+  );
 
   /**
    * The entries, in their groups, with empty groups dropped.
@@ -95,10 +75,7 @@ const AddLayerMenu = ({
           key: source.id,
           label: t(source.labelKey),
           icon: source.icon,
-          onSelect: () => {
-            if (source.handoff !== undefined) onOpenLegacy?.(source.handoff);
-            else setOpenSource(source.id);
-          },
+          onSelect: () => setOpenSource(source.id),
         })),
       ...(group.id === "new" ? (extra ?? []) : []),
     ],
@@ -162,7 +139,6 @@ const AddLayerMenu = ({
             </MenuItem>
           )),
         ])}
-
       </Menu>
 
       <AddLayerDialog

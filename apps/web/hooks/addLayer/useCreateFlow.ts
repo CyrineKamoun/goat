@@ -13,6 +13,7 @@ import { createEmptyLayerSchema, isCreatableKind } from "@/lib/validations/layer
 import { useAppDispatch } from "@/hooks/store/ContextHooks";
 
 import type { FlowController } from "@/hooks/addLayer/flow";
+import { useShareNotice } from "@/hooks/addLayer/useShareNotice";
 
 /**
  * Creating an empty layer: name, geometry, fields — no UI.
@@ -57,6 +58,7 @@ export const useCreateFlow = ({
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const { mutate: mutateJobs } = useJobs({ read: false });
+  const notice = useShareNotice(projectId);
 
   const [isBusy, setIsBusy] = useState(false);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
@@ -144,9 +146,10 @@ export const useCreateFlow = ({
       label: t("create_layer"),
       disabled: !isValid || isBusy || !projectId,
       reason: projectId ? undefined : t("create_layer_needs_project"),
+      notice,
       run: submit,
     }),
-    [isValid, isBusy, projectId, submit, t]
+    [isValid, isBusy, projectId, submit, t, notice]
   );
 
   return {

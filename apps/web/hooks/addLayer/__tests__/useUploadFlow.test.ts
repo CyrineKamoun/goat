@@ -1,14 +1,20 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 // The flow is headless, so it can be exercised without mounting a dialog — which
 // is the point of the controller/host split, and impossible with the modal this
 // replaces. Only the edges are mocked: the network, the store, and the parser.
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-vi.mock("@/lib/api/datasets", () => ({ requestDatasetUpload: vi.fn() }));
-vi.mock("@/lib/api/layers", () => ({ createLayer: vi.fn() }));
+const { refreshContentFeedMock } = vi.hoisted(() => ({ refreshContentFeedMock: vi.fn() }));
+vi.mock("@/lib/api/content", () => ({ refreshContentFeed: refreshContentFeedMock }));
+vi.mock("@/lib/api/datasets", () => ({
+  requestDatasetUpload: vi.fn().mockResolvedValue({ url: "https://s3.example", fields: { key: "k" } }),
+}));
+vi.mock("@/lib/api/layers", () => ({ createLayer: vi.fn().mockResolvedValue({ jobID: "job-1" }) }));
 vi.mock("@/lib/api/processes", () => ({ useJobs: () => ({ mutate: vi.fn() }) }));
-vi.mock("@/lib/api/projects", () => ({ useProject: () => ({ project: undefined }) }));
+vi.mock("@/lib/api/projects", () => ({ useProject: () => ({ project: undefined, isLoading: false }) }));
+// useShareNotice's other dependency — no notice fixtures needed for this flow's tests.
+vi.mock("@/lib/api/teams", () => ({ useTeams: () => ({ teams: [], isLoading: false }) }));
 vi.mock("@/lib/services/s3", () => ({ uploadFileToS3: vi.fn() }));
 // Only the read is stubbed. `derivePreview` is the real one, so the header row and the row
 // count are still derived by the code under test rather than asserted against a fixture.
@@ -22,7 +28,7 @@ vi.mock("@/hooks/store/ContextHooks", () => ({
   useAppSelector: () => [],
 }));
 
-const FOLDERS = [{ id: "folder-1", name: "Home" }];
+const FOLDERS = [{ id: "11111111-1111-1111-1111-111111111111", name: "Home" }];
 vi.mock("@/lib/api/folders", () => ({
   useFolders: () => ({ folders: FOLDERS }),
   getWritableFolders: (folders: unknown) => folders,
@@ -76,6 +82,25 @@ describe("useUploadFlow", () => {
 
     act(() => result.current.upload.setDescription("Every cycle path in the city"));
     expect(result.current.upload.values.description).toBe("Every cycle path in the city");
+  });
+
+  it("refreshes the content feed immediately on submit, without waiting for the import", async () => {
+    // The import itself is not awaited (see the hook's own docs) — the dialog
+    // that hosts this closes before the server has necessarily created
+    // anything. This immediate refresh is a best-effort catch for whatever
+    // the request already committed; the Content page's `useJobStatus` wiring
+    // is what catches the import once the background job actually finishes.
+    refreshContentFeedMock.mockReset();
+    const onDone = vi.fn();
+    const { result } = renderHook(() => useUploadFlow({ defaultFolderId: "11111111-1111-1111-1111-111111111111", onDone }));
+
+    act(() => result.current.upload.setFile(file("roads.geojson")));
+    await waitFor(() => expect(result.current.action.disabled).toBe(false));
+
+    act(() => result.current.action.run());
+
+    expect(refreshContentFeedMock).toHaveBeenCalledTimes(1);
+    expect(onDone).toHaveBeenCalledTimes(1);
   });
 
   it("resets everything, so a reopened host starts clean", () => {

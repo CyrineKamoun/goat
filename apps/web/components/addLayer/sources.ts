@@ -1,16 +1,13 @@
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
-import { AddLayerSourceType } from "@/types/common";
-
 /**
  * The sources a layer can come from — one menu entry each, opening a dialog of its own.
  *
  * Labels are single words where a single word will do: the button is already called Add
  * Layer, so "Dataset Upload" and "Dataset Explorer" repeated its subject back at the reader.
  *
- * A source either has a flow of its own (a controller + a body) or, until it does, a
- * `handoff` to the dialog that still owns it. Hosts filter the list; nothing else decides
- * which entries exist.
+ * Every source has a flow of its own (a controller + a body). Hosts filter the list;
+ * nothing else decides which entries exist.
  */
 
 export type AddLayerSourceId = "upload" | "explorer" | "catalog" | "create";
@@ -39,8 +36,6 @@ export type AddLayerSource = {
   wide?: boolean;
   /** How wide this source's dialog is. A form's 860 by default. */
   width?: number | string;
-  /** The legacy dialog to open until this source has a flow. */
-  handoff?: AddLayerSourceType;
 };
 
 export const ADD_LAYER_SOURCES: AddLayerSource[] = [
@@ -53,7 +48,6 @@ export const ADD_LAYER_SOURCES: AddLayerSource[] = [
     // than a form's 860 and nothing like a catalog's 1360. The file's own settings open in
     // a dialog on top rather than widening this one.
     width: "min(900px, 94vw)",
-
   },
   {
     id: "explorer",
@@ -64,7 +58,8 @@ export const ADD_LAYER_SOURCES: AddLayerSource[] = [
     icon: ICON_NAME.DATABASE,
     needsProject: true,
     wide: true,
-    handoff: AddLayerSourceType.DatasourceExplorer,
+    // A spaces rail beside a grid of cards: the catalog picker's width.
+    width: "min(1360px, 94vw)",
   },
   {
     id: "catalog",
