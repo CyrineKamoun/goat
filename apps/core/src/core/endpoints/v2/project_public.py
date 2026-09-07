@@ -25,19 +25,26 @@ router = APIRouter()
 @router.get(
     "/{project_id}/public",
     summary="Get public project",
-    response_model=ProjectPublicRead | None,
+    response_model=ProjectPublicRead,
     response_model_exclude_none=True,
 )
 async def get_public_project(
     project_id: str,
     async_session: AsyncSession = Depends(get_db),
-) -> ProjectPublicRead | None:
-    """
-    Get shared project
+) -> ProjectPublicRead:
+    """Get the public config for a published project.
+
+    404 both when the project was never published and when it has since
+    been unpublished (a soft delete unpublishes the project) — a project's
+    public page must never keep resolving after either.
     """
     result = await crud_project.get_public_project(
         async_session=async_session, project_id=project_id
     )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+        )
 
     return result
 
@@ -55,6 +62,10 @@ async def publish_project(
     """
     Publish a project
     """
+    # 404 if the project itself is trashed — publishing
+    # a project nobody can see must not resurrect a public page for it.
+    await crud_project.get_live_or_404(async_session, UUID(project_id))
+
     result = ProjectPublicRead.model_validate(
         await crud_project.publish_project(
             async_session=async_session, project_id=project_id
@@ -76,6 +87,12 @@ async def unpublish_project(
     """
     Unpublish a project
     """
+    # 404 if the project itself is trashed. A delete
+    # already unpublishes internally (crud_project.delete) — this only
+    # guards a direct call to this endpoint against an already-trashed
+    # project.
+    await crud_project.get_live_or_404(async_session, UUID(project_id))
+
     await crud_project.unpublish_project(
         async_session=async_session, project_id=project_id
     )
@@ -104,6 +121,9 @@ async def assign_custom_domain(
     user_id: UUID4 = Depends(get_user_id),
 ) -> ProjectPublicRead:
     """Bind an active custom domain to a published project."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, UUID(project_id))
+
     result = await async_session.execute(
         select(ProjectPublic).where(ProjectPublic.project_id == UUID(project_id))
     )
@@ -144,6 +164,9 @@ async def unassign_custom_domain(
     user_id: UUID4 = Depends(get_user_id),
 ) -> None:
     """Clear the custom-domain assignment from a published project."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, UUID(project_id))
+
     result = await async_session.execute(
         select(ProjectPublic).where(ProjectPublic.project_id == UUID(project_id))
     )
@@ -189,6 +212,9 @@ async def set_tracking_settings(
     of ``analytics_id`` in the body is detected via ``model_fields_set`` so
     an explicit null (= tracking off) is distinguishable from omission.
     """
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, UUID(project_id))
+
     if not payload.model_fields_set:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -1,4 +1,5 @@
 import os
+from uuid import UUID
 
 from pydantic import PostgresDsn, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -79,6 +80,13 @@ class Settings(BaseSettings):
     DEFAULT_QUOTA_PROJECTS: int = 10000
     DEFAULT_QUOTA_EDITORS: int = 1000
     DEFAULT_QUOTA_VIEWERS: int = 1000
+
+    # ------------------------------------------------------------------
+    # Templates (T11b): organization whose space owns the seeded GOAT
+    # layout starters. None falls back to the default user's personal
+    # space (local dev without a designated plan4better organization).
+    # ------------------------------------------------------------------
+    GOAT_TEMPLATES_ORGANIZATION_ID: UUID | None = None
 
     # ------------------------------------------------------------------
     # Object storage — data bucket (S3-compatible: AWS / Hetzner / MinIO)

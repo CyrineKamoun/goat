@@ -1,29 +1,30 @@
 import json
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
+from fastapi import HTTPException, status
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import and_, not_, or_
 
+from core.core.config import settings
 from core.core.content import (
     build_shared_with_object,
     create_query_shared_content,
+    fetch_grants_by_resource,
+    grant_conditions,
     update_content_by_id,
 )
 from core.crud.base import CRUDBase
 from core.crud.crud_layer_project import layer_project as crud_layer_project
 from core.crud.crud_user_project import user_project as crud_user_project
 from core.db.models import (
-    Organization,
     Project,
-    ProjectOrganizationLink,
-    ProjectTeamLink,
     ResourceGrant,
     Role,
-    Team,
 )
 from core.db.models._link_model import UserProjectLink
 from core.db.models.project import ProjectPublic
@@ -37,13 +38,123 @@ from core.schemas.project import (
     ProjectPublicRead,
 )
 
+# Default initial view state for a project with no per-user or owner
+# `UserProjectLink` row yet (a brand-new project, or one whose owner's row
+# was lost to `ON DELETE CASCADE` on user removal).
+DEFAULT_INITIAL_VIEW_STATE: dict[str, Any] = {
+    "zoom": 5,
+    "pitch": 0,
+    "bearing": 0,
+    "latitude": 51.01364693631891,
+    "max_zoom": 20,
+    "min_zoom": 0,
+    "longitude": 9.576740589534126,
+}
+
 
 class CRUDProject(CRUDBase[Project, Any, Any]):
+    async def space_labels(
+        self, async_session: AsyncSession, space_ids: list[UUID | None]
+    ) -> dict[UUID, dict[str, str | None]]:
+        """``space_kind`` and ``space_name`` per space, in one round trip.
+
+        The name is the owning team's or organisation's. A personal space has
+        none: its owner's display name is not what a project's badge shows, and
+        exposing it would leak the owner to anyone who can read the project.
+        ``space_id`` itself is already on the project row, so it is not
+        returned here.
+        """
+        wanted = [sid for sid in space_ids if sid is not None]
+        if not wanted:
+            return {}
+        result = await async_session.execute(
+            text(
+                "SELECT s.id, s.kind, CASE s.kind "
+                "WHEN 'team' THEN t.name WHEN 'organization' THEN o.name END AS name "
+                f"FROM {settings.SCHEMA}.space s "
+                f"LEFT JOIN {settings.SCHEMA}.team t ON t.id = s.team_id "
+                f"LEFT JOIN {settings.SCHEMA}.organization o ON o.id = s.organization_id "
+                "WHERE s.id = ANY(CAST(:ids AS uuid[]))"
+            ),
+            {"ids": [str(sid) for sid in dict.fromkeys(wanted)]},
+        )
+        return {
+            row.id: {"space_kind": row.kind, "space_name": row.name} for row in result
+        }
+
+    async def space_label(
+        self, async_session: AsyncSession, space_id: UUID | None
+    ) -> dict[str, str | None]:
+        """`space_labels` for a single project's space; empty for no space."""
+        if space_id is None:
+            return {"space_kind": None, "space_name": None}
+        labels = await self.space_labels(async_session, [space_id])
+        return labels.get(space_id, {"space_kind": None, "space_name": None})
+
+    async def personally_owned_layer_counts(
+        self, async_session: AsyncSession, project_ids: list[UUID | None]
+    ) -> dict[UUID, int | None]:
+        """Per project: the count of its linked live layers whose own space
+        is a *personal* space — ``None`` for a project that is itself in a
+        personal space (D13 health check; Home shows this only on
+        team/organisation projects).
+
+        One round trip for the whole batch (a correlated subquery per row),
+        never a per-row query — the listing page calls this once, same as
+        `space_labels`.
+        """
+        wanted = [pid for pid in project_ids if pid is not None]
+        if not wanted:
+            return {}
+        result = await async_session.execute(
+            text(
+                "SELECT p.id AS project_id, "
+                "CASE WHEN sp.kind = 'personal' THEN NULL ELSE ("
+                "  SELECT COUNT(DISTINCT lp.layer_id) "
+                f"    FROM {settings.SCHEMA}.layer_project lp "
+                f"    JOIN {settings.SCHEMA}.layer l "
+                "         ON l.id = lp.layer_id AND l.deleted_at IS NULL "
+                f"    JOIN {settings.SCHEMA}.space ls "
+                "         ON ls.id = l.space_id AND ls.kind = 'personal' "
+                "   WHERE lp.project_id = p.id"
+                ") END AS personally_owned_layer_count "
+                f"FROM {settings.SCHEMA}.project p "
+                f"LEFT JOIN {settings.SCHEMA}.space sp ON sp.id = p.space_id "
+                "WHERE p.id = ANY(CAST(:ids AS uuid[]))"
+            ),
+            {"ids": [str(pid) for pid in dict.fromkeys(wanted)]},
+        )
+        return {row.project_id: row.personally_owned_layer_count for row in result}
+
+    async def personally_owned_layer_count(
+        self, async_session: AsyncSession, project_id: UUID | None
+    ) -> int | None:
+        """`personally_owned_layer_counts` for a single project."""
+        if project_id is None:
+            return None
+        counts = await self.personally_owned_layer_counts(async_session, [project_id])
+        return counts.get(project_id)
+
+    async def get_my_role(
+        self, async_session: AsyncSession, *, project_id: UUID, user_id: UUID
+    ) -> str | None:
+        """Strongest project role across every path the user reaches the project
+        by (ownership, direct/team/organisation grant, folder grant), via
+        `effective_role` — prefixed with ``"project-"``. None when there is no
+        path.
+        """
+        result = await async_session.execute(
+            text(f"SELECT {settings.SCHEMA}.effective_role('project', :pid, :uid)"),
+            {"pid": str(project_id), "uid": str(user_id)},
+        )
+        role = result.scalar()
+        return f"project-{role}" if role else None
+
     async def create(
         self,
         async_session: AsyncSession,
         project_in: Project,
-        initial_view_state: InitialViewState,
+        initial_view_state: InitialViewState | None = None,
     ) -> IProjectRead:
         """Create project"""
 
@@ -52,16 +163,14 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
             db=async_session,
             obj_in=project_in,
         )
-        # Default initial view state
-        initial_view_state = {
-            "zoom": 5,
-            "pitch": 0,
-            "bearing": 0,
-            "latitude": 51.01364693631891,
-            "max_zoom": 20,
-            "min_zoom": 0,
-            "longitude": 9.576740589534126,
-        }
+        # Seed the owner's view state from the create payload when one was
+        # given; fall back to the default otherwise (e.g. a caller with no
+        # view state of its own).
+        seeded_view_state: dict[str, Any] = (
+            initial_view_state.model_dump()
+            if initial_view_state is not None
+            else dict(DEFAULT_INITIAL_VIEW_STATE)
+        )
 
         # Create link between user and project for initial view state
         await crud_user_project.create(
@@ -69,11 +178,36 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
             obj_in=UserProjectLink(
                 user_id=project.user_id,
                 project_id=project.id,
-                initial_view_state=initial_view_state,
+                initial_view_state=seeded_view_state,
             ).model_dump(),
         )
         # Doing unneeded type conversion to make sure the relations of project are not loaded
-        return IProjectRead(**project.model_dump())
+        return IProjectRead(
+            **project.model_dump(),
+            **await self.space_label(async_session, project.space_id),
+            personally_owned_layer_count=await self.personally_owned_layer_count(
+                async_session, project.id
+            ),
+        )
+
+    async def get_live_or_404(
+        self, async_session: AsyncSession, project_id: UUID
+    ) -> Project:
+        """Fetch a project, 404ing if it doesn't exist or is trashed.
+
+        A trashed project behaves as gone for every normal route that reaches
+        it via `project_id` in the path — its sub-resources (layers,
+        layer-tree, groups, report layouts, workflows) included, so a soft
+        delete can't be worked around by going through a child route. The
+        trash listing (`GET /content/trash`) is the only place a trashed
+        project is still surfaced.
+        """
+        project = await self.get(async_session, id=project_id)
+        if project is None or project.deleted_at is not None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+            )
+        return project
 
     async def get_projects(
         self,
@@ -95,31 +229,17 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
         # Build query and filters
         use_folder_grant_query = False
         if team_id or organization_id:
-            grant_conditions = []
-            if team_id:
-                grant_conditions.append(
-                    and_(
-                        ResourceGrant.grantee_type == "team",
-                        ResourceGrant.grantee_id == team_id,
-                    )
-                )
-            if organization_id:
-                grant_conditions.append(
-                    and_(
-                        ResourceGrant.grantee_type == "organization",
-                        ResourceGrant.grantee_id == organization_id,
-                    )
-                )
+            grantee_conditions = grant_conditions(None, team_id, organization_id)
             if folder_id:
                 # Check whether this folder is accessible via a ResourceGrant for the
-                # given team/org. If so, bypass the ProjectTeamLink join — projects in
-                # folder-shared folders have no such link.
+                # given team/org. If so, bypass the direct-grant filter below —
+                # projects in folder-shared folders have no such grant of their own.
                 grant_result = await async_session.execute(
                     select(ResourceGrant.id)
                     .where(
                         ResourceGrant.resource_type == "folder",
                         ResourceGrant.resource_id == folder_id,
-                        or_(*grant_conditions),
+                        or_(*grantee_conditions),
                     )
                     .limit(1)
                 )
@@ -131,7 +251,7 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
                 # into the folder, not at the root level.
                 folder_granted_ids = select(ResourceGrant.resource_id).where(
                     ResourceGrant.resource_type == "folder",
-                    or_(*grant_conditions),
+                    or_(*grantee_conditions),
                 )
                 # NULL-safe: folder_id IS NULL means no folder, so always include it.
                 # Without this, NULL NOT IN (...) evaluates to UNKNOWN (= excluded).
@@ -145,28 +265,28 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
             # Check if the folder is shared with the user via a grant.
             # If so, show all projects in the folder (not just the user's own).
             has_grant = False
-            grant_conditions = []
+            folder_grant_conditions = []
             if team_ids:
-                grant_conditions.append(
+                folder_grant_conditions.append(
                     and_(
                         ResourceGrant.grantee_type == "team",
                         ResourceGrant.grantee_id.in_(team_ids),
                     )
                 )
             if user_organization_id:
-                grant_conditions.append(
+                folder_grant_conditions.append(
                     and_(
                         ResourceGrant.grantee_type == "organization",
                         ResourceGrant.grantee_id == user_organization_id,
                     )
                 )
-            if grant_conditions:
+            if folder_grant_conditions:
                 grant_result = await async_session.execute(
                     select(ResourceGrant.id)
                     .where(
                         ResourceGrant.resource_type == "folder",
                         ResourceGrant.resource_id == folder_id,
-                        or_(*grant_conditions),
+                        or_(*folder_grant_conditions),
                     )
                     .limit(1)
                 )
@@ -178,18 +298,24 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
         else:
             filters = [Project.user_id == user_id]
 
+        # Every listing hides trashed projects; effective_role already hides
+        # them from anyone but the space owner/admin restoring them. A
+        # frozen template-source copy (T2) is hidden from every listing too
+        # — only the template row pointing at it is content a user sees.
+        filters.append(Project.deleted_at.is_(None))
+        filters.append(Project.is_template_source.is_(False))
+
         if ids:
-            query = select(Project).where(Project.id.in_(ids))
+            query = select(Project).where(
+                Project.id.in_(ids),
+                Project.deleted_at.is_(None),
+                Project.is_template_source.is_(False),
+            )
         elif use_folder_grant_query:
-            # Folder is shared via ResourceGrant — bypass team/org link join so we
-            # see all projects in the folder regardless of ProjectTeamLink entries.
+            # Folder is shared via ResourceGrant — bypass the team/org grant join
+            # so we see all projects in the folder regardless of their own grants.
             query = create_query_shared_content(
                 Project,
-                ProjectTeamLink,
-                ProjectOrganizationLink,
-                Team,
-                Organization,
-                Role,
                 filters,
                 team_id=None,
                 organization_id=None,
@@ -197,11 +323,6 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
         else:
             query = create_query_shared_content(
                 Project,
-                ProjectTeamLink,
-                ProjectOrganizationLink,
-                Team,
-                Organization,
-                Role,
                 filters,
                 team_id=team_id,
                 organization_id=organization_id,
@@ -224,15 +345,36 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
         )
         effective_team_id = None if use_folder_grant_query else team_id
         effective_org_id = None if use_folder_grant_query else organization_id
+        grants_by_resource = None
+        if not effective_team_id and not effective_org_id:
+            grants_by_resource = await fetch_grants_by_resource(
+                async_session, "project", [row[0].id for row in projects.items]
+            )
         projects.items = build_shared_with_object(
             items=projects.items,
             role_mapping=role_mapping,
-            team_key="team_links",
-            org_key="organization_links",
             model_name="project",
             team_id=effective_team_id,
             organization_id=effective_org_id,
+            grants_by_resource=grants_by_resource,
         )
+        # One lookup for the whole page: Home badges every project with the
+        # space it belongs to.
+        labels = await self.space_labels(
+            async_session, [item.get("space_id") for item in projects.items]
+        )
+        # One more lookup for the whole page: the "personally owned datasets
+        # in this project" health count (D13), never a per-row round trip.
+        owned_counts = await self.personally_owned_layer_counts(
+            async_session, [item.get("id") for item in projects.items]
+        )
+        for item in projects.items:
+            item.update(
+                labels.get(
+                    item.get("space_id"), {"space_kind": None, "space_name": None}
+                )
+            )
+            item["personally_owned_layer_count"] = owned_counts.get(item.get("id"))
         return projects
 
     async def update_base(
@@ -252,7 +394,13 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
         if updated_project is None:
             raise Exception("Project not found")
 
-        return IProjectRead(**updated_project.model_dump())
+        return IProjectRead(
+            **updated_project.model_dump(),
+            **await self.space_label(async_session, updated_project.space_id),
+            personally_owned_layer_count=await self.personally_owned_layer_count(
+                async_session, updated_project.id
+            ),
+        )
 
     async def get_public_project(
         self, *, async_session: AsyncSession, project_id: UUID
@@ -334,9 +482,13 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
             .scalars()
             .first()
         )
+        # D7: a non-shareable link never reaches the public config — publishing
+        # would hand the layer to everyone, and its adder could not share it at
+        # all.
         project_layers = await crud_layer_project.get_layers(
-            async_session=async_session, project_id=project_id
+            async_session=async_session, project_id=project_id, only_shareable=True
         )
+        published_link_ids = {pl.id for pl in project_layers}
         # `catalog_materialize` is served live precisely because it keeps
         # moving; a snapshot of it would describe a long-ready layer as pending
         # forever. The public viewer needs the item, not the job.
@@ -370,7 +522,13 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
             initial_view_state=user_project.initial_view_state,
             basemap=project.basemap,
             custom_basemaps=project.custom_basemaps,
-            layer_order=project.layer_order,
+            # Kept in step with the layers above, so the public config never
+            # orders a link it does not carry.
+            layer_order=[
+                link_id
+                for link_id in (project.layer_order or [])
+                if link_id in published_link_ids
+            ],
             max_extent=project.max_extent,
             folder_id=project.folder_id,
             builder_config=project.builder_config,
@@ -418,6 +576,51 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
         else:
             raise Exception("Project not found")
         return None
+
+    async def unpublish_projects_in(
+        self, async_session: AsyncSession, folder_ids: list[UUID]
+    ) -> None:
+        """Unpublish every project inside these folders that has a public
+        page. Used when a folder is soft-deleted so a project's
+        public URL 404s immediately instead of continuing to serve the
+        last-published config."""
+        project_ids = (
+            (
+                await async_session.execute(
+                    select(ProjectPublic.project_id)
+                    .join(Project, Project.id == ProjectPublic.project_id)
+                    .where(Project.folder_id.in_(folder_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for project_id in project_ids:
+            await self.unpublish_project(
+                async_session=async_session, project_id=str(project_id)
+            )
+
+    async def delete(self, db: AsyncSession, *, id: UUID) -> None:
+        """Soft delete: set `deleted_at` and, if published, unpublish first —
+        rows stay so a restore can undo this; DuckLake data for the
+        project's layers is untouched (the purge task removes it later)."""
+        project = await db.get(Project, id)
+        if project is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
+            )
+        if project.deleted_at is not None:
+            return
+        public = (
+            await db.execute(
+                select(ProjectPublic.id).where(ProjectPublic.project_id == id)
+            )
+        ).scalar_one_or_none()
+        if public is not None:
+            await self.unpublish_project(async_session=db, project_id=str(id))
+        project.deleted_at = datetime.now(timezone.utc)
+        db.add(project)
+        await db.commit()
 
 
 project = CRUDProject(Project)

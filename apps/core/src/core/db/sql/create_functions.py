@@ -109,16 +109,31 @@ class AsyncFunctionManager:
         print(f"{len(functions)} functions dropped!")
 
     async def add_functions(self) -> None:
-        sql_functions = self.sql_function_entities()
+        """Install every function; report all failures at once, then raise.
 
+        A broken authorization function must fail the deploy, not silently
+        deploy as a missing function. The engine runs with isolation_level=AUTOCOMMIT
+        (db/session.py), so each statement commits on its own; a failing statement
+        cannot poison the ones after it.
+        """
+        sql_functions = self.sql_function_entities()
+        failures: list[str] = []
         for function_sql in sql_functions:
             try:
                 await self.session.execute(text(function_sql))
-                print("Adding function...")
-            except Exception as e:
-                print(f"Error adding function: {e}")
-
-        print(f"{len(sql_functions)} functions added!")
+            except Exception as e:  # noqa: BLE001 - we re-raise below with context
+                head = (
+                    function_sql.strip().splitlines()[0][:120]
+                    if function_sql.strip()
+                    else "<empty>"
+                )
+                failures.append(f"{head} -> {e.__class__.__name__}: {e}")
+        print(f"{len(sql_functions) - len(failures)} functions added!")
+        if failures:
+            raise RuntimeError(
+                f"{len(failures)} SQL function(s) failed to install:\n  "
+                + "\n  ".join(failures)
+            )
 
     async def update_functions(self) -> None:
         await self.drop_functions()

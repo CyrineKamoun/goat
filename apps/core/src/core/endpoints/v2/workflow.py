@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from pydantic import UUID4
 
+from core.crud.crud_project import project as crud_project
 from core.crud.crud_workflow import workflow as crud_workflow
 from core.db.session import AsyncSession
 from core.deps.auth import auth_z
@@ -42,6 +43,9 @@ async def get_workflows(
     ),
 ) -> List[WorkflowRead]:
     """Get all workflows for a project."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     workflows = await crud_workflow.get_by_project(async_session, project_id=project_id)
     return [WorkflowRead.model_validate(w) for w in workflows]
 
@@ -69,6 +73,9 @@ async def get_workflow(
     ),
 ) -> WorkflowRead:
     """Get a specific workflow by ID."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     wf = await crud_workflow.get_by_project_and_id(
         async_session, project_id=project_id, workflow_id=workflow_id
     )
@@ -101,6 +108,9 @@ async def create_workflow(
     ),
 ) -> WorkflowRead:
     """Create a new workflow for a project."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     wf = await crud_workflow.create_for_project(
         async_session, project_id=project_id, obj_in=workflow_in
     )
@@ -133,6 +143,9 @@ async def update_workflow(
     ),
 ) -> WorkflowRead:
     """Update an existing workflow."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     wf = await crud_workflow.update_for_project(
         async_session,
         project_id=project_id,
@@ -169,6 +182,9 @@ async def delete_workflow(
     ),
 ) -> None:
     """Delete a workflow."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     deleted = await crud_workflow.delete_for_project(
         async_session, project_id=project_id, workflow_id=workflow_id
     )
@@ -207,6 +223,9 @@ async def duplicate_workflow(
     ),
 ) -> WorkflowRead:
     """Duplicate a workflow."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     wf = await crud_workflow.duplicate(
         async_session, project_id=project_id, workflow_id=workflow_id, new_name=new_name
     )

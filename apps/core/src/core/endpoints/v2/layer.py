@@ -1,4 +1,5 @@
 # Standard Libraries
+from datetime import datetime, timezone
 from typing import Any, Dict
 from uuid import UUID
 
@@ -7,25 +8,33 @@ from fastapi import (
     APIRouter,
     Body,
     Depends,
+    HTTPException,
     Path,
     Query,
+    status,
 )
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4, BaseModel
+from sqlalchemy import select
 from sqlmodel import SQLModel
 
 # Local application imports
+from core.core import authz
 from core.core.content import (
     read_content_by_id,
 )
+from core.crud.crud_folder import folder as crud_folder
 from core.crud.crud_layer import layer as crud_layer
+from core.crud.crud_space import space as crud_space
+from core.db.models._link_model import BundleLayerLink
 from core.db.models.layer import Layer
+from core.db.models.user import User
 from core.db.session import AsyncSession
 from core.deps.auth import auth_z
 from core.endpoints.deps import get_db, get_user_id
 from core.schemas.common import OrderEnum
-from core.schemas.error import HTTPErrorHandler
+from core.schemas.error import FolderNotFoundError, HTTPErrorHandler
 from core.schemas.layer import (
     ILayerGet,
     ILayerRead,
@@ -58,14 +67,32 @@ async def create_layer_raster(
 ) -> BaseModel:
     """Create a new raster layer from a service hosted externally."""
 
-    layer = IRasterLayerRead(
-        **(
-            await crud_layer.create(
-                db=async_session,
-                obj_in=Layer(**layer_in.model_dump(), user_id=user_id).model_dump(),
+    space_id = (await crud_space.ensure_personal(async_session, user_id)).id
+    if layer_in.folder_id is not None:
+        # Outside HTTPErrorHandler below: authz.require raises HTTPException
+        # directly, which HTTPErrorHandler does not know how to map and
+        # would otherwise turn into a 500.
+        try:
+            await crud_folder.assert_same_space(
+                async_session, folder_id=layer_in.folder_id, space_id=space_id
             )
-        ).model_dump()
-    )
+        except FolderNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        await authz.require(
+            async_session, "folder", layer_in.folder_id, user_id, "write"
+        )
+
+    with HTTPErrorHandler():
+        layer = IRasterLayerRead(
+            **(
+                await crud_layer.create(
+                    db=async_session,
+                    obj_in=Layer(
+                        **layer_in.model_dump(), user_id=user_id, space_id=space_id
+                    ).model_dump(),
+                )
+            ).model_dump()
+        )
     return layer
 
 
@@ -84,11 +111,31 @@ async def read_layer(
         description="The ID of the layer to get",
         examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
     ),
-) -> SQLModel:
+) -> ILayerRead:
     """Retrieve a layer by its ID."""
-    return await read_content_by_id(
+    layer = await read_content_by_id(
         async_session=async_session, id=layer_id, model=Layer, crud_content=crud_layer
     )
+
+    # The owner, as the listing endpoint reports it. A catalog layer has no
+    # user_id, so it keeps `owned_by` None.
+    owner = (
+        await async_session.get(User, layer.user_id)
+        if getattr(layer, "user_id", None)
+        else None
+    )
+    owned_by = (
+        {
+            "id": str(owner.id),
+            "firstname": owner.firstname,
+            "lastname": owner.lastname,
+            "avatar": owner.avatar,
+        }
+        if owner
+        else None
+    )
+
+    return ILayerRead.model_validate({**layer.model_dump(), "owned_by": owned_by})
 
 
 @router.post(
@@ -159,6 +206,7 @@ async def read_layers(
 )
 async def update_layer(
     async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
     layer_id: UUID4 = Path(
         ...,
         description="The ID of the layer to get",
@@ -168,6 +216,26 @@ async def update_layer(
         ..., examples=[layer_request_examples["update"]], description="Layer to update"
     ),
 ) -> ILayerRead:
+    target_folder_id = layer_in.get("folder_id")
+    if target_folder_id is not None:
+        # Outside HTTPErrorHandler below: authz.require raises HTTPException
+        # directly, which HTTPErrorHandler does not know how to map and
+        # would otherwise turn into a 500.
+        layer = await crud_layer.get(async_session, id=layer_id)
+        if layer is None:
+            raise HTTPException(status_code=404, detail="Layer not found")
+        try:
+            await crud_folder.assert_same_space(
+                async_session,
+                folder_id=UUID(str(target_folder_id)),
+                space_id=layer.space_id,
+            )
+        except FolderNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        await authz.require(
+            async_session, "folder", UUID(str(target_folder_id)), user_id, "write"
+        )
+
     with HTTPErrorHandler():
         result: SQLModel = await crud_layer.update(
             async_session=async_session,
@@ -176,3 +244,51 @@ async def update_layer(
         )
 
     return result
+
+
+@router.delete(
+    "/{layer_id}",
+    summary="Delete a layer",
+    status_code=204,
+    dependencies=[Depends(auth_z)],
+)
+async def delete_layer(
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
+    layer_id: UUID4 = Path(
+        ...,
+        description="The ID of the layer to delete",
+        examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
+    ),
+) -> None:
+    """Soft delete a layer: sets `deleted_at` — the row, its grants
+    and its DuckLake data stay untouched until the trash retention window
+    expires and the purge task removes them. A layer that belongs to a
+    bundle must be deleted through the bundle instead (refused here with
+    409) so the bundle stays together.
+    """
+    await authz.require(async_session, "layer", layer_id, user_id, "delete")
+
+    is_bundle_member = (
+        await async_session.execute(
+            select(BundleLayerLink.id)
+            .where(BundleLayerLink.layer_id == layer_id)
+            .limit(1)
+        )
+    ).first() is not None
+    if is_bundle_member:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This layer belongs to a bundle — delete the bundle instead",
+        )
+
+    layer = await crud_layer.get(async_session, id=layer_id)
+    if layer is None or layer.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Layer not found"
+        )
+
+    layer.deleted_at = datetime.now(timezone.utc)
+    async_session.add(layer)
+    await async_session.commit()
+    return None

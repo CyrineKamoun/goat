@@ -24,6 +24,7 @@ class FolderNotFoundError(Exception):
 # Define the mapping between custom errors and HTTP status codes
 ERROR_MAPPING = {
     LayerNotFoundError: status.HTTP_404_NOT_FOUND,
+    FolderNotFoundError: status.HTTP_404_NOT_FOUND,
     ValueError: status.HTTP_400_BAD_REQUEST,
 }
 

@@ -104,6 +104,25 @@ class IProjectCreate(ContentBaseAttributes):
 
 class IProjectRead(ContentBaseAttributes, DateTimeBase):
     id: UUID = Field(..., description="Project ID")
+    space_id: UUID | None = Field(None, description="Space that owns this project")
+    space_kind: Literal["personal", "team", "organization"] | None = Field(
+        None, description="Kind of the owning space"
+    )
+    space_name: str | None = Field(
+        None,
+        description=(
+            "Name of the owning team or organisation. None for a personal "
+            "space — its owner's name is not exposed here."
+        ),
+    )
+    personally_owned_layer_count: int | None = Field(
+        None,
+        description=(
+            "Count of this project's linked live layers that live in a "
+            "personal space (D13 health check). None for a project that is "
+            "itself in a personal space."
+        ),
+    )
     layer_order: list[int] | None = Field(None, description="Layer order in project")
     thumbnail_url: str | None = Field(description="Project thumbnail URL")
     basemap: str | None = Field(None, description="Project basemap")
@@ -192,6 +211,14 @@ class LayerProjectIds(BaseModel):
     #: data": restyling the layer moves it. This is the dataset's own.
     dataset_updated_at: datetime | None = Field(
         None, description="When the underlying dataset last changed"
+    )
+    locked: bool = Field(
+        False,
+        description=(
+            "The caller has no access to this dataset of his own: it is in the "
+            "project through a non-shareable link (D7), so it is listed but its "
+            "style, filter and preferences are withheld and it is not mapped."
+        ),
     )
 
 

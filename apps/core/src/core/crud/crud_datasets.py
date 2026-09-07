@@ -11,20 +11,20 @@ from sqlalchemy import and_, func, literal, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Local application imports
-from core.core.content import build_shared_with_object, create_query_shared_content
+from core.core.content import (
+    build_shared_with_object,
+    create_query_shared_content,
+    fetch_grants_by_resource,
+    grant_conditions,
+    granted_ids,
+)
 from core.crud.base import CRUDBase
 from core.crud.crud_layer import layer as crud_layer
-from core.db.models._link_model import (
-    LayerOrganizationLink,
-    LayerTeamLink,
-    ResourceGrant,
-)
+from core.db.models._link_model import ResourceGrant
 from core.db.models.bundle import Bundle
 from core.db.models.folder import Folder
 from core.db.models.layer import Layer
-from core.db.models.organization import Organization
 from core.db.models.role import Role
-from core.db.models.team import Team
 from core.db.models.user import User
 from core.schemas.bundle import DatasetContentTile
 from core.schemas.layer import ILayerGet
@@ -53,22 +53,7 @@ class CRUDDatasets:
     @staticmethod
     def _grant_match(team_id: UUID | None, organization_id: UUID | None) -> list[Any]:
         """ResourceGrant grantee conditions for the active team/org."""
-        conds: list[Any] = []
-        if team_id:
-            conds.append(
-                and_(
-                    ResourceGrant.grantee_type == "team",
-                    ResourceGrant.grantee_id == team_id,
-                )
-            )
-        if organization_id:
-            conds.append(
-                and_(
-                    ResourceGrant.grantee_type == "organization",
-                    ResourceGrant.grantee_id == organization_id,
-                )
-            )
-        return conds
+        return grant_conditions(None, team_id, organization_id)
 
     def _layer_access_filters(
         self,
@@ -83,24 +68,7 @@ class CRUDDatasets:
         ``get_base_filter`` already scopes to the owner."""
         if not team_id and not organization_id:
             return []
-        direct: list[Any] = []
-        if team_id:
-            direct.append(
-                Layer.id.in_(
-                    select(LayerTeamLink.layer_id).where(
-                        LayerTeamLink.team_id == team_id
-                    )
-                )
-            )
-        if organization_id:
-            direct.append(
-                Layer.id.in_(
-                    select(LayerOrganizationLink.layer_id).where(
-                        LayerOrganizationLink.organization_id == organization_id
-                    )
-                )
-            )
-        direct_link = or_(*direct)
+        direct_link = Layer.id.in_(granted_ids("layer", None, team_id, organization_id))
         if folder_id is not None:
             # Granted folder → all its layers (folder_id already filtered by
             # get_base_filter); otherwise only directly-linked layers in it.
@@ -131,7 +99,10 @@ class CRUDDatasets:
         folder shared with the team/org — so bundles inherit folder grants the
         same way layers do, keeping the folder hierarchy intact."""
         if not team_id and not organization_id:
-            filters: list[Any] = [Bundle.user_id == user_id]
+            filters: list[Any] = [
+                Bundle.user_id == user_id,
+                Bundle.deleted_at.is_(None),
+            ]
             if folder_id is not None:
                 filters.append(Bundle.folder_id == folder_id)
             else:
@@ -153,9 +124,13 @@ class CRUDDatasets:
             # Granted folder → every bundle in it; otherwise only directly-
             # granted bundles in the folder.
             return (
-                [Bundle.folder_id == folder_id]
+                [Bundle.folder_id == folder_id, Bundle.deleted_at.is_(None)]
                 if folder_granted
-                else [Bundle.folder_id == folder_id, direct_bundle]
+                else [
+                    Bundle.folder_id == folder_id,
+                    direct_bundle,
+                    Bundle.deleted_at.is_(None),
+                ]
             )
         # Root: directly-granted bundles not inside a granted folder (those
         # surface when navigating into that folder, mirroring layers).
@@ -166,7 +141,8 @@ class CRUDDatasets:
                     Bundle.folder_id.is_(None),
                     Bundle.folder_id.notin_(granted_folder_ids),
                 ),
-            )
+            ),
+            Bundle.deleted_at.is_(None),
         ]
 
     async def list_content(
@@ -316,6 +292,7 @@ class CRUDDatasets:
                         if str(t.get("id")) == str(team_id)
                     ],
                     "organizations": [],
+                    "users": [],
                 }
             return {
                 "teams": [],
@@ -324,6 +301,7 @@ class CRUDDatasets:
                     for o in shared_with.get("organizations", [])
                     if str(o.get("id")) == str(organization_id)
                 ],
+                "users": [],
             }
 
         # Hydrate layers as content tiles (reusing the standard owned_by/
@@ -334,20 +312,17 @@ class CRUDDatasets:
             role_mapping = {role.id: role.name for role in roles}
             query = create_query_shared_content(
                 Layer,
-                LayerTeamLink,
-                LayerOrganizationLink,
-                Team,
-                Organization,
-                Role,
                 [Layer.id.in_(layer_ids)],
             )
             result = await async_session.execute(query)
+            grants_by_resource = await fetch_grants_by_resource(
+                async_session, "layer", layer_ids
+            )
             for d in build_shared_with_object(
                 items=result.all(),
                 role_mapping=role_mapping,
-                team_key="team_links",
-                org_key="organization_links",
                 model_name="layer",
+                grants_by_resource=grants_by_resource,
             ):
                 tile_by_id[str(d["id"])] = DatasetContentTile(
                     content_type="layer",

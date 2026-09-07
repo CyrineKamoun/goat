@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List
 from uuid import UUID
 
@@ -9,6 +10,7 @@ from sqlalchemy.sql import text
 from sqlmodel import (
     ARRAY,
     Column,
+    DateTime,
     Field,
     Float,
     ForeignKey,
@@ -24,8 +26,6 @@ if TYPE_CHECKING:
     from core.db.models._link_model import (
         LayerProjectGroup,
         LayerProjectLink,
-        ProjectOrganizationLink,
-        ProjectTeamLink,
         UserProjectLink,
     )
 
@@ -46,13 +46,14 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         ),
         description="Layer ID",
     )
-    user_id: UUID = Field(
+    user_id: UUID | None = Field(
+        default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
-            nullable=False,
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="SET NULL"),
+            nullable=True,
         ),
-        description="Project owner ID",
+        description='Project creator. Nullable: informational "created by", survives the user.',
     )
     folder_id: UUID = Field(
         sa_column=Column(
@@ -61,6 +62,32 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
             nullable=False,
         ),
         description="Project folder ID",
+    )
+    space_id: UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.space.id", ondelete="CASCADE"),
+            nullable=True,
+            index=True,
+        ),
+        description=(
+            "Space this project belongs to. Every create path sets it — "
+            "nullable only because the dev DB carries legacy projects whose "
+            "owning user row no longer exists, so the backfill has no "
+            "personal space to put them in; such rows were already "
+            "unreachable before spaces."
+        ),
+    )
+    deleted_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+        description="Soft-delete timestamp; NULL while the project is live.",
+    )
+    restricted: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default=text("false")),
+        description="Restricted (D9): members of the project's space do not get the space default role on it; grants still apply.",
     )
     layer_order: List[int] | None = Field(
         sa_column=Column(
@@ -106,6 +133,14 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         sa_column=Column(ARRAY(Text), nullable=True),
         description="Layer tags",
     )
+    is_template_source: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default=text("false")),
+        description=(
+            "Marks a hidden frozen copy made for a project template (T2): "
+            "excluded from every listing, feed, trash and search."
+        ),
+    )
 
     # Relationships
     user_projects: List["UserProjectLink"] = Relationship(
@@ -113,14 +148,6 @@ class Project(ContentBaseAttributes, DateTimeBase, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     layer_projects: List["LayerProjectLink"] = Relationship(
-        back_populates="project",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-    team_links: List["ProjectTeamLink"] = Relationship(
-        back_populates="project",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-    organization_links: List["ProjectOrganizationLink"] = Relationship(
         back_populates="project",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )

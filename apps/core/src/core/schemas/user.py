@@ -16,6 +16,7 @@ class UserRead(UserBase):
     enabled: bool | None = None
     topt: bool | None = None
     roles: list[str] | None = []
+    is_superuser: bool = False
 
 
 class UserCreate(UserBase):

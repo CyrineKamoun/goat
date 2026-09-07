@@ -2,6 +2,9 @@
 import asyncio
 import contextlib
 import logging
+import os
+import re
+from pathlib import Path
 
 # Import Env variables
 import core._dotenv  # noqa: E402, F401, I001
@@ -13,21 +16,74 @@ import pytest_asyncio
 # Local application imports
 from core.core.config import settings
 from core.crud.base import CRUDBase
+from core.crud.crud_space import space as crud_space
 from core.db.models import Folder, User
+from core.db.sql.create_functions import AsyncFunctionManager
 from core.endpoints.deps import get_db, session_manager
 from core.main import app
 from httpx import AsyncClient
 from sqlalchemy import select, text
 
 
+# One schema per test process. The session fixture DROPs the schema it owns
+# before creating it, so a shared name lets two concurrent runs in the same
+# worktree destroy each other's tables mid-test. `GOAT_TEST_SCHEMA` pins the
+# name when something outside pytest needs to know it.
+TEST_SCHEMA_PREFIX = "test_schema"
+_WORKER = os.environ.get("PYTEST_XDIST_WORKER")
+TEST_SCHEMA = os.environ.get("GOAT_TEST_SCHEMA") or (
+    f"{TEST_SCHEMA_PREFIX}_{_WORKER}_{os.getpid()}"
+    if _WORKER
+    else f"{TEST_SCHEMA_PREFIX}_{os.getpid()}"
+)
+
+
 def set_test_mode():
-    settings.SCHEMA = "test_schema"
+    settings.SCHEMA = TEST_SCHEMA
     settings.MAX_FOLDER_COUNT = 15
     settings.TEST_MODE = True
     settings.AUTH = False
 
 
 set_test_mode()
+
+
+def _owning_pid(schema: str) -> int | None:
+    match = re.fullmatch(rf"{TEST_SCHEMA_PREFIX}(?:_gw\d+)?_(\d+)", schema)
+    return int(match.group(1)) if match else None
+
+
+async def _drop_abandoned_test_schemas(connection) -> None:
+    """Drop test schemas left behind by processes that are no longer running.
+
+    Each run now owns a schema named after its pid, so an interrupted run
+    leaks one. Only schemas whose pid is dead are dropped, so a concurrent
+    run's schema is never touched.
+    """
+    names = (
+        (
+            await connection.execute(
+                text("SELECT nspname FROM pg_namespace WHERE nspname LIKE :like"),
+                {"like": f"{TEST_SCHEMA_PREFIX}%"},
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for name in names:
+        if name == TEST_SCHEMA_PREFIX:
+            # The single shared schema every run used before this split.
+            await connection.execute(text(f"DROP SCHEMA IF EXISTS {name} CASCADE"))
+            continue
+        pid = _owning_pid(name)
+        if pid is None or pid == os.getpid():
+            continue
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            await connection.execute(text(f"DROP SCHEMA IF EXISTS {name} CASCADE"))
+        except OSError:
+            continue
 
 
 @pytest_asyncio.fixture
@@ -56,6 +112,7 @@ async def session_fixture(event_loop):
     )
     async with session_manager.connect() as connection:
         await connection.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+        await _drop_abandoned_test_schemas(connection)
         for schema in [settings.SCHEMA]:
             await connection.execute(
                 text(f"""DROP SCHEMA IF EXISTS {schema} CASCADE""")
@@ -64,10 +121,49 @@ async def session_fixture(event_loop):
         await session_manager.drop_all(connection)
         await session_manager.create_all(connection)
         await connection.commit()
+    # `get_my_role` and other listing paths call `effective_role` /
+    # `can` — install the authz SQL functions into the test schema so any
+    # test hitting a project/layer/bundle endpoint has them, not just tests
+    # under tests/authz/ that install them again themselves (add-only, so
+    # re-running this is a no-op there).
+    async with session_manager.session() as function_session:
+        manager = AsyncFunctionManager(
+            session=function_session,
+            path="functions",
+            schema="basic",
+            schema_mapping={"basic": "basic", "customer": settings.SCHEMA},
+        )
+        await manager.add_functions()
+    # `folder_depth_check` enforces folder nesting depth <= 3 and same-space
+    # parents at the DB level too, and `content_space_default` backfills
+    # space_id from the folder on insert — install both the same way
+    # init_triggers.py does for a real deploy (`customer.` substituted to
+    # the active schema), so any test that inserts/updates folder/layer/
+    # project/bundle rows runs against them, not just the tests that target
+    # them directly.
+    triggers_dir = (
+        Path(__file__).resolve().parent.parent
+        / "src"
+        / "core"
+        / "db"
+        / "sql"
+        / "triggers"
+    )
+    for trigger_name in ("folder_depth.sql", "content_space_default.sql"):
+        trigger_sql = (
+            (triggers_dir / trigger_name)
+            .read_text()
+            .replace("customer.", f"{settings.SCHEMA}.")
+        )
+        async with session_manager.session() as trigger_session:
+            await trigger_session.execute(text(trigger_sql))
     yield
     logging.info("Starting session_fixture finalizer")
     async with session_manager.connect() as connection:
-        pass
+        await connection.execute(
+            text(f"DROP SCHEMA IF EXISTS {settings.SCHEMA} CASCADE")
+        )
+        await connection.commit()
     await session_manager.close()
     logging.info("Finished session_fixture finalizer")
 
@@ -112,7 +208,8 @@ async def fixture_create_user(client: AsyncClient, db_session):
         select(Folder.id).where(Folder.user_id == user_id, Folder.name == "home")
     )
     if existing_home.first() is None:
-        db_session.add(Folder(user_id=user_id, name="home"))
+        space_id = (await crud_space.ensure_personal(db_session, user_id)).id
+        db_session.add(Folder(user_id=user_id, name="home", space_id=space_id))
         await db_session.commit()
     yield user.id
     # Teardown: Delete the user after the test

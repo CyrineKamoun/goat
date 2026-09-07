@@ -112,9 +112,14 @@ class CRUDLayerProjectGroup(CRUDBase):
         async_session: AsyncSession,
         project_id: UUID,
         bundle_id: UUID,
+        *,
+        user_id: UUID,
     ) -> tuple[LayerProjectGroup, list]:
         """Add a bundle to a project: create a bundle-backed group and place all
         of the bundle's member layers into it. Membership is locked downstream.
+
+        ``user_id`` is the user doing the adding; it decides whether each member
+        link is shareable (D7), exactly as for a plain layer add.
         """
         # Reuse crud_layer_project for the member links (name/order handling).
         from core.crud.crud_layer_project import layer_project as crud_layer_project
@@ -201,6 +206,7 @@ class CRUDLayerProjectGroup(CRUDBase):
                     async_session,
                     project_id=project_id,
                     layer_ids=list(member_ids),
+                    user_id=user_id,
                     group_id=group.id,
                     # Directly below the group header, in role order.
                     start_order=group.order + 1,

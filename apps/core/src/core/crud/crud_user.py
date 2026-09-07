@@ -4,6 +4,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from core.core.config import settings
 from core.crud.base import CRUDBase
+from core.crud.crud_space import space as crud_space
 from core.db.models import User
 from core.db.models._link_model import UserRoleLink
 from core.db.models.organization import Organization
@@ -40,6 +41,8 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             if changed:
                 await db_session.commit()
                 await db_session.refresh(user_obj)
+            assert user_obj.id is not None
+            await crud_space.ensure_personal(db_session, user_obj.id)
             return user_obj
 
         new_user = User(
@@ -52,6 +55,8 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         db_session.add(new_user)
         await db_session.commit()
         await db_session.refresh(new_user)
+        assert new_user.id is not None
+        await crud_space.ensure_personal(db_session, new_user.id)
         return new_user
 
     async def create_if_not_exists(
@@ -69,6 +74,8 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             if organization and not user_obj.organization_id:
                 user_obj.organization_id = organization.id
                 await db_session.commit()
+            assert user_obj.id is not None
+            await crud_space.ensure_personal(db_session, user_obj.id)
             return user_obj
         avatar = settings.USER_DEFAULT_AVATAR
         keycloak_user = await get_keycloak_user(user_id)
@@ -86,6 +93,8 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
             organization_id=organization.id if organization else None,
         )
         new_user = await self.create(db=db_session, obj_in=new_user_obj)
+        assert new_user.id is not None
+        await crud_space.ensure_personal(db_session, new_user.id)
 
         return new_user
 

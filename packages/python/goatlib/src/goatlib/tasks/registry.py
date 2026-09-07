@@ -161,4 +161,20 @@ TASK_REGISTRY: tuple[TaskDefinition, ...] = (
         schedule="0 30 0 * * *",
         worker_tag="tools",
     ),
+    TaskDefinition(
+        name="purge_trash",
+        display_name="Purge Trash",
+        description=(
+            "Permanently delete folders, layers, templates, projects and "
+            "bundles that have been in the trash past their retention "
+            "period: DuckLake "
+            "tables first, then the rows and their resource_grant rows, "
+            "children before parents."
+        ),
+        module_path="goatlib.tasks.purge_trash",
+        params_class_name="PurgeTrashParams",
+        windmill_path="f/goat/tasks/purge_trash",
+        schedule="0 0 3 * * *",  # Daily, 03:00
+        worker_tag="tools",
+    ),
 )

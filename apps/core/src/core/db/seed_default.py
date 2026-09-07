@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.core.config import settings
 from core.crud.crud_organization import SELF_HOSTED_PLAN_METADATA
+from core.crud.crud_space import space as crud_space
 from core.db.models import Organization, Role, User, UserRoleLink
 from core.db.models.folder import Folder
 from core.db.session import session_manager
@@ -82,7 +83,8 @@ async def seed_default_user_org(session: AsyncSession) -> None:
         )
     ).scalar_one_or_none()
     if has_home_folder is None:
-        session.add(Folder(user_id=user_id, name="home"))
+        space_id = (await crud_space.ensure_personal(session, user_id)).id
+        session.add(Folder(user_id=user_id, name="home", space_id=space_id))
 
     await session.commit()
 

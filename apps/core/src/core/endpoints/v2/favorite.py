@@ -15,7 +15,9 @@ router = APIRouter()
 
 # What can be favourited. Extending this list is the whole change for a new
 # kind — the table stores the type verbatim.
-FavoriteItemType = Literal["catalog_item", "workflow_template", "project", "dataset"]
+FavoriteItemType = Literal[
+    "catalog_item", "workflow_template", "project", "dataset", "template"
+]
 
 
 @router.put(

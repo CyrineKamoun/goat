@@ -29,6 +29,12 @@ ROLES = [
     {"name": "bundle-owner", "resource_type": "bundle"},
     {"name": "bundle-editor", "resource_type": "bundle"},
     {"name": "bundle-viewer", "resource_type": "bundle"},
+    {"name": "folder-owner", "resource_type": "folder"},
+    {"name": "folder-editor", "resource_type": "folder"},
+    {"name": "folder-viewer", "resource_type": "folder"},
+    {"name": "template-owner", "resource_type": "template"},
+    {"name": "template-editor", "resource_type": "template"},
+    {"name": "template-viewer", "resource_type": "template"},
 ]
 
 PERMISSIONS = [
@@ -176,6 +182,45 @@ RESOURCES_PERMISSIONS = [
         "url_pattern": "project/{project_id}/layer-tree",
         "method": ["PUT"],
         "permissions": ["update-project"],
+    },
+    {
+        # No permissions: any authenticated user may call it — per-item
+        # access is enforced in code via `effective_role`/`authz.can`
+        # the same way `job`/`system` below are gated.
+        "url_pattern": "content/trash",
+        "method": ["GET"],
+    },
+    {
+        "url_pattern": "content/restore",
+        "method": ["POST"],
+    },
+    {
+        # Ownership is enforced in code (`CRUDContent.set_restricted` requires
+        # space owner/admin rank on the target) — this only gates the endpoint
+        # to any authenticated user, like `content/restore` above.
+        "url_pattern": "content/{resource_type}/{resource_id}/restricted",
+        "method": ["PATCH"],
+    },
+    {
+        # Per-item visibility is enforced by `effective_role` inside the feed
+        # — this permission only gates the endpoint itself to any
+        # authenticated user who can read content at all.
+        "url_pattern": "content",
+        "method": ["GET"],
+        "permissions": ["read-layer"],
+    },
+    {
+        # The real ownership/membership/organisation rights check is done by
+        # `CRUDTransfer` — this only gates the endpoint to any authenticated
+        # user who can read content at all.
+        "url_pattern": "content/transfer/preview",
+        "method": ["POST"],
+        "permissions": ["read-layer"],
+    },
+    {
+        "url_pattern": "content/transfer",
+        "method": ["POST"],
+        "permissions": ["read-layer"],
     },
     {
         "url_pattern": "datasets/request-upload",
@@ -379,6 +424,24 @@ RESOURCES_PERMISSIONS = [
         "permissions": ["manage-organization-invitation"],
     },
     {
+        "url_pattern": "space",
+        "method": ["GET"],
+        "permissions": ["read-team"],
+    },
+    {
+        "url_pattern": "space/{space_id}",
+        "method": ["PATCH"],
+        "permissions": ["update-team"],
+    },
+    {
+        # Per-space membership (space_rank >= 1) is enforced in code by
+        # `crud_space.usage` — this only gates the endpoint to any
+        # authenticated user, like `GET /space` above.
+        "url_pattern": "space/{space_id}/usage",
+        "method": ["GET"],
+        "permissions": ["read-team"],
+    },
+    {
         "url_pattern": "teams",
         "method": ["GET", "POST"],
         "permissions": ["read-team"],
@@ -424,9 +487,19 @@ RESOURCES_PERMISSIONS = [
         "permissions": ["create-share"],
     },
     {
+        "url_pattern": "share/layer/{layer_id}",
+        "method": ["GET"],
+        "permissions": ["read-share"],
+    },
+    {
         "url_pattern": "share/project/{project_id}",
         "method": ["POST"],
         "permissions": ["create-share"],
+    },
+    {
+        "url_pattern": "share/project/{project_id}",
+        "method": ["GET"],
+        "permissions": ["read-share"],
     },
     {
         "url_pattern": "billing",
@@ -569,6 +642,47 @@ RESOURCES_PERMISSIONS = [
         "permissions": ["update-project"],
         "plan_names": ["goat_professional", "goat_enterprise"],
     },
+    # ---------------------------------------------------------------
+    # Templates (T1/T3/T4). No permissions: any authenticated user may call
+    # these — per-item access is enforced in code via `effective_role`/
+    # `authz.can`, the same pattern as `content/trash` above.
+    # ---------------------------------------------------------------
+    {
+        "url_pattern": "template",
+        "method": ["GET", "POST"],
+    },
+    {
+        "url_pattern": "template/preview",
+        "method": ["POST"],
+    },
+    {
+        "url_pattern": "template/{template_id}",
+        "method": ["GET", "PATCH", "DELETE"],
+    },
+    {
+        "url_pattern": "template/{template_id}/use",
+        "method": ["POST"],
+    },
+    {
+        "url_pattern": "template/{template_id}/refresh",
+        "method": ["POST"],
+    },
+    {
+        "url_pattern": "template/{template_id}/publish",
+        "method": ["POST"],
+    },
+    {
+        "url_pattern": "template/{template_id}/unpublish",
+        "method": ["POST"],
+    },
+    {
+        "url_pattern": "template/{template_id}/grant",
+        "method": ["GET", "POST"],
+    },
+    {
+        "url_pattern": "template/{template_id}/grant/{grant_id}",
+        "method": ["DELETE"],
+    },
 ]
 
 
@@ -580,7 +694,7 @@ async def seed_roles(session: AsyncSession) -> None:
     commit; there is no window where the authz tables are empty.
 
     Roles are only ever added, never deleted: their ids are referenced by user
-    assignments (``user_role``, ``user_team``, ``layer_user``, ``project_user``).
+    assignments (``user_role``, ``user_team``, ``resource_grant``).
     The permission/resource graph carries no external references, so it is
     rebuilt from scratch to also drop entries removed from this file.
     """

@@ -928,6 +928,133 @@ class TestProjectImportRunner:
             field_config in args
         ), f"field_config value not passed to the layer INSERT: {args}"
 
+    def test_import_sets_space_id_on_project_and_layer(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        """The imported project and its layers must carry the target
+        folder's `space_id` (Task 9): without it both rows would be
+        unreachable through any space-scoped listing or grant."""
+        import uuid as uuid_module
+
+        user_id = "00000000-0000-0000-0000-000000000001"
+        folder_id = "00000000-0000-0000-0000-ffffffffffff"
+        layer_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        folder_space_id = uuid_module.UUID("11111111-1111-1111-1111-111111111111")
+
+        with tempfile.TemporaryDirectory() as build_dir:
+            zip_path = Path(build_dir) / "export.zip"
+
+            project_data = {"name": "Spaced Project"}
+            layer_meta = {
+                "id": layer_id,
+                "name": "Stops",
+                "type": "feature",
+                "data_type": None,
+            }
+            layer_index = {"layers": [layer_meta]}
+            layer_link = {"name": "Stops", "order": 0}
+
+            checksums: dict[str, str] = {}
+
+            def _cs(b: bytes) -> str:
+                return f"sha256:{hashlib.sha256(b).hexdigest()}"
+
+            project_bytes = json.dumps(project_data, indent=2).encode()
+            checksums["project.json"] = _cs(project_bytes)
+
+            index_bytes = json.dumps(layer_index, indent=2).encode()
+            checksums["layers/index.json"] = _cs(index_bytes)
+
+            meta_bytes = json.dumps(layer_meta, indent=2).encode()
+            checksums[f"layers/{layer_id}/metadata.json"] = _cs(meta_bytes)
+
+            link_bytes = json.dumps(layer_link, indent=2).encode()
+            checksums[f"layers/{layer_id}/project_link.json"] = _cs(link_bytes)
+
+            manifest = {
+                "format_version": "1.0",
+                "exported_at": "2025-06-01T00:00:00Z",
+                "project_name": "Spaced Project",
+                "checksums": checksums,
+                "layer_count": 1,
+                "internal_layer_count": 1,
+                "external_layer_count": 0,
+                "workflow_count": 0,
+                "report_count": 0,
+            }
+
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("project.json", project_bytes)
+                zf.writestr("layers/index.json", index_bytes)
+                zf.writestr(f"layers/{layer_id}/metadata.json", meta_bytes)
+                zf.writestr(f"layers/{layer_id}/project_link.json", link_bytes)
+                zf.writestr(f"layers/{layer_id}/data.parquet", b"FAKE_PARQUET")
+                zf.writestr("manifest.json", json.dumps(manifest, indent=2).encode())
+
+            zip_bytes = zip_path.read_bytes()
+
+        params = ProjectImportParams(
+            user_id=user_id,
+            s3_key="imports/spaced.zip",
+            target_folder_id=folder_id,
+        )
+
+        def mock_download_file(**kwargs: object) -> None:
+            Path(str(kwargs["Filename"])).write_bytes(zip_bytes)
+
+        runner._s3_client.download_file.side_effect = mock_download_file
+        runner._duckdb_con.execute.return_value.fetchall.return_value = [
+            ("id", "INTEGER"),
+            ("geometry", "GEOMETRY"),
+        ]
+
+        project_insert_calls: list[tuple[str, tuple[object, ...]]] = []
+        layer_insert_calls: list[tuple[str, tuple[object, ...]]] = []
+
+        mock_asyncpg_conn = AsyncMock()
+        mock_asyncpg_conn.set_type_codec = AsyncMock()
+        mock_txn = MagicMock()
+        mock_txn.__aenter__ = AsyncMock(return_value=mock_txn)
+        mock_txn.__aexit__ = AsyncMock(return_value=False)
+        mock_asyncpg_conn.transaction = MagicMock(return_value=mock_txn)
+
+        async def tracking_execute(query: str, *args: object) -> None:
+            if "INSERT INTO customer.project\n" in query:
+                project_insert_calls.append((query, args))
+            elif "INSERT INTO customer.layer\n" in query:
+                layer_insert_calls.append((query, args))
+            return None
+
+        async def tracking_fetchval(query: str, *args: object) -> object:
+            if "SELECT space_id FROM customer.folder" in query:
+                return folder_space_id
+            return 1  # group/link RETURNING id elsewhere in the import
+
+        mock_asyncpg_conn.execute = AsyncMock(side_effect=tracking_execute)
+        mock_asyncpg_conn.fetchval = AsyncMock(side_effect=tracking_fetchval)
+
+        with patch("goatlib.tools.project_import.asyncpg") as mock_asyncpg:
+            mock_asyncpg.connect = AsyncMock(return_value=mock_asyncpg_conn)
+            runner.run(params)
+
+        assert len(project_insert_calls) == 1
+        project_query, project_args = project_insert_calls[0]
+        assert "space_id" in project_query, (
+            "project INSERT must write space_id, got:\n" + project_query
+        )
+        assert (
+            folder_space_id in project_args
+        ), f"target folder's space_id not passed to the project INSERT: {project_args}"
+
+        assert len(layer_insert_calls) == 1
+        layer_query, layer_args = layer_insert_calls[0]
+        assert "space_id" in layer_query, (
+            "layer INSERT must write space_id, got:\n" + layer_query
+        )
+        assert (
+            folder_space_id in layer_args
+        ), f"target folder's space_id not passed to the layer INSERT: {layer_args}"
+
     def test_import_duplicate_layer_links(self, runner: ProjectImportRunner) -> None:
         """A 1.1 archive with 2 links to the same layer creates 2 layer_project rows.
 

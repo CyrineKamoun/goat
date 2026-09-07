@@ -20,6 +20,8 @@ class RessourceTypeEnum(str, Enum):
     team = "team"
     layer = "layer"
     project = "project"
+    folder = "folder"
+    bundle = "bundle"
 
 
 class Role(UUIDServerDefaultBase, table=True):

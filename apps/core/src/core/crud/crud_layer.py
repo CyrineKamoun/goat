@@ -13,19 +13,21 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Local application imports
-from core.core.content import build_shared_with_object, create_query_shared_content
+from core.core.content import (
+    build_shared_with_object,
+    create_query_shared_content,
+    fetch_grants_by_resource,
+    grant_conditions,
+    granted_ids,
+)
 from core.crud.base import CRUDBase
 from core.db.models._link_model import (
     BundleLayerLink,
-    LayerOrganizationLink,
-    LayerTeamLink,
     ResourceGrant,
 )
 from core.db.models.folder import Folder
 from core.db.models.layer import Layer, LayerType
-from core.db.models.organization import Organization
 from core.db.models.role import Role
-from core.db.models.team import Team
 from core.schemas.error import (
     LayerNotFoundError,
 )
@@ -52,6 +54,12 @@ class CRUDLayer(CRUDBase):
         if layer is None:
             raise LayerNotFoundError(f"{Layer.__name__} not found")
 
+        # The folder-move guard (same space + write access) runs at the
+        # endpoint (core/endpoints/v2/layer.py: update_layer) — it needs the
+        # caller's identity for the write check, which this method does not
+        # receive, and it must run outside `HTTPErrorHandler` so a 403/404
+        # from `authz.require` is not rewrapped into a 500.
+
         # Get the right Layer model for update
         schema = get_layer_schema(
             class_mapping=layer_update_class,
@@ -76,7 +84,7 @@ class CRUDLayer(CRUDBase):
         organization_id: UUID | None = None,
     ) -> List[Any]:
         """Get filter for get layer queries."""
-        filters = []
+        filters: List[Any] = [Layer.deleted_at.is_(None)]
         for key, value in params.dict().items():
             if (
                 key
@@ -169,48 +177,33 @@ class CRUDLayer(CRUDBase):
         )
 
         # When a folder_id is set in a team/org context, check if folder is shared
-        # via ResourceGrant. If so, bypass LayerTeamLink join — layers in
-        # folder-shared folders have no such link entry.
+        # via ResourceGrant. If so, bypass the direct-grant filter below — layers in
+        # folder-shared folders have no such grant of their own.
         use_folder_grant_query = False
         folder_id = getattr(params, "folder_id", None)
-        grant_conditions: list[Any] = []
-        if team_id:
-            grant_conditions.append(
-                and_(
-                    ResourceGrant.grantee_type == "team",
-                    ResourceGrant.grantee_id == team_id,
-                )
-            )
-        if organization_id:
-            grant_conditions.append(
-                and_(
-                    ResourceGrant.grantee_type == "organization",
-                    ResourceGrant.grantee_id == organization_id,
-                )
-            )
+        grantee_conditions = grant_conditions(None, team_id, organization_id)
 
-        if folder_id and grant_conditions:
+        if folder_id and grantee_conditions:
             grant_result = await async_session.execute(
                 select(ResourceGrant.id)
                 .where(
                     ResourceGrant.resource_type == "folder",
                     ResourceGrant.resource_id == folder_id,
-                    or_(*grant_conditions),
+                    or_(*grantee_conditions),
                 )
                 .limit(1)
             )
             use_folder_grant_query = grant_result.first() is not None
-        elif not folder_id and grant_conditions:
-            # At team/org root: show only layers explicitly shared via direct link
-            # (LayerTeamLink / LayerOrganizationLink). Layers that live inside a
-            # folder shared with the team/org are NOT shown here — they surface only
-            # when the user navigates into that shared folder.
-            accessible: list[Any] = []
+        elif not folder_id and grantee_conditions:
+            # At team/org root: show only layers explicitly shared via a direct
+            # grant. Layers that live inside a folder shared with the team/org are
+            # NOT shown here — they surface only when the user navigates into that
+            # shared folder.
             # Sub-select: folders granted to this team/org — layers in these are excluded
-            # from the direct-link list so they don't bleed through here.
+            # from the direct-grant list so they don't bleed through here.
             folder_granted_ids = select(ResourceGrant.resource_id).where(
                 ResourceGrant.resource_type == "folder",
-                or_(*grant_conditions),
+                or_(*grantee_conditions),
             )
 
             # NULL-safe: folder_id IS NULL means no folder, always include such layers.
@@ -218,30 +211,12 @@ class CRUDLayer(CRUDBase):
             def not_in_granted(col: Any) -> Any:
                 return or_(col.is_(None), col.notin_(folder_granted_ids))
 
-            if team_id:
-                accessible.append(
-                    and_(
-                        Layer.id.in_(
-                            select(LayerTeamLink.layer_id).where(
-                                LayerTeamLink.team_id == team_id
-                            )
-                        ),
-                        not_in_granted(Layer.folder_id),
-                    )
+            filters.append(
+                and_(
+                    Layer.id.in_(granted_ids("layer", None, team_id, organization_id)),
+                    not_in_granted(Layer.folder_id),
                 )
-            if organization_id:
-                accessible.append(
-                    and_(
-                        Layer.id.in_(
-                            select(LayerOrganizationLink.layer_id).where(
-                                LayerOrganizationLink.organization_id == organization_id
-                            )
-                        ),
-                        not_in_granted(Layer.folder_id),
-                    )
-                )
-            if accessible:
-                filters.append(or_(*accessible))
+            )
             use_folder_grant_query = True
 
         # Get roles
@@ -257,11 +232,6 @@ class CRUDLayer(CRUDBase):
         # Build query
         query = create_query_shared_content(
             Layer,
-            LayerTeamLink,
-            LayerOrganizationLink,
-            Team,
-            Organization,
-            Role,
             filters,
             team_id=None if bypass_join else team_id,
             organization_id=None if bypass_join else organization_id,
@@ -284,14 +254,20 @@ class CRUDLayer(CRUDBase):
             **builder_params,
         )
         assert isinstance(layers, Page)
+        effective_team_id = None if bypass_join else team_id
+        effective_org_id = None if bypass_join else organization_id
+        grants_by_resource = None
+        if not effective_team_id and not effective_org_id:
+            grants_by_resource = await fetch_grants_by_resource(
+                async_session, "layer", [row[0].id for row in layers.items]
+            )
         layers_arr = build_shared_with_object(
             items=layers.items,
             role_mapping=role_mapping,
-            team_key="team_links",
-            org_key="organization_links",
             model_name="layer",
-            team_id=None if bypass_join else team_id,
-            organization_id=None if bypass_join else organization_id,
+            team_id=effective_team_id,
+            organization_id=effective_org_id,
+            grants_by_resource=grants_by_resource,
         )
         layers.items = layers_arr
         return layers

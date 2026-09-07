@@ -10,14 +10,20 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.core import authz
+from core.crud.crud_folder import folder as crud_folder
+from core.crud.crud_layer_project import layer_project as crud_layer_project
+from core.crud.crud_space import space as crud_space
 from core.db.models._link_model import (
     LayerProjectGroup,
     LayerProjectLink,
     UserProjectLink,
 )
+from core.db.models.folder import Folder
 from core.db.models.project import Project
 from core.db.models.report_layout import ReportLayout
 from core.db.models.workflow import Workflow
+from core.schemas.error import FolderNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +34,8 @@ async def copy_project(
     project_id: UUID,
     user_id: UUID,
     target_folder_id: UUID | None = None,
+    mark_template_source: bool = False,
+    cross_space: bool = False,
 ) -> Project:
     """Create a shallow copy of a project.
 
@@ -35,19 +43,36 @@ async def copy_project(
     LayerProjectLinks, Workflows, ReportLayouts) but references the same layer
     data — no DuckLake duplication occurs.
 
+    Each copied layer link is ``shareable`` only if the source link was and the
+    copier may share that layer himself (D7), so copying a project cannot mint
+    a link that hands the copy's audience access the copier never had.
+
     Args:
         async_session: Async SQLAlchemy session.
         project_id: Source project UUID.
         user_id: ID of the user requesting the copy (becomes owner of the copy).
         target_folder_id: Folder for the new project. Falls back to the source
             project's folder when ``None``.
+        mark_template_source: Sets ``is_template_source`` on the copy (T2) — a
+            hidden frozen copy backing a project-payload template, excluded
+            from every listing/feed/trash/search.
+        cross_space: The "Use" flow: the copy's destination folder
+            can be in a different space than the source project. Requires
+            `target_folder_id`. The copy's space becomes that TARGET
+            folder's own space (not the source project's), and
+            `assert_same_space` — whose whole point is refusing exactly
+            that — is skipped.
 
     Returns:
         The newly created :class:`Project` instance (already flushed, not yet
         committed — caller may commit or the function commits at the end).
 
     Raises:
-        ValueError: When the source project or its user-link cannot be found.
+        ValueError: When the source project or its user-link cannot be
+            found, or `cross_space` is True without `target_folder_id`.
+        FolderNotFoundError: When `target_folder_id` is not a live folder —
+            of the source project's own space (`cross_space=False`), or at
+            all (`cross_space=True`).
     """
     # ------------------------------------------------------------------
     # 1. Fetch source project
@@ -55,6 +80,47 @@ async def copy_project(
     source_project = await async_session.get(Project, project_id)
     if source_project is None:
         raise ValueError(f"Project {project_id} not found")
+
+    # The copy's folder: the caller's explicit choice, or the source
+    # project's own folder when none is given. Ordinarily the copy takes on
+    # the SOURCE PROJECT's space (not the copier's personal space) —
+    # copying a project inside a team space keeps the copy in the team
+    # space — so an explicit choice must be a live folder of that same
+    # space (a folder in an unrelated space 404s exactly like an
+    # owner-only check would, rather than leaking that it exists via a
+    # 403). `cross_space=True` inverts this on purpose: the copy is meant
+    # to land in a different space than the source, so it takes on the
+    # TARGET folder's own space instead.
+    new_folder_id = (
+        target_folder_id if target_folder_id is not None else source_project.folder_id
+    )
+    new_space_id: UUID | None
+    if cross_space:
+        if target_folder_id is None:
+            raise ValueError("copy_project(cross_space=True) requires target_folder_id")
+        target_folder = await async_session.get(Folder, target_folder_id)
+        if (
+            target_folder is None
+            or target_folder.deleted_at is not None
+            or target_folder.space_id is None
+        ):
+            raise FolderNotFoundError(f"Folder {target_folder_id} not found")
+        new_space_id = target_folder.space_id
+    else:
+        new_space_id = source_project.space_id
+        if target_folder_id is not None:
+            await crud_folder.assert_same_space(
+                async_session, folder_id=target_folder_id, space_id=new_space_id
+            )
+    if new_folder_id is not None:
+        # Both the explicit choice and the default (the source project's
+        # own folder) need a write check: read access to the source — what
+        # let the caller copy it at all — says nothing about whether they
+        # may place a NEW project into that folder. A team-space viewer can
+        # read a project sitting in a folder they have no write access to.
+        await authz.require(async_session, "folder", new_folder_id, user_id, "write")
+    if new_space_id is None:
+        new_space_id = (await crud_space.ensure_personal(async_session, user_id)).id
 
     # ------------------------------------------------------------------
     # 2. Fetch source UserProjectLink (initial_view_state lives here)
@@ -108,13 +174,11 @@ async def copy_project(
     # 4. Create new Project
     # ------------------------------------------------------------------
     new_name = f"{source_project.name} (Copy)"
-    new_folder_id = (
-        target_folder_id if target_folder_id is not None else source_project.folder_id
-    )
 
     new_project = Project(
         user_id=user_id,
         folder_id=new_folder_id,
+        space_id=new_space_id,
         name=new_name,
         description=source_project.description,
         tags=copy.deepcopy(source_project.tags) if source_project.tags else None,
@@ -130,6 +194,7 @@ async def copy_project(
         builder_config=copy.deepcopy(source_project.builder_config)
         if source_project.builder_config
         else None,
+        is_template_source=mark_template_source,
     )
     async_session.add(new_project)
     await async_session.flush()  # populate new_project.id
@@ -187,6 +252,16 @@ async def copy_project(
     # ------------------------------------------------------------------
     old_to_new_link_id: dict[int, int] = {}
 
+    # `shareable` records that whoever put the layer into the project held
+    # `share` on it (D7). On a copy that person is the copier, who may reach the
+    # layer only through the project he is copying — so the flag is recomputed
+    # for him and ANDed with the source link's, never widening either side.
+    shareable_by_layer_id = await crud_layer_project.shareable_by_layer_id(
+        async_session,
+        [source_link.layer_id for source_link in source_links],
+        user_id,
+    )
+
     for source_link in source_links:
         assert source_link.id is not None
         new_group_id: int | None = None
@@ -207,6 +282,13 @@ async def copy_project(
             else None,
             query=copy.deepcopy(source_link.query) if source_link.query else None,
             charts=copy.deepcopy(source_link.charts) if source_link.charts else None,
+            # Never wider than the source link, never wider than what the
+            # copier may share himself (D7). The copier keeps reading the
+            # layer through the source project's link either way; what a
+            # non-shareable copy withholds is handing that read on to the
+            # copy's own audience.
+            shareable=bool(source_link.shareable)
+            and shareable_by_layer_id.get(source_link.layer_id, False),
         )
         async_session.add(new_link)
         await async_session.flush()
@@ -305,9 +387,7 @@ def _remap_basemap_layer_config(
                     old_id = int(target)
                 except (TypeError, ValueError):
                     old_id = None
-                new_id = (
-                    old_to_new_link_id.get(old_id) if old_id is not None else None
-                )
+                new_id = old_to_new_link_id.get(old_id) if old_id is not None else None
                 target = str(new_id) if new_id is not None else "all"
             new_config[layer_id] = {**setting, "target": target}
         remapped.append({**basemap, "layer_config": new_config})

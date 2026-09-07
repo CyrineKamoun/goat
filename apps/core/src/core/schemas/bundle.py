@@ -89,7 +89,9 @@ class BundleArtifactSummary(BaseModel):
 
 class BundleRead(BundleBase, ThumbnailUrlMixin):
     id: UUID = Field(..., description="Bundle ID")
-    user_id: UUID = Field(..., description="Bundle owner ID")
+    user_id: UUID | None = Field(
+        None, description="Bundle owner ID; None if the owning user was deleted"
+    )
     folder_id: UUID = Field(..., description="Folder the bundle lives in")
     status: str = Field("ready", description="Processing lifecycle status")
     # The mixin turns the stored value into a presigned URL and falls back to the

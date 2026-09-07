@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Union
 from uuid import UUID
@@ -10,13 +11,14 @@ from pydantic import (
     field_serializer,
     field_validator,
 )
-from sqlalchemy import text
+from sqlalchemy import Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
 from sqlmodel import (
     ARRAY,
     Boolean,
     Column,
+    DateTime,
     Field,
     ForeignKey,
     Integer,
@@ -37,9 +39,7 @@ if TYPE_CHECKING:
 
     from ._link_model import (
         BundleLayerLink,
-        LayerOrganizationLink,
         LayerProjectLink,
-        LayerTeamLink,
     )
 
 
@@ -131,7 +131,22 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     """Layer model."""
 
     __tablename__ = "layer"
-    __table_args__ = {"schema": settings.SCHEMA}
+    __table_args__ = (
+        # The arbiter of promote-on-use: `catalog_promote` inserts with
+        # ON CONFLICT (catalog_external_uid, catalog_version) WHERE
+        # catalog_external_uid IS NOT NULL, so a concurrent promote of the same
+        # (item, version) conflicts here and the loser reuses the winner's row.
+        # The predicate must stay identical to that statement's, or the
+        # conflict target resolves to no index and every promote fails.
+        Index(
+            "uq_layer_catalog_identity",
+            "catalog_external_uid",
+            "catalog_version",
+            unique=True,
+            postgresql_where=text("catalog_external_uid IS NOT NULL"),
+        ),
+        {"schema": settings.SCHEMA},
+    )
 
     id: UUID | None = Field(
         default=None,
@@ -147,13 +162,16 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="SET NULL"),
             nullable=True,
         ),
         description=(
             "Layer owner. NULL for a catalog layer: it belongs to the provider "
             "that published it, not to anyone here, which is what keeps it out "
-            "of every content listing and every storage quota."
+            "of every content listing and every storage quota. Also NULL for a "
+            "space-owned layer whose creator's account was removed: "
+            'informational "created by", survives the user like every other '
+            "content table's user_id."
         ),
     )
     catalog_external_uid: str | None = Field(
@@ -183,6 +201,26 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
             nullable=True,
         ),
         description="Folder the layer lives in. NULL for an unowned catalog layer.",
+    )
+    space_id: UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.space.id", ondelete="SET NULL"),
+            nullable=True,
+            index=True,
+        ),
+        description="Space this layer belongs to. NULL for an unowned catalog layer.",
+    )
+    deleted_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+        description="Soft-delete timestamp; NULL while the layer is live.",
+    )
+    restricted: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default=text("false")),
+        description="Restricted (D9): members of the layer's space do not get the space default role on it; grants still apply.",
     )
     type: LayerType = Field(
         sa_column=Column(Text, nullable=False), description="Layer type"
@@ -265,12 +303,6 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
     bundle_link: "BundleLayerLink" = Relationship(
         back_populates="layer",
         sa_relationship_kwargs={"uselist": False, "cascade": "all, delete-orphan"},
-    )
-    organization_links: List["LayerOrganizationLink"] = Relationship(
-        back_populates="layer", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
-    )
-    team_links: List["LayerTeamLink"] = Relationship(
-        back_populates="layer", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
 
     @field_validator("extent", mode="after")

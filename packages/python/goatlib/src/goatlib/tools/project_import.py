@@ -521,19 +521,31 @@ class ProjectImportRunner(SimpleToolRunner):
             )
 
             async with conn.transaction():
+                # The imported project and every layer it references land in
+                # `target_folder_id` — they belong to that folder's space
+                # (every folder/layer/project/bundle row carries the
+                # `space_id` of the space that owns it). Without this, both
+                # rows would be created with `space_id` NULL — unreachable
+                # through any space-scoped listing or grant.
+                target_space_id = await conn.fetchval(
+                    f"SELECT space_id FROM {schema}.folder WHERE id = $1",
+                    uuid.UUID(target_folder_id),
+                )
+
                 # 1. Insert project (builder_config deferred until layer_project IDs are known)
                 await conn.execute(
                     f"""
                     INSERT INTO {schema}.project
-                        (id, user_id, folder_id, name, description, basemap,
+                        (id, user_id, folder_id, space_id, name, description, basemap,
                          custom_basemaps, max_extent, tags,
                          created_at, updated_at)
                     VALUES
-                        ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+                        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
                     """,
                     uuid.UUID(new_project_id),
                     uuid.UUID(new_user_id),
                     uuid.UUID(target_folder_id),
+                    target_space_id,
                     project_data.name,
                     project_data.description,
                     project_data.basemap,
@@ -641,19 +653,20 @@ class ProjectImportRunner(SimpleToolRunner):
                     await conn.execute(
                         f"""
                         INSERT INTO {schema}.layer
-                            (id, user_id, folder_id, name, description, type,
+                            (id, user_id, folder_id, space_id, name, description, type,
                              feature_layer_type, feature_layer_geometry_type,
                              data_type, url, properties, other_properties,
                              size, field_config,
                              created_at, updated_at)
                         VALUES
                             ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                             $11, $12, $13, $14,
+                             $11, $12, $13, $14, $15,
                              NOW(), NOW())
                         """,
                         uuid.UUID(new_layer_id),
                         uuid.UUID(new_user_id),
                         uuid.UUID(target_folder_id),
+                        target_space_id,
                         layer_meta.name,
                         layer_meta.description,
                         layer_meta.type,

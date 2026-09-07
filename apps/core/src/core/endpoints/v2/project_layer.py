@@ -40,6 +40,7 @@ router = APIRouter()
     response_model=List[
         IFeatureStandardProjectRead
         | IFeatureToolProjectRead
+        | IFeatureStreetNetworkProjectRead
         | ITableProjectRead
         | IRasterProjectRead
     ],
@@ -59,19 +60,34 @@ async def add_layers_to_project(
         description="List of layer IDs to add to the project",
         examples=[["3fa85f64-5717-4562-b3fc-2c963f66afa6"]],
     ),
+    user_id: UUID = Depends(get_user_id),
 ) -> List[
     IFeatureStandardProjectRead
     | IFeatureToolProjectRead
+    | IFeatureStreetNetworkProjectRead
     | ITableProjectRead
     | IRasterProjectRead
 ]:
     """Add layers to a project by its ID."""
+
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
+    role = await crud_project.get_my_role(
+        async_session, project_id=project_id, user_id=user_id
+    )
+    if role not in ("project-owner", "project-editor"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Adding layers to a project requires editor access to the project",
+        )
 
     # Add layers to project
     layers_project = await crud_layer_project.create(
         async_session=async_session,
         project_id=project_id,
         layer_ids=layer_ids,
+        user_id=user_id,
     )
     assert isinstance(layers_project, List)
 
@@ -124,6 +140,7 @@ def catalog_batch_refusal(*, requested: int, existing: int) -> str | None:
     response_model=List[
         IFeatureStandardProjectRead
         | IFeatureToolProjectRead
+        | IFeatureStreetNetworkProjectRead
         | ITableProjectRead
         | IRasterProjectRead
     ],
@@ -143,9 +160,11 @@ async def add_catalog_items_to_project(
         ...,
         description="Catalog item IDs (STAC item ids) to add to the project",
     ),
+    user_id: UUID = Depends(get_user_id),
 ) -> List[
     IFeatureStandardProjectRead
     | IFeatureToolProjectRead
+    | IFeatureStreetNetworkProjectRead
     | ITableProjectRead
     | IRasterProjectRead
 ]:
@@ -157,6 +176,18 @@ async def add_catalog_items_to_project(
     provider that published it — with data materialized asynchronously) and
     then links it.
     """
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
+    role = await crud_project.get_my_role(
+        async_session, project_id=project_id, user_id=user_id
+    )
+    if role not in ("project-owner", "project-editor"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Adding layers to a project requires editor access to the project",
+        )
+
     import json
     import uuid as uuid_module
     from pathlib import Path as FSPath
@@ -309,6 +340,7 @@ async def add_catalog_items_to_project(
             async_session=async_session,
             project_id=project_id,
             layer_ids=layer_ids,
+            user_id=user_id,
         )
         if layer_ids
         else []
@@ -316,7 +348,10 @@ async def add_catalog_items_to_project(
     assert isinstance(layers_project, List)
     if reused_link_ids:
         layers_project = layers_project + await crud_layer_project.get_by_ids(
-            async_session=async_session, ids=reused_link_ids
+            async_session=async_session,
+            ids=reused_link_ids,
+            project_id=project_id,
+            user_id=user_id,
         )
     return layers_project
 
@@ -341,12 +376,15 @@ async def add_bundle_to_project(
     in/out or removed individually); removing the whole group removes the bundle
     from the project.
     """
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     # Project write access is enforced by auth_z; the caller also needs at least
     # read access to the bundle.
     await authorize_bundle(async_session, bundle_id, user_id, "read")
 
     group, _ = await crud_layer_project_group.add_bundle(
-        async_session, project_id=project_id, bundle_id=bundle_id
+        async_session, project_id=project_id, bundle_id=bundle_id, user_id=user_id
     )
     return group
 
@@ -365,6 +403,7 @@ async def get_layers_from_project(
         description="The ID of the project to get",
         examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
     ),
+    user_id: UUID = Depends(get_user_id),
 ) -> List[
     IFeatureStandardProjectRead
     | IFeatureToolProjectRead
@@ -372,12 +411,22 @@ async def get_layers_from_project(
     | ITableProjectRead
     | IRasterProjectRead
 ]:
-    """Get layers from a project by its ID."""
+    """Get layers from a project by its ID.
+
+    A layer the caller has no access to of his own — reachable here only
+    through a non-shareable link (D7) — is listed as `locked`, without the
+    style, filter and preference payload the map and data table read.
+    """
+
+    # 404 if the project itself is trashed — a soft delete must not
+    # be worked around by reading its layer list directly.
+    await crud_project.get_live_or_404(async_session, project_id)
 
     # Get all layers from project
     layers_project = await crud_layer_project.get_layers(
         async_session,
         project_id=project_id,
+        user_id=user_id,
     )
     assert isinstance(layers_project, List)
 
@@ -388,6 +437,7 @@ async def get_layers_from_project(
     "/{project_id}/layer/{layer_project_id}",
     response_model=IFeatureStandardProjectRead
     | IFeatureToolProjectRead
+    | IFeatureStreetNetworkProjectRead
     | ITableProjectRead
     | IRasterProjectRead,
     response_model_exclude_none=True,
@@ -406,20 +456,43 @@ async def get_layer_from_project(
         description="Layer project ID to get",
         examples=["1"],
     ),
+    user_id: UUID = Depends(get_user_id),
 ) -> Union[
     IFeatureStandardProjectRead
     | IFeatureToolProjectRead
+    | IFeatureStreetNetworkProjectRead
     | ITableProjectRead
     | IRasterProjectRead
 ]:
-    layer_project = (
-        await crud_layer_project.get_by_ids(async_session, ids=[layer_project_id])
-    )[0]
-    assert type(layer_project) is (
-        IFeatureStandardProjectRead
-        | IFeatureToolProjectRead
-        | ITableProjectRead
-        | IRasterProjectRead
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
+    # Scoped to the project in the path — `auth_z` only checked the caller's
+    # role on THAT project, so a link id naming another project's link is not
+    # found here. Same locking as the layer list on top of that: reading one
+    # row must not hand out the style and filter of a dataset the caller has
+    # no access to (D7).
+    rows = await crud_layer_project.get_by_ids(
+        async_session,
+        ids=[layer_project_id],
+        project_id=project_id,
+        user_id=user_id,
+    )
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Layer project relation not found",
+        )
+    layer_project = rows[0]
+    assert isinstance(
+        layer_project,
+        (
+            IFeatureStandardProjectRead,
+            IFeatureToolProjectRead,
+            IFeatureStreetNetworkProjectRead,
+            ITableProjectRead,
+            IRasterProjectRead,
+        ),
     )
 
     return layer_project
@@ -429,6 +502,7 @@ async def get_layer_from_project(
     "/{project_id}/layer/{layer_project_id}",
     response_model=IFeatureStandardProjectRead
     | IFeatureToolProjectRead
+    | IFeatureStreetNetworkProjectRead
     | ITableProjectRead
     | IRasterProjectRead,
     response_model_exclude_none=True,
@@ -437,6 +511,7 @@ async def get_layer_from_project(
 )
 async def update_layer_in_project(
     async_session: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_user_id),
     project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
@@ -455,10 +530,25 @@ async def update_layer_in_project(
 ) -> Union[
     IFeatureStandardProjectRead
     | IFeatureToolProjectRead
+    | IFeatureStreetNetworkProjectRead
     | ITableProjectRead
     | IRasterProjectRead
 ]:
-    """Update layer in a project by its ID."""
+    """Update layer in a project by its ID.
+
+    The link is looked up by both ids, so a `layer_project_id` belonging to
+    another project 404s: `auth_z` only checked the caller's role on the
+    project in the path.
+
+    Project write is enough to reach this route, so the caller may be someone
+    the link is LOCKED for — a layer added by a member who could not share it
+    (D7). `crud_layer_project.update` refuses those with 403 and builds its
+    response through the same read path as `GET /project/{id}/layer`.
+    """
+
+    # 404 if the project itself is trashed — checked
+    # before the mutation below, not after.
+    await crud_project.get_live_or_404(async_session, project_id)
 
     # NOTE: Avoid getting layer_id from layer_in as the authorization is running against the query params.
 
@@ -466,12 +556,15 @@ async def update_layer_in_project(
     layer_project: (
         IFeatureStandardProjectRead
         | IFeatureToolProjectRead
+        | IFeatureStreetNetworkProjectRead
         | ITableProjectRead
         | IRasterProjectRead
     ) = await crud_layer_project.update(
         async_session=async_session,
         id=layer_project_id,
         layer_in=layer_in,
+        project_id=project_id,
+        user_id=user_id,
     )
 
     # Update the last updated at of the project
@@ -513,10 +606,20 @@ async def delete_layer_from_project(
         examples=["1"],
     ),
 ) -> None:
-    """Delete layer from a project by its ID."""
+    """Delete layer from a project by its ID.
+
+    The link is looked up by both ids, so a `layer_project_id` belonging to
+    another project 404s: `auth_z` only checked the caller's role on the
+    project in the path.
+    """
+
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
 
     # Get layer project
-    layer_project = await crud_layer_project.get(async_session, id=layer_project_id)
+    layer_project = await crud_layer_project.get_in_project(
+        async_session, id=layer_project_id, project_id=project_id
+    )
     if layer_project is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

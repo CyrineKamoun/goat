@@ -13,10 +13,9 @@ from uuid import UUID
 import pytest
 from core.core.config import settings
 from core.crud.crud_layer import layer as crud_layer
+from core.crud.crud_space import space as crud_space
 from core.db.models import (
     Layer,
-    LayerOrganizationLink,
-    LayerTeamLink,
     Organization,
     Role,
     Team,
@@ -89,7 +88,12 @@ async def _make_user(db, user_id: UUID | None = None) -> User:
 
 
 async def _make_folder(db, user_id: UUID, name: str = "home") -> Folder:
-    f = Folder(id=_uid(), user_id=user_id, name=name)
+    f = Folder(
+        id=_uid(),
+        user_id=user_id,
+        space_id=(await crud_space.ensure_personal(db, user_id)).id,
+        name=name,
+    )
     db.add(f)
     await db.flush()
     return f
@@ -131,14 +135,28 @@ async def _link_user_team(db, user_id: UUID, team_id: UUID) -> None:
 
 
 async def _link_layer_team(db, layer_id: UUID, team_id: UUID, role_id: UUID) -> None:
-    db.add(LayerTeamLink(layer_id=layer_id, team_id=team_id, role_id=role_id))
+    db.add(
+        ResourceGrant(
+            resource_type="layer",
+            resource_id=layer_id,
+            grantee_type="team",
+            grantee_id=team_id,
+            role_id=role_id,
+            granted_by=None,
+        )
+    )
     await db.flush()
 
 
 async def _link_layer_org(db, layer_id: UUID, org_id: UUID, role_id: UUID) -> None:
     db.add(
-        LayerOrganizationLink(
-            layer_id=layer_id, organization_id=org_id, role_id=role_id
+        ResourceGrant(
+            resource_type="layer",
+            resource_id=layer_id,
+            grantee_type="organization",
+            grantee_id=org_id,
+            role_id=role_id,
+            granted_by=None,
         )
     )
     await db.flush()
@@ -180,7 +198,9 @@ async def test_my_content_own_layer_visible(db_session, fixture_create_user):
     db = db_session
     await _seed_roles(db)
     user_a = await _make_user(db, _PRIMARY_USER_ID)
-    folder = await _make_folder(db, user_a.id, "home")
+    # not "home": fixture_create_user already made that folder for this user,
+    # and folder names are now unique per space at the root level
+    folder = await _make_folder(db, user_a.id, "mine")
     layer = await _make_layer(db, user_a.id, folder.id, "mine")
     await db.commit()
 
@@ -250,7 +270,9 @@ async def test_my_content_multiple_own_folders(db_session, fixture_create_user):
     db = db_session
     await _seed_roles(db)
     user_a = await _make_user(db, _PRIMARY_USER_ID)
-    home = await _make_folder(db, user_a.id, "home")
+    # not "home": fixture_create_user already made that folder for this user,
+    # and folder names are now unique per space at the root level
+    home = await _make_folder(db, user_a.id, "Personal")
     named = await _make_folder(db, user_a.id, "Work")
     layer_home = await _make_layer(db, user_a.id, home.id, "home-layer")
     layer_named = await _make_layer(db, user_a.id, named.id, "named-layer")

@@ -2,6 +2,7 @@
 Bundle Model
 """
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict, List
 from uuid import UUID
 
@@ -10,7 +11,7 @@ from pydantic import field_serializer
 from sqlalchemy import ForeignKey, Integer, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as UUID_PG
-from sqlmodel import Column, Field, Relationship, text
+from sqlmodel import Boolean, Column, DateTime, Field, Relationship, text
 
 from core.core.config import settings
 from core.db.models._base_class import (
@@ -56,13 +57,34 @@ class Bundle(ContentBaseAttributes, DateTimeBase, table=True):
         ),
         description="Bundle ID",
     )
-    user_id: UUID = Field(
+    user_id: UUID | None = Field(
+        default=None,
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="CASCADE"),
-            nullable=False,
+            ForeignKey(f"{settings.SCHEMA}.user.id", ondelete="SET NULL"),
+            nullable=True,
         ),
-        description="Bundle owner ID",
+        description='Bundle creator. Nullable: informational "created by", survives the user.',
+    )
+    space_id: UUID | None = Field(
+        default=None,
+        sa_column=Column(
+            UUID_PG(as_uuid=True),
+            ForeignKey(f"{settings.SCHEMA}.space.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        ),
+        description="Space this bundle belongs to.",
+    )
+    deleted_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+        description="Soft-delete timestamp; NULL while the bundle is live.",
+    )
+    restricted: bool = Field(
+        default=False,
+        sa_column=Column(Boolean, nullable=False, server_default=text("false")),
+        description="Restricted (D9): members of the bundle's space do not get the space default role on it; grants still apply.",
     )
     bundle_type: BundleTypeName = Field(
         sa_column=Column(

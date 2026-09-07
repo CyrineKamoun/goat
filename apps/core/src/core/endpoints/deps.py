@@ -94,16 +94,19 @@ async def ensure_home_folder(
     """
     from sqlalchemy.exc import IntegrityError
 
+    from core.crud.crud_space import space as crud_space
     from core.crud.crud_user import user as crud_user
 
     user = await crud_user.upsert_from_token(token=claims, db_session=async_session)
+    assert user.id is not None
 
     existing = await crud_folder.get_by_multi_keys(
         async_session, keys={"user_id": user.id, "name": "home"}
     )
     if not existing:
         try:
-            folder = FolderCreate(name="home", user_id=user.id)
+            space_id = (await crud_space.ensure_personal(async_session, user.id)).id
+            folder = FolderCreate(name="home", user_id=user.id, space_id=space_id)
             await crud_folder.create(async_session, obj_in=folder)
         except IntegrityError:
             # Another request already created the folder (race condition)

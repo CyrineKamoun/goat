@@ -72,6 +72,7 @@ class LayerRecord(BaseModel):
     id: uuid_module.UUID
     user_id: uuid_module.UUID
     folder_id: uuid_module.UUID
+    space_id: uuid_module.UUID
     name: str = Field(min_length=1)
     type: Literal["feature", "raster", "table"]
     feature_layer_type: Literal["standard", "tool", "street_network"] | None = None
@@ -126,6 +127,24 @@ class ToolDatabaseService:
         """
         self.pool = pool
         self.schema = schema
+
+    async def _resolve_folder_space_id(self: Self, folder_id: str) -> uuid_module.UUID:
+        """Look up the space a folder belongs to.
+
+        Raises if the folder does not exist or has no space, so a tool never
+        writes a layer/bundle row that is unreachable to its owner.
+        """
+        row = await self.pool.fetchrow(
+            f"SELECT space_id FROM {self.schema}.folder WHERE id = $1",
+            uuid_module.UUID(folder_id),
+        )
+        if row is None:
+            raise ValueError(f"Folder {folder_id} does not exist")
+        if row["space_id"] is None:
+            raise ValueError(
+                f"Folder {folder_id} has no space_id; cannot create a reachable record"
+            )
+        return row["space_id"]
 
     async def get_project_folder_id(self: Self, project_id: str) -> str | None:
         """Get the folder_id for a project.
@@ -188,11 +207,16 @@ class ToolDatabaseService:
         # Normalize geometry type (POINT -> point, LINESTRING -> line, etc.)
         normalized_geom = normalize_geometry_type(geometry_type)
 
+        # A layer is only reachable through its space (folder listings, trash,
+        # transfer, authz all key off it), so resolve it from the folder up front.
+        space_id = await self._resolve_folder_space_id(folder_id)
+
         # Validate all fields through the Pydantic model before touching the DB
         record = LayerRecord(
             id=uuid_module.UUID(layer_id),
             user_id=uuid_module.UUID(user_id),
             folder_id=uuid_module.UUID(folder_id),
+            space_id=space_id,
             name=name,
             type=layer_type,
             feature_layer_type=feature_layer_type,
@@ -217,23 +241,25 @@ class ToolDatabaseService:
         await self.pool.execute(
             f"""
             INSERT INTO {self.schema}.layer (
-                id, user_id, folder_id, name, type, feature_layer_type,
+                id, user_id, folder_id, space_id, name, type, feature_layer_type,
                 feature_layer_geometry_type, extent,
                 size, properties, other_properties, thumbnail_url,
                 tool_type, job_id, created_at, updated_at
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7,
-                CASE WHEN $8::text IS NOT NULL
-                    THEN ST_Multi(ST_GeomFromText($8::text, 4326))
+                $8,
+                CASE WHEN $9::text IS NOT NULL
+                    THEN ST_Multi(ST_GeomFromText($9::text, 4326))
                     ELSE NULL
                 END,
-                $9, $10::jsonb, $11::jsonb, $12, $13, $14,
+                $10, $11::jsonb, $12::jsonb, $13, $14, $15,
                 NOW(), NOW()
             )
             """,
             record.id,
             record.user_id,
             record.folder_id,
+            record.space_id,
             record.name,
             record.type,
             record.feature_layer_type,
@@ -266,16 +292,18 @@ class ToolDatabaseService:
     ) -> None:
         """Create a bundle record in customer.bundle."""
         type_value = getattr(bundle_type, "value", bundle_type)
+        space_id = await self._resolve_folder_space_id(folder_id)
         await self.pool.execute(
             f"""
             INSERT INTO {self.schema}.bundle (
-                id, user_id, folder_id, name, description,
+                id, user_id, folder_id, space_id, name, description,
                 bundle_type, properties, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW(), NOW())
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW(), NOW())
             """,
             uuid_module.UUID(bundle_id),
             uuid_module.UUID(user_id),
             uuid_module.UUID(folder_id),
+            space_id,
             name,
             description,
             type_value,

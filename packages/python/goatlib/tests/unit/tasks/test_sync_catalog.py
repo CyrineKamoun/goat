@@ -25,6 +25,7 @@ from goatlib.tasks.sync_catalog import (
     REQUIRED_COLLECTION_COLUMNS,
     REQUIRED_ITEM_COLUMNS,
     SyncCatalogParams,
+    _build_client_and_bucket,
     _composite_version,
     _parse_s3_url,
     _sync_with_client,
@@ -377,28 +378,30 @@ def test_dry_run_short_circuits_when_unchanged(tmp_path: Path) -> None:
     assert client.download_calls == []
 
 
-def test_missing_catalog_key_raises_not_implemented(tmp_path: Path) -> None:
+def test_missing_catalog_key_names_bucket_and_key(tmp_path: Path) -> None:
     dest_dir = tmp_path / "catalog"
     dest_dir.mkdir()
 
     client = _FakeS3Client(etag=None, head_error_code="NoSuchKey")
 
-    with pytest.raises(NotImplementedError, match="C1"):
+    with pytest.raises(FileNotFoundError) as excinfo:
         _sync_with_client(client, "test-bucket", "", dest_dir, dry_run=False)
 
+    message = str(excinfo.value)
+    assert "s3://test-bucket/items.parquet" in message
+    assert "CATALOG_S3_BUCKET" in message
+    assert "C1" not in message
     assert client.download_calls == []
     assert not (dest_dir / "VERSION").exists()
 
 
-def test_missing_catalog_key_404_status_also_raises_not_implemented(
-    tmp_path: Path,
-) -> None:
+def test_missing_catalog_key_404_status_is_also_not_found(tmp_path: Path) -> None:
     dest_dir = tmp_path / "catalog"
     dest_dir.mkdir()
 
     client = _FakeS3Client(etag=None, head_error_code="404")
 
-    with pytest.raises(NotImplementedError, match="C1"):
+    with pytest.raises(FileNotFoundError, match="s3://test-bucket/items.parquet"):
         _sync_with_client(client, "test-bucket", "", dest_dir, dry_run=False)
 
 
@@ -445,3 +448,81 @@ def test_parse_s3_url_with_port_and_no_bucket_or_region() -> None:
 def test_parse_s3_url_missing_host_raises() -> None:
     with pytest.raises(ValueError, match="host"):
         _parse_s3_url("not-a-url")
+
+
+# ────────────────────────────────────────────────────────────────────────
+# _build_client_and_bucket: which S3 the task talks to
+# ────────────────────────────────────────────────────────────────────────
+
+_SHARED_S3_ENV = {
+    "S3_PROVIDER": "minio",
+    "S3_ENDPOINT_URL": "http://minio:9000",
+    "S3_ACCESS_KEY_ID": "minioadmin",
+    "S3_SECRET_ACCESS_KEY": "minioadmin",
+    "S3_REGION": "us-east-1",
+    "S3_BUCKET_NAME": "goat",
+}
+
+_CATALOG_S3_ENV = {
+    "CATALOG_S3_BUCKET": "goat-catalog",
+    "CATALOG_S3_ENDPOINT_URL": "https://acct.r2.cloudflarestorage.com",
+    "CATALOG_S3_ACCESS_KEY_ID": "catalog-key",
+    "CATALOG_S3_SECRET_ACCESS_KEY": "catalog-secret",
+    "CATALOG_S3_REGION": "auto",
+}
+
+
+def _set_env(monkeypatch: pytest.MonkeyPatch, values: dict[str, str]) -> None:
+    for name in {*_SHARED_S3_ENV, *_CATALOG_S3_ENV}:
+        monkeypatch.delenv(name, raising=False)
+    for name, value in values.items():
+        monkeypatch.setenv(name, value)
+
+
+def test_catalog_s3_env_wins_over_shared_s3_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_env(monkeypatch, {**_SHARED_S3_ENV, **_CATALOG_S3_ENV})
+
+    client, bucket = _build_client_and_bucket(SyncCatalogParams())
+
+    assert bucket == "goat-catalog"
+    assert client.meta.endpoint_url == "https://acct.r2.cloudflarestorage.com"
+    assert client.meta.region_name == "auto"
+
+
+def test_without_catalog_s3_env_the_shared_bucket_is_used(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_env(monkeypatch, _SHARED_S3_ENV)
+
+    client, bucket = _build_client_and_bucket(SyncCatalogParams())
+
+    assert bucket == "goat"
+    assert client.meta.endpoint_url == "http://minio:9000"
+
+
+def test_s3_url_param_overrides_catalog_s3_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_env(monkeypatch, {**_SHARED_S3_ENV, **_CATALOG_S3_ENV})
+    params = SyncCatalogParams(
+        s3_url="https://k:s@nbg1.your-objectstorage.com/p4b-catalog-test?region=nbg1"
+    )
+
+    client, bucket = _build_client_and_bucket(params)
+
+    assert bucket == "p4b-catalog-test"
+    assert client.meta.endpoint_url == "https://nbg1.your-objectstorage.com"
+    assert client.meta.region_name == "nbg1"
+
+
+def test_bucket_param_overrides_catalog_s3_bucket_but_keeps_its_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_env(monkeypatch, {**_SHARED_S3_ENV, **_CATALOG_S3_ENV})
+
+    client, bucket = _build_client_and_bucket(SyncCatalogParams(bucket="other"))
+
+    assert bucket == "other"
+    assert client.meta.endpoint_url == "https://acct.r2.cloudflarestorage.com"

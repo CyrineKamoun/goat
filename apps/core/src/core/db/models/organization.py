@@ -22,7 +22,7 @@ from core.core.config import settings
 from core.db.models._base_class import UUIDServerDefaultBase, serialize_str_enum
 
 if TYPE_CHECKING:
-    from ._link_model import LayerOrganizationLink, ProjectOrganizationLink
+    from .team import Team
     from .user import User
 
 
@@ -178,11 +178,4 @@ class Organization(UUIDServerDefaultBase, OrganizationBase, table=True):
 
     # Relationships
     users: List["User"] = Relationship(back_populates="organization")
-    layer_links: List["LayerOrganizationLink"] = Relationship(
-        back_populates="organization",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
-    project_links: List["ProjectOrganizationLink"] = Relationship(
-        back_populates="organization",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
-    )
+    teams: List["Team"] = Relationship(back_populates="organization")

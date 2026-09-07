@@ -36,10 +36,11 @@ Algorithm:
        marker changes, so writing it last is what bounds a mixed read to the
        gap between the two replaces rather than to the whole build.
 
-If the bucket holds a JSON STAC tree instead of published parquet (no such
-keys), this raises ``NotImplementedError``: the JSON-tree → geoparquet
-conversion is contract decision C1 in `docs/goat-catalog-contract.md` and is
-not built yet, on purpose — do not half-build it here.
+Which bucket: the ``s3_url`` param, else the ``bucket`` param, else the
+dedicated ``CATALOG_S3_*`` variables (shared with `apps/catalog`), else the
+generic ``S3_*`` settings. If neither published key exists in the resolved
+bucket this raises ``FileNotFoundError`` naming bucket, key and endpoint —
+in practice that means the task resolved to the uploads bucket.
 
 Windmill deployment: registered in `goatlib.tasks.registry` as
 `f/goat/tasks/sync_catalog` and synced via `scripts/windmill/sync-tools.sh`
@@ -173,13 +174,40 @@ def _default_dest_dir() -> Path:
     return Path(os.environ.get("DATA_DIR", "/app/data")) / "catalog"
 
 
+def _catalog_s3_target() -> _S3Target | None:
+    """The dedicated catalog bucket, from ``CATALOG_S3_*``.
+
+    These are the same variables ``apps/catalog`` reads to serve previews, so
+    one set of env keys points both consumers at the same bucket. The shared
+    ``S3_*`` settings describe the *uploads* bucket, which never holds the
+    published catalog; falling back to them is only right when no dedicated
+    bucket is configured at all.
+    """
+    bucket = ToolSettings._get_secret("CATALOG_S3_BUCKET", "") or None
+    if bucket is None:
+        return None
+    return _S3Target(
+        endpoint_url=ToolSettings._get_secret("CATALOG_S3_ENDPOINT_URL", "") or None,
+        access_key_id=ToolSettings._get_secret("CATALOG_S3_ACCESS_KEY_ID", "") or None,
+        secret_access_key=ToolSettings._get_secret("CATALOG_S3_SECRET_ACCESS_KEY", "")
+        or None,
+        region=ToolSettings._get_secret("CATALOG_S3_REGION", "") or None,
+        bucket=bucket,
+    )
+
+
 def _build_client_and_bucket(params: SyncCatalogParams) -> tuple[Any, str]:
-    """Resolve an S3 client + bucket from params/env, same precedence as
-    `pull_catalog`: an `s3_url` override wins over `bucket`, which wins over
-    the shared env-based default.
+    """Resolve an S3 client + bucket from params/env.
+
+    Precedence, highest first: the ``s3_url`` param (everything for one
+    bucket), then the ``bucket`` param, then the dedicated ``CATALOG_S3_*``
+    variables, then the shared ``S3_*`` settings. Connection details come
+    from the most specific source that has them, so ``bucket`` alone still
+    talks to the catalog endpoint when one is configured.
     """
     settings = ToolSettings.from_env()
-    target = _parse_s3_url(params.s3_url)
+    url_target = _parse_s3_url(params.s3_url)
+    target = url_target or _catalog_s3_target()
 
     if target is not None:
         settings = replace(
@@ -192,8 +220,9 @@ def _build_client_and_bucket(params: SyncCatalogParams) -> tuple[Any, str]:
         )
 
     bucket = (
-        (target.bucket if target else None)
+        (url_target.bucket if url_target else None)
         or params.bucket
+        or (target.bucket if target else None)
         or settings.s3_bucket_name
         or "goat"
     )
@@ -248,16 +277,31 @@ def _validate_and_count(path: Path, required: tuple[str, ...]) -> int:
         con.close()
 
 
-def _raise_missing_key(exc: ClientError, bucket: str, prefix: str, key: str) -> None:
+def _raise_missing_key(
+    exc: ClientError, client: Any, bucket: str, prefix: str, key: str
+) -> None:
+    """Turn a 404 on a published key into a message that says where we looked.
+
+    A missing ``items.parquet`` almost always means the task resolved to the
+    wrong bucket (typically the shared uploads bucket because no
+    ``CATALOG_S3_*`` is set), so the error names bucket, key and endpoint and
+    the variables that steer them.
+    """
     error = exc.response.get("Error", {})
     code = str(error.get("Code", ""))
     status = str(exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode", ""))
     if code in _MISSING_KEY_ERROR_CODES or status == "404":
-        raise NotImplementedError(
-            f"no {key} found in s3://{bucket}/{prefix}/ — this bucket appears to "
-            "hold a JSON STAC tree rather than published stac-geoparquet. "
-            "JSON-tree -> geoparquet conversion is contract decision C1 in "
-            "docs/goat-catalog-contract.md and is not built yet."
+        endpoint = getattr(getattr(client, "meta", None), "endpoint_url", None)
+        where = f"s3://{bucket}/{key}"
+        if endpoint:
+            where += f" (endpoint {endpoint})"
+        raise FileNotFoundError(
+            f"{where} does not exist. The published catalog is items.parquet + "
+            "collections.parquet at the root of the catalog bucket; this bucket "
+            "has neither. Check the `s3_url`/`bucket` params or the "
+            "CATALOG_S3_BUCKET / CATALOG_S3_ENDPOINT_URL / CATALOG_S3_ACCESS_KEY_ID / "
+            "CATALOG_S3_SECRET_ACCESS_KEY / CATALOG_S3_REGION variables of the "
+            f"worker (prefix={prefix!r})."
         ) from exc
     raise exc
 
@@ -308,7 +352,7 @@ def _sync_with_client(
         try:
             head = client.head_object(Bucket=bucket, Key=key)
         except ClientError as exc:
-            _raise_missing_key(exc, bucket, prefix, key)
+            _raise_missing_key(exc, client, bucket, prefix, key)
             raise  # pragma: no cover - _raise_missing_key always raises
         etags[name] = str(head.get("ETag", "")).strip('"')
 

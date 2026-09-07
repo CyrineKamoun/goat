@@ -1,22 +1,17 @@
 import logging
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete as sql_delete
-from sqlalchemy import select
+from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.crud.base import CRUDBase
-from core.db.models._link_model import ResourceGrant
 from core.db.models.bundle import Bundle
-from core.db.models.layer import Layer, LayerType
+from core.db.models.layer import Layer
 from core.schemas.bundle import (
     BundleCreate,
     BundleUpdate,
-)
-from core.services.processes import (
-    delete_bundle_artifacts_via_processes,
-    delete_layers_via_processes,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,76 +62,42 @@ class CRUDBundle(CRUDBase[Bundle, BundleCreate, BundleUpdate]):
         *,
         id: UUID,
         user_id: UUID,
-        access_token: str,
     ) -> bool:
-        """Delete a bundle together with its member layers, cleaning up their
-        DuckLake data.
+        """Soft delete a bundle together with its member layers.
 
-        Membership lives in ``bundle_layer``, so removing the bundle
-        only cascades the link rows — the member layers are deleted explicitly
-        here (a bundle "stays together"). Their DuckLake tables are dropped via
-        GeoAPI and the derived artifacts are removed from the data volume.
-        Returns False if no bundle with this id is owned by the user.
+        Membership lives in ``bundle_layer`` — the bundle and every member
+        layer get `deleted_at` (a bundle "stays together" through trash too),
+        but the rows themselves, their grants and their DuckLake tables are
+        left untouched (the purge task removes the DuckLake data once the
+        trash retention window expires). Returns False if no bundle with this
+        id exists.
+
+        Authorization (bundle owner) is the caller's job — see
+        ``authorize_bundle(..., "owner")`` at the endpoint; `user_id` is
+        accepted for interface symmetry with other CRUD deletes but no
+        longer gates who may call it.
         """
         bundles = await self.get_by_multi_keys(
             async_session,
-            keys={"id": id, "user_id": user_id},
-            extra_fields=[Bundle.layer_links, Bundle.artifacts],
+            keys={"id": id},
+            extra_fields=[Bundle.layer_links],
         )
         if len(bundles) == 0:
             return False
 
         bundle = bundles[0]
         member_layer_ids = [link.layer_id for link in bundle.layer_links]
-        has_artifacts = any(a.storage_path for a in bundle.artifacts)
+        now = datetime.now(timezone.utc)
 
-        # Only feature/table layers have DuckLake tables — resolve types by id
-        # without pulling full ORM objects into the session.
-        ducklake_layer_ids: list[str] = []
-        if member_layer_ids:
-            rows = (
-                await async_session.execute(
-                    select(Layer.id, Layer.type).where(Layer.id.in_(member_layer_ids))
-                )
-            ).all()
-            ducklake_layer_ids = [
-                str(lid)
-                for lid, ltype in rows
-                if ltype in (LayerType.feature, LayerType.table)
-            ]
-
-        # Delete the bundle (cascades the link/artifact/dependency rows), then
-        # the member layer records (cascades their remaining links/share links).
-        await async_session.delete(bundle)
-        await async_session.flush()
+        bundle.deleted_at = now
+        async_session.add(bundle)
         if member_layer_ids:
             await async_session.execute(
-                sql_delete(Layer).where(Layer.id.in_(member_layer_ids))
+                sql_update(Layer)
+                .where(Layer.id.in_(member_layer_ids), Layer.deleted_at.is_(None))
+                .values(deleted_at=now)
             )
-        # Sharing grants live in resource_grant, which has no FK to the bundle
-        # (resource_id is a generic UUID), so they don't cascade — remove them
-        # explicitly to avoid orphaned grants.
-        await async_session.execute(
-            sql_delete(ResourceGrant).where(
-                ResourceGrant.resource_type == "bundle",
-                ResourceGrant.resource_id == id,
-            )
-        )
         await async_session.commit()
-
-        if ducklake_layer_ids:
-            logger.info(
-                "Deleting DuckLake data for %d layers from bundle %s",
-                len(ducklake_layer_ids),
-                id,
-            )
-            await delete_layers_via_processes(ducklake_layer_ids, access_token)
-
-        # Artifact files sit on the data volume, so a worker removes them — the
-        # same split as the DuckLake/PMTiles cleanup above.
-        if has_artifacts:
-            logger.info("Dispatching artifact cleanup for bundle %s", id)
-            await delete_bundle_artifacts_via_processes([str(id)], access_token)
         return True
 
 

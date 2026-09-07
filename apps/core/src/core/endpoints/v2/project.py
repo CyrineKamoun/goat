@@ -7,27 +7,32 @@ from fastapi import (
     HTTPException,
     Path,
     Query,
-    status,
 )
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from pydantic import UUID4
 from sqlalchemy import select, text
 
+from core.core import authz
 from core.core.config import settings
+from core.crud.crud_folder import folder as crud_folder
+from core.crud.crud_project import DEFAULT_INITIAL_VIEW_STATE
 from core.crud.crud_project import project as crud_project
 from core.crud.crud_project_copy import copy_project as copy_project_fn
+from core.crud.crud_space import space as crud_space
 from core.crud.crud_user_project import user_project as crud_user_project
 from core.db.models._link_model import (
     UserProjectLink,
     UserTeamLink,
 )
+from core.db.models.folder import Folder
 from core.db.models.project import Project
 from core.db.models.user import User
 from core.db.session import AsyncSession
 from core.deps.auth import auth_z
 from core.endpoints.deps import get_db, get_user_id
 from core.schemas.common import OrderEnum
+from core.schemas.error import FolderNotFoundError
 from core.schemas.project import (
     InitialViewState,
     IProjectBaseUpdate,
@@ -63,22 +68,44 @@ async def create_project(
 ) -> IProjectRead:
     """This will create an empty project with a default initial view state. The project does not contains layers."""
 
+    # A target folder must exist, be live, and be writable by the caller —
+    # the new project then takes THAT folder's own space (personal, or a
+    # team/org space the caller may write to), rather than always landing
+    # in the caller's personal space regardless of where folder_id actually
+    # points.
+    if project_in.folder_id is not None:
+        folder = await async_session.get(Folder, project_in.folder_id)
+        if folder is None or folder.deleted_at is not None or folder.space_id is None:
+            raise HTTPException(status_code=404, detail="Folder not found")
+        if not await authz.can(
+            async_session, "folder", project_in.folder_id, user_id, "write"
+        ):
+            # Read access but not write: confirm the folder is there but
+            # refuse it (403). No access at all: behave as if it weren't
+            # there (404) rather than confirming a totally foreign folder's
+            # existence to a caller with no relationship to it.
+            if await authz.can(
+                async_session, "folder", project_in.folder_id, user_id, "read"
+            ):
+                raise HTTPException(
+                    status_code=403, detail="Not allowed to write this folder"
+                )
+            raise HTTPException(status_code=404, detail="Folder not found")
+        space_id = folder.space_id
+    else:
+        space_id = (await crud_space.ensure_personal(async_session, user_id)).id
+
     # Create project
     project = await crud_project.create(
         async_session=async_session,
-        project_in=Project(**project_in.model_dump(exclude_none=True), user_id=user_id),
+        project_in=Project(
+            **project_in.model_dump(exclude_none=True),
+            user_id=user_id,
+            space_id=space_id,
+        ),
         initial_view_state=project_in.initial_view_state,
     )
 
-    # Grant the creator project-owner access in project_user so auth_z can resolve it
-    await async_session.execute(
-        text(
-            f"INSERT INTO {settings.SCHEMA}.project_user (project_id, user_id, role_id) "
-            f"SELECT :project_id, :user_id, r.id FROM {settings.SCHEMA}.role r "
-            f"WHERE r.name = 'project-owner' ON CONFLICT DO NOTHING"
-        ),
-        {"project_id": str(project.id), "user_id": str(user_id)},
-    )
     await async_session.commit()
 
     return project
@@ -103,12 +130,20 @@ async def read_project(
 ) -> IProjectRead:
     """Retrieve a project by its ID."""
 
-    # Get project
-    project = await crud_project.get(async_session, id=project_id)
-    if project is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
-        )
+    # Get project (404s if trashed)
+    project = await crud_project.get_live_or_404(async_session, project_id)
+
+    # Stamp the caller's own link so Home can order "recent" by what *I*
+    # last opened rather than what anyone last edited (H4). A no-op when
+    # the caller has no link (e.g. no `user_project` row for this project).
+    await async_session.execute(
+        text(
+            f"UPDATE {settings.SCHEMA}.user_project SET last_opened_at = now() "
+            "WHERE project_id = :project_id AND user_id = :user_id"
+        ),
+        {"project_id": project_id, "user_id": user_id},
+    )
+    await async_session.commit()
 
     # Populate owned_by from the project owner
     owner = await async_session.get(User, project.user_id)
@@ -123,82 +158,19 @@ async def read_project(
         else None
     )
 
-    # Get current user's role, checking all grant paths (user, team, org, folder).
-    # The query returns the most permissive role across all paths.
-    role_result = await async_session.execute(
-        text(
-            f"""
-            SELECT role_name FROM (
-                -- 1. Project owner (user_id matches project owner)
-                SELECT 'project-owner' AS role_name, 1 AS priority
-                FROM customer.project p
-                WHERE p.id = :pid AND p.user_id = :uid
-
-                UNION ALL
-
-                -- 2. Direct user grant
-                SELECT r.name, 2
-                FROM {settings.SCHEMA}.project_user pu
-                JOIN {settings.SCHEMA}.role r ON r.id = pu.role_id
-                WHERE pu.project_id = :pid AND pu.user_id = :uid
-
-                UNION ALL
-
-                -- 3. Team grant
-                SELECT r.name, 3
-                FROM {settings.SCHEMA}.project_team pt
-                JOIN {settings.SCHEMA}.user_team ut ON ut.team_id = pt.team_id
-                JOIN {settings.SCHEMA}.role r ON r.id = pt.role_id
-                WHERE pt.project_id = :pid AND ut.user_id = :uid
-
-                UNION ALL
-
-                -- 4. Organisation grant
-                SELECT r.name, 4
-                FROM {settings.SCHEMA}.project_organization po
-                JOIN {settings.SCHEMA}.role r ON r.id = po.role_id
-                JOIN {settings.SCHEMA}.user u ON u.organization_id = po.organization_id
-                WHERE po.project_id = :pid AND u.id = :uid
-
-                UNION ALL
-
-                -- 5. Folder grant (team or org)
-                SELECT
-                    CASE rg.role_name
-                        WHEN 'folder-editor' THEN 'project-editor'
-                        WHEN 'folder-viewer' THEN 'project-viewer'
-                        ELSE NULL
-                    END,
-                    5
-                FROM customer.project p
-                JOIN (
-                    SELECT rg2.resource_id, r2.name AS role_name
-                    FROM {settings.SCHEMA}.resource_grant rg2
-                    JOIN {settings.SCHEMA}.role r2 ON r2.id = rg2.role_id
-                    WHERE rg2.resource_type = 'folder'
-                      AND (
-                          (rg2.grantee_type = 'team' AND EXISTS (
-                              SELECT 1 FROM {settings.SCHEMA}.user_team ut2
-                              WHERE ut2.team_id = rg2.grantee_id AND ut2.user_id = :uid
-                          ))
-                          OR (rg2.grantee_type = 'organization' AND EXISTS (
-                              SELECT 1 FROM {settings.SCHEMA}.user u2
-                              WHERE u2.id = :uid AND u2.organization_id = rg2.grantee_id
-                          ))
-                      )
-                ) rg ON rg.resource_id = p.folder_id
-                WHERE p.id = :pid AND p.folder_id IS NOT NULL
-            ) sub
-            WHERE role_name IS NOT NULL
-            ORDER BY priority ASC
-            LIMIT 1
-            """
-        ),
-        {"pid": str(project_id), "uid": str(user_id)},
+    my_role = await crud_project.get_my_role(
+        async_session, project_id=project_id, user_id=user_id
     )
-    my_role = role_result.scalars().first()
 
-    return IProjectRead(**project.model_dump(), owned_by=owned_by, my_role=my_role)
+    return IProjectRead(
+        **project.model_dump(),
+        owned_by=owned_by,
+        my_role=my_role,
+        **await crud_project.space_label(async_session, project.space_id),
+        personally_owned_layer_count=await crud_project.personally_owned_layer_count(
+            async_session, project.id
+        ),
+    )
 
 
 @router.get(
@@ -272,6 +244,7 @@ async def read_projects(
 )
 async def update_project(
     async_session: AsyncSession = Depends(get_db),
+    user_id: UUID4 = Depends(get_user_id),
     project_id: UUID4 = Path(
         ...,
         description="The ID of the project to get",
@@ -284,6 +257,23 @@ async def update_project(
     ),
 ) -> IProjectRead:
     """Update base attributes of a project by its ID."""
+
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
+    if project_in.folder_id is not None:
+        current = await crud_project.get(async_session, id=project_id)
+        if current is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+        try:
+            await crud_folder.assert_same_space(
+                async_session, folder_id=project_in.folder_id, space_id=current.space_id
+            )
+        except FolderNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="Folder not found") from exc
+        await authz.require(
+            async_session, "folder", project_in.folder_id, user_id, "write"
+        )
 
     # Update project
     project = await crud_project.update_base(
@@ -308,14 +298,10 @@ async def delete_project(
         examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
     ),
 ) -> None:
-    """Delete a project by its ID."""
+    """Delete a project by its ID (soft delete: sets `deleted_at`)."""
 
-    # Get project
-    project = await crud_project.get(async_session, id=project_id)
-    if project is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Project not found"
-        )
+    # Get project (404s if already trashed)
+    await crud_project.get_live_or_404(async_session, project_id)
 
     # Delete project
     await crud_project.delete(db=async_session, id=project_id)
@@ -349,19 +335,18 @@ async def read_project_initial_view_state(
         return InitialViewState(**user_project.initial_view_state)
 
     # Shared-folder user: no personal row yet — fall back to the owner's view state.
-    project = await crud_project.get(async_session, id=project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = await crud_project.get_live_or_404(async_session, project_id)
     owner_projects = await crud_user_project.get_by_multi_keys(
         async_session, keys={"user_id": project.user_id, "project_id": project_id}
     )
     if owner_projects:
         return InitialViewState(**owner_projects[0].initial_view_state)
 
-    raise HTTPException(
-        status_code=404,
-        detail="Project not found or user has no access to this project",
-    )
+    # Neither the requester nor the owner has a row yet (e.g. the owner's row
+    # was lost to `ON DELETE CASCADE` when a prior owner was offboarded) —
+    # fall back to the same default a fresh project would get, lazily,
+    # rather than 404ing on a project the caller can otherwise read.
+    return InitialViewState(**DEFAULT_INITIAL_VIEW_STATE)
 
 
 @router.put(
@@ -386,6 +371,9 @@ async def update_project_initial_view_state(
     ),
 ) -> InitialViewState:
     """Update initial view state of a project by its ID."""
+
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
 
     # Update project
     user_project = await crud_user_project.update_initial_view_state(
@@ -412,6 +400,9 @@ async def copy_project(
     user_id: UUID4 = Depends(get_user_id),
 ) -> IProjectRead:
     """Create a shallow copy of a project."""
+    # 404 if the source project is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     try:
         new_project = await copy_project_fn(
             async_session,
@@ -421,4 +412,12 @@ async def copy_project(
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return IProjectRead.model_validate(new_project)
+    except FolderNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return IProjectRead(
+        **new_project.model_dump(),
+        **await crud_project.space_label(async_session, new_project.space_id),
+        personally_owned_layer_count=await crud_project.personally_owned_layer_count(
+            async_session, new_project.id
+        ),
+    )
