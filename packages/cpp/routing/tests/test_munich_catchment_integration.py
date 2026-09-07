@@ -159,9 +159,7 @@ class TestMonotonicity:
     def test_speed_monotonicity(self):
         slow = routing.compute_reachability_field(_make_config(speed_km_h=3.0))
         fast = routing.compute_reachability_field(_make_config(speed_km_h=7.0))
-        assert _reachable_count(fast.costs, 10.0) >= _reachable_count(
-            slow.costs, 10.0
-        )
+        assert _reachable_count(fast.costs, 10.0) >= _reachable_count(slow.costs, 10.0)
 
     def test_distance_budget_monotonicity(self):
         short = routing.compute_reachability_field(
@@ -188,9 +186,7 @@ class TestModeComparison:
         bike = routing.compute_reachability_field(
             _make_config(mode=routing.RoutingMode.Bicycle, speed_km_h=15.0)
         )
-        assert _reachable_count(bike.costs, 10.0) > _reachable_count(
-            walk.costs, 10.0
-        )
+        assert _reachable_count(bike.costs, 10.0) > _reachable_count(walk.costs, 10.0)
 
     def test_car_reaches_more_than_bicycle(self):
         bike = routing.compute_reachability_field(
@@ -199,9 +195,7 @@ class TestModeComparison:
         car = routing.compute_reachability_field(
             _make_config(mode=routing.RoutingMode.Car, speed_km_h=50.0)
         )
-        assert _reachable_count(car.costs, 10.0) > _reachable_count(
-            bike.costs, 10.0
-        )
+        assert _reachable_count(car.costs, 10.0) > _reachable_count(bike.costs, 10.0)
 
 
 # ── Output type tests ───────────────────────────────────────────────────
@@ -242,9 +236,7 @@ class TestOutputTypes:
             _make_config(catchment_type=routing.CatchmentType.Polygon)
         )
         assert net.node_count == poly.node_count
-        assert _reachable_count(net.costs, 10.0) == _reachable_count(
-            poly.costs, 10.0
-        )
+        assert _reachable_count(net.costs, 10.0) == _reachable_count(poly.costs, 10.0)
 
     @pytest.mark.parametrize(
         "catchment_type",
@@ -345,7 +337,9 @@ class TestOutputTypes:
     def test_geojson_hexagonal_grid_resolution_depends_on_mode(
         self, mode, expected_resolution
     ):
-        cfg = _make_config(catchment_type=routing.CatchmentType.HexagonalGrid, mode=mode)
+        cfg = _make_config(
+            catchment_type=routing.CatchmentType.HexagonalGrid, mode=mode
+        )
         payload = routing.compute_catchment(cfg)
         doc = json.loads(payload)
 
@@ -380,5 +374,3 @@ class TestValidation:
         cfg = _make_config(starting_points=[far_point])
         with pytest.raises(RuntimeError, match="No edges loaded"):
             routing.compute_reachability_field(cfg)
-
-

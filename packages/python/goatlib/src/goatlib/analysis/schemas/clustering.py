@@ -59,14 +59,14 @@ class ClusteringParams(BaseModel):
     )
 
     nb_cluster: int = Field(
-          10,
-          description="Number of clusters " "It should be an integer ",
-          json_schema_extra=ui_field(
-              section="configuration",
-              field_order=2,
-              widget="number-input",
-          ),
-      )
+        10,
+        description="Number of clusters " "It should be an integer ",
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=2,
+            widget="number-input",
+        ),
+    )
     size_method: SizeMethod = Field(
         default=SizeMethod.count,
         description="Method to determine balance weight: count (each point = 1) or field (use a numeric column).",
@@ -78,8 +78,6 @@ class ClusteringParams(BaseModel):
             visible_when={"cluster_type": "equal_size"},
         ),
     )
-
-
 
     size_field: str | None = Field(
         default=None,
@@ -167,4 +165,3 @@ class ClusteringParams(BaseModel):
             hidden=True,
         ),
     )
-

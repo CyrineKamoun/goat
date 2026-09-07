@@ -84,9 +84,9 @@ def test_raw_graph_paths_never_render(tool_name: str) -> None:
 
     for name in ("edge_path", "node_path"):
         if name in properties:
-            assert properties[name]["x-ui"].get("hidden") is True, (
-                f"{tool_name} renders {name} as an input"
-            )
+            assert (
+                properties[name]["x-ui"].get("hidden") is True
+            ), f"{tool_name} renders {name} as an input"
 
 
 @pytest.mark.parametrize("schema", ANALYSIS_SCHEMAS, ids=lambda s: s.__name__)
@@ -101,18 +101,28 @@ def test_half_an_override_is_rejected(schema: type, half: str) -> None:
     ids don't match, which yields a near-empty result instead of an error."""
     minimal = {
         "CatchmentAreaV2Params": dict(
-            latitude=[48.137], longitude=[11.575], max_cost=15,
+            latitude=[48.137],
+            longitude=[11.575],
+            max_cost=15,
             output_path="/tmp/out.parquet",
         ),
         "HeatmapV2Params": dict(output_path="/tmp/out.parquet", opportunities=[]),
         "HuffmodelV2Params": dict(
-            reference_area_path="a", demand_path="b", demand_field="c",
-            opportunity_path="d", attractivity="e", output_path="/tmp/out.parquet",
+            reference_area_path="a",
+            demand_path="b",
+            demand_field="c",
+            opportunity_path="d",
+            attractivity="e",
+            output_path="/tmp/out.parquet",
         ),
         "TravelCostMatrixParams": dict(
-            origin_latitude=[48.137], origin_longitude=[11.575], origin_id=["o"],
-            destination_latitude=[48.14], destination_longitude=[11.58],
-            destination_id=["d"], output_path="/tmp/out.parquet",
+            origin_latitude=[48.137],
+            origin_longitude=[11.575],
+            origin_id=["o"],
+            destination_latitude=[48.14],
+            destination_longitude=[11.58],
+            destination_id=["d"],
+            output_path="/tmp/out.parquet",
         ),
     }[schema.__name__]
 
@@ -129,9 +139,7 @@ def test_half_an_override_is_rejected(schema: type, half: str) -> None:
 def test_the_override_reaches_the_routing_config(module_name: str) -> None:
     """The field is inert unless the analysis layer prefers it over the settings
     default, which is a single line easy to miss when adding a tool."""
-    module = __import__(
-        f"goatlib.analysis.accessibility.{module_name}", fromlist=["_"]
-    )
+    module = __import__(f"goatlib.analysis.accessibility.{module_name}", fromlist=["_"])
     source = inspect.getsource(module)
 
     assert "cfg.edge_dir = str(params.edge_path or self._edge_dir)" in source

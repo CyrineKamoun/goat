@@ -279,7 +279,9 @@ class TestTemporalCQL:
 
         con = duckdb.connect()
         con.execute("CREATE TABLE t (d DATE)")
-        con.execute("INSERT INTO t VALUES ('2024-01-01'), ('2024-06-15'), ('2024-12-31')")
+        con.execute(
+            "INSERT INTO t VALUES ('2024-01-01'), ('2024-06-15'), ('2024-12-31')"
+        )
 
         cql = '{"op": "<", "args": [{"property": "d"}, "2024-06-01"]}'
         ast = parse_cql2_filter(cql, "cql2-json")

@@ -49,7 +49,20 @@ STANDARD_TO_EXTENDED_ROUTE_TYPES: dict[str, list[str]] = {
         "403",
         "405",
     ],
-    "3": ["200", "201", "202", "204", "700", "701", "702", "704", "705", "712", "715", "800"],
+    "3": [
+        "200",
+        "201",
+        "202",
+        "204",
+        "700",
+        "701",
+        "702",
+        "704",
+        "705",
+        "712",
+        "715",
+        "800",
+    ],
     "4": ["1000"],
     "5": ["1300"],
     "6": [],
@@ -135,7 +148,10 @@ class OevGueteklasseStationConfig(BaseModel):
     @model_validator(mode="after")
     def validate_configuration_consistency(self) -> "OevGueteklasseStationConfig":
         """Validate consistency across categories, groups and classification."""
-        for standard_route_type, extended_route_types in STANDARD_TO_EXTENDED_ROUTE_TYPES.items():
+        for (
+            standard_route_type,
+            extended_route_types,
+        ) in STANDARD_TO_EXTENDED_ROUTE_TYPES.items():
             group = self.groups.get(standard_route_type)
             if group is None:
                 continue
@@ -144,9 +160,7 @@ class OevGueteklasseStationConfig(BaseModel):
                 self.groups.setdefault(extended_route_type, group)
 
         if len(self.categories) != len(self.time_frequency):
-            raise ValueError(
-                "categories length must match time_frequency length"
-            )
+            raise ValueError("categories length must match time_frequency length")
 
         allowed_groups = {"A", "B", "C"}
         invalid_group_mappings = {
@@ -155,9 +169,7 @@ class OevGueteklasseStationConfig(BaseModel):
             if group not in allowed_groups
         }
         if invalid_group_mappings:
-            raise ValueError(
-                "groups must map route types only to A, B, or C"
-            )
+            raise ValueError("groups must map route types only to A, B, or C")
 
         used_station_categories: set[int] = set()
         for row in self.categories:
@@ -172,7 +184,9 @@ class OevGueteklasseStationConfig(BaseModel):
 
             for station_category in row.values():
                 if station_category <= 0:
-                    raise ValueError("station category values must be positive integers")
+                    raise ValueError(
+                        "station category values must be positive integers"
+                    )
                 used_station_categories.add(station_category)
 
         if not self.classification:

@@ -140,7 +140,9 @@ class GeocodingTool(AnalysisTool):
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             tasks = []
             for row in row_dicts:
-                task = self._geocode_row(client, base_url, params, row, authorization, semaphore)
+                task = self._geocode_row(
+                    client, base_url, params, row, authorization, semaphore
+                )
                 tasks.append(task)
 
             results = await asyncio.gather(*tasks)

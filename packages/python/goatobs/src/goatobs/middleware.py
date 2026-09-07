@@ -16,6 +16,7 @@ service has its own thin `decode_token` (delegating to
 `goatlib.auth.KeycloakAuth`), which is why this is a factory rather
 than a hardcoded import.
 """
+
 from typing import Any, Awaitable, Callable
 from urllib.parse import urlparse
 

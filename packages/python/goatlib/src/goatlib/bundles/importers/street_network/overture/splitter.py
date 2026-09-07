@@ -171,9 +171,7 @@ def split_network(
     stats.segments_out = len(out_segments)
     stats.nodes_out = len(out_connectors)
     stats.nodes_reconstructed = len(synthetic)
-    stats.nodes_unreferenced = (
-        len(connectors) + len(synthetic) - len(out_connectors)
-    )
+    stats.nodes_unreferenced = len(connectors) + len(synthetic) - len(out_connectors)
     if stats.segments_skipped:
         logger.warning(
             "Skipped %d unusable segment(s): %s",

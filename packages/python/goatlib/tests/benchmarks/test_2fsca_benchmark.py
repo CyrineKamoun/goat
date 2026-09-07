@@ -75,8 +75,8 @@ def benchmark_2sfca_oberbayern() -> tuple[float, float, str, int]:
     )
 
     # Create demand layer (population census data for Oberbayern)
-    demand_path=str(oberbayern_census_data)
-    demand_field="einwohner"
+    demand_path = str(oberbayern_census_data)
+    demand_field = "einwohner"
 
     # Set up 2FSCA parameters for Oberbayern benchmark
     params = Heatmap2SFCAParams(
@@ -86,7 +86,7 @@ def benchmark_2sfca_oberbayern() -> tuple[float, float, str, int]:
         two_sfca_type=TwoSFCAType.sfca_2,
         opportunities=[opportunity_kita],
         demand_path=demand_path,
-        demand_field=demand_field
+        demand_field=demand_field,
     )
 
     print("🏔️  OBERBAYERN 2FSCA BENCHMARK")

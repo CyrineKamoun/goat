@@ -59,7 +59,5 @@ class BundleType(DateTimeBase, table=True):
     bundles: List["Bundle"] = Relationship(back_populates="type_definition")
 
     @field_serializer("type")
-    def serialize_type(
-        self, value: "BundleTypeName | str | None"
-    ) -> "str | None":
+    def serialize_type(self, value: "BundleTypeName | str | None") -> "str | None":
         return serialize_str_enum(value)

@@ -101,7 +101,8 @@ def test_road_flags_stay_whole_in_the_residual(flattened) -> None:
     flag array is carried instead."""
     edges, _ = flattened
     flagged = [
-        e for e in _edges_of(edges, "seg-isarradweg")
+        e
+        for e in _edges_of(edges, "seg-isarradweg")
         if e["other"] and "road_flags" in json.loads(e["other"])
     ]
     assert len(flagged) == 1
@@ -259,7 +260,9 @@ def test_stated_limit_wins_over_the_default() -> None:
 
 def test_unconditional_denial_closes_both_directions() -> None:
     edge = flatten_segment(
-        _piece(road_class="residential", access_restrictions=[{"access_type": "denied"}])
+        _piece(
+            road_class="residential", access_restrictions=[{"access_type": "denied"}]
+        )
     )
     assert edge["speed_limit_kph_forward"] == 0
     assert edge["speed_limit_kph_backward"] == 0
@@ -319,7 +322,7 @@ def test_a_later_rule_only_overrides_the_heading_it_names() -> None:
 
 
 def test_permit_only_permission_does_not_open_a_general_denial() -> None:
-    """"closed, except with a permit" is closed to an ordinary driver."""
+    """ "closed, except with a permit" is closed to an ordinary driver."""
     edge = flatten_segment(
         _piece(
             road_class="residential",
@@ -381,8 +384,16 @@ def test_situational_closures_do_not_block_permanently() -> None:
     in general — treating it as impassable would remove it from the network."""
     for when in (
         {"during": "Mo-Fr 15:00-18:00"},
-        {"vehicle": [{"dimension": "weight", "comparison": "greater_than",
-                      "value": 3.5, "unit": "t"}]},
+        {
+            "vehicle": [
+                {
+                    "dimension": "weight",
+                    "comparison": "greater_than",
+                    "value": 3.5,
+                    "unit": "t",
+                }
+            ]
+        },
         {"using": ["at_destination"]},
     ):
         edge = flatten_segment(
@@ -425,8 +436,10 @@ def test_a_conditional_speed_limit_is_kept() -> None:
             road_class="residential",
             speed_limits=[
                 {"max_speed": {"value": 50, "unit": "km/h"}},
-                {"max_speed": {"value": 30, "unit": "km/h"},
-                 "when": {"during": "Mo-Fr 07:00-09:00"}},
+                {
+                    "max_speed": {"value": 30, "unit": "km/h"},
+                    "when": {"during": "Mo-Fr 07:00-09:00"},
+                },
             ],
         )
     )
@@ -466,8 +479,9 @@ def test_route_reference_names_an_unnamed_numbered_road() -> None:
         _piece(
             road_class="trunk",
             names=None,
-            routes=[{"name": "Bundesstraße 17", "ref": "B 17",
-                     "network": "DE:national"}],
+            routes=[
+                {"name": "Bundesstraße 17", "ref": "B 17", "network": "DE:national"}
+            ],
         )
     )
     assert edge["name"] == "B 17"
@@ -477,9 +491,12 @@ def test_common_and_rule_names_are_fallbacks() -> None:
     assert flatten_segment(_piece(names={"common": {"de": "Hauptstraße"}}))["name"] == (
         "Hauptstraße"
     )
-    assert flatten_segment(
-        _piece(names={"rules": [{"variant": "official", "value": "Alte Gasse"}]})
-    )["name"] == "Alte Gasse"
+    assert (
+        flatten_segment(
+            _piece(names={"rules": [{"variant": "official", "value": "Alte Gasse"}]})
+        )["name"]
+        == "Alte Gasse"
+    )
 
 
 def test_a_genuinely_unnamed_road_stays_null() -> None:
@@ -494,10 +511,14 @@ def test_heading_scoped_limits_become_the_two_columns() -> None:
         _piece(
             road_class="residential",
             speed_limits=[
-                {"max_speed": {"value": 50, "unit": "km/h"},
-                 "when": {"heading": "forward"}},
-                {"max_speed": {"value": 30, "unit": "km/h"},
-                 "when": {"heading": "backward"}},
+                {
+                    "max_speed": {"value": 50, "unit": "km/h"},
+                    "when": {"heading": "forward"},
+                },
+                {
+                    "max_speed": {"value": 30, "unit": "km/h"},
+                    "when": {"heading": "backward"},
+                },
             ],
         )
     )
@@ -510,8 +531,10 @@ def test_time_scoped_limit_falls_back_to_the_class_default() -> None:
         _piece(
             road_class="residential",
             speed_limits=[
-                {"max_speed": {"value": 30, "unit": "km/h"},
-                 "when": {"during": "Mo-Fr 07:00-09:00"}}
+                {
+                    "max_speed": {"value": 30, "unit": "km/h"},
+                    "when": {"during": "Mo-Fr 07:00-09:00"},
+                }
             ],
         )
     )
@@ -588,9 +611,7 @@ def test_every_overture_field_is_either_a_column_or_residual(flattened) -> None:
     edges, _ = flattened
 
     for field in present:
-        residuals = [
-            json.loads(e["other"]) for e in edges if e["other"] is not None
-        ]
+        residuals = [json.loads(e["other"]) for e in edges if e["other"] is not None]
         in_residual = any(field in r for r in residuals)
         consumed = field in _CONSUMED_FIELDS
         assert consumed or in_residual, (

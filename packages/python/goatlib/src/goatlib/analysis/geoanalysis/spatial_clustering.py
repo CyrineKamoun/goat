@@ -42,7 +42,7 @@ class ClusteringZones(AnalysisTool):
         n_generations: int = 50,
         mutation_rate: float = 0.1,
         crossover_rate: float = 0.7,
-        equal_size_weight: float = 1.0
+        equal_size_weight: float = 1.0,
     ) -> None:
         """Initialize the balanced zone clustering tool.
 
@@ -93,7 +93,7 @@ class ClusteringZones(AnalysisTool):
             )
 
         k = params.nb_cluster
-        use_compactness=params.use_compactness
+        use_compactness = params.use_compactness
         if use_compactness:
             max_distance = params.max_distance
             self.compactness_weight = params.compactness_weight
@@ -106,7 +106,7 @@ class ClusteringZones(AnalysisTool):
         if has_field_weights:
             weight_expr = f'CAST("{params.size_field}" AS DOUBLE)'
         else:
-            weight_expr = '1'
+            weight_expr = "1"
 
         self.con.execute(f"""
             CREATE OR REPLACE TEMP TABLE features_metric AS
@@ -120,35 +120,55 @@ class ClusteringZones(AnalysisTool):
                 ST_Y(ST_Transform({input_geom}, '{crs_str}', 'EPSG:3857')) AS y
             FROM {input_view}
         """)
-        n_features = self.con.execute("SELECT COUNT(*) FROM features_metric").fetchone()[0]
-        n_weighted_features = self.con.execute("SELECT SUM(weight) FROM features_metric").fetchone()[0]
+        n_features = self.con.execute(
+            "SELECT COUNT(*) FROM features_metric"
+        ).fetchone()[0]
+        n_weighted_features = self.con.execute(
+            "SELECT SUM(weight) FROM features_metric"
+        ).fetchone()[0]
         if n_features == 0:
             raise ValueError("No features found in input data")
         if n_features < k:
             raise ValueError(f"Cannot create {k} clusters from {n_features} features")
 
-
-
         if params.cluster_type == ClusterType.equal_size:
-
             # Step 1: Create initial population using K-means for seeding
             self._run_kmeans(k, max_iter=50)
             self._build_distance_neighbor_graph(n_features, k)
 
             # Create ga_assignments table to store all individuals and ga_seeds table to store seed array
-            self.con.execute(""" CREATE OR REPLACE TEMP TABLE ga_assignments (individual_id INTEGER,feature_id INTEGER, cluster_id INTEGER ) """)
-            self.con.execute(""" CREATE OR REPLACE TEMP TABLE ga_seeds ( individual_id INTEGER, cluster_id INTEGER,seed_id INTEGER) """)
+            self.con.execute(
+                """ CREATE OR REPLACE TEMP TABLE ga_assignments (individual_id INTEGER,feature_id INTEGER, cluster_id INTEGER ) """
+            )
+            self.con.execute(
+                """ CREATE OR REPLACE TEMP TABLE ga_seeds ( individual_id INTEGER, cluster_id INTEGER,seed_id INTEGER) """
+            )
 
             self._init_population(k)
             if n_features > 1000:
                 batch_size = 5
                 for batch_start in range(0, self.population_size, batch_size):
-                    batch_ids = list(range(batch_start, min(batch_start + batch_size, self.population_size)))
-                    self._create_individuals_from_seeds_batch(batch_ids, k, n_features, n_weighted_features, use_compactness)
+                    batch_ids = list(
+                        range(
+                            batch_start,
+                            min(batch_start + batch_size, self.population_size),
+                        )
+                    )
+                    self._create_individuals_from_seeds_batch(
+                        batch_ids, k, n_features, n_weighted_features, use_compactness
+                    )
             else:
-                self._create_individuals_from_seeds_batch( list(range(self.population_size)), k, n_features, n_weighted_features, use_compactness )
+                self._create_individuals_from_seeds_batch(
+                    list(range(self.population_size)),
+                    k,
+                    n_features,
+                    n_weighted_features,
+                    use_compactness,
+                )
 
-            logger.info("Created initial population of %d individuals", self.population_size)
+            logger.info(
+                "Created initial population of %d individuals", self.population_size
+            )
 
             # Genetic algorithm evolution
             best_fitness = float("inf")
@@ -159,9 +179,20 @@ class ClusteringZones(AnalysisTool):
 
             for gen in range(self.n_generations + 1):
                 # Calculate fitness for current population and track best solution
-                fitness_dict = self._calculate_fitness_batch(population_ids, k, n_weighted_features,use_compactness, max_distance)
-                fitness_scores = [fitness_dict.get(i, {}).get('total', float("inf")) for i in population_ids]
-                gen_best_fitness = ( min(fitness_scores) if fitness_scores else float("inf") )
+                fitness_dict = self._calculate_fitness_batch(
+                    population_ids,
+                    k,
+                    n_weighted_features,
+                    use_compactness,
+                    max_distance,
+                )
+                fitness_scores = [
+                    fitness_dict.get(i, {}).get("total", float("inf"))
+                    for i in population_ids
+                ]
+                gen_best_fitness = (
+                    min(fitness_scores) if fitness_scores else float("inf")
+                )
                 improvement_threshold = 1e-6
 
                 if gen_best_fitness < best_fitness - improvement_threshold:
@@ -171,11 +202,22 @@ class ClusteringZones(AnalysisTool):
 
                     # Log detailed fitness breakdown from the same calculation
                     best_detail = fitness_dict[best_individual]
-                    logger.info( "Generation %d: NEW BEST fitness = %.6f (size=%.6f, compactness=%.6f)", gen, best_fitness, best_detail["size"], best_detail["compactness"],)
+                    logger.info(
+                        "Generation %d: NEW BEST fitness = %.6f (size=%.6f, compactness=%.6f)",
+                        gen,
+                        best_fitness,
+                        best_detail["size"],
+                        best_detail["compactness"],
+                    )
                 else:
                     stagnation_count += 1
                     if gen % 5 == 0:
-                        logger.info("Generation %d: fitness = %.6f, stagnation = %d", gen, gen_best_fitness,stagnation_count, )
+                        logger.info(
+                            "Generation %d: fitness = %.6f, stagnation = %d",
+                            gen,
+                            gen_best_fitness,
+                            stagnation_count,
+                        )
 
                 # Stop if this is the last generation or early stopping
                 if gen >= self.n_generations or stagnation_count >= 10:
@@ -196,7 +238,18 @@ class ClusteringZones(AnalysisTool):
                     elite_ids = [population_ids[i] for i in sorted_indices[:n_elite]]
 
                     # Create next generation
-                    new_individual_ids, elite_ids_kept, next_individual_id = (self._evolve_generation_batch( parent_ids, elite_ids, next_individual_id, k, n_features,n_weighted_features, use_compactness, has_field_weights) )
+                    new_individual_ids, elite_ids_kept, next_individual_id = (
+                        self._evolve_generation_batch(
+                            parent_ids,
+                            elite_ids,
+                            next_individual_id,
+                            k,
+                            n_features,
+                            n_weighted_features,
+                            use_compactness,
+                            has_field_weights,
+                        )
+                    )
 
                     # Update population for next iteration
                     population_ids = list(elite_ids_kept) + list(new_individual_ids)
@@ -401,12 +454,16 @@ class ClusteringZones(AnalysisTool):
             )
         """)
 
-        logger.info("Neighbor graph built: %d edges",
-            self.con.execute("SELECT COUNT(*) FROM neighbors").fetchone()[0])
+        logger.info(
+            "Neighbor graph built: %d edges",
+            self.con.execute("SELECT COUNT(*) FROM neighbors").fetchone()[0],
+        )
 
         # Free intermediate table and index neighbors for fast lookup during zone growing
         self.con.execute("DROP TABLE IF EXISTS neighbor_candidates")
-        self.con.execute("CREATE INDEX IF NOT EXISTS idx_neighbors_from ON neighbors(from_id)")
+        self.con.execute(
+            "CREATE INDEX IF NOT EXISTS idx_neighbors_from ON neighbors(from_id)"
+        )
 
     def _run_kmeans(self: Self, k: int, max_iter: int = 100) -> None:
         """
@@ -609,7 +666,7 @@ class ClusteringZones(AnalysisTool):
         k: int,
         n_weighted_features: int,
         use_compactness: bool,
-        max_distance: float ,
+        max_distance: float,
     ) -> dict[int, dict]:
         """
         Calculate fitness scores.
@@ -679,13 +736,17 @@ class ClusteringZones(AnalysisTool):
         for _, row in results.iterrows():
             ind_id = int(row["individual_id"])
             size_f = row["size_score"] if row["size_score"] is not None else 0.0
-            compact_f = row["compactness_score"] if row["compactness_score"] is not None else 0.0
+            compact_f = (
+                row["compactness_score"]
+                if row["compactness_score"] is not None
+                else 0.0
+            )
             size_weighted = self.equal_size_weight * size_f
             compact_weighted = self.compactness_weight * compact_f
             fitness_dict[ind_id] = {
-                'total': size_weighted + compact_weighted,
-                'size': size_weighted,
-                'compactness': compact_weighted,
+                "total": size_weighted + compact_weighted,
+                "size": size_weighted,
+                "compactness": compact_weighted,
             }
         return fitness_dict
 
@@ -696,9 +757,9 @@ class ClusteringZones(AnalysisTool):
         next_individual_id: int,
         k: int,
         n_features: int,
-        n_weighted_features:float,
+        n_weighted_features: float,
         use_compactness: bool,
-        has_field_weights: bool
+        has_field_weights: bool,
     ) -> tuple[list[int], list[int], int]:
         """
         Create new generation: crossover, mutation, and zone growing.
@@ -817,8 +878,12 @@ class ClusteringZones(AnalysisTool):
               AND ga_seeds.cluster_id = nf.cluster_id
         """)
 
-        new_individual_ids = (self.con.execute("""  SELECT DISTINCT individual_id FROM generation_offspring_seeds ORDER BY individual_id
-        """).df()["individual_id"].tolist())
+        new_individual_ids = (
+            self.con.execute("""  SELECT DISTINCT individual_id FROM generation_offspring_seeds ORDER BY individual_id
+        """)
+            .df()["individual_id"]
+            .tolist()
+        )
 
         if not new_individual_ids:
             return elite_ids, elite_ids, next_individual_id
@@ -827,8 +892,10 @@ class ClusteringZones(AnalysisTool):
         if n_features > 1000:
             batch_size = max(5, len(new_individual_ids) // 4)
             for batch_start in range(0, len(new_individual_ids), batch_size):
-                batch_ids = new_individual_ids[batch_start:batch_start + batch_size]
-                self._create_individuals_from_seeds_batch(batch_ids, k, n_features, n_weighted_features, use_compactness)
+                batch_ids = new_individual_ids[batch_start : batch_start + batch_size]
+                self._create_individuals_from_seeds_batch(
+                    batch_ids, k, n_features, n_weighted_features, use_compactness
+                )
         else:
             self._create_individuals_from_seeds_batch(
                 new_individual_ids, k, n_features, n_weighted_features, use_compactness
@@ -843,7 +910,7 @@ class ClusteringZones(AnalysisTool):
         k: int,
         n_features: int,
         n_weighted_features: float,
-        use_compactness: bool
+        use_compactness: bool,
     ) -> None:
         """
         Create multiple individuals from their seeds using a growing process to maintain contiguity. Favoring proximity if use_compactness is True.
@@ -921,7 +988,7 @@ class ClusteringZones(AnalysisTool):
         max_iterations = max(75, (n_features // (k * features_per_zone_per_iter)) + 50)
         if target_size <= 50:
             features_per_zone_per_iter = 1
-            max_iterations= 50
+            max_iterations = 50
         # Slow growth rate when zones approach target size to avoid overshooting
         slow_growth_rate = max(1, features_per_zone_per_iter // 2)
         slow_threshold = target_size * 0.95
@@ -986,7 +1053,9 @@ class ClusteringZones(AnalysisTool):
                   AND conflict_rank = 1
             """)
 
-            assigned = self.con.execute("SELECT COUNT(*) FROM batch_assignments").fetchone()[0]
+            assigned = self.con.execute(
+                "SELECT COUNT(*) FROM batch_assignments"
+            ).fetchone()[0]
             if assigned == 0:
                 break
             # Update zone assignments
@@ -1032,7 +1101,9 @@ class ClusteringZones(AnalysisTool):
             ).fetchone()[0]
             if unassigned_count == 0:
                 break
-        unassigned_count = self.con.execute("SELECT COUNT(*) FROM batch_zone_grow WHERE cluster_id = -1" ).fetchone()[0]
+        unassigned_count = self.con.execute(
+            "SELECT COUNT(*) FROM batch_zone_grow WHERE cluster_id = -1"
+        ).fetchone()[0]
         if unassigned_count > 0:
             self.con.execute("""
                 WITH unassigned AS (

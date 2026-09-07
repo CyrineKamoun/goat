@@ -63,7 +63,9 @@ FEED_INFO = {
 }
 
 
-def test_feed_info_is_preferred_over_agency(importer: GtfsImporter, tmp_path: Path) -> None:
+def test_feed_info_is_preferred_over_agency(
+    importer: GtfsImporter, tmp_path: Path
+) -> None:
     """feed_info.txt is the feed's own declaration of who published it."""
     archive = _make_feed(tmp_path, feed_info=[FEED_INFO], agencies=[AGENCY])
 
@@ -144,7 +146,9 @@ def test_feed_start_date_wins_over_calendar(
     assert importer.extract_metadata(str(archive)).data_reference_year == 2026
 
 
-@pytest.mark.parametrize("email", ["not an email", "kontakt@", "@mvg.de", "kontakt at mvg.de"])
+@pytest.mark.parametrize(
+    "email", ["not an email", "kontakt@", "@mvg.de", "kontakt at mvg.de"]
+)
 def test_unparseable_emails_are_dropped(
     importer: GtfsImporter, tmp_path: Path, email: str
 ) -> None:

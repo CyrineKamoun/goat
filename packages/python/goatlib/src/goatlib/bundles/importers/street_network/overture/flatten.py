@@ -206,8 +206,10 @@ def _directional_speeds(
         # Not a drivable class: no speed applies in either direction, and an
         # access rule cannot make one apply — so nothing was expressed and every
         # rule has to be carried.
-        return None, None, _unexpressed(
-            piece.get("speed_limits"), piece.get("access_restrictions")
+        return (
+            None,
+            None,
+            _unexpressed(piece.get("speed_limits"), piece.get("access_restrictions")),
         )
 
     stated_forward, stated_backward, speed_unexpressed = _stated_speeds(piece)

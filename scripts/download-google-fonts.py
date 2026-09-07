@@ -8,6 +8,7 @@ Re-run when the dashboard font list in apps/web/components/builder/SettingsTab.t
 changes. Mulish is intentionally excluded — it's already shipped under
 assets/fonts/mulish and loaded by next/font in apps/web/app/layout.tsx.
 """
+
 from __future__ import annotations
 
 import re
@@ -96,9 +97,7 @@ def process(font: str) -> None:
             target.write_bytes(fetch(url))
 
         rewritten.append(
-            f"/* {subset} */\n"
-            + block.replace(url, f"./{filename}")
-            + "\n"
+            f"/* {subset} */\n" + block.replace(url, f"./{filename}") + "\n"
         )
 
     (out_dir / "font.css").write_text("\n".join(rewritten), encoding="utf-8")

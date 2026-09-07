@@ -29,19 +29,29 @@ def test_a_side_effect_job_is_marked_hidden() -> None:
 
 
 def test_bundle_cleanup_is_marked_hidden() -> None:
-    assert _windmill_job_to_status_info(
-        _job("f/goat/tools/bundle_artifact_delete"), BASE
-    ).hidden is True
+    assert (
+        _windmill_job_to_status_info(
+            _job("f/goat/tools/bundle_artifact_delete"), BASE
+        ).hidden
+        is True
+    )
 
 
 def test_a_job_the_user_started_is_not_hidden() -> None:
     """Hidden from the toolbox is not the same as hidden from the job list: an
     export is exactly what the user is waiting on."""
-    for path in ("f/goat/tools/layer_export", "f/goat/tools/clip", "f/goat/print_report"):
+    for path in (
+        "f/goat/tools/layer_export",
+        "f/goat/tools/clip",
+        "f/goat/print_report",
+    ):
         assert _windmill_job_to_status_info(_job(path), BASE).hidden is False, path
 
 
 def test_an_unknown_process_is_shown() -> None:
     """A script the registry has never heard of is someone's job until proven
     otherwise — defaulting to hidden would make it disappear."""
-    assert _windmill_job_to_status_info(_job("f/goat/tools/not_a_tool"), BASE).hidden is False
+    assert (
+        _windmill_job_to_status_info(_job("f/goat/tools/not_a_tool"), BASE).hidden
+        is False
+    )

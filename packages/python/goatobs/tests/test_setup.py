@@ -1,4 +1,5 @@
 """Unit tests for goatobs.setup — the public entrypoint."""
+
 import os
 from unittest.mock import patch
 

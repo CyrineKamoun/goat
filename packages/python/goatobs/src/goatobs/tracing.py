@@ -16,6 +16,7 @@ the global OTel TracerProvider:
     process hasn't imported, so it's safe to register all of them
     unconditionally from a shared package.
 """
+
 import sys
 
 from opentelemetry import trace as otel_trace
@@ -123,7 +124,9 @@ def setup_tracing(
         # sees the span as soon as the request finishes.
         # `out=sys.stdout` is passed at call time, not as a default arg,
         # so pytest's stdout substitution is respected.
-        provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter(out=sys.stdout)))
+        provider.add_span_processor(
+            SimpleSpanProcessor(ConsoleSpanExporter(out=sys.stdout))
+        )
 
     otel_trace.set_tracer_provider(provider)
 
@@ -135,9 +138,13 @@ def setup_tracing(
     # the target library isn't installed in this service (e.g. geoapi
     # uses DuckDB, not SQLAlchemy).
     if SQLAlchemyInstrumentor is not None:
-        SQLAlchemyInstrumentor().instrument(tracer_provider=provider, meter_provider=meter_provider)
+        SQLAlchemyInstrumentor().instrument(
+            tracer_provider=provider, meter_provider=meter_provider
+        )
     if HTTPXClientInstrumentor is not None:
-        HTTPXClientInstrumentor().instrument(tracer_provider=provider, meter_provider=meter_provider)
+        HTTPXClientInstrumentor().instrument(
+            tracer_provider=provider, meter_provider=meter_provider
+        )
     if AsyncPGInstrumentor is not None:
         AsyncPGInstrumentor().instrument(tracer_provider=provider)
 

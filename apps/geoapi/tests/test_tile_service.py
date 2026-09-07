@@ -276,5 +276,7 @@ def test_finding_tiles_by_layer_id_alone_sees_catalog_tiles() -> None:
         service.catalog_tiles_dir = catalog
 
         (catalog / "t_cat456.pmtiles").write_bytes(b"CAT")
-        assert service._find_pmtiles_by_layer_id("cat456") == catalog / "t_cat456.pmtiles"
+        assert (
+            service._find_pmtiles_by_layer_id("cat456") == catalog / "t_cat456.pmtiles"
+        )
         assert service._find_pmtiles_by_layer_id("missing") is None

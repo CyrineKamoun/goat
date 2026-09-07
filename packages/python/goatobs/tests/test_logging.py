@@ -1,4 +1,5 @@
 """Unit tests for goatobs.logging — structlog setup + user-context processor."""
+
 import json
 import logging
 

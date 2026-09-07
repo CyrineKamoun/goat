@@ -34,9 +34,7 @@ def _all_join_fields(join_path: str) -> list[str]:
 
     con = duckdb.connect()
     con.execute("INSTALL spatial; LOAD spatial;")
-    rows = con.execute(
-        f"DESCRIBE SELECT * FROM read_parquet('{join_path}')"
-    ).fetchall()
+    rows = con.execute(f"DESCRIBE SELECT * FROM read_parquet('{join_path}')").fetchall()
     return [r[0] for r in rows]
 
 
@@ -120,7 +118,7 @@ def test_statistical_aggregation() -> bool:
 
     # Check North region statistics
     north_stats = con.execute(
-        'SELECT sales_amount_sum, "count", units_sold_sum FROM result WHERE region_code = \'NORTH\''
+        "SELECT sales_amount_sum, \"count\", units_sold_sum FROM result WHERE region_code = 'NORTH'"
     ).fetchone()
 
     print(

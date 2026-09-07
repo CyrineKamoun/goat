@@ -46,6 +46,7 @@ def _year(date: Optional[str]) -> Optional[int]:
         return int(date[:4])
     return None
 
+
 # role -> GTFS file
 _GTFS_FILE: Dict[str, str] = {
     "agency": "agency.txt",

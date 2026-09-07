@@ -71,9 +71,7 @@ class S3Service:
             region_name=settings.AWS_REGION,
         )
 
-    def upload_asset(
-        self, fileobj: BinaryIO, s3_key: str, content_type: str
-    ) -> None:
+    def upload_asset(self, fileobj: BinaryIO, s3_key: str, content_type: str) -> None:
         """Upload a file object to the assets bucket (avatars, documents)."""
         try:
             self.assets_client.upload_fileobj(

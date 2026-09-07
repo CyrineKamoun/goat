@@ -1,4 +1,5 @@
 """Unit tests for goatobs.middleware — reusable auth-context middleware factory."""
+
 from typing import Any
 
 import pytest

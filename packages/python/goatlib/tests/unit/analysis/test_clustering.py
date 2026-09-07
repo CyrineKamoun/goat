@@ -91,11 +91,11 @@ def test_clustering_basic_workflow():
     # Mock the import_input method for this test
     def mock_import(path, view_name):
         tool.con.execute(f"CREATE OR REPLACE VIEW {view_name} AS SELECT * FROM {path}")
-        metadata = type('obj', (object,), {
-            'geometry_column': 'geometry',
-            'crs': None
-        })()
+        metadata = type(
+            "obj", (object,), {"geometry_column": "geometry", "crs": None}
+        )()
         return metadata, view_name
+
     tool.import_input = mock_import
 
     # Run clustering
@@ -117,7 +117,7 @@ def test_clustering_basic_workflow():
     # Basic validation
     assert "cluster_id" in points_df.columns
     assert len(points_df) == 18  # 6x3 grid
-    assert len(summary_df) == 3   # 3 clusters
+    assert len(summary_df) == 3  # 3 clusters
     assert "cluster_size" in summary_df.columns
     assert "max_distance" in summary_df.columns
 
@@ -152,7 +152,9 @@ class TestZonesClustering:
         params = ClusteringParams(
             input_path=input_path,
             output_path=str(result_dir / "cluster_kita_balanced.parquet"),
-            output_summary_path=str(result_dir / "cluster_kita_balanced_summary.parquet"),
+            output_summary_path=str(
+                result_dir / "cluster_kita_balanced_summary.parquet"
+            ),
             nb_cluster=4,
             cluster_type=ClusterType.equal_size,
         )
@@ -183,7 +185,6 @@ class TestZonesClustering:
         size_mean = np.mean(zone_sizes)
         cv = size_std / size_mean
         assert cv < 0.5, f"Zones are not well balanced: CV = {cv:.3f}"
-
 
     def test_kmeans_kita_data(self) -> None:
         """Test K-means clustering with kita (kindergarten) data."""

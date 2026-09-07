@@ -16,7 +16,7 @@ def project_root():
     return Path(__file__).parent.parent.parent
 
 
-@pytest.fixture(scope="session") 
+@pytest.fixture(scope="session")
 def data_dir(project_root):
     """Return the data directory path."""
     return project_root / "data"

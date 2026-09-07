@@ -10,6 +10,7 @@ Usage from any service:
         # everything inside picks up user context in logs/spans
         ...
 """
+
 from goatobs.context import bind_user_context, get_user_context, set_user_context
 from goatobs.middleware import build_auth_context_middleware
 from goatobs.setup import setup_observability

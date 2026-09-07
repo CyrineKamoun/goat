@@ -392,7 +392,9 @@ class GeocodingResult(BaseModel):
     match_type: str | None = Field(
         default=None, description="Match type (exact, fallback, etc.)"
     )
-    label: str | None = Field(default=None, description="Formatted address label from geocoder")
+    label: str | None = Field(
+        default=None, description="Formatted address label from geocoder"
+    )
     geocoded_postalcode: str | None = Field(
         default=None, description="Postal code from geocoded result for PLZ validation"
     )

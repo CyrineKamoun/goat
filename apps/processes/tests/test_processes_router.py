@@ -20,8 +20,14 @@ class TestExecuteAnalyticsSyncHistogram:
             "order": "descendent",
         }
 
-        with patch("processes.routers.processes.analytics_service.histogram") as mock_histogram:
-            mock_histogram.return_value = {"bins": [], "missing_count": 0, "total_rows": 0}
+        with patch(
+            "processes.routers.processes.analytics_service.histogram"
+        ) as mock_histogram:
+            mock_histogram.return_value = {
+                "bins": [],
+                "missing_count": 0,
+                "total_rows": 0,
+            }
 
             result = _execute_analytics_sync("histogram", inputs)
 

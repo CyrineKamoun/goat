@@ -70,12 +70,18 @@ def main() -> None:
     parser.add_argument("--edge-dir", required=True)
     parser.add_argument("--start-x", type=float, default=1288578.0)
     parser.add_argument("--start-y", type=float, default=6130064.0)
-    parser.add_argument("--mode", choices=["Walking", "Bicycle", "Pedelec", "Car"], default="Car")
+    parser.add_argument(
+        "--mode", choices=["Walking", "Bicycle", "Pedelec", "Car"], default="Car"
+    )
     parser.add_argument("--cost-mode", choices=["Time", "Distance"], default="Time")
     parser.add_argument("--max-traveltime", type=float, default=60.0)
     parser.add_argument("--steps", type=int, default=10)
     parser.add_argument("--speed-km-h", type=float, default=30.0)
-    parser.add_argument("--catchment-type", choices=["Polygon", "Network", "HexagonalGrid"], default="Network")
+    parser.add_argument(
+        "--catchment-type",
+        choices=["Polygon", "Network", "HexagonalGrid"],
+        default="Network",
+    )
     parser.add_argument("--polygon-difference", action="store_true")
     parser.add_argument("--warmup-runs", type=int, default=1)
     parser.add_argument("--runs", type=int, default=5)
@@ -83,7 +89,9 @@ def main() -> None:
 
     cfg = build_config(args)
 
-    warmups = [routing.benchmark_catchment_steps(cfg) for _ in range(max(0, args.warmup_runs))]
+    warmups = [
+        routing.benchmark_catchment_steps(cfg) for _ in range(max(0, args.warmup_runs))
+    ]
     runs = [routing.benchmark_catchment_steps(cfg) for _ in range(max(1, args.runs))]
 
     derived_runs = [_derive_metrics(r) for r in runs]
@@ -121,8 +129,7 @@ def main() -> None:
         },
         "warmup": [summarize_run(r) for r in warmups],
         "runs": {
-            name: [round(m[name], 2) for m in derived_runs]
-            for name in metric_names
+            name: [round(m[name], 2) for m in derived_runs] for name in metric_names
         },
         "median": {
             name: round(statistics.median(m[name] for m in derived_runs), 2)

@@ -203,7 +203,9 @@ class TestOevGueteklasseStationConfig:
 
     def test_invalid_time_frequency_not_increasing(self):
         """Reject non-increasing time_frequency values."""
-        with pytest.raises(ValueError, match="time_frequency must be strictly increasing"):
+        with pytest.raises(
+            ValueError, match="time_frequency must be strictly increasing"
+        ):
             OevGueteklasseStationConfig(
                 groups={"3": "C"},
                 time_frequency=[10, 10, 30],

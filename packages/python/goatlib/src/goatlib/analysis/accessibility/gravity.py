@@ -48,7 +48,7 @@ class HeatmapGravityTool(HeatmapToolBase):
         unified_table = self._combine_opportunities(standardized_tables)
         logger.info("Unified opportunity table created: %s", unified_table)
 
-        destination_ids = self._extract_h3_ids(unified_table, column_name='dest_id')
+        destination_ids = self._extract_h3_ids(unified_table, column_name="dest_id")
         if not destination_ids:
             raise ValueError("No destination IDs found in opportunity data")
 
@@ -73,7 +73,9 @@ class HeatmapGravityTool(HeatmapToolBase):
             reference_table_h3 = self._process_table_to_h3(
                 reference_table, meta, h3_resolution, "reference_area_h3", "dest_id"
             )
-            gravity_results = self._project_to_reference_area(gravity_results, reference_table_h3)
+            gravity_results = self._project_to_reference_area(
+                gravity_results, reference_table_h3
+            )
 
         logger.info("Heatmap gravity analysis completed successfully")
 
@@ -280,7 +282,7 @@ class HeatmapGravityTool(HeatmapToolBase):
             return expr
 
         # --- Constant potential ---
-        if opp.potential_type ==PotentialType.constant:
+        if opp.potential_type == PotentialType.constant:
             return str(float(opp.potential_constant))
 
         # --- Field-based potential ---

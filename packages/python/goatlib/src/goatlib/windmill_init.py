@@ -155,9 +155,7 @@ def bootstrap(
             )
             session = _try_login(admin_email, desired_password)
             if not session:
-                raise RuntimeError(
-                    "password rotation succeeded but re-login failed"
-                )
+                raise RuntimeError("password rotation succeeded but re-login failed")
 
     # 4. Workspace (idempotent: swallow any failure — token mint below
     # surfaces a genuinely missing workspace via /api/w/<ws>/* 401s).

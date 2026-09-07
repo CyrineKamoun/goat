@@ -443,8 +443,12 @@ class HeatmapToolBase(AnalysisTool):
         """
         self.con.execute(query)
 
-        count = self.con.execute(f"SELECT COUNT(*) FROM {projected_table}").fetchone()[0]
-        original_count = self.con.execute(f"SELECT COUNT(*) FROM {result_table}").fetchone()[0]
+        count = self.con.execute(f"SELECT COUNT(*) FROM {projected_table}").fetchone()[
+            0
+        ]
+        original_count = self.con.execute(
+            f"SELECT COUNT(*) FROM {result_table}"
+        ).fetchone()[0]
         logger.info(
             "Projected result to reference area: %d H3 cells (original result had %d)",
             count,

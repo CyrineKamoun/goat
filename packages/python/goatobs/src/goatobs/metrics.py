@@ -7,6 +7,7 @@ emits HTTP RED metrics (request duration, count, status code) through
 the meter provider this module sets up. So calling setup_metrics is
 required for HTTP RED metrics to actually be exported.
 """
+
 from opentelemetry import metrics as otel_metrics
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.metrics import MeterProvider

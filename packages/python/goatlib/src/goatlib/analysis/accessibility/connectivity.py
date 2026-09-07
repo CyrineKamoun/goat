@@ -36,7 +36,7 @@ class HeatmapConnectivityTool(HeatmapToolBase):
             reference_table, meta, h3_resolution, "reference_area_h3", "dest_id"
         )
 
-        dest_ids = self._extract_h3_ids(reference_table_h3, column_name='dest_id')
+        dest_ids = self._extract_h3_ids(reference_table_h3, column_name="dest_id")
         if not dest_ids:
             raise ValueError("No destination IDs found in opportunity data")
 

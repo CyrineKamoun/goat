@@ -185,9 +185,7 @@ class HuffmodelTool(HeatmapToolBase):
         transform_to_4326 = geom_col
         if meta.crs and meta.crs.to_epsg() != 4326:
             source_crs = meta.crs.to_string()
-            transform_to_4326 = (
-                f"ST_Transform({geom_col}, '{source_crs}', 'EPSG:4326')"
-            )
+            transform_to_4326 = f"ST_Transform({geom_col}, '{source_crs}', 'EPSG:4326')"
 
         if "point" in geom_type:
             query = f"""
