@@ -1019,10 +1019,14 @@ def main(
             try:
                 overwrite_previous = bool(export_data.get("overwritePrevious"))
 
+                # If-nodes pass an upstream temp_layer_id through without writing a temp dir.
+                temp_parts = (source_result.get("temp_layer_id") or "").split(":")
+                temp_node_id = temp_parts[1] if len(temp_parts) >= 2 else source_node_id
+
                 finalize_inputs = {
                     "user_id": params.user_id,
                     "workflow_id": params.workflow_id,
-                    "node_id": source_node_id,  # Source node's temp dir
+                    "node_id": temp_node_id,  # Node that actually wrote the temp dir
                     "export_node_id": export_node_id,  # Identity key for overwrite + status tracking
                     "project_id": params.project_id,
                     "folder_id": params.folder_id,
