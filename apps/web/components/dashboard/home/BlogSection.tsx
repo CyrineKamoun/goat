@@ -4,7 +4,6 @@ import {
   Card,
   CardContent,
   CardMedia,
-  Divider,
   Grid,
   Skeleton,
   Stack,
@@ -14,6 +13,8 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
+
+import HomeSection from "@/components/dashboard/home/HomeSection";
 
 type BlogPost = {
   title: string;
@@ -90,114 +91,109 @@ const BlogSection = () => {
   const { t, i18n } = useTranslation("common");
 
   return (
-    <Box>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 2,
-        }}>
-        <Typography variant="h6">{t("explore")}</Typography>
-        <Button
-          variant="text"
-          size="small"
-          endIcon={<Icon iconName={ICON_NAME.EXTERNAL_LINK} style={{ fontSize: 12 }} />}
-          onClick={() =>
-            window.open(
-              i18n.language === "de"
-                ? "https://www.plan4better.de/de/blog"
-                : "https://www.plan4better.de/blog",
-              "_blank"
-            )
-          }
-          sx={{
-            borderRadius: 0,
-          }}>
-          {t("visit_blog")}
-        </Button>
-      </Box>
-      <Divider sx={{ mb: 4 }} />
-      <Grid container spacing={5}>
-        {(isLoading
-          ? Array.from(new Array(3))
-          : i18n.language === "de"
-            ? blogPostsGerman
-            : (blogPostsEnglish ?? [])
-        ).map((item: BlogPost, index: number) => (
-          <Grid
-            item
-            key={item?.title ?? index}
-            xs={12}
-            sm={6}
-            md={6}
-            lg={4}
-            display={{
-              sm: index > 3 ? "none" : "block",
-              md: index > 3 ? "none" : "block",
-              lg: index > 2 ? "none" : "block",
+    <Box sx={{ pt: "32px", borderTop: `1px solid ${theme.palette.divider}` }}>
+      <HomeSection
+        title={t("from_our_blog")}
+        action={
+          <Button
+            variant="text"
+            size="small"
+            endIcon={<Icon iconName={ICON_NAME.EXTERNAL_LINK} style={{ fontSize: 12 }} />}
+            onClick={() =>
+              window.open(
+                i18n.language === "de"
+                  ? "https://www.plan4better.de/de/blog"
+                  : "https://www.plan4better.de/blog",
+                "_blank"
+              )
+            }
+            sx={{
+              borderRadius: 0,
             }}>
-            {!item ? (
-              <Skeleton variant="rectangular" height={220} />
-            ) : (
-              <Card
-                style={{
-                  backgroundColor: "transparent",
-                  border: "none",
-                  boxShadow: "none",
-                }}
-                variant="outlined"
-                onClick={() => window.open(item.url, "_blank")}
-                sx={{
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  "&:hover": {
-                    cursor: "pointer",
-                    "& img": {
-                      boxShadow: theme.shadows[4],
+            {t("visit_blog")}
+          </Button>
+        }>
+        <Grid container spacing={5}>
+          {(isLoading
+            ? Array.from(new Array(3))
+            : i18n.language === "de"
+              ? blogPostsGerman
+              : (blogPostsEnglish ?? [])
+          ).map((item: BlogPost, index: number) => (
+            <Grid
+              item
+              key={item?.title ?? index}
+              xs={12}
+              sm={6}
+              md={6}
+              lg={4}
+              display={{
+                sm: index > 3 ? "none" : "block",
+                md: index > 3 ? "none" : "block",
+                lg: index > 2 ? "none" : "block",
+              }}>
+              {!item ? (
+                <Skeleton variant="rectangular" height={220} />
+              ) : (
+                <Card
+                  style={{
+                    backgroundColor: "transparent",
+                    border: "none",
+                    boxShadow: "none",
+                  }}
+                  variant="outlined"
+                  onClick={() => window.open(item.url, "_blank")}
+                  sx={{
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    "&:hover": {
+                      cursor: "pointer",
+                      "& img": {
+                        boxShadow: theme.shadows[4],
+                      },
+                      "& p": {
+                        color: theme.palette.primary.main,
+                      },
                     },
-                    "& p": {
-                      color: theme.palette.primary.main,
-                    },
-                  },
-                }}>
-                {item.thumbnail && (
-                  <CardMedia
-                    component="img"
-                    sx={{
-                      height: 220,
-                      objectFit: "cover",
-                      backgroundSize: "cover",
-                      transition: theme.transitions.create(["box-shadow", "transform"], {
-                        duration: theme.transitions.duration.standard,
-                      }),
-                    }}
-                    image={item.thumbnail}
-                  />
-                )}
-                <CardContent sx={{ flexGrow: 1, px: 0 }}>
-                  <Stack spacing={2}>
-                    <Typography gutterBottom variant="caption">
-                      {item.date}
-                    </Typography>
-
-                    <Typography
+                  }}>
+                  {item.thumbnail && (
+                    <CardMedia
+                      component="img"
                       sx={{
-                        transition: theme.transitions.create(["color", "transform"], {
+                        height: 220,
+                        objectFit: "cover",
+                        backgroundSize: "cover",
+                        transition: theme.transitions.create(["box-shadow", "transform"], {
                           duration: theme.transitions.duration.standard,
                         }),
                       }}
-                      fontWeight="bold">
-                      {item.title}
-                    </Typography>
-                  </Stack>
-                </CardContent>
-              </Card>
-            )}
-          </Grid>
-        ))}
-      </Grid>
+                      image={item.thumbnail}
+                    />
+                  )}
+                  <CardContent sx={{ flexGrow: 1, px: 0 }}>
+                    <Stack spacing={2}>
+                      <Typography gutterBottom variant="caption">
+                        {item.date}
+                      </Typography>
+
+                      <Typography
+                        sx={{
+                          transition: theme.transitions.create(["color", "transform"], {
+                            duration: theme.transitions.duration.standard,
+                          }),
+                        }}
+                        fontWeight="bold">
+                        {item.title}
+                      </Typography>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )}
+            </Grid>
+          ))}
+        </Grid>
+      </HomeSection>
     </Box>
   );
 };
