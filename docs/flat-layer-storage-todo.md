@@ -72,9 +72,12 @@ human glance at the map canvas.
       column lists and never name a dropped column.
 
 - [ ] Per-env DB steps, in order: `alembic upgrade head` (chain is
-      `init → 12d658d174ae` bundle tables `→ a1c4b2d9e001` catalog backrefs
-      `→ b2d5e8f1a002` favourites `→ c3e7a91b4d10` legacy drops + unowned
-      catalog layers) → `initial_data.py` (re-installs `check_layer` with the
+      `init → 0001_bundles_catalog → 0002_favorites → 0003_sharing_grants →
+      0004_spaces → 0005_home_templates`; every step is guarded, so a database
+      built by `init` from the current models passes through unchanged and a
+      dev/prod-era `init` database gets the full delta — see
+      `docs/superpowers/plans/2026-09-06-alembic-consolidation.md`) →
+      `initial_data.py` (re-installs `check_layer` with the
       catalog + bundle branches **and `create_layer` with the NULL-owner
       guard**, seeds the `datasets` authz resource row and bundle types).
       `seed_catalog_identity` is gone — there is no catalog user to seed.
@@ -168,7 +171,7 @@ mutations. Still open:
 
 - [x] **Drop the old catalog's metadata columns from `customer.layer`.**
       DONE 2026-08-27. Thirteen columns removed (migration
-      `c3e7a91b4d10`, which also carries the drops below) with
+      `0001_bundles_catalog`, which also carries the drops below) with
       **nothing replacing them** — the earlier plan to collapse them into a
       JSONB `dataset_metadata` was dropped once it was clear a layer has no
       metadata of its own to hold:
@@ -238,13 +241,11 @@ mutations. Still open:
       need it anymore"*. `customer.scenario` (214 rows, 118 distinct owners),
       `customer.scenario_feature` (246), `customer.scenario_scenario_feature`
       (245) and `customer.project.active_scenario_id` (160 non-null) all go in
-      migration `c3e7a91b4d10`, after the column drops so the FKs unwind
-      cleanly. The downgrade recreates all three in shape, regenerating
-      `scenario_feature`'s 109 generic attribute columns from a family table
-      rather than spelling them out; verified by running upgrade **and**
-      downgrade inside one rolled-back transaction against the real database
-      (layer 41 -> 24 -> 41 columns, table set identical, `scenario_feature`
-      back at exactly 121 columns).
+      migration `0001_bundles_catalog`, after the column drops so the FKs unwind
+      cleanly. The consolidated revisions offer no downgrade (it raises
+      `NotImplementedError`); the drop was proven on the dev copy
+      (`goat_rehearsal`), where the three tables and the column are gone and
+      `alembic check` is clean afterwards.
 
       Worth knowing if this is ever second-guessed: the payload would have
       become unreadable anyway. `scenario_feature` kept attributes in generic
@@ -254,7 +255,7 @@ mutations. Still open:
       `pg_dump` of the three tables before running this is the only way back.
 
 - [x] **Drop `attribute_mapping` and the vestigial upload/data-store columns**
-      (same migration, `c3e7a91b4d10`). `attribute_mapping` mapped generic physical
+      (same migration, `0001_bundles_catalog`). `attribute_mapping` mapped generic physical
       column names back to real ones from the shared-wide-table era; the DuckLake
       migration already applied it (a layer mapping `{"text_attr1": "category"}`
       has a `category` column) and the field list now comes from the table schema
@@ -380,15 +381,15 @@ mutations. Still open:
 Second wave, from the adversarial diff review. All fixed unless marked.
 
 - [x] **`customer.bundle` would never have got `dataset_metadata` on an existing
-      environment.** The bundle revision `12d658d174ae` was edited in place, but
+      environment.** The bundle revision `0001_bundles_catalog` was edited in place, but
       it is already applied on dev and locally, so `alembic upgrade head` would
       have succeeded and then every `PUT /bundle/{id}` and every GTFS/Overture
       import would fail on `UndefinedColumn` — and `runner.py` deletes the
       just-ingested member layers when the metadata step fails. The transition
-      now lives in `c3e7a91b4d10`: add the column, fold the eight flat columns
-      into it with `jsonb_strip_nulls`, drop them and the unused `properties`.
-      Proven up and down on the real (old-shape) table — values survive both
-      directions.
+      lives in `0001_bundles_catalog`, guarded on the presence of the eight
+      flat columns: add `dataset_metadata`, fold the flat columns into it with
+      `jsonb_strip_nulls`, drop them and the unused `properties`. Proven on the
+      dev copy (`goat_rehearsal`) and as a no-op on a fresh database.
 
 - [x] **`git checkout --` cost the goatlib translations too.** Same mistake as
       the web locales earlier in the day, and this time I did not notice:
