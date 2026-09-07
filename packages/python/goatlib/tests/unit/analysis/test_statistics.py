@@ -1036,3 +1036,119 @@ class TestHistogram:
         assert result.total_rows == 4
         assert sum(b.count for b in result.bins) == 4
         assert result.bins[0].range[0] < result.bins[-1].range[1]
+
+
+class TestColumnValidation:
+    """`attribute`/`column` must name a real column of the table.
+
+    `unique-values`, `class-breaks` and `histogram` are public (unauthenticated)
+    processes and splice this value into their SQL, so an unknown or crafted
+    name is rejected with a ValueError (a 400 on the HTTP path) instead of
+    reaching DuckDB.
+    """
+
+    INJECTION = 'value" IS NOT NULL OR (SELECT 1) IS NOT NULL --'
+
+    def test_unique_values_rejects_unknown_column(self, sample_data_table):
+        with pytest.raises(ValueError, match="attribute"):
+            calculate_unique_values(sample_data_table, "test_data", "nope")
+
+    def test_unique_values_rejects_injection_payload(self, sample_data_table):
+        with pytest.raises(ValueError, match="attribute"):
+            calculate_unique_values(sample_data_table, "test_data", self.INJECTION)
+
+    def test_unique_values_rejects_empty_column(self, sample_data_table):
+        with pytest.raises(ValueError, match="attribute"):
+            calculate_unique_values(sample_data_table, "test_data", "")
+
+    def test_class_breaks_rejects_unknown_column(self, sample_data_table):
+        with pytest.raises(ValueError, match="attribute"):
+            calculate_class_breaks(sample_data_table, "test_data", "nope")
+
+    def test_class_breaks_rejects_injection_payload(self, sample_data_table):
+        with pytest.raises(ValueError, match="attribute"):
+            calculate_class_breaks(sample_data_table, "test_data", self.INJECTION)
+
+    def test_histogram_rejects_unknown_column(self, sample_data_table):
+        with pytest.raises(ValueError, match="column"):
+            calculate_histogram(sample_data_table, "test_data", column="nope")
+
+    def test_histogram_rejects_injection_payload(self, sample_data_table):
+        with pytest.raises(ValueError, match="column"):
+            calculate_histogram(sample_data_table, "test_data", column=self.INJECTION)
+
+    def test_column_with_quotes_in_its_name_is_usable(self, duckdb_connection):
+        """A real column keeps working, embedded quote and all."""
+        con = duckdb_connection
+        con.execute('CREATE TABLE t_quoted ("we""ird" INTEGER)')
+        con.execute("INSERT INTO t_quoted VALUES (1), (1), (2)")
+        result = calculate_unique_values(con, "t_quoted", 'we"ird')
+        assert {v.value for v in result.values} == {"1", "2"}
+
+
+class TestAggregationColumnValidation:
+    """`aggregation-stats` (also public) validates by membership, not by shape.
+
+    A real column name containing a space, a dash or non-ASCII letters — which
+    uploaded shapefile/CSV layers routinely carry — must work; an unknown or
+    crafted one must still raise (a 400 on the HTTP path).
+    """
+
+    @pytest.fixture
+    def odd_names_table(self, duckdb_connection):
+        con = duckdb_connection
+        con.execute('CREATE TABLE t_odd ("Straßen name" VARCHAR, "value-2020" INTEGER)')
+        con.execute(
+            "INSERT INTO t_odd VALUES ('Hauptstraße', 10), ('Hauptstraße', 20), "
+            "('Nebenstraße', 30)"
+        )
+        return con
+
+    def test_group_by_column_with_a_space_works(self, odd_names_table):
+        result = calculate_aggregation_stats(
+            odd_names_table,
+            "t_odd",
+            operation=StatisticsOperation.count,
+            group_by_column="Straßen name",
+        )
+        assert {item.grouped_value for item in result.items} == {
+            "Hauptstraße",
+            "Nebenstraße",
+        }
+
+    def test_operation_column_with_a_dash_works(self, odd_names_table):
+        result = calculate_aggregation_stats(
+            odd_names_table,
+            "t_odd",
+            operation=StatisticsOperation.sum,
+            operation_column="value-2020",
+        )
+        assert result.items[0].operation_value == 60.0
+
+    def test_unknown_group_by_column_still_raises(self, sample_data_table):
+        with pytest.raises(ValueError, match="group_by_column"):
+            calculate_aggregation_stats(
+                sample_data_table,
+                "test_data",
+                operation=StatisticsOperation.count,
+                group_by_column="nope",
+            )
+
+    def test_injected_operation_column_still_raises(self, sample_data_table):
+        with pytest.raises(ValueError, match="operation_column"):
+            calculate_aggregation_stats(
+                sample_data_table,
+                "test_data",
+                operation=StatisticsOperation.sum,
+                operation_column='value") + (SELECT 1) --',
+            )
+
+    def test_unknown_secondary_group_by_column_still_raises(self, sample_data_table):
+        with pytest.raises(ValueError, match="group_by_secondary_column"):
+            calculate_aggregation_stats(
+                sample_data_table,
+                "test_data",
+                operation=StatisticsOperation.count,
+                group_by_column="category",
+                group_by_secondary_column="nope",
+            )

@@ -67,11 +67,14 @@ def _hidden_columns(native_column_types: Optional[dict[str, str]]) -> set[str]:
     for name, native_type in native_column_types.items():
         if name in settings.HIDDEN_FIELDS:
             hidden.add(name)
-        elif _BBOX_STRUCT_NAME.match(name) and native_type.upper().startswith(
-            "STRUCT"
-        ):
+        elif _BBOX_STRUCT_NAME.match(name) and native_type.upper().startswith("STRUCT"):
             hidden.add(name)
     return hidden
+
+
+def _qi(name: str) -> str:
+    """Quote a SQL identifier, doubling any embedded double quote."""
+    return '"' + name.replace('"', '""') + '"'
 
 
 def build_items_select_clause(
@@ -90,7 +93,7 @@ def build_items_select_clause(
 
     if properties:
         props_set = set(properties)
-        select_cols = ", ".join(f'"{p}"' for p in props_set if p != geom_col)
+        select_cols = ", ".join(_qi(p) for p in props_set if p != geom_col)
         if geom_col:
             return f'rowid, {select_cols}, ST_AsGeoJSON("{geom_col}") AS geom_json'
         return f"rowid, {select_cols}"
@@ -452,13 +455,13 @@ class FeatureService:
         # Build SELECT clause — always include rowid
         if properties:
             props_set = set(properties)
-            select_cols = ", ".join(f'"{p}"' for p in props_set if p != geom_col)
+            select_cols = ", ".join(_qi(p) for p in props_set if p != geom_col)
             if has_geometry and geom_col:
                 select_clause = (
                     f'rowid, {select_cols}, ST_AsGeoJSON("{geom_col}") AS geom_json'
                 )
             else:
-                select_clause = f'rowid, {select_cols}'
+                select_clause = f"rowid, {select_cols}"
         else:
             if has_geometry and geom_col:
                 select_clause = f'rowid, *, ST_AsGeoJSON("{geom_col}") AS geom_json'

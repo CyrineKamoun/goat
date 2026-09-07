@@ -13,6 +13,7 @@ from goatlib.analysis.schemas.statistics import (
     SortOrder,
 )
 from goatlib.analysis.statistics.class_breaks import calculate_class_breaks
+from goatlib.analysis.statistics.columns import quote_identifier, require_column
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,9 @@ def calculate_histogram(
 
     Returns:
         HistogramResult with bins, missing_count, and total_rows
+
+    Raises:
+        ValueError: If `column` is not a column of the table.
     """
     if isinstance(method, str):
         try:
@@ -52,7 +56,8 @@ def calculate_histogram(
         except ValueError:
             method = HistogramBreakMethod.equal_interval
 
-    col = f'"{column}"'
+    column = require_column(con, table_name, column, "column")
+    col = quote_identifier(column)
 
     # Temporal columns are binned on their epoch value (time -> seconds of day,
     # date/timestamp -> unix seconds); the caller formats the numeric edges back.
@@ -63,7 +68,11 @@ def calculate_histogram(
             f"WHERE {where_clause} AND {col} IS NOT NULL LIMIT 1",
             params or [],
         ).fetchone()
-        if type_row and type_row[0] and ("time" in type_row[0] or "date" in type_row[0]):
+        if (
+            type_row
+            and type_row[0]
+            and ("time" in type_row[0] or "date" in type_row[0])
+        ):
             value_expr = f"epoch({col})"
     except Exception:
         value_expr = col

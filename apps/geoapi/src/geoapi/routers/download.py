@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import shutil
 import tempfile
 import zipfile
@@ -48,6 +49,26 @@ FORMAT_EXTENSION: dict[str, str] = {
 }
 
 SUPPORTED_FORMATS = list(FORMAT_MAP.keys())
+
+# The target CRS is inlined into the ST_Transform call and the GDAL SRS
+# option of a `COPY (...) TO file` statement, so only an EPSG code passes.
+_CRS_PATTERN = re.compile(r"epsg:(\d{4,6})", re.IGNORECASE)
+
+
+def _normalize_crs(crs: str | None) -> str | None:
+    """Canonical `EPSG:<code>` for a requested CRS, or None for no reprojection.
+
+    Raises:
+        ValueError: If the value is not an EPSG code.
+    """
+    if not crs:
+        return None
+    match = _CRS_PATTERN.fullmatch(crs.strip())
+    if not match:
+        raise ValueError(
+            f"Unsupported crs: {crs}. Expected an EPSG code, e.g. EPSG:4326"
+        )
+    return f"EPSG:{match.group(1)}"
 
 
 def _get_exportable_columns(
@@ -111,7 +132,11 @@ def _export_layer_to_file(
         output_path: Path for the output file
         output_format: GDAL driver name
         crs: Target CRS (e.g. "EPSG:4326")
+
+    Raises:
+        ValueError: If crs is not an EPSG code.
     """
+    crs = _normalize_crs(crs)
     with ducklake_manager.connection() as con:
         full_table = table_name
         exportable_columns = _get_exportable_columns(con, table_name)
@@ -313,6 +338,12 @@ async def download_layer(
             f"Supported: {', '.join(SUPPORTED_FORMATS)}",
         )
 
+    # Validate CRS before any work: it is inlined into the export SQL.
+    try:
+        target_crs = _normalize_crs(crs)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     # Check that this layer belongs to a public project
     layer_uuid = UUID(
         f"{layer_info.layer_id[:8]}-{layer_info.layer_id[8:12]}-"
@@ -349,7 +380,7 @@ async def download_layer(
             file_name,
             format_lower,
             gdal_format,
-            crs,
+            target_crs,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

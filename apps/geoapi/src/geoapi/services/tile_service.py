@@ -47,6 +47,12 @@ from geoapi.tile_cache import cache_tile, get_cached_tile
 
 logger = logging.getLogger(__name__)
 
+
+def _qi(name: str) -> str:
+    """Quote a SQL identifier, doubling any embedded double quote."""
+    return '"' + name.replace('"', '""') + '"'
+
+
 # Web Mercator extent in meters (EPSG:3857)
 WEB_MERCATOR_EXTENT = 20037508.342789244
 
@@ -1341,8 +1347,12 @@ class TileService:
 
         # Build property selection - must be explicit columns (no * in subqueries)
         if properties:
-            # Use specified properties, excluding geometry
-            prop_cols = [p for p in properties if p not in (geom_col,)]
+            # Use specified properties, excluding geometry. A name the layer
+            # does not have would break the whole tile query, so it is dropped
+            # here; the route rejects it with a 400 before getting this far.
+            prop_cols = [
+                p for p in properties if p not in (geom_col,) and p in column_names
+            ]
             # Always include id if it exists in the table (for feature identification)
             if has_id_column and "id" not in prop_cols:
                 prop_cols.append("id")
@@ -1366,10 +1376,11 @@ class TileService:
         for col in prop_cols:
             col_type = col_types.get(col, "VARCHAR")
             cast_type = get_cast_type(col_type)
+            ident = _qi(col)
             if cast_type:
-                select_parts.append(f'CAST("{col}" AS {cast_type}) AS "{col}"')
+                select_parts.append(f"CAST({ident} AS {cast_type}) AS {ident}")
             else:
-                select_parts.append(f'"{col}"')
+                select_parts.append(ident)
         select_props = ", ".join(select_parts) if select_parts else None
 
         # Build WHERE clause (additional filters beyond tile bounds)
@@ -1397,7 +1408,7 @@ class TileService:
 
         # Include all property columns (including original 'id' if present)
         for col in prop_cols:
-            struct_fields.append(f'"{col}" := candidates."{col}"')
+            struct_fields.append(f"{_qi(col)} := candidates.{_qi(col)}")
         struct_pack_args = ", ".join(struct_fields)
 
         # Build MVT query

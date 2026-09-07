@@ -29,15 +29,23 @@ def mock_ducklake_manager():
 
 @pytest.fixture
 def mock_layer_service():
-    """Mock layer service for tests (both the defining module and the
-    reference the lifespan in `geoapi.main` holds)."""
+    """Mock layer service for tests (the defining module, the reference the
+    lifespan in `geoapi.main` holds, and the reference the `require_layer_read`
+    route dependency holds).
+
+    `user_can_read_layer` defaults to allowing the read: individual read-authz
+    tests override it, and every other route test would otherwise 500 (no
+    pool) or fail to await a plain MagicMock.
+    """
     with (
         patch("geoapi.services.layer_service.layer_service") as mock,
         patch("geoapi.main.layer_service") as mock_main,
+        patch("geoapi.deps.authz.layer_service") as mock_authz,
     ):
-        for m in (mock, mock_main):
+        for m in (mock, mock_main, mock_authz):
             m.init = AsyncMock()
             m.close = AsyncMock()
+        mock_authz.user_can_read_layer = AsyncMock(return_value=True)
         yield mock
 
 

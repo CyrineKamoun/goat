@@ -283,6 +283,22 @@ class LayerService:
                     await self._create_pool()
         raise last_error
 
+    def cached_metadata(self, layer_id: str) -> Optional[LayerMetadata]:
+        """Metadata already in the shared cache for `layer_id`, or None.
+
+        Pure cache probe — no Postgres, no DuckLake, no `LayerInfo`
+        resolution — for callers that have only the layer id and must not pay
+        a lookup per request (the PMTiles tile fast path). The entry is the
+        same one `get_layer_metadata` writes and the write hooks invalidate,
+        so a reader here sees exactly what the dynamic path would see.
+        """
+        try:
+            if layer_id in _metadata_cache:
+                return _metadata_cache[layer_id]
+        except KeyError:  # evicted between the check and the read
+            return None
+        return None
+
     async def get_layer_metadata(
         self, layer_info: LayerInfo
     ) -> Optional[LayerMetadata]:
@@ -490,115 +506,67 @@ class LayerService:
         )
         return bool(row and row["is_public"])
 
+    async def user_can_read_layer(
+        self, layer_id: UUID | str, user_id: UUID | None
+    ) -> bool:
+        """Check whether a user may read a layer.
+
+        A layer in any published (public) project is readable by anyone,
+        anonymous included. Otherwise the one authorization rule decides —
+        ``customer.can`` accepts a NULL user for a catalog layer's public
+        read grant.
+
+        Args:
+            layer_id: Layer UUID (hyphenated or 32-char hex)
+            user_id: Requesting user's UUID, or None if anonymous
+
+        Returns:
+            True if the layer may be read
+        """
+        if not self._pool:
+            raise RuntimeError("LayerService not initialized")
+
+        lid = normalize_layer_id(str(layer_id))
+        if await self.is_layer_in_public_project(UUID(lid)):
+            return True
+
+        row = await self._execute_with_retry(
+            "SELECT customer.can('layer', $1::uuid, $2::uuid, 'read') AS ok",
+            lid,
+            str(user_id) if user_id else None,
+            fetch_one=True,
+        )
+        return bool(row and row["ok"])
+
     async def user_can_edit_layer(self, layer_id: UUID | str, user_id: UUID) -> bool:
-        """Check whether a non-owner may write to a layer.
+        """Check whether a user may write to a layer.
 
-        A user who does not own the layer may still write to it when the
-        layer's owner has deliberately brought it into a workspace they both
-        edit: there is a project containing the layer on which *both* the
-        requesting user and the layer owner hold an edit grant
-        (project-owner / project-editor, directly or via team, organization
-        or a folder-editor grant on the project's folder).
+        Delegates to ``customer.layer_write_allowed``, the single write rule
+        shared with core: the layer's owner, an editor-or-owner via
+        ``effective_role('layer', ...)`` (direct/folder/bundle grants), or
+        the shared-workspace rule — a project containing the layer on which
+        *both* the requesting user and the layer owner hold an edit-or-owner
+        role.
 
-        The owner-side condition is what keeps read access from converting
-        into write access. Adding a layer to a project only requires
-        ``read-layer``, so without it any user could add a catalog layer — or
-        one shared with them as viewer — to a project they own and inherit
-        write access to someone else's dataset.
-
-        Ownership is checked by the caller and is not covered here.
+        The owner-side half of the shared-workspace rule is what keeps read
+        access from converting into write access. Adding a layer to a
+        project only requires ``read-layer``, so without it any user could
+        add a catalog layer — or one shared with them as viewer — to a
+        project they own and inherit write access to someone else's
+        dataset. Project access alone never grants write.
 
         Args:
             layer_id: Layer UUID (hyphenated or 32-char hex)
             user_id: Requesting user's UUID
 
         Returns:
-            True if the shared-workspace rule admits the write
+            True if the write rule admits the write
         """
         if not self._pool:
             raise RuntimeError("LayerService not initialized")
 
         row = await self._execute_with_retry(
-            """
-            WITH candidate_projects AS (
-                SELECT DISTINCT lp.project_id
-                FROM customer.layer_project lp
-                WHERE lp.layer_id = $1::uuid
-            ),
-            layer_owner AS (
-                SELECT l.user_id FROM customer.layer l WHERE l.id = $1::uuid
-            ),
-            /* (project_id, user_id) pairs holding an edit grant on a
-               candidate project, by every route that grants one. */
-            project_editors AS (
-                SELECT cp.project_id, p.user_id
-                FROM candidate_projects cp
-                JOIN customer.project p ON p.id = cp.project_id
-
-                UNION
-
-                SELECT cp.project_id, pu.user_id
-                FROM candidate_projects cp
-                JOIN customer.project_user pu ON pu.project_id = cp.project_id
-                JOIN customer.role r ON r.id = pu.role_id
-                WHERE r.name IN ('project-owner', 'project-editor')
-
-                UNION
-
-                SELECT cp.project_id, ut.user_id
-                FROM candidate_projects cp
-                JOIN customer.project_team pt ON pt.project_id = cp.project_id
-                JOIN customer.role r ON r.id = pt.role_id
-                JOIN customer.user_team ut ON ut.team_id = pt.team_id
-                WHERE r.name IN ('project-owner', 'project-editor')
-
-                UNION
-
-                SELECT cp.project_id, u.id
-                FROM candidate_projects cp
-                JOIN customer.project_organization po
-                    ON po.project_id = cp.project_id
-                JOIN customer.role r ON r.id = po.role_id
-                JOIN customer."user" u ON u.organization_id = po.organization_id
-                WHERE r.name IN ('project-owner', 'project-editor')
-
-                UNION
-
-                SELECT cp.project_id, ut.user_id
-                FROM candidate_projects cp
-                JOIN customer.project p
-                    ON p.id = cp.project_id AND p.folder_id IS NOT NULL
-                JOIN customer.resource_grant rg
-                    ON rg.resource_type = 'folder'
-                   AND rg.resource_id = p.folder_id
-                   AND rg.grantee_type = 'team'
-                JOIN customer.role r ON r.id = rg.role_id
-                   AND r.name = 'folder-editor'
-                JOIN customer.user_team ut ON ut.team_id = rg.grantee_id
-
-                UNION
-
-                SELECT cp.project_id, u.id
-                FROM candidate_projects cp
-                JOIN customer.project p
-                    ON p.id = cp.project_id AND p.folder_id IS NOT NULL
-                JOIN customer.resource_grant rg
-                    ON rg.resource_type = 'folder'
-                   AND rg.resource_id = p.folder_id
-                   AND rg.grantee_type = 'organization'
-                JOIN customer.role r ON r.id = rg.role_id
-                   AND r.name = 'folder-editor'
-                JOIN customer."user" u ON u.organization_id = rg.grantee_id
-            )
-            SELECT EXISTS (
-                SELECT 1
-                FROM project_editors requester
-                JOIN project_editors owner
-                    ON owner.project_id = requester.project_id
-                WHERE requester.user_id = $2::uuid
-                  AND owner.user_id = (SELECT user_id FROM layer_owner)
-            ) AS can_edit
-            """,
+            "SELECT customer.layer_write_allowed($1::uuid, $2::uuid) AS can_edit",
             normalize_layer_id(str(layer_id)),
             str(user_id),
             fetch_one=True,

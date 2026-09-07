@@ -108,11 +108,24 @@ PUBLIC_ALLOWED_PROCESSES = frozenset(
         "extent",
         "aggregation-stats",
         "histogram",
-        "validate-sql",
-        "preview-sql",
+        # A public dashboard viewer is anonymous and its statistics are
+        # computed here, gated by a public `project_id`. `layer-search` keeps
+        # its own gate (public `project_id`, or auth for an explicit `layers`
+        # list). `preview-sql`/`validate-sql` are NOT here: they take arbitrary
+        # SQL and a raw `layers` list, their only callers (the formula builder
+        # and the table widget) are authenticated, and a public seat would be
+        # unauthenticated read of any layer plus local-file/SSRF reach through
+        # DuckDB.
         "layer-search",
     }
 )
+
+# Every sync-analytics process handled inline below (the public subset above
+# plus the two authenticated-only SQL helpers). Membership here routes a
+# request into `_execute_analytics_sync`; `PUBLIC_ALLOWED_PROCESSES` then
+# decides whether it may run without a caller.
+SYNC_ANALYTICS_PROCESSES = PUBLIC_ALLOWED_PROCESSES | {"preview-sql", "validate-sql"}
+
 
 # Cheap overload guard for layer-search fan-outs: reject instead of queueing
 # unboundedly when the analytics pool is saturated.
@@ -536,7 +549,22 @@ async def execute_process(
         execute_request.inputs = search_input.model_dump(mode="json")
 
     # Check if this is a public-allowed analytics process (sync execution)
-    if is_public_allowed_process(process_id):
+    # Sync analytics runs here. A process in PUBLIC_ALLOWED_PROCESSES may run
+    # anonymously (public dashboards); every other sync-analytics process —
+    # preview-sql and validate-sql among them — requires a caller, so an
+    # unauthenticated request cannot reach arbitrary SQL over a layer.
+    if process_id in SYNC_ANALYTICS_PROCESSES:
+        if not is_public_allowed_process(process_id) and user_id is None:
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "type": OGC_EXCEPTION_NOT_AUTHORIZED,
+                    "title": "Authentication required",
+                    "status": 401,
+                    "detail": "Authentication required for this process",
+                },
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         global _layer_search_inflight
         is_search = process_id == "layer-search"
         if is_search and _layer_search_inflight >= _LAYER_SEARCH_MAX_INFLIGHT:

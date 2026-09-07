@@ -19,6 +19,11 @@ class Settings(BaseSettings):
 
     # Authentication settings
     AUTH: bool = os.getenv("AUTH", "true").lower() == "true"
+
+    # Read authorization gate for tile/feature/metadata endpoints. Shadow
+    # mode (False, default) only logs `read_authz.would_deny`; flip on dev
+    # only after that counter is quiet. Env: GEOAPI_ENFORCE_READ_AUTHZ.
+    ENFORCE_READ_AUTHZ: bool = False
     KEYCLOAK_SERVER_URL: str = os.getenv(
         "KEYCLOAK_SERVER_URL", "https://auth.dev.plan4better.de"
     )

@@ -249,6 +249,11 @@ def build_filters(
 def build_order_clause(sortby: Optional[str]) -> str:
     """Build ORDER BY clause from sortby parameter.
 
+    The column name is emitted as a quoted identifier with embedded double
+    quotes doubled, so it cannot terminate the identifier and add SQL of its
+    own. Whether the column exists is the caller's business: an unknown name
+    still reaches the database.
+
     Args:
         sortby: Sort column name, optionally prefixed with - (desc) or + (asc)
 
@@ -259,8 +264,11 @@ def build_order_clause(sortby: Optional[str]) -> str:
         return ""
 
     if sortby.startswith("-"):
-        return f'ORDER BY "{sortby[1:]}" DESC'
+        column, direction = sortby[1:], "DESC"
     elif sortby.startswith("+"):
-        return f'ORDER BY "{sortby[1:]}" ASC'
+        column, direction = sortby[1:], "ASC"
     else:
-        return f'ORDER BY "{sortby}" ASC'
+        column, direction = sortby, "ASC"
+
+    quoted = '"' + column.replace('"', '""') + '"'
+    return f"ORDER BY {quoted} {direction}"

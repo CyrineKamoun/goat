@@ -1,8 +1,16 @@
 """The SQL behind ``LayerService.user_can_edit_layer``, against a real database.
 
-The rule is: a non-owner may write a layer when the layer's owner has put it
-into a project they both edit. The owner-side half of that condition is a
-security boundary, not a nicety — adding a layer to a project only requires
+The rule, enforced by ``customer.layer_write_allowed``, is: the layer's
+owner; an editor-or-owner via a direct, folder, or bundle grant
+(``effective_role('layer', ...)``); or the shared-workspace rule — a
+project containing the layer where the owner and the requester both hold an
+edit-or-owner role on that project. A catalog layer (owner NULL, or flagged
+``in_catalog``/``catalog_external_uid``) is never writable by anyone but its
+owner column — no grant path, including the shared-workspace one, may raise
+it above viewer.
+
+The owner-side half of the shared-workspace condition is a security
+boundary, not a nicety — adding a layer to a project only requires
 ``read-layer``, so without it any user could add a catalog layer (or one
 shared with them as viewer) to a project they own and inherit write access to
 somebody else's dataset. Mocked tests cannot show that; only the SQL can.
@@ -17,7 +25,7 @@ with: ``uv run pytest apps/geoapi/tests/integration -m integration``
 from __future__ import annotations
 
 import uuid
-from typing import AsyncGenerator
+from typing import AsyncGenerator, cast
 
 import asyncpg
 import pytest
@@ -94,14 +102,46 @@ async def _make_user(conn: asyncpg.Connection) -> uuid.UUID:
     )
 
 
+async def _ensure_personal_space(
+    conn: asyncpg.Connection, user_id: uuid.UUID
+) -> uuid.UUID:
+    """The owner of `effective_role` is a space, not a user_id column — every
+    user this suite creates needs its own personal space before it can own
+    anything."""
+    space_id = await conn.fetchval(
+        "SELECT id FROM customer.space WHERE kind = 'personal' AND user_id = $1",
+        user_id,
+    )
+    if space_id is not None:
+        return cast(uuid.UUID, space_id)
+    return cast(
+        uuid.UUID,
+        await conn.fetchval(
+            """
+            INSERT INTO customer.space (id, kind, user_id, default_role)
+            VALUES ($1, 'personal', $2, 'editor') RETURNING id
+            """,
+            uuid.uuid4(),
+            user_id,
+        ),
+    )
+
+
 async def _make_folder(conn: asyncpg.Connection, user_id: uuid.UUID) -> uuid.UUID:
+    """A fresh root folder in the owner's personal space. Root folder names
+    are unique per space, so each call needs its own name — one user's
+    tests can create several folders in the same (now shared) space."""
+    space_id = await _ensure_personal_space(conn, user_id)
+    folder_id = uuid.uuid4()
     return await conn.fetchval(
         """
-        INSERT INTO customer.folder (id, user_id, name, updated_at)
-        VALUES ($1, $2, 'test-folder', NOW()) RETURNING id
+        INSERT INTO customer.folder (id, user_id, space_id, name, updated_at)
+        VALUES ($1, $2, $3, $4, NOW()) RETURNING id
         """,
-        uuid.uuid4(),
+        folder_id,
         user_id,
+        space_id,
+        f"test-folder-{folder_id}",
     )
 
 
@@ -109,32 +149,37 @@ async def _make_layer(
     conn: asyncpg.Connection, owner_id: uuid.UUID, *, in_catalog: bool = False
 ) -> uuid.UUID:
     folder_id = await _make_folder(conn, owner_id)
+    space_id = await _ensure_personal_space(conn, owner_id)
     return await conn.fetchval(
         """
         INSERT INTO customer.layer
-            (id, user_id, folder_id, name, type, in_catalog, updated_at)
-        VALUES ($1, $2, $3, 'test-layer', 'feature', $4, NOW())
+            (id, user_id, folder_id, space_id, name, type, in_catalog, updated_at)
+        VALUES ($1, $2, $3, $4, 'test-layer', 'feature', $5, NOW())
         RETURNING id
         """,
         uuid.uuid4(),
         owner_id,
         folder_id,
+        space_id,
         in_catalog,
     )
 
 
 async def _make_project(conn: asyncpg.Connection, owner_id: uuid.UUID) -> uuid.UUID:
-    """Create a project. A trigger grants the owner project-owner."""
+    """Create a project in the owner's personal space — the space is what
+    makes the owner its owner under `effective_role`."""
     folder_id = await _make_folder(conn, owner_id)
+    space_id = await _ensure_personal_space(conn, owner_id)
     return await conn.fetchval(
         """
-        INSERT INTO customer.project (id, user_id, folder_id, name, updated_at)
-        VALUES ($1, $2, $3, 'test-project', NOW())
+        INSERT INTO customer.project (id, user_id, folder_id, space_id, name, updated_at)
+        VALUES ($1, $2, $3, $4, 'test-project', NOW())
         RETURNING id
         """,
         uuid.uuid4(),
         owner_id,
         folder_id,
+        space_id,
     )
 
 
@@ -158,14 +203,17 @@ async def _share_project_with_user(
     user_id: uuid.UUID,
     role: str,
 ) -> None:
+    granter = await _make_user(conn)
     await conn.execute(
         """
-        INSERT INTO customer.project_user (project_id, user_id, role_id)
-        VALUES ($1, $2, $3)
+        INSERT INTO customer.resource_grant
+            (resource_type, resource_id, grantee_type, grantee_id, role_id, granted_by)
+        VALUES ('project', $1, 'user', $2, $3, $4)
         """,
         project_id,
         user_id,
         await _role_id(conn, role),
+        granter,
     )
 
 
@@ -185,11 +233,17 @@ async def _share_project_with_team(
         user_id,
         await _role_id(conn, "team-member"),
     )
+    granter = await _make_user(conn)
     await conn.execute(
-        "INSERT INTO customer.project_team (project_id, team_id, role_id) VALUES ($1, $2, $3)",
+        """
+        INSERT INTO customer.resource_grant
+            (resource_type, resource_id, grantee_type, grantee_id, role_id, granted_by)
+        VALUES ('project', $1, 'team', $2, $3, $4)
+        """,
         project_id,
         team_id,
         await _role_id(conn, role),
+        granter,
     )
 
 

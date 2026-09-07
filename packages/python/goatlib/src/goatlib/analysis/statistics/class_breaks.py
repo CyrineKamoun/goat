@@ -6,6 +6,7 @@ from typing import Any
 import duckdb
 
 from goatlib.analysis.schemas.statistics import ClassBreakMethod, ClassBreaksResult
+from goatlib.analysis.statistics.columns import quote_identifier, require_column
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,12 @@ def calculate_class_breaks(
 
     Returns:
         ClassBreaksResult with break values and statistics
+
+    Raises:
+        ValueError: If `attribute` is not a column of the table.
     """
-    attr_col = f'"{attribute}"'
+    attribute = require_column(con, table_name, attribute, "attribute")
+    attr_col = quote_identifier(attribute)
 
     # Build full where clause with null check and optional zero stripping
     full_where = f"({where_clause}) AND {attr_col} IS NOT NULL"

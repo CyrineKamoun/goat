@@ -4,10 +4,11 @@ from typing import Any, cast
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 
 from geoapi.config import settings
 from geoapi.dependencies import LayerInfo, LayerInfoDep
+from geoapi.deps.authz import require_layer_read
 from geoapi.ducklake_pool import ducklake_pool
 from geoapi.http_cache import apply_cache_headers, build_query_etag, not_modified
 from geoapi.models import (
@@ -183,6 +184,7 @@ async def conformance() -> Conformance:
     "/collections/{collectionId}",
     summary="Collection metadata",
     response_model=Collection,
+    dependencies=[Depends(require_layer_read)],
 )
 async def get_collection(
     request: Request,
@@ -263,6 +265,7 @@ async def get_collection(
     "/collections/{collectionId}/queryables",
     summary="Collection queryables",
     response_model=Queryables,
+    dependencies=[Depends(require_layer_read)],
 )
 async def get_queryables(
     request: Request,

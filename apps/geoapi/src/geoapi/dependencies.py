@@ -305,6 +305,69 @@ async def properties_query(
     return [p.strip() for p in properties.split(",")]
 
 
+def unknown_requested_fields(
+    column_names: Optional[list[str]],
+    properties: Optional[list[str]] = None,
+    sortby: Optional[str] = None,
+    geometry_column: Optional[str] = None,
+) -> list[str]:
+    """Requested `properties` / `sortby` names the layer does not have.
+
+    The query builders splice these names into the SELECT and ORDER BY
+    clauses as quoted identifiers, so an unknown name reaches DuckDB and
+    fails the whole query.
+
+    Order is preserved and duplicates collapsed. With no resolved column
+    list nothing can be checked, so the result is empty (the request keeps
+    its previous behaviour rather than 400-ing on every field).
+    """
+    if not column_names:
+        return []
+
+    known = set(column_names)
+    if geometry_column:
+        known.add(geometry_column)
+    # rowid is DuckDB's row identifier, selectable and sortable on every
+    # table but never part of the layer's column metadata.
+    known.add("rowid")
+
+    requested: list[str] = list(properties or [])
+    if sortby:
+        sort_field = sortby.lstrip("+-")
+        if sort_field:
+            requested.append(sort_field)
+
+    unknown: list[str] = []
+    for name in requested:
+        if name not in known and name not in unknown:
+            unknown.append(name)
+    return unknown
+
+
+def reject_unknown_fields(
+    column_names: Optional[list[str]],
+    properties: Optional[list[str]] = None,
+    sortby: Optional[str] = None,
+    geometry_column: Optional[str] = None,
+) -> None:
+    """400 when `properties`/`sortby` name a field the collection lacks.
+
+    Such a name is spliced into the query as a quoted identifier and would
+    otherwise fail inside DuckDB and surface as a 500.
+    """
+    unknown = unknown_requested_fields(
+        column_names=column_names,
+        properties=properties,
+        sortby=sortby,
+        geometry_column=geometry_column,
+    )
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail="Unknown field(s) for this collection: " + ", ".join(unknown),
+        )
+
+
 async def cql_filter_query(
     filter: Annotated[
         Optional[str],

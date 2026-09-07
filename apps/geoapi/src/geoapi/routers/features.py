@@ -28,8 +28,10 @@ from geoapi.dependencies import (
     LimitDep,
     OffsetDep,
     PropertiesDep,
+    reject_unknown_fields,
 )
 from geoapi.deps.auth import get_optional_user_id
+from geoapi.deps.authz import require_layer_read, require_layer_read_unless_temp
 from geoapi.ducklake_pool import ducklake_pool
 from geoapi.http_cache import apply_cache_headers, build_query_etag, not_modified
 from geoapi.models import Feature, Link
@@ -123,6 +125,9 @@ def _finalize_items_body(body: bytes, accept_gzip: bool) -> Response:
 @router.get(
     "/collections/{collectionId}/items",
     summary="Get features",
+    # This route alone has a `?temp=true` branch, so it takes the
+    # temp-aware variant — every other route uses plain `require_layer_read`.
+    dependencies=[Depends(require_layer_read_unless_temp)],
 )
 async def get_features(
     request: Request,
@@ -222,6 +227,13 @@ async def get_features(
         has_geometry,
     )
 
+    reject_unknown_fields(
+        column_names=column_names,
+        properties=properties,
+        sortby=sortby,
+        geometry_column=geometry_column,
+    )
+
     # Parse IDs
     id_list = None
     if ids:
@@ -296,6 +308,7 @@ async def get_features(
     "/collections/{collectionId}/items/{itemId}",
     summary="Get feature by ID",
     response_model=Feature,
+    dependencies=[Depends(require_layer_read)],
 )
 async def get_feature(
     request: Request,
@@ -322,6 +335,12 @@ async def get_feature(
 
     geometry_column = metadata.geometry_column or "geometry"
     has_geometry = metadata.has_geometry
+
+    reject_unknown_fields(
+        column_names=metadata.column_names,
+        properties=properties,
+        geometry_column=geometry_column,
+    )
 
     # Get feature
     loop = asyncio.get_event_loop()
