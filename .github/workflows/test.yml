@@ -95,6 +95,20 @@ jobs:
       POSTGRES_PORT: "5432"
       AUTH: "False"
       ENVIRONMENT: dev
+      # No S3 service here, and none is wanted. Presigning a URL is local
+      # signing, so credentials — any credentials — are all the thumbnail
+      # tests need to assert that a stored key comes back as a signed URL
+      # rather than the default artwork. The endpoint points at a closed port
+      # so the few calls that do reach for S3 (a bundle import reading its
+      # upload) fail at once with connection refused instead of travelling to
+      # real AWS.
+      S3_ACCESS_KEY_ID: test
+      S3_SECRET_ACCESS_KEY: test
+      S3_ENDPOINT_URL: http://127.0.0.1:1
+      S3_FORCE_PATH_STYLE: "true"
+      # Without this botocore retries each refused connection with backoff,
+      # which cost 8 of the 9 seconds tests/api/test_folder_guard.py took.
+      AWS_MAX_ATTEMPTS: "1"
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
