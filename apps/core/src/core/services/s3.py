@@ -5,7 +5,7 @@ from typing import BinaryIO, Dict
 
 import boto3
 from botocore.client import Config
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 from core.core.config import settings
 from fastapi import HTTPException, status
 
@@ -13,6 +13,16 @@ logger = logging.getLogger(__name__)
 
 
 class S3Service:
+    """Core's S3 access.
+
+    Every handler here catches `ClientError` *and* `BotoCoreError`:
+    the first is what the service refused, the second is what never
+    reached it — absent credentials, an unreachable endpoint, a timeout.
+    They are siblings rather than parent and child, so catching only the
+    first turns a misconfigured deployment into an unhandled 500 instead
+    of the HTTP error, or the default artwork, each caller expects.
+    """
+
     def __init__(self) -> None:
         """
         Initialize an S3 client that can talk to either AWS S3
@@ -80,7 +90,7 @@ class S3Service:
                 Key=s3_key,
                 ExtraArgs={"ContentType": content_type},
             )
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             logger.error(f"Asset upload failed for {s3_key}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -93,7 +103,7 @@ class S3Service:
             self.assets_client.delete_object(
                 Bucket=settings.AWS_S3_ASSETS_BUCKET, Key=s3_key
             )
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             logger.error(f"Asset delete failed for {s3_key}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -128,7 +138,7 @@ class S3Service:
 
             return result
 
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             logger.error(f"S3 presigned POST failed: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -151,7 +161,7 @@ class S3Service:
                 ExtraArgs={"ContentType": content_type},
             )
             return f"s3://{bucket_name}/{s3_key}"
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             logger.error(f"S3 upload failed: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -187,7 +197,7 @@ class S3Service:
                 Params=params,
                 ExpiresIn=expires_in,
             )
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             logger.error(f"Presigned download URL failed: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -198,7 +208,7 @@ class S3Service:
         """Delete an object from S3."""
         try:
             self.s3_client.delete_object(Bucket=bucket_name, Key=s3_key)
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             logger.error(f"Delete failed for {bucket_name}/{s3_key}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -209,7 +219,7 @@ class S3Service:
         """Download an object from S3 to a local path."""
         try:
             self.s3_client.download_file(bucket_name, s3_key, dest_path)
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             logger.error(f"Download failed for {bucket_name}/{s3_key}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -250,7 +260,7 @@ class S3Service:
                 Params=params,
                 ExpiresIn=expires_in,
             )
-        except ClientError as e:
+        except (ClientError, BotoCoreError) as e:
             logger.warning(f"Failed to generate presigned URL for {thumbnail_key}: {e}")
             return default_url
 

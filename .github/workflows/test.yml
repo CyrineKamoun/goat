@@ -48,10 +48,20 @@ jobs:
           enable-corepack: true
           cwd: ${{ github.workspace }}
           node_version: 22
-      # No browser is installed here: vitest runs in jsdom and its config
-      # excludes playwright/ and **/*.e2e.*, so nothing in this job needs one.
-      # The e2e suite is not run in CI at all — running it needs a service
-      # stack, and that is a separate decision.
+      # vitest runs in jsdom and its config excludes playwright/ and
+      # **/*.e2e.*, but lib/print/__tests__/pdf-renderer.test.ts is a plain
+      # *.test.ts inside the tree and launches a real Chromium in beforeAll,
+      # so the browser has to be here. The e2e suite is not run in CI at all —
+      # running it needs a service stack, and that is a separate decision.
+      - name: 💾 Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: 📥 Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter web exec playwright install --with-deps chromium
       - name: 🧪 Vitest
         run: pnpm --filter web exec vitest run
 
@@ -173,9 +183,12 @@ jobs:
           enable-cache: true
       # Only suite that needs real gdal (WFS/converter tests). The compiled
       # wheel lands in the uv cache, so the source build runs once per
-      # lockfile change, not per run.
-      - name: 🌍 Install libgdal-dev
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libgdal-dev
+      # lockfile change, not per run. `tippecanoe` is needed because
+      # `PMTilesGenerator.__init__` refuses to construct without the binary
+      # on PATH, so the tests/io and tests/unit/io PMTiles suites cannot even
+      # reach their assertions without it.
+      - name: 🌍 Install libgdal-dev and tippecanoe
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libgdal-dev tippecanoe
       - name: 🐍 Install dependencies
         run: uv sync --frozen --all-packages --all-extras
       - name: 🧪 pytest (unit, utils, io)
