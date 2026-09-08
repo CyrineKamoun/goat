@@ -6,6 +6,7 @@ id/attribute handling that decides whether a save actually lands.
 
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
+from uuid import UUID
 
 import duckdb
 import pytest
@@ -13,6 +14,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 LAYER = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+CALLER = "744e4fd1-685c-495c-8b02-efebce875359"
 BUNDLE = "22222222-2222-2222-2222-222222222222"
 EDITS_URL = f"/collections/{LAYER}/edits"
 
@@ -20,6 +22,7 @@ EDITS_URL = f"/collections/{LAYER}/edits"
 @pytest.fixture
 def client(mock_ducklake_manager):
     from geoapi.dependencies import LayerInfo, get_layer_info
+    from geoapi.deps.auth import get_user_id
     from geoapi.main import app
 
     # Resolving a LayerInfo would hit the DuckLake catalog for the layer's
@@ -27,6 +30,9 @@ def client(mock_ducklake_manager):
     app.dependency_overrides[get_layer_info] = lambda: LayerInfo(
         layer_id=LAYER, schema_name="user_data", table_name="layer_test"
     )
+    # The route requires a caller. Overriding the dependency pins one whatever
+    # `AUTH` is set to, rather than leaning on the AUTH=False mock identity.
+    app.dependency_overrides[get_user_id] = lambda: UUID(CALLER)
     yield TestClient(app)
     app.dependency_overrides.clear()
 
