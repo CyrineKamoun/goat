@@ -104,6 +104,57 @@ jobs:
         run: uv run --no-sync pytest tests/
         working-directory: apps/core
 
+  alembic:
+    name: alembic (fresh upgrade)
+    if: ${{ inputs.core }}
+    runs-on: ubuntu-latest
+    # REQUIRED. The core suite builds its schema with metadata.create_all, so
+    # nothing else here runs a migration. This walks the chain on an empty
+    # database the way a fresh deploy does, then `alembic check` asserts the
+    # result matches the models — the drift the create_all path cannot see.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: rds
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: goat
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      POSTGRES_SERVER: localhost
+      POSTGRES_USER: rds
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: goat
+      POSTGRES_PORT: "5432"
+      AUTH: "False"
+      ENVIRONMENT: dev
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      - name: 📥 Checkout PR
+        uses: plan4better/.github/.github/actions/pr-git-checkout@main
+      - name: 🐍 Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.2"
+          enable-cache: true
+      - name: 🐍 Install dependencies
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
+      # `init` creates its own schemas and both extensions, so an empty
+      # database is all this needs.
+      - name: 🗄️ alembic upgrade head
+        run: uv run --no-sync alembic upgrade head
+        working-directory: apps/core
+      - name: 🗄️ alembic check (no model drift)
+        run: uv run --no-sync alembic check
+        working-directory: apps/core
+
   goatlib:
     name: goatlib (pytest)
     if: ${{ inputs.goatlib }}

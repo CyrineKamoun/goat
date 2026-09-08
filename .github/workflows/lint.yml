@@ -79,7 +79,8 @@ jobs:
       - name: 🔬 ruff check (clean packages, required)
         run: >-
           uv run --no-sync ruff check
-          apps/core apps/geoapi apps/processes packages/python/goatobs
+          apps/core apps/geoapi apps/processes apps/catalog
+          packages/python/goatobs
         working-directory: ${{ github.workspace }}
 
       # ADVISORY: full gate (mypy --strict + repo-wide ruff check + ruff format
