@@ -14,7 +14,10 @@ What an `init`-era database gains here:
   from things GOAT no longer has (the old catalog page with its filter
   vocabulary, the shared-wide-table storage layout that `attribute_mapping`
   translated, an upload path that no longer records what it did, and
-  scenarios). `organization.odoo_company_id` and `user.odoo_contact_id` are
+  scenarios), together with `customer.job`, `job_test`, `report`, `status` and
+  `system_task`: job execution and its history belong to the `processes`
+  service, `report_layout` replaced `report`, and nothing reads the rest.
+  `organization.odoo_company_id` and `user.odoo_contact_id` are
   deliberately left alone: no revision here creates them and no model declares
   them, so they exist only on a database carrying the unmerged Odoo work, and
   dropping them would take its mapping with them;
@@ -107,6 +110,10 @@ _BUNDLE_PROVENANCE = (
 
 # Children first: `scenario_scenario_feature` references both of the others.
 _SCENARIO_TABLES = ("scenario_scenario_feature", "scenario_feature", "scenario")
+
+# No model declares these and nothing reads them. Nothing references them
+# either, so they drop in any order.
+_DEAD_TABLES = ("job", "job_test", "report", "status", "system_task")
 
 
 def _create_bundle_tables() -> None:
@@ -453,6 +460,9 @@ def upgrade() -> None:
 
     h.drop_column_if_present("project", "active_scenario_id", S)
     for name in _SCENARIO_TABLES:
+        h.drop_table_if_present(name, S)
+
+    for name in _DEAD_TABLES:
         h.drop_table_if_present(name, S)
 
     _fold_bundle_provenance()
