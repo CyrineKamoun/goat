@@ -10,11 +10,14 @@ What an `init`-era database gains here:
   a promoted layer came from and at which version, with the partial unique
   index over the pair that makes promote-on-use idempotent;
 * the removal of seventeen nullable `layer` columns, `customer.data_store`,
-  `project.active_scenario_id`, the three scenario tables and the two Odoo id
-  columns — all left over from things GOAT no longer has (the old catalog page
-  with its filter vocabulary, the shared-wide-table storage layout that
-  `attribute_mapping` translated, an upload path that no longer records what it
-  did, scenarios, and the Odoo ids that moved out of this schema);
+  `project.active_scenario_id` and the three scenario tables — all left over
+  from things GOAT no longer has (the old catalog page with its filter
+  vocabulary, the shared-wide-table storage layout that `attribute_mapping`
+  translated, an upload path that no longer records what it did, and
+  scenarios). `organization.odoo_company_id` and `user.odoo_contact_id` are
+  deliberately left alone: no revision here creates them and no model declares
+  them, so they exist only on a database carrying the unmerged Odoo work, and
+  dropping them would take its mapping with them;
 * nullable `layer.user_id` / `layer.folder_id`, with every promoted catalog
   layer set to NULL on both and the synthetic `catalog@goat.local` identity
   (its user, folders, roles and `GOAT Catalog` organization) deleted. A catalog
@@ -451,9 +454,6 @@ def upgrade() -> None:
     h.drop_column_if_present("project", "active_scenario_id", S)
     for name in _SCENARIO_TABLES:
         h.drop_table_if_present(name, S)
-
-    h.drop_column_if_present("organization", "odoo_company_id", S)
-    h.drop_column_if_present("user", "odoo_contact_id", S)
 
     _fold_bundle_provenance()
 
