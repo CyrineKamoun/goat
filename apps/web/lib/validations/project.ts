@@ -34,6 +34,14 @@ export const shareProjectWithTeamOrOrganizationSchema = z.object({
 export const shareProjectSchema = z.object({
   teams: z.array(shareProjectWithTeamOrOrganizationSchema).optional(),
   organizations: z.array(shareProjectWithTeamOrOrganizationSchema).optional(),
+  // `name` here is already the resolved display name the backend builds for a
+  // user grantee (firstname + lastname, falling back to email) — the same
+  // shape a team/organization entry carries.
+  users: z
+    .array(
+      z.object({ id: z.string(), name: z.string().optional(), role: projectShareRoleEnum })
+    )
+    .optional(),
 });
 
 export const builderWidgetSchema = z.object({
@@ -261,13 +269,25 @@ export const projectSchema = contentMetadataSchema.extend({
   shared_with: shareProjectSchema.optional(),
   owned_by: publicUserSchema.optional(),
   my_role: z.string().nullish(),
+  // The space that owns this project (Content Spaces). `space_name` is null
+  // for a personal space — its owner's name is not exposed here.
+  space_id: z.string().uuid().optional().nullable(),
+  space_kind: z.enum(["personal", "team", "organization"]).optional().nullable(),
+  space_name: z.string().optional().nullable(),
+  // Count of this project's linked live layers that live in a personal
+  // space; null when the project is itself in a personal space.
+  personally_owned_layer_count: z.number().optional().nullable(),
 });
 
 // order: int = Field(0, description="Visual sorting order")
 // layer_project_group_id: int | None = Field(None, description="Parent group ID")
 export const projectLayerSchema = layerSchema.extend({
+  /** The dataset's own last change — `updated_at` also moves when this
+   * project restyles the layer, because the tile source keys on it. */
+  dataset_updated_at: z.string().optional(),
   id: z.number(),
-  folder_id: z.string(),
+  // See layerSchema: absent for a catalog layer.
+  folder_id: z.string().nullish(),
   query: z
     .object({
       metadata: z.object({}).passthrough().optional(),
@@ -285,8 +305,13 @@ export const projectLayerSchema = layerSchema.extend({
   order: z.number().optional(),
   layer_project_group_id: z.number().nullable().optional(),
   charts: z.object({}).optional(),
-  filtered_count: z.number().optional(),
-  legend_urls: z.array(z.string()).optional(),
+  // D7: true when the current user has no access of their own to the
+  // underlying dataset. The backend then whitelists the row to id/layer_id/
+  // name/type/feature_layer_type/feature_layer_geometry_type/order/
+  // layer_project_group_id, with `properties: {}` and every other
+  // style/metadata field null — nothing here may be dereferenced for a
+  // locked row.
+  locked: z.boolean().default(false),
 });
 
 export const projectLayerGroupSchema = z.object({
@@ -296,6 +321,8 @@ export const projectLayerGroupSchema = z.object({
   order: z.number().optional(),
   project_id: z.string().uuid(),
   parent_id: z.number().nullable().optional(),
+  // Set when this group holds a bundle's layers; its membership is locked.
+  bundle_id: z.string().uuid().nullable().optional(),
   children: z.array(z.union([z.lazy(() => projectLayerGroupSchema), projectLayerSchema])).optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
@@ -331,6 +358,8 @@ export const projectLayerTreeNodeSchema = z.object({
   parent_id: z.number().nullable().optional(),
   order: z.number(),
   extent: z.string().default(DEFAULT_WKT_EXTENT),
+  // Set on group nodes backed by a bundle (locked membership).
+  bundle_id: z.string().uuid().nullable().optional(),
   // Layer Specifics (Nullable for groups)
   layer_id: z.string().uuid().nullable().optional(),
   layer_type: z.string().nullable().optional(),
@@ -341,6 +370,8 @@ export const projectLayerTreeNodeSchema = z.object({
   query: z.record(z.any()).nullable().optional(),
   user_id: z.string().optional(),
   in_catalog: z.boolean().optional(),
+  // See projectLayerSchema: a locked node carries no style/data to draw.
+  locked: z.boolean().optional(),
 });
 
 export const projectLayerTreeUpdateItemSchema = z.object({

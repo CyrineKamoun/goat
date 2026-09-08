@@ -91,6 +91,7 @@ class LayerInfo:
     geometry_column: str
     snapshot_id: int
     size_bytes: int = 0
+    record_count: int = 0
 
     @property
     def full_table_name(self: Self) -> str:
@@ -253,8 +254,7 @@ class PMTilesSyncTask:
         """
         user_filter = ""
         if user_id:
-            user_schema = f"user_{user_id.replace('-', '')}"
-            user_filter = f"AND s.schema_name = '{user_schema}'"
+            user_filter = f"AND l.user_id = '{user_id}'"
 
         limit_clause = f"LIMIT {limit}" if limit else ""
         order_clause = (
@@ -267,6 +267,7 @@ class PMTilesSyncTask:
             raise RuntimeError("Call init_from_env() before running task")
 
         catalog = self.settings.ducklake_catalog_schema
+        customer_schema = self.settings.customer_schema
 
         # Query PostgreSQL catalog tables via DuckDB's postgres_query()
         # These are DuckLake metadata tables stored in PostgreSQL
@@ -296,14 +297,24 @@ class PMTilesSyncTask:
             ),
             ducklake_data_file AS (
                 SELECT * FROM postgres_query('pg',
-                    'SELECT table_id, file_size_bytes, begin_snapshot, end_snapshot
+                    'SELECT table_id, file_size_bytes, record_count,
+                            begin_snapshot, end_snapshot
                      FROM {catalog}.ducklake_data_file')
+            ),
+            layer_owner AS (
+                -- Ownership comes from the layer record, never from the
+                -- schema name: the schema is where the data happens to sit,
+                -- which is not a fact about who owns it.
+                SELECT * FROM postgres_query('pg',
+                    'SELECT id::text AS layer_id, user_id::text AS user_id
+                     FROM {customer_schema}.layer')
             ),
             table_stats AS (
                 -- Get both size and latest data modification snapshot per table
                 SELECT
                     df.table_id,
                     SUM(df.file_size_bytes) as total_size,
+                    SUM(df.record_count) as total_records,
                     MAX(df.begin_snapshot) as last_data_snapshot
                 FROM ducklake_data_file df, current_snapshot cs
                 WHERE df.end_snapshot IS NULL
@@ -313,18 +324,21 @@ class PMTilesSyncTask:
             SELECT
                 s.schema_name,
                 t.table_name,
+                l.layer_id,
+                l.user_id,
                 c.column_name AS geometry_column,
                 COALESCE(stats.last_data_snapshot, t.begin_snapshot) as data_snapshot,
-                COALESCE(stats.total_size, 0) as total_size
+                COALESCE(stats.total_size, 0) as total_size,
+                COALESCE(stats.total_records, 0) as total_records
             FROM ducklake_table t
             JOIN ducklake_schema s ON t.schema_id = s.schema_id
             JOIN ducklake_column c ON t.table_id = c.table_id
+            JOIN layer_owner l ON t.table_name = 't_' || REPLACE(l.layer_id, '-', '')
             LEFT JOIN table_stats stats ON t.table_id = stats.table_id
             CROSS JOIN current_snapshot cs
             WHERE c.column_type ILIKE 'geometry'
             AND t.end_snapshot IS NULL
             AND c.end_snapshot IS NULL
-            AND s.schema_name LIKE 'user_%'
             AND cs.snapshot_id >= t.begin_snapshot
             AND cs.snapshot_id >= c.begin_snapshot
             {user_filter}
@@ -347,23 +361,13 @@ class PMTilesSyncTask:
         for (
             schema_name,
             table_name,
+            layer_id_uuid,
+            user_id_uuid,
             geometry_column,
             data_snapshot,
             total_size,
+            total_records,
         ) in rows:
-            user_id_nodash = schema_name.replace("user_", "")
-            layer_id_nodash = table_name.replace("t_", "")
-
-            # Convert to UUID format (8-4-4-4-12)
-            user_id_uuid = (
-                f"{user_id_nodash[:8]}-{user_id_nodash[8:12]}-"
-                f"{user_id_nodash[12:16]}-{user_id_nodash[16:20]}-{user_id_nodash[20:]}"
-            )
-            layer_id_uuid = (
-                f"{layer_id_nodash[:8]}-{layer_id_nodash[8:12]}-"
-                f"{layer_id_nodash[12:16]}-{layer_id_nodash[16:20]}-{layer_id_nodash[20:]}"
-            )
-
             layers.append(
                 LayerInfo(
                     schema_name=schema_name,
@@ -373,6 +377,7 @@ class PMTilesSyncTask:
                     geometry_column=geometry_column,
                     snapshot_id=data_snapshot,  # Per-table data modification snapshot
                     size_bytes=total_size,
+                    record_count=total_records,
                 )
             )
 
@@ -430,7 +435,20 @@ class PMTilesSyncTask:
         generator = self._get_generator()
 
         try:
-            pmtiles_path = generator.get_pmtiles_path(layer.user_id, layer.layer_id)
+            # A layer with no rows is a normal state — the Create flow makes
+            # empty layers to draw into, and a filter or join can match
+            # nothing. tippecanoe rejects the empty GeoJSON that would
+            # produce ("Did not read any valid geometries"), which reads as a
+            # failure when nothing is wrong. The count comes from the
+            # catalog, so this costs no table access.
+            if layer.record_count == 0:
+                return SyncResult(
+                    layer_id=layer.layer_id,
+                    status="skipped",
+                    message="Layer has no features",
+                )
+
+            pmtiles_path = generator.get_pmtiles_path(layer.layer_id)
 
             # Anchor-only mode: generate only anchor PMTiles for polygon layers
             if anchor_only:
@@ -457,7 +475,6 @@ class PMTilesSyncTask:
                     output = generator.generate_anchor_from_table(
                         duckdb_con=con,
                         table_name=layer.full_table_name,
-                        user_id=layer.user_id,
                         layer_id=layer.layer_id,
                         geometry_column=layer.geometry_column,
                         snapshot_id=layer.snapshot_id,
@@ -514,7 +531,6 @@ class PMTilesSyncTask:
                 output = generator.generate_from_table(
                     duckdb_con=con,
                     table_name=layer.full_table_name,
-                    user_id=layer.user_id,
                     layer_id=layer.layer_id,
                     geometry_column=layer.geometry_column,
                     snapshot_id=layer.snapshot_id,
@@ -635,7 +651,7 @@ class PMTilesSyncTask:
             corrupted = []
 
             for layer in layers:
-                pmtiles_path = generator.get_pmtiles_path(layer.user_id, layer.layer_id)
+                pmtiles_path = generator.get_pmtiles_path(layer.layer_id)
 
                 # Clean up any leftover temp files from interrupted generations
                 # These patterns are from previous implementations:

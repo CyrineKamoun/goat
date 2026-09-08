@@ -16,6 +16,10 @@ interface SelectorFreeSoloProps {
   onClear?: () => void;
   onSelect?: (value: SelectorItem | undefined) => void;
   inputType?: "number" | "text";
+  /** Commit what has been typed when focus leaves, rather than only on Enter
+   *  or a pick. For a field whose value is the point of the form, losing the
+   *  text on a click elsewhere reads as the input having been ignored. */
+  commitOnBlur?: boolean;
 }
 
 const filter = createFilterOptions<SelectorItem>();
@@ -29,7 +33,11 @@ const SelectorFreeSolo = (props: SelectorFreeSoloProps) => {
         <FormLabelHelper
           label={props.label}
           color={
-            props.disabled ? theme.palette.secondary.main : focused ? theme.palette.primary.main : theme.palette.text.secondary
+            props.disabled
+              ? theme.palette.secondary.main
+              : focused
+                ? theme.palette.primary.main
+                : theme.palette.text.secondary
           }
           tooltip={props.tooltip}
         />
@@ -37,9 +45,12 @@ const SelectorFreeSolo = (props: SelectorFreeSoloProps) => {
 
       <Autocomplete
         freeSolo
+        autoSelect={props.commitOnBlur}
         disabled={props.disabled}
         options={props.options}
-        value={props.selectedItem}
+        // `undefined` would make the Autocomplete uncontrolled until the first
+        // value arrives; a field with nothing in it is still controlled.
+        value={props.selectedItem ?? null}
         onFocus={() => {
           setFocused(true);
         }}

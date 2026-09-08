@@ -1,24 +1,20 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Navigation & Smoke Tests", () => {
-  test("home page loads and shows recent projects", async ({ page }) => {
+  test("home page loads and shows the greeting", async ({ page }) => {
     await page.goto("/home");
     await expect(page).toHaveTitle(/GOAT/);
-    await expect(page.getByRole("heading", { name: "Recent Projects" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Recent Datasets" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
   });
 
   test("can navigate to all main sections", async ({ page }) => {
     await page.goto("/home");
 
-    // Navigate to Projects
-    await page.getByRole("link", { name: "Projects" }).click();
-    await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
-
-    // Navigate to Datasets
-    await page.getByRole("link", { name: "Datasets" }).click();
-    await expect(page.getByRole("heading", { name: "Datasets" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Add Dataset" })).toBeVisible();
+    // Navigate to Content
+    await page.getByRole("link", { name: "Content" }).click();
+    await expect(page.getByRole("heading", { name: "Content" })).toBeVisible();
+    // Exact — a substring match also catches the "Team spaces" row header.
+    await expect(page.getByText("Spaces", { exact: true })).toBeVisible();
 
     // Navigate to Catalog
     await page.getByRole("link", { name: "Catalog" }).click();
@@ -30,14 +26,13 @@ test.describe("Navigation & Smoke Tests", () => {
 
     // Navigate back Home
     await page.getByRole("link", { name: "Home" }).click();
-    await expect(page.getByRole("heading", { name: "Recent Projects" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
   });
 
-  test("recent projects and datasets sections have create cards", async ({ page }) => {
+  test("home's hero shows the quick-create actions", async ({ page }) => {
     await page.goto("/home");
-    await expect(page.getByRole("heading", { name: "Recent Projects" })).toBeVisible();
-    // The "+" create cards have aria titles
-    await expect(page.locator('[aria-label="Create New Project"]')).toBeVisible();
-    await expect(page.locator('[aria-label="Create New Dataset"]')).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "New Project" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add Dataset" })).toBeVisible();
   });
 });

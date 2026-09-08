@@ -3,13 +3,16 @@ Report Layout Endpoints
 """
 
 from typing import List
+from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from pydantic import UUID4
 
+from core.crud.crud_project import project as crud_project
 from core.crud.crud_report_layout import report_layout as crud_report_layout
 from core.db.session import AsyncSession
-from core.endpoints.deps import get_db
+from core.deps.auth import auth_z
+from core.endpoints.deps import get_db, get_user_id
 from core.schemas.report_layout import (
     ReportLayoutCreate,
     ReportLayoutRead,
@@ -27,12 +30,12 @@ router = APIRouter()
     summary="Get all report layouts for a project",
     response_model=List[ReportLayoutRead],
     status_code=200,
-    # dependencies=[Depends(auth_z)],  # Auth temporarily disabled
+    dependencies=[Depends(auth_z)],
 )
 async def get_report_layouts(
     *,
     async_session: AsyncSession = Depends(get_db),
-    # user_id: UUID4 = Depends(get_user_id),  # Auth temporarily disabled
+    user_id: UUID = Depends(get_user_id),
     project_id: UUID4 = Path(
         ...,
         description="The ID of the project",
@@ -40,6 +43,9 @@ async def get_report_layouts(
     ),
 ) -> List[ReportLayoutRead]:
     """Get all report layouts for a project."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     layouts = await crud_report_layout.get_by_project(
         async_session, project_id=project_id
     )
@@ -51,12 +57,12 @@ async def get_report_layouts(
     summary="Get a specific report layout",
     response_model=ReportLayoutRead,
     status_code=200,
-    # dependencies=[Depends(auth_z)],  # Auth temporarily disabled
+    dependencies=[Depends(auth_z)],
 )
 async def get_report_layout(
     *,
     async_session: AsyncSession = Depends(get_db),
-    # user_id: UUID4 = Depends(get_user_id),  # Auth temporarily disabled
+    user_id: UUID = Depends(get_user_id),
     project_id: UUID4 = Path(
         ...,
         description="The ID of the project",
@@ -69,6 +75,9 @@ async def get_report_layout(
     ),
 ) -> ReportLayoutRead:
     """Get a specific report layout by ID."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     layout = await crud_report_layout.get_by_project_and_id(
         async_session, project_id=project_id, layout_id=layout_id
     )
@@ -85,12 +94,12 @@ async def get_report_layout(
     summary="Create a new report layout",
     response_model=ReportLayoutRead,
     status_code=201,
-    # dependencies=[Depends(auth_z)],  # Auth temporarily disabled
+    dependencies=[Depends(auth_z)],
 )
 async def create_report_layout(
     *,
     async_session: AsyncSession = Depends(get_db),
-    # user_id: UUID4 = Depends(get_user_id),  # Auth temporarily disabled
+    user_id: UUID = Depends(get_user_id),
     project_id: UUID4 = Path(
         ...,
         description="The ID of the project",
@@ -101,6 +110,9 @@ async def create_report_layout(
     ),
 ) -> ReportLayoutRead:
     """Create a new report layout for a project."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     layout = await crud_report_layout.create_for_project(
         async_session, project_id=project_id, obj_in=layout_in
     )
@@ -112,12 +124,12 @@ async def create_report_layout(
     summary="Update a report layout",
     response_model=ReportLayoutRead,
     status_code=200,
-    # dependencies=[Depends(auth_z)],  # Auth temporarily disabled
+    dependencies=[Depends(auth_z)],
 )
 async def update_report_layout(
     *,
     async_session: AsyncSession = Depends(get_db),
-    # user_id: UUID4 = Depends(get_user_id),  # Auth temporarily disabled
+    user_id: UUID = Depends(get_user_id),
     project_id: UUID4 = Path(
         ...,
         description="The ID of the project",
@@ -133,6 +145,9 @@ async def update_report_layout(
     ),
 ) -> ReportLayoutRead:
     """Update an existing report layout."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     layout = await crud_report_layout.update_for_project(
         async_session, project_id=project_id, layout_id=layout_id, obj_in=layout_in
     )
@@ -148,12 +163,12 @@ async def update_report_layout(
     "/{project_id}/report-layout/{layout_id}",
     summary="Delete a report layout",
     status_code=204,
-    # dependencies=[Depends(auth_z)],  # Auth temporarily disabled
+    dependencies=[Depends(auth_z)],
 )
 async def delete_report_layout(
     *,
     async_session: AsyncSession = Depends(get_db),
-    # user_id: UUID4 = Depends(get_user_id),  # Auth temporarily disabled
+    user_id: UUID = Depends(get_user_id),
     project_id: UUID4 = Path(
         ...,
         description="The ID of the project",
@@ -166,6 +181,9 @@ async def delete_report_layout(
     ),
 ) -> None:
     """Delete a report layout."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     deleted = await crud_report_layout.delete_for_project(
         async_session, project_id=project_id, layout_id=layout_id
     )
@@ -181,12 +199,12 @@ async def delete_report_layout(
     summary="Duplicate a report layout",
     response_model=ReportLayoutRead,
     status_code=201,
-    # dependencies=[Depends(auth_z)],  # Auth temporarily disabled
+    dependencies=[Depends(auth_z)],
 )
 async def duplicate_report_layout(
     *,
     async_session: AsyncSession = Depends(get_db),
-    # user_id: UUID4 = Depends(get_user_id),  # Auth temporarily disabled
+    user_id: UUID = Depends(get_user_id),
     project_id: UUID4 = Path(
         ...,
         description="The ID of the project",
@@ -203,6 +221,9 @@ async def duplicate_report_layout(
     ),
 ) -> ReportLayoutRead:
     """Duplicate an existing report layout."""
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     layout = await crud_report_layout.duplicate(
         async_session, project_id=project_id, layout_id=layout_id, new_name=new_name
     )

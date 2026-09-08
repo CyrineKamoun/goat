@@ -18,6 +18,7 @@ import {
   faAlignJustify,
   faAlignLeft,
   faAlignRight,
+  faArrowPointer,
   faArrowRightArrowLeft,
   faBars,
   faBarsProgress,
@@ -30,6 +31,7 @@ import {
   faBullseye,
   faBus,
   faCableCar,
+  faCalendarDays,
   faCar,
   faCaretDown,
   faCaretUp,
@@ -47,7 +49,6 @@ import {
   faCircleCheck,
   faCircleHalfStroke,
   faCircleInfo,
-  faCalendarDays,
   faCirclePlus,
   faCircleQuestion,
   faClock,
@@ -55,7 +56,6 @@ import {
   faClose,
   faCode,
   faComment,
-  faCompassDrafting,
   faCookieBite,
   faCopy,
   faCreditCard,
@@ -68,7 +68,6 @@ import {
   faDrawPolygon,
   faEdit,
   faEllipsis,
-  faArrowPointer,
   faEllipsisVertical,
   faEnvelope,
   faExpand,
@@ -84,7 +83,6 @@ import {
   faFolderPlus,
   faFont,
   faGears,
-  faT,
   faGlobe,
   faGripHorizontal,
   faGripVertical,
@@ -131,6 +129,7 @@ import {
   faShare,
   faSignOut,
   faSliders,
+  faSort,
   faSortAlphaDown,
   faSortAlphaUp,
   faStar,
@@ -139,6 +138,7 @@ import {
   faSubscript,
   faSubway,
   faSuperscript,
+  faT,
   faTable,
   faToolbox,
   faTrain,
@@ -202,7 +202,6 @@ export enum ICON_NAME {
   HELP = "help",
   TOOLBOX = "toolbox",
   FILTER = "filter",
-  SCENARIO = "scenario",
   STYLE = "style",
   SIGNOUT = "signout",
   ORGANIZATION = "organization",
@@ -259,6 +258,7 @@ export enum ICON_NAME {
   EDITPEN = "editpen",
   SAVE = "save",
   DATABASE = "database",
+  SORT = "sort",
   SORT_ALPHA_ASC = "sort-alpha-asc",
   SORT_ALPHA_DESC = "sort-alpha-desc",
   CLOCK = "clock",
@@ -394,7 +394,6 @@ const nameToIcon: { [k in ICON_NAME]: IconDefinition } = {
   [ICON_NAME.HELP]: faQuestionCircle,
   [ICON_NAME.TOOLBOX]: faToolbox,
   [ICON_NAME.FILTER]: faFilter,
-  [ICON_NAME.SCENARIO]: faCompassDrafting,
   [ICON_NAME.STYLE]: faPalette,
   [ICON_NAME.SIGNOUT]: faSignOut,
   [ICON_NAME.ORGANIZATION]: faBuilding,
@@ -452,6 +451,7 @@ const nameToIcon: { [k in ICON_NAME]: IconDefinition } = {
   [ICON_NAME.EDITPEN]: faPen,
   [ICON_NAME.SAVE]: faFloppyDisk,
   [ICON_NAME.DATABASE]: faDatabase,
+  [ICON_NAME.SORT]: faSort,
   [ICON_NAME.SORT_ALPHA_ASC]: faSortAlphaUp,
   [ICON_NAME.SORT_ALPHA_DESC]: faSortAlphaDown,
   [ICON_NAME.CLOCK]: faClock,
@@ -595,19 +595,24 @@ export const brandColors: BrandColors = {
 
 library.add(...Object.values(nameToIcon));
 
-export function Icon({ iconName, ...rest }: SvgIconProps & { iconName: ICON_NAME }): React.JSX.Element {
+/** An icon's raw geometry: its own viewBox size and the path data behind it.
+ * `null` for a name the map has no icon for. */
+function iconGeometry(iconName: ICON_NAME): { width: number; height: number; paths: string[] } | null {
   const def = nameToIcon[iconName];
-  if (!def) throw new Error(`Invalid icon name: ${iconName}`);
-
+  if (!def) return null;
   const [width, height, , , svgPathData] = def.icon;
+  return { width, height, paths: Array.isArray(svgPathData) ? svgPathData : [svgPathData] };
+}
+
+export function Icon({ iconName, ...rest }: SvgIconProps & { iconName: ICON_NAME }): React.JSX.Element {
+  const geometry = iconGeometry(iconName);
+  if (!geometry) throw new Error(`Invalid icon name: ${iconName}`);
 
   return (
-    <SvgIcon viewBox={`0 0 ${width} ${height}`} {...rest}>
-      {Array.isArray(svgPathData) ? (
-        svgPathData.map((d, i) => <path key={i} d={d} fill="currentColor" />)
-      ) : (
-        <path d={svgPathData} fill="currentColor" />
-      )}
+    <SvgIcon viewBox={`0 0 ${geometry.width} ${geometry.height}`} {...rest}>
+      {geometry.paths.map((d, i) => (
+        <path key={i} d={d} fill="currentColor" />
+      ))}
     </SvgIcon>
   );
 }

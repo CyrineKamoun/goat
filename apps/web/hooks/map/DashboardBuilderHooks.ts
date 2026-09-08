@@ -6,6 +6,7 @@ import type { ZodSchema } from "zod";
 
 import { useProjectLayers } from "@/lib/api/projects";
 import { selectProjectLayers } from "@/lib/store/layer/selectors";
+import { resolveProjectLayer } from "@/lib/utils/map/layer";
 import { getMapExtentCQL } from "@/lib/utils/map/navigate";
 
 import { useAppSelector } from "@/hooks/store/ContextHooks";
@@ -46,9 +47,13 @@ interface ChartWidgetResult<TConfig, TQueryParams> {
   baseQueryParams?: TQueryParams; // Query params without cross_filter (for highlight mode)
   cqlFilter?: string; // Stringified CQL filter (cross-filter + base filter + viewport), available even when querySchema fails
   projectId: string;
-  layerId?: string; // The layer UUID for API calls
+  layerId?: string; // The layer UUID for API calls; undefined when the layer is locked (D7)
   layerProjectId?: number; // The layer_project_id from config
   hasActiveFilters?: boolean; // Whether there are cross-filters currently applied
+  /** D7: the configured layer exists but the current viewer has no access
+   *  of their own to it — `layerId` is withheld, so widgets render a hint
+   *  instead of fetching (or erroring on) feature data. */
+  isLayerLocked?: boolean;
 }
 
 /**
@@ -76,15 +81,13 @@ export function useChartWidget<TConfig, TQueryParams>(
     return result.success ? result.data : undefined;
   }, [rawConfig, configSchema]);
 
-  // Get the layer from layer_project_id
-  const layer = useMemo(() => {
+  // Get the layer from layer_project_id, refusing a locked one (D7): its
+  // `layerId` stays undefined so no geoapi request is ever issued for it,
+  // on the builder canvas or the public view's Redux-fallback path alike.
+  const { layer, layerId, isLayerLocked } = useMemo(() => {
     const layerProjectId = (config as any)?.setup?.layer_project_id;
-    if (!layerProjectId || !layers) return undefined;
-    return layers.find((l) => l.id === layerProjectId);
+    return resolveProjectLayer(layers, layerProjectId);
   }, [config, layers]);
-
-  // Get the layer_id (UUID) from layer
-  const layerId = layer?.layer_id;
 
   // Get the layer's base filter (set in layer project configuration)
   const layerBaseFilter = useMemo(() => {
@@ -221,5 +224,15 @@ export function useChartWidget<TConfig, TQueryParams>(
     };
   }, [map, config, buildCqlFilter]);
 
-  return { config, queryParams, baseQueryParams, cqlFilter, projectId, layerId, layerProjectId, hasActiveFilters };
+  return {
+    config,
+    queryParams,
+    baseQueryParams,
+    cqlFilter,
+    projectId,
+    layerId,
+    layerProjectId,
+    hasActiveFilters,
+    isLayerLocked,
+  };
 }

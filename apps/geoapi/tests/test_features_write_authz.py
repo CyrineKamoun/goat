@@ -26,6 +26,16 @@ OTHER_USER_ID = UUID("22222222-2222-2222-2222-222222222222")
 LAYER_ID_HEX = "abc123def456789012345678901234ab"
 
 
+@pytest.fixture(autouse=True)
+def _not_a_bundle_member():
+    """These tests are about the ownership rule, not bundle membership."""
+    with patch(
+        "geoapi.routers.features_write.layer_is_bundle_member",
+        AsyncMock(return_value=False),
+    ):
+        yield
+
+
 @pytest.fixture()
 def layer_info() -> LayerInfo:
     return LayerInfo(
@@ -115,3 +125,57 @@ async def test_missing_layer_is_not_found(layer_info, mock_layer_service):
         await _get_authorized_metadata(layer_info, OWNER_ID)
 
     assert exc_info.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_a_bundle_member_layer_rejects_direct_feature_writes():
+    """A bundle member is writable only through the bundle's batch endpoint.
+
+    Editing edges drives the whole bundle's derived artifacts, so a write that
+    bypassed that path would leave the routing graph disagreeing with the data.
+    """
+    from geoapi.routers.features_write import _get_authorized_metadata
+
+    layer_info = LayerInfo(
+        layer_id="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        schema_name="user_data",
+        table_name="layer_x",
+    )
+    with patch(
+        "geoapi.routers.features_write.layer_is_bundle_member",
+        AsyncMock(return_value=True),
+    ):
+        with pytest.raises(HTTPException) as exc:
+            await _get_authorized_metadata(
+                layer_info, UUID("11111111-1111-1111-1111-111111111111")
+            )
+    assert exc.value.status_code == 403
+    assert "bundle" in exc.value.detail.lower()
+
+
+@pytest.mark.asyncio
+async def test_a_plain_layer_is_unaffected_by_the_bundle_guard():
+    """The guard must not change anything for an ordinary layer."""
+    from geoapi.routers.features_write import _get_authorized_metadata
+
+    layer_info = LayerInfo(
+        layer_id="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        schema_name="user_data",
+        table_name="layer_x",
+    )
+    owner = "11111111111111111111111111111111"
+    metadata = type("M", (), {"user_id": owner})()
+    with (
+        patch(
+            "geoapi.routers.features_write.layer_is_bundle_member",
+            AsyncMock(return_value=False),
+        ),
+        patch(
+            "geoapi.routers.features_write.layer_service.get_layer_metadata",
+            AsyncMock(return_value=metadata),
+        ),
+    ):
+        result = await _get_authorized_metadata(
+            layer_info, UUID("11111111-1111-1111-1111-111111111111")
+        )
+    assert result is metadata

@@ -65,3 +65,44 @@ class DatasetMetadata(BaseModel):
         if extra:
             info += "  – " + ", ".join(extra)
         return info
+
+
+class ConversionFailure(BaseModel):
+    """One dataset that could not be converted, and why."""
+
+    source: str = Field(
+        ...,
+        description="Discovered path that failed, including `::layer` if it had one.",
+    )
+    name: str = Field(..., description="What the dataset would have been called.")
+    reason: str = Field(..., description="Error message, for reporting to the user.")
+
+
+class ConvertedDataset(BaseModel):
+    """One dataset that converted, and where it came from.
+
+    The source travels with the output because the converted file's name cannot carry it:
+    `city.gpkg::roads` and `city_roads.gpkg` both land as `city_roads.parquet`.
+    """
+
+    source: str = Field(
+        ...,
+        description="Discovered path it came from, including `::layer` if it had one.",
+    )
+    name: str = Field(
+        ..., description="Layer name: its own layer name, else the file's stem."
+    )
+    path: str = Field(..., description="Converted parquet (or tif, for rasters).")
+    metadata: DatasetMetadata
+
+
+class ConversionReport(BaseModel):
+    """What came of converting one source: the datasets that made it, and those that did not.
+
+    Both halves matter. An upload can hold several datasets — the layers of a GeoPackage,
+    the files of an archive — and one of them being unreadable is no reason to discard the
+    rest, nor to leave the person who uploaded it guessing which one was dropped.
+    """
+
+    outputs: list[ConvertedDataset] = Field(default_factory=list)
+    failures: list[ConversionFailure] = Field(default_factory=list)

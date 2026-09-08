@@ -15,7 +15,6 @@ from goatlib.analysis.schemas.ui import (
     SECTION_INPUT,
     SECTION_OUTPUT,
     SECTION_RESULT,
-    UISection,
     ui_field,
     ui_sections,
 )
@@ -23,7 +22,6 @@ from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
     LayerInputMixin,
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -31,9 +29,7 @@ from goatlib.tools.schemas import (
 logger = logging.getLogger(__name__)
 
 
-class CentroidToolParams(
-    ScenarioSelectorMixin, ToolInputBase, LayerInputMixin, CentroidParams
-):
+class CentroidToolParams(ToolInputBase, LayerInputMixin, CentroidParams):
     """Parameters for centroid tool.
 
     Inherits centroid options from CentroidParams, adds layer context from ToolInputBase.
@@ -44,14 +40,6 @@ class CentroidToolParams(
         json_schema_extra=ui_sections(
             SECTION_INPUT,
             SECTION_RESULT,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"input_layer_id": {"$ne": None}},
-            ),
             SECTION_OUTPUT,
         )
     )
@@ -108,8 +96,6 @@ class CentroidToolRunner(BaseToolRunner[CentroidToolParams]):
             layer_id=params.input_layer_id,
             user_id=params.user_id,
             cql_filter=params.input_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
         output_path = temp_dir / "output.parquet"
 
@@ -121,7 +107,6 @@ class CentroidToolRunner(BaseToolRunner[CentroidToolParams]):
                     "user_id",
                     "folder_id",
                     "project_id",
-                    "scenario_id",
                     "output_name",
                     "input_layer_id",
                     "input_layer_filter",

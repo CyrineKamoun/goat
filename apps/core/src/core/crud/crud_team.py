@@ -1,18 +1,28 @@
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import delete as sql_delete
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from core.core.config import settings
 from core.crud.base import CRUDBase
 from core.crud.crud_role import role as crud_role
+from core.crud.crud_space import space as crud_space
 from core.crud.crud_user import user as crud_user
-from core.db.models._link_model import UserTeamLink
+from core.db.models._link_model import ResourceGrant, UserTeamLink
+from core.db.models.bundle import Bundle
+from core.db.models.folder import Folder
 from core.db.models.invitation import InvitationStatusEnum
+from core.db.models.layer import Layer
+from core.db.models.project import Project
 from core.db.models.role import Role
+from core.db.models.space import Space, SpaceKind
 from core.db.models.team import Team, TeamRolesEnum
+from core.db.models.template import Template
 from core.db.models.user import User
 from core.schemas.team import TeamCreate, TeamMember, TeamRead, TeamUpdate
 from core.services.s3 import s3_service
@@ -25,13 +35,16 @@ class CRUDTeam(CRUDBase[Team, TeamCreate, TeamUpdate]):
         self, *, db: AsyncSession, team_obj: TeamCreate, user_id: str
     ) -> Team:
         user = await crud_user.get(db, user_id)
-        team = Team(**team_obj.model_dump())
+        assert user is not None
+        team = Team(**team_obj.model_dump(), organization_id=user.organization_id)
         role = await crud_role.get_by_key(db=db, key="name", value=TeamRolesEnum.owner)
         user_team = UserTeamLink(user=user, team=team, role_id=role[0].id)
         db.add(team)
         db.add(user_team)
         await db.commit()
         await db.refresh(team)
+        assert team.id is not None
+        await crud_space.ensure_team(db, team.id)
         return team
 
     async def update_team(
@@ -63,6 +76,67 @@ class CRUDTeam(CRUDBase[Team, TeamCreate, TeamUpdate]):
         db: AsyncSession,
         team_id: str,
     ) -> Team:
+        # A team space cascades away with the team (space.team_id FK), which
+        # would take any content still in it along — refuse while the space
+        # still holds anything, live OR TRASHED: a trashed row is still
+        # restorable until it is purged, so silently
+        # hard-deleting it via the space cascade would destroy content an
+        # admin could otherwise have brought back. Counts every row
+        # regardless of `deleted_at`, so the admin must restore/transfer the
+        # live content and empty the trash before the team can go.
+        team_space_id = (
+            await db.execute(
+                select(Space.id).where(
+                    Space.kind == SpaceKind.team, Space.team_id == UUID(str(team_id))
+                )
+            )
+        ).scalar_one_or_none()
+        if team_space_id is not None:
+            content_count = 0
+            for model in (Layer, Project, Bundle, Template):
+                content_count += int(
+                    (
+                        await db.execute(
+                            select(func.count())
+                            .select_from(model)
+                            .where(model.space_id == team_space_id)
+                        )
+                    ).scalar_one()
+                )
+            # Folders, minus the space's own `home` root: that root
+            # (`parent_id IS NULL AND user_id IS NULL`) is provisioned with
+            # the space itself by `crud_space.ensure_team` and is not
+            # content anyone can restore or transfer, so counting it would
+            # make every team undeletable. Every other folder in the space
+            # still blocks, root or not.
+            content_count += int(
+                (
+                    await db.execute(
+                        select(func.count())
+                        .select_from(Folder)
+                        .where(
+                            Folder.space_id == team_space_id,
+                            ~(Folder.parent_id.is_(None) & Folder.user_id.is_(None)),
+                        )
+                    )
+                ).scalar_one()
+            )
+            if content_count:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=_(
+                        "The team still owns content — restore or transfer it, "
+                        "and empty its trash, before deleting the team"
+                    ),
+                )
+
+        # A team is a grantee with no FK from resource_grant — drop its grants with it
+        await db.execute(
+            sql_delete(ResourceGrant).where(
+                ResourceGrant.grantee_type == "team",
+                ResourceGrant.grantee_id == UUID(str(team_id)),
+            )
+        )
         team = await self.remove(db=db, id=team_id)
 
         await db.commit()

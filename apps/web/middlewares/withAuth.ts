@@ -8,6 +8,7 @@ import type { MiddlewareFactory } from "@/middlewares/types";
 
 const protectedPaths = [
   "/home",
+  "/content",
   "/projects",
   "/datasets",
   "/settings",

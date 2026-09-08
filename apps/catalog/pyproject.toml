@@ -1,0 +1,68 @@
+[project]
+name = "catalog"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "duckdb>=1.5.4",
+  "pydantic-settings>=2.4",
+  # goatlib's base deps are minimal and its pygeofilter/etc. live in the `full`
+  # extra, so -- like geoapi and processes -- this app declares the libraries it
+  # actually imports. pygeofilter backs goatlib.storage.cql_evaluator (CQL2).
+  "pygeofilter>=0.2.0",
+  "goatlib",
+  "goatobs",
+  "mcp>=1.2",
+]
+
+[tool.uv.sources]
+goatlib = { workspace = true }
+goatobs = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/catalog"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.0.0",
+    "httpx>=0.27.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Module names derived from the full path, so this suite's conftest does not
+# claim the bare name `tests` — which another app's tests also resolve to when
+# both are collected in one session (an editor's test explorer does that).
+addopts = ["--import-mode=importlib"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# lark 0.12 (pinned <1.0 by pygeofilter, which parses our CQL2 filters) imports
+# the stdlib modules Python 3.11 deprecated. Not actionable here; scoped to
+# these two messages in that one module so our own warnings still surface.
+# Remove once pygeofilter allows lark >=1.0.
+filterwarnings = [
+    "ignore:module 'sre_parse' is deprecated:DeprecationWarning:lark.utils",
+    "ignore:module 'sre_constants' is deprecated:DeprecationWarning:lark.utils",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true

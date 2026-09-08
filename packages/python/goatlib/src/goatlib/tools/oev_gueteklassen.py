@@ -27,7 +27,6 @@ from goatlib.analysis.schemas.ui import (
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -42,7 +41,7 @@ logger = logging.getLogger(__name__)
 GTFS_DATA_PATH = os.environ.get("GTFS_DATA_PATH", "/app/data/gtfs")
 
 # Section definitions for this tool
-# Order: calculation_time (1), configuration (2), result (7), scenario (8)
+# Order: calculation_time (1), configuration (2), result (7)
 SECTION_CALCULATION_TIME = UISection(id="calculation_time", order=1, icon="clock")
 SECTION_OEV_CONFIGURATION = UISection(id="configuration", order=2, icon="settings")
 SECTION_RESULT_OEV = UISection(
@@ -61,7 +60,7 @@ class CatchmentType(StrEnum):
     buffer = "buffer"
 
 
-class OevGueteklassenToolParams(ScenarioSelectorMixin, ToolInputBase):
+class OevGueteklassenToolParams(ToolInputBase):
     """Parameters for ÖV-Güteklassen tool.
 
     Calculates public transport quality classes based on station accessibility
@@ -73,14 +72,6 @@ class OevGueteklassenToolParams(ScenarioSelectorMixin, ToolInputBase):
             SECTION_CALCULATION_TIME,
             SECTION_OEV_CONFIGURATION,
             SECTION_RESULT_OEV,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"reference_area_layer_id": {"$ne": None}},
-            ),
         )
     }
 
@@ -260,8 +251,6 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
                 layer_id=params.reference_area_layer_id,
                 user_id=params.user_id,
                 cql_filter=params.reference_area_layer_filter,
-                scenario_id=params.scenario_id,
-                project_id=params.project_id,
             )
         )
 

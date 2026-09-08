@@ -1,5 +1,6 @@
 #include "h3_util.h"
 
+#include <algorithm>
 #include <cmath>
 #include <duckdb.hpp>
 #include <iomanip>
@@ -26,9 +27,16 @@ namespace routing::data
                (180.0 / M_PI);
     }
 
+    double ground_to_mercator(double ground_meters, double y_3857)
+    {
+        double const lat_rad = to_latitude(y_3857) * M_PI / 180.0;
+        double const scale = std::max(std::cos(lat_rad), 0.05);
+        return ground_meters / scale;
+    }
+
     // ── H3 cell resolver ───────────────────────────────────────────────────
 
-    H3CellFilter compute_h3_filter(duckdb::Connection &con,
+    SpatialFilter compute_spatial_filter(duckdb::Connection &con,
                                    std::vector<Point3857> const &points,
                                    double buffer_meters)
     {
@@ -39,6 +47,26 @@ namespace routing::data
         int k = static_cast<int>(std::ceil(buffer_meters / kH3Res6EdgeLengthM)) + 1;
         if (k < 1)
             k = 1;
+
+        // The bbox equivalent of the cell cover, for datasets without H3
+        // columns. One res-6 edge length of slack keeps it from being tighter
+        // than the cell disk, which rounds k up and adds a ring.
+        Bbox3857 box{points[0].x, points[0].y, points[0].x, points[0].y};
+        for (auto const &pt : points)
+        {
+            box.min_x = std::min(box.min_x, pt.x);
+            box.min_y = std::min(box.min_y, pt.y);
+            box.max_x = std::max(box.max_x, pt.x);
+            box.max_y = std::max(box.max_y, pt.y);
+        }
+        double const furthest_y =
+            std::abs(box.max_y) > std::abs(box.min_y) ? box.max_y : box.min_y;
+        double const margin =
+            ground_to_mercator(buffer_meters + kH3Res6EdgeLengthM, furthest_y);
+        box.min_x -= margin;
+        box.min_y -= margin;
+        box.max_x += margin;
+        box.max_y += margin;
 
         // Build a VALUES clause with all starting points as (lat, lng)
         std::ostringstream values;
@@ -78,7 +106,7 @@ namespace routing::data
                 " | SQL: " + sql.str());
         }
 
-        H3CellFilter filter;
+        SpatialFilter filter;
         std::set<int32_t> h3_3_set, h3_6_set;
 
         for (size_t row = 0; row < result->RowCount(); ++row)
@@ -91,19 +119,24 @@ namespace routing::data
 
         filter.h3_3_cells.assign(h3_3_set.begin(), h3_3_set.end());
         filter.h3_6_cells.assign(h3_6_set.begin(), h3_6_set.end());
+        filter.bbox = box;
         return filter;
     }
 
-    H3CellFilter compute_h3_filter_bbox(duckdb::Connection &con,
-                                       double min_x, double min_y,
-                                       double max_x, double max_y,
-                                       double margin_meters)
+    SpatialFilter compute_spatial_filter_bbox(duckdb::Connection &con,
+                                              double min_x, double min_y,
+                                              double max_x, double max_y,
+                                              double margin_meters)
     {
-        // Expand bbox by margin
-        min_x -= margin_meters;
-        min_y -= margin_meters;
-        max_x += margin_meters;
-        max_y += margin_meters;
+        // Expand by the margin, in projected units so it is the ground distance
+        // the caller asked for.
+        double const furthest_y =
+            std::abs(max_y) > std::abs(min_y) ? max_y : min_y;
+        double const margin = ground_to_mercator(margin_meters, furthest_y);
+        min_x -= margin;
+        min_y -= margin;
+        max_x += margin;
+        max_y += margin;
 
         // Convert corners to WGS84
         double lon0 = to_longitude(min_x);
@@ -141,7 +174,7 @@ namespace routing::data
                 "H3 bbox cell computation failed: " + result->GetError());
         }
 
-        H3CellFilter filter;
+        SpatialFilter filter;
         std::set<int32_t> h3_3_set, h3_6_set;
 
         for (size_t row = 0; row < result->RowCount(); ++row)
@@ -154,6 +187,7 @@ namespace routing::data
 
         filter.h3_3_cells.assign(h3_3_set.begin(), h3_3_set.end());
         filter.h3_6_cells.assign(h3_6_set.begin(), h3_6_set.end());
+        filter.bbox = Bbox3857{min_x, min_y, max_x, max_y};
         return filter;
     }
 

@@ -21,7 +21,6 @@ from goatlib.analysis.schemas.ui import (
     SECTION_OPPORTUNITIES,
     SECTION_RESULT_ROUTING,
     SECTION_ROUTING,
-    UISection,
     ui_field,
     ui_sections,
 )
@@ -32,7 +31,6 @@ from goatlib.tools._opportunity_handles import (
 )
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -43,7 +41,6 @@ logger = logging.getLogger(__name__)
 
 class Heatmap2SFCAToolParams(
     NumberedOpportunityLayersMixin,
-    ScenarioSelectorMixin,
     ToolInputBase,
     Heatmap2SFCAParams,
 ):
@@ -61,14 +58,6 @@ class Heatmap2SFCAToolParams(
             SECTION_DEMAND,
             SECTION_OPPORTUNITIES,
             SECTION_RESULT_ROUTING,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"demand_layer_id": {"$ne": None}},
-            ),
         )
     )
 
@@ -116,7 +105,6 @@ class Heatmap2SFCAToolParams(
         default=None,
         json_schema_extra=ui_field(section="demand", hidden=True),
     )
-
 
     output_path: str | None = None  # type: ignore[assignment]
     reference_area_path: str | None = None  # type: ignore[assignment]
@@ -215,8 +203,6 @@ class Heatmap2SFCAToolRunner(BaseToolRunner[Heatmap2SFCAToolParams]):
             params.demand_layer_id,
             user_id=params.user_id,
             cql_filter=params.demand_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
 
         # Export reference area layer
@@ -227,15 +213,15 @@ class Heatmap2SFCAToolRunner(BaseToolRunner[Heatmap2SFCAToolParams]):
                     layer_id=params.reference_area_layer_id,
                     user_id=params.user_id,
                     cql_filter=params.reference_area_layer_filter,
-                    scenario_id=params.scenario_id,
-                    project_id=params.project_id,
                 )
             )
 
         # Auto-resolve od_matrix_path from routing_mode if not provided
         od_matrix_path = params.od_matrix_path
         if not od_matrix_path:
-            od_matrix_path = f"{self.settings.od_matrix_base_path}/{params.routing_mode.value}/"
+            od_matrix_path = (
+                f"{self.settings.od_matrix_base_path}/{params.routing_mode.value}/"
+            )
 
         # Build analysis params
         analysis_params = Heatmap2SFCAParams(
@@ -246,7 +232,6 @@ class Heatmap2SFCAToolRunner(BaseToolRunner[Heatmap2SFCAToolParams]):
                     "user_id",
                     "folder_id",
                     "project_id",
-                    "scenario_id",
                     "output_name",
                     "opportunities",
                     "demand_path",

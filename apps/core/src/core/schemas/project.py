@@ -104,6 +104,25 @@ class IProjectCreate(ContentBaseAttributes):
 
 class IProjectRead(ContentBaseAttributes, DateTimeBase):
     id: UUID = Field(..., description="Project ID")
+    space_id: UUID | None = Field(None, description="Space that owns this project")
+    space_kind: Literal["personal", "team", "organization"] | None = Field(
+        None, description="Kind of the owning space"
+    )
+    space_name: str | None = Field(
+        None,
+        description=(
+            "Name of the owning team or organisation. None for a personal "
+            "space — its owner's name is not exposed here."
+        ),
+    )
+    personally_owned_layer_count: int | None = Field(
+        None,
+        description=(
+            "Count of this project's linked live layers that live in a "
+            "personal space (D13 health check). None for a project that is "
+            "itself in a personal space."
+        ),
+    )
     layer_order: list[int] | None = Field(None, description="Layer order in project")
     thumbnail_url: str | None = Field(description="Project thumbnail URL")
     basemap: str | None = Field(None, description="Project basemap")
@@ -186,6 +205,21 @@ class IProjectBaseUpdate(SQLModel):
 class LayerProjectIds(BaseModel):
     id: int = Field(..., description="Layer Project ID")
     layer_id: UUID = Field(..., description="Layer ID")
+    #: `updated_at` on a project layer is the LATER of the dataset's and the
+    #: link's, because the map keys its tile source on it and either side
+    #: changing has to refetch. That makes it useless for "how current is this
+    #: data": restyling the layer moves it. This is the dataset's own.
+    dataset_updated_at: datetime | None = Field(
+        None, description="When the underlying dataset last changed"
+    )
+    locked: bool = Field(
+        False,
+        description=(
+            "The caller has no access to this dataset of his own: it is in the "
+            "project through a non-shareable link (D7), so it is listed but its "
+            "style, filter and preferences are withheld and it is not mapped."
+        ),
+    )
 
 
 class IFeatureBaseProject(CQLQuery):
@@ -263,7 +297,9 @@ class IFeatureToolProjectUpdate(IFeatureBaseProject):
 
 
 class ITableProjectRead(LayerProjectIds, TableRead, CQLQuery):
-    group: str | None = Field(None, description="Layer group name", max_length=255)
+    # Unbounded on read: one row over a limit fails the whole response, not just
+    # this field. The limit belongs on create/update.
+    group: str | None = Field(None, description="Layer group name")
     other_properties: dict[str, Any] | None = Field(
         None,
         description="Per-project-layer preferences (e.g. data table configuration)",
@@ -289,7 +325,9 @@ class ITableProjectUpdate(CQLQuery):
 
 
 class IRasterProjectRead(LayerProjectIds, RasterRead):
-    group: str | None = Field(None, description="Layer group name", max_length=255)
+    # Unbounded on read: one row over a limit fails the whole response, not just
+    # this field. The limit belongs on create/update.
+    group: str | None = Field(None, description="Layer group name")
     properties: Optional[dict[str, Any]] = Field(
         None,
         description="Layer properties",
@@ -441,21 +479,33 @@ class LayerTreeUpdate(BaseModel):
 
 # --- Schemas for Group CRUD (Renamed) ---
 class ILayerProjectGroupCreate(BaseModel):
-    name: str
+    # The column is unbounded `text`, so nothing else stops a group name of any
+    # size — 5,000 characters was accepted and stored.
+    name: str = Field(..., max_length=255)
     properties: dict[str, Any] | None = None
     parent_id: Optional[int] = None
 
 
 class ILayerProjectGroupUpdate(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=255)
     properties: dict[str, Any] | None = None
     parent_id: Optional[int] = None
 
 
 class ILayerProjectGroupRead(ILayerProjectGroupCreate):
+    # Unbounded on read, though it inherits a bounded field: a group named
+    # before the limit existed must still be readable.
+    name: str
     id: int
     project_id: UUID4
     order: int
+    # Read-only: a bundle-backed group is created through the dedicated
+    # add-bundle endpoint (which authorizes the bundle), never through the
+    # generic group create.
+    bundle_id: Optional[UUID4] = Field(
+        None,
+        description="Set when the group holds a bundle's layers (locked membership)",
+    )
 
 
 # TODO: Refactor

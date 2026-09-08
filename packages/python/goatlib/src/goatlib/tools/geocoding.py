@@ -27,7 +27,6 @@ from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
     LayerInputMixin,
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -57,7 +56,7 @@ INPUT_MODE_LABELS: dict[str, str] = {
 # =============================================================================
 
 
-class GeocodingToolParams(ScenarioSelectorMixin, ToolInputBase, LayerInputMixin):
+class GeocodingToolParams(ToolInputBase, LayerInputMixin):
     """Parameters for geocoding tool.
 
     Inherits geocoding options from GeocodingParams, adds layer context from ToolInputBase.
@@ -73,14 +72,6 @@ class GeocodingToolParams(ScenarioSelectorMixin, ToolInputBase, LayerInputMixin)
             SECTION_INPUT,
             SECTION_GEOCODING,
             SECTION_RESULT,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"input_layer_id": {"$ne": None}},
-            ),
             SECTION_OUTPUT,
         )
     }
@@ -290,8 +281,6 @@ class GeocodingToolRunner(BaseToolRunner[GeocodingToolParams]):
                 layer_id=params.input_layer_id,
                 user_id=params.user_id,
                 cql_filter=params.input_layer_filter,
-                scenario_id=params.scenario_id,
-                project_id=params.project_id,
             )
         )
         output_path = temp_dir / "output.parquet"

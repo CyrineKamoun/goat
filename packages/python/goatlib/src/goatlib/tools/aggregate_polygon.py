@@ -23,14 +23,12 @@ from goatlib.analysis.schemas.ui import (
     SECTION_INPUT_AGGREGATE,
     SECTION_RESULT_AGGREGATE,
     SECTION_STATISTICS,
-    UISection,
     ui_field,
     ui_sections,
 )
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -38,9 +36,7 @@ from goatlib.tools.schemas import (
 logger = logging.getLogger(__name__)
 
 
-class AggregatePolygonToolParams(
-    ScenarioSelectorMixin, ToolInputBase, AggregatePolygonParams
-):
+class AggregatePolygonToolParams(ToolInputBase, AggregatePolygonParams):
     """Parameters for aggregate polygon tool.
 
     Inherits aggregate options from AggregatePolygonParams, adds layer context from ToolInputBase.
@@ -53,14 +49,6 @@ class AggregatePolygonToolParams(
             SECTION_AREA,
             SECTION_STATISTICS,
             SECTION_RESULT_AGGREGATE,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"source_layer_id": {"$ne": None}},
-            ),
         )
     }
 
@@ -330,8 +318,6 @@ class AggregatePolygonToolRunner(BaseToolRunner[AggregatePolygonToolParams]):
                 layer_id=params.source_layer_id,
                 user_id=params.user_id,
                 cql_filter=params.source_layer_filter,
-                scenario_id=params.scenario_id,
-                project_id=params.project_id,
             )
         )
 
@@ -343,8 +329,6 @@ class AggregatePolygonToolRunner(BaseToolRunner[AggregatePolygonToolParams]):
                     layer_id=params.area_layer_id,
                     user_id=params.user_id,
                     cql_filter=params.area_layer_filter,
-                    scenario_id=params.scenario_id,
-                    project_id=params.project_id,
                 )
             )
 
@@ -359,7 +343,6 @@ class AggregatePolygonToolRunner(BaseToolRunner[AggregatePolygonToolParams]):
                     "user_id",
                     "folder_id",
                     "project_id",
-                    "scenario_id",
                     "output_name",
                     "source_layer_id",
                     "source_layer_filter",

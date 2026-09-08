@@ -198,8 +198,12 @@ class DownloadS3FolderTask:
         self.settings = ToolSettings.from_env()
 
     def _get_s3_client(
-        self: Self, endpoint_url: str | None, max_retries: int, workers: int,
-        access_key_id: str, secret_access_key: str
+        self: Self,
+        endpoint_url: str | None,
+        max_retries: int,
+        workers: int,
+        access_key_id: str,
+        secret_access_key: str,
     ) -> "boto3.client":
         """Get or create S3 client."""
         if not self.settings:
@@ -401,8 +405,11 @@ class DownloadS3FolderTask:
 
         # Create S3 client
         s3_client = self._get_s3_client(
-            params.endpoint_url, params.max_retries, params.workers,
-            params.access_key_id, params.secret_access_key
+            params.endpoint_url,
+            params.max_retries,
+            params.workers,
+            params.access_key_id,
+            params.secret_access_key,
         )
 
         # Initialize stats

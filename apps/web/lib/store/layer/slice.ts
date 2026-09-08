@@ -12,6 +12,11 @@ export interface StyleClipboard {
 export interface LayerState {
   activeLayerId: number | null;
   selectedLayerIds: number[];
+  /** Bundle whose settings panel is open. A bundle is a layer *group* in the
+   *  tree, so it cannot be addressed by `selectedLayerIds` — those are
+   *  layer_project ids, a different id space. The two are mutually exclusive:
+   *  selecting one clears the other. */
+  selectedBundleId: string | null;
   projectLayers: ProjectLayer[];
   projectLayerGroups: ProjectLayerGroup[];
   styleClipboard: StyleClipboard | null;
@@ -20,6 +25,7 @@ export interface LayerState {
 const initialState = {
   activeLayerId: -1,
   selectedLayerIds: [],
+  selectedBundleId: null,
   projectLayers: [],
   projectLayerGroups: [],
   styleClipboard: null,
@@ -36,8 +42,13 @@ const layerSlice = createSlice({
         state.activeLayerId = action.payload;
       }
     },
+    setSelectedBundle: (state, action: PayloadAction<string | null>) => {
+      state.selectedBundleId = action.payload;
+      if (action.payload) state.selectedLayerIds = [];
+    },
     setSelectedLayers: (state, action: PayloadAction<number[]>) => {
       state.selectedLayerIds = action.payload;
+      if (action.payload.length) state.selectedBundleId = null;
 
       // Sync the primary active ID:
       // If exactly one item is selected, it becomes the "Active" layer.
@@ -92,6 +103,7 @@ const layerSlice = createSlice({
 
 export const {
   setActiveLayer,
+  setSelectedBundle,
   setSelectedLayers,
   setProjectLayers,
   updateProjectLayer,

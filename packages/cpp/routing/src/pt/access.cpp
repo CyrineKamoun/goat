@@ -1,6 +1,7 @@
 #include "access.h"
 #include "stop_finder.h"
 
+#include "../data/h3_util.h"
 #include "../data/street_network_loader.h"
 #include "../kernel/dijkstra.h"
 #include "../kernel/graph_builder.h"
@@ -99,10 +100,15 @@ namespace routing::pt
             net_min_y = std::min(net_min_y, p.y);
             net_max_y = std::max(net_max_y, p.y);
         }
-        net_min_x -= buffer_m;
-        net_min_y -= buffer_m;
-        net_max_x += buffer_m;
-        net_max_y += buffer_m;
+        // Ground metres into projected units, or the window drops stops the access
+        // leg can actually reach.
+        double const net_margin = data::ground_to_mercator(
+            buffer_m, std::abs(net_max_y) > std::abs(net_min_y) ? net_max_y
+                                                                : net_min_y);
+        net_min_x -= net_margin;
+        net_min_y -= net_margin;
+        net_max_x += net_margin;
+        net_max_y += net_margin;
 
         std::vector<Point3857> nearby_stop_coords;
         std::vector<size_t> nearby_stop_indices;

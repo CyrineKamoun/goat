@@ -2,7 +2,12 @@ import useSWR from "swr";
 
 import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
 import type { GetContentQueryParams } from "@/lib/validations/common";
-import type { FolderGrantsResponse, FolderResponse, FolderSharePayload } from "@/lib/validations/folder";
+import type {
+  Folder,
+  FolderGrantsResponse,
+  FolderResponse,
+  FolderSharePayload,
+} from "@/lib/validations/folder";
 
 export const FOLDERS_API_BASE_URL = new URL("api/v2/folder", process.env.NEXT_PUBLIC_API_URL).href;
 
@@ -30,36 +35,55 @@ export const deleteFolder = async (id: string) => {
   return await response;
 };
 
-export const createFolder = async (name: string) => {
-  const response = await apiRequestAuth(`${FOLDERS_API_BASE_URL}`, {
+/** Creates a folder: nested under `parentId` when given, otherwise at the
+ * root of `spaceId` (a team/organisation space the caller may write to) or,
+ * with neither, at the root of the caller's personal space. `space_id` is
+ * only sent when passed, so the personal-space default is untouched. */
+export const createFolder = async (
+  name: string,
+  parentId?: string | null,
+  spaceId?: string | null
+): Promise<Folder> => {
+  const body: { name: string; parent_id?: string; space_id?: string } = { name };
+  if (parentId) body.parent_id = parentId;
+  else if (spaceId) body.space_id = spaceId;
+  const response = await apiRequestAuth(FOLDERS_API_BASE_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
-  if (!response.ok) {
-    throw new Error("Failed to create folder");
-  }
-  return await response.json();
+  if (!response.ok) throw new Error("Failed to create folder");
+  return (await response.json()) as Folder;
 };
 
-export const updateFolder = async (id: string, name: string) => {
+export const updateFolder = async (
+  id: string,
+  payload: { name?: string; parent_id?: string | null }
+): Promise<Folder> => {
   const response = await apiRequestAuth(`${FOLDERS_API_BASE_URL}/${id}`, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ name }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
-  if (!response.ok) {
-    throw new Error("Failed to update folder");
-  }
-  return await response.json();
+  if (!response.ok) throw new Error("Failed to update folder");
+  return (await response.json()) as Folder;
 };
 
 export const getWritableFolders = (folders: FolderResponse | undefined) =>
-  folders?.filter((f) => f.is_owned || f.role === "folder-editor") ?? [];
+  folders?.filter((f) => f.is_owned || f.role === "folder-editor" || f.role === "folder-owner") ?? [];
+
+/** The team/organisation spaces the caller reaches through membership, keyed
+ * by space id and recognised by each space's own `home` root folder — a
+ * root the caller did not create. Folders in these spaces belong to a
+ * Content-page space, not to "My Content" and not to a folder grant, so the
+ * older Projects/Datasets pages exclude them from all three of their own
+ * sections. */
+export const memberSpaceIds = (folders: FolderResponse | undefined): Set<string> =>
+  new Set(
+    (folders ?? [])
+      .filter((f) => !f.is_owned && f.parent_id === null && f.name === "home" && !!f.space_id)
+      .map((f) => f.space_id as string)
+  );
 
 export const useFolderGrants = (folderId: string | null) => {
   return useSWR<FolderGrantsResponse>(

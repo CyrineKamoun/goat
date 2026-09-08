@@ -12,7 +12,9 @@ TOKEN = {"sub": USER_ID}
 
 
 def _db_user() -> SimpleNamespace:
-    return SimpleNamespace(id=USER_ID, email="old@example.com", firstname="A", lastname="B")
+    return SimpleNamespace(
+        id=USER_ID, email="old@example.com", firstname="A", lastname="B"
+    )
 
 
 def _kc_403() -> MagicMock:

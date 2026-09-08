@@ -32,6 +32,9 @@ from goatlib.tools.project_schemas import (
     ExportManifest,
 )
 from goatlib.tools.schemas import ToolInputBase
+from goatlib.utils.layer import (
+    quoted_relation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -156,16 +159,11 @@ class ProjectExportRunner(SimpleToolRunner):
             if layer_ids:
                 layer_rows = await conn.fetch(
                     f"""
-                    SELECT id, name, description, type, data_store_id, url,
+                    SELECT id, name, description, type, url,
                            data_type, feature_layer_type,
                            feature_layer_geometry_type, tool_type, job_id,
-                           properties, other_properties, attribute_mapping,
-                           upload_reference_system, upload_file_type, size,
-                           thumbnail_url, tags, license, data_category,
-                           geographical_code, language_code, distributor_name,
-                           distributor_email, distribution_url, attribution,
-                           data_reference_year, lineage, positional_accuracy,
-                           attribute_accuracy, completeness, in_catalog,
+                           properties, other_properties, size,
+                           thumbnail_url, tags, in_catalog,
                            user_id, folder_id, field_config
                     FROM {schema}.layer
                     WHERE id = ANY($1)
@@ -179,9 +177,6 @@ class ProjectExportRunner(SimpleToolRunner):
                         "name": row["name"],
                         "description": row["description"],
                         "type": row["type"],
-                        "data_store_id": str(row["data_store_id"])
-                        if row["data_store_id"]
-                        else None,
                         "url": row["url"],
                         "data_type": row["data_type"],
                         "feature_layer_type": row["feature_layer_type"],
@@ -192,30 +187,14 @@ class ProjectExportRunner(SimpleToolRunner):
                         "job_id": str(row["job_id"]) if row["job_id"] else None,
                         "properties": row["properties"],
                         "other_properties": row["other_properties"],
-                        "attribute_mapping": row["attribute_mapping"],
-                        "upload_reference_system": row["upload_reference_system"],
-                        "upload_file_type": row["upload_file_type"],
                         "size": row["size"],
                         "thumbnail_url": row["thumbnail_url"],
                         "tags": list(row["tags"]) if row["tags"] else None,
-                        "license": row["license"],
-                        "data_category": row["data_category"],
-                        "geographical_code": row["geographical_code"],
-                        "language_code": row["language_code"],
-                        "distributor_name": row["distributor_name"],
-                        "distributor_email": str(row["distributor_email"])
-                        if row["distributor_email"]
-                        else None,
-                        "distribution_url": row["distribution_url"],
-                        "attribution": row["attribution"],
-                        "data_reference_year": row["data_reference_year"],
-                        "lineage": row["lineage"],
-                        "positional_accuracy": row["positional_accuracy"],
-                        "attribute_accuracy": row["attribute_accuracy"],
-                        "completeness": row["completeness"],
                         "in_catalog": row["in_catalog"],
-                        "user_id": str(row["user_id"]),
-                        "folder_id": str(row["folder_id"]),
+                        "user_id": str(row["user_id"]) if row["user_id"] else None,
+                        "folder_id": (
+                            str(row["folder_id"]) if row["folder_id"] else None
+                        ),
                         # Per-column metadata: formula/computed kinds and
                         # display config. Without it, imported layers keep
                         # the values but lose the definitions.
@@ -408,15 +387,13 @@ class ProjectExportRunner(SimpleToolRunner):
         """
         from goatlib.io.parquet import write_optimized_parquet
 
-        table_path = self.get_layer_table_path(owner_id, layer_id)
+        table_path = self.resolve_layer_table_path(layer_id)
 
         # Check table exists. DESCRIBE probes only this table;
         # information_schema.tables would lazily load every table in the
         # catalog to answer.
-        user_schema = f"user_{owner_id.replace('-', '')}"
-        table_name = f"t_{layer_id.replace('-', '')}"
         try:
-            self.duckdb_con.execute(f'DESCRIBE lake."{user_schema}"."{table_name}"')
+            self.duckdb_con.execute(f"DESCRIBE {quoted_relation(table_path)}")
         except duckdb.CatalogException:
             logger.warning("DuckLake table not found: %s", table_path)
             return 0
@@ -509,7 +486,9 @@ class ProjectExportRunner(SimpleToolRunner):
 
                 # data.parquet (internal layers only)
                 if not is_external:
-                    owner_id = layer.get("user_id", params.user_id)
+                    # `or`, not a dict default: the key is always present now,
+                    # and it is None for an unowned catalog layer.
+                    owner_id = layer.get("user_id") or params.user_id
                     data_path = layer_dir / "data.parquet"
                     row_count = self._export_layer_data(
                         layer_id=layer_id,

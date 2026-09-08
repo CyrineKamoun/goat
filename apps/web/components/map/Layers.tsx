@@ -25,7 +25,7 @@ import { addOrUpdateMarkerImages, loadImage } from "@/lib/transformers/map-image
 import { transformToLineDecorationLayers } from "@/lib/transformers/lineStyle";
 import { computeStackOrder, resolveTarget } from "@/lib/utils/map/basemapLayers";
 import { generateCOGColorFunction } from "@/lib/utils/map/cog-styling";
-import { getLayerKey } from "@/lib/utils/map/layer";
+import { getLayerKey, selectDataLayers } from "@/lib/utils/map/layer";
 import { registerSpriteImages } from "@/lib/utils/map/registerSpriteImages";
 import type {
   FeatureLayerLineProperties,
@@ -194,16 +194,10 @@ const Layers = (props: LayersProps) => {
     return getClusterGeoJsonUrl(GEOAPI_BASE_URL ?? "", layerId, filterStr);
   };
 
-  const useDataLayers = useMemo(() => {
-    const dataLayers = [] as ProjectLayer[] | Layer[];
-    props.layers?.forEach((layer) => {
-      const layerId = layer["layer_id"] ?? layer.id;
-      if (SYSTEM_LAYERS_IDS.indexOf(layerId) === -1) {
-        dataLayers.push(layer);
-      }
-    });
-    return dataLayers;
-  }, [props.layers]);
+  const useDataLayers = useMemo(
+    () => selectDataLayers(props.layers, SYSTEM_LAYERS_IDS) as ProjectLayer[] | Layer[],
+    [props.layers]
+  );
 
   // Lazy-load clustered (GeoJSON) layers: their source downloads the full
   // dataset (/items?limit=100000) eagerly on mount, so we only mount it once a

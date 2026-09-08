@@ -86,6 +86,9 @@ export type JobType =
   | "project_export"
   | "project_import"
   | "layer_create"
+  | "bundle_import"
+  | "bundle_artifact_rebuild"
+  | "bundle_artifact_delete"
   | "layer_create_filtered";
 
 /**
@@ -106,6 +109,10 @@ export interface Job {
   user_id?: string;
   read?: boolean;
   project_id?: string;
+  /** A job the user did not start — a side effect of another action, which
+   * the job tray leaves out. Set by the processes service from the tool
+   * registry, so the list of them is not kept here. */
+  hidden?: boolean;
   inputs?: Record<string, unknown>; // Job inputs (e.g., layout_id for PrintReport)
   result?: Record<string, unknown>; // Job result/output
   // Workflow execution status
@@ -354,6 +361,23 @@ export async function getJob(jobId: string): Promise<Job> {
   }
 
   return await response.json();
+}
+
+/**
+ * A finished job's own result payload.
+ *
+ * The job *list* does not carry results — `GET /jobs` reports `result: null` for every
+ * entry — so anything that needs what a job produced has to ask for it per job.
+ */
+export async function getJobResult(jobId: string): Promise<Record<string, unknown> | null> {
+  const response = await apiRequestAuth(`${JOBS_API_BASE_URL}/${jobId}/results`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) return null;
+  const body = (await response.json()) as { result?: Record<string, unknown> };
+  return body?.result ?? null;
 }
 
 /**

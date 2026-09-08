@@ -11,6 +11,7 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from goatlib.api import mount_api_docs
 from goatlib.auth import JOSEError
 from goatobs import build_auth_context_middleware, setup_observability
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -25,6 +26,7 @@ from geoapi.ducklake_pool import ducklake_pool
 from geoapi.ducklake_write import ducklake_write_manager
 from geoapi.models import HealthCheck
 from geoapi.routers import (
+    bundle_edits_router,
     download_router,
     expressions_router,
     features_router,
@@ -119,10 +121,15 @@ app = FastAPI(
     version="2.0.0",
     description="OGC Features and Tiles API for GOAT layers, powered by DuckDB/DuckLake",
     openapi_url="/api/openapi.json",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
+    # Both docs pages are served by goatlib.api.mount_api_docs below;
+    # FastAPI's built-ins cannot carry a favicon.
+    docs_url=None,
+    redoc_url=None,
     lifespan=lifespan,
 )
+
+# Docs pages + shared GOAT favicon, one implementation for all services.
+mount_api_docs(app)
 
 # OTel auto-instrumentation + structlog. Module-top so middleware is
 # installed before the first request arrives. Env-var-gated — no-op
@@ -157,6 +164,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=6)
 app.include_router(metadata_router)
 app.include_router(features_router)
 app.include_router(features_write_router)
+app.include_router(bundle_edits_router)
 app.include_router(tiles_router)
 app.include_router(expressions_router)
 app.include_router(download_router)

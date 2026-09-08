@@ -7,19 +7,12 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import DownloadIcon from "@mui/icons-material/Download";
 import EditIcon from "@mui/icons-material/Edit";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import LockIcon from "@mui/icons-material/Lock";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
-import bbox from "@turf/bbox";
-import dayjs from "dayjs";
-import utc from "dayjs/plugin/utc";
-
-import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
-import { TEMPORAL_VALUE_FORMAT } from "@p4b/ui/components/temporalFormats";
-import FullscreenIcon from "@mui/icons-material/Fullscreen";
-import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import SearchIcon from "@mui/icons-material/Search";
-import { alpha, emphasize } from "@mui/material/styles";
 import {
   Badge,
   Box,
@@ -44,28 +37,30 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { alpha, emphasize } from "@mui/material/styles";
 import type { Theme } from "@mui/material/styles";
 import { debounce } from "@mui/material/utils";
+import bbox from "@turf/bbox";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import { useParams } from "next/navigation";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useMap } from "react-map-gl/maplibre";
 import { toast } from "react-toastify";
 
+import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
+import { TEMPORAL_VALUE_FORMAT } from "@p4b/ui/components/temporalFormats";
+
+import { useBundleForLayer } from "@/lib/api/bundles";
 import {
   deleteColumn,
   deleteFeaturesBulk,
   useDatasetCollectionItems,
   useLayerQueryables,
 } from "@/lib/api/layers";
-import type { FieldKind } from "@/lib/validations/layer";
-import { BOOLEAN_SELECT_ITEMS, parseBooleanInput } from "@/lib/utils/fieldInput";
-import { formatFieldValue } from "@/lib/utils/formatFieldValue";
-import FieldKindIcon, { fieldIndicatorKind } from "@/components/common/FieldKindIcon";
-import { COLUMN_MENU_DIVIDER_SX, COLUMN_MENU_PAPER_SX } from "@/components/common/columnMenuStyles";
-import { canEditLayerFeatures } from "@/lib/utils/layerPermissions";
-import type { GetCollectionItemsQueryParams } from "@/lib/validations/layer";
-import type { ProjectLayer } from "@/lib/validations/project";
-
+import { updateProjectLayer, useProject, useProjectLayers } from "@/lib/api/projects";
+import { useUserProfile } from "@/lib/api/users";
 import {
   addPendingFeature,
   commitFeature,
@@ -75,17 +70,28 @@ import {
 } from "@/lib/store/featureEditor/slice";
 import { setSelectedLayers } from "@/lib/store/layer/slice";
 import { setActiveRightPanel, setHighlightedFeature, setPopupInfo } from "@/lib/store/map/slice";
-import { MapSidebarItemID } from "@/types/map/common";
-import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
-import { useMap } from "react-map-gl/maplibre";
-import useLayerFields from "@/hooks/map/CommonHooks";
-
-import { updateProjectLayer, useProject, useProjectLayers } from "@/lib/api/projects";
-import { useUserProfile } from "@/lib/api/users";
-import ColumnStatsPanel from "@/components/map/panels/ColumnStatsPanel";
-import ColumnFilterPopover from "@/components/map/panels/ColumnFilterPopover";
+import type { EditableField, FieldEditability } from "@/lib/utils/allowedValues";
+import { fieldEditability } from "@/lib/utils/allowedValues";
+import { isCatalogLayer } from "@/lib/utils/catalog-layer";
 import { filterColumnType } from "@/lib/utils/columnFilterOperators";
+import { BOOLEAN_SELECT_ITEMS, parseBooleanInput } from "@/lib/utils/fieldInput";
+import { formatFieldValue } from "@/lib/utils/formatFieldValue";
+import { canEditLayerFeatures, canEditLayerFields } from "@/lib/utils/layerPermissions";
+import type { FieldKind } from "@/lib/validations/layer";
+import type { GetCollectionItemsQueryParams } from "@/lib/validations/layer";
+import type { ProjectLayer } from "@/lib/validations/project";
+
+import { MapSidebarItemID } from "@/types/map/common";
+
+import useLayerFields from "@/hooks/map/CommonHooks";
 import useProjectLayerFilterController from "@/hooks/map/useProjectLayerFilterController";
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
+
+import CatalogLayerTag from "@/components/common/CatalogLayerTag";
+import FieldKindIcon, { fieldIndicatorKind } from "@/components/common/FieldKindIcon";
+import { COLUMN_MENU_DIVIDER_SX, COLUMN_MENU_PAPER_SX } from "@/components/common/columnMenuStyles";
+import ColumnFilterPopover from "@/components/map/panels/ColumnFilterPopover";
+import ColumnStatsPanel from "@/components/map/panels/ColumnStatsPanel";
 import ConfirmModal from "@/components/modals/Confirm";
 import EditFieldsModal from "@/components/modals/EditFields";
 
@@ -125,14 +131,39 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   const { userProfile } = useUserProfile();
   const { layers: projectLayers, mutate: mutateProjectLayers } = useProjectLayers(projectId as string);
   const { project } = useProject(projectId as string);
-  const canEditFeatures = canEditLayerFeatures({
+  // `isEditor` says the user may edit the PROJECT — enough for filters, column
+  // widths and other per-project-layer state, but not for writing to the
+  // dataset. A catalog layer is a shared read-only snapshot that geoapi
+  // refuses every write to, so the actions that reach it are gated separately.
+  // A bundle member's rows and columns are managed through the bundle (the
+  // map editor for its editable role); every per-feature/column write to it
+  // would 403, so the table offers none.
+  const { bundleForLayer } = useBundleForLayer(layerId);
+  const layerPermissionArgs = {
     currentUserId: userProfile?.id,
     layerOwnerId: projectLayer.user_id,
     projectOwnerId: project?.owned_by?.id,
     isProjectEditor: isEditor,
-    layerSize: projectLayer.size,
     inCatalog: projectLayer.in_catalog,
+    inBundle: !!bundleForLayer,
+    // D7: the table should never actually open for a locked layer (the tree
+    // offers no Table action for one), but this keeps every write path here
+    // closed even if it were reached some other way.
+    locked: projectLayer.locked,
+  };
+  const canEditFields = canEditLayerFields(layerPermissionArgs);
+  const canEditFeatures = canEditLayerFeatures({
+    ...layerPermissionArgs,
+    layerSize: projectLayer.size,
   });
+  // Edit mode is the exception to the bundle gate: an editable member (street
+  // edges) saves its pending edits through the bundle's batch endpoint, so
+  // the toggle stays for it — while direct writes like the row delete remain
+  // off for every member.
+  const canStartEditing = bundleForLayer
+    ? bundleForLayer.editable &&
+      canEditLayerFeatures({ ...layerPermissionArgs, inBundle: false, layerSize: projectLayer.size })
+    : canEditFeatures;
   const activeRightPanel = useAppSelector((state) => state.map.activeRightPanel);
   const editLayerId = useAppSelector((state) => state.featureEditor.activeLayerId);
   const pendingFeatures = useAppSelector((state) => state.featureEditor.pendingFeatures);
@@ -173,7 +204,10 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const debouncedSetSearch = useCallback(debounce((val: string) => setDebouncedSearch(val), 400), []);
+  const debouncedSetSearch = useCallback(
+    debounce((val: string) => setDebouncedSearch(val), 400),
+    []
+  );
 
   // Column header menu state
   const [columnMenuAnchor, setColumnMenuAnchor] = useState<HTMLElement | null>(null);
@@ -228,16 +262,14 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   // Frozen (pinned-left) columns and column widths — persisted per project
   // layer under other_properties.table_config so they survive reloads.
   const tableConfig = useMemo(() => {
-    return ((projectLayer.other_properties as Record<string, unknown> | null | undefined)
-      ?.table_config ?? {}) as { frozen_columns?: unknown; column_widths?: unknown };
+    return ((projectLayer.other_properties as Record<string, unknown> | null | undefined)?.table_config ??
+      {}) as { frozen_columns?: unknown; column_widths?: unknown };
   }, [projectLayer.other_properties]);
 
   const frozenColumns = useMemo<string[]>(() => {
     if (!Array.isArray(tableConfig.frozen_columns)) return [];
     const valid = new Set(layerFields.map((f) => f.name));
-    return tableConfig.frozen_columns.filter(
-      (c): c is string => typeof c === "string" && valid.has(c)
-    );
+    return tableConfig.frozen_columns.filter((c): c is string => typeof c === "string" && valid.has(c));
   }, [tableConfig, layerFields]);
 
   // Seed widths from the persisted config; in-session drags take precedence.
@@ -287,9 +319,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   // so their explicit width always resolves (fallback included).
   const effectiveColumnWidth = useCallback(
     (name: string): number | undefined =>
-      frozenOffsets[name] !== undefined
-        ? (columnWidths[name] ?? FROZEN_FALLBACK_WIDTH)
-        : columnWidths[name],
+      frozenOffsets[name] !== undefined ? (columnWidths[name] ?? FROZEN_FALLBACK_WIDTH) : columnWidths[name],
     [frozenOffsets, columnWidths]
   );
 
@@ -298,7 +328,14 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   const columnMeta = useMemo(() => {
     const meta: Record<
       string,
-      { kind: FieldKind; iconKind: FieldKind; isComputed: boolean; displayConfig: Record<string, unknown> }
+      {
+        kind: FieldKind;
+        iconKind: FieldKind;
+        /** The column's editing metadata, for the items a cell offers. */
+        field: EditableField;
+        editability: FieldEditability;
+        displayConfig: Record<string, unknown>;
+      }
     > = {};
     if (!queryables?.properties) return meta;
     for (const [fieldName, prop] of Object.entries(queryables.properties)) {
@@ -321,12 +358,22 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
             : prop.type === "boolean"
               ? "boolean"
               : "string";
-      const isComputed = !!(prop as { is_computed?: boolean }).is_computed;
-      const displayConfig = ((prop as { display_config?: Record<string, unknown> }).display_config) ?? {};
+      const displayConfig = (prop as { display_config?: Record<string, unknown> }).display_config ?? {};
       // The header icon shows the declared kind (a formula column keeps the
       // formula icon), while `kind` drives value formatting and editing.
       const iconKind: FieldKind = declaredKind === "formula" ? "formula" : kind;
-      meta[fieldName] = { kind, iconKind, isComputed, displayConfig };
+      // Read-only, pick-from-a-vocabulary or type-with-suggestions: the same
+      // derivation the attribute panel and the popover editor use, so a column
+      // cannot be editable in one surface and not in another. The items are
+      // resolved per cell, against the value that cell holds.
+      const field = prop as EditableField;
+      meta[fieldName] = {
+        kind,
+        iconKind,
+        field,
+        editability: fieldEditability(field),
+        displayConfig,
+      };
     }
     return meta;
   }, [queryables]);
@@ -429,7 +476,8 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     (event: React.MouseEvent, columnKey: string) => {
       event.preventDefault();
       event.stopPropagation();
-      const currentWidth = (event.currentTarget.parentElement as HTMLElement | null)?.getBoundingClientRect().width;
+      const currentWidth = (event.currentTarget.parentElement as HTMLElement | null)?.getBoundingClientRect()
+        .width;
       activeResizeRef.current = {
         columnKey,
         startX: event.clientX,
@@ -443,7 +491,10 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
     const handleMouseMove = (event: MouseEvent) => {
       const activeResize = activeResizeRef.current;
       if (!activeResize) return;
-      const nextWidth = Math.max(60, Math.min(600, activeResize.startWidth + (event.clientX - activeResize.startX)));
+      const nextWidth = Math.max(
+        60,
+        Math.min(600, activeResize.startWidth + (event.clientX - activeResize.startX))
+      );
       setColumnWidths((prev) => {
         const next = { ...prev, [activeResize.columnKey]: nextWidth };
         widthsLiveRef.current = next;
@@ -497,13 +548,22 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
         // Determine the MapLibre layer type from the geometry type
         const geomType = projectLayer.feature_layer_geometry_type;
         const isCustomMarker = !!projectLayer.properties?.["custom_marker"];
-        const layerType = geomType === "polygon" ? "fill" : geomType === "line" ? "line" : isCustomMarker ? "symbol" : "circle";
-        dispatch(setHighlightedFeature({
-          id: feature.id != null ? Number(feature.id) : undefined,
-          properties: feature.properties || {},
-          layer: { id: projectLayer.id.toString(), type: layerType },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any));
+        const layerType =
+          geomType === "polygon"
+            ? "fill"
+            : geomType === "line"
+              ? "line"
+              : isCustomMarker
+                ? "symbol"
+                : "circle";
+        dispatch(
+          setHighlightedFeature({
+            id: feature.id != null ? Number(feature.id) : undefined,
+            properties: feature.properties || {},
+            layer: { id: projectLayer.id.toString(), type: layerType },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          } as any)
+        );
       }
     }
   };
@@ -554,8 +614,8 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
 
   const handleCellClick = (rowId: string, column: string, value: unknown) => {
     if (!isEditing) return; // Cells are only editable in edit mode
-    // Computed columns are always read-only — never enter edit mode
-    if (columnMeta[column]?.isComputed) return;
+    // A computed or locked column is never edited — don't enter edit mode
+    if (columnMeta[column]?.editability.readOnly) return;
     // Already editing this cell: ignore. Clicks inside the editor bubble up
     // to the cell through the React tree — including clicks on the boolean
     // select's menu, which renders in a portal — and re-entering edit mode
@@ -617,7 +677,10 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
       typeof parsedValue === "string" &&
       typeof originalValue === "string" &&
       dayjs.utc(parsedValue).valueOf() === dayjs.utc(originalValue).valueOf();
-    const unchanged = parsedValue === originalValue || isSameDatetime || (parsedValue === null && (originalValue === null || originalValue === undefined));
+    const unchanged =
+      parsedValue === originalValue ||
+      isSameDatetime ||
+      (parsedValue === null && (originalValue === null || originalValue === undefined));
     if (unchanged) {
       setDirtyCells((prev) => {
         const next = new Map(prev);
@@ -637,22 +700,26 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
         const existingPending = pendingFeatures[featureId];
         if (existingPending) {
           // Update existing pending feature's properties
-          dispatch(updatePendingProperties({
-            id: featureId,
-            properties: { ...existingPending.properties, [column]: parsedValue },
-          }));
+          dispatch(
+            updatePendingProperties({
+              id: featureId,
+              properties: { ...existingPending.properties, [column]: parsedValue },
+            })
+          );
         } else {
           // Create a new pending feature for this row
-          dispatch(addPendingFeature({
-            id: featureId,
-            drawFeatureId: null,
-            geometry: (feature.geometry as GeoJSON.Geometry) || null,
-            properties: { ...feature.properties, [column]: parsedValue },
-            committed: false,
-            action: "update",
-            originalGeometry: (feature.geometry as GeoJSON.Geometry) || null,
-            originalProperties: { ...feature.properties },
-          }));
+          dispatch(
+            addPendingFeature({
+              id: featureId,
+              drawFeatureId: null,
+              geometry: (feature.geometry as GeoJSON.Geometry) || null,
+              properties: { ...feature.properties, [column]: parsedValue },
+              committed: false,
+              action: "update",
+              originalGeometry: (feature.geometry as GeoJSON.Geometry) || null,
+              originalProperties: { ...feature.properties },
+            })
+          );
         }
         // Auto-commit table edits (no "Done" button needed for inline editing)
         if (!pendingFeatures[featureId]?.committed) {
@@ -706,10 +773,8 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
       if (projectLayers) {
         const now = new Date().toISOString();
         mutateProjectLayers(
-          projectLayers.map((l) =>
-            l.layer_id === layerId ? { ...l, updated_at: now } : l
-          ),
-          { revalidate: false },
+          projectLayers.map((l) => (l.layer_id === layerId ? { ...l, updated_at: now } : l)),
+          { revalidate: false }
         );
       }
       toast.success(t("column_deleted", { defaultValue: "Column deleted" }));
@@ -718,7 +783,6 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
       console.error("Delete column error:", error);
     }
   };
-
 
   // --- Column Header Menu ---
 
@@ -811,9 +875,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
 
   const handleZoomToFeature = () => {
     if (!rowMenuRowId || !map) return;
-    const feature = collectionData?.features.find(
-      (f, i) => `${f.id}-${page}-${i}` === rowMenuRowId
-    );
+    const feature = collectionData?.features.find((f, i) => `${f.id}-${page}-${i}` === rowMenuRowId);
     if (feature?.geometry) {
       const bounds = bbox(feature) as [number, number, number, number];
       map.fitBounds(bounds, { padding: 100, maxZoom: 18, duration: 1000 });
@@ -883,11 +945,14 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
         <Typography variant="body2" fontWeight="bold" noWrap sx={{ mr: 1 }}>
           {layerName}
         </Typography>
+        {/* Beside the name, because this toolbar is where a catalog layer's
+            missing edit actions are noticed. */}
+        {isCatalogLayer(projectLayer) && <CatalogLayerTag />}
 
         <Box sx={{ flex: 1 }} />
 
         {/* Right: action buttons + utility icons */}
-        {isEditor && (
+        {canEditFields && (
           <Button
             size="small"
             variant="outlined"
@@ -900,7 +965,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
             {t("edit_fields")}
           </Button>
         )}
-        {isEditor && (isEditing || canEditFeatures) && (
+        {isEditor && (isEditing || canStartEditing) && (
           <Button
             size="small"
             variant="outlined"
@@ -914,10 +979,14 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
                   dispatch(stopEditing());
                 }
               } else {
-                dispatch(startEditing({
-                  layerId,
-                  geometryType: projectLayer.feature_layer_geometry_type as "point" | "line" | "polygon" | null ?? null,
-                }));
+                dispatch(
+                  startEditing({
+                    layerId,
+                    geometryType:
+                      (projectLayer.feature_layer_geometry_type as "point" | "line" | "polygon" | null) ??
+                      null,
+                  })
+                );
               }
             }}
             sx={{ textTransform: "none", whiteSpace: "nowrap" }}>
@@ -1000,7 +1069,10 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
             </Badge>
           </IconButton>
         </Tooltip>
-        <Tooltip title={isExpanded ? t("collapse", { defaultValue: "Collapse" }) : t("expand", { defaultValue: "Expand" })}>
+        <Tooltip
+          title={
+            isExpanded ? t("collapse", { defaultValue: "Collapse" }) : t("expand", { defaultValue: "Expand" })
+          }>
           <IconButton size="small" onClick={onToggleExpand}>
             {isExpanded ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
           </IconButton>
@@ -1060,10 +1132,8 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           if (projectLayers) {
             const now = new Date().toISOString();
             mutateProjectLayers(
-              projectLayers.map((l) =>
-                l.layer_id === layerId ? { ...l, updated_at: now } : l
-              ),
-              { revalidate: false },
+              projectLayers.map((l) => (l.layer_id === layerId ? { ...l, updated_at: now } : l)),
+              { revalidate: false }
             );
           }
         }}
@@ -1073,404 +1143,451 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
 
       {/* Table + Stats panel side by side */}
       <Box sx={{ display: "flex", flex: 1, minHeight: 0 }}>
-      <TableContainer
-        ref={tableContainerRef}
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          overflow: "auto",
-          // Thin, theme-aware scrollbars. The standard properties are what
-          // modern Chromium and Firefox honor (matching the app's global
-          // scrollbar colors); the -webkit pseudos remain for older engines.
-          scrollbarWidth: "thin",
-          scrollbarColor: (theme) =>
-            `${theme.palette.mode === "dark" ? "#374A62" : theme.palette.grey[400]} transparent`,
-          "&::-webkit-scrollbar": { width: 6, height: 6 },
-          "&::-webkit-scrollbar-thumb": {
-            backgroundColor: (theme) =>
-              theme.palette.mode === "dark" ? "#374A62" : theme.palette.grey[400],
-            borderRadius: 3,
-          },
-          "&::-webkit-scrollbar-track": { backgroundColor: "transparent" },
-          "&::-webkit-scrollbar-corner": { background: "transparent" },
-        }}>
-        {(isLoading || areFieldsLoading) && !collectionData ? (
-          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
-            <CircularProgress size={32} />
-          </Box>
-        ) : displayFields.length === 0 ? (
-          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
-            <Typography variant="body2" color="text.secondary">
-              {t("no_attributes")}
-            </Typography>
-          </Box>
-        ) : (
-          <Table
-            size="small"
-            stickyHeader
-            sx={{
-              width: "max-content",
-              minWidth: "100%",
-              "& .MuiTableCell-root": {
-                verticalAlign: "top",
-                borderRight: "1px solid",
-                borderColor: "divider",
-              },
-              "& .MuiTableRow-root > .MuiTableCell-root:last-of-type": {
-                borderRight: 0,
-              },
-              "& .MuiTableCell-stickyHeader": {
-                backgroundColor: (theme) => emphasize(theme.palette.background.paper, 0.03),
-                zIndex: 3,
-              },
-              // Corner cell (over the row numbers) must stick horizontally too
-              // and paint above the column headers scrolling underneath it.
-              // Declared here because this selector outranks the cell's own sx.
-              "& .MuiTableCell-stickyHeader:first-of-type": {
-                left: 0,
-                zIndex: 5,
-              },
-              // Frozen column headers paint above the scrolling headers
-              // (same specificity trick as the corner cell above).
-              "& .MuiTableCell-stickyHeader.frozen-header": {
-                zIndex: 4,
-              },
-              // Row hover must reach frozen cells too — they're opaque, so
-              // the row-level hover background can't show through. Skip
-              // cells that already carry a state tint (dirty/selected).
-              "& .MuiTableRow-root:hover .frozen-body-cell:not(.frozen-cell-tinted)": {
-                background: (theme) =>
-                  `linear-gradient(${theme.palette.action.hover}, ${theme.palette.action.hover}), ${theme.palette.background.paper}`,
-              },
-            }}>
-            <TableHead>
-              <TableRow>
-                {/* Row number column */}
-                <TableCell
-                  sx={{
-                    width: 48,
-                    minWidth: 48,
-                    maxWidth: 48,
-                    position: "sticky",
-                    left: 0,
-                    zIndex: 4,
-                    backgroundColor: (theme) => emphasize(theme.palette.background.paper, 0.03),
-                    textAlign: "center",
-                    px: 0,
-                  }}>
-                  <Typography variant="caption" color="text.secondary">
-                    #
-                  </Typography>
-                </TableCell>
-                {displayFields.map((field) => {
-                  const w = effectiveColumnWidth(field.name);
-                  const frozenLeft = frozenOffsets[field.name];
-                  return (
-                    <TableCell
-                      key={field.name}
-                      className={frozenLeft !== undefined ? "frozen-header" : undefined}
-                      sx={{
-                        ...(w ? { width: w, minWidth: w, maxWidth: w } : { minWidth: 100 }),
-                        ...(frozenLeft !== undefined && {
-                          position: "sticky",
-                          left: frozenLeft,
-                          backgroundColor: (theme) => emphasize(theme.palette.background.paper, 0.03),
-                        }),
-                        cursor: "pointer",
-                        userSelect: "none",
-                        whiteSpace: "nowrap",
-                        ...(statsColumn === field.name && {
-                          boxShadow: (theme) =>
-                            `inset 2px 0 0 0 ${theme.palette.primary.main}, inset -2px 0 0 0 ${theme.palette.primary.main}, inset 0 2px 0 0 ${theme.palette.primary.main}`,
-                        }),
-                      }}
-                      onClick={(e) => handleColumnMenuOpen(e, field.name)}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                        <FieldKindIcon kind={columnMeta[field.name]?.iconKind ?? fieldIndicatorKind(field)} />
-                        <Typography variant="body2" fontWeight="bold" noWrap sx={{ flex: 1, minWidth: 0 }}>
-                          {field.name}
-                        </Typography>
-                      </Box>
-                      {/* Resize handle */}
-                      <Box
-                        sx={{
-                          position: "absolute",
-                          top: 0,
-                          right: 0,
-                          width: 8,
-                          height: "100%",
-                          cursor: "col-resize",
-                          userSelect: "none",
-                          zIndex: 2,
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => startColumnResize(e, field.name)}
-                      />
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredFeatures.length === 0 && (
+        <TableContainer
+          ref={tableContainerRef}
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflow: "auto",
+            // Thin, theme-aware scrollbars. The standard properties are what
+            // modern Chromium and Firefox honor (matching the app's global
+            // scrollbar colors); the -webkit pseudos remain for older engines.
+            scrollbarWidth: "thin",
+            scrollbarColor: (theme) =>
+              `${theme.palette.mode === "dark" ? "#374A62" : theme.palette.grey[400]} transparent`,
+            "&::-webkit-scrollbar": { width: 6, height: 6 },
+            "&::-webkit-scrollbar-thumb": {
+              backgroundColor: (theme) =>
+                theme.palette.mode === "dark" ? "#374A62" : theme.palette.grey[400],
+              borderRadius: 3,
+            },
+            "&::-webkit-scrollbar-track": { backgroundColor: "transparent" },
+            "&::-webkit-scrollbar-corner": { background: "transparent" },
+          }}>
+          {(isLoading || areFieldsLoading) && !collectionData ? (
+            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
+              <CircularProgress size={32} />
+            </Box>
+          ) : displayFields.length === 0 ? (
+            <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
+              <Typography variant="body2" color="text.secondary">
+                {t("no_attributes")}
+              </Typography>
+            </Box>
+          ) : (
+            <Table
+              size="small"
+              stickyHeader
+              sx={{
+                width: "max-content",
+                minWidth: "100%",
+                "& .MuiTableCell-root": {
+                  verticalAlign: "top",
+                  borderRight: "1px solid",
+                  borderColor: "divider",
+                },
+                "& .MuiTableRow-root > .MuiTableCell-root:last-of-type": {
+                  borderRight: 0,
+                },
+                "& .MuiTableCell-stickyHeader": {
+                  backgroundColor: (theme) => emphasize(theme.palette.background.paper, 0.03),
+                  zIndex: 3,
+                },
+                // Corner cell (over the row numbers) must stick horizontally too
+                // and paint above the column headers scrolling underneath it.
+                // Declared here because this selector outranks the cell's own sx.
+                "& .MuiTableCell-stickyHeader:first-of-type": {
+                  left: 0,
+                  zIndex: 5,
+                },
+                // Frozen column headers paint above the scrolling headers
+                // (same specificity trick as the corner cell above).
+                "& .MuiTableCell-stickyHeader.frozen-header": {
+                  zIndex: 4,
+                },
+                // Row hover must reach frozen cells too — they're opaque, so
+                // the row-level hover background can't show through. Skip
+                // cells that already carry a state tint (dirty/selected).
+                "& .MuiTableRow-root:hover .frozen-body-cell:not(.frozen-cell-tinted)": {
+                  background: (theme) =>
+                    `linear-gradient(${theme.palette.action.hover}, ${theme.palette.action.hover}), ${theme.palette.background.paper}`,
+                },
+              }}>
+              <TableHead>
                 <TableRow>
-                  <TableCell colSpan={displayFields.length + 1} align="center" sx={{ py: 4 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      {t("no_data", { defaultValue: "No data" })}
+                  {/* Row number column */}
+                  <TableCell
+                    sx={{
+                      width: 48,
+                      minWidth: 48,
+                      maxWidth: 48,
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 4,
+                      backgroundColor: (theme) => emphasize(theme.palette.background.paper, 0.03),
+                      textAlign: "center",
+                      px: 0,
+                    }}>
+                    <Typography variant="caption" color="text.secondary">
+                      #
                     </Typography>
                   </TableCell>
+                  {displayFields.map((field) => {
+                    const w = effectiveColumnWidth(field.name);
+                    const frozenLeft = frozenOffsets[field.name];
+                    return (
+                      <TableCell
+                        key={field.name}
+                        className={frozenLeft !== undefined ? "frozen-header" : undefined}
+                        sx={{
+                          ...(w ? { width: w, minWidth: w, maxWidth: w } : { minWidth: 100 }),
+                          ...(frozenLeft !== undefined && {
+                            position: "sticky",
+                            left: frozenLeft,
+                            backgroundColor: (theme) => emphasize(theme.palette.background.paper, 0.03),
+                          }),
+                          cursor: "pointer",
+                          userSelect: "none",
+                          whiteSpace: "nowrap",
+                          ...(statsColumn === field.name && {
+                            boxShadow: (theme) =>
+                              `inset 2px 0 0 0 ${theme.palette.primary.main}, inset -2px 0 0 0 ${theme.palette.primary.main}, inset 0 2px 0 0 ${theme.palette.primary.main}`,
+                          }),
+                        }}
+                        onClick={(e) => handleColumnMenuOpen(e, field.name)}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <FieldKindIcon
+                            kind={columnMeta[field.name]?.iconKind ?? fieldIndicatorKind(field)}
+                          />
+                          <Typography variant="body2" fontWeight="bold" noWrap sx={{ flex: 1, minWidth: 0 }}>
+                            {field.name}
+                          </Typography>
+                        </Box>
+                        {/* Resize handle */}
+                        <Box
+                          sx={{
+                            position: "absolute",
+                            top: 0,
+                            right: 0,
+                            width: 8,
+                            height: "100%",
+                            cursor: "col-resize",
+                            userSelect: "none",
+                            zIndex: 2,
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => startColumnResize(e, field.name)}
+                        />
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
-              )}
-              {filteredFeatures.map((feature, index) => {
-                const rowId = `${feature.id}-${page}-${index}`;
-                const isSelected = selectedRowId === rowId;
-                const isRowDirty = Array.from(dirtyCells.values()).some((c) => c.rowId === rowId);
-                const rowNumber = page * rowsPerPage + index + 1;
-
-                return (
-                  <TableRow
-                    key={rowId}
-                    hover
-                    selected={isSelected}
-                    onClick={() => selectRow(rowId)}
-                    onDoubleClick={() => handleRowDoubleClick(rowId)}
-                    onContextMenu={(e) => handleRowContextMenu(e, rowId)}
-                    sx={{
-                      cursor: "pointer",
-                      backgroundColor: isRowDirty ? "rgba(255, 193, 7, 0.08)" : undefined,
-                    }}>
-                    <TableCell
-                      sx={{
-                        position: "sticky",
-                        left: 0,
-                        zIndex: 1,
-                        // Must be opaque (action.selected/hover are translucent):
-                        // scrolled data cells slide underneath and would show through
-                        backgroundColor: (theme) =>
-                          emphasize(theme.palette.background.paper, isSelected ? 0.08 : 0.03),
-                        textAlign: "center",
-                        px: 0,
-                      }}>
-                      <Typography variant="caption" color="text.secondary">
-                        {rowNumber}
+              </TableHead>
+              <TableBody>
+                {filteredFeatures.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={displayFields.length + 1} align="center" sx={{ py: 4 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {t("no_data", { defaultValue: "No data" })}
                       </Typography>
                     </TableCell>
-                    {displayFields.map((field) => {
-                      const originalValue = feature.properties?.[field.name];
-                      const displayValue = getCellValue(rowId, field.name, originalValue);
-                      const isEditing = editingCell?.rowId === rowId && editingCell?.column === field.name;
-                      const isSelected = selectedCell?.rowId === rowId && selectedCell?.column === field.name;
-                      const isDirty = dirtyCells.has(`${rowId}:${field.name}`);
-                      const meta = columnMeta[field.name];
-                      const isComputed = meta?.isComputed ?? false;
-                      const fieldKind = meta?.kind ?? (field.type === "number" ? "number" : "string");
-                      const fieldDisplayConfig = meta?.displayConfig ?? {};
-
-                      // Format value using formatFieldValue when the column has a non-trivial kind or display_config
-                      const hasNonDefaultDisplay =
-                        fieldKind !== "string" || Object.keys(fieldDisplayConfig).length > 0;
-                      const formattedValue =
-                        displayValue === null || displayValue === undefined
-                          ? ""
-                          : hasNonDefaultDisplay
-                            ? formatFieldValue(displayValue, fieldKind as FieldKind, fieldDisplayConfig)
-                            : String(displayValue);
-
-                      const frozenLeft = frozenOffsets[field.name];
-                      const bodyWidth = effectiveColumnWidth(field.name);
-                      const isRowSelected = selectedRowId === rowId;
-                      // Frozen cells must be opaque: scrolled columns slide
-                      // underneath. Layer the translucent state tint (cell
-                      // state or row selection) over the opaque paper
-                      // background via a gradient.
-                      // Row selection must match MUI's TableRow.Mui-selected
-                      // color exactly (primary at selectedOpacity)
-                      const frozenTint = (theme: Theme): string | null =>
-                        isDirty
-                          ? "rgba(255, 193, 7, 0.12)"
-                          : isSelected && !isEditing
-                            ? "rgba(128, 128, 128, 0.12)"
-                            : isRowSelected
-                              ? alpha(theme.palette.primary.main, theme.palette.action.selectedOpacity)
-                              : null;
-                      return (
-                        <TableCell
-                          key={field.name}
-                          className={
-                            frozenLeft !== undefined
-                              ? `frozen-body-cell${isDirty || (isSelected && !isEditing) || isRowSelected ? " frozen-cell-tinted" : ""}`
-                              : undefined
-                          }
-                          sx={{
-                            ...(bodyWidth ? { width: bodyWidth, minWidth: bodyWidth, maxWidth: bodyWidth } : {}),
-                            cursor: isComputed ? "default" : "text",
-                            position: "relative",
-                            ...(frozenLeft !== undefined && {
-                              position: "sticky",
-                              left: frozenLeft,
-                              zIndex: 1,
-                              // Base is plain paper so frozen data cells are
-                              // indistinguishable from normal cells; only the
-                              // header/row-number chrome uses the emphasized
-                              // shade.
-                              background: (theme) => {
-                                const tint = frozenTint(theme);
-                                const base = theme.palette.background.paper;
-                                return tint
-                                  ? `linear-gradient(${tint}, ${tint}), ${base}`
-                                  : base;
-                              },
-                            }),
-                            // Computed columns get a subtle read-only tint
-                            // (frozen cells handle their background above)
-                            backgroundColor:
-                              frozenLeft !== undefined
-                                ? undefined
-                                : isDirty
-                                  ? "rgba(255, 193, 7, 0.12)"
-                                  : isComputed
-                                    ? (theme) => `${theme.palette.action.disabledBackground}40`
-                                    : isSelected && !isEditing
-                                      ? "action.hover"
-                                      : undefined,
-                            p: isEditing ? 0 : undefined,
-                            ...(isEditing && {
-                              outline: (theme) => `2px solid ${theme.palette.primary.main}`,
-                              outlineOffset: -2,
-                            }),
-                            ...(statsColumn === field.name && {
-                              boxShadow: (theme) =>
-                                `inset 2px 0 0 0 ${theme.palette.primary.main}, inset -2px 0 0 0 ${theme.palette.primary.main}`,
-                            }),
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            selectRow(rowId);
-                            handleCellClick(rowId, field.name, originalValue);
-                          }}>
-                          {isEditing ? (
-                            fieldKind === "boolean" ? (
-                              <TextField
-                                select
-                                autoFocus
-                                fullWidth
-                                size="small"
-                                value={editValue}
-                                onChange={(e) => commitCellEdit(e.target.value)}
-                                onBlur={handleCellBlur}
-                                variant="outlined"
-                                SelectProps={{ defaultOpen: true, displayEmpty: true }}
-                                sx={{
-                                  "& .MuiInputBase-root": {
-                                    fontSize: "0.875rem",
-                                    borderRadius: 0,
-                                  },
-                                  // Match the 6px/16px padding of a small
-                                  // TableCell so entering edit mode never
-                                  // changes the row height
-                                  "& .MuiInputBase-input": {
-                                    py: "6px",
-                                    px: "16px",
-                                  },
-                                  "& .MuiOutlinedInput-notchedOutline": {
-                                    border: "none",
-                                  },
-                                }}>
-                                {BOOLEAN_SELECT_ITEMS.map((item) => (
-                                  <MenuItem key={item.value} value={item.value}>
-                                    {item.label}
-                                  </MenuItem>
-                                ))}
-                              </TextField>
-                            ) : (
-                            <TextField
-                              autoFocus
-                              fullWidth
-                              size="small"
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              onBlur={handleCellBlur}
-                              onKeyDown={handleCellKeyDown}
-                              type={
-                                fieldKind === "datetime"
-                                  ? "datetime-local"
-                                  : field.type === "number" || field.type === "integer"
-                                    ? "number"
-                                    : "text"
-                              }
-                              variant="outlined"
-                              sx={{
-                                "& .MuiInputBase-root": {
-                                  fontSize: "0.875rem",
-                                  borderRadius: 0,
-                                },
-                                // Match the 6px/16px padding of a small
-                                // TableCell so entering edit mode never
-                                // changes the row height
-                                "& .MuiInputBase-input": {
-                                  py: "6px",
-                                  px: "16px",
-                                },
-                                "& .MuiOutlinedInput-notchedOutline": {
-                                  border: "none",
-                                },
-                              }}
-                            />
-                            )
-                          ) : (
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                              <Typography
-                                variant="body2"
-                                noWrap
-                                sx={{
-                                  display: "block",
-                                  lineHeight: 1.43,
-                                  minHeight: "1.43em",
-                                  flex: 1,
-                                }}>
-                                {formattedValue}
-                              </Typography>
-                              {isComputed && (
-                                <Tooltip title={t("computed_read_only", { defaultValue: "Computed (read-only)" })}>
-                                  <LockIcon sx={{ fontSize: 10, color: "text.disabled", flexShrink: 0 }} />
-                                </Tooltip>
-                              )}
-                            </Box>
-                          )}
-                        </TableCell>
-                      );
-                    })}
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </TableContainer>
+                )}
+                {filteredFeatures.map((feature, index) => {
+                  const rowId = `${feature.id}-${page}-${index}`;
+                  const isSelected = selectedRowId === rowId;
+                  const isRowDirty = Array.from(dirtyCells.values()).some((c) => c.rowId === rowId);
+                  const rowNumber = page * rowsPerPage + index + 1;
 
-      {/* Column Stats Panel */}
-      {statsColumn && (
-        <ColumnStatsPanel
-          layerId={layerId}
-          columnName={statsColumn}
-          columnType={displayFields.find((f) => f.name === statsColumn)?.type ?? "string"}
-          columnKind={columnMeta[statsColumn]?.kind}
-          cqlFilter={cqlFilter}
-          onClose={() => setStatsColumn(null)}
-          onPrev={() => {
-            const idx = displayFields.findIndex((f) => f.name === statsColumn);
-            const prevIdx = idx <= 0 ? displayFields.length - 1 : idx - 1;
-            statsNavRef.current = true;
-            setStatsColumn(displayFields[prevIdx].name);
-          }}
-          onNext={() => {
-            const idx = displayFields.findIndex((f) => f.name === statsColumn);
-            const nextIdx = idx >= displayFields.length - 1 ? 0 : idx + 1;
-            statsNavRef.current = true;
-            setStatsColumn(displayFields[nextIdx].name);
-          }}
-        />
-      )}
+                  return (
+                    <TableRow
+                      key={rowId}
+                      hover
+                      selected={isSelected}
+                      onClick={() => selectRow(rowId)}
+                      onDoubleClick={() => handleRowDoubleClick(rowId)}
+                      onContextMenu={(e) => handleRowContextMenu(e, rowId)}
+                      sx={{
+                        cursor: "pointer",
+                        backgroundColor: isRowDirty ? "rgba(255, 193, 7, 0.08)" : undefined,
+                      }}>
+                      <TableCell
+                        sx={{
+                          position: "sticky",
+                          left: 0,
+                          zIndex: 1,
+                          // Must be opaque (action.selected/hover are translucent):
+                          // scrolled data cells slide underneath and would show through
+                          backgroundColor: (theme) =>
+                            emphasize(theme.palette.background.paper, isSelected ? 0.08 : 0.03),
+                          textAlign: "center",
+                          px: 0,
+                        }}>
+                        <Typography variant="caption" color="text.secondary">
+                          {rowNumber}
+                        </Typography>
+                      </TableCell>
+                      {displayFields.map((field) => {
+                        const originalValue = feature.properties?.[field.name];
+                        const displayValue = getCellValue(rowId, field.name, originalValue);
+                        const isEditing = editingCell?.rowId === rowId && editingCell?.column === field.name;
+                        const isSelected =
+                          selectedCell?.rowId === rowId && selectedCell?.column === field.name;
+                        const isDirty = dirtyCells.has(`${rowId}:${field.name}`);
+                        const meta = columnMeta[field.name];
+                        const editability = meta?.editability;
+                        const isReadOnly = editability?.readOnly ?? false;
+                        const fieldKind = meta?.kind ?? (field.type === "number" ? "number" : "string");
+                        const fieldDisplayConfig = meta?.displayConfig ?? {};
+
+                        // Format value using formatFieldValue when the column has a non-trivial kind or display_config
+                        const hasNonDefaultDisplay =
+                          fieldKind !== "string" || Object.keys(fieldDisplayConfig).length > 0;
+                        const formattedValue =
+                          displayValue === null || displayValue === undefined
+                            ? ""
+                            : hasNonDefaultDisplay
+                              ? formatFieldValue(displayValue, fieldKind as FieldKind, fieldDisplayConfig)
+                              : String(displayValue);
+
+                        const frozenLeft = frozenOffsets[field.name];
+                        const bodyWidth = effectiveColumnWidth(field.name);
+                        const isRowSelected = selectedRowId === rowId;
+                        // Frozen cells must be opaque: scrolled columns slide
+                        // underneath. Layer the translucent state tint (cell
+                        // state or row selection) over the opaque paper
+                        // background via a gradient.
+                        // Row selection must match MUI's TableRow.Mui-selected
+                        // color exactly (primary at selectedOpacity)
+                        const frozenTint = (theme: Theme): string | null =>
+                          isDirty
+                            ? "rgba(255, 193, 7, 0.12)"
+                            : isSelected && !isEditing
+                              ? "rgba(128, 128, 128, 0.12)"
+                              : isRowSelected
+                                ? alpha(theme.palette.primary.main, theme.palette.action.selectedOpacity)
+                                : null;
+                        return (
+                          <TableCell
+                            key={field.name}
+                            className={
+                              frozenLeft !== undefined
+                                ? `frozen-body-cell${isDirty || (isSelected && !isEditing) || isRowSelected ? " frozen-cell-tinted" : ""}`
+                                : undefined
+                            }
+                            sx={{
+                              ...(bodyWidth
+                                ? { width: bodyWidth, minWidth: bodyWidth, maxWidth: bodyWidth }
+                                : {}),
+                              cursor: isReadOnly ? "default" : "text",
+                              position: "relative",
+                              ...(frozenLeft !== undefined && {
+                                position: "sticky",
+                                left: frozenLeft,
+                                zIndex: 1,
+                                // Base is plain paper so frozen data cells are
+                                // indistinguishable from normal cells; only the
+                                // header/row-number chrome uses the emphasized
+                                // shade.
+                                background: (theme) => {
+                                  const tint = frozenTint(theme);
+                                  const base = theme.palette.background.paper;
+                                  return tint ? `linear-gradient(${tint}, ${tint}), ${base}` : base;
+                                },
+                              }),
+                              // Computed columns get a subtle read-only tint
+                              // (frozen cells handle their background above)
+                              backgroundColor:
+                                frozenLeft !== undefined
+                                  ? undefined
+                                  : isDirty
+                                    ? "rgba(255, 193, 7, 0.12)"
+                                    : isReadOnly
+                                      ? (theme) => `${theme.palette.action.disabledBackground}40`
+                                      : isSelected && !isEditing
+                                        ? "action.hover"
+                                        : undefined,
+                              p: isEditing ? 0 : undefined,
+                              ...(isEditing && {
+                                outline: (theme) => `2px solid ${theme.palette.primary.main}`,
+                                outlineOffset: -2,
+                              }),
+                              ...(statsColumn === field.name && {
+                                boxShadow: (theme) =>
+                                  `inset 2px 0 0 0 ${theme.palette.primary.main}, inset -2px 0 0 0 ${theme.palette.primary.main}`,
+                              }),
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              selectRow(rowId);
+                              handleCellClick(rowId, field.name, originalValue);
+                            }}>
+                            {isEditing ? (
+                              editability?.vocabulary ? (
+                                <TextField
+                                  select
+                                  autoFocus
+                                  fullWidth
+                                  size="small"
+                                  value={editValue ?? ""}
+                                  onChange={(e) => commitCellEdit(e.target.value)}
+                                  onBlur={handleCellBlur}
+                                  variant="outlined"
+                                  SelectProps={{ defaultOpen: true, displayEmpty: true }}
+                                  sx={{
+                                    "& .MuiInputBase-root": {
+                                      fontSize: "0.875rem",
+                                      borderRadius: 0,
+                                    },
+                                    "& .MuiInputBase-input": {
+                                      py: "6px",
+                                      px: "16px",
+                                    },
+                                    "& .MuiOutlinedInput-notchedOutline": {
+                                      border: "none",
+                                    },
+                                  }}>
+                                  {/* The value the cell holds is offered even
+                                      when it falls outside the vocabulary, so
+                                      editing some other cell of that row does
+                                      not quietly rewrite this one. */}
+                                  {fieldEditability(meta.field, originalValue).items.map((item) => (
+                                    <MenuItem key={String(item.value)} value={String(item.value)}>
+                                      {item.label}
+                                    </MenuItem>
+                                  ))}
+                                </TextField>
+                              ) : fieldKind === "boolean" ? (
+                                <TextField
+                                  select
+                                  autoFocus
+                                  fullWidth
+                                  size="small"
+                                  value={editValue}
+                                  onChange={(e) => commitCellEdit(e.target.value)}
+                                  onBlur={handleCellBlur}
+                                  variant="outlined"
+                                  SelectProps={{ defaultOpen: true, displayEmpty: true }}
+                                  sx={{
+                                    "& .MuiInputBase-root": {
+                                      fontSize: "0.875rem",
+                                      borderRadius: 0,
+                                    },
+                                    // Match the 6px/16px padding of a small
+                                    // TableCell so entering edit mode never
+                                    // changes the row height
+                                    "& .MuiInputBase-input": {
+                                      py: "6px",
+                                      px: "16px",
+                                    },
+                                    "& .MuiOutlinedInput-notchedOutline": {
+                                      border: "none",
+                                    },
+                                  }}>
+                                  {BOOLEAN_SELECT_ITEMS.map((item) => (
+                                    <MenuItem key={item.value} value={item.value}>
+                                      {item.label}
+                                    </MenuItem>
+                                  ))}
+                                </TextField>
+                              ) : (
+                                <TextField
+                                  autoFocus
+                                  fullWidth
+                                  size="small"
+                                  value={editValue}
+                                  onChange={(e) => setEditValue(e.target.value)}
+                                  onBlur={handleCellBlur}
+                                  onKeyDown={handleCellKeyDown}
+                                  type={
+                                    fieldKind === "datetime"
+                                      ? "datetime-local"
+                                      : field.type === "number" || field.type === "integer"
+                                        ? "number"
+                                        : "text"
+                                  }
+                                  variant="outlined"
+                                  sx={{
+                                    "& .MuiInputBase-root": {
+                                      fontSize: "0.875rem",
+                                      borderRadius: 0,
+                                    },
+                                    // Match the 6px/16px padding of a small
+                                    // TableCell so entering edit mode never
+                                    // changes the row height
+                                    "& .MuiInputBase-input": {
+                                      py: "6px",
+                                      px: "16px",
+                                    },
+                                    "& .MuiOutlinedInput-notchedOutline": {
+                                      border: "none",
+                                    },
+                                  }}
+                                />
+                              )
+                            ) : (
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                <Typography
+                                  variant="body2"
+                                  noWrap
+                                  sx={{
+                                    display: "block",
+                                    lineHeight: 1.43,
+                                    minHeight: "1.43em",
+                                    flex: 1,
+                                  }}>
+                                  {formattedValue}
+                                </Typography>
+                                {isReadOnly && (
+                                  <Tooltip
+                                    title={
+                                      // A locked column is not computed: there
+                                      // is no formula and nothing to
+                                      // recompute — something else maintains
+                                      // the value.
+                                      editability?.locked
+                                        ? t("field_locked_tooltip")
+                                        : t("computed_read_only", { defaultValue: "Computed (read-only)" })
+                                    }>
+                                    <LockIcon sx={{ fontSize: 10, color: "text.disabled", flexShrink: 0 }} />
+                                  </Tooltip>
+                                )}
+                              </Box>
+                            )}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </TableContainer>
+
+        {/* Column Stats Panel */}
+        {statsColumn && (
+          <ColumnStatsPanel
+            layerId={layerId}
+            columnName={statsColumn}
+            columnType={displayFields.find((f) => f.name === statsColumn)?.type ?? "string"}
+            columnKind={columnMeta[statsColumn]?.kind}
+            cqlFilter={cqlFilter}
+            onClose={() => setStatsColumn(null)}
+            onPrev={() => {
+              const idx = displayFields.findIndex((f) => f.name === statsColumn);
+              const prevIdx = idx <= 0 ? displayFields.length - 1 : idx - 1;
+              statsNavRef.current = true;
+              setStatsColumn(displayFields[prevIdx].name);
+            }}
+            onNext={() => {
+              const idx = displayFields.findIndex((f) => f.name === statsColumn);
+              const nextIdx = idx >= displayFields.length - 1 ? 0 : idx + 1;
+              statsNavRef.current = true;
+              setStatsColumn(displayFields[nextIdx].name);
+            }}
+          />
+        )}
       </Box>
 
       {/* Pagination */}
@@ -1531,7 +1648,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           </ListItemText>
         </MenuItem>
         <Divider sx={COLUMN_MENU_DIVIDER_SX} />
-        {isEditor && (
+        {canEditFields && (
           <MenuItem
             onClick={() => {
               if (columnMenuField) {
@@ -1573,7 +1690,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
               : t("add_filter", { defaultValue: "Add filter" })}
           </ListItemText>
         </MenuItem>
-        {isEditor && (
+        {canEditFields && (
           <MenuItem disabled>
             <ListItemIcon>
               <CalculateIcon />
@@ -1581,7 +1698,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
             <ListItemText>{t("calculate_field", { defaultValue: "Calculate field" })}</ListItemText>
           </MenuItem>
         )}
-        {isEditor && [
+        {canEditFields && [
           <Divider key="delete-column-divider" sx={COLUMN_MENU_DIVIDER_SX} />,
           <MenuItem
             key="delete-column"
@@ -1616,17 +1733,12 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
           </ListItemIcon>
           <ListItemText primary={t("zoom_to_feature", { defaultValue: "Zoom to feature" })} />
         </ListItemButton>
-        {isEditor && (
-          <ListItemButton
-            onClick={handleDeleteRow}
-            sx={{ color: (theme) => theme.palette.error.main }}>
+        {canEditFeatures && (
+          <ListItemButton onClick={handleDeleteRow} sx={{ color: (theme) => theme.palette.error.main }}>
             <ListItemIcon sx={{ minWidth: 0, pr: 4, color: "inherit" }}>
               <Icon iconName={ICON_NAME.TRASH} style={{ fontSize: 15 }} htmlColor="inherit" />
             </ListItemIcon>
-            <ListItemText
-              primary={t("delete")}
-              sx={{ "& .MuiTypography-root": { color: "inherit" } }}
-            />
+            <ListItemText primary={t("delete")} sx={{ "& .MuiTypography-root": { color: "inherit" } }} />
           </ListItemButton>
         )}
       </Menu>

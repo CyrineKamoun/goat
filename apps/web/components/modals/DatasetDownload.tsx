@@ -1,34 +1,23 @@
-import { LoadingButton } from "@mui/lab";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  MenuItem,
-  Select,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, MenuItem, Select, Stack, Typography } from "@mui/material";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
+
+import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { downloadLayerDirect, startDatasetExport } from "@/lib/api/layers";
 import { useJobs } from "@/lib/api/processes";
 import { useUserProfile } from "@/lib/api/users";
 import { setRunningJobIds } from "@/lib/store/jobs/slice";
+import { getSuggestedCRS } from "@/lib/utils/map/crs-suggestions";
 import type { FeatureDataExchangeType } from "@/lib/validations/common";
-import {
-  featureDataExchangeType,
-  tableDataExchangeType,
-} from "@/lib/validations/common";
+import { featureDataExchangeType, tableDataExchangeType } from "@/lib/validations/common";
 import type { DatasetDownloadRequest, Layer } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
-import { getSuggestedCRS } from "@/lib/utils/map/crs-suggestions";
 
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 interface DownloadDatasetDialogProps {
   open: boolean;
@@ -140,82 +129,84 @@ const DatasetDownloadModal: React.FC<DownloadDatasetDialogProps> = ({
   ];
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
-      <DialogTitle>{`${t("download")} "${dataset.name}"`}</DialogTitle>
-      <DialogContent>
-        {isCatalogNotOwned ? (
-          <Typography variant="body2" sx={{ py: 2 }}>
-            {t("catalog_download_not_allowed")}
-          </Typography>
+    <AppDialog
+      open={open}
+      onClose={() => onClose?.()}
+      icon={ICON_NAME.DOWNLOAD}
+      title={t("download")}
+      subtitle={dataset.name}
+      maxWidth={444}
+      closeDisabled={isBusy}
+      footer={
+        // A catalog dataset someone else owns cannot be exported at all, so the
+        // dialog only says so and offers the way out.
+        isCatalogNotOwned ? (
+          <AppDialogFooter primaryLabel={t("close")} onPrimary={() => onClose?.()} />
         ) : (
-          <Stack spacing={2} sx={{ py: 2 }}>
+          <AppDialogFooter
+            onCancel={onClose}
+            cancelDisabled={isBusy}
+            primaryLabel={t("download")}
+            onPrimary={() => void handleDownload()}
+            primaryDisabled={disabled}
+            primaryLoading={isBusy}
+          />
+        )
+      }>
+      {isCatalogNotOwned ? (
+        <Typography variant="body2" sx={{ py: 2 }}>
+          {t("catalog_download_not_allowed")}
+        </Typography>
+      ) : (
+        <Stack spacing={2} sx={{ py: 2 }}>
+          <Box>
+            <Typography variant="caption">{t(`download_type`)}</Typography>
+            <Select
+              fullWidth
+              disabled={isBusy}
+              sx={{
+                my: 2,
+              }}
+              id="download-simple-select"
+              value={dataDownloadType}
+              onChange={(e) => setDataDownloadType(e.target.value as FeatureDataExchangeType)}>
+              {isSpatialLayer &&
+                featureDataExchangeType.options.map((type: string) => (
+                  <MenuItem key={type} value={type}>
+                    {t(`${type}`)}
+                  </MenuItem>
+                ))}
+              {!isSpatialLayer &&
+                tableDataExchangeType.options.map((type: string) => (
+                  <MenuItem key={type} value={type}>
+                    {t(`${type}`)}
+                  </MenuItem>
+                ))}
+            </Select>
+          </Box>
+          {isSpatialLayer && (
             <Box>
-              <Typography variant="caption">{t(`download_type`)}</Typography>
+              <Typography variant="caption">{t(`download_crs`)}</Typography>
               <Select
                 fullWidth
                 disabled={isBusy}
                 sx={{
                   my: 2,
                 }}
-                id="download-simple-select"
-                value={dataDownloadType}
-                onChange={(e) => setDataDownloadType(e.target.value as FeatureDataExchangeType)}>
-                {isSpatialLayer &&
-                  featureDataExchangeType.options.map((type: string) => (
-                    <MenuItem key={type} value={type}>
-                      {t(`${type}`)}
-                    </MenuItem>
-                  ))}
-                {!isSpatialLayer &&
-                  tableDataExchangeType.options.map((type: string) => (
-                    <MenuItem key={type} value={type}>
-                      {t(`${type}`)}
-                    </MenuItem>
-                  ))}
+                id="download-crs-select"
+                value={dataCrs}
+                onChange={(e) => setDataCrs(e.target.value as string)}>
+                {orderedCrs.map((crs) => (
+                  <MenuItem key={crs.code} value={crs.code}>
+                    {crs.label}
+                  </MenuItem>
+                ))}
               </Select>
             </Box>
-            {isSpatialLayer && (
-              <Box>
-                <Typography variant="caption">{t(`download_crs`)}</Typography>
-                <Select
-                  fullWidth
-                  disabled={isBusy}
-                  sx={{
-                    my: 2,
-                  }}
-                  id="download-crs-select"
-                  value={dataCrs}
-                  onChange={(e) => setDataCrs(e.target.value as string)}>
-                  {orderedCrs.map((crs) => (
-                    <MenuItem key={crs.code} value={crs.code}>
-                      {crs.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </Box>
-            )}
-          </Stack>
-        )}
-      </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          pb: 2,
-        }}>
-        <Button onClick={onClose} variant="text" disabled={isBusy}>
-          <Typography variant="body2" fontWeight="bold">
-            {t(isCatalogNotOwned ? "close" : "cancel")}
-          </Typography>
-        </Button>
-        {!isCatalogNotOwned && (
-          <LoadingButton loading={isBusy} onClick={handleDownload} disabled={disabled}>
-            <Typography variant="body2" fontWeight="bold" color="inherit">
-              {t("download")}
-            </Typography>
-          </LoadingButton>
-        )}
-      </DialogActions>
-    </Dialog>
+          )}
+        </Stack>
+      )}
+    </AppDialog>
   );
 };
 

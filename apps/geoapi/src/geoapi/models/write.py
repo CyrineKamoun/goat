@@ -124,6 +124,18 @@ class ColumnCreate(BaseModel):
         "function whitelist and the layer's columns before use.",
     )
     display_config: dict[str, Any] = Field(default_factory=dict)
+    allowed_values: Optional[list[Any]] = Field(
+        None,
+        max_length=500,
+        description="Constrain the column to these values. An editor offers "
+        "them instead of a free text box, and a write outside the list is "
+        "refused unless allow_other is set.",
+    )
+    allow_other: bool = Field(
+        False,
+        description="Treat allowed_values as suggestions rather than the only "
+        "accepted values.",
+    )
     default_value: Optional[Any] = None
 
 
@@ -139,6 +151,19 @@ class ColumnUpdate(BaseModel):
         max_length=10_000,
         description="New SQL expression for a kind='formula' column. The whole "
         "column is recomputed; the column type follows the expression.",
+    )
+    allowed_values: Optional[list[Any]] = Field(
+        None,
+        max_length=500,
+        description="Replace the column's vocabulary. An empty list removes it, "
+        "leaving the column free text again.",
+    )
+    allow_other: Optional[bool] = None
+    default_value: Optional[Any] = Field(
+        None,
+        description="Value a new feature gets when this column is left blank. "
+        "An empty string removes the default. Existing rows are untouched, and "
+        "so is the column's DDL default — this is the default of record.",
     )
 
 

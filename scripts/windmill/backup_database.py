@@ -1,7 +1,7 @@
 # py311
-#requirements:
-#boto3
-#wmill
+# requirements:
+# boto3
+# wmill
 
 # Standalone Windmill script: Back up PostgreSQL databases and upload to S3.
 #
@@ -90,7 +90,8 @@ def _get_s3_client(
         "s3",
         aws_access_key_id=s3_access_key or _get_secret("S3_ACCESS_KEY_ID"),
         aws_secret_access_key=s3_secret_key or _get_secret("S3_SECRET_ACCESS_KEY"),
-        region_name=_get_secret("S3_REGION_NAME") or _get_secret("S3_REGION", "us-east-1"),
+        region_name=_get_secret("S3_REGION_NAME")
+        or _get_secret("S3_REGION", "us-east-1"),
         **extra_kwargs,
     )
 
@@ -134,11 +135,15 @@ def _download_and_extract_deb(
     log.info(f"Downloading {deb_url}")
     subprocess.run(
         ["curl", "-fsSL", "-o", str(deb_path), deb_url],
-        check=True, capture_output=True, timeout=120,
+        check=True,
+        capture_output=True,
+        timeout=120,
     )
     subprocess.run(
         ["dpkg", "-x", str(deb_path), str(extract_dir)],
-        check=True, capture_output=True, timeout=30,
+        check=True,
+        capture_output=True,
+        timeout=30,
     )
     return extract_dir
 
@@ -160,7 +165,9 @@ def _download_pg_client(bin_dir: Path) -> None:
         log.info(f"Fetching package index from {packages_url}")
         subprocess.run(
             ["curl", "-fsSL", "-o", str(packages_file), packages_url],
-            check=True, capture_output=True, timeout=60,
+            check=True,
+            capture_output=True,
+            timeout=60,
         )
 
         # 1. Download and extract postgresql-client (pg_dump, pg_isready, etc.)
@@ -260,10 +267,14 @@ def _run_pg_dump(
 
     cmd = [
         pg_dump_path,
-        "-h", pg_server,
-        "-p", pg_port,
-        "-U", pg_user,
-        "-d", database,
+        "-h",
+        pg_server,
+        "-p",
+        pg_port,
+        "-U",
+        pg_user,
+        "-d",
+        database,
         "--no-owner",
         "--no-privileges",
         "--format=plain",
@@ -275,7 +286,9 @@ def _run_pg_dump(
     schema_str = " --schema ".join(schemas) if schemas else "(full)"
     log.info(f"Running: pg_dump -d {database} {schema_str}")
 
-    proc = subprocess.run(cmd, capture_output=True, env=_pg_env(pg_password), timeout=600)
+    proc = subprocess.run(
+        cmd, capture_output=True, env=_pg_env(pg_password), timeout=600
+    )
 
     if proc.returncode != 0:
         stderr = proc.stderr.decode("utf-8", errors="replace")
@@ -307,12 +320,18 @@ def _check_db(
         result = subprocess.run(
             [
                 pg_isready_path,
-                "-h", pg_server or _get_secret("POSTGRES_SERVER", "db"),
-                "-p", _get_secret("POSTGRES_PORT", "5432"),
-                "-U", pg_user or _get_secret("POSTGRES_USER", "rds"),
-                "-d", database,
+                "-h",
+                pg_server or _get_secret("POSTGRES_SERVER", "db"),
+                "-p",
+                _get_secret("POSTGRES_PORT", "5432"),
+                "-U",
+                pg_user or _get_secret("POSTGRES_USER", "rds"),
+                "-d",
+                database,
             ],
-            capture_output=True, env=_pg_env(pg_password), timeout=10,
+            capture_output=True,
+            env=_pg_env(pg_password),
+            timeout=10,
         )
         return result.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -371,7 +390,10 @@ def main(
     # Log pg_dump version
     try:
         ver = subprocess.run(
-            [pg_dump_path, "--version"], capture_output=True, env=_pg_env(pg_password), timeout=10
+            [pg_dump_path, "--version"],
+            capture_output=True,
+            env=_pg_env(pg_password),
+            timeout=10,
         )
         if ver.returncode == 0:
             log.info(ver.stdout.decode().strip())
@@ -386,18 +408,43 @@ def main(
     default_password = _get_secret("POSTGRES_PASSWORD", "postgres")
     databases = []
     if backup_goat:
-        databases.append((goat_db, goat_schemas, goat_pg_user or default_user, goat_pg_password or default_password))
+        databases.append(
+            (
+                goat_db,
+                goat_schemas,
+                goat_pg_user or default_user,
+                goat_pg_password or default_password,
+            )
+        )
     if backup_keycloak:
-        databases.append((keycloak_db, None, keycloak_pg_user or default_user, keycloak_pg_password or default_password))
+        databases.append(
+            (
+                keycloak_db,
+                None,
+                keycloak_pg_user or default_user,
+                keycloak_pg_password or default_password,
+            )
+        )
     if backup_windmill:
-        databases.append((windmill_db, None, windmill_pg_user or default_user, windmill_pg_password or default_password))
+        databases.append(
+            (
+                windmill_db,
+                None,
+                windmill_pg_user or default_user,
+                windmill_pg_password or default_password,
+            )
+        )
 
     if not databases:
         log.warning("No databases selected for backup")
         results["status"] = "skipped"
         return results
 
-    s3_client = None if dry_run else _get_s3_client(s3_access_key, s3_secret_key, s3_endpoint_url)
+    s3_client = (
+        None
+        if dry_run
+        else _get_s3_client(s3_access_key, s3_secret_key, s3_endpoint_url)
+    )
 
     for db_name, schemas, db_user, db_password in databases:
         db_result = {"database": db_name, "schemas": schemas or "all"}
@@ -430,7 +477,15 @@ def main(
                 dump_file = Path(tmpdir) / f"{db_name}.sql.gz"
 
                 dump_start = time.time()
-                _run_pg_dump(pg_dump_path, db_name, dump_file, schemas, pg_server, db_user, db_password)
+                _run_pg_dump(
+                    pg_dump_path,
+                    db_name,
+                    dump_file,
+                    schemas,
+                    pg_server,
+                    db_user,
+                    db_password,
+                )
                 dump_duration = time.time() - dump_start
 
                 s3_key = f"{prefix}/{timestamp}_{db_name}.sql.gz"
@@ -442,7 +497,9 @@ def main(
                 )
                 upload_start = time.time()
                 s3_client.upload_file(
-                    str(dump_file), effective_bucket, s3_key,
+                    str(dump_file),
+                    effective_bucket,
+                    s3_key,
                     ExtraArgs={"ContentType": "application/gzip"},
                 )
                 upload_duration = time.time() - upload_start
@@ -478,7 +535,9 @@ def main(
     log.info(f"  Successful: {ok}")
     log.info(f"  Failed:     {fail}")
     for name, r in results["databases"].items():
-        log.info(f"  {name}: {r.get('status')} {r.get('size_human', '')} -> {r.get('s3_key', '')}")
+        log.info(
+            f"  {name}: {r.get('status')} {r.get('size_human', '')} -> {r.get('s3_key', '')}"
+        )
 
     results["status"] = "success" if fail == 0 else "partial_failure"
     return results

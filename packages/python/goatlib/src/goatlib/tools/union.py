@@ -24,7 +24,6 @@ from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
     LayerInputMixin,
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -32,9 +31,7 @@ from goatlib.tools.schemas import (
 logger = logging.getLogger(__name__)
 
 
-class UnionToolParams(
-    ScenarioSelectorMixin, ToolInputBase, LayerInputMixin, UnionParams
-):
+class UnionToolParams(ToolInputBase, LayerInputMixin, UnionParams):
     """Parameters for union tool.
 
     Inherits union options from UnionParams, adds layer context from ToolInputBase.
@@ -47,14 +44,6 @@ class UnionToolParams(
             SECTION_INPUT,
             UISection(id="overlay", order=2, icon="layers"),
             SECTION_RESULT,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"input_layer_id": {"$ne": None}},
-            ),
             SECTION_OUTPUT,
         )
     )
@@ -148,8 +137,6 @@ class UnionToolRunner(BaseToolRunner[UnionToolParams]):
             layer_id=params.input_layer_id,
             user_id=params.user_id,
             cql_filter=params.input_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
 
         # Overlay is optional - if not provided, performs self-union
@@ -159,8 +146,6 @@ class UnionToolRunner(BaseToolRunner[UnionToolParams]):
                 layer_id=params.overlay_layer_id,
                 user_id=params.user_id,
                 cql_filter=params.overlay_layer_filter,
-                scenario_id=params.scenario_id,
-                project_id=params.project_id,
             )
 
         output_path = temp_dir / "output.parquet"
@@ -174,7 +159,6 @@ class UnionToolRunner(BaseToolRunner[UnionToolParams]):
                     "user_id",
                     "folder_id",
                     "project_id",
-                    "scenario_id",
                     "output_name",
                     "input_layer_id",
                     "input_layer_filter",

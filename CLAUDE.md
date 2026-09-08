@@ -15,9 +15,10 @@ GOAT is an open-source WebGIS platform for integrated planning, built as a monor
 - `packages/js/` — Shared configs (eslint, prettier, tsconfig), types, UI components, keycloak-theme
 
 **Python** (managed by uv workspaces, Python 3.11):
-- `apps/core` — Main FastAPI backend: user management, projects, folders, scenarios, metadata. Uses SQLAlchemy/SQLModel + PostgreSQL/PostGIS, Alembic migrations, Redis for caching; background jobs run in Windmill
+- `apps/core` — Main FastAPI backend: user management, projects, folders, metadata. Uses SQLAlchemy/SQLModel + PostgreSQL/PostGIS, Alembic migrations, Redis for caching; background jobs run in Windmill
 - `apps/geoapi` — FastAPI service for OGC API Features/Tiles: layer uploads, serving geospatial data, DuckDB/DuckLake storage
 - `apps/processes` — FastAPI service for OGC API Processes: async tool execution via Windmill, sync analytics queries, job management
+- `apps/catalog` — FastAPI STAC API service for the GOAT data catalog: database-less, serves `catalog.parquet` (+ `nuts.parquet`) from `${DATA_DIR}/catalog` via an in-memory DuckDB table + FTS index; also hosts an MCP server at `/mcp`. Specs: `docs/goat-catalog-design.md`, `docs/goat-catalog-api.md`, `docs/goat-catalog-contract.md`
 - `apps/routing` — FastAPI routing/navigation service
 - `packages/python/goatlib` — Shared library: all analytics tools, analysis algorithms, data I/O, Pydantic models
 
@@ -46,6 +47,7 @@ cd apps/web && npx vitest run path/to/test.ts  # Single test file
 uv run uvicorn core.main:app --reload --port 8000       # from apps/core
 uv run uvicorn geoapi.main:app --reload --port 8100     # from apps/geoapi
 uv run uvicorn processes.main:app --reload --port 8300   # from apps/processes
+uv run uvicorn catalog.main:app --reload --port 8400      # from apps/catalog (needs $DATA_DIR/catalog/catalog.parquet)
 uv run uvicorn routing.main:app --reload --port 8200     # from apps/routing
 
 # Linting
@@ -91,6 +93,7 @@ docker compose --profile prod up -d  # Full production stack
 - All four Python services use FastAPI + Pydantic v2 + pydantic-settings for config
 - `core` uses SQLAlchemy 2.0 async with asyncpg, SQLModel for models, Alembic for migrations
 - `geoapi` and `processes` use DuckDB/DuckLake for geospatial data queries
+- `catalog` is database-less: it serves a fully compliant STAC API (`/stac`, incl. CQL2 filter, free-text search, aggregations, NUTS spatial-filter helpers) from a local parquet mirror maintained by the goatlib `sync_catalog` Windmill task; catalog items are promoted into `customer.layer` on first use (promote-on-use, Plan 2)
 - Analytics tools are defined in `goatlib/tools/`, inherit from `BaseToolRunner[TParams]`, and run as Windmill jobs
 - Auth: Keycloak + python-jose for JWT validation (can be disabled with `AUTH=False`)
 - API versioning: core and routing use `/api/v2/` prefix

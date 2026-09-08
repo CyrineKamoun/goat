@@ -10,6 +10,7 @@ from goatlib.analysis.schemas.statistics import (
     UniqueValue,
     UniqueValuesResult,
 )
+from goatlib.analysis.statistics.columns import quote_identifier, require_column
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,12 @@ def calculate_unique_values(
 
     Returns:
         UniqueValuesResult with the list of unique values and their counts
+
+    Raises:
+        ValueError: If `attribute` is not a column of the table.
     """
-    attr_col = f'"{attribute}"'
+    attribute = require_column(con, table_name, attribute, "attribute")
+    attr_col = quote_identifier(attribute)
 
     # Add null check to where clause
     full_where = f"({where_clause}) AND {attr_col} IS NOT NULL"

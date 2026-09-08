@@ -1,3 +1,6 @@
+import os
+from uuid import UUID
+
 from pydantic import PostgresDsn, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -63,6 +66,12 @@ class Settings(BaseSettings):
     DEFAULT_USER_FIRSTNAME: str = "GOAT"
     DEFAULT_USER_LASTNAME: str = "Admin"
     DEFAULT_ORGANIZATION_NAME: str = "GOAT"
+    # The catalog mirror directory (mirror_items.parquet, written by goatlib
+    # sync_catalog) — the ONLY thing core reads from the shared volume, and
+    # only ever reads. Deployments should mount just this subtree, read-only;
+    # user data on that volume is not core's business. The default derives
+    # from DATA_DIR so a whole-volume mount keeps working unconfigured.
+    CATALOG_DATA_DIR: str = os.path.join(os.getenv("DATA_DIR", "/app/data"), "catalog")
     # Plan and quotas applied to organizations when no billing system is
     # configured (self-hosted deployments). With billing enabled these come
     # from the billing provider instead.
@@ -71,6 +80,13 @@ class Settings(BaseSettings):
     DEFAULT_QUOTA_PROJECTS: int = 10000
     DEFAULT_QUOTA_EDITORS: int = 1000
     DEFAULT_QUOTA_VIEWERS: int = 1000
+
+    # ------------------------------------------------------------------
+    # Templates (T11b): organization whose space owns the seeded GOAT
+    # layout starters. None falls back to the default user's personal
+    # space (local dev without a designated plan4better organization).
+    # ------------------------------------------------------------------
+    GOAT_TEMPLATES_ORGANIZATION_ID: UUID | None = None
 
     # ------------------------------------------------------------------
     # Object storage — data bucket (S3-compatible: AWS / Hetzner / MinIO)
@@ -134,9 +150,17 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str | None = None
 
     # ------------------------------------------------------------------
-    # GeoAPI
+    # Processes service (OGC API - Processes front for Windmill). Core posts
+    # here to run the background jobs it triggers (layer/bundle cleanup on
+    # delete, bundle import, catalog materialize). GOAT_GEOAPI_HOST is the
+    # former name — read as a fallback so existing deployments keep working.
     # ------------------------------------------------------------------
-    GOAT_GEOAPI_HOST: str | None = None
+    GOAT_PROCESSES_URL: str | None = None
+    GOAT_GEOAPI_HOST: str | None = None  # deprecated alias for GOAT_PROCESSES_URL
+
+    @property
+    def processes_url(self) -> str | None:
+        return self.GOAT_PROCESSES_URL or self.GOAT_GEOAPI_HOST
 
     # ------------------------------------------------------------------
     # Custom domains (white label)

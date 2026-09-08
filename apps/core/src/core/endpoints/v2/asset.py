@@ -16,14 +16,12 @@ from fastapi import (
     status,
 )
 from pydantic import UUID4
-from sqlalchemy import and_, or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.core import authz
 from core.core.config import settings
-from core.db.models._link_model import ResourceGrant, UserTeamLink
 from core.db.models.asset import AssetType, UploadedAsset
-from core.db.models.folder import Folder
-from core.db.models.user import User
 from core.deps.auth import auth_z
 from core.endpoints.deps import get_db, get_user_id
 from core.schemas.asset import AssetRead, AssetUpdate
@@ -60,66 +58,15 @@ ALLOWED_MIME_TYPES = {
 DOCUMENTS_MAX_FILE_SIZE_BYTES: int = settings.DOCUMENTS_MAX_FILE_SIZE
 
 
-async def _get_user_context(
-    async_session: AsyncSession, user_id: UUID
-) -> tuple[list[UUID], UUID | None]:
-    """Return (team_ids, organization_id) for a user — used for folder-grant checks."""
-    team_result = await async_session.execute(
-        select(UserTeamLink.team_id).where(UserTeamLink.user_id == user_id)
-    )
-    team_ids = [row[0] for row in team_result.all()]
-
-    user_result = await async_session.execute(select(User).where(User.id == user_id))
-    user_obj = user_result.scalar_one_or_none()
-    organization_id = user_obj.organization_id if user_obj else None
-
-    return team_ids, organization_id
-
-
 async def _check_folder_access(
     async_session: AsyncSession,
     folder_id: UUID,
     user_id: UUID,
 ) -> None:
-    """Raise 404/403 if folder doesn't exist or requesting user has no access."""
-    folder_result = await async_session.execute(
-        select(Folder).where(Folder.id == folder_id)
-    )
-    folder = folder_result.scalar_one_or_none()
-    if not folder:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found.")
-
-    if folder.user_id == user_id:
-        return  # owner — always allowed
-
-    team_ids, organization_id = await _get_user_context(async_session, user_id)
-
-    grant_conditions = []
-    for tid in team_ids:
-        grant_conditions.append(
-            and_(ResourceGrant.grantee_type == "team", ResourceGrant.grantee_id == tid)
-        )
-    if organization_id:
-        grant_conditions.append(
-            and_(
-                ResourceGrant.grantee_type == "organization",
-                ResourceGrant.grantee_id == organization_id,
-            )
-        )
-
-    if not grant_conditions:
-        # User has no team memberships and no organization — no grant can match.
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
-
-    grant_result = await async_session.execute(
-        select(ResourceGrant.id).where(
-            ResourceGrant.resource_type == "folder",
-            ResourceGrant.resource_id == folder_id,
-            or_(*grant_conditions),
-        )
-    )
-    if not grant_result.first():
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied.")
+    """Raise 404/403 if the folder doesn't exist or the requesting user has no
+    access to it (any grant — viewer or above — is enough; asset placement
+    itself is not role-gated beyond that)."""
+    await authz.require(async_session, "folder", folder_id, user_id, "read")
 
 
 @router.post(
@@ -144,7 +91,9 @@ async def upload_asset(
     - For `document` assets, `folder_id` is required.
     """
     if not file.filename:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No file selected.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No file selected."
+        )
 
     if asset_type == AssetType.ICON and not display_name:
         raise HTTPException(
@@ -204,7 +153,9 @@ async def upload_asset(
             existing_asset.file_name = file.filename
             existing_asset.display_name = display_name or existing_asset.display_name
             existing_asset.category = category or existing_asset.category
-            existing_asset.folder_id = folder_id if folder_id is not None else existing_asset.folder_id
+            existing_asset.folder_id = (
+                folder_id if folder_id is not None else existing_asset.folder_id
+            )
             async_session.add(existing_asset)
             await async_session.commit()
             await async_session.refresh(existing_asset)
@@ -265,7 +216,9 @@ async def read_assets(
     if asset_type:
         query = query.where(UploadedAsset.asset_type == asset_type.value)
 
-    result = await async_session.execute(query.order_by(UploadedAsset.created_at.desc()))
+    result = await async_session.execute(
+        query.order_by(UploadedAsset.created_at.desc())
+    )
     assets = result.scalars().all()
     return [AssetRead.model_validate(a) for a in assets]
 
@@ -290,7 +243,9 @@ async def update_asset(
     )
     asset = result.scalar_one_or_none()
     if not asset:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found"
+        )
 
     if asset_update.display_name is not None:
         asset.display_name = asset_update.display_name
@@ -321,7 +276,9 @@ async def delete_asset(
     )
     asset = result.scalar_one_or_none()
     if not asset:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Asset not found"
+        )
 
     s3_service.delete_asset(asset.s3_key)
     await async_session.delete(asset)

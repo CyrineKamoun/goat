@@ -37,7 +37,11 @@ from geoapi.models import (
     FeatureWriteResponse,
 )
 from geoapi.routers.tiles import bump_layer_version
-from geoapi.services.computed_columns import fetch_field_config, write_field_config
+from geoapi.services.computed_columns import (
+    coerce_allowed_values,
+    fetch_field_config,
+    write_field_config,
+)
 from geoapi.services.feature_write_service import feature_write_service
 from geoapi.services.layer_service import LayerMetadata, _metadata_cache, layer_service
 from geoapi.services.tile_service import tile_service
@@ -51,7 +55,18 @@ router = APIRouter(tags=["Features Write"])
 UserIdDep = Annotated[UUID, Depends(get_user_id)]
 
 
-async def _get_authorized_metadata(
+async def layer_is_bundle_member(layer_id: str) -> bool:
+    """Whether a layer belongs to a bundle."""
+    pool = layer_service._pool
+    if not pool:
+        return False
+    row = await pool.fetchrow(
+        "SELECT 1 FROM customer.bundle_layer WHERE layer_id = $1::uuid", layer_id
+    )
+    return row is not None
+
+
+async def get_write_authorized_metadata(
     layer_info: LayerInfo, user_id: UUID
 ) -> LayerMetadata:
     """Get layer metadata and verify the user may write to the layer.
@@ -59,6 +74,11 @@ async def _get_authorized_metadata(
     The layer's owner always may. A non-owner may when the layer's owner has
     put it in a project they both edit — see
     ``LayerService.user_can_edit_layer``.
+
+    This is the ONE write-access rule for layer data: the per-feature routes
+    add the bundle-member refusal on top (``_get_authorized_metadata``), and
+    the bundle batch endpoint builds on this rule directly, so the two cannot
+    drift.
 
     Args:
         layer_info: Layer info from URL
@@ -70,6 +90,14 @@ async def _get_authorized_metadata(
     Raises:
         HTTPException: If layer not found or user not authorized
     """
+    if not layer_info.writable:
+        # A catalog layer is a shared read-only snapshot; no grant can make
+        # it writable, so refuse before consulting any.
+        raise HTTPException(
+            status_code=403,
+            detail="Catalog layers are read-only",
+        )
+
     metadata = await layer_service.get_layer_metadata(layer_info)
     if not metadata:
         raise HTTPException(status_code=404, detail="Collection not found")
@@ -92,6 +120,25 @@ async def _get_authorized_metadata(
         )
 
     return metadata
+
+
+async def _get_authorized_metadata(
+    layer_info: LayerInfo, user_id: UUID
+) -> LayerMetadata:
+    """Write authorization for the per-feature endpoints: the shared rule plus
+    the bundle-member refusal."""
+    # A bundle member's edits drive the bundle's derived artifacts, so they go
+    # through the bundle's batch endpoint or not at all — a write landing here
+    # would leave the routing graph disagreeing with the layer.
+    if await layer_is_bundle_member(layer_info.layer_id):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "This layer is part of a bundle. Edit it through the bundle so its "
+                "routing data stays in step."
+            ),
+        )
+    return await get_write_authorized_metadata(layer_info, user_id)
 
 
 def _invalidate_caches(layer_id: str) -> None:
@@ -583,6 +630,17 @@ async def add_column(
         else:
             validated_cfg = body.display_config or {}
 
+        # Coerced before the DDL, with everything else that can be refused: the
+        # ALTER TABLE below is not part of the field_config transaction, so a
+        # 400 raised after it would leave a real DuckDB column with no entry
+        # describing it and the client's corrected retry would fail with
+        # "column already exists".
+        coerced_allowed_values: list[Any] | None = None
+        if body.allowed_values and body.kind is not None:
+            coerced_allowed_values = coerce_allowed_values(
+                cfg_kind, body.allowed_values
+            )
+
         feature_write_service.add_column_with_sql(
             layer_info=layer_info,
             name=body.name,
@@ -603,6 +661,20 @@ async def add_column(
             if body.kind == "formula":
                 entry["formula"] = body.formula
                 entry["output_kind"] = output_kind
+            if coerced_allowed_values is not None:
+                entry["allowed_values"] = coerced_allowed_values
+                entry["allow_other"] = body.allow_other
+            if body.default_value is not None:
+                # Two stores, one authority. The ALTER TABLE above set a DuckDB
+                # column DEFAULT, which backfilled existing rows and would also
+                # cover an INSERT that omitted the column — but nothing relies
+                # on that: `apply_defaults` fills the column explicitly before
+                # every write, and only this entry is read to do so, or to show
+                # the user what they are about to get. So `field_config` is the
+                # default of record; the DDL default is a leftover of creating
+                # the column and is deliberately not kept in step by
+                # `update_column`, which is why that endpoint touches only this.
+                entry["default_value"] = body.default_value
             async with pool.acquire() as conn:
                 conn = cast("asyncpg.Connection[asyncpg.Record]", conn)
                 current = await fetch_field_config(conn, UUID(layer_info.layer_id))
@@ -636,10 +708,20 @@ async def update_column(
     metadata = await _get_authorized_metadata(layer_info, user_id)
 
     try:
-        if not body.new_name and body.display_config is None and body.formula is None:
+        if (
+            not body.new_name
+            and body.display_config is None
+            and body.formula is None
+            and body.allowed_values is None
+            and body.allow_other is None
+            and body.default_value is None
+        ):
             raise HTTPException(
                 status_code=400,
-                detail="No update specified (provide new_name, display_config and/or formula)",
+                detail=(
+                    "No update specified (provide new_name, display_config, "
+                    "formula, allowed_values and/or default_value)"
+                ),
             )
 
         # Formula edit: validate, re-infer the result type, and recompute the
@@ -737,14 +819,24 @@ async def update_column(
                             formula_update["output_kind"], None
                         ).model_dump()
 
-                if body.display_config is not None:
-                    # Resolve the column's kind: prefer the JSONB entry,
-                    # otherwise infer from the actual DuckDB column type
-                    # (matches what queryables surfaces to the frontend).
+                def config_kind() -> str:
+                    """The kind a display_config or a vocabulary is read against.
+
+                    Prefers the JSONB entry, and infers from the actual DuckDB
+                    column type when the column has no entry yet — the common
+                    case, since an entry is only written when someone edits the
+                    column's definition. Shared by both branches below: a
+                    vocabulary coerced against ``None`` would store a number
+                    column's values as strings, and the strict ``in`` in
+                    ``validate_allowed_values`` would then refuse every value
+                    the editor offers.
+                    """
                     kind = entry.get("kind")
                     if not kind:
                         col_types = feature_write_service.get_column_types(layer_info)
-                        duckdb_type = col_types.get(columnName, "")
+                        # The rename above has already landed, so the column
+                        # answers to its new name by now.
+                        duckdb_type = col_types.get(body.new_name or columnName, "")
                         json_type = layer_service._duckdb_to_json_type(duckdb_type)
                         kind = (
                             "number" if json_type in ("number", "integer") else "string"
@@ -752,19 +844,52 @@ async def update_column(
                         entry["kind"] = kind
                         entry.setdefault("is_computed", False)
                         entry.setdefault("depends_on", [])
-                    # Formula display config is validated against the
-                    # formula's result kind, not "formula" itself.
-                    cfg_kind = (
-                        entry.get("output_kind", "string")
-                        if kind == "formula"
-                        else kind
-                    )
+                    # A formula's own config follows its *result* kind, not
+                    # "formula" itself.
+                    if kind == "formula":
+                        return str(entry.get("output_kind", "string"))
+                    return str(kind)
+
+                if body.display_config is not None:
+                    cfg_kind = config_kind()
                     try:
                         entry["display_config"] = validate_display_config(
                             cfg_kind, body.display_config
                         ).model_dump()
                     except (ValueError, ValidationError) as e:
                         raise HTTPException(status_code=400, detail=str(e)) from e
+
+                if body.default_value is not None:
+                    # Only what future features get. Rewriting rows that already
+                    # hold a value is not what changing a default means, and the
+                    # column's DDL default is left alone for the same reason —
+                    # `field_config` is the default of record (see add_column).
+                    if body.default_value == "":
+                        # An empty string removes the default rather than
+                        # making the blank itself the default.
+                        entry.pop("default_value", None)
+                    else:
+                        entry["default_value"] = body.default_value
+
+                if body.allowed_values is not None:
+                    # An empty list removes the vocabulary, leaving the column
+                    # free text again. Values already stored outside the new
+                    # list are left alone: the constraint governs what may be
+                    # written from now on, and rewriting a column's data is not
+                    # what editing its definition means.
+                    if body.allowed_values:
+                        # Against the column's own kind, which the server
+                        # resolves (entry, else the DuckDB type) because the
+                        # request does not carry it.
+                        entry["allowed_values"] = coerce_allowed_values(
+                            config_kind(), body.allowed_values
+                        )
+                        entry["allow_other"] = bool(body.allow_other)
+                    else:
+                        entry.pop("allowed_values", None)
+                        entry.pop("allow_other", None)
+                elif body.allow_other is not None and entry.get("allowed_values"):
+                    entry["allow_other"] = body.allow_other
 
                 if entry:
                     current[key] = entry

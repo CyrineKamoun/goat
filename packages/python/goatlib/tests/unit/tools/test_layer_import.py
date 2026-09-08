@@ -422,8 +422,9 @@ class TestLayerImportOutputName:
             s3_key="uploads/my-layer-data.gpkg",
         )
 
-        # Mock the parent run method
-        with patch.object(LayerImportRunner.__bases__[0], "run", return_value={}):
+        # `run` hands an upload to the multi-dataset path; the name derivation under test
+        # happens before that.
+        with patch.object(LayerImportRunner, "_run_multi", return_value={}):
             runner.run(params)
 
         assert params.output_name == "my-layer-data"
@@ -437,7 +438,7 @@ class TestLayerImportOutputName:
             name="My Custom Name",
         )
 
-        with patch.object(LayerImportRunner.__bases__[0], "run", return_value={}):
+        with patch.object(LayerImportRunner, "_run_multi", return_value={}):
             runner.run(params)
 
         assert params.output_name == "My Custom Name"
@@ -478,7 +479,7 @@ class TestLayerImportOutputName:
             output_name="Explicit Name",
         )
 
-        with patch.object(LayerImportRunner.__bases__[0], "run", return_value={}):
+        with patch.object(LayerImportRunner, "_run_multi", return_value={}):
             runner.run(params)
 
         # Should keep explicit name

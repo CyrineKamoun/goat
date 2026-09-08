@@ -153,17 +153,28 @@ def test_pmtiles_exists_caching() -> None:
 
 
 def test_get_pmtiles_path() -> None:
-    """Test PMTiles path construction."""
-    service = TileService()
-    layer_info = MagicMock()
-    layer_info.schema_name = "user_abc123"
-    layer_info.table_name = "t_layer456"
+    """Tiles are flat; the schema-nested layout is still read."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        service = TileService()
+        service.tiles_data_dir = root
+        layer_info = MagicMock()
+        layer_info.schema_name = "user_abc123"
+        layer_info.table_name = "t_layer456"
 
-    path = service._get_pmtiles_path(layer_info)
+        # Nothing on disk: the flat path is what a writer would produce.
+        assert service._get_pmtiles_path(layer_info) == root / "t_layer456.pmtiles"
 
-    assert path.name == "t_layer456.pmtiles"
-    assert "tiles" in str(path)
-    assert "user_abc123" in str(path)
+        # Only legacy tiles exist (layer not regenerated since the move).
+        legacy = root / "user_abc123" / "t_layer456.pmtiles"
+        legacy.parent.mkdir()
+        legacy.write_bytes(b"OLD")
+        assert service._get_pmtiles_path(layer_info) == legacy
+
+        # Once regenerated, the flat file wins over the stale one.
+        flat = root / "t_layer456.pmtiles"
+        flat.write_bytes(b"NEW")
+        assert service._get_pmtiles_path(layer_info) == flat
 
 
 @pytest.mark.asyncio
@@ -182,3 +193,90 @@ async def test_get_tile_from_pmtiles_missing_file() -> None:
 
             result = await service._get_tile_from_pmtiles(layer_info, 0, 0, 0)
             assert result is None
+
+
+def test_catalog_layer_tiles_are_read_from_the_catalog_directory() -> None:
+    """A catalog layer's tiles come from the catalog tree, not the user tiles dir.
+
+    Catalog artifacts are derived and identical for every deployment — the same
+    dataset through the same converter — so they belong in a wipeable tree that
+    can be rebuilt or shipped prebuilt, rather than mixed into the tiles a
+    user's own data produced.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        tiles, catalog = root / "tiles", root / "catalog"
+        tiles.mkdir()
+        catalog.mkdir()
+        service = TileService()
+        service.tiles_data_dir = tiles
+        service.catalog_tiles_dir = catalog
+
+        layer_info = MagicMock()
+        layer_info.schema_name = "main"
+        layer_info.table_name = "t_cat456"
+        layer_info.kind = "catalog"
+
+        # Nothing on disk yet: the catalog directory is where a writer puts it.
+        assert service._get_pmtiles_path(layer_info) == catalog / "t_cat456.pmtiles"
+
+        (catalog / "t_cat456.pmtiles").write_bytes(b"CAT")
+        assert service._get_pmtiles_path(layer_info) == catalog / "t_cat456.pmtiles"
+
+
+def test_catalog_tiles_left_in_the_old_place_are_still_served() -> None:
+    """Deployments that materialized before the move keep working un-migrated."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        tiles, catalog = root / "tiles", root / "catalog"
+        tiles.mkdir()
+        catalog.mkdir()
+        service = TileService()
+        service.tiles_data_dir = tiles
+        service.catalog_tiles_dir = catalog
+
+        layer_info = MagicMock()
+        layer_info.schema_name = "main"
+        layer_info.table_name = "t_old789"
+        layer_info.kind = "catalog"
+
+        (tiles / "t_old789.pmtiles").write_bytes(b"OLD")
+        assert service._get_pmtiles_path(layer_info) == tiles / "t_old789.pmtiles"
+
+
+def test_an_ordinary_layer_never_looks_in_the_catalog_directory() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        tiles, catalog = root / "tiles", root / "catalog"
+        tiles.mkdir()
+        catalog.mkdir()
+        service = TileService()
+        service.tiles_data_dir = tiles
+        service.catalog_tiles_dir = catalog
+
+        layer_info = MagicMock()
+        layer_info.schema_name = "main"
+        layer_info.table_name = "t_mine123"
+        layer_info.kind = "lake"
+
+        # A same-named file in the catalog tree must not be served for it.
+        (catalog / "t_mine123.pmtiles").write_bytes(b"NOT MINE")
+        assert service._get_pmtiles_path(layer_info) == tiles / "t_mine123.pmtiles"
+
+
+def test_finding_tiles_by_layer_id_alone_sees_catalog_tiles() -> None:
+    """The id-only lookup has no `kind`, so it must search both trees."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        tiles, catalog = root / "tiles", root / "catalog"
+        tiles.mkdir()
+        catalog.mkdir()
+        service = TileService()
+        service.tiles_data_dir = tiles
+        service.catalog_tiles_dir = catalog
+
+        (catalog / "t_cat456.pmtiles").write_bytes(b"CAT")
+        assert (
+            service._find_pmtiles_by_layer_id("cat456") == catalog / "t_cat456.pmtiles"
+        )
+        assert service._find_pmtiles_by_layer_id("missing") is None

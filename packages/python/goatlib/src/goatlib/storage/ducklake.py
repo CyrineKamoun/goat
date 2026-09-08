@@ -11,7 +11,7 @@ import queue
 import re
 import threading
 from contextlib import contextmanager
-from typing import Any, Generator, Protocol
+from typing import Any, Callable, Generator, Protocol
 from urllib.parse import unquote, urlparse
 
 import duckdb
@@ -214,6 +214,27 @@ class BaseDuckLakeManager:
         self._pin: SnapshotPin | None = None
         self._poll_con: duckdb.DuckDBPyConnection | None = None
         self._poll_lock = threading.Lock()
+        # Run on every NEW connection this manager builds. The connection is
+        # replaced over its lifetime (stale-recycle, snapshot-refresh swap),
+        # and anything created in the old instance's in-memory catalog — e.g.
+        # the views geoapi reads materialized catalog layers through — dies
+        # with it. A hook re-creates such state wherever the connection came
+        # from, so callers never see a swap.
+        self._connection_hooks: list[Callable[[duckdb.DuckDBPyConnection], None]] = []
+
+    def add_connection_hook(
+        self: "BaseDuckLakeManager",
+        hook: "Callable[[duckdb.DuckDBPyConnection], None]",
+    ) -> None:
+        """Register a hook run on every connection this manager builds.
+
+        Also runs immediately against the current connection, so state a late
+        registrant needs exists without waiting for the next swap.
+        """
+        self._connection_hooks.append(hook)
+        if self._connection is not None:
+            with self._lock:
+                hook(self._connection)
 
     def init(self: "BaseDuckLakeManager", settings: DuckLakeSettings) -> None:
         """Initialize DuckLake connection."""
@@ -283,7 +304,14 @@ class BaseDuckLakeManager:
         self._s3_access_key = s3_access_key
         self._s3_secret_key = s3_secret_key
 
-        if not storage_path.startswith("s3://") and not os.path.exists(storage_path):
+        # Only in write mode: a read-only manager has no business creating the
+        # lake directory, and doing so races other readers starting at the same
+        # time. Mirrors the guard in init_from_env.
+        if (
+            not self._read_only
+            and not storage_path.startswith("s3://")
+            and not os.path.exists(storage_path)
+        ):
             os.makedirs(storage_path, exist_ok=True)
 
         self._create_connection()
@@ -311,6 +339,11 @@ class BaseDuckLakeManager:
         self._load_extensions(con)
         self._setup_s3(con)
         self._attach_ducklake(con, snapshot_version=snapshot_version)
+        for hook in list(self._connection_hooks):
+            try:
+                hook(con)
+            except Exception:
+                logger.exception("Connection hook failed on a new connection")
         return con
 
     def _create_connection(
@@ -841,6 +874,11 @@ class DuckLakePool:
         # (an in-flight query must never lose its base). Guarded by
         # _rebuild_lock.
         self._bases: dict[int, list[Any]] = {}
+        # Run on every NEW base connection (each generation's shared
+        # instance). Cursors share their base's catalog, so state a hook
+        # creates — e.g. the catalog-layer views — is visible to every
+        # cursor of that generation, and recreated when generations swap.
+        self._connection_hooks: list[Callable[[duckdb.DuckDBPyConnection], None]] = []
         # Serializes whole _apply_snapshot invocations (build included) so
         # racing rebuild triggers (pin refresh, aged recycle, reconnect)
         # cannot interleave and swap the pool BEHIND the pin's snapshot.
@@ -1153,7 +1191,36 @@ class DuckLakePool:
             except Exception:
                 pass
             raise
+        for hook in list(self._connection_hooks):
+            try:
+                hook(con)
+            except Exception:
+                logger.exception("Connection hook failed on a new pool base")
         return con
+
+    def add_connection_hook(
+        self, hook: "Callable[[duckdb.DuckDBPyConnection], None]"
+    ) -> None:
+        """Register a hook run on every base this pool builds — and on the
+        bases already live, so late registration needs no swap to take
+        effect. Cursors see whatever the hook created on their base."""
+        self._connection_hooks.append(hook)
+        self.apply_to_bases(hook)
+
+    def apply_to_bases(self, fn: "Callable[[duckdb.DuckDBPyConnection], None]") -> None:
+        """Run `fn` against every live base, all generations.
+
+        For state that must exist before the next query — a hook alone only
+        reaches bases built after registration, and pool bases are built at
+        startup, long before a request registers anything.
+        """
+        with self._rebuild_lock:
+            bases = [entry[0] for entry in self._bases.values()]
+        for base in bases:
+            try:
+                fn(base)
+            except Exception:
+                logger.exception("Connection hook failed on a live pool base")
 
     def _register_base(self, gen: int, base: duckdb.DuckDBPyConnection) -> None:
         """Track a generation's base with pool_size live cursors expected.

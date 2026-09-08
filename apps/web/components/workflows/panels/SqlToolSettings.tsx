@@ -6,7 +6,7 @@
  * Shown when a tool node has processId === "custom_sql".
  * Provides:
  * - Connected inputs display (auto-detected from edges)
- * - Additional layer selection (from project / dataset explorer / catalog)
+ * - Additional layer selection (from project / my datasets / catalog)
  * - SQL editor via FormulaBuilder in SQL mode
  * - Output name
  */
@@ -24,9 +24,9 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
+import { useEdges } from "@xyflow/react";
 import { formatDistance } from "date-fns";
 import dynamic from "next/dynamic";
-import { useEdges } from "@xyflow/react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -50,22 +50,22 @@ import {
   selectVariables,
 } from "@/lib/store/workflow/selectors";
 import { requestMapView, requestTableView, updateNode } from "@/lib/store/workflow/slice";
-import type { Layer } from "@/lib/validations/layer";
+import type { ContentItem } from "@/lib/validations/content";
 import type { WorkflowNode } from "@/lib/validations/workflow";
 
 import type { SelectorItem } from "@/types/map/common";
 
 import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 
+import DatasetPickerDialog from "@/components/addLayer/DatasetPickerDialog";
 import Container from "@/components/map/panels/Container";
 import Selector from "@/components/map/panels/common/Selector";
 import ToolsHeader from "@/components/map/panels/common/ToolsHeader";
-import CatalogExplorerModal from "@/components/modals/CatalogExplorer";
-import DatasetExplorerModal from "@/components/modals/DatasetExplorer";
-const FormulaBuilder = dynamic(() => import("@/components/modals/FormulaBuilder"), { ssr: false });
 import type { FormulaField, SqlTable } from "@/components/modals/FormulaBuilder";
 import { useWorkflowExecutionContext } from "@/components/workflows/context/WorkflowExecutionContext";
 import SaveDatasetDialog from "@/components/workflows/dialogs/SaveDatasetDialog";
+
+const FormulaBuilder = dynamic(() => import("@/components/modals/FormulaBuilder"), { ssr: false });
 
 const EMPTY_FIELDS: FormulaField[] = [];
 
@@ -89,8 +89,7 @@ interface SqlToolSettingsProps {
 // Dataset source type enum (same as DatasetNodeSettings)
 enum LayerSourceType {
   FromProject = "from_project",
-  DatasetExplorer = "dataset_explorer",
-  CatalogExplorer = "catalog_explorer",
+  MyDatasets = "my_datasets",
 }
 
 /**
@@ -210,9 +209,7 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
   // Get config from node data
   const config = (node.data.type === "tool" ? node.data.config : {}) as SqlToolConfig;
   const [sqlQuery, setSqlQuery] = useState(config.sql_query || "");
-  const [additionalLayers, setAdditionalLayers] = useState<AdditionalLayer[]>(
-    config.additional_layers || []
-  );
+  const [additionalLayers, setAdditionalLayers] = useState<AdditionalLayer[]>(config.additional_layers || []);
   const [resultLayerName, setResultLayerName] = useState(config.result_layer_name || "Custom SQL");
 
   // Formula builder dialog state
@@ -248,8 +245,7 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
   const menuOpen = Boolean(menuAnchorEl);
 
   // Modal states
-  const [datasetExplorerOpen, setDatasetExplorerOpen] = useState(false);
-  const [catalogExplorerOpen, setCatalogExplorerOpen] = useState(false);
+  const [myDatasetsOpen, setMyDatasetsOpen] = useState(false);
 
   // "From project" selector state
   const [showProjectSelector, setShowProjectSelector] = useState(false);
@@ -286,7 +282,10 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
       let layerName = `Input ${idx}`;
       if (sourceData?.type === "tool") {
         const toolConfig = sourceData.config as Record<string, unknown> | undefined;
-        layerName = (toolConfig?.result_layer_name as string) || t(sourceData.processId as string, { defaultValue: sourceData.label as string }) || layerName;
+        layerName =
+          (toolConfig?.result_layer_name as string) ||
+          t(sourceData.processId as string, { defaultValue: sourceData.label as string }) ||
+          layerName;
       } else if (sourceData?.label) {
         layerName = sourceData.label as string;
       }
@@ -314,7 +313,14 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
         }
       }
 
-      inputs.push({ handleName, alias, sourceNodeId: sourceNode?.id, sourceNode: sourceNode as WorkflowNode | undefined, layerUuid, layerName });
+      inputs.push({
+        handleName,
+        alias,
+        sourceNodeId: sourceNode?.id,
+        sourceNode: sourceNode as WorkflowNode | undefined,
+        layerUuid,
+        layerName,
+      });
     }
 
     return inputs;
@@ -344,7 +350,9 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
         const base = `${ci.sourceNodeId || ""}:${ci.sourceNode?.data?.type || ""}`;
         // For tool source nodes, include config hash so we re-predict when upstream changes
         if (ci.sourceNode?.data?.type === "tool") {
-          const config = (ci.sourceNode.data as Record<string, unknown>).config as Record<string, unknown> | undefined;
+          const config = (ci.sourceNode.data as Record<string, unknown>).config as
+            | Record<string, unknown>
+            | undefined;
           const sqlQuery = config?.sql_query as string | undefined;
           return `${base}:${sqlQuery || ""}`;
         }
@@ -368,7 +376,7 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
     const resolveNodeColumns = async (
       nodeId: string,
       cache: Record<string, Record<string, string>>,
-      visited: Set<string>,
+      visited: Set<string>
     ): Promise<Record<string, string>> => {
       if (visited.has(nodeId)) return {};
       visited.add(nodeId);
@@ -621,8 +629,7 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
   // Menu items for "Add Layer" dropdown (same pattern as DatasetNodeSettings)
   const menuItems = [
     { type: LayerSourceType.FromProject, icon: ICON_NAME.LAYERS, label: t("from_project") },
-    { type: LayerSourceType.DatasetExplorer, icon: ICON_NAME.DATABASE, label: t("dataset_explorer") },
-    { type: LayerSourceType.CatalogExplorer, icon: ICON_NAME.GLOBE, label: t("catalog_explorer") },
+    { type: LayerSourceType.MyDatasets, icon: ICON_NAME.DATABASE, label: t("my_datasets") },
   ];
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -639,11 +646,8 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
       case LayerSourceType.FromProject:
         setShowProjectSelector(true);
         break;
-      case LayerSourceType.DatasetExplorer:
-        setDatasetExplorerOpen(true);
-        break;
-      case LayerSourceType.CatalogExplorer:
-        setCatalogExplorerOpen(true);
+      case LayerSourceType.MyDatasets:
+        setMyDatasetsOpen(true);
         break;
     }
   };
@@ -662,10 +666,12 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
     [projectLayers, addAdditionalLayer]
   );
 
-  // Handle layer selection from Dataset Explorer or Catalog Explorer
-  const handleExplorerLayerSelect = useCallback(
-    (layer: Layer) => {
-      addAdditionalLayer(layer.id, layer.name);
+  // Handle dataset selection from the dataset shelf
+  const handleMyDatasetsPick = useCallback(
+    (item: ContentItem) => {
+      // A bundle is a set of layers, not a table the SQL tool can join.
+      if (item.type !== "layer") return;
+      addAdditionalLayer(item.id, item.name);
     },
     [addAdditionalLayer]
   );
@@ -739,11 +745,7 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
                 {connectedInputs.map((input, idx) => {
                   const fieldCount = sqlTables.find((t) => t.alias === input.alias)?.fields.length ?? 0;
                   return (
-                    <Stack
-                      key={idx}
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center">
+                    <Stack key={idx} direction="row" justifyContent="space-between" alignItems="center">
                       <Typography variant="body2" color="text.secondary">
                         {input.alias}:
                       </Typography>
@@ -974,9 +976,7 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
                     <Typography variant="body2" color="text.secondary">
                       {t("features")}:
                     </Typography>
-                    <Typography variant="body2">
-                      {tempLayerMetadata.featureCount.toLocaleString()}
-                    </Typography>
+                    <Typography variant="body2">{tempLayerMetadata.featureCount.toLocaleString()}</Typography>
                   </Stack>
 
                   {tempLayerMetadata.geometryTypes.length > 0 && (
@@ -1053,25 +1053,12 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
         variables={workflowVariables}
       />
 
-      {/* Dataset Explorer Modal */}
-      {datasetExplorerOpen && (
-        <DatasetExplorerModal
-          open={datasetExplorerOpen}
-          onClose={() => setDatasetExplorerOpen(false)}
-          projectId={projectId as string}
-          onLayerSelect={handleExplorerLayerSelect}
-        />
-      )}
-
-      {/* Catalog Explorer Modal */}
-      {catalogExplorerOpen && (
-        <CatalogExplorerModal
-          open={catalogExplorerOpen}
-          onClose={() => setCatalogExplorerOpen(false)}
-          projectId={projectId as string}
-          onLayerSelect={handleExplorerLayerSelect}
-        />
-      )}
+      {/* The dataset shelf */}
+      <DatasetPickerDialog
+        open={myDatasetsOpen}
+        onClose={() => setMyDatasetsOpen(false)}
+        onPick={handleMyDatasetsPick}
+      />
 
       {/* Save Dataset Dialog */}
       <SaveDatasetDialog

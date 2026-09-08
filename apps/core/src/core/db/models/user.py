@@ -18,8 +18,10 @@ from core.db.models._base_class import UUIDServerDefaultBase
 
 if TYPE_CHECKING:
     from ._link_model import UserRoleLink, UserTeamLink
+    from .bundle import Bundle
     from .folder import Folder
     from .organization import Organization
+    from .space import Space
     from .system_setting import SystemSetting
 
 
@@ -52,6 +54,9 @@ class User(UUIDServerDefaultBase, UserBase, table=True):
     folders: List["Folder"] = Relationship(
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+    bundles: List["Bundle"] = Relationship(
+        back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
     system_setting: "SystemSetting" = Relationship(
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
@@ -62,6 +67,13 @@ class User(UUIDServerDefaultBase, UserBase, table=True):
         back_populates="user", sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
     organization: "Organization" = Relationship(back_populates="users")
+    # passive_deletes: on delete, defer to the DB's ON DELETE CASCADE on
+    # space.user_id instead of the ORM proactively nulling it out first,
+    # which would violate space_exactly_one_owner (a space always has an
+    # owner; a deleted user's personal space is deleted with it, not orphaned).
+    space: Optional["Space"] = Relationship(
+        sa_relationship_kwargs={"uselist": False, "passive_deletes": True},
+    )
 
 
 Index("idx_user_organization_id", User.__table__.c.organization_id)

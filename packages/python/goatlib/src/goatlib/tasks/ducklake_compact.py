@@ -202,9 +202,7 @@ class DuckLakeCompactTask:
         ).fetchall()
         return [(r[0], r[1], int(r[2]), int(r[3]), int(r[4])) for r in rows]
 
-    def run(
-        self: Self, params: DuckLakeCompactParams
-    ) -> dict[str, Any]:
+    def run(self: Self, params: DuckLakeCompactParams) -> dict[str, Any]:
         manager = self._get_manager()
         target_bytes = params.target_file_size_mib * 1024 * 1024
         floor_bytes = params.min_file_size_kib * 1024
@@ -310,8 +308,7 @@ class DuckLakeCompactTask:
                 # Reclaim the small files compaction just marked
                 # end_snapshot != NULL. Same call as ducklake_maintenance.
                 deleted = con.execute(
-                    "CALL ducklake_cleanup_old_files('lake', "
-                    "cleanup_all => true)"
+                    "CALL ducklake_cleanup_old_files('lake', " "cleanup_all => true)"
                 ).fetchall()
                 files_reclaimed = len(deleted)
                 logger.info(

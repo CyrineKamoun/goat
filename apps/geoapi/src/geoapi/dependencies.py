@@ -2,8 +2,10 @@
 
 import asyncio
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Annotated, Optional
+from pathlib import Path as FSPath
+from typing import Annotated, Any, Literal, Optional
 
 from fastapi import Depends, HTTPException, Path, Query
 from goatlib.utils.layer import (
@@ -19,9 +21,83 @@ from goatlib.utils.layer import (
 )
 from pydantic import BaseModel
 
+from geoapi.config import settings
 from geoapi.ducklake import ducklake_manager
+from geoapi.ducklake_pool import ducklake_pool as _ducklake_pool
 
 logger = logging.getLogger(__name__)
+
+# Catalog layers this process serves, and where their parquet lives. The
+# manager's connection is REPLACED over its lifetime (stale-recycle,
+# snapshot-refresh swap), and views in the old instance's in-memory catalog
+# die with it — so views are not created once but REPLAYED on every new
+# connection via the manager hook below.
+_catalog_views: dict[str, FSPath] = {}
+_catalog_views_lock = threading.Lock()
+
+
+def _catalog_parquet_path(table_name: str) -> FSPath:
+    return FSPath(settings.CATALOG_LAYERS_DIR) / f"{table_name}.parquet"
+
+
+def _create_catalog_view(con: Any, table_name: str, path: FSPath) -> None:
+    """The read view for one materialized catalog layer.
+
+    Lives in the in-memory `catalog_layers` schema — nothing touches the
+    DuckLake catalog, no snapshots involved. It names file_row_number
+    `rowid`: stable because the file is immutable (a new catalog version is
+    a new layer with a new file), so every rowid-based query works on it.
+    """
+    con.execute("CREATE SCHEMA IF NOT EXISTS catalog_layers")
+    con.execute(
+        f'CREATE VIEW IF NOT EXISTS catalog_layers."{table_name}" AS '
+        f"SELECT file_row_number AS rowid, * EXCLUDE (file_row_number) "
+        f"FROM read_parquet('{path}', file_row_number=true)"
+    )
+
+
+def _replay_catalog_views(con: Any) -> None:
+    with _catalog_views_lock:
+        views = dict(_catalog_views)
+    for table_name, path in views.items():
+        _create_catalog_view(con, table_name, path)
+
+
+# Both connection owners need the views: the manager serves metadata/download
+# paths, the cursor pool serves feature and tile queries — each builds and
+# swaps its own DuckDB instances.
+ducklake_manager.add_connection_hook(_replay_catalog_views)
+_ducklake_pool.add_connection_hook(_replay_catalog_views)
+
+
+def _ensure_catalog_view(table_name: str) -> None:
+    """Register a catalog layer's view and create it on the live connections.
+
+    Registration and creation happen under one lock. Registering first and
+    creating after release let a second request see the name as known and
+    query a view that did not exist yet — a 500 under the routine four-worker
+    concurrency of `get_layer_info_sync`.
+    """
+    with _catalog_views_lock:
+        if table_name in _catalog_views:
+            return
+        path = _catalog_parquet_path(table_name)
+        # Both owners' LIVE connections, immediately: the replay hooks only
+        # cover connections built after this point, and the pool's bases were
+        # built at startup — long before the first request registered anything.
+        with ducklake_manager.connection() as con:
+            _create_catalog_view(con, table_name, path)
+        _ducklake_pool.apply_to_bases(
+            lambda con: _create_catalog_view(con, table_name, path)
+        )
+        _catalog_views[table_name] = path
+
+
+def _forget_catalog_view(table_name: str) -> None:
+    """Stop replaying a view whose file is gone (GC, or an operator)."""
+    with _catalog_views_lock:
+        _catalog_views.pop(table_name, None)
+
 
 # Thread pool for sync DuckDB operations in dependencies
 _layer_info_executor = ThreadPoolExecutor(
@@ -30,16 +106,38 @@ _layer_info_executor = ThreadPoolExecutor(
 
 
 class LayerInfo(BaseModel):
-    """Layer information extracted from URL."""
+    """Layer information extracted from URL.
+
+    `kind` says where the data lives: "lake" is a DuckLake table (user data,
+    editable), "catalog" is a materialized catalog layer — an immutable
+    GeoParquet read through a view whose first column names file_row_number
+    `rowid`, so every rowid-based query works on both kinds unchanged.
+    """
 
     layer_id: str
     schema_name: str
     table_name: str
+    kind: Literal["lake", "catalog"] = "lake"
+
+    @property
+    def writable(self) -> bool:
+        """Catalog layers are shared read-only snapshots; writes must refuse
+        cleanly — a view over a parquet scan is not updatable anyway."""
+        return self.kind == "lake"
 
     @property
     def full_table_name(self) -> str:
         """Get full qualified table name."""
+        if self.kind == "catalog":
+            return f'catalog_layers."{self.table_name}"'
         return f"lake.{self.schema_name}.{self.table_name}"
+
+    @property
+    def sql_relation(self) -> str:
+        """The relation, quoted — for DESCRIBE and identifier positions."""
+        if self.kind == "catalog":
+            return f'catalog_layers."{self.table_name}"'
+        return f'lake."{self.schema_name}"."{self.table_name}"'
 
 
 def normalize_layer_id(layer_id: str) -> str:
@@ -98,12 +196,30 @@ def get_layer_info_sync(collection_id: str) -> LayerInfo:
     Schema is looked up from DuckLake catalog with caching.
     """
     layer_id = normalize_layer_id(collection_id)
-    schema_name = get_schema_for_layer(layer_id)
+    table_name = _layer_id_to_table_name(layer_id)
+
+    try:
+        schema_name = get_schema_for_layer(layer_id)
+    except HTTPException:
+        # Not a DuckLake table. A materialized catalog layer lives as a
+        # parquet file instead; absent that too, the 404 stands.
+        if not _catalog_parquet_path(table_name).exists():
+            # If we served this once and the file has since been collected,
+            # stop recreating its view on every new connection.
+            _forget_catalog_view(table_name)
+            raise
+        _ensure_catalog_view(table_name)
+        return LayerInfo(
+            layer_id=layer_id,
+            schema_name="catalog_layers",
+            table_name=table_name,
+            kind="catalog",
+        )
 
     return LayerInfo(
         layer_id=layer_id,
         schema_name=schema_name,
-        table_name=_layer_id_to_table_name(layer_id),
+        table_name=table_name,
     )
 
 
@@ -187,6 +303,69 @@ async def properties_query(
     if properties is None or properties == "":
         return None
     return [p.strip() for p in properties.split(",")]
+
+
+def unknown_requested_fields(
+    column_names: Optional[list[str]],
+    properties: Optional[list[str]] = None,
+    sortby: Optional[str] = None,
+    geometry_column: Optional[str] = None,
+) -> list[str]:
+    """Requested `properties` / `sortby` names the layer does not have.
+
+    The query builders splice these names into the SELECT and ORDER BY
+    clauses as quoted identifiers, so an unknown name reaches DuckDB and
+    fails the whole query.
+
+    Order is preserved and duplicates collapsed. With no resolved column
+    list nothing can be checked, so the result is empty (the request keeps
+    its previous behaviour rather than 400-ing on every field).
+    """
+    if not column_names:
+        return []
+
+    known = set(column_names)
+    if geometry_column:
+        known.add(geometry_column)
+    # rowid is DuckDB's row identifier, selectable and sortable on every
+    # table but never part of the layer's column metadata.
+    known.add("rowid")
+
+    requested: list[str] = list(properties or [])
+    if sortby:
+        sort_field = sortby.lstrip("+-")
+        if sort_field:
+            requested.append(sort_field)
+
+    unknown: list[str] = []
+    for name in requested:
+        if name not in known and name not in unknown:
+            unknown.append(name)
+    return unknown
+
+
+def reject_unknown_fields(
+    column_names: Optional[list[str]],
+    properties: Optional[list[str]] = None,
+    sortby: Optional[str] = None,
+    geometry_column: Optional[str] = None,
+) -> None:
+    """400 when `properties`/`sortby` name a field the collection lacks.
+
+    Such a name is spliced into the query as a quoted identifier and would
+    otherwise fail inside DuckDB and surface as a 500.
+    """
+    unknown = unknown_requested_fields(
+        column_names=column_names,
+        properties=properties,
+        sortby=sortby,
+        geometry_column=geometry_column,
+    )
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail="Unknown field(s) for this collection: " + ", ".join(unknown),
+        )
 
 
 async def cql_filter_query(

@@ -4,6 +4,7 @@ We test that setup_tracing() registers a TracerProvider with the
 expected service.name resource attribute and that bound user context
 appears as span attributes when a span is started.
 """
+
 import pytest
 from goatobs.context import bind_user_context
 from goatobs.tracing import setup_tracing

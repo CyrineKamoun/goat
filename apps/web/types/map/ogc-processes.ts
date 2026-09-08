@@ -178,6 +178,7 @@ export interface OGCJobStatus {
  */
 export type InferredInputType =
   | "layer" // Layer selector (keywords includes "layer")
+  | "bundle" // Bundle selector (x-ui.widget is bundle-selector)
   | "field" // Field selector (keywords includes "field")
   | "enum" // Dropdown (schema has enum)
   | "multi-enum" // Multi-select dropdown (array of enums)

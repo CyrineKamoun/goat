@@ -3,11 +3,12 @@ from typing import List
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, status
 from pydantic import UUID4
-from sqlmodel import update
+from sqlmodel import select, update
 
 from core.crud.crud_layer_project_group import (
     layer_project_group as crud_layer_project_group,
 )
+from core.crud.crud_project import project as crud_project
 from core.db.models._link_model import LayerProjectGroup, LayerProjectLink
 from core.db.session import AsyncSession
 from core.deps.auth import auth_z
@@ -39,6 +40,9 @@ async def get_project_layer_groups(
     Get all layer groups for a project.
     Returns groups in hierarchical order.
     """
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     return await crud_layer_project_group.get_groups_by_project(
         async_session=async_session, project_id=project_id
     )
@@ -60,6 +64,9 @@ async def create_layer_group(
     Create a new layer group.
     Supports nesting up to 2 levels.
     """
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     return await crud_layer_project_group.create(
         async_session=async_session, project_id=project_id, obj_in=group_in
     )
@@ -78,6 +85,9 @@ async def update_layer_group(
     group_id: int = Path(...),
     group_in: ILayerProjectGroupUpdate = Body(...),
 ) -> LayerProjectGroup:
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
+
     group = await crud_layer_project_group.get(async_session, group_id)
     if not group or group.project_id != project_id:
         raise HTTPException(status_code=404, detail="Group not found")
@@ -105,6 +115,8 @@ async def delete_layer_group(
     2. Any Sub-groups
     3. Any Layers linked to these groups (via LayerProjectLink)
     """
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
 
     group = await crud_layer_project_group.get(async_session, group_id)
     if not group or group.project_id != project_id:
@@ -133,9 +145,36 @@ async def update_project_layer_tree(
     This handles reordering items and reparenting (moving layers into/out of folders).
     Also updates visibility, collapsed states, and expanded states for both groups and layers.
     """
+    # 404 if the project itself is trashed.
+    await crud_project.get_live_or_404(async_session, project_id)
 
     updates_groups = []
     updates_layers = []
+
+    # Bundle-backed groups have locked membership: layers can't be moved into or
+    # out of them. Precompute the locked group ids and each layer's current group.
+    bundle_group_ids = set(
+        (
+            await async_session.execute(
+                select(LayerProjectGroup.id).where(
+                    LayerProjectGroup.project_id == project_id,
+                    LayerProjectGroup.bundle_id.isnot(None),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    layer_group_map = {
+        row[0]: row[1]
+        for row in (
+            await async_session.execute(
+                select(
+                    LayerProjectLink.id, LayerProjectLink.layer_project_group_id
+                ).where(LayerProjectLink.project_id == project_id)
+            )
+        ).all()
+    }
 
     # 1. Separate updates by type for efficient batch processing
     for item in tree_in.items:
@@ -164,10 +203,19 @@ async def update_project_layer_tree(
             updates_groups.append(update_data)
 
         elif item.type == "layer":
+            # Enforce bundle-group membership lock: never move a layer into or
+            # out of a bundle-backed group. Order/properties still apply.
+            target_group_id = item.parent_id
+            current_group_id = layer_group_map.get(item.id)
+            if (
+                current_group_id in bundle_group_ids
+                or target_group_id in bundle_group_ids
+            ):
+                target_group_id = current_group_id
             update_data = {
                 "id": item.id,
                 # Map standard 'parent_id' back to the specific DB column
-                "layer_project_group_id": item.parent_id,
+                "layer_project_group_id": target_group_id,
                 "order": item.order,
             }
             # Handle properties for layers (visibility, legend.collapsed, etc.)
@@ -231,9 +279,7 @@ async def update_project_layer_tree(
 
     except Exception:
         await async_session.rollback()
-        logger.exception(
-            "Failed to update layer tree for project %s", project_id
-        )
+        logger.exception("Failed to update layer tree for project %s", project_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update layer tree structure.",

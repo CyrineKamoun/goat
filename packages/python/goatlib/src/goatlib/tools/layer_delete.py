@@ -75,16 +75,15 @@ class LayerDeleteRunner(SimpleToolRunner):
         Returns:
             True if table was deleted, False if it didn't exist
         """
-        user_schema = f"user_{owner_id.replace('-', '')}"
-        table_name = f"t_{layer_id.replace('-', '')}"
-        full_table = f"lake.{user_schema}.{table_name}"
+        full_table = self.resolve_layer_table_path(layer_id)
+        _lake, schema, table_name = full_table.split(".", 2)
 
         try:
             # Check if table exists. DESCRIBE probes only this table;
             # information_schema.tables would lazily load every table in
             # the catalog to answer.
             try:
-                self.duckdb_con.execute(f'DESCRIBE lake."{user_schema}"."{table_name}"')
+                self.duckdb_con.execute(f'DESCRIBE lake."{schema}"."{table_name}"')
                 table_exists = True
             except duckdb.CatalogException:
                 table_exists = False
@@ -114,7 +113,7 @@ class LayerDeleteRunner(SimpleToolRunner):
             from goatlib.io.pmtiles import PMTilesGenerator
 
             generator = PMTilesGenerator(tiles_data_dir=self.settings.tiles_data_dir)
-            deleted = generator.delete_pmtiles(owner_id, layer_id)
+            deleted = generator.delete_pmtiles(layer_id)
             if deleted:
                 logger.info("Deleted PMTiles for layer: %s", layer_id)
             return deleted
@@ -156,10 +155,26 @@ class LayerDeleteRunner(SimpleToolRunner):
                 return False, None
 
             # Verify ownership
-            layer_owner_id = str(row["user_id"])
+            # NULL owner = a catalog layer, which is nobody's to change.
+            layer_owner_id = str(row["user_id"]) if row["user_id"] else None
             if layer_owner_id != user_id:
                 raise PermissionError(
                     f"User {user_id} cannot delete layer {layer_id} owned by {layer_owner_id}"
+                )
+
+            # Bundle members are deleted with their bundle, never one by one —
+            # removing one directly would leave the bundle "ready" with a
+            # missing role and stale artifacts. (Bundle deletion is unaffected:
+            # it removes the link rows before this tool runs.)
+            in_bundle = await pool.fetchval(
+                f"SELECT 1 FROM {self.settings.customer_schema}.bundle_layer "
+                "WHERE layer_id = $1 LIMIT 1",
+                uuid_module.UUID(layer_id),
+            )
+            if in_bundle is not None:
+                raise PermissionError(
+                    f"Layer {layer_id} belongs to a bundle and cannot be "
+                    "deleted individually. Delete the bundle instead."
                 )
 
             # Delete layer (cascade deletes layer_project links)

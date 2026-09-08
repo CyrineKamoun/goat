@@ -1,7 +1,7 @@
 import { Box, Tab, Tabs, TextField, Typography } from "@mui/material";
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
 import { useTranslation } from "react-i18next";
+import ReactMarkdown from "react-markdown";
 
 import { popupMarkdownComponents } from "@/components/builder/widgets/common/markdownComponents";
 
@@ -15,6 +15,16 @@ interface MarkdownContentEditorProps {
   placeholder?: string;
   /** Override hint text (defaults to the markdown syntax hint). */
   hint?: string;
+  /** The accessible name of the text area, for a form that labels it
+   * above itself rather than through a floating label. */
+  ariaLabel?: string;
+  /** The video/poster syntax line under the field. Off for a host whose
+   * renderer does not embed video. */
+  videoHint?: boolean;
+  /** The Write/Preview tabs and the preview pane they switch to. Off for a
+   * form that already renders the markdown beside the field, where the
+   * textarea and the syntax hint are the whole editor. */
+  showPreview?: boolean;
 }
 
 const previewStyles = {
@@ -33,6 +43,10 @@ const previewStyles = {
  *
  * In plainText mode, drops the tabs and preview pane and shows a plain textarea
  * — used for tooltip-type popups where markdown is stripped on render.
+ *
+ * With `showPreview` off it keeps the markdown field and its hint but drops
+ * the tabs, for a host that renders the markdown itself — the save-template
+ * dialog's live preview column.
  */
 const MarkdownContentEditor = ({
   value,
@@ -42,6 +56,9 @@ const MarkdownContentEditor = ({
   maxRows = 14,
   placeholder,
   hint,
+  ariaLabel,
+  videoHint = true,
+  showPreview = true,
 }: MarkdownContentEditorProps) => {
   const { t } = useTranslation("common");
   const [tab, setTab] = useState<"write" | "preview">("write");
@@ -59,11 +76,48 @@ const MarkdownContentEditor = ({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={resolvedPlaceholder}
+          inputProps={{ "aria-label": ariaLabel }}
           InputProps={{ sx: { fontSize: 13, lineHeight: 1.7 } }}
         />
         <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
           {resolvedHint}
         </Typography>
+      </>
+    );
+  }
+
+  const hints = (
+    <>
+      <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
+        {resolvedHint}
+      </Typography>
+      {/* Own line: the poster syntax is too easy to miss inside the list above. */}
+      {videoHint && (
+        <Typography variant="caption" color="text.disabled" sx={{ display: "block" }}>
+          {t("markdown_video_hint")}
+        </Typography>
+      )}
+    </>
+  );
+
+  if (!showPreview) {
+    return (
+      <>
+        <TextField
+          multiline
+          minRows={minRows}
+          maxRows={maxRows}
+          fullWidth
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={resolvedPlaceholder}
+          inputProps={{ "aria-label": ariaLabel }}
+          // The house form metric, the same one the fields around it are set
+          // in — the tabbed editor's monospace belongs to a pane that shows
+          // the rendered markdown beside the source.
+          InputProps={{ sx: { fontSize: "0.875rem", lineHeight: 1.7 } }}
+        />
+        {hints}
       </>
     );
   }
@@ -74,8 +128,16 @@ const MarkdownContentEditor = ({
         value={tab}
         onChange={(_, v) => setTab(v as "write" | "preview")}
         sx={{ borderBottom: 1, borderColor: "divider", minHeight: 32, mb: 1 }}>
-        <Tab value="write" label={t("write")} sx={{ textTransform: "none", fontWeight: 600, minHeight: 32, py: 0.5 }} />
-        <Tab value="preview" label={t("preview")} sx={{ textTransform: "none", fontWeight: 600, minHeight: 32, py: 0.5 }} />
+        <Tab
+          value="write"
+          label={t("write")}
+          sx={{ textTransform: "none", fontWeight: 600, minHeight: 32, py: 0.5 }}
+        />
+        <Tab
+          value="preview"
+          label={t("preview")}
+          sx={{ textTransform: "none", fontWeight: 600, minHeight: 32, py: 0.5 }}
+        />
       </Tabs>
       {tab === "write" ? (
         <TextField
@@ -86,6 +148,7 @@ const MarkdownContentEditor = ({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={resolvedPlaceholder}
+          inputProps={{ "aria-label": ariaLabel }}
           InputProps={{
             sx: { fontFamily: "monospace", fontSize: 13, lineHeight: 1.7 },
           }}
@@ -110,17 +173,7 @@ const MarkdownContentEditor = ({
           )}
         </Box>
       )}
-      {tab === "write" && (
-        <>
-          <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
-            {resolvedHint}
-          </Typography>
-          {/* Own line: the poster syntax is too easy to miss inside the list above. */}
-          <Typography variant="caption" color="text.disabled" sx={{ display: "block" }}>
-            {t("markdown_video_hint")}
-          </Typography>
-        </>
-      )}
+      {tab === "write" && hints}
     </>
   );
 };

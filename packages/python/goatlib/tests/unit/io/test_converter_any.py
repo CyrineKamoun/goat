@@ -243,12 +243,19 @@ def test_xlsx_has_header_true(tmp_path: Path, tabular_valid_xlsx: Path) -> None:
     import duckdb as _duckdb
 
     con = _duckdb.connect(database=":memory:")
-    cols = [c[0] for c in con.execute(f"SELECT * FROM read_parquet('{out}') LIMIT 0").description]
+    cols = [
+        c[0]
+        for c in con.execute(f"SELECT * FROM read_parquet('{out}') LIMIT 0").description
+    ]
     # Column names should come from the first row, not be Field1, Field2...
-    assert not any(c.startswith("Field") for c in cols), f"Expected real headers, got {cols}"
+    assert not any(
+        c.startswith("Field") for c in cols
+    ), f"Expected real headers, got {cols}"
 
 
-def test_xlsx_has_header_false(tmp_path: Path, tabular_valid_xlsx_no_header: Path) -> None:
+def test_xlsx_has_header_false(
+    tmp_path: Path, tabular_valid_xlsx_no_header: Path
+) -> None:
     """XLSX with has_header=False should keep all rows as data."""
     results = convert_any(str(tabular_valid_xlsx_no_header), tmp_path, has_header=False)
     assert results, "convert_any() returned empty list"
@@ -259,8 +266,13 @@ def test_xlsx_has_header_false(tmp_path: Path, tabular_valid_xlsx_no_header: Pat
     con = _duckdb.connect(database=":memory:")
     nrows = con.execute(f"SELECT COUNT(*) FROM read_parquet('{out}')").fetchone()[0]
     assert nrows == 3, f"Expected 3 data rows, got {nrows}"
-    cols = [c[0] for c in con.execute(f"SELECT * FROM read_parquet('{out}') LIMIT 0").description]
-    assert all(c.startswith("Field") for c in cols), f"Expected generic headers, got {cols}"
+    cols = [
+        c[0]
+        for c in con.execute(f"SELECT * FROM read_parquet('{out}') LIMIT 0").description
+    ]
+    assert all(
+        c.startswith("Field") for c in cols
+    ), f"Expected generic headers, got {cols}"
 
 
 def test_xlsx_sheet_name(tmp_path: Path, tabular_valid_xlsx_multi_sheet: Path) -> None:
@@ -277,13 +289,20 @@ def test_xlsx_sheet_name(tmp_path: Path, tabular_valid_xlsx_multi_sheet: Path) -
     import duckdb as _duckdb
 
     con = _duckdb.connect(database=":memory:")
-    cols = [c[0] for c in con.execute(f"SELECT * FROM read_parquet('{out}') LIMIT 0").description]
-    assert "country" in cols, f"Expected 'country' column from Countries sheet, got {cols}"
+    cols = [
+        c[0]
+        for c in con.execute(f"SELECT * FROM read_parquet('{out}') LIMIT 0").description
+    ]
+    assert (
+        "country" in cols
+    ), f"Expected 'country' column from Countries sheet, got {cols}"
     nrows = con.execute(f"SELECT COUNT(*) FROM read_parquet('{out}')").fetchone()[0]
     assert nrows == 2
 
 
-def test_xlsx_default_reads_first_sheet(tmp_path: Path, tabular_valid_xlsx_multi_sheet: Path) -> None:
+def test_xlsx_default_reads_first_sheet(
+    tmp_path: Path, tabular_valid_xlsx_multi_sheet: Path
+) -> None:
     """XLSX without sheet_name should read the first sheet."""
     results = convert_any(
         str(tabular_valid_xlsx_multi_sheet),
@@ -295,7 +314,10 @@ def test_xlsx_default_reads_first_sheet(tmp_path: Path, tabular_valid_xlsx_multi
     import duckdb as _duckdb
 
     con = _duckdb.connect(database=":memory:")
-    cols = [c[0] for c in con.execute(f"SELECT * FROM read_parquet('{out}') LIMIT 0").description]
+    cols = [
+        c[0]
+        for c in con.execute(f"SELECT * FROM read_parquet('{out}') LIMIT 0").description
+    ]
     assert "name" in cols, f"Expected 'name' column from Cities sheet, got {cols}"
 
 
@@ -309,16 +331,20 @@ def test_csv_has_header_false(tmp_path: Path, tabular_valid_csv: Path) -> None:
 
     con = _duckdb.connect(database=":memory:")
     # With header=False, all original rows (including header row) become data
-    nrows_no_header = con.execute(f"SELECT COUNT(*) FROM read_parquet('{out}')").fetchone()[0]
+    nrows_no_header = con.execute(
+        f"SELECT COUNT(*) FROM read_parquet('{out}')"
+    ).fetchone()[0]
 
     # Compare with header=True
     results2 = convert_any(str(tabular_valid_csv), tmp_path / "sub", has_header=True)
     out2, _ = results2[0]
-    nrows_with_header = con.execute(f"SELECT COUNT(*) FROM read_parquet('{out2}')").fetchone()[0]
+    nrows_with_header = con.execute(
+        f"SELECT COUNT(*) FROM read_parquet('{out2}')"
+    ).fetchone()[0]
 
-    assert nrows_no_header == nrows_with_header + 1, (
-        f"has_header=False should have 1 more row: {nrows_no_header} vs {nrows_with_header}"
-    )
+    assert (
+        nrows_no_header == nrows_with_header + 1
+    ), f"has_header=False should have 1 more row: {nrows_no_header} vs {nrows_with_header}"
 
 
 # =====================================================================

@@ -1,6 +1,6 @@
 import LayersIcon from "@mui/icons-material/Layers";
 import { Box, Stack, Tab, Tabs, Typography } from "@mui/material";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { setSelectedLayers } from "@/lib/store/layer/slice";
@@ -9,6 +9,7 @@ import type { ProjectLayer } from "@/lib/validations/project";
 
 import { MapSidebarItemID } from "@/types/map/common";
 
+import { useLazyTabs } from "@/hooks/map/useLazyTabs";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import Container from "@/components/map/panels/Container";
@@ -82,22 +83,13 @@ const LayerSettingsPanel = ({ projectId, projectLayers = [] }: LayerSettingsPane
     clampTabValue(getTabFromPanelId(activeRightPanel, layerType), layerType)
   );
 
-  // Tabs render on first visit and then stay mounted (hidden): remounting
-  // LayerStyle/Filter on every switch costs ~500ms of pure mount work.
-  const visitedTabsRef = useRef(new Set<number>());
-  visitedTabsRef.current.add(activeTab);
-  const isTabLive = (tab: number) => activeTab === tab || visitedTabsRef.current.has(tab);
-
   // 3. Keep syncing if Redux changes while panel is open
   useEffect(() => {
     const newTab = clampTabValue(getTabFromPanelId(activeRightPanel, layerType), layerType);
     setActiveTab(newTab);
   }, [activeRightPanel, layerType]);
 
-  const activeLayerId = activeLayer?.id;
-  useEffect(() => {
-    visitedTabsRef.current = new Set();
-  }, [activeLayerId]);
+  const isTabLive = useLazyTabs(activeTab, activeLayer?.id);
 
   const handleClose = () => {
     dispatch(setSelectedLayers([]));

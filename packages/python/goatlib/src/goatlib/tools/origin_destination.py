@@ -24,7 +24,6 @@ from goatlib.analysis.schemas.ui import (
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     ToolOutputBase,
     get_default_layer_name,
@@ -43,9 +42,7 @@ SECTION_RESULT_OD = UISection(
 )
 
 
-class OriginDestinationToolParams(
-    ScenarioSelectorMixin, ToolInputBase, OriginDestinationParams
-):
+class OriginDestinationToolParams(ToolInputBase, OriginDestinationParams):
     """Parameters for origin-destination tool.
 
     Inherits OD options from OriginDestinationParams, adds layer context from ToolInputBase.
@@ -58,14 +55,6 @@ class OriginDestinationToolParams(
             UISection(id="matrix", order=2, icon="grid", label_key="matrix"),
             UISection(id="columns", order=3, icon="list", label_key="columns"),
             SECTION_RESULT_OD,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"geometry_layer_id": {"$ne": None}},
-            ),
             SECTION_OUTPUT,
         )
     )
@@ -256,8 +245,6 @@ class OriginDestinationToolRunner(BaseToolRunner[OriginDestinationToolParams]):
             layer_id=params.geometry_layer_id,
             user_id=params.user_id,
             cql_filter=params.geometry_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
 
         # Export matrix layer
@@ -265,8 +252,6 @@ class OriginDestinationToolRunner(BaseToolRunner[OriginDestinationToolParams]):
             layer_id=params.matrix_layer_id,
             user_id=params.user_id,
             cql_filter=params.matrix_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
 
         output_path_lines = temp_dir / "output_lines.parquet"
@@ -282,7 +267,6 @@ class OriginDestinationToolRunner(BaseToolRunner[OriginDestinationToolParams]):
                     "user_id",
                     "folder_id",
                     "project_id",
-                    "scenario_id",
                     "output_name",
                     "geometry_layer_id",
                     "geometry_layer_filter",

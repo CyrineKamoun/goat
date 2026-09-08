@@ -13,7 +13,7 @@ slug: /
 
 ## What is GOAT?
 
-GOAT is like having a super-smart assistant for urban, spatial and transport planning. **It’s a WebGIS platform packed with rich data and advanced tools, helping planners and GIS analysts make fact-based decisions**. With GOAT, you can compute benchmarks, analyze existing situations, and even create and assess potential scenarios. The platform offers a modern user interface and an intuitive user flow, to simplify the planning process. **GOAT's main goal is to empower you to plan smarter, collaborate more effectively, and make a real difference in the communities you serve**.
+GOAT is like having a super-smart assistant for urban, spatial and transport planning. **It’s a WebGIS platform packed with rich data and advanced tools, helping planners and GIS analysts make fact-based decisions**. With GOAT, you can compute benchmarks, analyze existing situations, and compare planning alternatives. The platform offers a modern user interface and an intuitive user flow, to simplify the planning process. **GOAT's main goal is to empower you to plan smarter, collaborate more effectively, and make a real difference in the communities you serve**.
 
 ## With GOAT, you can:
 

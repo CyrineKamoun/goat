@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 import shutil
 import tempfile
 import zipfile
@@ -49,6 +50,26 @@ FORMAT_EXTENSION: dict[str, str] = {
 
 SUPPORTED_FORMATS = list(FORMAT_MAP.keys())
 
+# The target CRS is inlined into the ST_Transform call and the GDAL SRS
+# option of a `COPY (...) TO file` statement, so only an EPSG code passes.
+_CRS_PATTERN = re.compile(r"epsg:(\d{4,6})", re.IGNORECASE)
+
+
+def _normalize_crs(crs: str | None) -> str | None:
+    """Canonical `EPSG:<code>` for a requested CRS, or None for no reprojection.
+
+    Raises:
+        ValueError: If the value is not an EPSG code.
+    """
+    if not crs:
+        return None
+    match = _CRS_PATTERN.fullmatch(crs.strip())
+    if not match:
+        raise ValueError(
+            f"Unsupported crs: {crs}. Expected an EPSG code, e.g. EPSG:4326"
+        )
+    return f"EPSG:{match.group(1)}"
+
 
 def _get_exportable_columns(
     con: duckdb.DuckDBPyConnection, table_name: str
@@ -60,8 +81,7 @@ def _get_exportable_columns(
     DESCRIBE loads only this table's metadata; information_schema.columns
     would lazily load every table in the catalog to answer.
     """
-    schema, table = table_name.split(".", 1)
-    result = con.execute(f'DESCRIBE lake."{schema}"."{table}"').fetchall()
+    result = con.execute(f"DESCRIBE {table_name}").fetchall()
 
     unsupported_prefixes = ("STRUCT", "MAP", "UNION")
     exportable = []
@@ -74,8 +94,7 @@ def _get_exportable_columns(
 
 def _has_geometry_column(con: duckdb.DuckDBPyConnection, table_name: str) -> bool:
     """Check if table has a geometry column."""
-    schema, table = table_name.split(".", 1)
-    result = con.execute(f'DESCRIBE lake."{schema}"."{table}"').fetchall()
+    result = con.execute(f"DESCRIBE {table_name}").fetchall()
     return any(row[0] == "geometry" for row in result)
 
 
@@ -109,13 +128,17 @@ def _export_layer_to_file(
     Runs synchronously using the ducklake_manager connection (with lock).
 
     Args:
-        table_name: Fully qualified table name (schema.table, without lake. prefix for queries)
+        table_name: Fully qualified, quoted relation (LayerInfo.sql_relation)
         output_path: Path for the output file
         output_format: GDAL driver name
         crs: Target CRS (e.g. "EPSG:4326")
+
+    Raises:
+        ValueError: If crs is not an EPSG code.
     """
+    crs = _normalize_crs(crs)
     with ducklake_manager.connection() as con:
-        full_table = f"lake.{table_name}"
+        full_table = table_name
         exportable_columns = _get_exportable_columns(con, table_name)
 
         if not exportable_columns:
@@ -315,6 +338,12 @@ async def download_layer(
             f"Supported: {', '.join(SUPPORTED_FORMATS)}",
         )
 
+    # Validate CRS before any work: it is inlined into the export SQL.
+    try:
+        target_crs = _normalize_crs(crs)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     # Check that this layer belongs to a public project
     layer_uuid = UUID(
         f"{layer_info.layer_id[:8]}-{layer_info.layer_id[8:12]}-"
@@ -337,7 +366,7 @@ async def download_layer(
         c if c.isalnum() or c in (" ", "-", "_") else "_" for c in file_name
     ).strip()
 
-    table_name = f"{layer_info.schema_name}.{layer_info.table_name}"
+    table_name = layer_info.sql_relation
 
     # Run export in thread pool (DuckDB is blocking)
     import asyncio
@@ -351,7 +380,7 @@ async def download_layer(
             file_name,
             format_lower,
             gdal_format,
-            crs,
+            target_crs,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

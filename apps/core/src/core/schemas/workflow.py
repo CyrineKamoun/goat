@@ -48,7 +48,9 @@ class WorkflowRead(WorkflowBase):
 
     id: UUID = Field(..., description="Workflow ID")
     project_id: UUID = Field(..., description="Parent project ID")
-    thumbnail_url: str | None = Field(None, description="Workflow preview thumbnail URL")
+    thumbnail_url: str | None = Field(
+        None, description="Workflow preview thumbnail URL"
+    )
     created_at: datetime = Field(..., description="Creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
 

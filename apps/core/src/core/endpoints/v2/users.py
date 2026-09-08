@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.params import Query
@@ -12,16 +13,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.core.config import settings
 from core.crud.crud_invitation import invitation as crud_invitation
+from core.crud.crud_onboarding import onboarding as crud_onboarding
 from core.crud.crud_organization import organization as crud_organization
 from core.crud.crud_role import role as crud_role
 from core.crud.crud_user import user as crud_user
 from core.db.models._link_model import UserRoleLink
 from core.db.models.invitation import Invitation, InvitationStatusEnum, InvitationType
 from core.db.models.organization import Organization
-from core.deps.auth import auth, auth_z, user_token
+from core.deps.auth import auth, auth_z, is_superuser, user_token
 from core.deps.keycloak import get_keycloak_user, keycloak_admin
-from core.endpoints.deps import get_db
+from core.endpoints.deps import get_db, get_user_id
 from core.schemas.common import OrderEnum
+from core.schemas.onboarding import OnboardingFacts
 from core.schemas.user import UserProfileUpdate, UserRead, UserUpdate, request_examples
 from core.services.s3 import s3_service
 from core.utils.other import decode_base64_file, get_image_extension_from_base64
@@ -223,8 +226,23 @@ async def get_profile(
         enabled=keycloak_user.get("enabled"),
         topt=keycloak_user.get("totp"),
         roles=roles,
+        is_superuser=is_superuser(user_token, False),
     )
     return user
+
+
+@router.get(
+    "/me/onboarding",
+    response_model=OnboardingFacts,
+    dependencies=[Depends(auth_z)],
+)
+async def get_onboarding(
+    async_session: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_user_id),
+) -> OnboardingFacts:
+    """Facts Home derives its stage and checklist from, over every space
+    the caller is a member of."""
+    return await crud_onboarding.facts(async_session, user_id)
 
 
 @router.patch(

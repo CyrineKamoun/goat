@@ -89,7 +89,9 @@ class Heatmap2SFCATool(HeatmapToolBase):
             reference_table_h3 = self._process_table_to_h3(
                 reference_table, meta, h3_resolution, "reference_area_h3", "dest_id"
             )
-            result_table = self._project_to_reference_area(result_table, reference_table_h3)
+            result_table = self._project_to_reference_area(
+                result_table, reference_table_h3
+            )
 
         logger.info("2SFCA result table created: %s", result_table)
 
@@ -301,7 +303,6 @@ class Heatmap2SFCATool(HeatmapToolBase):
         # --- Default constant ---
         return "1.0"
 
-
     def _combine_opportunities(
         self: Self, standardized_tables: list[tuple[str, str]]
     ) -> str:
@@ -374,7 +375,6 @@ class Heatmap2SFCATool(HeatmapToolBase):
                 )
         except Exception:
             pass
-
 
         if "point" in geom_type:
             query = f"""
@@ -618,7 +618,9 @@ class Heatmap2SFCATool(HeatmapToolBase):
         )
 
         # Total accessibility as sum of all individual accessibilities
-        total_accessibility_sql = f"({' + '.join(sum_expressions)}) AS total_accessibility"
+        total_accessibility_sql = (
+            f"({' + '.join(sum_expressions)}) AS total_accessibility"
+        )
 
         query = f"""
             CREATE OR REPLACE TEMP TABLE {result_table} AS

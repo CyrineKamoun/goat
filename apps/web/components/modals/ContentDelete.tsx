@@ -1,26 +1,20 @@
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Typography,
-} from "@mui/material";
+import { DialogContentText } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { Trans } from "react-i18next";
 import { toast } from "react-toastify";
 import { mutate } from "swr";
 
-import { LAYERS_API_BASE_URL, deleteLayer } from "@/lib/api/layers";
-import { useJobs } from "@/lib/api/processes";
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
+import { deleteBundle, isBundleTile } from "@/lib/api/bundles";
+import { matchesContentListKey } from "@/lib/api/datasets";
+import { deleteLayer } from "@/lib/api/layers";
 import { PROJECTS_API_BASE_URL, deleteProject } from "@/lib/api/projects";
-import { setRunningJobIds } from "@/lib/store/jobs/slice";
 import type { Layer } from "@/lib/validations/layer";
 
 import type { ContentDialogBaseProps } from "@/types/dashboard/content";
 
-import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 interface ContentDeleteDialogProps extends ContentDialogBaseProps {
   disabled?: boolean;
@@ -36,17 +30,22 @@ const ContentDeleteModal: React.FC<ContentDeleteDialogProps> = ({
   content,
 }) => {
   const { t } = useTranslation("common");
-  const { mutate: mutateJobs } = useJobs({ read: false });
-  const dispatch = useAppDispatch();
-  const runningJobIds = useAppSelector((state) => state.jobs.runningJobIds);
+
+  const isBundle = isBundleTile(content);
 
   const handleDelete = async () => {
     try {
       if (!content) return;
-      if (type === "layer") {
+      if (isBundle) {
+        // Bundle: one call removes the bundle + all its member layers
+        // (backend cascades DuckLake cleanup). Refresh the bundles list.
+        await deleteBundle(content.id);
+        mutate(matchesContentListKey);
+        toast.success(t("delete_bundle_success"));
+      } else if (type === "layer") {
         // Optimistic update: immediately remove layer from cache
         mutate(
-          (key) => Array.isArray(key) && key[0] === LAYERS_API_BASE_URL,
+          matchesContentListKey,
           (currentData: { items: Layer[]; total: number; pages: number } | undefined) => {
             if (!currentData?.items) return currentData;
             return {
@@ -58,13 +57,8 @@ const ContentDeleteModal: React.FC<ContentDeleteDialogProps> = ({
           { revalidate: false }
         );
 
-        // Start delete job in background
-        const job = await deleteLayer(content?.id);
-        if (job?.jobID) {
-          // Track job only for error handling - success doesn't need UI update
-          mutateJobs();
-          dispatch(setRunningJobIds([...runningJobIds, job.jobID]));
-        }
+        await deleteLayer(content.id);
+        toast.success(t("delete_layer_success"));
       } else if (type === "project") {
         await deleteProject(content?.id);
         mutate((key) => Array.isArray(key) && key[0] === PROJECTS_API_BASE_URL);
@@ -72,57 +66,59 @@ const ContentDeleteModal: React.FC<ContentDeleteDialogProps> = ({
       }
     } catch {
       // Revert optimistic update on error by revalidating
-      if (type === "layer") {
-        mutate((key) => Array.isArray(key) && key[0] === LAYERS_API_BASE_URL);
+      if (isBundle || type === "layer") {
+        mutate(matchesContentListKey);
       }
-      toast.error(type === "layer" ? t("delete_layer_error") : t("delete_project_error"));
+      toast.error(
+        isBundle
+          ? t("delete_bundle_error")
+          : type === "layer"
+            ? t("delete_layer_error")
+            : t("delete_project_error")
+      );
     }
 
     onDelete?.();
   };
 
   return (
-    <Dialog open={open} onClose={onClose}>
-      <DialogTitle>{type === "layer" ? t("delete_layer") : t("delete_project")}</DialogTitle>
-      <DialogContent>
-        <DialogContentText>
-          {type === "layer" ? (
-            <Trans
-              i18nKey="common:are_you_sure_to_delete_layer"
-              values={{ layer: content?.name }}
-              components={{ b: <b /> }}
-            />
-          ) : (
-            <Trans
-              i18nKey="common:are_you_sure_to_delete_project"
-              values={{ project: content?.name }}
-              components={{ b: <b /> }}
-            />
-          )}
-        </DialogContentText>
-      </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          pb: 2,
-        }}>
-        <Button onClick={onClose} variant="text" sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-        <Button
-          onClick={handleDelete}
-          variant="text"
-          color="error"
-          disabled={disabled}
-          sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("delete")}
-          </Typography>
-        </Button>
-      </DialogActions>
-    </Dialog>
+    <AppDialog
+      open={open}
+      onClose={() => onClose?.()}
+      icon={ICON_NAME.TRASH}
+      tone="warning"
+      title={isBundle ? t("delete_bundle") : type === "layer" ? t("delete_layer") : t("delete_project")}
+      footer={
+        <AppDialogFooter
+          onCancel={onClose}
+          primaryLabel={t("delete")}
+          onPrimary={() => void handleDelete()}
+          primaryColor="error"
+          primaryDisabled={disabled}
+        />
+      }>
+      <DialogContentText>
+        {isBundle ? (
+          <Trans
+            i18nKey="common:are_you_sure_to_delete_bundle"
+            values={{ name: content?.name }}
+            components={{ b: <b /> }}
+          />
+        ) : type === "layer" ? (
+          <Trans
+            i18nKey="common:are_you_sure_to_delete_layer"
+            values={{ layer: content?.name }}
+            components={{ b: <b /> }}
+          />
+        ) : (
+          <Trans
+            i18nKey="common:are_you_sure_to_delete_project"
+            values={{ project: content?.name }}
+            components={{ b: <b /> }}
+          />
+        )}
+      </DialogContentText>
+    </AppDialog>
   );
 };
 

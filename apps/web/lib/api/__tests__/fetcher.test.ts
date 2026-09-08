@@ -17,10 +17,7 @@ describe("fetcher auth handling", () => {
     clearTokenCache();
     getSessionMock.mockReset();
     signInMock.mockReset();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) })
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }));
   });
 
   it("sends the session access token as bearer", async () => {
@@ -39,6 +36,28 @@ describe("fetcher auth handling", () => {
     const options = vi.mocked(fetch).mock.calls[0][1];
     expect(options?.headers?.["Authorization"]).toBeUndefined();
     expect(signInMock).toHaveBeenCalledWith("keycloak");
+  });
+
+  it("leaves an unset query value out of the query string", async () => {
+    // `URLSearchParams` writes an unset value out as the literal
+    // "undefined", which a typed query parameter rejects with a 422.
+    getSessionMock.mockResolvedValue(null);
+    await fetcher(["http://api.test/thing", { source: "all", kind: undefined, size: 12 }]);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe("http://api.test/thing?source=all&size=12");
+  });
+
+  it("keeps a query value that is set", async () => {
+    getSessionMock.mockResolvedValue(null);
+    await fetcher(["http://api.test/thing", { kind: "workflow", page: 1 }]);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe("http://api.test/thing?kind=workflow&page=1");
+  });
+
+  it("keeps falsy values that are set, only an unset value is dropped", async () => {
+    getSessionMock.mockResolvedValue(null);
+    await fetcher(["http://api.test/thing", { page: 0, search: "", flag: false, empty: null }]);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
+      "http://api.test/thing?page=0&search=&flag=false&empty=null"
+    );
   });
 
   it("sends no auth header without a session", async () => {

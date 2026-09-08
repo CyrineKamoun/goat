@@ -6,7 +6,6 @@ import {
   CircularProgress,
   Divider,
   IconButton,
-  Paper,
   Stack,
   Tooltip,
   Typography,
@@ -21,6 +20,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import { type Job, dismissJob, useJobs } from "@/lib/api/processes";
 
 import { ArrowPopper as JobStatusMenu } from "@/components/ArrowPoper";
+import HeaderPopoverPaper, { HEADER_POPOVER_PLACEMENT } from "@/components/header/HeaderPopoverPaper";
 import JobProgressItem from "@/components/jobs/JobProgressItem";
 
 const StyledBadge = styled(Badge)(({ theme }) => ({
@@ -63,10 +63,24 @@ export default function JobsPopper() {
   // Track jobs that were already successful on initial load (don't auto-download these)
   const initialSuccessfulJobsRef = useRef<Set<string> | null>(null);
 
+  /**
+   * What the tray is about: jobs the user started.
+   *
+   * A `hidden` job ran as a side effect of something else — materializing a
+   * catalog layer they added, cleaning up after a bundle they removed. The
+   * service marks them, so this does not keep its own list. They are reported
+   * where they can be identified and acted on: a catalog layer's own row says
+   * "Preparing data …" and "Data preparation failed", and re-adding the
+   * dataset is the retry. A row here would name neither the layer nor an
+   * action — and would appear only for whoever happened to trigger the shared
+   * job in the first place.
+   */
+  const visibleJobs = useMemo(() => jobs?.jobs?.filter((job) => !job.hidden), [jobs?.jobs]);
+
   // Filter to get running/accepted jobs using OGC status
   const runningJobs = useMemo(() => {
-    return jobs?.jobs?.filter((job) => job.status === "running" || job.status === "accepted");
-  }, [jobs?.jobs]);
+    return visibleJobs?.filter((job) => job.status === "running" || job.status === "accepted");
+  }, [visibleJobs]);
 
   // Handle download for export and print jobs
   const handleDownload = useCallback(
@@ -115,7 +129,9 @@ export default function JobsPopper() {
         jobs.jobs
           .filter(
             (job) =>
-              (job.processID === "layer_export" || job.processID === "print_report" || job.processID === "project_export") &&
+              (job.processID === "layer_export" ||
+                job.processID === "print_report" ||
+                job.processID === "project_export") &&
               job.status === "successful"
           )
           .map((job) => job.jobID)
@@ -130,7 +146,9 @@ export default function JobsPopper() {
       // 3. Were NOT already successful on initial load
       // 4. Haven't been downloaded yet in this session
       if (
-        (job.processID === "layer_export" || job.processID === "print_report" || job.processID === "project_export") &&
+        (job.processID === "layer_export" ||
+          job.processID === "print_report" ||
+          job.processID === "project_export") &&
         job.status === "successful" &&
         !initialSuccessfulJobsRef.current?.has(job.jobID) &&
         !downloadedJobsRef.current.has(job.jobID)
@@ -253,16 +271,10 @@ export default function JobsPopper() {
 
   return (
     <>
-      {jobs?.jobs && jobs.jobs.length > 0 && (
+      {visibleJobs && visibleJobs.length > 0 && (
         <JobStatusMenu
           content={
-            <Paper
-              sx={{
-                width: "320px",
-                overflow: "auto",
-                pt: 4,
-                pb: 2,
-              }}>
+            <HeaderPopoverPaper sx={{ pt: 4, pb: 2 }}>
               <Box>
                 <Typography variant="body1" fontWeight="bold" sx={{ px: 4, py: 1 }}>
                   {t("job_status")}
@@ -277,7 +289,7 @@ export default function JobsPopper() {
                   py: 2,
                 }}>
                 <Stack direction="column">
-                  {jobs?.jobs?.map((job, index) => {
+                  {visibleJobs?.map((job, index) => {
                     const actionButton = getActionButton(job);
 
                     return (
@@ -291,18 +303,19 @@ export default function JobsPopper() {
                           errorMessage={job.status === "failed" ? job.message : undefined}
                           actionButton={actionButton}
                         />
-                        {index < jobs.jobs.length - 1 && <Divider />}
+                        {index < visibleJobs.length - 1 && <Divider />}
                       </Box>
                     );
                   })}
                 </Stack>
               </Box>
-            </Paper>
+            </HeaderPopoverPaper>
           }
           open={open}
-          placement="bottom"
+          placement={HEADER_POPOVER_PLACEMENT}
+          arrow={false}
           onClose={() => setOpen(false)}>
-          {jobs?.jobs && jobs.jobs.length > 0 ? (
+          {visibleJobs && visibleJobs.length > 0 ? (
             <Tooltip title={t("job_status")}>
               <IconButton
                 onClick={() => {

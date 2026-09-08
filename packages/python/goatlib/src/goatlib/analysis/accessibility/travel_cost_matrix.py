@@ -113,7 +113,9 @@ class TravelCostMatrixTool(AnalysisTool):
         ]
         destinations = [
             routing.Point3857(*self._to_web_mercator(lon, lat))
-            for lat, lon in zip(params.destination_latitude, params.destination_longitude)
+            for lat, lon in zip(
+                params.destination_latitude, params.destination_longitude
+            )
         ]
 
         mode_map = {
@@ -150,12 +152,14 @@ class TravelCostMatrixTool(AnalysisTool):
         # C++ uses 0.0 as the "not set" sentinel; for routing modes that don't
         # take a user-supplied speed (PT/Car/flight_distance), params.speed is None.
         cfg.speed_km_h = params.speed if params.speed is not None else 0.0
-        cfg.edge_dir = self._edge_dir
-        cfg.node_dir = self._node_dir
+        # An uploaded street network bundle's graph overrides the global network.
+        cfg.edge_dir = str(params.edge_path or self._edge_dir)
+        cfg.node_dir = str(params.node_path or self._node_dir)
         cfg.output_path = params.output_path
 
         if params.routing_mode == RoutingMode.pt:
-            cfg.timetable_path = str(self._timetable_path)
+            # A selected PT bundle's timetable overrides the global network.
+            cfg.timetable_path = str(params.timetable_path or self._timetable_path)
             cfg.departure_time = self._pt_departure_unix_minutes(params)
             cfg.max_transfers = params.max_transfers
             cfg.access_mode = access_mode_map[params.access_mode]
@@ -175,11 +179,13 @@ class TravelCostMatrixTool(AnalysisTool):
             # Fall back to mode-specific default when user didn't set the per-leg
             # speed (e.g. advanced collapsed). Car: no user speed → 0.
             cfg.access_speed_km_h = (
-                params.access_speed if params.access_speed is not None
+                params.access_speed
+                if params.access_speed is not None
                 else _PT_LEG_DEFAULT_SPEED_KMH.get(params.access_mode, 0.0)
             )
             cfg.egress_speed_km_h = (
-                params.egress_speed if params.egress_speed is not None
+                params.egress_speed
+                if params.egress_speed is not None
                 else _PT_LEG_DEFAULT_SPEED_KMH.get(params.egress_mode, 0.0)
             )
 

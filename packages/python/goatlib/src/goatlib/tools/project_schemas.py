@@ -16,33 +16,6 @@ LayerTypeLiteral = Literal["feature", "raster", "table"]
 FeatureTypeLiteral = Literal["standard", "tool", "street_network"]
 FeatureGeometryTypeLiteral = Literal["point", "line", "polygon"]
 DataTypeLiteral = Literal["mvt", "wfs", "wms", "xyz", "wmts", "cog"]
-FileUploadTypeLiteral = Literal[
-    "csv", "xlsx", "geojson", "gpkg", "kml", "zip", "parquet"
-]
-DataLicenseLiteral = Literal[
-    "DDN2",
-    "DDZ2",
-    "CC_BY",
-    "CC_BY_SA",
-    "CC_BY_ND",
-    "CC_BY_NC",
-    "CC_BY_NC_SA",
-    "CC_BY_NC_ND",
-    "CC_ZERO",
-    "ODC_BY",
-    "ODC_ODbL",
-    "OTHER",
-]
-DataCategoryLiteral = Literal[
-    "basemap",
-    "imagery",
-    "boundary",
-    "people",
-    "transportation",
-    "environment",
-    "landuse",
-    "places",
-]
 AssetTypeLiteral = Literal["image", "icon"]
 
 
@@ -95,28 +68,11 @@ class ExportLayerMetadata(BaseModel):
     url: str | None = None
     properties: dict[str, Any] | None = None
     other_properties: dict[str, Any] | None = None
-    attribute_mapping: dict[str, Any] | None = None
     # Per-column metadata keyed by column name (field kind, formula and its
     # dependencies, display config). Empty for archives written before it
     # was exported.
     field_config: dict[str, Any] = Field(default_factory=dict)
-    upload_reference_system: int | None = None
-    upload_file_type: FileUploadTypeLiteral | None = None
     size: int | None = None
-    # Quality/metadata fields
-    lineage: str | None = None
-    positional_accuracy: str | None = None
-    attribute_accuracy: str | None = None
-    completeness: str | None = None
-    geographical_code: str | None = None
-    language_code: str | None = None
-    distributor_name: str | None = None
-    distributor_email: str | None = None
-    distribution_url: str | None = None
-    license: DataLicenseLiteral | None = None
-    attribution: str | None = None
-    data_reference_year: int | None = None
-    data_category: DataCategoryLiteral | None = None
     is_external: bool = False  # True if WMS/WFS/XYZ/COG (no data.parquet)
 
 

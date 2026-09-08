@@ -54,9 +54,7 @@ class Invitation(UUIDServerDefaultBase, table=True):
     organization_id: UUID | None = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(
-                f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"
-            ),
+            ForeignKey(f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"),
         )
     )
     type: InvitationType = Field(sa_column=Column(Text, nullable=False))

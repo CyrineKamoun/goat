@@ -1,6 +1,7 @@
 from typing import Any, List
+from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -214,19 +215,29 @@ async def remove_user_from_organization(
     user_token: dict = Depends(user_token),
     user_id: str | None = None,
     organization_id: str,
+    reassign_to: UUID | None = Query(
+        None,
+        description="Member of the same organization who receives the user's folders, layers, projects and bundles. Required when the user owns content.",
+    ),
 ) -> Any:
-    """
-    Remove a user from an organization
-    """
+    """Remove a user from an organization. Content the user owns is handed to `reassign_to`, never deleted."""
     organization_obj = await crud_organization.get(db=db, id=organization_id)
     if organization_obj.contact_user_id == user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot remove organization owner",
         )
-    user = await crud_organization.remove_user(
-        db=db, organization_id=organization_obj.id, user_id=user_id
-    )
+    try:
+        user = await crud_organization.remove_user(
+            db=db,
+            organization_id=organization_obj.id,
+            user_id=user_id,
+            reassign_to=str(reassign_to) if reassign_to is not None else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     return user
 
 

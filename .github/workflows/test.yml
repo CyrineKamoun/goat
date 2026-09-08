@@ -24,6 +24,9 @@ on:
       processes:
         type: boolean
         default: false
+      catalog:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -45,6 +48,11 @@ jobs:
           enable-corepack: true
           cwd: ${{ github.workspace }}
           node_version: 22
+      # vitest runs in jsdom and its config excludes playwright/ and
+      # **/*.e2e.*, but lib/print/__tests__/pdf-renderer.test.ts is a plain
+      # *.test.ts inside the tree and launches a real Chromium in beforeAll,
+      # so the browser has to be here. The e2e suite is not run in CI at all —
+      # running it needs a service stack, and that is a separate decision.
       - name: 💾 Cache Playwright Chromium
         id: playwright-cache
         uses: actions/cache@v4
@@ -86,7 +94,21 @@ jobs:
       POSTGRES_DB: goat
       POSTGRES_PORT: "5432"
       AUTH: "False"
-      ENVIRONMENT: test
+      ENVIRONMENT: dev
+      # No S3 service here, and none is wanted. Presigning a URL is local
+      # signing, so credentials — any credentials — are all the thumbnail
+      # tests need to assert that a stored key comes back as a signed URL
+      # rather than the default artwork. The endpoint points at a closed port
+      # so the few calls that do reach for S3 (a bundle import reading its
+      # upload) fail at once with connection refused instead of travelling to
+      # real AWS.
+      S3_ACCESS_KEY_ID: test
+      S3_SECRET_ACCESS_KEY: test
+      S3_ENDPOINT_URL: http://127.0.0.1:1
+      S3_FORCE_PATH_STYLE: "true"
+      # Without this botocore retries each refused connection with backoff,
+      # which cost 8 of the 9 seconds tests/api/test_folder_guard.py took.
+      AWS_MAX_ATTEMPTS: "1"
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
@@ -104,6 +126,57 @@ jobs:
       # --no-sync: a bare `uv run` re-syncs and would pull gdal back in.
       - name: 🧪 pytest
         run: uv run --no-sync pytest tests/
+        working-directory: apps/core
+
+  alembic:
+    name: alembic (fresh upgrade)
+    if: ${{ inputs.core }}
+    runs-on: ubuntu-latest
+    # REQUIRED. The core suite builds its schema with metadata.create_all, so
+    # nothing else here runs a migration. This walks the chain on an empty
+    # database the way a fresh deploy does, then `alembic check` asserts the
+    # result matches the models — the drift the create_all path cannot see.
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: rds
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: goat
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      POSTGRES_SERVER: localhost
+      POSTGRES_USER: rds
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: goat
+      POSTGRES_PORT: "5432"
+      AUTH: "False"
+      ENVIRONMENT: dev
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      - name: 📥 Checkout PR
+        uses: plan4better/.github/.github/actions/pr-git-checkout@main
+      - name: 🐍 Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.2"
+          enable-cache: true
+      - name: 🐍 Install dependencies
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
+      # `init` creates its own schemas and both extensions, so an empty
+      # database is all this needs.
+      - name: 🗄️ alembic upgrade head
+        run: uv run --no-sync alembic upgrade head
+        working-directory: apps/core
+      - name: 🗄️ alembic check (no model drift)
+        run: uv run --no-sync alembic check
         working-directory: apps/core
 
   goatlib:
@@ -124,14 +197,43 @@ jobs:
           enable-cache: true
       # Only suite that needs real gdal (WFS/converter tests). The compiled
       # wheel lands in the uv cache, so the source build runs once per
-      # lockfile change, not per run.
-      - name: 🌍 Install libgdal-dev
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libgdal-dev
+      # lockfile change, not per run. `tippecanoe` is needed because
+      # `PMTilesGenerator.__init__` refuses to construct without the binary
+      # on PATH, so the tests/io and tests/unit/io PMTiles suites cannot even
+      # reach their assertions without it.
+      - name: 🌍 Install libgdal-dev and tippecanoe
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libgdal-dev tippecanoe
       - name: 🐍 Install dependencies
         run: uv sync --frozen --all-packages --all-extras
-      - name: 🧪 pytest (unit)
-        run: uv run --no-sync pytest tests/unit
+      - name: 🧪 pytest (unit, utils, io)
+        # tests/integration is excluded on purpose: it needs a DuckLake catalog
+        # and Postgres fixtures this job has no services for. tests/benchmarks
+        # holds manually-run scripts, not tests.
+        run: uv run --no-sync pytest tests/unit tests/utils tests/io
         working-directory: packages/python/goatlib
+
+  goatobs:
+    name: goatobs (pytest)
+    # Shares goatlib's input: the paths-filter feeds packages/python/goatobs
+    # into the core/geoapi/catalog filters that input is derived from.
+    if: ${{ inputs.goatlib }}
+    runs-on: ubuntu-latest
+    # REQUIRED. Pure unit suite — no services.
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      - name: 📥 Checkout PR
+        uses: plan4better/.github/.github/actions/pr-git-checkout@main
+      - name: 🐍 Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.2"
+          enable-cache: true
+      - name: 🐍 Install dependencies
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
+      - name: 🧪 pytest
+        run: uv run --no-sync pytest tests/
+        working-directory: packages/python/goatobs
 
   geoapi:
     name: geoapi (pytest)
@@ -174,3 +276,26 @@ jobs:
       - name: 🧪 pytest
         run: uv run --no-sync pytest tests/
         working-directory: apps/processes
+
+  catalog:
+    name: catalog (pytest)
+    if: ${{ inputs.catalog }}
+    runs-on: ubuntu-latest
+    # REQUIRED. Suite runs against generated parquet fixtures — no services
+    # needed; DuckDB extensions (spatial/fts) are fetched on first run and
+    # cached by setup-uv's cache thereafter.
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      - name: 📥 Checkout PR
+        uses: plan4better/.github/.github/actions/pr-git-checkout@main
+      - name: 🐍 Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.2"
+          enable-cache: true
+      - name: 🐍 Install dependencies
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
+      - name: 🧪 pytest
+        run: uv run --no-sync pytest tests/
+        working-directory: apps/catalog

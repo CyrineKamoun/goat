@@ -1,34 +1,34 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { LoadingButton } from "@mui/lab";
-import { Button, Stack, TextField, Typography } from "@mui/material";
-import { useForm } from "react-hook-form";
+import { Stack, TextField, Typography } from "@mui/material";
+import type { FieldErrors, UseFormRegister } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 
-import { customDomainCreateSchema } from "@/lib/validations/customDomain";
 import type { CustomDomainCreate } from "@/lib/validations/customDomain";
 
 interface StepEnterProps {
-  isBusy: boolean;
-  onCancel: () => void;
-  onSubmit: (data: CustomDomainCreate) => void;
+  /** The `id` the dialog's footer Continue button submits via `primaryForm`. */
+  formId: string;
+  register: UseFormRegister<CustomDomainCreate>;
+  errors: FieldErrors<CustomDomainCreate>;
+  /** Defensive only: a submit-type button associated by `form` (rather than
+   * DOM nesting) is what Enter and a click both drive, so this native
+   * `onSubmit` is not expected to fire — kept as a fallback all the same. */
+  onSubmit: () => void;
 }
 
-export function StepEnter({ isBusy, onCancel, onSubmit }: StepEnterProps) {
+export function StepEnter({ formId, register, errors, onSubmit }: StepEnterProps) {
   const { t } = useTranslation("common");
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isValid },
-  } = useForm<CustomDomainCreate>({
-    mode: "onChange",
-    resolver: zodResolver(customDomainCreateSchema),
-    defaultValues: { base_domain: "" },
-  });
 
   return (
-    <Stack component="form" spacing={3} onSubmit={handleSubmit(onSubmit)}>
+    <Stack
+      component="form"
+      id={formId}
+      spacing={3}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}>
       <Typography variant="body2" color="text.secondary">
         {t(
           "white_label_add_domain_enter_description",
@@ -44,22 +44,6 @@ export function StepEnter({ isBusy, onCancel, onSubmit }: StepEnterProps) {
         error={!!errors.base_domain}
         helperText={errors.base_domain?.message}
       />
-      <Stack direction="row" spacing={1} justifyContent="flex-end">
-        <Button onClick={onCancel} variant="text">
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-        <LoadingButton
-          variant="contained"
-          loading={isBusy}
-          disabled={!isValid}
-          type="submit">
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("white_label_add_domain_continue", "Continue")}
-          </Typography>
-        </LoadingButton>
-      </Stack>
     </Stack>
   );
 }

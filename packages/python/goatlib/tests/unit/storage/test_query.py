@@ -121,7 +121,41 @@ class TestDuckDBCQLEvaluator:
         ast = parse_cql2_filter(cql, "cql2-json")
         sql, params = cql2_to_duckdb_sql(ast, ["name"])
 
-        assert "IS NULL" in sql
+        # Not a substring check: "IS NULL" is also a substring of
+        # "IS NOT NULL", so `in sql` passed even when the negation was being
+        # dropped and every IS NOT NULL filter returned the complement of what
+        # was asked for.
+        assert "IS NOT NULL" not in sql
+        assert sql.strip().endswith("IS NULL")
+
+    def test_is_not_null_operator(self):
+        """IS NOT NULL must not compile to IS NULL."""
+        ast = parse_cql2_filter("name IS NOT NULL", "cql2-text")
+        sql, params = cql2_to_duckdb_sql(ast, ["name"])
+
+        assert "IS NOT NULL" in sql
+
+    def test_is_not_null_returns_the_complement_in_duckdb(self):
+        """End-to-end: IS NULL and IS NOT NULL partition the table."""
+        import duckdb
+
+        con = duckdb.connect()
+        con.execute("CREATE TABLE t (name VARCHAR)")
+        con.execute("INSERT INTO t VALUES ('a'), (NULL), ('c'), (NULL)")
+
+        null_ast = parse_cql2_filter("name IS NULL", "cql2-text")
+        null_sql, null_params = cql2_to_duckdb_sql(null_ast, ["name"])
+        not_null_ast = parse_cql2_filter("name IS NOT NULL", "cql2-text")
+        not_null_sql, not_null_params = cql2_to_duckdb_sql(not_null_ast, ["name"])
+
+        nulls = con.execute(
+            f"SELECT count(*) FROM t WHERE {null_sql}", null_params
+        ).fetchone()[0]
+        not_nulls = con.execute(
+            f"SELECT count(*) FROM t WHERE {not_null_sql}", not_null_params
+        ).fetchone()[0]
+
+        assert (nulls, not_nulls) == (2, 2)
 
     def test_invalid_field_raises_error(self):
         """Test that invalid field names raise errors."""
@@ -245,7 +279,9 @@ class TestTemporalCQL:
 
         con = duckdb.connect()
         con.execute("CREATE TABLE t (d DATE)")
-        con.execute("INSERT INTO t VALUES ('2024-01-01'), ('2024-06-15'), ('2024-12-31')")
+        con.execute(
+            "INSERT INTO t VALUES ('2024-01-01'), ('2024-06-15'), ('2024-12-31')"
+        )
 
         cql = '{"op": "<", "args": [{"property": "d"}, "2024-06-01"]}'
         ast = parse_cql2_filter(cql, "cql2-json")
@@ -470,3 +506,50 @@ class TestBuildOrderClause:
         """Test empty string."""
         result = build_order_clause("")
         assert result == ""
+
+
+class TestFieldExpressions:
+    """`field_exprs` lets a caller say what a property means in SQL."""
+
+    def test_expression_replaces_the_column_reference(self):
+        """A property backed by an expression is not quoted as a column."""
+        cql = '{"op": "=", "args": [{"property": "year"}, 2024]}'
+        ast = parse_cql2_filter(cql, "cql2-json")
+        sql, params = cql2_to_duckdb_sql(
+            ast,
+            ["datetime"],
+            field_exprs={"year": "date_part('year', datetime)"},
+        )
+
+        assert "date_part('year', datetime)" in sql
+        assert '"year"' not in sql
+        assert params == [2024]
+
+    def test_expression_needs_no_entry_in_field_names(self):
+        """The override is authoritative, so column validation is bypassed."""
+        cql = '{"op": "=", "args": [{"property": "code"}, "DE"]}'
+        ast = parse_cql2_filter(cql, "cql2-json")
+        sql, params = cql2_to_duckdb_sql(
+            ast,
+            [],
+            field_exprs={"code": "(doc->>'code')"},
+        )
+
+        assert "(doc->>'code')" in sql
+        assert params == ["DE"]
+
+    def test_lookup_is_case_insensitive(self):
+        cql = '{"op": "=", "args": [{"property": "Year"}, 2024]}'
+        ast = parse_cql2_filter(cql, "cql2-json")
+        sql, _ = cql2_to_duckdb_sql(
+            ast, [], field_exprs={"year": "date_part('year', ts)"}
+        )
+
+        assert "date_part('year', ts)" in sql
+
+    def test_unmapped_properties_still_validate_against_field_names(self):
+        """Supplying overrides must not disable validation for everything else."""
+        cql = '{"op": "=", "args": [{"property": "nope"}, 1]}'
+        ast = parse_cql2_filter(cql, "cql2-json")
+        with pytest.raises(ValueError, match="Unknown field"):
+            cql2_to_duckdb_sql(ast, ["name"], field_exprs={"year": "1"})

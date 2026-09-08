@@ -1,17 +1,9 @@
-import { LoadingButton } from "@mui/lab";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
+
+import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { requestDatasetUpload } from "@/lib/api/datasets";
 import { updateLayerDataset } from "@/lib/api/layers";
@@ -24,6 +16,7 @@ import type { ContentDialogBaseProps } from "@/types/dashboard/content";
 import { useFileUpload } from "@/hooks/dashboard/ContentHooks";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 import { MuiFileInput } from "@/components/common/FileInput";
 
 const DatasetUpdateModal: React.FC<ContentDialogBaseProps> = ({ open, onClose, content }) => {
@@ -86,75 +79,58 @@ const DatasetUpdateModal: React.FC<ContentDialogBaseProps> = ({ open, onClose, c
     }
   };
   return (
-    <>
-      <Dialog open={open} onClose={handleOnClose} fullWidth maxWidth="sm">
-        <DialogTitle>{`${t("dataset_update")} - "${content.name}"`}</DialogTitle>
-        <DialogContent>
-          <Box sx={{ width: "100%" }}>
-            {content.data_type === "wfs" && (
-              <Stack direction="column" spacing={4}>
-                <Typography variant="body2">
-                  <b>{t("url")}:</b> {content.other_properties?.url}
-                </Typography>
-                <Typography variant="body2">
-                  <b>{t("layer")}:</b> {content.other_properties?.layers}
-                </Typography>
-              </Stack>
-            )}
-            {!content.data_type && (
-              <>
-                <Typography variant="caption">{t("select_file_to_upload")}</Typography>
-                <MuiFileInput
-                  sx={{
-                    my: 2,
-                  }}
-                  inputProps={{
-                    accept: acceptedFileTypes.join(","),
-                  }}
-                  fullWidth
-                  error={!!fileUploadError}
-                  helperText={fileUploadError}
-                  value={fileValue}
-                  multiple={false}
-                  onChange={handleChange}
-                  placeholder={`${t("eg")} file.gpkg, file.geojson, file.parquet, shapefile.zip`}
-                />
-                <Typography variant="caption">
-                  {t("supported")} <b>GeoPackage</b>, <b>GeoJSON</b>, <b>Shapefile (.zip)</b>, <b>KML</b>,{" "}
-                  <b>CSV</b>, <b>XLSX</b>
-                </Typography>
-              </>
-            )}
-          </Box>
-        </DialogContent>
-
-        <DialogActions
-          disableSpacing
-          sx={{
-            pt: 6,
-            pb: 2,
-          }}>
-          <Stack direction="row" spacing={2}>
-            <Button onClick={handleOnClose} variant="text">
-              <Typography variant="body2" fontWeight="bold">
-                {t("cancel")}
-              </Typography>
-            </Button>
-
-            <LoadingButton
-              disabled={isBusy || (!fileValue && content.data_type !== "wfs")}
-              onClick={handleUpdate}
-              variant="outlined"
-              color="primary"
-              loading={isBusy}>
-              <Typography variant="body2" fontWeight="bold" color="inherit">
-                {t("update")}
-              </Typography>
-            </LoadingButton>
+    <AppDialog
+      open={open}
+      onClose={handleOnClose}
+      icon={ICON_NAME.UPLOAD}
+      title={t("dataset_update")}
+      subtitle={content.name}
+      footer={
+        <AppDialogFooter
+          onCancel={handleOnClose}
+          primaryLabel={t("update")}
+          onPrimary={() => void handleUpdate()}
+          primaryDisabled={isBusy || (!fileValue && content.data_type !== "wfs")}
+          primaryLoading={isBusy}
+        />
+      }>
+      <Box sx={{ width: "100%" }}>
+        {content.data_type === "wfs" && (
+          <Stack direction="column" spacing={4}>
+            <Typography variant="body2">
+              <b>{t("url")}:</b> {content.other_properties?.url}
+            </Typography>
+            <Typography variant="body2">
+              <b>{t("layer")}:</b> {content.other_properties?.layers}
+            </Typography>
           </Stack>
-        </DialogActions>
-      </Dialog>
-    </>
+        )}
+        {!content.data_type && (
+          <>
+            <Typography variant="caption">{t("select_file_to_upload")}</Typography>
+            <MuiFileInput
+              sx={{
+                my: 2,
+              }}
+              inputProps={{
+                accept: acceptedFileTypes.join(","),
+              }}
+              fullWidth
+              error={!!fileUploadError}
+              helperText={fileUploadError}
+              value={fileValue}
+              multiple={false}
+              onChange={handleChange}
+              placeholder={`${t("eg")} file.gpkg, file.geojson, file.parquet, shapefile.zip`}
+            />
+            <Typography variant="caption">
+              {t("supported")} <b>GeoPackage</b>, <b>GeoJSON</b>, <b>Shapefile (.zip)</b>, <b>KML</b>,{" "}
+              <b>CSV</b>, <b>XLSX</b>
+            </Typography>
+          </>
+        )}
+      </Box>
+    </AppDialog>
   );
 };
 

@@ -1,6 +1,7 @@
 import { configureStore } from "@reduxjs/toolkit";
 
 import { jobsReduces } from "@/lib/store/jobs/slice";
+import { uploadsReducer } from "@/lib/store/uploads/slice";
 
 import { featureEditorReducer } from "./featureEditor/slice";
 import { interactionReducer } from "./interaction/slice";
@@ -13,6 +14,7 @@ const store = configureStore({
     layers: layerReducer,
     map: mapReducer,
     jobs: jobsReduces,
+    uploads: uploadsReducer,
     workflow: workflowReducer,
     featureEditor: featureEditorReducer,
     interaction: interactionReducer,

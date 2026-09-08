@@ -59,7 +59,7 @@ const PIE_SIZE_PRESETS = {
 export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }) => {
   const { t, i18n } = useTranslation("common");
   const theme = useTheme();
-  const { config, queryParams, layerId } = useChartWidget(
+  const { config, queryParams, layerId, isLayerLocked } = useChartWidget(
     rawConfig,
     pieChartConfigSchema,
     aggregationStatsQueryParams
@@ -303,9 +303,11 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
     }
   };
 
+  // D7: see Categories.tsx — `layer_project_id` alone doesn't say whether
+  // the layer is locked for this viewer, `isLayerLocked` does.
   const isChartConfigured = useMemo(() => {
-    return config?.setup?.layer_project_id && queryParams;
-  }, [config, queryParams]);
+    return config?.setup?.layer_project_id && queryParams && !isLayerLocked;
+  }, [config, queryParams, isLayerLocked]);
 
   return (
     <>
@@ -314,7 +316,7 @@ export const PieChartWidget = ({ config: rawConfig }: { config: PieChartSchema }
         isNotConfigured={!isChartConfigured}
         isError={isError}
         height={150}
-        isNotConfiguredMessage={t("please_configure_chart")}
+        isNotConfiguredMessage={isLayerLocked ? t("layer_locked_hint") : t("please_configure_chart")}
         errorMessage={t("cannot_render_chart_error")}
       />
 

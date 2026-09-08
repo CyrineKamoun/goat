@@ -56,6 +56,7 @@ class GravityDecay(StrEnum):
 
 class TwoSFCAType(StrEnum):
     """2SFCA method variant (mirrors v1)."""
+
     twosfca = "twosfca"
     e2sfca = "e2sfca"
     m2sfca = "m2sfca"
@@ -121,11 +122,14 @@ class HeatmapV2Params(BaseModel):
     routing_mode: RoutingMode = RoutingMode.walking
     cost_type: CostType = CostType.time
     max_cost: float = Field(
-        default=15.0, gt=0.0,
+        default=15.0,
+        gt=0.0,
         description="Budget: minutes (time) or meters (distance)",
     )
     speed: float | None = Field(
-        default=None, ge=0.0, le=60.0,
+        default=None,
+        ge=0.0,
+        le=60.0,
         description="Travel speed in km/h. None for PT/Car (mode default).",
     )
 
@@ -146,20 +150,22 @@ class HeatmapV2Params(BaseModel):
         description="Egress leg mode (alighting stop→opportunity); selects its lookup table.",
     )
     access_max_time: int = Field(
-        default=15, ge=1, le=MAX_LEG_TIME_LOOKUP_MIN,
+        default=15,
+        ge=1,
+        le=MAX_LEG_TIME_LOOKUP_MIN,
         description="Max access-leg minutes (≤ the access table's built max).",
     )
     egress_max_time: int = Field(
-        default=15, ge=1, le=MAX_LEG_TIME_LOOKUP_MIN,
+        default=15,
+        ge=1,
+        le=MAX_LEG_TIME_LOOKUP_MIN,
         description="Max egress-leg minutes (≤ the egress table's built max).",
     )
     transit_modes: list[str] | None = Field(
         default=None,
         description="Allowed PT classes (bus, tram, rail, …). None = all.",
     )
-    max_transfers: int = Field(
-        default=5, ge=0, le=5, description="Max PT transfers."
-    )
+    max_transfers: int = Field(default=5, ge=0, le=5, description="Max PT transfers.")
 
     # ---- Heatmap formula -----------------------------------------------------
     heatmap_type: HeatmapType = HeatmapType.gravity
@@ -207,16 +213,38 @@ class HeatmapV2Params(BaseModel):
     output_path: str = Field(
         ...,
         description="Output GeoParquet path: (h3_index, geometry, "
-                    "<opp_name>_accessibility..., total_accessibility).",
+        "<opp_name>_accessibility..., total_accessibility).",
     )
+
+    # ---- Street network override --------------------------------------------
+    # Point the engine at an uploaded street network bundle's graph instead of
+    # the default global network. None uses the default.
+    edge_path: str | None = Field(
+        default=None,
+        description="Path to an edges parquet to use for street routing",
+    )
+    node_path: str | None = Field(
+        default=None,
+        description="Path to a nodes parquet to use for street routing",
+    )
+
+    @model_validator(mode="after")
+    def validate_network_override(self: Self) -> Self:
+        # Half an override is worse than none: the engine would route over one
+        # network's edges joined to the other's nodes, which silently yields a
+        # near-empty result rather than failing.
+        if bool(self.edge_path) != bool(self.node_path):
+            raise ValueError(
+                "edge_path and node_path must be set together — a routing graph "
+                "is only coherent as a pair"
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_inputs_by_type(self: Self) -> Self:
         if self.heatmap_type == HeatmapType.connectivity:
             if not self.reference_area_path:
-                raise ValueError(
-                    "connectivity requires reference_area_path."
-                )
+                raise ValueError("connectivity requires reference_area_path.")
         else:
             if not self.opportunities:
                 raise ValueError(
@@ -225,7 +253,5 @@ class HeatmapV2Params(BaseModel):
                 )
         if self.heatmap_type == HeatmapType.two_sfca:
             if not self.demand_path or not self.demand_field:
-                raise ValueError(
-                    "two_sfca requires demand_path and demand_field."
-                )
+                raise ValueError("two_sfca requires demand_path and demand_field.")
         return self

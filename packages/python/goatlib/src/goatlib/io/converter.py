@@ -124,8 +124,13 @@ class IOConverter:
 
             # Convert single file
             return self._convert_single_file(
-                src_info, out, geometry_col, target_crs, column_mapping,
-                has_header=has_header, sheet_name=sheet_name,
+                src_info,
+                out,
+                geometry_col,
+                target_crs,
+                column_mapping,
+                has_header=has_header,
+                sheet_name=sheet_name,
             )
 
         except Exception as e:
@@ -292,7 +297,9 @@ class IOConverter:
         logger.debug("Analyzing source format: %s", src_info.path)
 
         # Build source reader
-        st_read = self._build_source_reader(src_info, has_header=has_header, sheet_name=sheet_name)
+        st_read = self._build_source_reader(
+            src_info, has_header=has_header, sheet_name=sheet_name
+        )
 
         # Detect geometry information
         geom_info = self._detect_geometry_info(src_info, st_read, geometry_col)
@@ -358,9 +365,7 @@ class IOConverter:
         )
 
         if is_xlsx and has_header is not None:
-            return self._build_xlsx_reader(
-                src_info.path, effective_layer, has_header
-            )
+            return self._build_xlsx_reader(src_info.path, effective_layer, has_header)
 
         # Default ST_Read (no explicit header control)
         if effective_layer:
@@ -385,8 +390,7 @@ class IOConverter:
         safe_layer = layer.replace("'", "''") if layer else None
         layer_arg = f", layer='{safe_layer}'" if safe_layer else ""
         base_read = self._strip_ogc_fid(
-            f"ST_Read('{path}'{layer_arg}, "
-            f"open_options=ARRAY['HEADERS=DISABLE'])"
+            f"ST_Read('{path}'{layer_arg}, " f"open_options=ARRAY['HEADERS=DISABLE'])"
         )
 
         if not has_header:
@@ -394,17 +398,13 @@ class IOConverter:
 
         # has_header=True: read first row to get column names, then build
         # a query that renames columns and skips the header row.
-        first_row = self.con.execute(
-            f"SELECT * FROM {base_read} LIMIT 1"
-        ).fetchone()
+        first_row = self.con.execute(f"SELECT * FROM {base_read} LIMIT 1").fetchone()
         if not first_row:
             return base_read
 
         raw_cols = [
             c[0]
-            for c in self.con.execute(
-                f"SELECT * FROM {base_read} LIMIT 0"
-            ).description
+            for c in self.con.execute(f"SELECT * FROM {base_read} LIMIT 0").description
         ]
 
         # Build column aliases: "Field1" AS "actual_name"
@@ -914,10 +914,7 @@ class IOConverter:
                         dst.write(src.read())
 
             # Yield only the files with supported extensions
-            supported = [
-                f for f in tmp_dir.iterdir()
-                if f.suffix.lower() in ALL_EXTS
-            ]
+            supported = [f for f in tmp_dir.iterdir() if f.suffix.lower() in ALL_EXTS]
             if not supported:
                 raise ValueError(f"No supported files found in {zip_path}")
 

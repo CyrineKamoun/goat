@@ -22,7 +22,6 @@ from goatlib.analysis.schemas.ui import (
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     TwoLayerInputMixin,
     get_default_layer_name,
@@ -31,9 +30,7 @@ from goatlib.tools.schemas import (
 logger = logging.getLogger(__name__)
 
 
-class ClipToolParams(
-    ScenarioSelectorMixin, ToolInputBase, TwoLayerInputMixin, ClipParams
-):
+class ClipToolParams(ToolInputBase, TwoLayerInputMixin, ClipParams):
     """Parameters for clip tool.
 
     Inherits clip options from ClipParams, adds layer context from ToolInputBase.
@@ -45,14 +42,6 @@ class ClipToolParams(
             SECTION_INPUT,
             UISection(id="overlay", order=2, icon="layers"),
             SECTION_RESULT,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"input_layer_id": {"$ne": None}},
-            ),
             SECTION_OUTPUT,
         )
     )
@@ -118,15 +107,11 @@ class ClipToolRunner(BaseToolRunner[ClipToolParams]):
             layer_id=params.input_layer_id,
             user_id=params.user_id,
             cql_filter=params.input_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
         overlay_path = self.export_layer_to_parquet(
             layer_id=params.overlay_layer_id,
             user_id=params.user_id,
             cql_filter=params.overlay_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
         output_path = temp_dir / "output.parquet"
 
@@ -139,7 +124,6 @@ class ClipToolRunner(BaseToolRunner[ClipToolParams]):
                     "user_id",
                     "folder_id",
                     "project_id",
-                    "scenario_id",
                     "output_name",
                     "input_layer_id",
                     "input_layer_filter",

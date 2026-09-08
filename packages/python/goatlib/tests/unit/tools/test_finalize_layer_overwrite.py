@@ -90,24 +90,18 @@ class TestFinalizeLayerOverwriteBranch:
 
     def test_falls_back_when_no_prior_export_found(self, tmp_path: Path):
         r = self._runner()
-        params = _base_params(
-            overwrite_previous=True, export_node_id=EXPORT_NODE
-        )
+        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
         parquet = tmp_path / "t_x.parquet"
         parquet.write_bytes(b"")
 
-        with patch.object(
-            r, "_find_previous_export", new=AsyncMock(return_value=None)
-        ):
+        with patch.object(r, "_find_previous_export", new=AsyncMock(return_value=None)):
             result = r._try_overwrite_existing(params, parquet, metadata={})
         assert result is None
 
     def test_falls_back_when_matched_layer_gone(self, tmp_path: Path):
         """Stamp points at a layer that was since deleted or reassigned."""
         r = self._runner()
-        params = _base_params(
-            overwrite_previous=True, export_node_id=EXPORT_NODE
-        )
+        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
         parquet = tmp_path / "t_x.parquet"
         parquet.write_bytes(b"")
 
@@ -128,9 +122,7 @@ class TestFinalizeLayerOverwriteBranch:
 
     def test_falls_back_when_permission_denied(self, tmp_path: Path):
         r = self._runner()
-        params = _base_params(
-            overwrite_previous=True, export_node_id=EXPORT_NODE
-        )
+        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
         parquet = tmp_path / "t_x.parquet"
         parquet.write_bytes(b"")
 
@@ -155,9 +147,7 @@ class TestFinalizeLayerOverwriteBranch:
 
     def test_happy_path_replaces_in_place(self, tmp_path: Path):
         r = self._runner()
-        params = _base_params(
-            overwrite_previous=True, export_node_id=EXPORT_NODE
-        )
+        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
         parquet = tmp_path / "t_x.parquet"
         parquet.write_bytes(b"parquet")
 
@@ -180,7 +170,6 @@ class TestFinalizeLayerOverwriteBranch:
             "data_type": None,
             "feature_layer_type": "tool",
             "geometry_type": "point",
-            "attribute_mapping": {},
             "other_properties": {
                 "workflow_export": {
                     "workflow_id": WORKFLOW,
@@ -233,9 +222,7 @@ class TestFinalizeLayerProcessDispatch:
 
     def test_overwrite_branch_used_when_returns_output(self, tmp_path: Path):
         r = self._runner()
-        params = _base_params(
-            overwrite_previous=True, export_node_id=EXPORT_NODE
-        )
+        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
         base_path = tmp_path / "base"
         parquet = base_path / "t_x.parquet"
         base_path.mkdir()
@@ -273,9 +260,7 @@ class TestFinalizeLayerProcessDispatch:
         self, tmp_path: Path
     ):
         r = self._runner()
-        params = _base_params(
-            overwrite_previous=True, export_node_id=EXPORT_NODE
-        )
+        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
         base_path = tmp_path / "base"
         parquet = base_path / "t_x.parquet"
         base_path.mkdir()
@@ -357,9 +342,7 @@ class TestCreateNewLayerStamp:
         fake_db_service.create_layer = AsyncMock(return_value={"style": "x"})
         fake_db_service.add_to_project = AsyncMock(return_value=99)
 
-        params = _base_params(
-            overwrite_previous=True, export_node_id=EXPORT_NODE
-        )
+        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
 
         with (
             patch(

@@ -29,7 +29,6 @@ from goatlib.analysis.schemas.ui import (
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -79,7 +78,7 @@ JOIN_TYPE_LABELS: dict[str, str] = {
 }
 
 
-class JoinToolParams(ScenarioSelectorMixin, ToolInputBase, BaseModel):
+class JoinToolParams(ToolInputBase, BaseModel):
     """Parameters for join tool.
 
     Matches ArcGIS Join Features tool with toggle-based spatial/attribute selection.
@@ -102,14 +101,6 @@ class JoinToolParams(ScenarioSelectorMixin, ToolInputBase, BaseModel):
                 collapsible=True,
             ),
             SECTION_RESULT_JOIN,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"target_layer_id": {"$ne": None}},
-            ),
             SECTION_OUTPUT,
         ),
     )
@@ -501,15 +492,11 @@ class JoinToolRunner(BaseToolRunner[JoinToolParams]):
             layer_id=params.target_layer_id,
             user_id=params.user_id,
             cql_filter=params.target_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
         join_path = self.export_layer_to_parquet(
             layer_id=params.join_layer_id,
             user_id=params.user_id,
             cql_filter=params.join_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
         output_path = temp_dir / "output.parquet"
 

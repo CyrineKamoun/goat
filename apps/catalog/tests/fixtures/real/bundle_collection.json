@@ -1,0 +1,152 @@
+{
+ "id": "data_gv_at:2f5baa1f-208c-42c2-8d04-9ea74aa1b229",
+ "type": "Collection",
+ "links": [
+  {
+   "rel": "self",
+   "href": "collection.json",
+   "type": "application/json"
+  },
+  {
+   "rel": "root",
+   "href": "../../catalog.json",
+   "type": "application/json"
+  },
+  {
+   "rel": "parent",
+   "href": "../catalog.json",
+   "type": "application/json"
+  },
+  {
+   "rel": "via",
+   "href": "https://www.data.gv.at/katalog/datasets/2f5baa1f-208c-42c2-8d04-9ea74aa1b229",
+   "type": "text/html",
+   "title": "Source dataset"
+  },
+  {
+   "rel": "via",
+   "href": "https://ckan.govdata.de/dataset/2f5baa1f-208c-42c2-8d04-9ea74aa1b229",
+   "type": "text/html",
+   "title": "Harvested from"
+  },
+  {
+   "rel": "item",
+   "href": "items/9ea45c79-9a99-4a59-8011-831b816f03b6_ogd-21d1d4ee8498.json",
+   "type": "application/geo+json",
+   "title": "Realnutzungskartierung 2007 bis 2022 Wien [ogdwien:REALNUT2012OGD]"
+  },
+  {
+   "rel": "item",
+   "href": "items/020ecfbf-2fcc-472f-8531-8052b1160f06_ogd-3fafa7a1ed7a.json",
+   "type": "application/geo+json",
+   "title": "Realnutzungskartierung 2007 bis 2022 Wien [ogdwien:REALNUT2016GOGD]"
+  },
+  {
+   "rel": "item",
+   "href": "items/3de225ad-9b30-4e2b-bff2-b7c88435b1b6_ogd-a69b45083e89.json",
+   "type": "application/geo+json",
+   "title": "Realnutzungskartierung 2007 bis 2022 Wien [ogdwien:REALNUT2009OGD]"
+  }
+ ],
+ "title": "Realnutzungskartierung 2007 bis 2022 Wien",
+ "assets": {
+  "thumbnail": {
+   "href": "s3://p4b-catalog-test/catalog/thumbs/020ecfbf-2fcc-472f-8531-8052b1160f06_ogd-3fafa7a1ed7a.svg",
+   "type": "image/svg+xml",
+   "roles": [
+    "thumbnail"
+   ],
+   "title": "Thumbnail"
+  }
+ },
+ "extent": {
+  "spatial": {
+   "bbox": [
+    [
+     16.181830379117955,
+     48.11790330115346,
+     16.57751413031004,
+     48.32266661161856
+    ],
+    [
+     16.181830379117955,
+     48.11790330115346,
+     16.57751413031004,
+     48.32266661161856
+    ],
+    [
+     16.181830379117955,
+     48.11790330115346,
+     16.57751413031004,
+     48.32266661161856
+    ],
+    [
+     16.181830379117955,
+     48.11790330115346,
+     16.57751413031004,
+     48.32266661161856
+    ]
+   ]
+  },
+  "temporal": {
+   "interval": [
+    [
+     "2007-01-01T00:00:00Z",
+     "2007-01-01T00:00:00Z"
+    ]
+   ]
+  }
+ },
+ "license": "CC-BY-4.0",
+ "keywords": [
+  "Verkehr",
+  "RNK",
+  "Wohnen",
+  "Wasserflächen",
+  "Nutzung",
+  "Sonderflächen",
+  "Landnutzung",
+  "ViennaGIS",
+  "Grünflächen",
+  "Baublock",
+  "Realnutzung",
+  "Luftbildinterpretation"
+ ],
+ "providers": [
+  {
+   "name": "Stadt Wien",
+   "roles": [
+    "producer"
+   ]
+  },
+  {
+   "name": "Magistrat Wien - Magistratsabteilung 18 - Stadtentwicklung und Stadtplanung",
+   "roles": [
+    "producer"
+   ]
+  }
+ ],
+ "summaries": {
+  "themes": [
+   {
+    "scheme": "https://goat.plan4better.de/data-categories",
+    "concepts": [
+     {
+      "id": "other"
+     }
+    ]
+   }
+  ],
+  "goat:layerType": [
+   "feature"
+  ],
+  "goat:geometryType": [
+   "polygon"
+  ]
+ },
+ "description": "Dieser Datenbestand bildet die tatsächliche Flächennutzung Wiens in generalisierter Form ab. Die Datenbasis ist eine Luftbildinterpretation unter Hinzunahme ergänzender Sachdaten. Es gibt 32 Nutzungskategorien aus den Bereichen Wohnen, Grünflächen, Verkehr, etc. Die Nutzungskategorien sind hierarchisch in 3 Levels gegliedert.",
+ "stac_version": "1.0.0",
+ "stac_extensions": [
+  "https://stac-extensions.github.io/collection-assets/v1.0.0/schema.json"
+ ]
+}

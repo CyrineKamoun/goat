@@ -25,6 +25,7 @@ import pytest_asyncio
 from goatlib.tools.base import ToolSettings
 from goatlib.tools.project_export import ProjectExportParams, ProjectExportRunner
 from goatlib.tools.project_import import ProjectImportParams, ProjectImportRunner
+from goatlib.utils.layer import layer_schema_name
 
 from .conftest import TEST_CUSTOMER_SCHEMA
 
@@ -141,24 +142,9 @@ async def extended_test_schemas(postgres_pool: Any, test_schemas: None) -> None:
                 END $$;
             """)
 
-        # Add missing columns to layer (quality/metadata fields the import needs)
+        # Add missing columns to layer that the import needs
         layer_cols = [
             ("url", "TEXT"),
-            ("upload_reference_system", "INTEGER"),
-            ("upload_file_type", "TEXT"),
-            ("lineage", "TEXT"),
-            ("positional_accuracy", "TEXT"),
-            ("attribute_accuracy", "TEXT"),
-            ("completeness", "TEXT"),
-            ("geographical_code", "TEXT"),
-            ("language_code", "TEXT"),
-            ("distributor_name", "TEXT"),
-            ("distributor_email", "TEXT"),
-            ("distribution_url", "TEXT"),
-            ("license", "TEXT"),
-            ("attribution", "TEXT"),
-            ("data_reference_year", "INTEGER"),
-            ("data_category", "TEXT"),
             ("field_config", "JSONB NOT NULL DEFAULT '{}'::jsonb"),
         ]
         for col_name, col_type in layer_cols:
@@ -698,7 +684,7 @@ async def test_export_import_round_trip(
         # ------------------------------------------------------------------
         internal_layer = next(r for r in layers if r["name"] == "German Cities")
         new_internal_id = str(internal_layer["id"])
-        user_schema = f"user_{import_user_id.replace('-', '')}"
+        user_schema = layer_schema_name()
         table_name = f"t_{new_internal_id.replace('-', '')}"
 
         count = ducklake_connection.execute(
@@ -709,7 +695,7 @@ async def test_export_import_round_trip(
         # External layer should NOT have a DuckLake table
         external_layer = next(r for r in layers if r["name"] == "External WMS")
         new_external_id = str(external_layer["id"])
-        ext_schema = f"user_{import_user_id.replace('-', '')}"
+        ext_schema = layer_schema_name()
         ext_table = f"t_{new_external_id.replace('-', '')}"
         ext_exists = ducklake_connection.execute(
             f"""
@@ -736,7 +722,7 @@ async def test_export_import_round_trip(
                 )
             for layer_row in imported_layers:
                 lid = str(layer_row["id"])
-                tbl = f"lake.user_{import_user_id.replace('-', '')}.t_{lid.replace('-', '')}"
+                tbl = f"lake.{layer_schema_name()}.t_{lid.replace('-', '')}"
                 try:
                     ducklake_connection.execute(f"DROP TABLE IF EXISTS {tbl}")
                 except Exception:

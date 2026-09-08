@@ -49,7 +49,7 @@ from goatlib.tools.schemas import ToolInputBase, get_default_layer_name
 logger = logging.getLogger(__name__)
 
 # Custom sections for catchment area UI
-# Order: routing (1), configuration (2), starting_points (3), result (7), scenario (8)
+# Order: routing (1), configuration (2), starting_points (3), result (7)
 SECTION_CONFIGURATION = UISection(
     id="configuration",
     order=2,
@@ -75,16 +75,6 @@ SECTION_RESULT_CATCHMENT = UISection(
     depends_on={"routing_mode": {"$ne": None}},
 )
 
-SECTION_SCENARIO = UISection(
-    id="scenario",
-    order=8,
-    icon="git-branch",  # scenario/branch icon for network modifications
-    label_key="scenario",
-    collapsible=True,
-    collapsed=True,
-    depends_on={"routing_mode": {"$ne": None}},
-)
-
 
 class CatchmentAreaWindmillParams(ToolInputBase):
     """Parameters for catchment area tool via Windmill/GeoAPI.
@@ -99,7 +89,6 @@ class CatchmentAreaWindmillParams(ToolInputBase):
             SECTION_CONFIGURATION,
             SECTION_STARTING,
             SECTION_RESULT_CATCHMENT,
-            SECTION_SCENARIO,
         )
     }
 
@@ -240,14 +229,20 @@ class CatchmentAreaWindmillParams(ToolInputBase):
 
         if self.routing_mode == CatchmentAreaRoutingMode.car:
             if self.max_distance > 100000:
-                raise ValueError("Car catchment distance must be less than or equal to 100000 meters.")
+                raise ValueError(
+                    "Car catchment distance must be less than or equal to 100000 meters."
+                )
             return self
 
-        if self.routing_mode in {
-            CatchmentAreaRoutingMode.walking,
-            CatchmentAreaRoutingMode.bicycle,
-            CatchmentAreaRoutingMode.pedelec,
-        } and self.max_distance > 20000:
+        if (
+            self.routing_mode
+            in {
+                CatchmentAreaRoutingMode.walking,
+                CatchmentAreaRoutingMode.bicycle,
+                CatchmentAreaRoutingMode.pedelec,
+            }
+            and self.max_distance > 20000
+        ):
             raise ValueError(
                 "Active mobility catchment distance must be less than or equal to 20000 meters."
             )
@@ -272,8 +267,10 @@ class CatchmentAreaWindmillParams(ToolInputBase):
             field_order=4,
             label_key="speed",
             enum_labels=SPEED_LABELS,
-            visible_when={"routing_mode": {"$in": ["walking", "bicycle", "pedelec"]},
-                         "measure_type": CatchmentAreaMeasureType.time},
+            visible_when={
+                "routing_mode": {"$in": ["walking", "bicycle", "pedelec"]},
+                "measure_type": CatchmentAreaMeasureType.time,
+            },
             widget_options={
                 "default_by_field": {
                     "field": "routing_mode",
@@ -417,19 +414,6 @@ class CatchmentAreaWindmillParams(ToolInputBase):
         ),
     )
 
-    # =========================================================================
-    # Scenario Section
-    # =========================================================================
-    scenario_id: str | None = Field(
-        default=None,
-        description="Scenario ID to apply network modifications.",
-        json_schema_extra=ui_field(
-            section="scenario",
-            field_order=1,
-            widget="scenario-selector",
-        ),
-    )
-
 
 class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
     """Catchment Area tool runner for Windmill."""
@@ -549,33 +533,24 @@ class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
         layer_id: str,
         user_id: str,
         cql_filter: dict[str, Any] | None = None,
-        scenario_id: str | None = None,
-        project_id: str | None = None,
     ) -> tuple[list[float], list[float]]:
         """Extract lat/lon coordinates from a layer.
-
-        When scenario_id is provided, uses export_layer_to_parquet which handles
-        scenario feature merging (excluding deleted, including new/modified features).
 
         Args:
             layer_id: Layer UUID string
             user_id: User UUID string (fallback if layer info unavailable)
             cql_filter: Optional CQL2-JSON filter to apply to the layer
-            scenario_id: Optional scenario UUID for applying scenario edits
-            project_id: Optional project UUID (required with scenario_id)
 
         Returns:
             Tuple of (latitudes, longitudes) lists
         """
         is_temp_layer = ":" in layer_id
-        if scenario_id and project_id or is_temp_layer:
-            # Use export_layer_to_parquet which handles scenario merging and temp layers
+        if is_temp_layer:
+            # export_layer_to_parquet resolves temp layers
             temp_parquet = self.export_layer_to_parquet(
                 layer_id=layer_id,
                 user_id=user_id,
                 cql_filter=cql_filter,
-                scenario_id=scenario_id,
-                project_id=project_id,
             )
             # Detect geometry column name from the parquet
             parquet_info = self._get_table_info(self.duckdb_con, f"'{temp_parquet}'")
@@ -606,7 +581,7 @@ class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
                     f"Layer {layer_id} owned by {layer_owner_id}, accessed by {user_id}"
                 )
 
-            table_name = self.get_layer_table_path(layer_owner_id, layer_id)
+            table_name = self.resolve_layer_table_path(layer_id)
 
             # Detect geometry column name from table schema
             cols_result = self._execute_with_retry(
@@ -645,8 +620,12 @@ class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
         if not result:
             raise ValueError(f"No valid geometries found in layer {layer_id}")
 
-        latitudes = [row[0] for row in result if row[0] is not None and row[1] is not None]
-        longitudes = [row[1] for row in result if row[0] is not None and row[1] is not None]
+        latitudes = [
+            row[0] for row in result if row[0] is not None and row[1] is not None
+        ]
+        longitudes = [
+            row[1] for row in result if row[0] is not None and row[1] is not None
+        ]
 
         logger.info(
             "Extracted %d starting points from layer %s",
@@ -660,16 +639,12 @@ class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
         self: Self,
         starting_points: StartingPoints,
         user_id: str,
-        scenario_id: str | None = None,
-        project_id: str | None = None,
     ) -> tuple[list[float], list[float]]:
         """Get latitude/longitude coordinates from starting points.
 
         Args:
             starting_points: Either direct coordinates or layer reference
             user_id: User UUID string (needed for layer lookup)
-            scenario_id: Optional scenario UUID for applying scenario edits
-            project_id: Optional project UUID (required with scenario_id)
 
         Returns:
             Tuple of (latitudes, longitudes) lists
@@ -685,8 +660,6 @@ class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
                 starting_points.layer_id,
                 user_id,
                 cql_filter=starting_points.layer_filter,
-                scenario_id=scenario_id,
-                project_id=project_id,
             )
         else:
             raise ValueError(f"Invalid starting_points type: {type(starting_points)}")
@@ -703,8 +676,6 @@ class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
         latitudes, longitudes = self._get_starting_coordinates(
             params.starting_points,
             params.user_id,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
 
         # Validate starting point limits based on routing mode
@@ -810,7 +781,6 @@ class CatchmentAreaToolRunner(BaseToolRunner[CatchmentAreaWindmillParams]):
             egress_mode=params.pt_egress_mode or AccessEgressMode.walk,
             catchment_area_type=params.catchment_area_type,
             polygon_difference=params.polygon_difference,
-            scenario_id=params.scenario_id,
             output_path=str(output_path),
             routing_url=routing_url,
             authorization=authorization,

@@ -7,10 +7,6 @@ import {
   Button,
   Checkbox,
   IconButton,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
   Stack,
   Switch,
   Tooltip,
@@ -21,21 +17,32 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next";
 import { useMap } from "react-map-gl/maplibre";
 import { toast } from "react-toastify";
+import { mutate } from "swr";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
+import { useCatalogItemVersions } from "@/lib/api/catalog";
+import { projectLayersKey } from "@/lib/api/projects";
 // ----------------------------------------------------------------------
 // 3. MAIN COMPONENT
 // ----------------------------------------------------------------------
 // Redux
 import { useUserProfile } from "@/lib/api/users";
 import { MAX_EDITABLE_LAYER_SIZE } from "@/lib/constants";
-import useStartEditingGuard from "@/hooks/map/useStartEditingGuard";
 import { emitInteractionEvent } from "@/lib/store/interaction/slice";
-import { setSelectedLayers } from "@/lib/store/layer/slice";
+import { setSelectedBundle, setSelectedLayers } from "@/lib/store/layer/slice";
 import { setActiveRightPanel, setDataPanelLayerId, setIsDataPanelOpen } from "@/lib/store/map/slice";
+import { isBundleMemberLayer, isEditableBundleMember } from "@/lib/utils/bundleEditable";
+import {
+  catalogItemSnapshot,
+  isCatalogLayer,
+  isCatalogLayerFailed,
+  isCatalogLayerPending,
+} from "@/lib/utils/catalog-layer";
 import { rgbToHex } from "@/lib/utils/helpers";
 import { canEditLayerFeatures } from "@/lib/utils/layerPermissions";
+import { selectedTreeItemIds } from "@/lib/utils/map/layerTreeSelection";
+import { getLegendColorMap, getLegendMarkerMap, resolveFeatureMarker } from "@/lib/utils/map/legend";
 import { zoomToLayer, zoomToProjectLayer } from "@/lib/utils/map/navigate";
 // API & Store
 import type {
@@ -45,23 +52,23 @@ import type {
   ProjectLayerTreeUpdate,
 } from "@/lib/validations/project";
 
-import { AddLayerSourceType, ContentActions, MapLayerActions } from "@/types/common";
+import { ContentActions, MapLayerActions } from "@/types/common";
 import { MapSidebarItemID } from "@/types/map/common";
 
 import { useLayerSettingsMoreMenu } from "@/hooks/map/LayerPanelHooks";
+import { useBundleMemberGates } from "@/hooks/map/useBundleMemberGates";
+import useStartEditingGuard from "@/hooks/map/useStartEditingGuard";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
+// Modals
+import AddLayerMenu from "@/components/addLayer/AddLayerMenu";
+import PopupContentRenderer from "@/components/builder/widgets/common/PopupContentRenderer";
 // Common Components
 import MoreMenu from "@/components/common/PopperMenu";
 import type { PopperMenuItem } from "@/components/common/PopperMenu";
-// Modals
-import CatalogExplorerModal from "@/components/modals/CatalogExplorer";
+import { MaskedImageIcon } from "@/components/map/panels/style/other/MaskedImageIcon";
 import ConfirmModal from "@/components/modals/Confirm";
 import ContentDialogWrapper from "@/components/modals/ContentDialogWrapper";
-import DatasetExplorerModal from "@/components/modals/DatasetExplorer";
-import DatasetExternalModal from "@/components/modals/DatasetExternal";
-import CreateLayerModal from "@/components/modals/CreateLayer";
-import DatasetUploadModal from "@/components/modals/DatasetUpload";
 import MapLayerChartModal from "@/components/modals/MapLayerChart";
 import ProjectLayerDeleteModal from "@/components/modals/ProjectLayerDelete";
 import ProjectLayerGroupModal from "@/components/modals/ProjectLayerGroupModal";
@@ -70,11 +77,9 @@ import ProjectLayerRenameModal from "@/components/modals/ProjectLayerRename";
 // Tree Components
 import type { BaseTreeItem } from "./DraggableTreeView";
 import { DraggableTreeView } from "./DraggableTreeView";
+import { LockedLayerRow } from "./LockedLayerRow";
 import { LayerIcon } from "./legend/LayerIcon";
-import { MaskedImageIcon } from "@/components/map/panels/style/other/MaskedImageIcon";
 import { LayerLegendPanel } from "./legend/LayerLegend";
-import { getLegendColorMap, getLegendMarkerMap, resolveFeatureMarker } from "@/lib/utils/map/legend";
-import PopupContentRenderer from "@/components/builder/widgets/common/PopupContentRenderer";
 
 // Extended tree item interface to include project layer data
 interface ProjectTreeItem extends BaseTreeItem {
@@ -94,61 +99,19 @@ export const AddLayerButton = ({
   startIcon?: boolean;
 }) => {
   const { t } = useTranslation("common");
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [addSourceType, setAddSourceType] = useState<AddLayerSourceType | null>(null);
-  const open = Boolean(anchorEl);
-  const menuItems = [
-    { type: AddLayerSourceType.DatasourceExplorer, icon: ICON_NAME.DATABASE, label: t("dataset_explorer") },
-    { type: AddLayerSourceType.DatasourceUpload, icon: ICON_NAME.UPLOAD, label: t("dataset_upload") },
-    { type: AddLayerSourceType.DataSourceExternal, icon: ICON_NAME.LINK, label: t("dataset_external") },
-    { type: AddLayerSourceType.CatalogExplorer, icon: ICON_NAME.GLOBE, label: t("catalog_explorer") },
-    { type: AddLayerSourceType.CreateEmptyLayer, icon: ICON_NAME.PLUS, label: t("create_layer") },
-  ];
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+
   return (
     <>
       <Button
         variant={variant}
         size="small"
         startIcon={startIcon ? <AddIcon fontSize="small" /> : undefined}
-        onClick={(e) => setAnchorEl(e.currentTarget)}
+        onClick={(event) => setAnchorEl(event.currentTarget)}
         sx={{ borderRadius: 4, textTransform: "none", fontWeight: "bold", whiteSpace: "nowrap" }}>
         {t("add_layer")}
       </Button>
-      <Menu
-        anchorEl={anchorEl}
-        open={open}
-        onClose={() => setAnchorEl(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}>
-        {menuItems.map((item) => (
-          <MenuItem
-            key={item.type}
-            onClick={() => {
-              setAddSourceType(item.type);
-              setAnchorEl(null);
-            }}>
-            <ListItemIcon>
-              <Icon iconName={item.icon} style={{ fontSize: 15 }} />
-            </ListItemIcon>
-            <ListItemText primaryTypographyProps={{ variant: "body2" }}>{item.label}</ListItemText>
-          </MenuItem>
-        ))}
-      </Menu>
-      {addSourceType === AddLayerSourceType.DatasourceExplorer && (
-        <DatasetExplorerModal open={true} onClose={() => setAddSourceType(null)} projectId={projectId} />
-      )}
-      {addSourceType === AddLayerSourceType.DatasourceUpload && (
-        <DatasetUploadModal open={true} onClose={() => setAddSourceType(null)} projectId={projectId} />
-      )}
-      {addSourceType === AddLayerSourceType.DataSourceExternal && (
-        <DatasetExternalModal open={true} onClose={() => setAddSourceType(null)} projectId={projectId} />
-      )}
-      {addSourceType === AddLayerSourceType.CatalogExplorer && (
-        <CatalogExplorerModal open={true} onClose={() => setAddSourceType(null)} projectId={projectId} />
-      )}
-      {addSourceType === AddLayerSourceType.CreateEmptyLayer && (
-        <CreateLayerModal open={true} onClose={() => setAddSourceType(null)} projectId={projectId} />
-      )}
+      <AddLayerMenu anchorEl={anchorEl} onClose={() => setAnchorEl(null)} projectId={projectId} />
     </>
   );
 };
@@ -259,7 +222,10 @@ export const VisibilityToggle = ({
 // ----------------------------------------------------------------------
 // 2. UTILS
 // ----------------------------------------------------------------------
-function formatApiDataForDnd(nodes: ProjectLayerTreeNode[]): ProjectTreeItem[] {
+function formatApiDataForDnd(
+  nodes: ProjectLayerTreeNode[],
+  statusLabel?: (node: ProjectLayerTreeNode) => string | undefined
+): ProjectTreeItem[] {
   // First, identify which groups are invisible
   const invisibleGroupIds = new Set(
     nodes
@@ -289,21 +255,41 @@ function formatApiDataForDnd(nodes: ProjectLayerTreeNode[]): ProjectTreeItem[] {
     return false;
   };
 
+  // Groups backed by a bundle have locked membership: layers can't be dragged
+  // into/out of them, and members can't be removed individually.
+  const bundleGroupIds = new Set(
+    nodes.filter((node) => node.type === "group" && node.bundle_id).map((node) => node.id)
+  );
+
   return nodes
     .filter((node) => !shouldHideNode(node))
-    .map((node) => ({
-      id: `${node.type}-${node.id}`,
-      parentId: node.parent_id ? `group-${node.parent_id}` : null,
-      label: node.name,
-      collapsed:
-        node.type === "group"
-          ? !(node.properties?.expanded ?? true) // For groups, use expanded property
-          : (node.properties?.legend?.collapsed ?? false), // For layers, use legend.collapsed property
-      isGroup: node.type === "group",
-      data: node,
-      // Hide expand/collapse functionality for invisible groups
-      canExpand: node.type === "group" ? (node.properties?.visibility ?? true) : undefined,
-    }));
+    .map((node) => {
+      const isBundleGroup = node.type === "group" && !!node.bundle_id;
+      const isBundleMember = node.type === "layer" && !!node.parent_id && bundleGroupIds.has(node.parent_id);
+      return {
+        id: `${node.type}-${node.id}`,
+        parentId: node.parent_id ? `group-${node.parent_id}` : null,
+        label: node.name,
+        collapsed:
+          node.type === "group"
+            ? !(node.properties?.expanded ?? true) // For groups, use expanded property
+            : (node.properties?.legend?.collapsed ?? false), // For layers, use legend.collapsed property
+        isGroup: node.type === "group",
+        labelInfo: node.type === "layer" ? statusLabel?.(node) : undefined,
+        data: node,
+        // Hide expand/collapse functionality for invisible groups
+        canExpand: node.type === "group" ? (node.properties?.visibility ?? true) : undefined,
+        // Bundle-group lock: member layers can't be dragged at all, and nothing
+        // can be dropped into the group. The group itself stays a drop target so
+        // it can be reordered — marking it undroppable leaves a project holding
+        // only bundles with no valid drop target anywhere, and nothing moves.
+        // Membership is enforced in handleDragEnd, which rejects any drop that
+        // would adopt a bundle group as parent.
+        isBundleGroup,
+        dragDisabled: isBundleMember,
+        dropDisabled: isBundleMember,
+      };
+    });
 }
 
 function formatDndDataForApi(flatItems: ProjectTreeItem[]): ProjectLayerTreeUpdate {
@@ -379,7 +365,7 @@ const castNodeToProjectLayer = (node: ProjectLayerTreeNode): ProjectLayer => {
 // Helper function to filter menu options for view mode
 const filterMenuForViewMode = (
   menuOptions: PopperMenuItem[],
-  allowedActions?: { style?: boolean },
+  allowedActions?: { style?: boolean }
 ): PopperMenuItem[] => {
   const excludedActions: string[] = [
     ContentActions.DELETE,
@@ -487,13 +473,19 @@ export const ProjectLayerTree = ({
   const dispatch = useAppDispatch();
   const { userProfile } = useUserProfile();
   // Only subscribe to currentZoom when dimming is enabled and in view mode
-  const currentZoom = useAppSelector((state) => (dimOutOfZoom && viewMode === "view" ? state.map.currentZoom : undefined));
+  const currentZoom = useAppSelector((state) =>
+    dimOutOfZoom && viewMode === "view" ? state.map.currentZoom : undefined
+  );
   const editingLayerId = useAppSelector((state) => state.featureEditor.activeLayerId);
   const startEditingGuard = useStartEditingGuard();
+  // Which member layers of the project's bundles may be edited, by role.
+  const bundleMemberGates = useBundleMemberGates(projectLayerGroups.map((group) => group.bundle_id));
 
   const [items, setItems] = useState<ProjectTreeItem[]>([]);
   const itemsRef = useRef<ProjectTreeItem[]>([]);
-  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
   const [groupModal, setGroupModal] = useState<{
     open: boolean;
     mode: "create" | "rename" | "delete";
@@ -504,6 +496,7 @@ export const ProjectLayerTree = ({
   const activeLayerId = useAppSelector((state) => state.layers.activeLayerId);
   const activeRightPanel = useAppSelector((state) => state.map.activeRightPanel);
   const selectedLayerIds = useAppSelector((state) => state.layers.selectedLayerIds || []);
+  const selectedBundleId = useAppSelector((state) => state.layers.selectedBundleId);
   const mapMode = useAppSelector((state) => state.map.mapMode);
   const {
     getLayerMoreMenuOptions,
@@ -529,6 +522,7 @@ export const ProjectLayerTree = ({
         order: group.order ?? 0, // Provide default value for order
         extent: "", // Groups don't have extent, use empty string as default
         properties: group.properties, // Include properties for groups
+        bundle_id: group.bundle_id, // Bundle-backed groups have locked membership
       });
     });
 
@@ -547,17 +541,74 @@ export const ProjectLayerTree = ({
         properties: layer.properties,
         query: layer.query,
         other_properties: layer.other_properties,
-        user_id: layer.user_id,
+        // A catalog layer has no owner; the tree's node type says "unknown".
+        user_id: layer.user_id ?? undefined,
+        in_catalog: layer.in_catalog || isCatalogLayer(layer),
+        locked: layer.locked,
       });
     });
 
     return nodes.sort((a, b) => a.order - b.order);
   }, [projectLayers, projectLayerGroups]);
 
+  /**
+   * The live catalog version of every promoted layer's item, one request per
+   * distinct id set. A layer promoted at version N whose item now carries a
+   * newer version gets the "update available" caption below.
+   */
+  const catalogItemIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (projectLayers ?? [])
+            .map((layer) => catalogItemSnapshot(layer).id)
+            .filter((id): id is string => !!id)
+        )
+      ),
+    [projectLayers]
+  );
+  const { versions: liveCatalogVersions } = useCatalogItemVersions(catalogItemIds);
+
+  /**
+   * The one caption a layer row can carry: a catalog layer whose data is
+   * still materializing (or failed to), or whose catalog item has moved on to
+   * a newer version. Everything else stays caption-less.
+   */
+  const catalogStatusLabel = useCallback(
+    (node: ProjectLayerTreeNode): string | undefined => {
+      if (isCatalogLayerPending(node)) return t("catalog_layer_pending");
+      if (isCatalogLayerFailed(node)) return t("catalog_layer_failed");
+      const snapshot = catalogItemSnapshot(node);
+      if (snapshot.id && snapshot.version) {
+        const live = liveCatalogVersions[snapshot.id];
+        if (live && live !== snapshot.version) return t("catalog_layer_update_available");
+      }
+      return undefined;
+    },
+    [t, liveCatalogVersions]
+  );
+
+  /**
+   * While any catalog layer is materializing, poll the project layers so the
+   * pending caption clears (and the map draws) without a reload. The job is
+   * backend-enqueued and not in the user's job tray, so this is the signal.
+   */
+  const anyCatalogPending = useMemo(
+    () => (projectLayers ?? []).some((layer) => isCatalogLayerPending(layer)),
+    [projectLayers]
+  );
+  useEffect(() => {
+    if (!anyCatalogPending || !projectId) return;
+    const timer = setInterval(() => {
+      void mutate(projectLayersKey(projectId));
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [anyCatalogPending, projectId]);
+
   useEffect(() => {
     if (treeData) {
       setItems((prevItems) => {
-        const newItems = formatApiDataForDnd(treeData);
+        const newItems = formatApiDataForDnd(treeData, catalogStatusLabel);
         if (prevItems.length === 0) return newItems;
         // For items that already existed, preserve their collapsed state.
         // Newly appearing layer items (e.g. inside a group that was just toggled visible)
@@ -576,89 +627,99 @@ export const ProjectLayerTree = ({
         });
       });
     }
-  }, [treeData]);
+  }, [treeData, catalogStatusLabel]);
 
-  const treeSelectedIds = useMemo(() => {
-    if (selectedLayerIds.length === 0) return [];
-    return items
-      .filter((item) => {
-        const node = item.data;
-        // Safety check for node existence
-        return node && selectedLayerIds.includes(node.id);
-      })
-      .map((item) => item.id);
-  }, [selectedLayerIds, items]);
+  // What the tree highlights is what is actually open — a selected bundle
+  // included, whose row is a group and so has no entry in `selectedLayerIds`.
+  const treeSelectedIds = useMemo(
+    () => selectedTreeItemIds(items, { selectedLayerIds, selectedBundleId }),
+    [selectedLayerIds, selectedBundleId, items]
+  );
 
   // --- Handlers ---
 
-  const handleVisibilityToggle = useCallback(async (node: ProjectLayerTreeNode, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleVisibilityToggle = useCallback(
+    async (node: ProjectLayerTreeNode, e: React.MouseEvent) => {
+      e.stopPropagation();
 
-    const currentVisibility = node.properties?.visibility ?? true;
-    const newVisibility = !currentVisibility;
+      const currentVisibility = node.properties?.visibility ?? true;
+      const newVisibility = !currentVisibility;
 
-    // Compute updated items from the current snapshot (via ref to avoid stale closure)
-    const newItems = itemsRef.current.map((i) => {
-      if (i.data.id === node.id && i.data.type === node.type) {
-        return {
-          ...i,
-          data: {
-            ...i.data,
-            properties: { ...i.data.properties, visibility: newVisibility },
-          },
-          collapsed: !newVisibility,
-        };
+      // Compute updated items from the current snapshot (via ref to avoid stale closure)
+      const newItems = itemsRef.current.map((i) => {
+        if (i.data.id === node.id && i.data.type === node.type) {
+          return {
+            ...i,
+            data: {
+              ...i.data,
+              properties: { ...i.data.properties, visibility: newVisibility },
+            },
+            collapsed: !newVisibility,
+          };
+        }
+        return i;
+      });
+
+      setItems(newItems);
+
+      // Emit interaction events based on visibility toggle
+      if (node.type === "layer") {
+        dispatch(
+          emitInteractionEvent({
+            type: "visibility_changed",
+            sourceId: node.id,
+            value: newVisibility,
+          })
+        );
       }
-      return i;
-    });
-
-    setItems(newItems);
-
-    // Emit interaction events based on visibility toggle
-    if (node.type === "layer") {
-      dispatch(emitInteractionEvent({
-        type: "visibility_changed",
-        sourceId: node.id,
-        value: newVisibility,
-      }));
-    }
-    // When turning a group ON, activate it (switch tab). Turning OFF is just hiding.
-    if (node.type === "group" && newVisibility) {
-      dispatch(emitInteractionEvent({ type: "group_activated", sourceId: node.id }));
-    }
-
-    try {
-      const updatePayload = formatDndDataForApi(newItems);
-      if (onTreeUpdate) {
-        await onTreeUpdate(updatePayload);
+      // When turning a group ON, activate it (switch tab). Turning OFF is just hiding.
+      if (node.type === "group" && newVisibility) {
+        dispatch(emitInteractionEvent({ type: "group_activated", sourceId: node.id }));
       }
-    } catch (err) {
-      // Revert to the snapshot captured before the optimistic update
-      setItems(itemsRef.current);
-      toast.error(t("error_updating_visibility"));
-      console.error("Error in handleVisibilityToggle:", err);
-    }
-  }, [dispatch, onTreeUpdate, t]);
 
-  const handleProperties = useCallback((layer: ProjectLayer) => {
-    dispatch(setSelectedLayers([layer.id]));
-    dispatch(setActiveRightPanel(MapSidebarItemID.PROPERTIES));
-  }, [dispatch]);
-
-  const handleStyle = useCallback((layer: ProjectLayer) => {
-    dispatch(setSelectedLayers([layer.id]));
-    dispatch(setActiveRightPanel(MapSidebarItemID.STYLE));
-  }, [dispatch]);
-
-  const handleDuplicate = useCallback(async (layer: ProjectLayer) => {
-    try {
-      if (onLayerDuplicate) {
-        await onLayerDuplicate(layer.layer_id);
+      try {
+        const updatePayload = formatDndDataForApi(newItems);
+        if (onTreeUpdate) {
+          await onTreeUpdate(updatePayload);
+        }
+      } catch (err) {
+        // Revert to the snapshot captured before the optimistic update
+        setItems(itemsRef.current);
+        toast.error(t("error_updating_visibility"));
+        console.error("Error in handleVisibilityToggle:", err);
       }
-    } catch (error) {
-      toast.error(t("error_duplicating_layer"));
-    }
-  }, [onLayerDuplicate, t]);
+    },
+    [dispatch, onTreeUpdate, t]
+  );
+
+  const handleProperties = useCallback(
+    (layer: ProjectLayer) => {
+      dispatch(setSelectedLayers([layer.id]));
+      dispatch(setActiveRightPanel(MapSidebarItemID.PROPERTIES));
+    },
+    [dispatch]
+  );
+
+  const handleStyle = useCallback(
+    (layer: ProjectLayer) => {
+      dispatch(setSelectedLayers([layer.id]));
+      dispatch(setActiveRightPanel(MapSidebarItemID.STYLE));
+    },
+    [dispatch]
+  );
+
+  const handleDuplicate = useCallback(
+    async (layer: ProjectLayer) => {
+      try {
+        if (onLayerDuplicate) {
+          await onLayerDuplicate(layer.layer_id);
+        }
+      } catch (error) {
+        toast.error(t("error_duplicating_layer"));
+      }
+    },
+    [onLayerDuplicate, t]
+  );
 
   const handleNodeClick = (compositeIds: string[]) => {
     const realIds = compositeIds
@@ -673,7 +734,14 @@ export const ProjectLayerTree = ({
       const clickedItem = items.find((i) => i.id === compositeIds[0]);
       if (clickedItem?.data?.type === "group") {
         dispatch(emitInteractionEvent({ type: "group_activated", sourceId: realIds[0] }));
-        // Groups should not be selected or open panels — only emit the interaction event
+        // A bundle-backed group stands for the bundle itself, which has its own
+        // metadata and can be filtered as a whole — so it opens a panel where a
+        // plain group has nothing to show.
+        const bundleId = clickedItem.data.bundle_id;
+        if (isEditMode && bundleId) {
+          dispatch(setSelectedBundle(bundleId));
+          dispatch(setActiveRightPanel(MapSidebarItemID.PROPERTIES));
+        }
         return;
       }
     }
@@ -713,6 +781,7 @@ export const ProjectLayerTree = ({
         }
       }
     } else {
+      dispatch(setSelectedBundle(null));
       dispatch(setActiveRightPanel(undefined));
     }
   };
@@ -742,272 +811,325 @@ export const ProjectLayerTree = ({
   // across re-renders that don't change relevant deps. A nested component definition
   // would get a new identity on every render, causing React to unmount/remount the
   // PopperMenu and reset its open state — closing the three-dots menu unexpectedly.
-  const renderRowActions = useCallback((item: ProjectTreeItem) => {
-    const node = item.data as ProjectLayerTreeNode;
-    const nodeVisibility = node.properties?.visibility ?? true;
+  const renderRowActions = useCallback(
+    (item: ProjectTreeItem) => {
+      const node = item.data as ProjectLayerTreeNode;
+      const nodeVisibility = node.properties?.visibility ?? true;
 
-    // Prepare Menu Options
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let menuOptions: PopperMenuItem[] = [];
-    if (node.type === "group") {
-      menuOptions = [
-        ...(node.extent
-          ? [
-              {
-                id: MapLayerActions.ZOOM_TO,
-                label: t("zoom_to") || "Zoom To",
-                icon: ICON_NAME.ZOOM_IN,
-              },
-            ]
-          : []),
-        { id: MapLayerActions.RENAME, label: t("rename") || "Rename", icon: ICON_NAME.EDIT },
-        {
-          id: ContentActions.DELETE,
-          label: t("delete") || "Delete",
-          icon: ICON_NAME.TRASH,
-          color: "error.main",
-        },
-      ];
-    } else {
-      menuOptions = getLayerMoreMenuOptions(
-        (node.layer_type as "table" | "feature" | "raster") || "feature",
-        !!node.query,
-        !!node.in_catalog,
-        false,
-        // Catalog and size are handled by the filters below.
-        canEditLayerFeatures({
-          currentUserId: userProfile?.id,
-          layerOwnerId: node.user_id,
-          projectOwnerId,
-          isProjectEditor: isEditMode,
-        }),
-        isEditMode,
-      );
-    }
+      // Prepare Menu Options
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let menuOptions: PopperMenuItem[] = [];
+      if (node.type === "group") {
+        menuOptions = [
+          ...(node.extent
+            ? [
+                {
+                  id: MapLayerActions.ZOOM_TO,
+                  label: t("zoom_to") || "Zoom To",
+                  icon: ICON_NAME.ZOOM_IN,
+                },
+              ]
+            : []),
+          { id: MapLayerActions.RENAME, label: t("rename") || "Rename", icon: ICON_NAME.EDIT },
+          {
+            id: ContentActions.DELETE,
+            // For a bundle group, delete removes the bundle from the project.
+            label: item.isBundleGroup ? t("remove_bundle") || "Remove bundle" : t("delete") || "Delete",
+            icon: ICON_NAME.TRASH,
+            color: "error.main",
+          },
+        ];
+      } else if (node.locked) {
+        // D7: a locked row carries no style/data — the backend whitelist has
+        // nothing the usual menu builder could act on — so the only action
+        // offered is removing it from the project, gated exactly like every
+        // other layer's DELETE below (view mode, bundle membership, project
+        // role all still apply through the same filters).
+        menuOptions = [
+          {
+            id: ContentActions.DELETE,
+            label: t("delete") || "Delete",
+            icon: ICON_NAME.TRASH,
+            color: "error.main",
+          },
+        ];
+      } else {
+        menuOptions = getLayerMoreMenuOptions(
+          (node.layer_type as "table" | "feature" | "raster") || "feature",
+          !!node.query,
+          !!node.in_catalog,
+          false,
+          // Catalog and size are handled by the filters below.
+          canEditLayerFeatures({
+            currentUserId: userProfile?.id,
+            layerOwnerId: node.user_id,
+            projectOwnerId,
+            isProjectEditor: isEditMode,
+          }),
+          isEditMode
+        );
+      }
 
-    // Filter menu options based on view mode
-    if (viewMode === "view") {
-      menuOptions = filterMenuForViewMode(menuOptions, allowedActions);
-    }
+      // Bundle member layers can't be removed individually (remove the bundle).
+      if (node.type === "layer" && item.dragDisabled) {
+        menuOptions = menuOptions.filter((opt) => opt.id !== ContentActions.DELETE);
+      }
 
-    // Catalogue layers cannot be renamed, duplicated, or have features edited
-    if (node.in_catalog) {
-      menuOptions = filterMenuForCatalogLayer(menuOptions);
-    }
-
-    // Edit features only available in data (map) mode
-    if (mapMode !== "data") {
-      menuOptions = menuOptions.filter((opt) => opt.id !== MapLayerActions.EDIT_FEATURES);
-    }
-
-    // Edit features only allowed for layers under 100MB
-    if (node.type === "layer" && node.layer_id) {
-      const layerSize = projectLayers.find((l) => l.layer_id === node.layer_id)?.size;
-      if (layerSize && layerSize > MAX_EDITABLE_LAYER_SIZE) {
+      // A bundle member is editable only where its role's spec says so: editing
+      // one drives the whole bundle's derived artifacts.
+      if (
+        node.type === "layer" &&
+        node.layer_id &&
+        isBundleMemberLayer(node.layer_id, bundleMemberGates) &&
+        !isEditableBundleMember(node.layer_id, bundleMemberGates)
+      ) {
         menuOptions = menuOptions.filter((opt) => opt.id !== MapLayerActions.EDIT_FEATURES);
       }
-    }
 
-    // Filter menu options based on allowedActions
-    if (allowedActions) {
-      menuOptions = menuOptions.filter((opt) => {
-        if (opt.id === MapLayerActions.STYLE && allowedActions.style === false) return false;
-        if (opt.id === ContentActions.TABLE && allowedActions.viewData === false) return false;
-        if (opt.id === MapLayerActions.PROPERTIES && allowedActions.properties === false) return false;
-        if (opt.id === MapLayerActions.ZOOM_TO && allowedActions.zoomTo === false) return false;
-        return true;
-      });
-    }
+      // Filter menu options based on view mode
+      if (viewMode === "view") {
+        menuOptions = filterMenuForViewMode(menuOptions, allowedActions);
+      }
 
-    // Filter download action based on downloadableLayers
-    if (downloadableLayers && node.type === "layer") {
-      menuOptions = menuOptions.filter((opt) => {
-        if (opt.id === ContentActions.DOWNLOAD) {
-          return downloadableLayers.includes(node.id);
+      // Catalogue layers cannot be renamed, duplicated, or have features edited
+      if (node.in_catalog) {
+        menuOptions = filterMenuForCatalogLayer(menuOptions);
+      }
+
+      // Edit features only available in data (map) mode
+      if (mapMode !== "data") {
+        menuOptions = menuOptions.filter((opt) => opt.id !== MapLayerActions.EDIT_FEATURES);
+      }
+
+      // Edit features only allowed for layers under 100MB
+      if (node.type === "layer" && node.layer_id) {
+        const layerSize = projectLayers.find((l) => l.layer_id === node.layer_id)?.size;
+        if (layerSize && layerSize > MAX_EDITABLE_LAYER_SIZE) {
+          menuOptions = menuOptions.filter((opt) => opt.id !== MapLayerActions.EDIT_FEATURES);
         }
-        return true;
-      });
-    }
+      }
 
-    const hasFilter = node.query?.cql?.["args"]?.length;
-    const isFilterActive = activeLayerId === node.id && activeRightPanel === MapSidebarItemID.FILTER;
+      // Filter menu options based on allowedActions
+      if (allowedActions) {
+        menuOptions = menuOptions.filter((opt) => {
+          if (opt.id === MapLayerActions.STYLE && allowedActions.style === false) return false;
+          if (opt.id === ContentActions.TABLE && allowedActions.viewData === false) return false;
+          if (opt.id === MapLayerActions.PROPERTIES && allowedActions.properties === false) return false;
+          if (opt.id === MapLayerActions.ZOOM_TO && allowedActions.zoomTo === false) return false;
+          return true;
+        });
+      }
 
-    return (
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={1}>
-        {/* Filter Badge - Only show in edit mode */}
-        {isEditMode && node.type === "layer" && hasFilter && (
-          <Tooltip
-            title={isFilterActive ? t("hide_applied_filters") : t("show_applied_filters")}
-            placement="top">
-            <IconButton
-              size="small"
-              color={isFilterActive ? "primary" : "default"}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isFilterActive) dispatch(setActiveRightPanel(undefined));
-                else {
-                  if (node.id !== activeLayerId) dispatch(setSelectedLayers([node.id]));
-                  dispatch(setActiveRightPanel(MapSidebarItemID.FILTER));
-                }
-              }}
-              sx={{ p: 0.5 }}>
-              <Badge
-                badgeContent={hasFilter}
-                color="primary"
-                sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 15, minWidth: 15 } }}>
-                <Icon htmlColor="inherit" iconName={ICON_NAME.FILTER} style={{ fontSize: "15px" }} />
-              </Badge>
-            </IconButton>
-          </Tooltip>
-        )}
+      // Filter download action based on downloadableLayers
+      if (downloadableLayers && node.type === "layer") {
+        menuOptions = menuOptions.filter((opt) => {
+          if (opt.id === ContentActions.DOWNLOAD) {
+            return downloadableLayers.includes(node.id);
+          }
+          return true;
+        });
+      }
 
-        {/* Actions: direct buttons or compact three-dot menu */}
-        {!hideActions && menuOptions.length > 0 && (
-          moreOptionsStyle === "direct_actions" ? (
-            <>
-              {menuOptions.map((opt) => (
-                opt.icon && (
-                  <Tooltip key={opt.id} title={opt.label} placement="top">
-                    <IconButton
-                      size="small"
-                      sx={{ p: 0.25 }}
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        const handleAction = async () => {
-                          if (opt.id === MapLayerActions.ZOOM_TO) {
-                            const currentMap = mapRef.current;
-                            if (currentMap) {
-                              if (node.type === "layer") {
+      const hasFilter = node.query?.cql?.["args"]?.length;
+      const isFilterActive = activeLayerId === node.id && activeRightPanel === MapSidebarItemID.FILTER;
+
+      return (
+        <Stack direction="row" alignItems="center" spacing={1}>
+          {/* Filter Badge - Only show in edit mode */}
+          {isEditMode && node.type === "layer" && hasFilter && (
+            <Tooltip
+              title={isFilterActive ? t("hide_applied_filters") : t("show_applied_filters")}
+              placement="top">
+              <IconButton
+                size="small"
+                color={isFilterActive ? "primary" : "default"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isFilterActive) dispatch(setActiveRightPanel(undefined));
+                  else {
+                    if (node.id !== activeLayerId) dispatch(setSelectedLayers([node.id]));
+                    dispatch(setActiveRightPanel(MapSidebarItemID.FILTER));
+                  }
+                }}
+                sx={{ p: 0.5 }}>
+                <Badge
+                  badgeContent={hasFilter}
+                  color="primary"
+                  sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 15, minWidth: 15 } }}>
+                  <Icon htmlColor="inherit" iconName={ICON_NAME.FILTER} style={{ fontSize: "15px" }} />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+          )}
+
+          {/* Actions: direct buttons or compact three-dot menu */}
+          {!hideActions &&
+            menuOptions.length > 0 &&
+            (moreOptionsStyle === "direct_actions" ? (
+              <>
+                {menuOptions.map(
+                  (opt) =>
+                    opt.icon && (
+                      <Tooltip key={opt.id} title={opt.label} placement="top">
+                        <IconButton
+                          size="small"
+                          sx={{ p: 0.25 }}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const handleAction = async () => {
+                              if (opt.id === MapLayerActions.ZOOM_TO) {
+                                const currentMap = mapRef.current;
+                                if (currentMap) {
+                                  if (node.type === "layer") {
+                                    const target = castNodeToProjectLayer(node);
+                                    await zoomToProjectLayer(currentMap, target);
+                                  } else if (node.extent) {
+                                    zoomToLayer(currentMap, node.extent);
+                                  }
+                                }
+                              } else if (node.type === "layer") {
                                 const target = castNodeToProjectLayer(node);
-                                await zoomToProjectLayer(currentMap, target);
-                              } else if (node.extent) {
-                                zoomToLayer(currentMap, node.extent);
+                                if (opt.id === MapLayerActions.PROPERTIES) handleProperties(target);
+                                else if (opt.id === MapLayerActions.STYLE) handleStyle(target);
+                                else if (opt.id === MapLayerActions.DUPLICATE) handleDuplicate(target);
+                                else if (opt.id === ContentActions.TABLE) {
+                                  if (mapMode === "data") {
+                                    dispatch(setDataPanelLayerId(target.id));
+                                    dispatch(setIsDataPanelOpen(true));
+                                  } else {
+                                    openMoreMenu(opt, target);
+                                  }
+                                } else openMoreMenu(opt, target);
                               }
-                            }
-                          } else if (node.type === "layer") {
-                            const target = castNodeToProjectLayer(node);
-                            if (opt.id === MapLayerActions.PROPERTIES) handleProperties(target);
-                            else if (opt.id === MapLayerActions.STYLE) handleStyle(target);
-                            else if (opt.id === MapLayerActions.DUPLICATE) handleDuplicate(target);
-                            else if (opt.id === ContentActions.TABLE) {
-                              if (mapMode === "data") {
-                                dispatch(setDataPanelLayerId(target.id));
-                                dispatch(setIsDataPanelOpen(true));
-                              } else {
-                                openMoreMenu(opt, target);
-                              }
-                            } else openMoreMenu(opt, target);
-                          }
-                        };
-                        await handleAction();
-                      }}>
-                      <Icon iconName={opt.icon} style={{ fontSize: "13px" }} htmlColor={opt.color} />
+                            };
+                            await handleAction();
+                          }}>
+                          <Icon iconName={opt.icon} style={{ fontSize: "13px" }} htmlColor={opt.color} />
+                        </IconButton>
+                      </Tooltip>
+                    )
+                )}
+              </>
+            ) : (
+              <MoreMenu
+                menuItems={menuOptions}
+                disablePortal={false}
+                menuButton={
+                  <Tooltip title={t("more_options")} placement="top">
+                    <IconButton size="small" sx={{ px: 0.5 }}>
+                      <Icon iconName={ICON_NAME.MORE_VERT} style={{ fontSize: "15px" }} />
                     </IconButton>
                   </Tooltip>
-                )
-              ))}
-            </>
-          ) : (
-            <MoreMenu
-              menuItems={menuOptions}
-              disablePortal={false}
-              menuButton={
-                <Tooltip title={t("more_options")} placement="top">
-                  <IconButton size="small" sx={{ px: 0.5 }}>
-                    <Icon iconName={ICON_NAME.MORE_VERT} style={{ fontSize: "15px" }} />
-                  </IconButton>
-                </Tooltip>
-              }
-              onSelect={async (menuItem: PopperMenuItem) => {
-                if (menuItem.id === MapLayerActions.ZOOM_TO) {
-                  const currentMap = mapRef.current;
-                  if (currentMap) {
-                    if (node.type === "layer") {
-                      const target = castNodeToProjectLayer(node);
-                      await zoomToProjectLayer(currentMap, target);
-                    } else if (node.extent) {
-                      zoomToLayer(currentMap, node.extent);
-                    }
-                  }
-                  return;
                 }
-                if (node.type === "layer") {
-                  const target = castNodeToProjectLayer(node);
-                  if (menuItem.id === MapLayerActions.PROPERTIES) {
-                    handleProperties(target);
-                  } else if (menuItem.id === MapLayerActions.STYLE) {
-                    handleStyle(target);
-                  } else if (menuItem.id === MapLayerActions.DUPLICATE) {
-                    handleDuplicate(target);
-                  } else if (menuItem.id === MapLayerActions.EDIT_FEATURES) {
-                    startEditingGuard.requestStartEditing({
-                      layerId: target.layer_id,
-                      geometryType: target.feature_layer_geometry_type ?? null,
-                      projectLayerId: target.id,
-                    });
-                  } else if (menuItem.id === ContentActions.TABLE) {
-                    if (mapMode === "data") {
-                      dispatch(setDataPanelLayerId(target.id));
-                      dispatch(setIsDataPanelOpen(true));
+                onSelect={async (menuItem: PopperMenuItem) => {
+                  if (menuItem.id === MapLayerActions.ZOOM_TO) {
+                    const currentMap = mapRef.current;
+                    if (currentMap) {
+                      if (node.type === "layer") {
+                        const target = castNodeToProjectLayer(node);
+                        await zoomToProjectLayer(currentMap, target);
+                      } else if (node.extent) {
+                        zoomToLayer(currentMap, node.extent);
+                      }
+                    }
+                    return;
+                  }
+                  if (node.type === "layer") {
+                    const target = castNodeToProjectLayer(node);
+                    if (menuItem.id === MapLayerActions.PROPERTIES) {
+                      handleProperties(target);
+                    } else if (menuItem.id === MapLayerActions.STYLE) {
+                      handleStyle(target);
+                    } else if (menuItem.id === MapLayerActions.DUPLICATE) {
+                      handleDuplicate(target);
+                    } else if (menuItem.id === MapLayerActions.EDIT_FEATURES) {
+                      startEditingGuard.requestStartEditing({
+                        layerId: target.layer_id,
+                        geometryType: target.feature_layer_geometry_type ?? null,
+                        projectLayerId: target.id,
+                      });
+                    } else if (menuItem.id === ContentActions.TABLE) {
+                      if (mapMode === "data") {
+                        dispatch(setDataPanelLayerId(target.id));
+                        dispatch(setIsDataPanelOpen(true));
+                      } else {
+                        openMoreMenu(menuItem, target);
+                      }
                     } else {
                       openMoreMenu(menuItem, target);
                     }
                   } else {
-                    openMoreMenu(menuItem, target);
+                    if (menuItem.id === MapLayerActions.RENAME && node.type === "group") {
+                      setGroupModal({ open: true, mode: "rename", group: node });
+                    } else if (menuItem.id === ContentActions.DELETE && node.type === "group") {
+                      setGroupModal({ open: true, mode: "delete", group: node });
+                    } else {
+                      const groupAsLayer = castNodeToProjectLayer(node);
+                      openMoreMenu(menuItem, groupAsLayer);
+                    }
                   }
-                } else {
-                  if (menuItem.id === MapLayerActions.RENAME && node.type === "group") {
-                    setGroupModal({ open: true, mode: "rename", group: node });
-                  } else if (menuItem.id === ContentActions.DELETE && node.type === "group") {
-                    setGroupModal({ open: true, mode: "delete", group: node });
-                  } else {
-                    const groupAsLayer = castNodeToProjectLayer(node);
-                    openMoreMenu(menuItem, groupAsLayer);
-                  }
-                }
-              }}
+                }}
+              />
+            ))}
+
+          {/* Group info ⓘ button */}
+          {node.type === "group" && groupInfo?.[String(node.id)] && (
+            <Tooltip title={t("properties")} placement="top">
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setGroupInfoDialog({ id: node.id, anchorEl: e.currentTarget as HTMLElement });
+                }}
+                sx={{ p: 0.25 }}>
+                <Icon iconName={ICON_NAME.CIRCLEINFO} style={{ fontSize: "15px" }} />
+              </IconButton>
+            </Tooltip>
+          )}
+
+          {/* Visibility toggle - very right when position is "right".
+            A locked layer has no properties to toggle a `visibility` flag
+            on, and never reaches the map anyway (see D7 / selectDataLayers). */}
+          {togglePosition !== "left" && !hideActions && node.layer_type !== "table" && !node.locked && (
+            <VisibilityToggle
+              toggleStyle={toggleStyle}
+              visible={nodeVisibility}
+              onToggle={(e) => handleVisibilityToggle(node, e)}
             />
-          )
-        )}
-
-        {/* Group info ⓘ button */}
-        {node.type === "group" && groupInfo?.[String(node.id)] && (
-          <Tooltip title={t("properties")} placement="top">
-            <IconButton
-              size="small"
-              onClick={(e) => { e.stopPropagation(); setGroupInfoDialog({ id: node.id, anchorEl: e.currentTarget as HTMLElement }); }}
-              sx={{ p: 0.25 }}>
-              <Icon iconName={ICON_NAME.CIRCLEINFO} style={{ fontSize: "15px" }} />
-            </IconButton>
-          </Tooltip>
-        )}
-
-        {/* Visibility toggle - very right when position is "right" */}
-        {togglePosition !== "left" && !hideActions && node.layer_type !== "table" && (
-          <VisibilityToggle
-            toggleStyle={toggleStyle}
-            visible={nodeVisibility}
-            onToggle={(e) => handleVisibilityToggle(node, e)}
-          />
-        )}
-      </Stack>
-    );
-  }, [
-    t,
-    getLayerMoreMenuOptions, openMoreMenu,
-    handleVisibilityToggle, handleProperties, handleStyle, handleDuplicate,
-    setGroupModal, setGroupInfoDialog,
-    mapRef,
-    viewMode, hideActions, toggleStyle, togglePosition, moreOptionsStyle,
-    allowedActions, downloadableLayers, projectLayers,
-    isEditMode, groupInfo,
-    mapMode, userProfile, projectOwnerId,
-    dispatch,
-    activeLayerId, activeRightPanel,
-  ]);
+          )}
+        </Stack>
+      );
+    },
+    [
+      t,
+      getLayerMoreMenuOptions,
+      openMoreMenu,
+      handleVisibilityToggle,
+      handleProperties,
+      handleStyle,
+      handleDuplicate,
+      setGroupModal,
+      setGroupInfoDialog,
+      mapRef,
+      viewMode,
+      hideActions,
+      toggleStyle,
+      togglePosition,
+      moreOptionsStyle,
+      allowedActions,
+      downloadableLayers,
+      projectLayers,
+      isEditMode,
+      groupInfo,
+      mapMode,
+      userProfile,
+      projectOwnerId,
+      dispatch,
+      activeLayerId,
+      activeRightPanel,
+      bundleMemberGates,
+    ]
+  );
 
   // --- ICONS & LEGEND ---
   const itemsWithIcons = useMemo(() => {
@@ -1043,13 +1165,35 @@ export const ProjectLayerTree = ({
             />
           ) : (
             <Icon
-              iconName={ICON_NAME.LAYERS}
+              // Bundle-backed groups get a distinct icon (a cube = a self-contained
+              // package of layers) to signal locked membership.
+              iconName={item.isBundleGroup ? ICON_NAME.CUBE : ICON_NAME.LAYERS}
               style={{ fontSize: "1rem", color: theme.palette.action.active }}
             />
           ),
           isVisible: nodeVisibility,
-          isSelectable: false,
+          // A plain group is only a container, so selecting it would open a
+          // panel with nothing in it. A bundle-backed group stands for the
+          // bundle, which has metadata of its own and can be filtered as a
+          // whole — but only in edit mode, where that panel exists at all.
+          isSelectable: !!item.isBundleGroup && isEditMode,
           labelInfo: legendCaption,
+        };
+      }
+
+      // D7: a locked layer's `properties` are blanked by the backend, so
+      // there is no geometry preview or legend to draw from them — show the
+      // lock icon + hint instead, and refuse selection (there is no style
+      // panel to open).
+      if (node.locked) {
+        return {
+          ...item,
+          contentOverride: <LockedLayerRow name={node.name} />,
+          icon: undefined,
+          legendContent: undefined,
+          isSelectable: false,
+          isVisible: true,
+          labelInfo: undefined,
         };
       }
 
@@ -1065,10 +1209,7 @@ export const ProjectLayerTree = ({
       // 2. Table Icon (System Icon)
       if (node.layer_type === "table") {
         iconNode = (
-          <Icon
-            iconName={ICON_NAME.TABLE}
-            style={{ fontSize: "1rem", color: theme.palette.action.active }}
-          />
+          <Icon iconName={ICON_NAME.TABLE} style={{ fontSize: "1rem", color: theme.palette.action.active }} />
         );
       }
       // 3. Raster Icon (System Icon)
@@ -1096,7 +1237,9 @@ export const ProjectLayerTree = ({
             rasterStyle.color_map.length > 0);
 
         if (hasRasterLegend && isVisible) {
-          legendNode = <LayerLegendPanel properties={props} geometryType="raster" hideHeading={hideLegendHeading} />;
+          legendNode = (
+            <LayerLegendPanel properties={props} geometryType="raster" hideHeading={hideLegendHeading} />
+          );
         }
       }
       // 4. Complex Legend - Only show legend if layer is visible. Layers
@@ -1112,7 +1255,9 @@ export const ProjectLayerTree = ({
         if (isVisible && hasLegendContent) {
           // Show legend content for visible layers
           // TODO: Add collapse/expand functionality to LayerLegendPanel component
-          legendNode = <LayerLegendPanel properties={props} geometryType={geomType} hideHeading={hideLegendHeading} />;
+          legendNode = (
+            <LayerLegendPanel properties={props} geometryType={geomType} hideHeading={hideLegendHeading} />
+          );
         } else if (!isVisible) {
           // If not visible, don't show anything and make it non-selectable
           isSelectable = false;
@@ -1152,7 +1297,9 @@ export const ProjectLayerTree = ({
                 strokeColor={props.stroked !== false ? strokeColor : undefined}
                 filled={props.filled !== false}
                 iconUrl={
-                  !props.marker_field && props.custom_marker && props.marker?.url ? props.marker.url : undefined
+                  !props.marker_field && props.custom_marker && props.marker?.url
+                    ? props.marker.url
+                    : undefined
                 }
                 iconSource={
                   !props.marker_field && props.custom_marker && props.marker?.source
@@ -1207,26 +1354,33 @@ export const ProjectLayerTree = ({
         legendContent: shouldShowLegend ? legendNode : undefined,
         isSelectable,
         isVisible,
-        labelInfo: legendCaption,
+        // The legend caption shares the row's one caption slot with the
+        // catalog materialize status the item already carries — don't clobber.
+        labelInfo: legendCaption ?? item.labelInfo,
       };
     });
-  }, [items, theme, currentZoom, viewMode, hideLegendHeading, groupIcons, simpleLegendLayerIds]);
+  }, [items, theme, currentZoom, viewMode, isEditMode, hideLegendHeading, groupIcons, simpleLegendLayerIds]);
 
-  const renderPrefix = useCallback(togglePosition === "left" ? (item: ProjectTreeItem) => {
-    const node = item.data as ProjectLayerTreeNode;
-    if (hideActions || node.layer_type === "table") return null;
-    const nodeVisibility = node.properties?.visibility ?? true;
-    return (
-      <Box onClick={(e) => e.stopPropagation()} sx={{ display: "flex", alignItems: "center" }}>
-        <VisibilityToggle
-          toggleStyle={toggleStyle}
-          visible={nodeVisibility}
-          compact
-          onToggle={(e) => handleVisibilityToggle(node, e)}
-        />
-      </Box>
-    );
-  } : () => null, [togglePosition, hideActions, toggleStyle, handleVisibilityToggle]);
+  const renderPrefix = useCallback(
+    togglePosition === "left"
+      ? (item: ProjectTreeItem) => {
+          const node = item.data as ProjectLayerTreeNode;
+          if (hideActions || node.layer_type === "table" || node.locked) return null;
+          const nodeVisibility = node.properties?.visibility ?? true;
+          return (
+            <Box onClick={(e) => e.stopPropagation()} sx={{ display: "flex", alignItems: "center" }}>
+              <VisibilityToggle
+                toggleStyle={toggleStyle}
+                visible={nodeVisibility}
+                compact
+                onToggle={(e) => handleVisibilityToggle(node, e)}
+              />
+            </Box>
+          );
+        }
+      : () => null,
+    [togglePosition, hideActions, toggleStyle, handleVisibilityToggle]
+  );
 
   // --- RENDER ---
   if (isLoading && items.length === 0) {
@@ -1238,7 +1392,15 @@ export const ProjectLayerTree = ({
   }
 
   return (
-    <Box sx={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden", pointerEvents: "all" }}>
+    <Box
+      sx={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        pointerEvents: "all",
+      }}>
       {/* 1. Header */}
       {isEditMode && (
         <Box

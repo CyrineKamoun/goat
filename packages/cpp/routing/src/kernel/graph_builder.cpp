@@ -46,7 +46,7 @@ namespace routing::kernel
             net.length_3857.push_back(e.length_3857);
 
             // Retain only lightweight info for output phase
-            net.edges.push_back({e.id, e.h3_3, std::move(e.geometry)});
+            net.edges.push_back({e.id, std::move(e.geometry)});
         }
 
         net.node_count = next_id;

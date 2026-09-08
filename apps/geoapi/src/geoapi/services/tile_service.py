@@ -30,7 +30,7 @@ from io import BufferedReader
 from pathlib import Path
 from typing import Any, Optional
 
-from cachetools import LRUCache
+from cachetools import LRUCache, TTLCache
 from goatlib.storage import build_filters
 from pmtiles.reader import MmapSource
 from pmtiles.tile import (
@@ -46,6 +46,12 @@ from geoapi.ducklake_pool import ducklake_pool
 from geoapi.tile_cache import cache_tile, get_cached_tile
 
 logger = logging.getLogger(__name__)
+
+
+def _qi(name: str) -> str:
+    """Quote a SQL identifier, doubling any embedded double quote."""
+    return '"' + name.replace('"', '""') + '"'
+
 
 # Web Mercator extent in meters (EPSG:3857)
 WEB_MERCATOR_EXTENT = 20037508.342789244
@@ -331,9 +337,19 @@ class TileService:
         self.buffer = settings.DEFAULT_TILE_BUFFER
         self.ducklake_data_dir = Path(settings.DUCKLAKE_DATA_DIR)
         self.tiles_data_dir = Path(settings.TILES_DATA_DIR)
+        # A catalog layer's tiles have their own directory under the catalog
+        # tree: derived from a dataset every deployment has, so wipeable and
+        # rebuildable on their own, and never mixed into the tiles a user's
+        # data produced.
+        self.catalog_tiles_dir = Path(settings.CATALOG_TILES_DIR)
         # Track which PMTiles files exist (LRU cache for 10k+ layers)
-        self._pmtiles_exists_cache: LRUCache[str, bool] = LRUCache(
-            maxsize=_EXISTS_CACHE_MAX_SIZE
+        # TTL, not plain LRU: a False verdict must expire, because PMTiles can
+        # arrive AFTER a layer starts serving — catalog layers flip ready as
+        # soon as their data lands and tiles follow — and a sticky False would
+        # pin every pod to the dynamic path until restart. (True expiring too
+        # means a deleted file self-heals within the same minute.)
+        self._pmtiles_exists_cache: TTLCache[str, bool] = TTLCache(
+            maxsize=_EXISTS_CACHE_MAX_SIZE, ttl=60
         )
         # Cache PMTiles paths by layer_id (LRU cache for 10k+ layers)
         self._pmtiles_path_cache: LRUCache[str, Path | None] = LRUCache(
@@ -361,7 +377,21 @@ class TileService:
         if cached is not None:
             return cached
 
-        # Search for PMTiles file: */t_{layer_id}.pmtiles
+        # No `kind` here, so both trees are candidates. The catalog one is a
+        # single stat() and holds at most the promoted layers, so it goes first.
+        catalog = self.catalog_tiles_dir / f"t_{layer_id_normalized}.pmtiles"
+        if catalog.exists():
+            self._pmtiles_path_cache[layer_id_normalized] = catalog
+            return catalog
+
+        # Tiles are written flat; the glob below only reaches the legacy
+        # schema-nested layout, one directory down.
+        flat = self.tiles_data_dir / f"t_{layer_id_normalized}.pmtiles"
+        if flat.exists():
+            self._pmtiles_path_cache[layer_id_normalized] = flat
+            return flat
+
+        # Legacy layout: <schema>/t_{layer_id}.pmtiles
         pattern = f"*/t_{layer_id_normalized}.pmtiles"
         matches = list(self.tiles_data_dir.glob(pattern))
 
@@ -394,17 +424,40 @@ class TileService:
     def _get_pmtiles_path(self, layer_info: LayerInfo) -> Path:
         """Get the PMTiles file path for a layer.
 
+        Tiles are written flat, keyed only by layer id. Tiles written before
+        that are nested under the schema holding the layer's table, so a
+        layer whose tiles have not been regenerated since is still found.
+
         Args:
             layer_info: Layer information
 
         Returns:
-            Path to PMTiles file
+            Path to PMTiles file — the flat one when it exists, else the
+            legacy location (returned even when absent, so callers keep
+            treating a missing file as "no tiles").
         """
-        return (
+        if getattr(layer_info, "kind", "lake") == "catalog":
+            catalog = self.catalog_tiles_dir / f"{layer_info.table_name}.pmtiles"
+            if catalog.exists():
+                return catalog
+            # Materialized before the move: served where it was written, so an
+            # un-migrated deployment keeps working. Returned unconditionally
+            # otherwise, so a caller still reads "no tiles" from a missing file
+            # -- but pointing at the catalog tree, which is where the next
+            # materialize writes.
+            moved = self.tiles_data_dir / f"{layer_info.table_name}.pmtiles"
+            return moved if moved.exists() else catalog
+
+        flat = self.tiles_data_dir / f"{layer_info.table_name}.pmtiles"
+        if flat.exists():
+            return flat
+
+        legacy = (
             self.tiles_data_dir
             / layer_info.schema_name
             / f"{layer_info.table_name}.pmtiles"
         )
+        return legacy if legacy.exists() else flat
 
     def _pmtiles_exists(self, layer_info: LayerInfo) -> bool:
         """Check if PMTiles file exists for a layer.
@@ -419,15 +472,19 @@ class TileService:
         """
         cache_key = f"{layer_info.schema_name}/{layer_info.table_name}"
 
-        if cache_key not in self._pmtiles_exists_cache:
-            pmtiles_path = self._get_pmtiles_path(layer_info)
-            exists = pmtiles_path.exists()
-            self._pmtiles_exists_cache[cache_key] = exists
-            logger.debug(
-                "PMTiles %s for %s", "available" if exists else "not found", cache_key
-            )
-
-        return self._pmtiles_exists_cache[cache_key]
+        # One read, not check-then-get: on a TTLCache `in` and `[]` each
+        # re-evaluate expiry, so an entry can pass the test and then raise
+        # KeyError on the read (also across threads on the tile executor).
+        cached = self._pmtiles_exists_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        pmtiles_path = self._get_pmtiles_path(layer_info)
+        exists = pmtiles_path.exists()
+        self._pmtiles_exists_cache[cache_key] = exists
+        logger.debug(
+            "PMTiles %s for %s", "available" if exists else "not found", cache_key
+        )
+        return exists
 
     def invalidate_pmtiles_cache(self, schema_name: str, table_name: str) -> None:
         """Invalidate PMTiles cache for a layer.
@@ -1290,8 +1347,12 @@ class TileService:
 
         # Build property selection - must be explicit columns (no * in subqueries)
         if properties:
-            # Use specified properties, excluding geometry
-            prop_cols = [p for p in properties if p not in (geom_col,)]
+            # Use specified properties, excluding geometry. A name the layer
+            # does not have would break the whole tile query, so it is dropped
+            # here; the route rejects it with a 400 before getting this far.
+            prop_cols = [
+                p for p in properties if p not in (geom_col,) and p in column_names
+            ]
             # Always include id if it exists in the table (for feature identification)
             if has_id_column and "id" not in prop_cols:
                 prop_cols.append("id")
@@ -1315,10 +1376,11 @@ class TileService:
         for col in prop_cols:
             col_type = col_types.get(col, "VARCHAR")
             cast_type = get_cast_type(col_type)
+            ident = _qi(col)
             if cast_type:
-                select_parts.append(f'CAST("{col}" AS {cast_type}) AS "{col}"')
+                select_parts.append(f"CAST({ident} AS {cast_type}) AS {ident}")
             else:
-                select_parts.append(f'"{col}"')
+                select_parts.append(ident)
         select_props = ", ".join(select_parts) if select_parts else None
 
         # Build WHERE clause (additional filters beyond tile bounds)
@@ -1346,7 +1408,7 @@ class TileService:
 
         # Include all property columns (including original 'id' if present)
         for col in prop_cols:
-            struct_fields.append(f'"{col}" := candidates."{col}"')
+            struct_fields.append(f"{_qi(col)} := candidates.{_qi(col)}")
         struct_pack_args = ", ".join(struct_fields)
 
         # Build MVT query

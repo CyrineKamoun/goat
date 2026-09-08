@@ -26,18 +26,41 @@ GEOMETRY_TYPE_MAP: dict[str, str] = {
     "polygon": "Polygon",
 }
 
-# Map user-facing field types to PyArrow types
+# Storage type per field kind, matching what geoapi's `_resolve_kind_to_sql` gives a
+# column added to an existing layer: string→VARCHAR, number→DOUBLE,
+# datetime→TIMESTAMPTZ, boolean→BOOLEAN. Creation used to know only the first two,
+# so a datetime field became text and a boolean the strings "true"/"false".
 FIELD_TYPE_MAP: dict[str, pa.DataType] = {
     "string": pa.string(),
     "number": pa.float64(),
+    "datetime": pa.timestamp("us", tz="UTC"),
+    "boolean": pa.bool_(),
 }
+
+#: Kinds a new layer can carry. Computed kinds (area/perimeter/length) and formula
+#: are deliberately absent: their values come from `field_config`, which is written
+#: when a column is added to a layer that already exists — nothing writes it during
+#: creation, so the column would be created and never filled.
+FieldKind = Literal["string", "number", "datetime", "boolean"]
 
 
 class FieldDefinition(BaseModel):
     """Definition of a single field (column) for the new layer."""
 
     name: str = Field(..., description="Column name")
-    type: Literal["string", "number"] = Field(..., description="Column data type")
+    kind: FieldKind | None = Field(
+        None,
+        description="Field kind, as used everywhere else in GOAT",
+    )
+    type: Literal["string", "number"] | None = Field(
+        None,
+        description="Legacy alias for `kind`, kept for callers that predate it",
+    )
+
+    @property
+    def storage_kind(self: Self) -> str:
+        """The kind to store as, preferring `kind` and falling back to `type`."""
+        return self.kind or self.type or "string"
 
 
 class LayerCreateParams(ToolInputBase):
@@ -104,7 +127,7 @@ class LayerCreateToolRunner(BaseToolRunner[LayerCreateParams]):
 
         # Build PyArrow fields for user-defined columns
         pa_fields = [
-            pa.field(f.name, FIELD_TYPE_MAP[f.type]) for f in params.fields
+            pa.field(f.name, FIELD_TYPE_MAP[f.storage_kind]) for f in params.fields
         ]
 
         geometry_type_name: str | None = None
@@ -118,7 +141,8 @@ class LayerCreateToolRunner(BaseToolRunner[LayerCreateParams]):
 
             # Build an empty Arrow table with the user fields + geometry
             geo_field = pa.field(
-                "geometry", pa.binary(),
+                "geometry",
+                pa.binary(),
                 metadata={
                     b"ARROW:extension:name": b"geoarrow.wkb",
                     b"ARROW:extension:metadata": b'{"crs":{"type":"GeographicCRS","name":"WGS 84","datum":{"type":"GeodeticReferenceFrame","name":"World Geodetic System 1984","ellipsoid":{"name":"WGS 84","semi_major_axis":6378137,"inverse_flattening":298.257223563}},"coordinate_system":{"type":"ellipsoidal","axis":[{"name":"Geodetic latitude","abbreviation":"Lat","direction":"north","unit":"degree"},{"name":"Geodetic longitude","abbreviation":"Lon","direction":"east","unit":"degree"}]},"id":{"authority":"EPSG","code":4326}}}',
@@ -150,7 +174,9 @@ class LayerCreateToolRunner(BaseToolRunner[LayerCreateParams]):
         else:
             # Table layer: plain Parquet via pyarrow
             schema = pa.schema(pa_fields)
-            table = pa.table({f.name: pa.array([], type=f.type) for f in schema}, schema=schema)
+            table = pa.table(
+                {f.name: pa.array([], type=f.type) for f in schema}, schema=schema
+            )
             pq.write_table(table, str(output_path))
 
         metadata = DatasetMetadata(

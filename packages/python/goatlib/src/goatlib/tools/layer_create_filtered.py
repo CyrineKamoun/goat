@@ -98,8 +98,6 @@ class LayerCreateFilteredToolRunner(BaseToolRunner["LayerCreateFilteredParams"])
             layer_id=params.source_layer_id,
             user_id=params.user_id,
             cql_filter=params.cql_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
 
         # The exported parquet IS our output — no further analysis needed

@@ -1,17 +1,4 @@
-import {
-  Box,
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Divider,
-  FormControlLabel,
-  Stack,
-  Typography,
-  useTheme,
-} from "@mui/material";
+import { Box, Checkbox, Divider, FormControlLabel, Stack, Typography, useTheme } from "@mui/material";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -26,6 +13,7 @@ import type { SelectorItem } from "@/types/map/common";
 
 import useLayerFields from "@/hooks/map/CommonHooks";
 
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 import EmptySection from "@/components/common/EmptySection";
 import FormLabelHelper from "@/components/common/FormLabelHelper";
 import { Plot } from "@/components/common/PlotlyPlot";
@@ -133,115 +121,110 @@ const MapLayerChartModal: React.FC<MapLayerChartDialogProps> = ({ open, onClose,
   }, [chartData, chartType, orientation]);
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>{`${layer.name} - ${t("chart")}`}</DialogTitle>
-      <Divider />
-      <DialogContent sx={{ px: 2, pt: 0, mt: 0, pb: 0 }}>
-        <Box>
-          {chartData && fields && layer.charts && (
-            <Stack sx={{ p: 2 }}>
-              <Selector
-                selectedItems={selectedChartType}
-                setSelectedItems={(item: SelectorItem) => {
-                  setSelectedChartType(item);
-                  if (item.value === "vertical_bar") {
-                    setChartType("bar");
-                    setOrientation("v");
-                  }
-                  if (item.value === "horizontal_bar") {
-                    setChartType("bar");
-                    setOrientation("h");
-                  }
-                  if (item.value === "line") {
-                    setChartType("line");
-                  }
-                }}
-                items={chartTypes}
-                label={t("select_chart_type")}
-                placeholder="Test"
-              />
-              <Divider />
-              <FormLabelHelper label={t("settings")} color="inherit" />
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={cumSum}
-                    onChange={(e) => setCumSum(e.target.checked)}
-                    color="primary"
-                  />
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      icon={ICON_NAME.CHART}
+      title={`${layer.name} - ${t("chart")}`}
+      maxWidth={900}
+      bodySx={{ px: 2, pt: 0, mt: 0, pb: 0 }}
+      footer={
+        // The chart is read-only: the footer holds only the way out.
+        <AppDialogFooter cancelLabel={t("close")} onCancel={onClose} />
+      }>
+      <Box>
+        {chartData && fields && layer.charts && (
+          <Stack sx={{ p: 2 }}>
+            <Selector
+              selectedItems={selectedChartType}
+              setSelectedItems={(item: SelectorItem) => {
+                setSelectedChartType(item);
+                if (item.value === "vertical_bar") {
+                  setChartType("bar");
+                  setOrientation("v");
                 }
-                label={
-                  <Typography variant="body2" fontWeight="bold">
-                    {t("cumsum")}
-                  </Typography>
+                if (item.value === "horizontal_bar") {
+                  setChartType("bar");
+                  setOrientation("h");
                 }
-              />
-              <Divider />
-            </Stack>
-          )}
-          {isError && <EmptySection icon={ICON_NAME.CIRCLEINFO} label={t("error_loading_chart_data")} />}{" "}
-          {(isLoading || areFieldsLoading) && (
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}>
-              <Loading size={40} />
-            </Box>
-          )}
-          {!chartData && !isLoading && !isError && (
-            <EmptySection icon={ICON_NAME.DATABASE} label={t("no_chart_data")} />
-          )}
-          {chartData && fields && layer.charts && (
-            <Plot
-              data={chartDataConfig}
-              layout={{
-                paper_bgcolor: "transparent",
-                plot_bgcolor: "transparent",
-                font: {
-                  color: theme.palette.text.primary,
-                },
-                modebar: {
-                  bgcolor: "transparent",
-                  color: theme.palette.text.primary,
-                  activecolor: theme.palette.primary.main,
-                },
-                ...chartLabelConfig,
+                if (item.value === "line") {
+                  setChartType("line");
+                }
               }}
-              config={
-                lng === "de"
-                  ? {
-                      locale: "de",
-                      toImageButtonOptions: {
-                        filename: `${layer.name}_chart`,
-                        format: "png",
-                      },
-                    }
-                  : {
-                      toImageButtonOptions: {
-                        filename: `${layer.name}_chart`,
-                        format: "png",
-                      },
-                    }
+              items={chartTypes}
+              label={t("select_chart_type")}
+              placeholder="Test"
+            />
+            <Divider />
+            <FormLabelHelper label={t("settings")} color="inherit" />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={cumSum}
+                  onChange={(e) => setCumSum(e.target.checked)}
+                  color="primary"
+                />
+              }
+              label={
+                <Typography variant="body2" fontWeight="bold">
+                  {t("cumsum")}
+                </Typography>
               }
             />
-          )}
-        </Box>
-      </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          pb: 2,
-        }}>
-        <Button onClick={onClose} variant="text" sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-      </DialogActions>
-    </Dialog>
+            <Divider />
+          </Stack>
+        )}
+        {isError && <EmptySection icon={ICON_NAME.CIRCLEINFO} label={t("error_loading_chart_data")} />}{" "}
+        {(isLoading || areFieldsLoading) && (
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}>
+            <Loading size={40} />
+          </Box>
+        )}
+        {!chartData && !isLoading && !isError && (
+          <EmptySection icon={ICON_NAME.DATABASE} label={t("no_chart_data")} />
+        )}
+        {chartData && fields && layer.charts && (
+          <Plot
+            data={chartDataConfig}
+            layout={{
+              paper_bgcolor: "transparent",
+              plot_bgcolor: "transparent",
+              font: {
+                color: theme.palette.text.primary,
+              },
+              modebar: {
+                bgcolor: "transparent",
+                color: theme.palette.text.primary,
+                activecolor: theme.palette.primary.main,
+              },
+              ...chartLabelConfig,
+            }}
+            config={
+              lng === "de"
+                ? {
+                    locale: "de",
+                    toImageButtonOptions: {
+                      filename: `${layer.name}_chart`,
+                      format: "png",
+                    },
+                  }
+                : {
+                    toImageButtonOptions: {
+                      filename: `${layer.name}_chart`,
+                      format: "png",
+                    },
+                  }
+            }
+          />
+        )}
+      </Box>
+    </AppDialog>
   );
 };
 

@@ -17,8 +17,8 @@ def test_remaps_known_target_ids_and_falls_back_for_unknown() -> None:
     result = _remap_basemap_layer_config(custom_basemaps, {10: 200})
     cfg = result[0]["layer_config"]
     assert cfg["road_label"]["target"] == "200"  # remapped
-    assert cfg["water"]["target"] == "all"        # untouched
-    assert cfg["poi"]["target"] == "all"          # unmapped → fallback
+    assert cfg["water"]["target"] == "all"  # untouched
+    assert cfg["poi"]["target"] == "all"  # unmapped → fallback
 
 
 def test_ignores_basemaps_without_layer_config() -> None:

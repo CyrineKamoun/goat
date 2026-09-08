@@ -15,14 +15,12 @@ from goatlib.analysis.schemas.ui import (
     SECTION_CONFIGURATION,
     SECTION_RESULT_ROUTING,
     SECTION_ROUTING,
-    UISection,
     ui_field,
     ui_sections,
 )
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -31,9 +29,7 @@ from goatlib.tools.style import get_heatmap_style
 logger = logging.getLogger(__name__)
 
 
-class HeatmapConnectivityToolParams(
-    ScenarioSelectorMixin, ToolInputBase, HeatmapConnectivityParams
-):
+class HeatmapConnectivityToolParams(ToolInputBase, HeatmapConnectivityParams):
     """Parameters for heatmap connectivity tool.
 
     Inherits heatmap options from HeatmapConnectivityParams, adds layer context from ToolInputBase.
@@ -44,14 +40,6 @@ class HeatmapConnectivityToolParams(
             SECTION_ROUTING,
             SECTION_CONFIGURATION,
             SECTION_RESULT_ROUTING,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"reference_area_layer_id": {"$ne": None}},
-            ),
         )
     )
 
@@ -171,15 +159,15 @@ class HeatmapConnectivityToolRunner(BaseToolRunner[HeatmapConnectivityToolParams
                 layer_id=params.reference_area_layer_id,
                 user_id=params.user_id,
                 cql_filter=params.reference_area_layer_filter,
-                scenario_id=params.scenario_id,
-                project_id=params.project_id,
             )
         )
 
         # Auto-resolve od_matrix_path from routing_mode if not provided
         od_matrix_path = params.od_matrix_path
         if not od_matrix_path:
-            od_matrix_path = f"{self.settings.od_matrix_base_path}/{params.routing_mode.value}/"
+            od_matrix_path = (
+                f"{self.settings.od_matrix_base_path}/{params.routing_mode.value}/"
+            )
 
         # Build analysis params
         analysis_params = HeatmapConnectivityParams(
@@ -193,7 +181,6 @@ class HeatmapConnectivityToolRunner(BaseToolRunner[HeatmapConnectivityToolParams
                     "user_id",
                     "folder_id",
                     "project_id",
-                    "scenario_id",
                     "output_name",
                 }
             ),

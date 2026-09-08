@@ -63,7 +63,9 @@ MOCK_RESPONSES = {
 }
 
 
-def get_mock_response(url: str, query_text: str | None = None, query_params: dict | None = None) -> dict:
+def get_mock_response(
+    url: str, query_text: str | None = None, query_params: dict | None = None
+) -> dict:
     """Get mock response for a query (works for both free-text and structured)."""
     if query_text and query_text in MOCK_RESPONSES:
         return MOCK_RESPONSES[query_text]
@@ -151,7 +153,9 @@ def patch_httpx(mock_client: AsyncMock) -> Any:
 class TestGeocodingTool:
     """Tests for GeocodingTool."""
 
-    def test_geocode_full_address_mode(self, test_input_path: Path, tmp_path: Path) -> None:
+    def test_geocode_full_address_mode(
+        self, test_input_path: Path, tmp_path: Path
+    ) -> None:
         """Test geocoding with full_address mode."""
         output_path = tmp_path / "geocoded_output.parquet"
 
@@ -164,7 +168,9 @@ class TestGeocodingTool:
             geocoder_authorization="Basic placeholder",
         )
 
-        def mock_get_side_effect(url: str, params: dict | None = None, headers: dict | None = None) -> MagicMock:
+        def mock_get_side_effect(
+            url: str, params: dict | None = None, headers: dict | None = None
+        ) -> MagicMock:
             query_text = (params or {}).get("text", "")
             response_data = get_mock_response(url, query_text=query_text)
             mock_response = MagicMock()
@@ -232,7 +238,9 @@ class TestGeocodingTool:
 
         called_urls: list[str] = []
 
-        def mock_get_side_effect(url: str, params: dict | None = None, headers: dict | None = None) -> MagicMock:
+        def mock_get_side_effect(
+            url: str, params: dict | None = None, headers: dict | None = None
+        ) -> MagicMock:
             called_urls.append(url)
             response_data = get_mock_response(url, query_params=params)
             mock_response = MagicMock()
@@ -249,9 +257,9 @@ class TestGeocodingTool:
         assert result_path.exists()
 
         # All requests must go to the structured endpoint
-        assert all("/v1/search/structured" in u for u in called_urls), (
-            f"Expected all calls to /v1/search/structured, got: {called_urls}"
-        )
+        assert all(
+            "/v1/search/structured" in u for u in called_urls
+        ), f"Expected all calls to /v1/search/structured, got: {called_urls}"
 
         # Verify output has geocode_input_text column
         con = duckdb.connect(":memory:")
@@ -265,9 +273,7 @@ class TestGeocodingTool:
         assert "München" in result[0][0]
         con.close()
 
-    def test_full_address_plz_scoring_picks_matching_plz(
-        self, tmp_path: Path
-    ) -> None:
+    def test_full_address_plz_scoring_picks_matching_plz(self, tmp_path: Path) -> None:
         """Full-address mode should prefer the candidate whose PLZ matches the query."""
         con = duckdb.connect(":memory:")
         con.execute("""
@@ -316,7 +322,9 @@ class TestGeocodingTool:
             ],
         }
 
-        def mock_get_side_effect(url: str, params: dict | None = None, headers: dict | None = None) -> MagicMock:
+        def mock_get_side_effect(
+            url: str, params: dict | None = None, headers: dict | None = None
+        ) -> MagicMock:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = wrong_response
@@ -395,7 +403,9 @@ class TestGeocodingTool:
             ],
         }
 
-        def mock_get(url: str, params: dict | None = None, headers: dict | None = None) -> MagicMock:
+        def mock_get(
+            url: str, params: dict | None = None, headers: dict | None = None
+        ) -> MagicMock:
             r = MagicMock()
             r.status_code = 200
             r.json.return_value = wrong_response
@@ -462,7 +472,9 @@ class TestGeocodingTool:
             ],
         }
 
-        def mock_get(url: str, params: dict | None = None, headers: dict | None = None) -> MagicMock:
+        def mock_get(
+            url: str, params: dict | None = None, headers: dict | None = None
+        ) -> MagicMock:
             r = MagicMock()
             r.status_code = 200
             r.json.return_value = wrong_response
@@ -479,9 +491,9 @@ class TestGeocodingTool:
         """).fetchone()
         con.close()
 
-        assert row[0] == "plz_mismatch", (
-            f"Expected 'plz_mismatch' for structured mode PLZ mismatch, got '{row[0]}'"
-        )
+        assert (
+            row[0] == "plz_mismatch"
+        ), f"Expected 'plz_mismatch' for structured mode PLZ mismatch, got '{row[0]}'"
 
     def test_geocode_with_locality_constant(
         self, test_input_path: Path, tmp_path: Path
@@ -504,7 +516,9 @@ class TestGeocodingTool:
 
         called_params: list[dict] = []
 
-        def mock_get_side_effect(url: str, params: dict | None = None, headers: dict | None = None) -> MagicMock:
+        def mock_get_side_effect(
+            url: str, params: dict | None = None, headers: dict | None = None
+        ) -> MagicMock:
             called_params.append(params or {})
             response_data = get_mock_response(url, query_params=params)
             mock_response = MagicMock()
@@ -567,7 +581,9 @@ class TestGeocodingTool:
             geocoder_authorization="Basic placeholder",
         )
 
-        def mock_get_side_effect(url: str, params: dict | None = None, headers: dict | None = None) -> MagicMock:
+        def mock_get_side_effect(
+            url: str, params: dict | None = None, headers: dict | None = None
+        ) -> MagicMock:
             query_text = (params or {}).get("text", "")
             response_data = get_mock_response(url, query_text=query_text)
             mock_response = MagicMock()
@@ -595,7 +611,9 @@ class TestGeocodingTool:
 
         con.close()
 
-    def test_geocode_handles_api_error(self, test_input_path: Path, tmp_path: Path) -> None:
+    def test_geocode_handles_api_error(
+        self, test_input_path: Path, tmp_path: Path
+    ) -> None:
         """Test that geocoding handles API errors gracefully."""
         output_path = tmp_path / "geocoded_error.parquet"
 
@@ -608,7 +626,9 @@ class TestGeocodingTool:
             geocoder_authorization="Basic placeholder",
         )
 
-        def mock_error_response(url: str, params: dict | None = None, headers: dict | None = None) -> MagicMock:
+        def mock_error_response(
+            url: str, params: dict | None = None, headers: dict | None = None
+        ) -> MagicMock:
             mock_response = MagicMock()
             mock_response.status_code = 500
             return mock_response

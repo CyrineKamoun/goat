@@ -77,11 +77,41 @@
       }
     },
     {
+      "name": "Catalog Debug",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "fastapi",
+      "args": [
+        "dev",
+        "src/catalog/main.py",
+        "--reload",
+        "--port",
+        "8400"
+      ],
+      "consoleName": "Catalog Debug Console",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "cwd": "${workspaceFolder}/apps/catalog",
+      "justMyCode": false,
+      "jinja": true,
+      "envFile": "${workspaceFolder}/.env",
+      "preLaunchTask": "catalog-pre-launch",
+      "presentation": {
+        "hidden": false,
+        "group": "backend",
+        "order": 4
+      }
+    },
+    {
       "name": "Web Debug",
       "type": "node-terminal",
       "request": "launch",
       "envFile": "${workspaceFolder}/.env",
-      "command": "pnpm run web",
+      // `NODE_OPTIONS=` clears the js-debug bootloader that node-terminal
+      // injects. With the inspector attached, Turbopack never finishes
+      // compiling the heavier routes (`/catalog/[datasetId]`) and the dev
+      // server spins until it runs out of memory. Use `pnpm dev:inspect` when
+      // the frontend actually needs a debugger (from `apps/web`).
+      "command": "NODE_OPTIONS= pnpm run web",
       "preLaunchTask": "web-pre-launch",
       "presentation": {
         "hidden": false,
@@ -119,28 +149,55 @@
       "type": "node-terminal",
       "request": "launch",
       "command": "tmux new -ADs core 'cd ${workspaceFolder}/apps/core && set -a && . ${workspaceFolder}/.env && set +a && exec uv run fastapi dev src/core/main.py --reload --port 8000'",
-      "presentation": { "hidden": false, "group": "tmux", "order": 1 }
+      "presentation": {
+        "hidden": false,
+        "group": "tmux",
+        "order": 1
+      }
     },
     {
       "name": "GeoAPI (tmux)",
       "type": "node-terminal",
       "request": "launch",
       "command": "tmux new -ADs geoapi 'cd ${workspaceFolder}/apps/geoapi && set -a && . ${workspaceFolder}/.env && set +a && exec uv run fastapi dev src/geoapi/main.py --reload --port 8100'",
-      "presentation": { "hidden": false, "group": "tmux", "order": 2 }
+      "presentation": {
+        "hidden": false,
+        "group": "tmux",
+        "order": 2
+      }
     },
     {
       "name": "Processes (tmux)",
       "type": "node-terminal",
       "request": "launch",
       "command": "tmux new -ADs processes 'cd ${workspaceFolder}/apps/processes && set -a && . ${workspaceFolder}/.env && set +a && exec uv run fastapi dev src/processes/main.py --reload --port 8300'",
-      "presentation": { "hidden": false, "group": "tmux", "order": 3 }
+      "presentation": {
+        "hidden": false,
+        "group": "tmux",
+        "order": 3
+      }
+    },
+    {
+      "name": "Catalog (tmux)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "tmux new -ADs catalog 'cd ${workspaceFolder}/apps/catalog && set -a && . ${workspaceFolder}/.env && set +a && exec uv run fastapi dev src/catalog/main.py --reload --port 8400'",
+      "presentation": {
+        "hidden": false,
+        "group": "tmux",
+        "order": 4
+      }
     },
     {
       "name": "Web (tmux)",
       "type": "node-terminal",
       "request": "launch",
       "command": "tmux new -ADs web 'cd ${workspaceFolder} && set -a && . ${workspaceFolder}/.env && set +a && exec pnpm web'",
-      "presentation": { "hidden": false, "group": "tmux", "order": 4 }
+      "presentation": {
+        "hidden": false,
+        "group": "tmux",
+        "order": 4
+      }
     },
     {
       "name": "Python: Current File",
@@ -194,7 +251,8 @@
         "GeoAPI Debug",
         "Processes Debug",
         "Core Debug",
-        "Web Debug"
+        "Web Debug",
+        "Catalog Debug"
       ],
       "presentation": {
         "hidden": false,

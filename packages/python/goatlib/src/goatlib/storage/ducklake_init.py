@@ -86,9 +86,7 @@ def bootstrap_from_env() -> None:
         con.execute(f"INSTALL {ext}; LOAD {ext};")
 
     if s3_endpoint:
-        s3_endpoint_clean = (
-            s3_endpoint.replace("http://", "").replace("https://", "")
-        )
+        s3_endpoint_clean = s3_endpoint.replace("http://", "").replace("https://", "")
         print(f"  S3 endpoint: {s3_endpoint_clean}")
         # Parameterised SET to avoid SQL-injection if creds contain quotes.
         con.execute("SET s3_endpoint = ?;", [s3_endpoint_clean])

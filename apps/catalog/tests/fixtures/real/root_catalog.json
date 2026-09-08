@@ -1,0 +1,29 @@
+{
+ "type": "Catalog",
+ "stac_version": "1.0.0",
+ "id": "goat-opencatalog",
+ "title": "GOAT Open Data Catalog",
+ "description": "GOAT open data catalog. Each child is a harvest source; each dataset is a Collection whose Items are layers backed by GeoParquet in object storage.",
+ "links": [
+  {
+   "rel": "self",
+   "type": "application/json",
+   "href": "catalog.json"
+  },
+  {
+   "rel": "root",
+   "type": "application/json",
+   "href": "catalog.json"
+  },
+  {
+   "rel": "child",
+   "type": "application/json",
+   "href": "data_gv_at/catalog.json"
+  },
+  {
+   "rel": "child",
+   "type": "application/json",
+   "href": "govdata/catalog.json"
+  }
+ ]
+}

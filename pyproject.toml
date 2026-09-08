@@ -31,6 +31,7 @@ dev = [
 package = false
 
 [tool.uv.sources]
+catalog = { workspace = true }
 core = { workspace = true }
 geoapi = { workspace = true }
 goatlib = { workspace = true }
@@ -42,6 +43,7 @@ members = [
     "apps/geoapi",
     "apps/core",
     "apps/processes",
+    "apps/catalog",
     "packages/python/goatlib",
     "packages/python/goatobs",
 ]
@@ -49,7 +51,11 @@ members = [
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
-exclude = ["venv", ".venv", "alembic", "data"]
+# Test packages deliberately have no __init__.py (unique pytest module names);
+# without explicit bases every app's conftest.py would map to the same bare
+# `conftest` module and mypy aborts on the duplicate before checking anything.
+explicit_package_bases = true
+exclude = ["venv", ".venv", "alembic", "data", "packages/rust", "packages/cpp"]
 
 # mypy is the Python type gate. Pyright/Pylance type checking is disabled so it
 # does not flood SQLModel/SQLAlchemy code with false positives; it still reports
@@ -75,7 +81,22 @@ per-file-ignores = { "*/__init__.py" = [
 asyncio_mode = "auto"
 addopts = ["--import-mode=importlib", "--log-cli-level=INFO"]
 pythonpath = ["apps/core", "apps/geoapi"]
+# Collection roots. Without these pytest walks the whole repo, including
+# DATA_DIR — where it hits unreadable Postgres data directories and tens of
+# gigabytes of lake files that hold no tests.
+testpaths = [
+    "apps/catalog/tests",
+    "apps/core/tests",
+    "apps/geoapi/tests",
+    "apps/processes/tests",
+    "packages/python/goatlib/tests",
+    "packages/python/goatobs/tests",
+]
 python_files = ["test_*.py", "*_test.py"]
+# tests/benchmarks holds manually-run scripts (benchmark_* functions and a
+# __main__ block, against large local fixtures), not tests — pytest collects
+# them only because of the file names.
+norecursedirs = ["benchmarks"]
 python_classes = ["Test*", "*Tests"]
 python_functions = ["test_*"]
 markers = [

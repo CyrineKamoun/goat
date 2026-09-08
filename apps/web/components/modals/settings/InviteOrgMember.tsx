@@ -1,27 +1,22 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LoadingButton } from "@mui/lab";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-  useTheme,
-} from "@mui/material";
+import { Box, DialogContentText, MenuItem, Stack, TextField, useTheme } from "@mui/material";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
 import { inviteMember } from "@/lib/api/organizations";
 import { useOrganization } from "@/lib/api/users";
 import type { InvitationCreate } from "@/lib/validations/organization";
 import { invitationCreateSchema, organizationRoles } from "@/lib/validations/organization";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
+
+/** Ties the footer's primary to the form, so Enter in a field sends the
+ * invite the way the in-body submit button used to. */
+const FORM_ID = "invite-org-member-form";
 
 interface OrgMemberInviteDialogProps {
   onClose: () => void;
@@ -78,52 +73,53 @@ const OrgMemberInviteModal: React.FC<OrgMemberInviteDialogProps> = ({ open, onCl
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t("common:invite_member")}</DialogTitle>
-      <DialogContent sx={{ pb: 2 }}>
-        <DialogContentText>{t("common:invite_member_description")}</DialogContentText>
-        <Box component="form" onSubmit={handleSubmit(onOrganizationMemberInvite)}>
-          <Stack
-            spacing={theme.spacing(6)}
-            sx={{
-              mt: 4,
-            }}>
-            <TextField
-              fullWidth
-              required
-              label={t("common:invite_member_email")}
-              {...register("user_email")}
-              id="user_email"
-            />
+    <AppDialog
+      open={open}
+      onClose={onClose}
+      icon={ICON_NAME.ADD_USER}
+      title={t("common:invite_member")}
+      maxWidth={600}
+      footer={
+        <AppDialogFooter
+          onCancel={onClose}
+          primaryLabel={t("common:send_invite")}
+          onPrimary={() => void handleSubmit(onOrganizationMemberInvite)()}
+          primaryType="submit"
+          primaryForm={FORM_ID}
+          primaryDisabled={!formState.isValid}
+          primaryLoading={isBusy}
+        />
+      }>
+      <DialogContentText>{t("common:invite_member_description")}</DialogContentText>
+      <Box component="form" id={FORM_ID} onSubmit={handleSubmit(onOrganizationMemberInvite)}>
+        <Stack
+          spacing={theme.spacing(6)}
+          sx={{
+            mt: 4,
+          }}>
+          <TextField
+            fullWidth
+            required
+            label={t("common:invite_member_email")}
+            {...register("user_email")}
+            id="user_email"
+          />
 
-            <TextField
-              select
-              label={t("common:role")}
-              defaultValue={getValues("role")}
-              size="medium"
-              {...register("role")}>
-              {[organizationRoles.ADMIN, organizationRoles.EDITOR, organizationRoles.VIEWER].map((role) => (
-                <MenuItem key={role} value={role} disabled={isRoleDisabled(role)}>
-                  {t(`common:${role}`)}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Stack>
-          <Stack direction="row" justifyContent="flex-end" alignItems="center" sx={{ mt: 8, mb: 0 }}>
-            <Button onClick={onClose} variant="text" sx={{ borderRadius: 0 }}>
-              <Typography variant="body2" fontWeight="bold">
-                {t("common:cancel")}
-              </Typography>
-            </Button>
-            <LoadingButton type="submit" variant="text" disabled={!formState.isValid} loading={isBusy}>
-              <Typography variant="body2" fontWeight="bold" color="inherit">
-                {t("common:send_invite")}
-              </Typography>
-            </LoadingButton>
-          </Stack>
-        </Box>
-      </DialogContent>
-    </Dialog>
+          <TextField
+            select
+            label={t("common:role")}
+            defaultValue={getValues("role")}
+            size="medium"
+            {...register("role")}>
+            {[organizationRoles.ADMIN, organizationRoles.EDITOR, organizationRoles.VIEWER].map((role) => (
+              <MenuItem key={role} value={role} disabled={isRoleDisabled(role)}>
+                {t(`common:${role}`)}
+              </MenuItem>
+            ))}
+          </TextField>
+        </Stack>
+      </Box>
+    </AppDialog>
   );
 };
 

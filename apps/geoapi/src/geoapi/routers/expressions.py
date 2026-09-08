@@ -10,7 +10,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from goatlib.utils.expressions import (
     FUNCTION_REGISTRY,
     ExpressionEvaluator,
@@ -20,6 +20,7 @@ from goatlib.utils.expressions import (
 from pydantic import BaseModel, Field
 
 from geoapi.dependencies import LayerInfoDep
+from geoapi.deps.authz import require_layer_read
 from geoapi.ducklake_pool import ducklake_pool
 from geoapi.services.layer_service import layer_service
 
@@ -177,6 +178,7 @@ async def validate_expression(
     "/validate/{collectionId}",
     summary="Validate an expression for a collection",
     response_model=ValidateExpressionResponse,
+    dependencies=[Depends(require_layer_read)],
 )
 async def validate_expression_for_collection(
     layer_info: LayerInfoDep,
@@ -221,6 +223,7 @@ async def validate_expression_for_collection(
     "/preview/{collectionId}",
     summary="Preview expression result",
     response_model=PreviewExpressionResponse,
+    dependencies=[Depends(require_layer_read)],
 )
 async def preview_expression(
     layer_info: LayerInfoDep,

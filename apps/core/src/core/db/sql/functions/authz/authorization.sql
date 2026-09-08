@@ -54,7 +54,7 @@ BEGIN
 
     /*Check team*/
     IF team_ids IS NOT NULL THEN
-        PERFORM customer.check_team(rec_user.id, team_ids);
+        PERFORM customer.check_team(rec_user.id, team_ids, rec_resource.id);
     END IF;
     
     /*Check if user has access to the layers*/

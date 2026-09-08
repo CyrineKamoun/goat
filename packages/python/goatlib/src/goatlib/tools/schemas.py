@@ -35,9 +35,6 @@ class ToolInputBase(BaseModel):
 
     folder_id is optional - if not provided, it will be derived from project_id.
     For layer imports outside a project, folder_id must be provided.
-
-    scenario_id applies to all input layers - scenario features will be merged
-    with original layer data (new/modified added, deleted removed).
     """
 
     model_config = ConfigDict(populate_by_name=True)
@@ -62,11 +59,6 @@ class ToolInputBase(BaseModel):
         None,
         description="If provided, add result layer to this project",
         json_schema_extra=ui_field(section="output", field_order=97, hidden=True),
-    )
-    scenario_id: str | None = Field(
-        None,
-        description="Scenario UUID. If provided, scenario features are merged with layer data for all input layers.",
-        json_schema_extra=ui_field(section="output", field_order=96, hidden=True),
     )
     result_layer_name: str | None = Field(
         None,
@@ -169,31 +161,6 @@ class TwoLayerInputMixin(BaseModel):
     )
 
 
-class ScenarioSelectorMixin(BaseModel):
-    """Mixin to add a visible scenario selector to a tool.
-
-    Include this mixin BEFORE ToolInputBase to override the hidden scenario_id field
-    with a visible scenario selector widget.
-
-    Example:
-        class MyToolParams(ScenarioSelectorMixin, ToolInputBase, LayerInputMixin):
-            # scenario_id will now have a visible selector widget
-            pass
-
-    The SECTION_SCENARIO should be added to the tool's model_config json_schema_extra.
-    """
-
-    scenario_id: str | None = Field(
-        None,
-        description="Scenario to apply. Scenario features will be merged with layer data.",
-        json_schema_extra=ui_field(
-            section="scenario",
-            field_order=1,
-            widget="scenario-selector",
-        ),
-    )
-
-
 class ToolOutputBase(BaseModel):
     """Standard output that all tools return.
 
@@ -233,9 +200,6 @@ class ToolOutputBase(BaseModel):
     )
     feature_count: int = Field(0, description="Number of features/rows")
     extent: Any | None = Field(None, description="Spatial extent (WKT or dict)")
-    attribute_mapping: dict[str, str] = Field(
-        default_factory=dict, description="Column name mapping"
-    )
 
     # Storage reference
     table_name: str | None = Field(None, description="DuckLake table name")

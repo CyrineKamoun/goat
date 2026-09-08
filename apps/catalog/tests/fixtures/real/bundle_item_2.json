@@ -1,0 +1,344 @@
+{
+ "id": "020ecfbf-2fcc-472f-8531-8052b1160f06_ogd-3fafa7a1ed7a",
+ "bbox": [
+  16.181830379117955,
+  48.11790330115346,
+  16.57751413031004,
+  48.32266661161856
+ ],
+ "type": "Feature",
+ "links": [
+  {
+   "rel": "self",
+   "href": "020ecfbf-2fcc-472f-8531-8052b1160f06_ogd-3fafa7a1ed7a.json",
+   "type": "application/geo+json"
+  },
+  {
+   "rel": "root",
+   "href": "../../../catalog.json",
+   "type": "application/json"
+  },
+  {
+   "rel": "parent",
+   "href": "../collection.json",
+   "type": "application/json"
+  },
+  {
+   "rel": "collection",
+   "href": "../collection.json",
+   "type": "application/json"
+  },
+  {
+   "rel": "via",
+   "href": "https://www.data.gv.at/katalog/datasets/2f5baa1f-208c-42c2-8d04-9ea74aa1b229",
+   "type": "text/html",
+   "title": "Source dataset"
+  },
+  {
+   "rel": "via",
+   "href": "https://ckan.govdata.de/dataset/2f5baa1f-208c-42c2-8d04-9ea74aa1b229",
+   "type": "text/html",
+   "title": "Harvested from"
+  }
+ ],
+ "assets": {
+  "kmz": {
+   "href": "https://data.wien.gv.at/daten/geo?version=1.3.0&service=WMS&request=GetMap&crs=EPSG:4326&bbox=48.10,16.16,48.34,16.59&width=1&height=1&layers=ogdwien:REALNUT2012OGD&styles=&format=application/vnd.google-earth.kmz",
+   "type": "application/octet-stream",
+   "roles": [
+    "data"
+   ],
+   "title": "WMS Geoserver GetMap (KMZ) - 2012"
+  },
+  "data": {
+   "href": "s3://p4b-catalog-test/catalog/data/020ecfbf-2fcc-472f-8531-8052b1160f06_ogd-3fafa7a1ed7a.parquet",
+   "type": "application/x-parquet",
+   "roles": [
+    "data"
+   ],
+   "title": "GeoParquet"
+  },
+  "json": {
+   "href": "https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&srsName=EPSG:4326&outputFormat=json&typeName=ogdwien:REALNUT2014OGD&maxFeatures=5",
+   "type": "application/octet-stream",
+   "roles": [
+    "data"
+   ],
+   "title": "WFS GetFeature (JSON) - 2014"
+  },
+  "json_2": {
+   "href": "https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&typeName=ogdwien:REALNUT2009OGD&srsName=EPSG:4326&outputFormat=json",
+   "type": "application/octet-stream",
+   "roles": [
+    "data"
+   ],
+   "title": "WFS GetFeature (JSON) - 2009"
+  },
+  "json_3": {
+   "href": "https://data.wien.gv.at/daten/geo?service=WFS&request=GetFeature&version=1.1.0&srsName=EPSG:4326&outputFormat=json&typeName=ogdwien:REALNUT2016GOGD",
+   "type": "application/octet-stream",
+   "roles": [
+    "data"
+   ],
+   "title": "WFS GetFeature (JSON) 2016"
+  },
+  "wfs_srvc": {
+   "href": "https://data.wien.gv.at/daten/geo?version=1.1.0&service=WFS&request=GetCapabilities",
+   "type": "application/octet-stream",
+   "roles": [
+    "data"
+   ],
+   "title": "WFS GetCapabilities"
+  },
+  "thumbnail": {
+   "href": "s3://p4b-catalog-test/catalog/thumbs/020ecfbf-2fcc-472f-8531-8052b1160f06_ogd-3fafa7a1ed7a.svg",
+   "type": "image/svg+xml",
+   "roles": [
+    "thumbnail"
+   ],
+   "title": "Thumbnail"
+  }
+ },
+ "geometry": {
+  "type": "Polygon",
+  "coordinates": [
+   [
+    [
+     16.181830379117955,
+     48.11790330115346
+    ],
+    [
+     16.57751413031004,
+     48.11790330115346
+    ],
+    [
+     16.57751413031004,
+     48.32266661161856
+    ],
+    [
+     16.181830379117955,
+     48.32266661161856
+    ],
+    [
+     16.181830379117955,
+     48.11790330115346
+    ]
+   ]
+  ]
+ },
+ "collection": "data_gv_at:2f5baa1f-208c-42c2-8d04-9ea74aa1b229",
+ "properties": {
+  "title": "Realnutzungskartierung 2007 bis 2022 Wien [ogdwien:REALNUT2016GOGD]",
+  "themes": [
+   {
+    "scheme": "https://goat.plan4better.de/data-categories",
+    "concepts": [
+     {
+      "id": "other"
+     }
+    ]
+   }
+  ],
+  "license": "CC-BY-4.0",
+  "updated": "2026-04-27Z",
+  "contacts": [
+   {
+    "name": "Stadt Wien",
+    "links": [
+     {
+      "rel": "about",
+      "href": "https://digitales.wien.gv.at"
+     }
+    ],
+    "roles": [
+     "publisher"
+    ]
+   },
+   {
+    "name": "Magistrat Wien - Magistratsabteilung 18 - Stadtentwicklung und Stadtplanung",
+    "roles": [
+     "pointOfContact"
+    ],
+    "emails": [
+     {
+      "value": "post@ma18.wien.gv.at"
+     }
+    ]
+   }
+  ],
+  "datetime": "2007-01-01T00:00:00Z",
+  "keywords": [
+   "Verkehr",
+   "RNK",
+   "Wohnen",
+   "Wasserflächen",
+   "Nutzung",
+   "Sonderflächen",
+   "Landnutzung",
+   "ViennaGIS",
+   "Grünflächen",
+   "Baublock",
+   "Realnutzung",
+   "Luftbildinterpretation"
+  ],
+  "goat:style": {
+   "color": [
+    102,
+    194,
+    165
+   ],
+   "filled": true,
+   "opacity": 0.8,
+   "stroked": false,
+   "max_zoom": 22,
+   "min_zoom": 1,
+   "visibility": true,
+   "color_field": {
+    "name": "NUTZUNG_LEVEL1",
+    "type": "string"
+   },
+   "color_range": {
+    "name": "Set2",
+    "type": "qualitative",
+    "colors": [
+     "#66c2a5",
+     "#fc8d62",
+     "#8da0cb",
+     "#e78ac3",
+     "#a6d854",
+     "#ffd92f",
+     "#e5c100",
+     "#b3b3b3"
+    ],
+    "category": "ColorBrewer",
+    "color_map": [
+     [
+      [
+       "Grünlandnutzung"
+      ],
+      "#66c2a5"
+     ],
+     [
+      [
+       "Verkehr"
+      ],
+      "#fc8d62"
+     ],
+     [
+      [
+       "Baulandnutzung"
+      ],
+      "#8da0cb"
+     ]
+    ]
+   },
+   "color_scale": "ordinal",
+   "stroke_color": [
+    217,
+    25,
+    85
+   ],
+   "stroke_width": 3,
+   "stroke_width_range": [
+    0,
+    10
+   ],
+   "stroke_width_scale": "linear"
+  },
+  "description": "Dieser Datenbestand bildet die tatsächliche Flächennutzung Wiens in generalisierter Form ab. Die Datenbasis ist eine Luftbildinterpretation unter Hinzunahme ergänzender Sachdaten. Es gibt 32 Nutzungskategorien aus den Bereichen Wohnen, Grünflächen, Verkehr, etc. Die Nutzungskategorien sind hierarchisch in 3 Levels gegliedert.",
+  "externalIds": [
+   {
+    "value": "2f5baa1f-208c-42c2-8d04-9ea74aa1b229",
+    "scheme": "ckan"
+   }
+  ],
+  "table:columns": [
+   {
+    "name": "OGC_FID"
+   },
+   {
+    "name": "id"
+   },
+   {
+    "name": "OBJECTID"
+   },
+   {
+    "name": "BEZ"
+   },
+   {
+    "name": "ZBEZ"
+   },
+   {
+    "name": "ZGEB"
+   },
+   {
+    "name": "BLK"
+   },
+   {
+    "max": 32.0,
+    "min": 1.0,
+    "mean": 11.6746,
+    "name": "NUTZUNG_CODE",
+    "type": "number",
+    "breaks": [
+     1.0,
+     3.0,
+     3.0,
+     9.0,
+     21.0,
+     29.0
+    ],
+    "null_pct": 0
+   },
+   {
+    "name": "NUTZUNG_LEVEL1",
+    "type": "string",
+    "null_pct": 0,
+    "unique_values": [
+     "Grünlandnutzung",
+     "Verkehr",
+     "Baulandnutzung"
+    ],
+    "distinct_count": 3
+   },
+   {
+    "name": "NUTZUNG_LEVEL2"
+   },
+   {
+    "name": "NUTZUNG_LEVEL3"
+   },
+   {
+    "max": 6206330.49,
+    "min": 5.89,
+    "mean": 22607.4777,
+    "name": "FLAECHE",
+    "type": "number",
+    "breaks": [
+     3012.7594,
+     4612.0208,
+     6615.0461,
+     9245.437,
+     13721.9215,
+     24465.6357
+    ],
+    "null_pct": 0
+   },
+   {
+    "name": "SE_ANNO_CAD_DATA"
+   },
+   {
+    "name": "geometry"
+   },
+   {
+    "name": "bbox"
+   }
+  ],
+  "goat:resourceId": "020ecfbf-2fcc-472f-8531-8052b1160f06::ogdwien:REALNUT2016GOGD",
+  "table:row_count": 18351,
+  "goat:geometryType": "polygon"
+ },
+ "stac_version": "1.0.0",
+ "stac_extensions": [
+  "https://stac-extensions.github.io/table/v1.2.0/schema.json"
+ ]
+}

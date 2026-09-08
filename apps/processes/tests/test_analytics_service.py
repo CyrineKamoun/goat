@@ -271,3 +271,129 @@ class TestAnalyticsServiceAreaStatistics:
 
                         assert result["total_area"] == 1000.5
                         assert result["unit"] == "square_meters"
+
+
+class TestCatalogLayers:
+    """A promoted catalog layer is not in DuckLake.
+
+    It is one parquet file in the shared catalog layers directory, read through
+    a `catalog_layers."t_…"` view — the same relation geoapi serves it from.
+    Resolving it through the lake asks the catalog for a table that was never
+    registered there, which came back as `404 Layer not found` and left the data
+    table's filter popover, feature counts and class breaks empty for every
+    catalog layer.
+    """
+
+    LAYER_ID = "3cdd1ea4-db25-414c-88ec-399ac841300c"
+    TABLE = "t_3cdd1ea4db25414c88ec399ac841300c"
+
+    @staticmethod
+    def _write_layer(directory, table, rows=None):
+        import duckdb as _duckdb
+
+        directory.mkdir(parents=True, exist_ok=True)
+        values = rows or [("road", 10), ("road", 20), ("rail", 30)]
+        literal = ", ".join(f"('{k}', {v})" for k, v in values)
+        con = _duckdb.connect()
+        con.execute(
+            f"COPY (SELECT * FROM (VALUES {literal}) AS t(source, level)) "
+            f"TO '{directory / f'{table}.parquet'}' (FORMAT PARQUET)"
+        )
+        con.close()
+
+    @staticmethod
+    def _fresh_connections():
+        """A manager handing out a NEW in-memory connection per call.
+
+        Production opens several per request, so the view has to be created on
+        each one — a fixture that reuses a single connection would hide that.
+        """
+        import contextlib
+
+        import duckdb as _duckdb
+
+        manager = MagicMock()
+
+        @contextlib.contextmanager
+        def connection():
+            con = _duckdb.connect()
+            try:
+                yield con
+            finally:
+                con.close()
+
+        manager.connection = connection
+        return manager
+
+    def test_the_relation_is_the_catalog_view_when_the_parquet_exists(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("CATALOG_LAYERS_DIR", str(tmp_path))
+        self._write_layer(tmp_path, self.TABLE)
+        service = AnalyticsService()
+
+        with patch(
+            "processes.services.analytics_service.get_schema_for_layer"
+        ) as mock_schema:
+            result = service._get_table_name(self.LAYER_ID)
+
+        assert result == f'catalog_layers."{self.TABLE}"'
+        mock_schema.assert_not_called(), "the lake must not be consulted at all"
+
+    def test_a_ducklake_layer_still_resolves_through_the_lake(
+        self, tmp_path, monkeypatch
+    ):
+        """No parquet on disk means it is an ordinary layer — unchanged path."""
+        monkeypatch.setenv("CATALOG_LAYERS_DIR", str(tmp_path))
+        service = AnalyticsService()
+
+        with patch(
+            "processes.services.analytics_service.get_schema_for_layer",
+            return_value="main",
+        ):
+            result = service._get_table_name(self.LAYER_ID)
+
+        assert result == f"lake.main.{self.TABLE}"
+
+    def test_unique_values_reads_a_catalog_layer(self, tmp_path, monkeypatch):
+        """What the data table's filter popover asks for."""
+        monkeypatch.setenv("CATALOG_LAYERS_DIR", str(tmp_path))
+        self._write_layer(tmp_path, self.TABLE)
+        service = AnalyticsService()
+
+        with patch(
+            "processes.services.analytics_service.ducklake_manager",
+            self._fresh_connections(),
+        ):
+            result = service.unique_values(self.LAYER_ID, "source")
+
+        values = {v["value"]: v["count"] for v in result["values"]}
+        assert values == {"road": 2, "rail": 1}
+
+    def test_feature_count_reads_a_catalog_layer(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CATALOG_LAYERS_DIR", str(tmp_path))
+        self._write_layer(tmp_path, self.TABLE)
+        service = AnalyticsService()
+
+        with patch(
+            "processes.services.analytics_service.ducklake_manager",
+            self._fresh_connections(),
+        ):
+            result = service.feature_count(self.LAYER_ID)
+
+        assert result["count"] == 3
+
+    def test_class_breaks_read_a_catalog_layer(self, tmp_path, monkeypatch):
+        """Styling asks for these; an empty answer is why a catalog layer could
+        not be classified."""
+        monkeypatch.setenv("CATALOG_LAYERS_DIR", str(tmp_path))
+        self._write_layer(tmp_path, self.TABLE)
+        service = AnalyticsService()
+
+        with patch(
+            "processes.services.analytics_service.ducklake_manager",
+            self._fresh_connections(),
+        ):
+            result = service.class_breaks(self.LAYER_ID, "level", "quantile", 2)
+
+        assert result["breaks"]

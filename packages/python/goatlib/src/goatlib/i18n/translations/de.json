@@ -1,5 +1,6 @@
 {
   "sections": {
+    "sql": {"label": "SQL"},
     "routing": {
       "label": "Routing"
     },
@@ -14,9 +15,6 @@
     },
     "reference_area": {
       "label": "Referenzgebiet"
-    },
-    "scenario": {
-      "label": "Szenario"
     },
     "input": {
       "label": "Eingabe"
@@ -110,6 +108,20 @@
     }
   },
   "fields": {
+    "polygon_union": {"label": "Überlappende Puffer zusammenführen", "description": "Puffer gleicher Distanz, die sich überlappen, zu einem Polygon zusammenführen"},
+    "egress_mode": {"label": "Abgangsmodus", "description": "Fortbewegungsart auf dem letzten Abschnitt von der Haltestelle zum Ziel"},
+    "input_layer_1": {"label": "Eingabeebene 1", "description": "Erste Eingabeebene (aus dem Workflow verbunden)"},
+    "input_layer_2": {"label": "Eingabeebene 2", "description": "Zweite Eingabeebene (aus dem Workflow verbunden)"},
+    "input_layer_3": {"label": "Eingabeebene 3", "description": "Dritte Eingabeebene (aus dem Workflow verbunden)"},
+    "sql_query": {"label": "SQL-Abfrage", "description": "SQL-SELECT-Anweisung, die auf den Eingabeebenen ausgeführt wird"},
+    "pt_network_bundle_id": {
+      "label": "ÖPNV-Netz-Bundle",
+      "description": "Wählen Sie ein benutzerdefiniertes ÖPNV-Netz-Bundle für das Routing. Wenn nicht gesetzt, wird das Standard-Bundle verwendet."
+    },
+    "street_network_bundle_id": {
+      "label": "Straßennetz-Bundle",
+      "description": "Wählen Sie ein benutzerdefiniertes Straßennetz-Bundle für das Routing. Wenn nicht gesetzt, wird das Standardnetz verwendet."
+    },
     "routing_mode": {
       "label": "Verkehrsmittel",
       "description": "Wählen Sie das Verkehrsmittel für die Erreichbarkeitsanalyse"
@@ -365,10 +377,6 @@
     "mitre_limit": {
       "label": "Gehrungsgrenze",
       "description": "Verhältnis für Gehrungsverbindungslänge"
-    },
-    "scenario_id": {
-      "label": "Szenario",
-      "description": "Wählen Sie ein Szenario für die Analyse"
     },
     "od_matrix_path": {
       "label": "OD-Matrix",
@@ -1053,7 +1061,7 @@
       "description": "Einzugsgebiete zeigen Flächen auf, die in einer festgelegten Reisezeit oder Entfernung von einem oder mehreren Ausgangspunkten erreicht werden können."
     },
     "travel_cost_matrix": {
-      "title": "Reisezeitmatrix",
+      "title": "Reisekostenmatrix",
       "description": "Berechnet Reisezeiten und Entfernungen zwischen Start- und Zielpunkt-Layern."
     },
     "merge": {
@@ -1112,7 +1120,7 @@
     "geocoding": "Geokodierung",
     "clustered_features": "Clusterzuordnung",
     "cluster_summary": "Cluster-Zusammenfassung",
-    "travel_cost_matrix": "Reisezeitmatrix",
+    "travel_cost_matrix": "Reisekostenmatrix",
     "travel_cost_matrix_destinations": "Zielpunkte"
   },
   "two_sfca_type": {

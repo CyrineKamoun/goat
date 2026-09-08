@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 type Anchor = "top_left" | "top_right" | "bottom_left" | "bottom_right";
 
 // Margin between the popup and the nearest edge of its host area.
-const EDGE_GAP = 12;
+export const EDGE_GAP = 12;
 
 /**
  * Positions a fixed popup at one of the 4 corners of its parent

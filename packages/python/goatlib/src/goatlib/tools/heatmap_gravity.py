@@ -16,7 +16,6 @@ from goatlib.analysis.schemas.ui import (
     SECTION_OPPORTUNITIES,
     SECTION_RESULT_ROUTING,
     SECTION_ROUTING,
-    UISection,
     ui_field,
     ui_sections,
 )
@@ -27,7 +26,6 @@ from goatlib.tools._opportunity_handles import (
 )
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -38,7 +36,6 @@ logger = logging.getLogger(__name__)
 
 class HeatmapGravityToolParams(
     NumberedOpportunityLayersMixin,
-    ScenarioSelectorMixin,
     ToolInputBase,
     HeatmapGravityParams,
 ):
@@ -53,13 +50,6 @@ class HeatmapGravityToolParams(
             SECTION_CONFIGURATION,
             SECTION_OPPORTUNITIES,
             SECTION_RESULT_ROUTING,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-            ),
         )
     )
 
@@ -82,7 +72,7 @@ class HeatmapGravityToolParams(
             label_key="reference_area_path",
             widget="layer-selector",
             widget_options={"geometry_types": ["Polygon", "MultiPolygon"]},
-            advanced=True
+            advanced=True,
         ),
     )
     reference_area_layer_filter: dict[str, Any] | None = Field(
@@ -187,15 +177,15 @@ class HeatmapGravityToolRunner(BaseToolRunner[HeatmapGravityToolParams]):
                     layer_id=params.reference_area_layer_id,
                     user_id=params.user_id,
                     cql_filter=params.reference_area_layer_filter,
-                    scenario_id=params.scenario_id,
-                    project_id=params.project_id,
                 )
             )
 
         # Auto-resolve od_matrix_path from routing_mode if not provided
         od_matrix_path = params.od_matrix_path
         if not od_matrix_path:
-            od_matrix_path = f"{self.settings.od_matrix_base_path}/{params.routing_mode.value}/"
+            od_matrix_path = (
+                f"{self.settings.od_matrix_base_path}/{params.routing_mode.value}/"
+            )
 
         # Build analysis params
         analysis_params = HeatmapGravityParams(

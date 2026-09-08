@@ -79,9 +79,7 @@ def validate_sql_query(sql: str) -> None:
     # Check that the query starts with SELECT or WITH (for CTEs)
     first_word = cleaned.split()[0].upper()
     if first_word not in ("SELECT", "WITH"):
-        raise ValueError(
-            f"Only SELECT statements are allowed. Got: {first_word}"
-        )
+        raise ValueError(f"Only SELECT statements are allowed. Got: {first_word}")
 
     # Check for forbidden keywords at statement boundaries
     # Split on semicolons to handle multi-statement injection attempts
@@ -219,7 +217,9 @@ class CustomSqlToolRunner(BaseToolRunner[CustomSqlToolParams]):
     default_output_name = "Custom SQL"
 
     @classmethod
-    def _resolve_input_alias(cls: type["CustomSqlToolRunner"], input_key: str, index: int) -> str:
+    def _resolve_input_alias(
+        cls: type["CustomSqlToolRunner"], input_key: str, index: int
+    ) -> str:
         """Map an input schema key to the table alias used in SQL queries.
 
         Handles both correct keys (input_layer_1_id) and fallback keys
@@ -304,9 +304,7 @@ class CustomSqlToolRunner(BaseToolRunner[CustomSqlToolParams]):
                     # Schema not yet available — create table with placeholder
                     col_defs = ['"_placeholder" INTEGER']
 
-                create_sql = (
-                    f'CREATE TABLE "{alias}" ({", ".join(col_defs)})'
-                )
+                create_sql = f'CREATE TABLE "{alias}" ({", ".join(col_defs)})'
                 con.execute(create_sql)
 
             # Execute the user's SQL with LIMIT 0 to get column types
@@ -359,7 +357,7 @@ class CustomSqlToolRunner(BaseToolRunner[CustomSqlToolParams]):
             )
 
         con.execute(
-            f'CREATE VIEW "{alias}" AS SELECT * FROM read_parquet(\'{parquet_path}\')'
+            f"CREATE VIEW \"{alias}\" AS SELECT * FROM read_parquet('{parquet_path}')"
         )
         logger.info(f"Registered view '{alias}' from {parquet_path}")
 
@@ -396,8 +394,6 @@ class CustomSqlToolRunner(BaseToolRunner[CustomSqlToolParams]):
                     layer_id=layer_id,
                     user_id=params.user_id,
                     cql_filter=layer_filter,
-                    scenario_id=params.scenario_id,
-                    project_id=params.project_id,
                 )
                 self._register_layer_as_view(con, alias, parquet_path)
 
@@ -432,9 +428,7 @@ class CustomSqlToolRunner(BaseToolRunner[CustomSqlToolParams]):
                 col_info = con.execute(
                     f"DESCRIBE SELECT * FROM read_parquet('{output_path}') LIMIT 0"
                 ).fetchall()
-                has_geometry = any(
-                    "GEOMETRY" in row[1].upper() for row in col_info
-                )
+                has_geometry = any("GEOMETRY" in row[1].upper() for row in col_info)
             except Exception:
                 pass
 

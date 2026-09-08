@@ -7,7 +7,16 @@ import time
 import uuid
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Header, HTTPException, Path, Query, Request, Response
+from fastapi import (
+    APIRouter,
+    Depends,
+    Header,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    Response,
+)
 
 from geoapi.dependencies import (
     BBoxDep,
@@ -16,7 +25,9 @@ from geoapi.dependencies import (
     PropertiesDep,
     TileMatrixSetIdDep,
     normalize_layer_id,
+    reject_unknown_fields,
 )
+from geoapi.deps.authz import require_layer_read
 from geoapi.models import (
     Link,
     StyleJSON,
@@ -91,6 +102,45 @@ def build_tile_etag_seed(
 router = APIRouter(tags=["Tiles"])
 
 
+async def _reject_unknown_tile_properties(
+    collection_id: str, layer_id: str, properties: list[str] | None
+) -> None:
+    """Validate `?properties=` on every tile path, PMTiles included.
+
+    The same request must not 400 on the dynamic path and 200 from PMTiles:
+    a validation that fires on one path only teaches callers the wrong
+    contract. The column list comes from the shared layer-metadata cache —
+    keyed by layer id, written by `get_layer_metadata` and dropped by the same
+    write hooks the dynamic path relies on, so this sees exactly what the
+    dynamic path would see. A cache miss resolves the layer once and warms
+    that entry, so the fast path pays a lookup per layer, not per tile, and
+    only for requests that carry `?properties=` at all.
+
+    An unresolvable layer returns without raising: the paths below produce the
+    404 for it.
+    """
+    if not properties:
+        return
+
+    metadata = layer_service.cached_metadata(layer_id)
+    if metadata is None:
+        from geoapi.dependencies import get_layer_info
+
+        try:
+            layer_info = await get_layer_info(collection_id)
+        except HTTPException:
+            return
+        metadata = await layer_service.get_layer_metadata(layer_info)
+    if metadata is None:
+        return
+
+    reject_unknown_fields(
+        column_names=metadata.column_names,
+        properties=properties,
+        geometry_column=metadata.geometry_column or "geometry",
+    )
+
+
 @router.get(
     "/collections/{collectionId}/tiles/{tileMatrixSetId}/{z}/{x}/{y}",
     summary="Get vector tile",
@@ -104,6 +154,7 @@ router = APIRouter(tags=["Tiles"])
         404: {"description": "Collection not found"},
         504: {"description": "Query timeout"},
     },
+    dependencies=[Depends(require_layer_read)],
 )
 async def get_tile(
     request: Request,
@@ -141,6 +192,8 @@ async def get_tile(
         raise HTTPException(
             status_code=400, detail=f"Invalid collection ID: {collection_id}"
         )
+
+    await _reject_unknown_tile_properties(collection_id, layer_id, properties)
 
     # Try ultra-fast PMTiles path first (wrapped in try-except to ensure fallback)
     try:
@@ -229,6 +282,15 @@ async def get_tile(
 
     if not metadata.has_geometry:
         raise HTTPException(status_code=400, detail="Collection has no geometry column")
+
+    # Only the dynamic path splices `properties` into SQL; the PMTiles paths
+    # above ignore it (a tileset carries all its properties) and return
+    # before any column list is resolved.
+    reject_unknown_fields(
+        column_names=metadata.column_names,
+        properties=properties,
+        geometry_column=metadata.geometry_column or "geometry",
+    )
 
     # --- ETag check: skip tile generation if client already has current version ---
     from geoapi.ducklake_pool import ducklake_pool
@@ -399,6 +461,7 @@ async def get_tileset(
     "/collections/{collectionId}/tiles/{tileMatrixSetId}/tilejson.json",
     summary="Get TileJSON",
     response_model=TileJSON,
+    dependencies=[Depends(require_layer_read)],
 )
 async def get_tilejson(
     request: Request,
@@ -460,6 +523,7 @@ async def get_tilejson(
     "/collections/{collectionId}/tiles/{tileMatrixSetId}/style.json",
     summary="Get StyleJSON",
     response_model=StyleJSON,
+    dependencies=[Depends(require_layer_read)],
 )
 async def get_stylejson(
     request: Request,

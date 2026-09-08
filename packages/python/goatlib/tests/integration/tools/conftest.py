@@ -53,6 +53,7 @@ import pytest
 import pytest_asyncio
 from goatlib.tools.base import ToolSettings
 from goatlib.tools.db import ToolDatabaseService
+from goatlib.utils.layer import layer_schema_name
 
 logger = logging.getLogger(__name__)
 
@@ -177,11 +178,22 @@ async def test_schemas(postgres_pool: asyncpg.Pool) -> None:
             )
         """)
 
+        # Create customer.space table (minimal - one personal space per user)
+        await conn.execute(f"""
+            CREATE TABLE {TEST_CUSTOMER_SCHEMA}.space (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                kind TEXT NOT NULL DEFAULT 'personal',
+                user_id UUID REFERENCES {TEST_CUSTOMER_SCHEMA}.user(id) ON DELETE CASCADE,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
+
         # Create customer.folder table
         await conn.execute(f"""
             CREATE TABLE {TEST_CUSTOMER_SCHEMA}.folder (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id UUID NOT NULL REFERENCES {TEST_CUSTOMER_SCHEMA}.user(id) ON DELETE CASCADE,
+                space_id UUID REFERENCES {TEST_CUSTOMER_SCHEMA}.space(id) ON DELETE SET NULL,
                 name TEXT NOT NULL,
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -200,7 +212,6 @@ async def test_schemas(postgres_pool: asyncpg.Pool) -> None:
                 tags TEXT[],
                 thumbnail_url TEXT,
                 layer_order INTEGER[],
-                active_scenario_id UUID,
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW()
             )
@@ -212,6 +223,7 @@ async def test_schemas(postgres_pool: asyncpg.Pool) -> None:
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 user_id UUID NOT NULL REFERENCES {TEST_CUSTOMER_SCHEMA}.user(id) ON DELETE CASCADE,
                 folder_id UUID NOT NULL REFERENCES {TEST_CUSTOMER_SCHEMA}.folder(id) ON DELETE CASCADE,
+                space_id UUID REFERENCES {TEST_CUSTOMER_SCHEMA}.space(id) ON DELETE SET NULL,
                 name TEXT NOT NULL,
                 description TEXT,
                 tags TEXT[],
@@ -220,7 +232,6 @@ async def test_schemas(postgres_pool: asyncpg.Pool) -> None:
                 feature_layer_type TEXT,
                 feature_layer_geometry_type TEXT,
                 extent GEOMETRY(MultiPolygon, 4326),
-                attribute_mapping JSONB,
                 size BIGINT DEFAULT 0,
                 properties JSONB,
                 other_properties JSONB,
@@ -301,14 +312,23 @@ async def test_folder(
     user_id = uuid.UUID(test_user["id"])
 
     async with postgres_pool.acquire() as conn:
+        space_id = await conn.fetchval(
+            f"""
+            INSERT INTO {TEST_CUSTOMER_SCHEMA}.space (kind, user_id)
+            VALUES ('personal', $1)
+            RETURNING id
+            """,
+            user_id,
+        )
         await conn.execute(
             f"""
-            INSERT INTO {TEST_CUSTOMER_SCHEMA}.folder (id, user_id, name)
-            VALUES ($1, $2, $3)
+            INSERT INTO {TEST_CUSTOMER_SCHEMA}.folder (id, user_id, space_id, name)
+            VALUES ($1, $2, $3, $4)
             ON CONFLICT (id) DO NOTHING
             """,
             folder_id,
             user_id,
+            space_id,
             "Test Folder",
         )
 
@@ -417,9 +437,13 @@ def test_layer_id() -> str:
     return str(uuid.uuid4())
 
 
-def get_user_schema_name(user_id: str) -> str:
-    """Get the DuckLake schema name for a user."""
-    return f"user_{user_id.replace('-', '')}"
+def get_user_schema_name(user_id: str) -> str:  # noqa: ARG001 - kept for call sites
+    """The DuckLake schema a layer table lives in.
+
+    Storage is flat now: every layer goes in the one shared schema and the
+    owner is not part of the path, so the user id no longer participates.
+    """
+    return layer_schema_name()
 
 
 def get_table_name(layer_id: str) -> str:

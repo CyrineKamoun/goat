@@ -6,6 +6,16 @@ export const GEOAPI_BASE_URL = process.env.NEXT_PUBLIC_GEOAPI_URL;
 export const PROCESSES_BASE_URL = process.env.NEXT_PUBLIC_PROCESSES_URL;
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
+/**
+ * STAC API of the catalog service (apps/catalog).
+ *
+ * Falls back to `${GEOAPI_BASE_URL}/stac`, which is where the ingress
+ * path-routes it in every deployed environment (design S7) — so only local
+ * development, where the service answers directly on :8400, needs the
+ * variable set.
+ */
+export const CATALOG_BASE_URL =
+  process.env.NEXT_PUBLIC_CATALOG_URL ?? (GEOAPI_BASE_URL ? `${GEOAPI_BASE_URL}/stac` : undefined);
 export const AUTH_DISABLED = isAuthDisabled(process.env.NEXT_PUBLIC_AUTH);
 
 export const DOCS_URL = "https://goat.plan4better.de/docs";

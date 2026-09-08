@@ -21,6 +21,12 @@ from goatlib.io.utils import detect_path_type
 logger = logging.getLogger(__name__)
 
 
+# Plain text is a dataset when someone hands over that file themselves, and almost never
+# when it turns up inside an archive: a zip of layers carries a `readme.txt` and a
+# `license.txt`, and importing those as layers means a failed dataset in every report.
+ARCHIVE_SKIP_EXTS = frozenset({FileFormat.TXT.value, FileFormat.DSV.value})
+
+
 class DiscoveryError(Exception):
     """Custom exception for discovery-related errors."""
 
@@ -151,6 +157,11 @@ def _extract_zip_safely(zip_path: Path) -> Iterator[Path]:
     """
     Safely extract ZIP contents to temporary directory.
 
+    The archive's own directory structure is preserved. Flattening to basenames loses
+    data: an archive holding `wien/stops.geojson` and `graz/stops.geojson` — the shape a
+    per-region export takes — would end up with one file, the second silently overwriting
+    the first. It also mixed shapefile sidecars between two same-named shapefiles.
+
     Args:
         zip_path: Path to ZIP file
 
@@ -166,15 +177,26 @@ def _extract_zip_safely(zip_path: Path) -> Iterator[Path]:
             if total_size > 500 * 1024 * 1024:  # 500MB limit
                 raise DiscoveryError(f"ZIP file too large: {total_size} bytes")
 
-            # Extract supported files
+            root = tmp_dir.resolve()
             for name in zf.namelist():
                 if name.endswith("/"):  # Skip directories
                     continue
 
-                dest = tmp_dir / Path(name).name
-                if dest.name.startswith("._") or dest.name == ".DS_Store":
+                relative = Path(name)
+                if relative.name.startswith("._") or relative.name == ".DS_Store":
+                    continue
+                # macOS resource forks, an archive of an archive's metadata.
+                if "__MACOSX" in relative.parts:
                     continue
 
+                dest = (tmp_dir / relative).resolve()
+                # Keeping the structure means member names are no longer reduced to a
+                # basename, so traversal has to be refused explicitly: `../../etc/passwd`
+                # used to be defused by accident.
+                if not dest.is_relative_to(root):
+                    raise DiscoveryError(f"ZIP entry escapes the archive: {name}")
+
+                dest.parent.mkdir(parents=True, exist_ok=True)
                 with zf.open(name) as src, open(dest, "wb") as dst:
                     dst.write(src.read())
 
@@ -191,9 +213,19 @@ def _extract_zip_safely(zip_path: Path) -> Iterator[Path]:
         pass
 
 
-def _discover_from_zip(zip_path: Path) -> Iterator[Path]:
+def _discover_from_zip(
+    zip_path: Path, _skipped: list[Path] | None = None
+) -> Iterator[Path]:
     """
     Discover convertible files within a ZIP archive.
+
+    Plain-text tables (``ARCHIVE_SKIP_EXTS``) are not imported from inside an
+    archive, where a ``.txt`` is far more often a README than a dataset. When
+    they are the *only* thing an archive holds, the caller would otherwise get
+    an empty result and no explanation, so that case raises ``DiscoveryError``
+    naming the skipped files. Nested archives share the outer call's ``_skipped``
+    list and never raise themselves: only the top level knows whether the
+    archive as a whole yielded anything.
 
     Args:
         zip_path: Path to ZIP file
@@ -201,8 +233,14 @@ def _discover_from_zip(zip_path: Path) -> Iterator[Path]:
     Yields:
         Paths to discovered convertible files
     """
+    top_level = _skipped is None
+    skipped: list[Path] = [] if _skipped is None else _skipped
+    found = False
     with _extract_zip_safely(zip_path) as tmp_dir:
-        for item_path in tmp_dir.iterdir():
+        # Recursively, because the archive's folders are kept: a dataset can sit at any
+        # depth, and `sorted` so the order a caller sees does not depend on the
+        # filesystem.
+        for item_path in sorted(tmp_dir.rglob("*")):
             if not item_path.is_file():
                 continue
             if item_path.name.startswith("._") or item_path.name == ".DS_Store":
@@ -213,38 +251,43 @@ def _discover_from_zip(zip_path: Path) -> Iterator[Path]:
             # Handle nested archives
             if ext == FileFormat.ZIP.value:
                 try:
-                    yield from _discover_from_zip(item_path)
+                    for nested in _discover_from_zip(item_path, skipped):
+                        found = True
+                        yield nested
                 except zipfile.BadZipFile:
                     logger.warning("Invalid nested ZIP: %s", item_path)
                 continue
 
             # Handle GeoPackages
             if ext == FileFormat.GPKG.value:
-                yield from (Path(v) for v in _discover_gpkg_layers(item_path))
+                for layer in _discover_gpkg_layers(item_path):
+                    found = True
+                    yield Path(layer)
                 continue
 
-            # Handle Shapefiles (need to group related files)
+            # A shapefile needs no grouping now: its sidecars kept the directory they
+            # were archived in, which is where GDAL looks for them.
             if ext == FileFormat.SHP.value:
-                base_name = item_path.stem
-                shp_dir = tmp_dir / f"{base_name}_set"
-                shp_dir.mkdir(exist_ok=True)
-
-                # Move all files with the same base name to the shapefile directory
-                for related_file in tmp_dir.iterdir():
-                    if (
-                        related_file.is_file()
-                        and related_file.stem == base_name
-                        and related_file.suffix.lower()
-                        in {".shp", ".shx", ".dbf", ".prj", ".cpg"}
-                    ):
-                        related_file.rename(shp_dir / related_file.name)
-
-                yield shp_dir / f"{base_name}.shp"
+                found = True
+                yield item_path
                 continue
 
             # Handle other supported formats
             if ext in ALL_EXTS:
+                if ext in ARCHIVE_SKIP_EXTS:
+                    skipped.append(item_path.relative_to(tmp_dir))
+                    continue
+                found = True
                 yield item_path
+
+    if top_level and not found and skipped:
+        exts = ", ".join(sorted({p.suffix.lower() for p in skipped}))
+        names = ", ".join(str(p) for p in skipped[:5])
+        more = f" (+{len(skipped) - 5} more)" if len(skipped) > 5 else ""
+        raise DiscoveryError(
+            f"{zip_path.name} contains no importable dataset: {exts} files are not "
+            f"read from inside an archive ({names}{more}). Upload them directly."
+        )
 
 
 def discover_inputs(src_path: str | Path) -> list[str]:

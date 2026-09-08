@@ -23,7 +23,7 @@ import EmptySection from "@/components/common/EmptySection";
 import type { PopperMenuItem } from "@/components/common/PopperMenu";
 import MoreMenu from "@/components/common/PopperMenu";
 import DatasetSummary from "@/components/dashboard/dataset/DatasetSummary";
-import { LayerVisibilityToggle } from "@/components/map/panels/layer/Layer";
+import { LayerVisibilityToggle } from "@/components/map/panels/layer/LayerVisibilityToggle";
 import { MaskedImageIcon } from "@/components/map/panels/style/other/MaskedImageIcon";
 import ContentDialogWrapper from "@/components/modals/ContentDialogWrapper";
 import ViewModal from "@/components/modals/View";
@@ -405,7 +405,11 @@ export function Legend(props: LegendProps) {
   } = useLayerSettingsMoreMenu();
 
   const layersWithLegend = useMemo(() => {
-    return props.layers.filter((layer) => layer.properties?.legend?.show !== false);
+    // D7: a locked layer's `properties` are blanked by the backend — never
+    // request its legend (or its tiles/extent elsewhere).
+    return props.layers.filter(
+      (layer) => layer.properties?.legend?.show !== false && !layer.locked
+    );
   }, [props.layers]);
 
   return (

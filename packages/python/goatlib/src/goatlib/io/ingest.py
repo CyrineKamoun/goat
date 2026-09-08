@@ -5,9 +5,52 @@ from pathlib import Path
 from goatlib.io.converter import IOConverter
 from goatlib.io.discover import discover_inputs
 from goatlib.io.formats import RASTER_EXTS, TABULAR_EXTS, VECTOR_EXTS, FileFormat
-from goatlib.models.io import DatasetMetadata
+from goatlib.models.io import (
+    ConversionFailure,
+    ConversionReport,
+    ConvertedDataset,
+    DatasetMetadata,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def convert_all(
+    src_path: str | list[str],
+    dest_dir: str | Path,
+    geometry_col: str | None = None,
+    target_crs: str | None = None,
+    has_header: bool | None = None,
+    sheet_name: str | None = None,
+) -> ConversionReport:
+    """
+    Convert every dataset a source contains, reporting the ones that fail.
+
+    Same discovery and conversion as `convert_any`; the difference is what happens when
+    one dataset of several cannot be read. Here it is recorded and the rest continue,
+    because an archive of twenty layers should not be lost to one bad file — and the
+    caller needs to say which one was dropped.
+    """
+    outputs, failures = _convert(
+        src_path=src_path,
+        dest_dir=dest_dir,
+        geometry_col=geometry_col,
+        target_crs=target_crs,
+        has_header=has_header,
+        sheet_name=sheet_name,
+    )
+    return ConversionReport(
+        outputs=[
+            ConvertedDataset(
+                source=source,
+                name=dataset_name(source),
+                path=str(path),
+                metadata=meta,
+            )
+            for source, path, meta in outputs
+        ],
+        failures=failures,
+    )
 
 
 def convert_any(
@@ -41,15 +84,40 @@ def convert_any(
     list[tuple[Path, DatasetMetadata]]
         List of (output_path, metadata) for all converted datasets
     """
+    outputs, failures = _convert(
+        src_path=src_path,
+        dest_dir=dest_dir,
+        geometry_col=geometry_col,
+        target_crs=target_crs,
+        has_header=has_header,
+        sheet_name=sheet_name,
+    )
+    # Nothing converted at all is a failed conversion; some of many is not.
+    if not outputs and failures:
+        raise ValueError(failures[0].reason)
+    return [(path, meta) for _source, path, meta in outputs]
+
+
+def _convert(
+    src_path: str | list[str],
+    dest_dir: str | Path,
+    geometry_col: str | None,
+    target_crs: str | None,
+    has_header: bool | None,
+    sheet_name: str | None,
+) -> tuple[list[tuple[str, Path, DatasetMetadata]], list[ConversionFailure]]:
+    """Discover and convert, collecting what failed rather than stopping at it."""
     dest = Path(dest_dir)
     dest.mkdir(parents=True, exist_ok=True)
 
     converter = IOConverter()
+    sources = src_path if isinstance(src_path, list) else [src_path]
 
-    # Handle multiple source paths
-    if isinstance(src_path, list):
-        return _convert_multiple_sources(
-            src_paths=src_path,
+    outputs: list[tuple[str, Path, DatasetMetadata]] = []
+    failures: list[ConversionFailure] = []
+    for source in sources:
+        source_outputs, source_failures = _convert_one_source(
+            src_path=source,
             converter=converter,
             dest_dir=dest,
             geometry_col=geometry_col,
@@ -57,20 +125,12 @@ def convert_any(
             has_header=has_header,
             sheet_name=sheet_name,
         )
-
-    # Single source path
-    return _convert_single_source(
-        src_path=src_path,
-        converter=converter,
-        dest_dir=dest,
-        geometry_col=geometry_col,
-        target_crs=target_crs,
-        has_header=has_header,
-        sheet_name=sheet_name,
-    )
+        outputs.extend(source_outputs)
+        failures.extend(source_failures)
+    return outputs, failures
 
 
-def _convert_single_source(
+def _convert_one_source(
     src_path: str,
     converter: IOConverter,
     dest_dir: Path,
@@ -78,51 +138,60 @@ def _convert_single_source(
     target_crs: str | None,
     has_header: bool | None = None,
     sheet_name: str | None = None,
-) -> list[tuple[Path, DatasetMetadata]]:
-    """Convert a single source path (which may contain multiple datasets)."""
+) -> tuple[list[tuple[str, Path, DatasetMetadata]], list[ConversionFailure]]:
+    """Convert one source path, which may contain several datasets."""
     logger.info("Discovering input datasets: %s", src_path)
 
-    # Discover inputs - this might create temp directories
     discovered = discover_inputs(src_path)
     if not discovered:
         raise ValueError(f"No convertible datasets found in {src_path}")
 
-    outputs: list[tuple[Path, DatasetMetadata]] = []
+    outputs: list[tuple[str, Path, DatasetMetadata]] = []
+    failures: list[ConversionFailure] = []
     total_items = len(discovered)
 
-    # Track temp directories that need cleanup
+    # Temp directories discovery created, cleaned up once everything is converted.
     temp_dirs_to_cleanup = set()
 
     try:
         for i, item in enumerate(discovered):
             logger.info("Converting dataset %d/%d: %s", i + 1, total_items, item)
 
-            # Check if this is a temp file from discovery
-            item_path = Path(item)
+            item_path = Path(item.split("::")[0])
             if item_path.parent.name.startswith(("goatlib_zip_", "goatlib_remote_")):
                 temp_dirs_to_cleanup.add(item_path.parent)
 
-            output_path, metadata = _convert_single_item(
-                converter=converter,
-                item=item,
-                dest_dir=dest_dir,
-                geometry_col=geometry_col,
-                target_crs=target_crs,
-                has_header=has_header,
-                sheet_name=sheet_name,
-            )
-            outputs.append((output_path, metadata))
+            try:
+                output_path, metadata = _convert_single_item(
+                    converter=converter,
+                    item=item,
+                    dest_dir=dest_dir,
+                    geometry_col=geometry_col,
+                    target_crs=target_crs,
+                    has_header=has_header,
+                    sheet_name=sheet_name,
+                )
+            except Exception as e:  # noqa: BLE001 - one bad dataset must not lose the rest
+                logger.warning("Failed to convert %s: %s", item, e)
+                failures.append(
+                    ConversionFailure(
+                        source=item, name=dataset_name(item), reason=first_line(e)
+                    )
+                )
+                continue
+
+            outputs.append((item, output_path, metadata))
             logger.info("Successfully converted: %s", output_path)
 
-        logger.info("Conversion completed: %s (%d files)", src_path, len(outputs))
-        return outputs
-
-    except Exception as e:
-        logger.error("Failed to convert %s: %s", src_path, e)
-        raise
+        logger.info(
+            "Conversion completed: %s (%d converted, %d failed)",
+            src_path,
+            len(outputs),
+            len(failures),
+        )
+        return outputs, failures
 
     finally:
-        # Clean up all temp directories after conversion is complete
         for temp_dir in temp_dirs_to_cleanup:
             if temp_dir.exists():
                 try:
@@ -134,47 +203,23 @@ def _convert_single_source(
                     )
 
 
-def _convert_multiple_sources(
-    src_paths: list[str],
-    converter: IOConverter,
-    dest_dir: Path,
-    geometry_col: str | None,
-    target_crs: str | None,
-    has_header: bool | None = None,
-    sheet_name: str | None = None,
-) -> list[tuple[Path, DatasetMetadata]]:
-    """Convert multiple source paths."""
-    all_outputs: list[tuple[Path, DatasetMetadata]] = []
-    total_sources = len(src_paths)
+def first_line(error: Exception) -> str:
+    """The first line of an error, which is the part worth reporting.
 
-    logger.info("Processing %d sources", total_sources)
-
-    for i, src_path in enumerate(src_paths):
-        logger.info("Processing source %d/%d: %s", i + 1, total_sources, src_path)
-
-        try:
-            outputs = _convert_single_source(
-                src_path=src_path,
-                converter=converter,
-                dest_dir=dest_dir,
-                geometry_col=geometry_col,
-                target_crs=target_crs,
-                has_header=has_header,
-                sheet_name=sheet_name,
-            )
-            all_outputs.extend(outputs)
-            logger.info("Successfully processed: %s", src_path)
-        except Exception as e:
-            logger.error("Failed to convert %s: %s", src_path, e)
-            # Continue with other sources instead of failing completely
-            continue
-
-    logger.info(
-        "Batch conversion completed: %d files converted from %d sources",
-        len(all_outputs),
-        total_sources,
+    A GDAL failure arrives as a paragraph with the failing SQL and a caret pointing into
+    it — useful in a log, noise in a list of datasets that could not be read.
+    """
+    return (
+        str(error).strip().splitlines()[0]
+        if str(error).strip()
+        else error.__class__.__name__
     )
-    return all_outputs
+
+
+def dataset_name(discovered_path: str) -> str:
+    """What a discovered dataset should be called: its layer, else its file's stem."""
+    base, _, layer = discovered_path.partition("::")
+    return layer or Path(base).stem
 
 
 def _convert_single_item(

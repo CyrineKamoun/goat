@@ -13,13 +13,14 @@ Please follow these guidelines when contributing:
 - `.husky/`: Husky hooks for managing Git hooks
 - `.vscode/`: VSCode-specific settings and configurations
 - `apps/`: Contains the main applications for the project
-  - `core/`: The main FastAPI/Python backend application for user management, projects, folders, scenarios, and content metadata. Does NOT handle file uploads, layer data processing, or analytics tools.
+  - `core/`: The main FastAPI/Python backend application for user management, projects, folders, and content metadata. Does NOT handle file uploads, layer data processing, or analytics tools.
   - `docs/`: Documentation for the project using Docusaurus.
   - `geoapi/`: FastAPI/Python API service implementing OGC API standards. Handles:
     - Layer file uploads and imports (via `/upload` endpoints)
     - Serving geospatial data to the frontend (OGC API Features)
     - Triggering analytics tools via OGC API Processes (jobs run in Windmill)
     - DuckLake data management for user layer data
+  - `catalog/`: FastAPI/Python STAC API service for the GOAT data catalog. Database-less: serves a local parquet mirror (`${DATA_DIR}/catalog/`) via DuckDB; also hosts an MCP server at `/mcp`.
   - `routing/`: FastAPI/Python API service for routing/navigation services.
   - `storybook/`: React/NextJS/TypeScript application for UI component development and testing.
   - `web/`: The main frontend application built with React/NextJS/TypeScript.

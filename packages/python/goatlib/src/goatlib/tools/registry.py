@@ -36,6 +36,11 @@ class ToolDefinition:
         category: Tool category for grouping (e.g., "geoprocessing", "data")
         keywords: Search keywords for discovery
         toolbox_hidden: If True, hide from toolbox UI (still available via API)
+        job_hidden: If True, this tool's jobs are a side effect of something
+            else the user did rather than something they started, so the job
+            list does not show them. Distinct from `toolbox_hidden`: an export
+            is hidden from the toolbox but its job is exactly what the user is
+            waiting for.
         beta: If True, render in a "Beta" sub-section at the bottom of its
             category in the toolbox UI
         docs_path: Path to documentation (appended to docs base URL)
@@ -51,6 +56,7 @@ class ToolDefinition:
     category: str = "geoprocessing"
     keywords: tuple[str, ...] = ()
     toolbox_hidden: bool = False
+    job_hidden: bool = False
     beta: bool = False
     docs_path: str | None = None
     worker_tag: str = "tools"
@@ -69,15 +75,29 @@ class ToolDefinition:
         """
         import importlib
 
+        from goatlib.tools.base import BaseToolRunner, SimpleToolRunner
+
         module = importlib.import_module(self.module_path)
-        # Find the ToolRunner class in the module
-        for name in dir(module):
-            if name.endswith("ToolRunner") and not name.startswith("Base"):
-                cls = getattr(module, name)
-                # Verify it's actually a class
-                if isinstance(cls, type):
-                    return cls
-        return None
+        # The runner this module DEFINES — not one it imports. `catchment_area_v2`
+        # imports the v1 runner and `dir()` is alphabetical, so a name-suffix
+        # scan returned the wrong class; modules whose runner is named `*Runner`
+        # rather than `*ToolRunner` resolved to the imported SimpleToolRunner.
+        runners = [
+            cls
+            for cls in vars(module).values()
+            if isinstance(cls, type)
+            and issubclass(cls, SimpleToolRunner)
+            and cls not in (SimpleToolRunner, BaseToolRunner)
+        ]
+        # Prefer a runner the module defines; a thin module (`heatmap_gravity_v2`,
+        # `bundle_import`) defines none and imports exactly the one it runs.
+        defined = [c for c in runners if c.__module__ == module.__name__]
+        candidates = defined or runners
+        if not candidates:
+            return None
+        # The most derived one, if a module layers a base runner and its tool.
+        candidates.sort(key=lambda c: len(c.__mro__), reverse=True)
+        return candidates[0]
 
     def get_output_geometry_type(self: Self) -> str | None:
         """Get the output geometry type from the tool runner.
@@ -586,6 +606,29 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         toolbox_hidden=True,
     ),
     ToolDefinition(
+        name="catalog_materialize",
+        display_name="Catalog Materialize",
+        description="Copy a promoted catalog layer's data onto the shared volume",
+        module_path="goatlib.tools.catalog_materialize",
+        params_class_name="CatalogMaterializeParams",
+        windmill_path="f/goat/tools/catalog_materialize",
+        category="data",
+        keywords=("catalog", "materialize", "promote"),
+        toolbox_hidden=True,
+        job_hidden=True,
+    ),
+    ToolDefinition(
+        name="bundle_import",
+        display_name="Bundle Import",
+        description="Import an uploaded source (e.g. GTFS) as a bundle",
+        module_path="goatlib.tools.bundle_import",
+        params_class_name="BundleImportParams",
+        windmill_path="f/goat/tools/bundle_import",
+        category="data",
+        keywords=("import", "dataset", "bundle", "gtfs", "data"),
+        toolbox_hidden=True,
+    ),
+    ToolDefinition(
         name="layer_delete",
         display_name="Layer Delete",
         description="Delete a layer from DuckLake storage and PostgreSQL metadata",
@@ -605,6 +648,43 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         windmill_path="f/goat/tools/layer_delete_multi",
         category="data",
         keywords=("delete", "remove", "layer", "data", "bulk"),
+        toolbox_hidden=True,
+    ),
+    ToolDefinition(
+        name="bundle_artifact_delete",
+        display_name="Bundle Artifact Delete",
+        description="Remove a bundle's built artifacts from the data volume",
+        module_path="goatlib.tools.bundle_artifact_delete",
+        params_class_name="BundleArtifactDeleteParams",
+        windmill_path="f/goat/tools/bundle_artifact_delete",
+        category="data",
+        keywords=("delete", "remove", "bundle", "artifact", "cleanup"),
+        toolbox_hidden=True,
+        job_hidden=True,
+    ),
+    ToolDefinition(
+        name="bundle_create_filtered",
+        display_name="Bundle Create Filtered",
+        description=(
+            "Create a new bundle from a spatially filtered copy of an existing "
+            "one, with its own derived artifacts"
+        ),
+        module_path="goatlib.tools.bundle_create_filtered",
+        params_class_name="BundleCreateFilteredParams",
+        windmill_path="f/goat/tools/bundle_create_filtered",
+        category="data",
+        keywords=("bundle", "filter", "clip", "subset", "copy"),
+        toolbox_hidden=True,
+    ),
+    ToolDefinition(
+        name="bundle_artifact_rebuild",
+        display_name="Bundle Artifact Rebuild",
+        description="Rebuild a bundle's derived artifacts from its member layers",
+        module_path="goatlib.tools.bundle_artifact_rebuild",
+        params_class_name="BundleArtifactRebuildParams",
+        windmill_path="f/goat/tools/bundle_artifact_rebuild",
+        category="data",
+        keywords=("rebuild", "bundle", "artifact", "graph", "routing"),
         toolbox_hidden=True,
     ),
     ToolDefinition(

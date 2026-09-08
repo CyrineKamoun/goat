@@ -15,16 +15,6 @@ class LayerShareRoleEnum(str, Enum):
     layer_editor = "layer-editor"
 
 
-class ShareLayerWithTeamOrOrganizationSchema(BaseModel):
-    id: str
-    role: LayerShareRoleEnum
-
-
-class ShareLayerSchema(BaseModel):
-    teams: List[ShareLayerWithTeamOrOrganizationSchema] | None = None
-    organizations: List[ShareLayerWithTeamOrOrganizationSchema] | None = None
-
-
 class ProjectRoleEnum(str, Enum):
     project_owner = "project-owner"
     project_viewer = "project-viewer"
@@ -36,11 +26,28 @@ class ProjectShareRoleEnum(str, Enum):
     project_editor = "project-editor"
 
 
+class ShareLayerWithTeamOrOrganizationSchema(BaseModel):
+    id: str
+    role: LayerShareRoleEnum
+
+
 class ShareProjectWithTeamOrOrganizationSchema(BaseModel):
     id: str
     role: ProjectShareRoleEnum
 
 
+class ShareWithUserSchema(BaseModel):
+    id: str
+    role: LayerShareRoleEnum | ProjectShareRoleEnum
+
+
+class ShareLayerSchema(BaseModel):
+    teams: List[ShareLayerWithTeamOrOrganizationSchema] | None = None
+    organizations: List[ShareLayerWithTeamOrOrganizationSchema] | None = None
+    users: List[ShareWithUserSchema] | None = None
+
+
 class ShareProjectSchema(BaseModel):
     teams: List[ShareProjectWithTeamOrOrganizationSchema] | None = None
     organizations: List[ShareProjectWithTeamOrOrganizationSchema] | None = None
+    users: List[ShareWithUserSchema] | None = None

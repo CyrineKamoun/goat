@@ -30,7 +30,6 @@ from goatlib.analysis.schemas.ui import (
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     ToolOutputBase,
     get_default_layer_name,
@@ -40,7 +39,7 @@ from goatlib.tools.style import DEFAULT_POINT_STYLE, build_ordinal_color_map, he
 logger = logging.getLogger(__name__)
 
 
-class ClusteringZonesToolParams(ScenarioSelectorMixin, ToolInputBase, ClusteringParams):
+class ClusteringZonesToolParams(ToolInputBase, ClusteringParams):
     """Parameters for balanced zones clustering tool.
 
     Inherits clustering options from ClusteringParams, adds layer context from ToolInputBase.
@@ -57,14 +56,6 @@ class ClusteringZonesToolParams(ScenarioSelectorMixin, ToolInputBase, Clustering
                 depends_on={"input_layer_id": {"$ne": None}},
             ),
             SECTION_RESULT,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"input_layer_id": {"$ne": None}},
-            ),
             SECTION_OUTPUT,
         )
     )
@@ -109,7 +100,10 @@ class ClusteringZonesToolParams(ScenarioSelectorMixin, ToolInputBase, Clustering
             field_order=3,
             label_key="size_field",
             widget="field-selector",
-            widget_options={"source_layer": "input_layer_id", "field_types": ["number"]},
+            widget_options={
+                "source_layer": "input_layer_id",
+                "field_types": ["number"],
+            },
             visible_when={
                 "$and": [
                     {"cluster_type": "equal_size"},
@@ -206,8 +200,6 @@ class ZonesClusteringToolRunner(BaseToolRunner[ClusteringZonesToolParams]):
             layer_id=params.input_layer_id,
             user_id=params.user_id,
             cql_filter=params.input_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
 
         # Validate feature limit and adapt GA parameters for equal_size clustering
@@ -231,8 +223,9 @@ class ZonesClusteringToolRunner(BaseToolRunner[ClusteringZonesToolParams]):
                 n_generations = min(n_generations, 45)
 
         # Initialize the clustering tool with algorithm parameters
-        tool = self.tool_class( population_size=population_size,
-            n_generations=n_generations)
+        tool = self.tool_class(
+            population_size=population_size, n_generations=n_generations
+        )
         # Convert tool params to analysis params
         analysis_params = ClusteringParams(
             **params.model_dump(
@@ -242,7 +235,6 @@ class ZonesClusteringToolRunner(BaseToolRunner[ClusteringZonesToolParams]):
                     "user_id",
                     "folder_id",
                     "project_id",
-                    "scenario_id",
                     "output_name",
                     "output_summary_path",
                     "result_layer_name",
@@ -288,9 +280,7 @@ class ZonesClusteringToolRunner(BaseToolRunner[ClusteringZonesToolParams]):
         output_name_points = (
             params.result_layer_name or params.output_name or self.default_output_name
         )
-        output_name_summary = (
-            params.summary_layer_name or self.default_summary_name
-        )
+        output_name_summary = params.summary_layer_name or self.default_summary_name
 
         logger.info(
             "Starting clustering tool: %s (user=%s, points=%s, summary=%s, temp_mode=%s)",

@@ -37,6 +37,11 @@ export interface TileCard {
   selected?: Project | Layer;
   roleChip?: { icon: ICON_NAME; tooltip: string };
   sharedChip?: { icon: ICON_NAME; tooltip: string };
+  /** A short health note rendered under the title (e.g. the Home page's
+   * "N datasets are personally owned" warning on a team-owned project) — the
+   * grid layout's own text, not a tooltip. Omitted entirely for a card with
+   * nothing to flag, which renders exactly as it did before this prop existed. */
+  caption?: { text: string; tone: "warning" | "info" };
 }
 
 export interface ActiveCard {
@@ -78,6 +83,7 @@ const CardTags = ({ tags, maxTags = 5 }: CardTagsProps) => {
 
 const TileCard = (props: TileCard) => {
   const { cardType, item, enableActions = true } = props;
+  const showMenu = enableActions && !!props.moreMenuOptions?.length;
   const theme = useTheme();
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const { t } = useTranslation("common");
@@ -164,6 +170,12 @@ const TileCard = (props: TileCard) => {
     </Tooltip>
   ) : null;
 
+  const captionEl = props.caption ? (
+    <Typography variant="caption" noWrap sx={{ color: theme.palette[props.caption.tone].main, display: "block" }}>
+      {props.caption.text}
+    </Typography>
+  ) : null;
+
   const sharedChipEl = props.sharedChip ? (
     <Tooltip title={props.sharedChip.tooltip} placement="top" arrow>
       <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -178,8 +190,11 @@ const TileCard = (props: TileCard) => {
   const gridContent = (
     <>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ pb: theme.spacing(2) }}>
-        {cardTitle}
-        {enableActions && !!props.moreMenuOptions?.length && moreMenu}
+        <Box sx={{ minWidth: 0 }}>
+          {cardTitle}
+          {captionEl}
+        </Box>
+        {showMenu && moreMenu}
       </Stack>
       {/* Created by info  */}
       <Stack direction="row" alignItems="center" spacing={2} sx={{ pb: 0 }}>
@@ -320,6 +335,7 @@ const TileCard = (props: TileCard) => {
               <>
                 <Grid item xs={11} sm={5} md={6}>
                   {cardTitle}
+                  {captionEl}
                 </Grid>
                 <Grid item xs={1} sm={2} md={1}>
                   <Box
@@ -344,7 +360,7 @@ const TileCard = (props: TileCard) => {
                     {sharedChipEl}
                   </Box>
                 </Grid>
-                {enableActions && !!props.moreMenuOptions?.length && (
+                {showMenu && (
                   <Grid item sm={1}>
                     <Box display="flex" justifyContent="flex-end">
                       {moreMenu}

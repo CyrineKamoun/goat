@@ -213,6 +213,11 @@ class TestFormatMap:
         assert FORMAT_MAP["parquet"] == "Parquet"
 
 
+def _catalog_returns(runner, schema):
+    """Make the mocked connection answer the schema lookup with `schema`."""
+    runner._duckdb_con.execute.return_value.fetchone.return_value = (schema,)
+
+
 class TestLayerExportRunner:
     """Test the runner logic with mocks."""
 
@@ -252,6 +257,7 @@ class TestLayerExportRunner:
             "get_layer_owner_id_sync",
             return_value="00000000-0000-0000-0000-000000000001",
         ):
+            _catalog_returns(runner, "user_00000000000000000000000000000001")
             table_name = runner._get_table_name(
                 "00000000-0000-0000-0000-000000000002",
                 "00000000-0000-0000-0000-000000000001",
@@ -269,6 +275,7 @@ class TestLayerExportRunner:
             "get_layer_owner_id_sync",
             return_value="00000000-0000-0000-0000-000000000099",
         ):
+            _catalog_returns(runner, "user_00000000000000000000000000000099")
             table_name = runner._get_table_name(
                 "00000000-0000-0000-0000-000000000002",
                 "00000000-0000-0000-0000-000000000001",  # Requesting user
@@ -279,12 +286,15 @@ class TestLayerExportRunner:
     def test_get_table_name_owner_lookup_fails(self, runner):
         """Test table name when owner lookup fails (fallback to user_id)."""
         with patch.object(runner, "get_layer_owner_id_sync", return_value=None):
+            # Catalog has no such table, so the computed path is the answer.
+            runner._duckdb_con.execute.return_value.fetchone.return_value = None
             table_name = runner._get_table_name(
                 "00000000-0000-0000-0000-000000000002",
                 "00000000-0000-0000-0000-000000000001",
             )
-            # Should fall back to passed user_id
-            assert "user_00000000000000000000000000000001" in table_name
+            # No table in the catalog, so the answer is where a new one would
+            # go — the flat schema, which no longer encodes an owner.
+            assert table_name == "lake.main.t_00000000000000000000000000000002"
 
     def test_get_exportable_columns_filters_struct(self, runner):
         """Test that STRUCT columns are excluded."""

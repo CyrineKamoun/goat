@@ -11,6 +11,7 @@ All writes are serialized by BaseDuckLakeManager's internal threading.Lock.
 
 import json
 import logging
+import re
 from typing import Any, Optional
 
 from geoapi.config import settings
@@ -18,14 +19,42 @@ from geoapi.dependencies import LayerInfo
 from geoapi.ducklake_write import ducklake_write_manager
 from geoapi.models.write import COLUMN_TYPE_MAP
 from geoapi.services.computed_columns import (
+    allowed_value_columns,
+    apply_defaults,
+    check_allowed_values,
+    column_defaults,
+    fill_defaults,
+    locked_column_names,
     parse_computed_columns,
     select_recompute_specs,
+    validate_allowed_values,
 )
 
 logger = logging.getLogger(__name__)
 
 # Columns that cannot be modified by users
 PROTECTED_COLUMNS = {"id", "geometry", "geom", "rowid"}
+
+
+def bbox_struct_sql(geom_expr: str) -> str:
+    """The GeoParquet bbox struct for a geometry expression.
+
+    The one definition of that struct, so bbox upkeep cannot drift between the
+    writers that maintain it — the per-feature paths below splice a bound
+    GeoJSON parameter in, the bundle editor a column or a projected expression.
+    """
+    return (
+        "struct_pack("
+        f"xmin := ST_XMin({geom_expr}), "
+        f"ymin := ST_YMin({geom_expr}), "
+        f"xmax := ST_XMax({geom_expr}), "
+        f"ymax := ST_YMax({geom_expr}))"
+    )
+
+
+# The bbox struct as the per-feature writes spell it: every ? is the same
+# GeoJSON string, bound four times.
+BBOX_STRUCT_SQL = bbox_struct_sql("ST_MakeValid(ST_GeomFromGeoJSON(?))")
 
 
 def _feature_id_to_rowid(feature_id: str) -> int:
@@ -54,6 +83,14 @@ def _validate_column_name(name: str, existing_columns: list[str]) -> None:
 
 def _validate_new_column_name(name: str, existing_columns: list[str]) -> None:
     """Validate that a new column name is safe and doesn't conflict."""
+    # The API models enforce the same pattern; repeated here because column
+    # names end up inside quoted SQL identifiers, so this function must hold
+    # the line even for a caller that skips the API layer.
+    if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", name):
+        raise ValueError(
+            "Column names may contain only letters, digits and underscores, "
+            "and must not start with a digit"
+        )
     if name in PROTECTED_COLUMNS:
         raise ValueError(f"Column name '{name}' is reserved")
     if name in settings.HIDDEN_FIELDS:
@@ -94,7 +131,13 @@ class FeatureWriteService:
             field_config or {},
             geom_column=geometry_column or "geometry",
         )
-        computed_names = {s.name for s in specs}
+        # Both are maintained by something other than the caller, so a value
+        # sent for either is dropped rather than written. Clients round-trip
+        # whole features, so this is ordinary, not a malformed request.
+        uneditable = {s.name for s in specs} | locked_column_names(field_config)
+        # A new feature gets the column's default for anything it left blank.
+        properties = apply_defaults(field_config, properties)
+        validate_allowed_values(field_config, properties)
 
         columns: list[str] = []
         placeholders: list[str] = []
@@ -110,13 +153,7 @@ class FeatureWriteService:
 
             if "bbox" in column_names:
                 columns.append('"bbox"')
-                placeholders.append(
-                    "struct_pack("
-                    "xmin := ST_XMin(ST_MakeValid(ST_GeomFromGeoJSON(?))), "
-                    "ymin := ST_YMin(ST_MakeValid(ST_GeomFromGeoJSON(?))), "
-                    "xmax := ST_XMax(ST_MakeValid(ST_GeomFromGeoJSON(?))), "
-                    "ymax := ST_YMax(ST_MakeValid(ST_GeomFromGeoJSON(?))))"
-                )
+                placeholders.append(BBOX_STRUCT_SQL)
                 values.extend([geom_json, geom_json, geom_json, geom_json])
 
         # Add user-supplied properties, skipping protected AND computed names
@@ -124,7 +161,7 @@ class FeatureWriteService:
             if (
                 col_name in column_names
                 and col_name not in PROTECTED_COLUMNS
-                and col_name not in computed_names
+                and col_name not in uneditable
             ):
                 columns.append(f'"{col_name}"')
                 placeholders.append("?")
@@ -179,12 +216,20 @@ class FeatureWriteService:
             field_config or {},
             geom_column=geometry_column or "geometry",
         )
-        computed_names = {s.name for s in specs}
+        # Both are maintained by something other than the caller, so a value
+        # sent for either is dropped rather than written. Clients round-trip
+        # whole features, so this is ordinary, not a malformed request.
+        uneditable = {s.name for s in specs} | locked_column_names(field_config)
+        # Derived once for the request: both are a projection of the same
+        # field_config, and the loop below can run to thousands of features.
+        defaults = column_defaults(field_config)
+        constrained = allowed_value_columns(field_config)
 
         with ducklake_write_manager.connection() as con:
             for feature_data in features:
                 geometry = feature_data.get("geometry")
-                properties = feature_data.get("properties", {})
+                properties = fill_defaults(defaults, feature_data.get("properties", {}))
+                check_allowed_values(constrained, properties)
 
                 columns: list[str] = []
                 placeholders: list[str] = []
@@ -199,20 +244,14 @@ class FeatureWriteService:
 
                     if "bbox" in column_names:
                         columns.append('"bbox"')
-                        placeholders.append(
-                            "struct_pack("
-                            "xmin := ST_XMin(ST_MakeValid(ST_GeomFromGeoJSON(?))), "
-                            "ymin := ST_YMin(ST_MakeValid(ST_GeomFromGeoJSON(?))), "
-                            "xmax := ST_XMax(ST_MakeValid(ST_GeomFromGeoJSON(?))), "
-                            "ymax := ST_YMax(ST_MakeValid(ST_GeomFromGeoJSON(?))))"
-                        )
+                        placeholders.append(BBOX_STRUCT_SQL)
                         values.extend([geom_json, geom_json, geom_json, geom_json])
 
                 for col_name, col_value in properties.items():
                     if (
                         col_name in column_names
                         and col_name not in PROTECTED_COLUMNS
-                        and col_name not in computed_names
+                        and col_name not in uneditable
                     ):
                         columns.append(f'"{col_name}"')
                         placeholders.append("?")
@@ -260,14 +299,16 @@ class FeatureWriteService:
         table = layer_info.full_table_name
 
         specs = parse_computed_columns(field_config or {})
-        computed_names = {s.name for s in specs}
+        # Both are maintained by something other than the caller, so a value
+        # sent for either is dropped rather than written. Clients round-trip
+        # whole features, so this is ordinary, not a malformed request.
+        uneditable = {s.name for s in specs} | locked_column_names(field_config)
+        validate_allowed_values(field_config, properties)
 
         safe_props = {
             k: v
             for k, v in properties.items()
-            if k in column_names
-            and k not in PROTECTED_COLUMNS
-            and k not in computed_names
+            if k in column_names and k not in PROTECTED_COLUMNS and k not in uneditable
         }
 
         set_clauses: list[str] = []
@@ -326,7 +367,11 @@ class FeatureWriteService:
             field_config or {},
             geom_column=geometry_column or "geometry",
         )
-        computed_names = {s.name for s in specs}
+        # Both are maintained by something other than the caller, so a value
+        # sent for either is dropped rather than written. Clients round-trip
+        # whole features, so this is ordinary, not a malformed request.
+        uneditable = {s.name for s in specs} | locked_column_names(field_config)
+        validate_allowed_values(field_config, properties)
 
         set_clauses: list[str] = []
         values: list[Any] = []
@@ -341,7 +386,7 @@ class FeatureWriteService:
             if (
                 col_name in column_names
                 and col_name not in PROTECTED_COLUMNS
-                and col_name not in computed_names
+                and col_name not in uneditable
             ):
                 set_clauses.append(f'"{col_name}" = ?')
                 values.append(col_value)
@@ -351,13 +396,7 @@ class FeatureWriteService:
 
         if geometry and geometry_column and "bbox" in column_names:
             geom_json = json.dumps(geometry)
-            set_clauses.append(
-                '"bbox" = struct_pack('
-                "xmin := ST_XMin(ST_MakeValid(ST_GeomFromGeoJSON(?))), "
-                "ymin := ST_YMin(ST_MakeValid(ST_GeomFromGeoJSON(?))), "
-                "xmax := ST_XMax(ST_MakeValid(ST_GeomFromGeoJSON(?))), "
-                "ymax := ST_YMax(ST_MakeValid(ST_GeomFromGeoJSON(?))))"
-            )
+            set_clauses.append(f'"bbox" = {BBOX_STRUCT_SQL}')
             values.extend([geom_json, geom_json, geom_json, geom_json])
 
         rid = _feature_id_to_rowid(feature_id)
@@ -442,9 +481,7 @@ class FeatureWriteService:
         would lazily load every table in the catalog to answer.
         """
         with ducklake_write_manager.connection() as con:
-            result = con.execute(
-                f'DESCRIBE lake."{layer_info.schema_name}"."{layer_info.table_name}"'
-            ).fetchall()
+            result = con.execute(f"DESCRIBE {layer_info.sql_relation}").fetchall()
             return [row[0] for row in result]
 
     def get_column_types(self, layer_info: LayerInfo) -> dict[str, str]:
@@ -454,9 +491,7 @@ class FeatureWriteService:
         would lazily load every table in the catalog to answer.
         """
         with ducklake_write_manager.connection() as con:
-            result = con.execute(
-                f'DESCRIBE lake."{layer_info.schema_name}"."{layer_info.table_name}"'
-            ).fetchall()
+            result = con.execute(f"DESCRIBE {layer_info.sql_relation}").fetchall()
             return {row[0]: row[1] for row in result}
 
     def add_column(

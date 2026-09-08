@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <duckdb.hpp>
 #include <filesystem>
+#include <iomanip>
 #include <sstream>
 #include <stdexcept>
 
@@ -45,6 +46,15 @@ namespace routing::data
     {
         std::string escaped = sql_escape(node_dir);
         std::ostringstream rel;
+        // Same handling as the edge scan: a caller may name one parquet file
+        // rather than a directory. Without this, a bundle artifact would have to
+        // put its two files in separate subdirectories, since globbing a single
+        // directory holding both would union their schemas.
+        if (is_glob_or_file_path(node_dir))
+        {
+            rel << "read_parquet('" << escaped << "', hive_partitioning=true)";
+            return rel.str();
+        }
         rel << "read_parquet('" << escaped << "/**/*.parquet', hive_partitioning=true)";
         return rel.str();
     }
@@ -81,13 +91,13 @@ namespace routing::data
         duckdb::Connection &con,
         std::string const &edge_dir,
         std::string const &node_dir,
-        H3CellFilter const &h3_filter,
+        SpatialFilter const &filter,
         std::vector<std::string> const &valid_classes,
         RoutingMode mode,
         bool load_geometry)
     {
-        auto const &h3_3_cells = h3_filter.h3_3_cells;
-        auto const &h3_6_cells = h3_filter.h3_6_cells;
+        auto const &h3_3_cells = filter.h3_3_cells;
+        auto const &h3_6_cells = filter.h3_6_cells;
 
         std::vector<Edge> edges;
 
@@ -96,6 +106,7 @@ namespace routing::data
 
         bool has_node_x_3857 = false;
         bool has_node_y_3857 = false;
+        bool has_node_h3_3 = false;
         bool has_node_h3_6 = false;
         auto node_schema = con.Query("DESCRIBE SELECT * FROM " + node_scan + " LIMIT 0");
         if (node_schema->HasError())
@@ -114,9 +125,38 @@ namespace routing::data
             {
                 has_node_y_3857 = true;
             }
+            else if (col_name == "h3_3")
+            {
+                has_node_h3_3 = true;
+            }
             else if (col_name == "h3_6")
             {
                 has_node_h3_6 = true;
+            }
+        }
+
+        // The H3 columns exist to prune a hive-partitioned dataset. An uploaded
+        // street network omits them, so every reference to them has to be
+        // conditional, and the bbox below narrows those datasets instead.
+        bool has_edge_h3_3 = false;
+        bool has_edge_h3_6 = false;
+        auto edge_schema =
+            con.Query("DESCRIBE SELECT * FROM " + parquet_scan + " LIMIT 0");
+        if (edge_schema->HasError())
+        {
+            throw std::runtime_error(
+                "Failed to read edge dataset schema: " + edge_schema->GetError());
+        }
+        for (size_t row = 0; row < edge_schema->RowCount(); ++row)
+        {
+            auto col_name = edge_schema->GetValue(0, row).GetValue<std::string>();
+            if (col_name == "h3_3")
+            {
+                has_edge_h3_3 = true;
+            }
+            else if (col_name == "h3_6")
+            {
+                has_edge_h3_6 = true;
             }
         }
 
@@ -134,24 +174,54 @@ namespace routing::data
             node_y_expr = "LN(TAN(PI()/4.0 + ST_Y(ST_GeomFromHEXEWKB(geom)) * PI()/360.0)) * 6378137.0";
         }
 
+        // Without H3 columns there is nothing to prune on, so narrow by the
+        // query's bbox instead: a node reachable from a starting point cannot lie
+        // outside it. Comparing the stored columns rather than the projected
+        // aliases lets DuckDB skip row groups on their statistics.
+        std::string node_bbox_predicate;
+        if (filter.bbox)
+        {
+            bool const stored = has_node_x_3857 && has_node_y_3857;
+            auto const &b = *filter.bbox;
+            std::ostringstream pred;
+            pred << std::setprecision(17)
+                 << (stored ? "x_3857" : node_x_expr)
+                 << " BETWEEN " << b.min_x << " AND " << b.max_x << " AND "
+                 << (stored ? "y_3857" : node_y_expr)
+                 << " BETWEEN " << b.min_y << " AND " << b.max_y;
+            node_bbox_predicate = pred.str();
+        }
+
         std::ostringstream sql;
         sql << "WITH node_coords AS ("
             << "  SELECT "
             << "    TRY_CAST(id AS BIGINT) AS node_id, "
             << "    " << node_x_expr << " AS x_3857, "
             << "    " << node_y_expr << " AS y_3857 "
-            << "  FROM " << node_scan << " "
-            << "  WHERE h3_3 IN " << sql_int_list(h3_3_cells);
-        if (has_node_h3_6 && !h3_6_cells.empty())
+            << "  FROM " << node_scan;
+        if (has_node_h3_3 && !h3_3_cells.empty())
         {
-            sql << " AND h3_6 IN " << sql_int_list(h3_6_cells);
+            sql << " WHERE h3_3 IN " << sql_int_list(h3_3_cells);
+            if (has_node_h3_6 && !h3_6_cells.empty())
+            {
+                sql << " AND h3_6 IN " << sql_int_list(h3_6_cells);
+            }
+        }
+        else if (has_node_h3_6 && !h3_6_cells.empty())
+        {
+            sql << " WHERE h3_6 IN " << sql_int_list(h3_6_cells);
+        }
+        else if (!node_bbox_predicate.empty())
+        {
+            sql << " WHERE " << node_bbox_predicate;
         }
         sql
             << ") "
+            // h3_3/h3_6 are deliberately not selected: they are pruning keys, and
+            // nothing downstream reads the values.
             << "SELECT e.id, e.source, e.target, e.length_m, e.length_3857, "
             << "class_, impedance_slope, impedance_slope_reverse, "
             << "impedance_surface, maxspeed_forward, maxspeed_backward, "
-            << "h3_3, h3_6, "
             << (load_geometry ? "coordinates_3857, " : "")
             << "src_nodes.x_3857 AS source_x, "
             << "src_nodes.y_3857 AS source_y, "
@@ -162,9 +232,9 @@ namespace routing::data
             << "JOIN node_coords dst_nodes ON dst_nodes.node_id = e.target "
             << "WHERE class_ IN " << sql_in_list(valid_classes);
 
-        if (!h3_3_cells.empty())
+        if (has_edge_h3_3 && !h3_3_cells.empty())
             sql << " AND h3_3 IN " << sql_int_list(h3_3_cells);
-        if (!h3_6_cells.empty())
+        if (has_edge_h3_6 && !h3_6_cells.empty())
             sql << " AND h3_6 IN " << sql_int_list(h3_6_cells);
 
         // For active mobility, filter primary roads by speed limit
@@ -203,8 +273,6 @@ namespace routing::data
             duckdb::UnifiedVectorFormat surface_vec;
             duckdb::UnifiedVectorFormat speed_fwd_vec;
             duckdb::UnifiedVectorFormat speed_back_vec;
-            duckdb::UnifiedVectorFormat h3_3_vec;
-            duckdb::UnifiedVectorFormat h3_6_vec;
             duckdb::UnifiedVectorFormat source_x_vec;
             duckdb::UnifiedVectorFormat source_y_vec;
             duckdb::UnifiedVectorFormat target_x_vec;
@@ -221,13 +289,13 @@ namespace routing::data
             chunk->data[8].ToUnifiedFormat(count, surface_vec);
             chunk->data[9].ToUnifiedFormat(count, speed_fwd_vec);
             chunk->data[10].ToUnifiedFormat(count, speed_back_vec);
-            chunk->data[11].ToUnifiedFormat(count, h3_3_vec);
-            chunk->data[12].ToUnifiedFormat(count, h3_6_vec);
+            // coordinates_3857 occupies column 11 when requested, shifting the
+            // node coordinates that follow it.
             int col_offset = load_geometry ? 1 : 0;
-            chunk->data[13 + col_offset].ToUnifiedFormat(count, source_x_vec);
-            chunk->data[14 + col_offset].ToUnifiedFormat(count, source_y_vec);
-            chunk->data[15 + col_offset].ToUnifiedFormat(count, target_x_vec);
-            chunk->data[16 + col_offset].ToUnifiedFormat(count, target_y_vec);
+            chunk->data[11 + col_offset].ToUnifiedFormat(count, source_x_vec);
+            chunk->data[12 + col_offset].ToUnifiedFormat(count, source_y_vec);
+            chunk->data[13 + col_offset].ToUnifiedFormat(count, target_x_vec);
+            chunk->data[14 + col_offset].ToUnifiedFormat(count, target_y_vec);
 
             auto const *id_data = reinterpret_cast<int64_t const *>(id_vec.data);
             auto const *source_data = reinterpret_cast<int64_t const *>(source_vec.data);
@@ -240,8 +308,6 @@ namespace routing::data
             auto const *surface_data = reinterpret_cast<float const *>(surface_vec.data);
             auto const *speed_fwd_data = reinterpret_cast<int16_t const *>(speed_fwd_vec.data);
             auto const *speed_back_data = reinterpret_cast<int16_t const *>(speed_back_vec.data);
-            auto const *h3_3_data = reinterpret_cast<int32_t const *>(h3_3_vec.data);
-            auto const *h3_6_data = reinterpret_cast<int32_t const *>(h3_6_vec.data);
             auto const *source_x_data = reinterpret_cast<double const *>(source_x_vec.data);
             auto const *source_y_data = reinterpret_cast<double const *>(source_y_vec.data);
             auto const *target_x_data = reinterpret_cast<double const *>(target_x_vec.data);
@@ -260,8 +326,6 @@ namespace routing::data
                 auto rid_surface = surface_vec.sel->get_index(i);
                 auto rid_speed_fwd = speed_fwd_vec.sel->get_index(i);
                 auto rid_speed_back = speed_back_vec.sel->get_index(i);
-                auto rid_h3_3 = h3_3_vec.sel->get_index(i);
-                auto rid_h3_6 = h3_6_vec.sel->get_index(i);
                 auto rid_source_x = source_x_vec.sel->get_index(i);
                 auto rid_source_y = source_y_vec.sel->get_index(i);
                 auto rid_target_x = target_x_vec.sel->get_index(i);
@@ -289,15 +353,13 @@ namespace routing::data
                 e.maxspeed_backward = speed_back_vec.validity.RowIsValid(rid_speed_back)
                                          ? speed_back_data[rid_speed_back]
                                          : static_cast<int16_t>(0);
-                e.h3_3 = h3_3_data[rid_h3_3];
-                e.h3_6 = h3_6_data[rid_h3_6];
                 e.source_coord = {source_x_data[rid_source_x], source_y_data[rid_source_y]};
                 e.target_coord = {target_x_data[rid_target_x], target_y_data[rid_target_y]};
 
-                // Parse geometry for active mobility (column 13 when present)
+                // Parse geometry for active mobility (column 11 when present)
                 if (load_geometry)
                 {
-                    auto geom_val = chunk->GetValue(13, i);
+                    auto geom_val = chunk->GetValue(11, i);
                     if (!geom_val.IsNull())
                     {
                         auto &coord_list = duckdb::ListValue::GetChildren(geom_val);
@@ -334,8 +396,8 @@ namespace routing::data
         RoutingMode mode,
         bool load_geometry)
     {
-        auto h3_filter = compute_h3_filter(con, starting_points, buffer_meters);
-        return load_edges_impl(con, edge_dir, node_dir, h3_filter,
+        auto filter = compute_spatial_filter(con, starting_points, buffer_meters);
+        return load_edges_impl(con, edge_dir, node_dir, filter,
                                valid_classes, mode, load_geometry);
     }
 
@@ -343,12 +405,12 @@ namespace routing::data
         duckdb::Connection &con,
         std::string const &edge_dir,
         std::string const &node_dir,
-        H3CellFilter const &h3_filter,
+        SpatialFilter const &filter,
         std::vector<std::string> const &valid_classes,
         RoutingMode mode,
         bool load_geometry)
     {
-        return load_edges_impl(con, edge_dir, node_dir, h3_filter,
+        return load_edges_impl(con, edge_dir, node_dir, filter,
                                valid_classes, mode, load_geometry);
     }
 

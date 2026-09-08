@@ -1,5 +1,6 @@
 {
   "sections": {
+    "sql": {"label": "SQL"},
     "routing": {
       "label": "Routing"
     },
@@ -14,9 +15,6 @@
     },
     "reference_area": {
       "label": "Reference area"
-    },
-    "scenario": {
-      "label": "Scenario"
     },
     "input": {
       "label": "Input"
@@ -110,6 +108,21 @@
     }
   },
   "fields": {
+    "size_field": {"label": "Size Field", "description": "Numeric field to use for zone balancing"},
+    "polygon_union": {"label": "Merge overlapping buffers", "description": "Merge buffers at the same distance that overlap into one polygon"},
+    "egress_mode": {"label": "Egress mode", "description": "How the last leg from the transit stop to the destination is travelled"},
+    "input_layer_1": {"label": "Input layer 1", "description": "First input layer (connected from the workflow)"},
+    "input_layer_2": {"label": "Input layer 2", "description": "Second input layer (connected from the workflow)"},
+    "input_layer_3": {"label": "Input layer 3", "description": "Third input layer (connected from the workflow)"},
+    "sql_query": {"label": "SQL query", "description": "SQL SELECT statement to run against the input layers"},
+    "pt_network_bundle_id": {
+      "label": "Public Transport Network bundle",
+      "description": "Choose a custom Public Transport Network bundle to use for routing. If unset, the default bundle will be used."
+    },
+    "street_network_bundle_id": {
+      "label": "Street Network bundle",
+      "description": "Choose a custom Street Network bundle to use for routing. If unset, the default network will be used."
+    },
     "routing_mode": {
       "label": "Transport mode",
       "description": "Select the transport mode for accessibility analysis"
@@ -345,10 +358,6 @@
     "mitre_limit": {
       "label": "Mitre Limit",
       "description": "Ratio for mitred join length"
-    },
-    "scenario_id": {
-      "label": "Scenario",
-      "description": "Select a scenario for analysis"
     },
     "od_matrix_path": {
       "label": "OD Matrix",
@@ -1111,9 +1120,5 @@
   "size_method": {
     "count": "Count",
     "field": "Field Value"
-  },
-  "size_field": {
-    "label": "Size Field",
-    "description": "Numeric field to use for zone balancing"
   }
 }

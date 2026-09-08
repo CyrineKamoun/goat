@@ -1,30 +1,19 @@
 import type { Theme } from "@mui/material/styles";
 
+/**
+ * The toast palette is deliberately NOT here.
+ *
+ * A page may mount a second `ThemeProvider` in a fixed mode — the print
+ * preview wraps its paper in a light theme, public dashboards do the same —
+ * and each one emits this CssBaseline again, later in the stylesheet. Anything
+ * declared here about the toast therefore wins globally, so a dark-mode user
+ * got a white toast on those pages. `ToastProvider` mounts once at the root
+ * and owns it.
+ */
 const CssBaseline = (theme: Theme) => {
   return {
     MuiCssBaseline: {
       styleOverrides: {
-        ":root": {
-          "--toastify-color-dark": theme.palette.background.paper,
-          "--toastify-color-light": theme.palette.background.paper,
-          "--toastify-color-info": theme.palette.info.main,
-          "--toastify-color-success": theme.palette.success.main,
-          "--toastify-color-warning": theme.palette.warning.main,
-          "--toastify-color-error": theme.palette.error.main,
-          "--toastify-icon-color-info": theme.palette.info.main,
-          "--toastify-icon-color-success": theme.palette.success.main,
-          "--toastify-icon-color-warning": theme.palette.warning.main,
-          "--toastify-icon-color-error": theme.palette.error.main,
-          "--toastify-font-family": "inherit",
-          "--toastify-color-progress-light": theme.palette.primary.main,
-          "--toastify-color-progress-dark": theme.palette.primary.main,
-          "--toastify-color-progress-info": theme.palette.info.main,
-          "--toastify-color-progress-success": theme.palette.success.main,
-          "--toastify-color-progress-warning": theme.palette.warning.main,
-          "--toastify-color-progress-error": theme.palette.error.main,
-          "--toastify-text-color-light": theme.palette.text.primary,
-          "--toastify-text-color-dark": theme.palette.text.primary,
-        },
         html: {
           "& ::-webkit-scrollbar": {
             width: "5px",

@@ -1,0 +1,122 @@
+/**
+ * Right-hand panel for a bundle selected in the layer tree.
+ *
+ * Mirrors `LayerSettingsPanel` — same container, same tabbed shell, the same
+ * `useLazyTabs` bookkeeping — and is separate only because a bundle is a layer
+ * *group* in the tree and so cannot be addressed by `selectedLayerIds`.
+ *
+ * Two tabs, not three: a bundle has no style of its own, since its member
+ * layers are styled individually.
+ */
+import { Box, Stack, Tab, Tabs, Typography } from "@mui/material";
+import React, { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+
+import { useBundle, useBundleLayers } from "@/lib/api/bundles";
+import { setSelectedBundle } from "@/lib/store/layer/slice";
+import { setActiveRightPanel } from "@/lib/store/map/slice";
+
+import { MapSidebarItemID } from "@/types/map/common";
+
+import { useLazyTabs } from "@/hooks/map/useLazyTabs";
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
+
+import BundleSummaryImpl from "@/components/dashboard/bundle/BundleSummary";
+import Container from "@/components/map/panels/Container";
+import BundleFilterImpl from "@/components/map/panels/bundle/BundleFilter";
+
+// Same reason as the layer panel: a tab switch re-renders this panel, and
+// without memo it re-renders the whole tab tree with it.
+const BundleFilter = React.memo(BundleFilterImpl);
+const BundleSummary = React.memo(BundleSummaryImpl);
+
+const FILTER_TAB = 0;
+const METADATA_TAB = 1;
+
+const BundleSettingsPanel = ({ projectId }: { projectId: string }) => {
+  const { t } = useTranslation("common");
+  const dispatch = useAppDispatch();
+  const activeRightPanel = useAppSelector((state) => state.map.activeRightPanel);
+  const selectedBundleId = useAppSelector((state) => state.layers.selectedBundleId);
+
+  const { bundle } = useBundle(selectedBundleId);
+  const { members } = useBundleLayers(selectedBundleId);
+
+  // A spatial predicate needs a geometry column to resolve against, and an
+  // attribute-table member has none.
+  const memberLayerId = useMemo(
+    () => members?.find((member) => !!member.feature_layer_geometry_type)?.layer_id,
+    [members]
+  );
+
+  // Which tab is open is already in Redux — the panel slot the tree opened,
+  // and what a tab click dispatches — so it is derived, not mirrored.
+  const activeTab = activeRightPanel === MapSidebarItemID.FILTER ? FILTER_TAB : METADATA_TAB;
+  const isTabLive = useLazyTabs(activeTab, selectedBundleId);
+
+  const handleTabChange = (value: number) => {
+    dispatch(
+      setActiveRightPanel(value === FILTER_TAB ? MapSidebarItemID.FILTER : MapSidebarItemID.PROPERTIES)
+    );
+  };
+
+  const handleClose = () => {
+    dispatch(setSelectedBundle(null));
+    dispatch(setActiveRightPanel(undefined));
+  };
+
+  const renderContent = () => {
+    if (!bundle) return null;
+    return (
+      <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+          <Tabs
+            value={activeTab}
+            onChange={(_, v) => handleTabChange(v)}
+            variant="fullWidth"
+            aria-label="Bundle Settings Tabs">
+            <Tab label={t("filter")} />
+            <Tab label={t("metadata.title")} />
+          </Tabs>
+        </Box>
+        <Box sx={{ flexGrow: 1, overflowY: "auto", p: 0 }}>
+          <Box role="tabpanel" hidden={activeTab !== FILTER_TAB} sx={{ height: "100%" }}>
+            {isTabLive(FILTER_TAB) &&
+              (memberLayerId ? (
+                <BundleFilter
+                  key={bundle.id}
+                  bundle={bundle}
+                  projectId={projectId}
+                  memberLayerId={memberLayerId}
+                />
+              ) : (
+                <Typography variant="body2" sx={{ p: 3, fontStyle: "italic" }}>
+                  {t("filter_bundle_no_geometry")}
+                </Typography>
+              ))}
+          </Box>
+          <Box role="tabpanel" hidden={activeTab !== METADATA_TAB} sx={{ height: "100%" }}>
+            {/* The aggregated fields, status and artifact state — the same
+                at-a-glance set the bundle's own page leads with. The long
+                provenance list stays on that page; a panel this narrow cannot
+                carry nine fields. Padding matches the layer metadata tab. */}
+            {isTabLive(METADATA_TAB) && (
+              <Stack spacing={4} sx={{ p: 2 }}>
+                <BundleSummary bundle={bundle} hideMetadataSection />
+              </Stack>
+            )}
+          </Box>
+        </Box>
+      </Box>
+    );
+  };
+
+  const title = bundle ? bundle.name : t("bundle");
+  return (
+    <Box sx={{ height: "100%" }}>
+      <Container title={title} disablePadding={true} close={handleClose} body={renderContent()} />
+    </Box>
+  );
+};
+
+export default BundleSettingsPanel;

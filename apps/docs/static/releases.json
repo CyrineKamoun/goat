@@ -1,0 +1,39 @@
+{
+  "generatedAt": "2026-09-04T19:39:54.759Z",
+  "entries": {
+    "en": [
+      {
+        "id": "2026-09-content-spaces",
+        "date": "2026-09-04",
+        "tag": "new",
+        "title": "Content Spaces",
+        "summary": "Content now lives in spaces you and your team own, with a clear line between sharing and transferring.",
+        "url": "https://docs.plan4better.de/releases/content-spaces",
+        "spotlight": {
+          "headline": "Content Spaces is here",
+          "cta": {
+            "label": "Read the release notes",
+            "url": "https://docs.plan4better.de/releases/2026-09-content-spaces"
+          }
+        }
+      }
+    ],
+    "de": [
+      {
+        "id": "2026-09-content-spaces",
+        "date": "2026-09-04",
+        "tag": "new",
+        "title": "Content Spaces",
+        "summary": "Inhalte liegen jetzt in Bereichen, die dir oder deinem Team gehören, mit einer klaren Trennung zwischen Teilen und Übertragen.",
+        "url": "https://docs.plan4better.de/de/releases/content-spaces",
+        "spotlight": {
+          "headline": "Content Spaces ist da",
+          "cta": {
+            "label": "Release-Hinweise lesen",
+            "url": "https://docs.plan4better.de/de/releases/2026-09-content-spaces"
+          }
+        }
+      }
+    ]
+  }
+}

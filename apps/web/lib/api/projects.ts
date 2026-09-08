@@ -272,6 +272,36 @@ export const deleteProjectLayer = async (projectId: string, layerId: number) => 
   return response;
 };
 
+/** SWR key of a project's layer list — for targeted revalidation. */
+export const projectLayersKey = (projectId: string) => [`${PROJECTS_API_BASE_URL}/${projectId}/layer`];
+
+/**
+ * Add catalog items to a project (promote-on-use).
+ *
+ * Each id is a STAC item id; core resolves it to the shared promoted layer —
+ * creating it on first use, with data materialized in the background — and
+ * links it to the project. Returned layers may be `pending` until the
+ * materialize job finishes.
+ */
+export const addCatalogLayersToProject = async (projectId: string, catalogIds: string[]) => {
+  const params = catalogIds.map((id) => `catalog_ids=${encodeURIComponent(id)}`).join("&");
+  const response = await apiRequestAuth(
+    `${PROJECTS_API_BASE_URL}/${projectId}/layer-catalog?${params}`,
+    { method: "POST", headers: { "Content-Type": "application/json" } }
+  );
+  if (!response.ok) {
+    // The server's own words when it has them: a refusal here says how many
+    // layers were asked for and what the limit is, which the generic message
+    // cannot. Falls back when the body is not the expected shape.
+    const detail = await response
+      .json()
+      .then((body) => (typeof body?.detail === "string" ? body.detail : undefined))
+      .catch(() => undefined);
+    throw new Error(detail ?? "Failed to add catalog layers to project");
+  }
+  return await response.json();
+};
+
 export const addProjectLayers = async (projectId: string, layerIds: string[]) => {
   //todo: fix the api for this. This structure doesn't make sense.
   //layer_ids=1&layer_ids=2&layer_ids=3
@@ -290,6 +320,21 @@ export const addProjectLayers = async (projectId: string, layerIds: string[]) =>
   );
   if (!response.ok) {
     throw new Error("Failed to add layers to project");
+  }
+  return await response.json();
+};
+
+export const addBundleToProject = async (projectId: string, bundleId: string) => {
+  // Creates a bundle-backed layer group and places the bundle's member layers
+  // into it (locked membership). Returns the created group.
+  const response = await apiRequestAuth(`${PROJECTS_API_BASE_URL}/${projectId}/bundle/${bundleId}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  if (!response.ok) {
+    throw new Error("Failed to add bundle to project");
   }
   return await response.json();
 };

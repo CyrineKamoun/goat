@@ -59,6 +59,9 @@ export function inferInputType(
   if (topLevelUiMeta?.widget === "layer-selector") {
     return "layer";
   }
+  if (topLevelUiMeta?.widget === "bundle-selector") {
+    return "bundle";
+  }
   if (topLevelUiMeta?.widget === "time-picker") {
     return "time-picker";
   }
@@ -82,6 +85,9 @@ export function inferInputType(
   const uiMeta = effectiveSchema["x-ui"];
   if (uiMeta?.widget === "layer-selector") {
     return "layer";
+  }
+  if (uiMeta?.widget === "bundle-selector") {
+    return "bundle";
   }
   if (uiMeta?.widget === "time-picker") {
     return "time-picker";

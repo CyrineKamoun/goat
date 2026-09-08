@@ -1,25 +1,18 @@
-import { LoadingButton } from "@mui/lab";
-import {
-  Button,
-  Checkbox,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControlLabel,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Checkbox, FormControlLabel, Stack, TextField, Typography } from "@mui/material";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 import { mutate } from "swr";
 
-import { LAYERS_API_BASE_URL, updateDataset, useDataset } from "@/lib/api/layers";
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
+import { matchesContentListKey } from "@/lib/api/datasets";
+import { updateDataset, useDataset } from "@/lib/api/layers";
 import { updateProjectLayer, useProjectLayers } from "@/lib/api/projects";
 import type { ProjectLayer } from "@/lib/validations/project";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 interface ProjectLayerRenameDialogProps {
   open: boolean;
@@ -59,7 +52,7 @@ const ProjectLayerRenameModal: React.FC<ProjectLayerRenameDialogProps> = ({
           name: layerName,
         });
         // Invalidate dataset layers cache
-        mutate(`${LAYERS_API_BASE_URL}`);
+        mutate(matchesContentListKey);
         toast.success(t("rename_layer_success"));
       }
 
@@ -75,71 +68,58 @@ const ProjectLayerRenameModal: React.FC<ProjectLayerRenameDialogProps> = ({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t("rename_project_layer")}</DialogTitle>
-      <DialogContent>
-        <Stack>
-          <TextField
-            autoFocus
-            size="small"
-            fullWidth
-            inputProps={{
-              style: {
-                fontSize: "0.875rem",
-                fontWeight: "bold",
-              },
-            }}
-            defaultValue={layerName}
-            onChange={(e) => {
-              setLayerName(e.target.value);
-            }}
+    <AppDialog
+      open={open}
+      onClose={() => onClose?.()}
+      icon={ICON_NAME.EDITPEN}
+      title={t("rename_project_layer")}
+      footer={
+        <AppDialogFooter
+          onCancel={onClose}
+          primaryLabel={t("rename")}
+          onPrimary={() => void handleRename()}
+          primaryLoading={isLoading}
+        />
+      }>
+      <Stack>
+        <TextField
+          autoFocus
+          size="small"
+          fullWidth
+          inputProps={{
+            style: {
+              fontSize: "0.875rem",
+              fontWeight: "bold",
+            },
+          }}
+          defaultValue={layerName}
+          onChange={(e) => {
+            setLayerName(e.target.value);
+          }}
+        />
+      </Stack>
+      {!projectLayer.in_catalog && (
+        <Stack sx={{ mt: 2 }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                size="small"
+                color="primary"
+                checked={renameSourceLayer}
+                onChange={(e) => {
+                  setRenameSourceLayer(e.target.checked);
+                }}
+              />
+            }
+            label={
+              <Typography variant="body2" fontWeight="bold">
+                {t("rename_dataset_source")}
+              </Typography>
+            }
           />
         </Stack>
-        {!projectLayer.in_catalog && (
-          <Stack sx={{ mt: 2 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  size="small"
-                  color="primary"
-                  checked={renameSourceLayer}
-                  onChange={(e) => {
-                    setRenameSourceLayer(e.target.checked);
-                  }}
-                />
-              }
-              label={
-                <Typography variant="body2" fontWeight="bold">
-                  {t("rename_dataset_source")}
-                </Typography>
-              }
-            />
-          </Stack>
-        )}
-      </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          pb: 2,
-        }}>
-        <Button onClick={onClose} variant="text" sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-        <LoadingButton
-          onClick={handleRename}
-          loading={isLoading}
-          variant="text"
-          color="primary"
-          disabled={false}
-          sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("rename")}
-          </Typography>
-        </LoadingButton>
-      </DialogActions>
-    </Dialog>
+      )}
+    </AppDialog>
   );
 };
 

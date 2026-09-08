@@ -2,11 +2,17 @@
 
 Imports geospatial data from S3 or WFS into DuckLake storage.
 Supports all formats that goatlib IOConverter handles (GeoPackage, Shapefile, GeoJSON, etc).
+
+An upload can hold more than one dataset — the layers of a GeoPackage, the files of an
+archive, at any depth — and this imports all of them, as one job. One dataset failing does
+not lose the others: the job reports which arrived and which were skipped.
 """
 
 import logging
 import os
 import shutil
+import tempfile
+import uuid as uuid_module
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
@@ -19,14 +25,21 @@ from goatlib.analysis.schemas.ui import (
     ui_sections,
 )
 from goatlib.io.converter import IOConverter
-from goatlib.models.io import DatasetMetadata
-from goatlib.tools.base import BaseToolRunner
-from goatlib.tools.schemas import ToolInputBase
+from goatlib.io.formats import RASTER_EXTS
+from goatlib.io.ingest import convert_all, first_line
+from goatlib.models.io import ConversionReport, DatasetMetadata
+from goatlib.tools.base import BaseToolRunner, _get_or_create_event_loop
+from goatlib.tools.schemas import ToolInputBase, ToolOutputBase
 
 if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
+
+# How many datasets one upload may import. A zip of shapefiles can hold hundreds, and
+# every one of them becomes a layer — and, from a map, a layer on that map. Refused after
+# discovery, which is the job's first step, so nothing is imported before the refusal.
+MAX_DATASETS_PER_IMPORT = 25
 
 
 class LayerImportParams(ToolInputBase):
@@ -337,15 +350,14 @@ class LayerImportRunner(BaseToolRunner[LayerImportParams]):
         return output_path, metadata
 
     def run(self: Self, params: LayerImportParams) -> dict:
-        """Run layer import with custom output name handling.
-
-        Overrides base to handle output_name from s3_key if not provided.
+        """Run layer import, importing every dataset the source contains.
 
         Args:
             params: Import parameters
 
         Returns:
-            Dict with layer metadata
+            Dict with the first layer's metadata, plus `imported` and `skipped` listing
+            every dataset the source held.
         """
         # Set default output name from filename if not provided
         if not params.output_name and not params.name:
@@ -360,7 +372,189 @@ class LayerImportRunner(BaseToolRunner[LayerImportParams]):
         if not params.output_name and params.name:
             params.output_name = params.name
 
-        return super().run(params)
+        # A WFS import is one layer by definition, and a workflow preview writes to temp
+        # storage rather than creating layers: both are the base's single-output path.
+        if params.wfs_url or getattr(params, "temp_mode", False):
+            return super().run(params)
+
+        return self._run_multi(params)
+
+    def _run_multi(self: Self, params: LayerImportParams) -> dict:
+        """Import every dataset in an uploaded file, as one job.
+
+        Mirrors `BaseToolRunner.run` — ingest, tiles, records — but per dataset, because
+        the base assumes a tool produces exactly one layer and an upload does not.
+        """
+        if not params.s3_key:
+            raise ValueError("s3_key is required")
+
+        loop = _get_or_create_event_loop()
+        loop.run_until_complete(self._init_db_service())
+
+        imported: list[dict[str, Any]] = []
+        skipped: list[dict[str, str]] = []
+        first_output: dict[str, Any] | None = None
+
+        with tempfile.TemporaryDirectory(prefix="layerimport_") as temp_dir:
+            temp_path = Path(temp_dir)
+            report = self._convert_upload(params, temp_path)
+
+            if not report.outputs and not report.failures:
+                raise ValueError(f"No convertible datasets found in {params.s3_key}")
+
+            # Only one dataset: the name the user typed is that layer's name. Several, and
+            # it cannot be — each takes the name of the layer or file it came from.
+            #
+            # Counted over everything the source held, failures included: a file of five
+            # datasets where four could not be read still held five, and naming the
+            # survivor after the file would claim it was the whole upload.
+            single = len(report.outputs) + len(report.failures) == 1
+
+            for dataset in report.outputs:
+                # A raster converts to a COG, not to parquet, and DuckLake ingestion takes
+                # parquet — so it cannot go through this path. Reported rather than
+                # ingested as if it were a table: an upload holding one is otherwise a
+                # corrupt layer instead of a skipped one.
+                if Path(dataset.path).suffix.lower() in RASTER_EXTS:
+                    skipped.append(
+                        {
+                            "name": dataset.name,
+                            "reason": "Raster datasets cannot be imported here yet",
+                        }
+                    )
+                    continue
+
+                name = (
+                    params.output_name or self.default_output_name
+                    if single
+                    else dataset.name
+                )
+                try:
+                    output = self._import_one(
+                        params=params,
+                        parquet=Path(dataset.path),
+                        metadata=dataset.metadata,
+                        name=name,
+                        loop=loop,
+                    )
+                except Exception as e:  # noqa: BLE001 - one layer must not lose the others
+                    logger.exception("Importing %s failed", name)
+                    skipped.append({"name": name, "reason": first_line(e)})
+                    continue
+
+                imported.append(
+                    {"layer_id": output["layer_id"], "name": output["name"]}
+                )
+                if first_output is None:
+                    first_output = output
+
+            for failure in report.failures:
+                skipped.append({"name": failure.name, "reason": failure.reason})
+
+        loop.run_until_complete(self._close_db_service())
+
+        if first_output is None:
+            reasons = "; ".join(f"{s['name']}: {s['reason']}" for s in skipped)
+            raise ValueError(f"Nothing could be imported. {reasons}")
+
+        logger.info(
+            "Import complete: %d layers created, %d skipped",
+            len(imported),
+            len(skipped),
+        )
+        # The first layer's own output, so anything reading a single import still works,
+        # with the full account beside it.
+        return {**first_output, "imported": imported, "skipped": skipped}
+
+    def _convert_upload(
+        self: Self, params: LayerImportParams, temp_dir: Path
+    ) -> ConversionReport:
+        """Fetch the upload and convert every dataset in it."""
+        if self.settings is None:
+            raise RuntimeError("Settings not initialized")
+
+        client = self._get_s3_client()
+        s3_key = params.s3_key or ""
+        local_file = temp_dir / Path(s3_key).name
+        logger.info(
+            "Downloading s3://%s/%s to %s",
+            self.settings.s3_bucket_name,
+            s3_key,
+            local_file,
+        )
+        client.download_file(self.settings.s3_bucket_name, s3_key, str(local_file))
+
+        report = convert_all(
+            str(local_file),
+            temp_dir / "converted",
+            target_crs="EPSG:4326",
+            has_header=params.has_header,
+            sheet_name=params.sheet_name,
+        )
+
+        total = len(report.outputs) + len(report.failures)
+        if total > MAX_DATASETS_PER_IMPORT:
+            raise ValueError(
+                f"This file holds {total} datasets; at most "
+                f"{MAX_DATASETS_PER_IMPORT} can be imported at once."
+            )
+        return report
+
+    def _import_one(
+        self: Self,
+        params: LayerImportParams,
+        parquet: Path,
+        metadata: DatasetMetadata,
+        name: str,
+        loop: Any,
+    ) -> dict[str, Any]:
+        """Ingest one converted dataset and record it as a layer."""
+        layer_id = str(uuid_module.uuid4())
+        custom_properties = self.get_layer_properties(
+            params, metadata, parquet_path=parquet
+        )
+
+        table_info = self._ingest_to_ducklake(
+            user_id=params.user_id, layer_id=layer_id, parquet_path=parquet
+        )
+        if table_info.get("geometry_type"):
+            pmtiles_path = self._generate_pmtiles(
+                user_id=params.user_id,
+                layer_id=layer_id,
+                table_name=table_info["table_name"],
+                geometry_column=table_info.get("geometry_column", "geometry"),
+            )
+            if pmtiles_path:
+                table_info["pmtiles_path"] = str(pmtiles_path)
+
+        result_info = loop.run_until_complete(
+            self._create_db_records(
+                output_layer_id=layer_id,
+                params=params,
+                output_name=name,
+                metadata=metadata,
+                table_info=table_info,
+                custom_properties=custom_properties,
+            )
+        )
+
+        geometry_type = table_info.get("geometry_type")
+        return ToolOutputBase(
+            layer_id=layer_id,
+            name=name,
+            folder_id=result_info["folder_id"],
+            user_id=params.user_id,
+            project_id=params.project_id,
+            layer_project_id=result_info.get("layer_project_id"),
+            type="feature" if geometry_type else "table",
+            feature_layer_type=self.get_feature_layer_type(params)
+            if geometry_type
+            else None,
+            geometry_type=geometry_type,
+            feature_count=table_info.get("feature_count", 0),
+            extent=table_info.get("extent"),
+            table_name=table_info["table_name"],
+        ).model_dump()
 
 
 def main(params: LayerImportParams) -> dict:

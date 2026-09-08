@@ -280,16 +280,32 @@ export function useWorkflowExecution({ workflow, projectId, folderId }: UseWorkf
   }, [workflowId, jobs, state.isExecuting, nodes, dispatch]);
 
   /**
+   * True when a dataset node still has an unresolved template "ask" input
+   * (`data.unresolved === true`, set outside datasetNodeDataSchema — see
+   * components/workflows/nodes/DatasetNode.tsx). Running with an unbound
+   * input would fail node-by-node with no clear cause, so the run button is
+   * gated on this instead.
+   */
+  const hasUnresolvedInputs = useMemo(
+    () =>
+      nodes.some(
+        (n) => n.data?.type === "dataset" && (n.data as { unresolved?: boolean }).unresolved === true
+      ),
+    [nodes]
+  );
+
+  /**
    * Check if workflow can be executed
    */
   const canExecute = useMemo(() => {
     if (!projectId || !workflowId) return false;
     if (state.isExecuting) return false;
+    if (hasUnresolvedInputs) return false;
 
     // Must have at least one tool node
     const hasToolNodes = nodes.some((n) => n.data?.type === "tool");
     return hasToolNodes;
-  }, [projectId, workflowId, state.isExecuting, nodes]);
+  }, [projectId, workflowId, state.isExecuting, hasUnresolvedInputs, nodes]);
 
   /**
    * Execute the workflow
@@ -516,7 +532,6 @@ export function useWorkflowExecution({ workflow, projectId, folderId }: UseWorkf
     if (job.status === "successful") {
       // Skip if we've already processed this job completion
       if (processedJobIdsRef.current.has(job.jobID)) {
-
         return;
       }
       processedJobIdsRef.current.add(job.jobID);
@@ -578,7 +593,6 @@ export function useWorkflowExecution({ workflow, projectId, folderId }: UseWorkf
     } else if (job.status === "failed") {
       // Skip if we've already processed this job failure
       if (processedJobIdsRef.current.has(job.jobID)) {
-
         return;
       }
       processedJobIdsRef.current.add(job.jobID);
@@ -593,8 +607,7 @@ export function useWorkflowExecution({ workflow, projectId, folderId }: UseWorkf
         const skipped = new Set<string>();
         if (job.node_status) {
           Object.entries(job.node_status).forEach(([nodeId, statusData]) => {
-            const status =
-              typeof statusData === "string" ? statusData : statusData?.status;
+            const status = typeof statusData === "string" ? statusData : statusData?.status;
             if (status === "skipped") {
               skipped.add(nodeId);
             }
@@ -737,5 +750,6 @@ export function useWorkflowExecution({ workflow, projectId, folderId }: UseWorkf
     finalizeNode,
     reset,
     canExecute,
+    hasUnresolvedInputs,
   };
 }

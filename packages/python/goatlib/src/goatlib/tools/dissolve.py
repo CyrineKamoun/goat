@@ -26,7 +26,6 @@ from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
     LayerInputMixin,
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -34,9 +33,7 @@ from goatlib.tools.schemas import (
 logger = logging.getLogger(__name__)
 
 
-class DissolveToolParams(
-    ScenarioSelectorMixin, ToolInputBase, LayerInputMixin, DissolveParams
-):
+class DissolveToolParams(ToolInputBase, LayerInputMixin, DissolveParams):
     """Parameters for dissolve tool.
 
     Inherits dissolve options from DissolveParams, adds layer context from ToolInputBase.
@@ -59,14 +56,6 @@ class DissolveToolParams(
                 depends_on={"input_layer_id": {"$ne": None}},
             ),
             SECTION_RESULT,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"input_layer_id": {"$ne": None}},
-            ),
             SECTION_OUTPUT,
         )
     )
@@ -247,8 +236,6 @@ class DissolveToolRunner(BaseToolRunner[DissolveToolParams]):
             layer_id=params.input_layer_id,
             user_id=params.user_id,
             cql_filter=params.input_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
         output_path = temp_dir / "output.parquet"
 
@@ -259,7 +246,6 @@ class DissolveToolRunner(BaseToolRunner[DissolveToolParams]):
                 "user_id",
                 "folder_id",
                 "project_id",
-                "scenario_id",
                 "output_name",
                 "input_layer_id",
                 "input_layer_filter",

@@ -22,7 +22,6 @@ from goatlib.analysis.schemas.ui import (
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -30,7 +29,7 @@ from goatlib.tools.schemas import (
 logger = logging.getLogger(__name__)
 
 
-class MergeToolParams(ScenarioSelectorMixin, ToolInputBase, MergeParams):
+class MergeToolParams(ToolInputBase, MergeParams):
     """Parameters for merge tool.
 
     Inherits merge options from MergeParams; layer context comes from ToolInputBase.
@@ -47,14 +46,6 @@ class MergeToolParams(ScenarioSelectorMixin, ToolInputBase, MergeParams):
                 collapsed=True,
             ),
             SECTION_RESULT,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"input_paths": {"$ne": None}},
-            ),
             SECTION_OUTPUT,
         )
     )
@@ -218,7 +209,6 @@ class MergeToolRunner(BaseToolRunner[MergeToolParams]):
                     "user_id",
                     "folder_id",
                     "project_id",
-                    "scenario_id",
                     "output_name",
                 }
             ),

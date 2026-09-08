@@ -87,6 +87,10 @@ interface MapProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   containerSx?: any;
   isEditor?: boolean;
+  /** Whether the active popup feature gets the pulse (click) or dot (hover)
+   * marker on top of its highlight. Off for maps that only need the
+   * highlight, such as the dataset preview. */
+  activeFeatureMarker?: boolean;
 }
 
 /**
@@ -112,6 +116,7 @@ const MapViewer: React.FC<MapProps> = ({
   children,
   containerSx,
   isEditor,
+  activeFeatureMarker = true,
 }) => {
   const { t, i18n } = useTranslation("common");
   const theme = useTheme();
@@ -895,7 +900,7 @@ const MapViewer: React.FC<MapProps> = ({
               )}
               <ActiveFeaturePulseLayer
                 lngLat={{ lng: popupInfo.lngLat[0], lat: popupInfo.lngLat[1] }}
-                visible={activePopupConfig.highlight_active_feature}
+                visible={activeFeatureMarker && activePopupConfig.highlight_active_feature}
                 // Pulse for click-triggered popups; static dot for hover.
                 // Hover is transient — the pulse is overkill.
                 pulse={popupInfo.triggeredBy !== "hover"}

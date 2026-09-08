@@ -38,6 +38,7 @@ Use a scope to indicate which part of the monorepo is affected:
 | `core`       | `apps/core` — Main FastAPI backend           |
 | `geoapi`     | `apps/geoapi` — OGC API Features/Tiles service |
 | `processes`  | `apps/processes` — OGC API Processes service |
+| `catalog`    | `apps/catalog` — STAC API service for the data catalog |
 | `routing`    | `apps/routing` — Routing service             |
 | `goatlib`    | `packages/python/goatlib` — Shared Python library |
 | `ui`         | `packages/js/ui` — Shared UI components      |

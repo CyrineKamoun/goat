@@ -9,7 +9,7 @@ import type { InvitationPaginated } from "@/lib/validations/invitation";
 import { refreshAccessToken } from "@/app/api/auth/[...nextauth]/options";
 import type { MiddlewareFactory } from "@/middlewares/types";
 
-const protectedPaths = ["/home", "/projects", "/datasets", "/settings", "/map"];
+const protectedPaths = ["/home", "/content", "/projects", "/datasets", "/settings", "/map"];
 const publicPaths = ["/map/public"];
 
 export const withOrganization: MiddlewareFactory = (next) => {

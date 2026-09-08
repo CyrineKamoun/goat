@@ -32,7 +32,8 @@ class TestSchemaHelpers:
         """Test user schema name generation."""
         user_id = "12345678-1234-1234-1234-123456789abc"
         schema = get_user_schema_name(user_id)
-        assert schema == "user_12345678123412341234123456789abc"
+        # Flat storage: one shared schema, the owner is no longer in the path.
+        assert schema == "main"
 
     def test_get_table_name(self):
         """Test table name generation."""
@@ -45,10 +46,7 @@ class TestSchemaHelpers:
         user_id = "00000000-0000-0000-0000-000000000001"
         layer_id = "00000000-0000-0000-0000-000000000002"
         path = get_full_table_path(user_id, layer_id)
-        assert (
-            path
-            == "lake.user_00000000000000000000000000000001.t_00000000000000000000000000000002"
-        )
+        assert path == "lake.main.t_00000000000000000000000000000002"
 
 
 @pytest.mark.asyncio(loop_scope="session")

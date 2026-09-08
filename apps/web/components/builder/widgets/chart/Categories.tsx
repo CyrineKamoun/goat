@@ -95,7 +95,7 @@ const getClassIndex = (value: number, thresholds: number[]): number => {
 export const CategoriesChartWidget = ({ config: rawConfig }: { config: CategoriesChartSchema }) => {
   const { t, i18n } = useTranslation("common");
   const theme = useTheme();
-  const { config, queryParams, baseQueryParams, layerId } = useChartWidget(
+  const { config, queryParams, baseQueryParams, layerId, isLayerLocked } = useChartWidget(
     rawConfig,
     categoriesChartConfigSchema,
     aggregationStatsQueryParams
@@ -314,9 +314,13 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
     return baseColor;
   };
 
+  // D7: `config.setup.layer_project_id` still points at the layer even when
+  // it's locked for this viewer — `isLayerLocked` is what actually decides
+  // there is no data to fetch (`layerId` is already withheld by
+  // `useChartWidget`, this just also swaps the "not configured" message).
   const isChartConfigured = useMemo(() => {
-    return config?.setup?.layer_project_id && queryParams;
-  }, [config, queryParams]);
+    return config?.setup?.layer_project_id && queryParams && !isLayerLocked;
+  }, [config, queryParams, isLayerLocked]);
 
   return (
     <>
@@ -325,7 +329,7 @@ export const CategoriesChartWidget = ({ config: rawConfig }: { config: Categorie
         isNotConfigured={!isChartConfigured}
         isError={isError}
         height={150}
-        isNotConfiguredMessage={t("please_configure_chart")}
+        isNotConfiguredMessage={isLayerLocked ? t("layer_locked_hint") : t("please_configure_chart")}
         errorMessage={t("cannot_render_chart_error")}
       />
 

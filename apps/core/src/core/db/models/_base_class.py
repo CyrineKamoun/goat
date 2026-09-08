@@ -94,7 +94,11 @@ class ContentBaseAttributes(SQLModel):
         default=None,
         sa_type=Text,
         description="Layer description",
-        max_length=2000,
+        # The column is unbounded `Text`; this only bounds what may be
+        # submitted. 2000 was too small for real data: a promoted catalog layer
+        # copies the provider's description verbatim, and 582 of the catalog's
+        # 34,760 items exceed it — the longest is 11,559 characters.
+        max_length=50_000,
     )
 
 

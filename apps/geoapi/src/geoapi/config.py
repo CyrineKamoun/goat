@@ -19,6 +19,11 @@ class Settings(BaseSettings):
 
     # Authentication settings
     AUTH: bool = os.getenv("AUTH", "true").lower() == "true"
+
+    # Read authorization gate for tile/feature/metadata endpoints. Shadow
+    # mode (False, default) only logs `read_authz.would_deny`; flip on dev
+    # only after that counter is quiet. Env: GEOAPI_ENFORCE_READ_AUTHZ.
+    ENFORCE_READ_AUTHZ: bool = False
     KEYCLOAK_SERVER_URL: str = os.getenv(
         "KEYCLOAK_SERVER_URL", "https://auth.dev.plan4better.de"
     )
@@ -38,6 +43,20 @@ class Settings(BaseSettings):
 
     # Tiles storage (separate from source data for cache semantics)
     TILES_DATA_DIR: str = os.getenv("TILES_DATA_DIR", "/app/data/tiles")
+    # Materialized catalog layers: one immutable GeoParquet per promoted layer,
+    # written by the catalog_materialize job. Read through a view that names
+    # file_row_number `rowid`, so every rowid-based query works unchanged.
+    CATALOG_LAYERS_DIR: str = os.getenv(
+        "CATALOG_LAYERS_DIR",
+        os.path.join(os.getenv("DATA_DIR", "/app/data"), "catalog", "layers"),
+    )
+    # Their PMTiles, in a sibling directory: a cache derived from the parquet
+    # above, so it can be wiped to force a rebuild without losing data that
+    # would have to come from the catalog bucket again.
+    CATALOG_TILES_DIR: str = os.getenv(
+        "CATALOG_TILES_DIR",
+        os.path.join(os.getenv("DATA_DIR", "/app/data"), "catalog", "tiles"),
+    )
 
     # S3/MinIO settings (shared for DuckLake and uploads)
     S3_PROVIDER: str = os.getenv("S3_PROVIDER", "hetzner").lower()
@@ -95,6 +114,11 @@ class Settings(BaseSettings):
     QUERY_TIMEOUT: int = int(os.getenv("GEOAPI_QUERY_TIMEOUT", "10"))
     # Download/export timeout - longer since exports can be large
     DOWNLOAD_TIMEOUT: int = int(os.getenv("GEOAPI_DOWNLOAD_TIMEOUT", "120"))
+
+    # Processes service, for queuing the artifact rebuild a bundle edit needs.
+    # Unset = the save still lands, but the bundle stays stale until rebuilt
+    # from its bundle page.
+    PROCESSES_URL: str = os.getenv("GOAT_PROCESSES_URL", "")
 
     # Redis settings for distributed tile caching
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379/0")

@@ -76,7 +76,7 @@ class _FakeConn:
         i = sql.find(marker)
         if i < 0:
             return None
-        rest = sql[i + len(marker):]
+        rest = sql[i + len(marker) :]
         end = rest.find("'")
         return rest[:end] if end >= 0 else None
 
@@ -155,10 +155,12 @@ class TestParams:
 
 class TestDryRun:
     def test_lists_candidates_no_merge(self) -> None:
-        con = _FakeConn(candidates=[
-            ("user_a", "t_a", 5, 4, 10_000),
-            ("user_b", "t_b", 8, 7, 20_000),
-        ])
+        con = _FakeConn(
+            candidates=[
+                ("user_a", "t_a", 5, 4, 10_000),
+                ("user_b", "t_b", 8, 7, 20_000),
+            ]
+        )
         task = _make_task(con)
         out = task.run(DuckLakeCompactParams(dry_run=True))
 
@@ -173,9 +175,7 @@ class TestDryRun:
         assert out["candidates"][0]["small_files"] == 4
 
     def test_max_tables_caps_dry_run(self) -> None:
-        con = _FakeConn(candidates=[
-            ("u", f"t_{i}", 4, 3, 5_000) for i in range(10)
-        ])
+        con = _FakeConn(candidates=[("u", f"t_{i}", 4, 3, 5_000) for i in range(10)])
         task = _make_task(con)
         out = task.run(DuckLakeCompactParams(dry_run=True, max_tables=3))
         assert len(out["candidates"]) == 3
@@ -253,9 +253,9 @@ class TestRealRun:
     def test_failure_per_table_doesnt_abort_run(self) -> None:
         con = _FakeConn(
             candidates=[
-                ("u", "t_ok",    4, 3, 1000),
-                ("u", "t_bad",   5, 4, 2000),
-                ("u", "t_ok2",   6, 5, 3000),
+                ("u", "t_ok", 4, 3, 1000),
+                ("u", "t_bad", 5, 4, 2000),
+                ("u", "t_ok2", 6, 5, 3000),
             ],
             merge_results={
                 ("u", "t_ok"): (4, 1),
@@ -302,8 +302,9 @@ class TestRealRun:
         con = _FakeConn(candidates=candidates, merge_results=results)
         task = _make_task(con)
         out = task.run(DuckLakeCompactParams(max_tables=2))
-        merge_calls = [c for c in con.calls
-                       if "SELECT * FROM ducklake_merge_adjacent_files" in c]
+        merge_calls = [
+            c for c in con.calls if "SELECT * FROM ducklake_merge_adjacent_files" in c
+        ]
         assert len(merge_calls) == 2
         assert out["candidates"] == 2
         assert out["tables_compacted"] == 2
@@ -318,13 +319,16 @@ class TestParamThreading:
     def test_thresholds_in_candidate_query(self) -> None:
         con = _FakeConn(candidates=[])
         task = _make_task(con)
-        task.run(DuckLakeCompactParams(
-            min_files_per_table=7,
-            target_file_size_mib=128,
-            dry_run=True,
-        ))
-        candidate_sql = next(c for c in con.calls
-                             if "FROM pg.ducklake.ducklake_data_file" in c)
+        task.run(
+            DuckLakeCompactParams(
+                min_files_per_table=7,
+                target_file_size_mib=128,
+                dry_run=True,
+            )
+        )
+        candidate_sql = next(
+            c for c in con.calls if "FROM pg.ducklake.ducklake_data_file" in c
+        )
         # min_files_per_table is templated into HAVING
         assert ">= 7" in candidate_sql
         # target size becomes the "small file" threshold for the filter
@@ -338,9 +342,7 @@ class TestParamThreading:
 
 class TestMain:
     def test_main_inits_runs_and_closes(self) -> None:
-        with patch(
-            "goatlib.tasks.ducklake_compact.DuckLakeCompactTask"
-        ) as mock_cls:
+        with patch("goatlib.tasks.ducklake_compact.DuckLakeCompactTask") as mock_cls:
             instance = mock_cls.return_value
             instance.run.return_value = {"dry_run": True}
             result = main(DuckLakeCompactParams(dry_run=True))
@@ -350,9 +352,7 @@ class TestMain:
             assert result == {"dry_run": True}
 
     def test_main_closes_on_exception(self) -> None:
-        with patch(
-            "goatlib.tasks.ducklake_compact.DuckLakeCompactTask"
-        ) as mock_cls:
+        with patch("goatlib.tasks.ducklake_compact.DuckLakeCompactTask") as mock_cls:
             instance = mock_cls.return_value
             instance.run.side_effect = RuntimeError("boom")
             with pytest.raises(RuntimeError):

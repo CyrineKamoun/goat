@@ -2,7 +2,7 @@
 
 Shared Python library for the GOAT platform. It contains the analytics tools,
 analysis algorithms, geospatial I/O, and shared models used by the `core`,
-`geoapi`, and `processes` services.
+`geoapi`, `processes`, and `catalog` services.
 
 ## Package layout
 

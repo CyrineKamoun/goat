@@ -103,8 +103,13 @@ StreetMatrixPrep prepare_street_matrix_network(
     double const dy = bmax_y - bmin_y;
     double const extent = std::sqrt(dx * dx + dy * dy);
 
+    // Convert to ground units
+    double const tiered_threshold = data::ground_to_mercator(
+        kTieredLoadExtentThresholdM,
+        std::abs(bmax_y) > std::abs(bmin_y) ? bmax_y : bmin_y);
+
     std::vector<Edge> edges;
-    if (extent > kTieredLoadExtentThresholdM)
+    if (extent > tiered_threshold)
     {
         // Tiered: classified roads across the full bbox + local roads in
         // small per-point circles. Avoids loading every residential street
@@ -113,7 +118,7 @@ StreetMatrixPrep prepare_street_matrix_network(
         auto const skeleton_classes = input::skeleton_classes(in.mode);
         auto const detail_classes = input::detail_classes(in.mode);
 
-        auto bbox_filter = data::compute_h3_filter_bbox(
+        auto bbox_filter = data::compute_spatial_filter_bbox(
             con, bmin_x, bmin_y, bmax_x, bmax_y, kBboxMarginM);
         auto skeleton = data::load_edges(
             con, in.edge_dir, in.node_dir, bbox_filter, skeleton_classes, in.mode);
@@ -137,7 +142,7 @@ StreetMatrixPrep prepare_street_matrix_network(
     {
         // Small extent: all classes via bbox corridor.
         auto classes = input::valid_classes(in.mode);
-        auto bbox_filter = data::compute_h3_filter_bbox(
+        auto bbox_filter = data::compute_spatial_filter_bbox(
             con, bmin_x, bmin_y, bmax_x, bmax_y, kBboxMarginM);
         edges = data::load_edges(
             con, in.edge_dir, in.node_dir, bbox_filter, classes, in.mode);

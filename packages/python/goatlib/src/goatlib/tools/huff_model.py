@@ -20,14 +20,12 @@ from goatlib.analysis.schemas.ui import (
     SECTION_OPPORTUNITIES,
     SECTION_RESULT_ROUTING,
     SECTION_ROUTING,
-    UISection,
     ui_field,
     ui_sections,
 )
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -36,7 +34,7 @@ from goatlib.tools.style import get_heatmap_style
 logger = logging.getLogger(__name__)
 
 
-class HuffModelToolParams(ScenarioSelectorMixin, ToolInputBase, HuffmodelParams):
+class HuffModelToolParams(ToolInputBase, HuffmodelParams):
     """Parameters for Huff model tool.
 
     The Huff model calculates consumer choice probabilities based on:
@@ -53,14 +51,6 @@ class HuffModelToolParams(ScenarioSelectorMixin, ToolInputBase, HuffmodelParams)
             SECTION_DEMAND,
             SECTION_OPPORTUNITIES,
             SECTION_RESULT_ROUTING,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"demand_layer_id": {"$ne": None}},
-            ),
         )
     )
 
@@ -160,7 +150,7 @@ class HuffModelToolParams(ScenarioSelectorMixin, ToolInputBase, HuffmodelParams)
                 "field_types": ["number"],
             },
             visible_when={"opportunity_layer_id": {"$ne": None}},
-        )
+        ),
     )
     od_matrix_path: str | None = Field(
         default=None,
@@ -248,8 +238,6 @@ class HuffModelToolRunner(BaseToolRunner[HuffModelToolParams]):
             layer_id=params.demand_layer_id,
             user_id=params.user_id,
             cql_filter=params.demand_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
 
         # Export opportunity layer
@@ -257,8 +245,6 @@ class HuffModelToolRunner(BaseToolRunner[HuffModelToolParams]):
             layer_id=params.opportunity_layer_id,
             user_id=params.user_id,
             cql_filter=params.opportunity_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
 
         # Export reference area layer
@@ -266,14 +252,14 @@ class HuffModelToolRunner(BaseToolRunner[HuffModelToolParams]):
             layer_id=params.reference_area_layer_id,
             user_id=params.user_id,
             cql_filter=params.reference_area_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
 
         # Auto-resolve od_matrix_path from routing_mode if not provided
         od_matrix_path = params.od_matrix_path
         if not od_matrix_path:
-            od_matrix_path = f"{self.settings.od_matrix_base_path}/{params.routing_mode.value}/"
+            od_matrix_path = (
+                f"{self.settings.od_matrix_base_path}/{params.routing_mode.value}/"
+            )
 
         # Build analysis params
         analysis_params = HuffmodelParams(
@@ -284,7 +270,6 @@ class HuffModelToolRunner(BaseToolRunner[HuffModelToolParams]):
                     "user_id",
                     "folder_id",
                     "project_id",
-                    "scenario_id",
                     "output_name",
                     "demand_path",
                     "opportunity_path",

@@ -1,26 +1,16 @@
-import CloseIcon from "@mui/icons-material/Close";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Box, Stack, TextField, Typography } from "@mui/material";
 import type { Editor } from "@tiptap/react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import type { InfoChipPlacement, InfoChipPopupType, InfoChipSize } from "@/lib/extensions/info-chip";
 
 import MarkdownContentEditor from "@/components/builder/widgets/common/MarkdownContentEditor";
 import PopupContentRenderer from "@/components/builder/widgets/common/PopupContentRenderer";
 import PopupSettingsControls from "@/components/builder/widgets/common/PopupSettingsControls";
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 interface InfoChipEditDialogProps {
   editor: Editor;
@@ -108,83 +98,82 @@ export const InfoChipEditDialog = ({ editor, open, onClose, onPersist }: InfoChi
   const showTitle = popupType !== "tooltip";
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ pr: 6, display: "flex", alignItems: "center", gap: 1 }}>
-        <InfoOutlinedIcon sx={{ fontSize: 20, color: "primary.main", opacity: 0.85 }} />
-        <Typography variant="h6" sx={{ flex: 1 }}>
-          {t("edit_popup_content")}
-        </Typography>
-        <IconButton size="small" onClick={handleClose} sx={{ position: "absolute", right: 12, top: 12 }}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent sx={{ pt: 2 }}>
-        <Stack spacing={2}>
-          <PopupSettingsControls
-            popupType={popupType}
-            placement={placement}
-            size={size}
-            onPopupTypeChange={setPopupType}
-            onPlacementChange={setPlacement}
-            onSizeChange={setSize}
-          />
+    <AppDialog
+      open={open}
+      onClose={handleClose}
+      icon={ICON_NAME.INFO}
+      title={t("edit_popup_content")}
+      maxWidth={600}
+      bodySx={{ pt: 2 }}
+      footer={<AppDialogFooter primaryLabel={t("done", { defaultValue: "Done" })} onPrimary={handleClose} />}>
+      <Stack spacing={2}>
+        <PopupSettingsControls
+          popupType={popupType}
+          placement={placement}
+          size={size}
+          onPopupTypeChange={setPopupType}
+          onPlacementChange={setPlacement}
+          onSizeChange={setSize}
+        />
 
-          {showTitle && (
-            <Box key="title">
-              <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mb: 0.5, display: "block" }}>
-                {t("title")}{" "}
-                <Typography component="span" variant="caption" color="text.disabled">
-                  ({t("optional", { defaultValue: "optional" })})
-                </Typography>
+        {showTitle && (
+          <Box key="title">
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              fontWeight={600}
+              sx={{ mb: 0.5, display: "block" }}>
+              {t("title")}{" "}
+              <Typography component="span" variant="caption" color="text.disabled">
+                ({t("optional", { defaultValue: "optional" })})
               </Typography>
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="Title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                autoComplete="off"
-                inputProps={{ "data-testid": "infochip-title-input" }}
-              />
-            </Box>
-          )}
-
-          <Box key="content">
-            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mb: 0.5, display: "block" }}>
-              {t("info_text", { defaultValue: "Info text" })}
             </Typography>
-            <MarkdownContentEditor
-              value={text}
-              onChange={setText}
-              plainText={popupType === "tooltip"}
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              autoComplete="off"
+              inputProps={{ "data-testid": "infochip-title-input" }}
             />
           </Box>
+        )}
 
-          {showUrl && (
-            <Box key="url">
-              <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ mb: 0.5, display: "block" }}>
-                {t("link_url", { defaultValue: "Link URL" })}{" "}
-                <Typography component="span" variant="caption" color="text.disabled">
-                  ({t("optional", { defaultValue: "optional" })})
-                </Typography>
+        <Box key="content">
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            fontWeight={600}
+            sx={{ mb: 0.5, display: "block" }}>
+            {t("info_text", { defaultValue: "Info text" })}
+          </Typography>
+          <MarkdownContentEditor value={text} onChange={setText} plainText={popupType === "tooltip"} />
+        </Box>
+
+        {showUrl && (
+          <Box key="url">
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              fontWeight={600}
+              sx={{ mb: 0.5, display: "block" }}>
+              {t("link_url", { defaultValue: "Link URL" })}{" "}
+              <Typography component="span" variant="caption" color="text.disabled">
+                ({t("optional", { defaultValue: "optional" })})
               </Typography>
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="https://..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-              />
-            </Box>
-          )}
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button onClick={handleClose} variant="contained" size="small">
-          {t("done", { defaultValue: "Done" })}
-        </Button>
-      </DialogActions>
-    </Dialog>
+            </Typography>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="https://..."
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+          </Box>
+        )}
+      </Stack>
+    </AppDialog>
   );
 };
 

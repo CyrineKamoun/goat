@@ -232,7 +232,10 @@ class HuffmodelV2Tool(HeatmapToolBase):
             # matrix columns: (origin, destination, travel_cost)
             self._compute_od_street(opp_cells, demand_cells, params, od_path, routing)
             orig_col, dest_col, cost_col, where = (
-                "origin", "destination", "travel_cost", "WHERE travel_cost IS NOT NULL"
+                "origin",
+                "destination",
+                "travel_cost",
+                "WHERE travel_cost IS NOT NULL",
             )
 
         self.con.execute(f"""
@@ -244,8 +247,12 @@ class HuffmodelV2Tool(HeatmapToolBase):
         return "od_matrix"
 
     def _compute_od_street(
-        self: Self, opp_cells: str, demand_cells: str,
-        params: HuffmodelV2Params, od_path: str, routing: Any,
+        self: Self,
+        opp_cells: str,
+        demand_cells: str,
+        params: HuffmodelV2Params,
+        od_path: str,
+        routing: Any,
     ) -> None:
         origins = self.con.execute(
             f"SELECT DISTINCT orig_cell, cx, cy FROM {demand_cells}"
@@ -256,7 +263,9 @@ class HuffmodelV2Tool(HeatmapToolBase):
 
         cfg = routing.MatrixConfig()
         cfg.origins = [routing.Point3857(float(cx), float(cy)) for _, cx, cy in origins]
-        cfg.destinations = [routing.Point3857(float(cx), float(cy)) for _, cx, cy in dests]
+        cfg.destinations = [
+            routing.Point3857(float(cx), float(cy)) for _, cx, cy in dests
+        ]
         cfg.origin_ids = [str(c) for c, _, _ in origins]
         cfg.destination_ids = [str(c) for c, _, _ in dests]
         cfg.mode = self._routing_mode_enum(params.routing_mode)
@@ -271,16 +280,20 @@ class HuffmodelV2Tool(HeatmapToolBase):
             if params.speed is not None
             else _MODE_SPEED_DEFAULTS.get(params.routing_mode, 0.0)
         )
-        cfg.edge_dir = self._edge_dir
-        cfg.node_dir = self._node_dir
+        # An uploaded street network bundle's graph overrides the global network.
+        cfg.edge_dir = str(params.edge_path or self._edge_dir)
+        cfg.node_dir = str(params.node_path or self._node_dir)
         cfg.reverse = True
         cfg.sparse = True
         cfg.output_path = od_path
         routing.compute_travel_cost_matrix(cfg)
 
     def _compute_od_pt(
-        self: Self, opp_cells: str, params: HuffmodelV2Params,
-        od_path: str, routing: Any,
+        self: Self,
+        opp_cells: str,
+        params: HuffmodelV2Params,
+        od_path: str,
+        routing: Any,
     ) -> None:
         if params.arrival_time is None:
             raise ValueError("PT Huff model requires an arrival_time.")
@@ -300,8 +313,9 @@ class HuffmodelV2Tool(HeatmapToolBase):
         cfg.mode = routing.RoutingMode.PublicTransport
         cfg.cost_type = routing.CostType.Time
         cfg.max_cost = float(params.max_cost)
-        cfg.edge_dir = self._edge_dir
-        cfg.node_dir = self._node_dir
+        # An uploaded street network bundle's graph overrides the global network.
+        cfg.edge_dir = str(params.edge_path or self._edge_dir)
+        cfg.node_dir = str(params.node_path or self._node_dir)
         cfg.timetable_path = self._timetable_path
         cfg.arrival_time = int(params.arrival_time)
         cfg.max_transfers = params.max_transfers
@@ -318,15 +332,21 @@ class HuffmodelV2Tool(HeatmapToolBase):
     # --------------------------------------------------------- Huff model math
 
     def _compute_huff_model(
-        self: Self, od: str, opp_cells: str, demand_cells: str,
-        alpha: float, beta: float, max_cost: float,
+        self: Self,
+        od: str,
+        opp_cells: str,
+        demand_cells: str,
+        alpha: float,
+        beta: float,
+        max_cost: float,
     ) -> str:
         """Per-facility market-share probability. Identical math to v1
         `huff_model.py::_compute_huff_model` (min-cost per origin/supply →
         weighted attractiveness → per-origin normalization → captured demand)."""
-        total_demand = self.con.execute(
-            f"SELECT SUM(demand) FROM {demand_cells}"
-        ).fetchone()[0] or 0
+        total_demand = (
+            self.con.execute(f"SELECT SUM(demand) FROM {demand_cells}").fetchone()[0]
+            or 0
+        )
         if total_demand == 0:
             raise ValueError("Total demand is zero - cannot compute Huff model")
 
@@ -360,9 +380,7 @@ class HuffmodelV2Tool(HeatmapToolBase):
         """)
         return "huff_v2_final"
 
-    def _export_original_geom(
-        self: Self, results_table: str, output_path: str
-    ) -> Path:
+    def _export_original_geom(self: Self, results_table: str, output_path: str) -> Path:
         """Attach per-facility probability to the original opportunity geometry
         (v1 output contract). supply_id is re-derived from the same import table
         with the same ROW_NUMBER() ordering used during rasterization."""
@@ -435,7 +453,8 @@ class HuffmodelV2Tool(HeatmapToolBase):
         )
         logger.info(
             "[Huff] mode=%s res=%d opp_cells=%d demand_cells=%d (pre-clip)",
-            params.routing_mode.value, h3_resolution,
+            params.routing_mode.value,
+            h3_resolution,
             self.con.execute(f"SELECT count(*) FROM {opp_cells}").fetchone()[0],
             self.con.execute(f"SELECT count(*) FROM {demand_cells}").fetchone()[0],
         )
@@ -466,23 +485,27 @@ class HuffmodelV2Tool(HeatmapToolBase):
         logger.info(
             "[Huff] OD matrix rows=%d (max_cost=%s, cost_type=%s)",
             self.con.execute(f"SELECT count(*) FROM {od}").fetchone()[0],
-            params.max_cost, params.cost_type.value,
+            params.max_cost,
+            params.cost_type.value,
         )
         results = self._compute_huff_model(
-            od, opp_cells, demand_cells,
-            params.attractiveness_param, params.distance_decay,
+            od,
+            opp_cells,
+            demand_cells,
+            params.attractiveness_param,
+            params.distance_decay,
             float(params.max_cost),
         )
-        n_facilities = self.con.execute(
-            f"SELECT count(*) FROM {results}"
-        ).fetchone()[0]
+        n_facilities = self.con.execute(f"SELECT count(*) FROM {results}").fetchone()[0]
         out_path = self._export_original_geom(results, params.output_path)
         n_out = self.con.execute(
             f"SELECT count(*) FROM read_parquet('{out_path}')"
         ).fetchone()[0]
         logger.info(
             "[Huff] facilities scored=%d, exported rows=%d → %s",
-            n_facilities, n_out, out_path,
+            n_facilities,
+            n_out,
+            out_path,
         )
 
         metadata = DatasetMetadata(

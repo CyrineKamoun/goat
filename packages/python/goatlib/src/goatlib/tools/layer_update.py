@@ -329,12 +329,6 @@ class LayerUpdateRunner(LayerReplaceMixin, SimpleToolRunner):
                 )
 
                 # Step 4: Update PostgreSQL metadata
-                # Build attribute mapping from columns
-                attr_mapping = {}
-                for col_name, col_type in table_info.get("columns", {}).items():
-                    if col_name.lower() not in ("geometry", "geom", "id"):
-                        attr_mapping[col_name] = col_name
-
                 asyncio.get_event_loop().run_until_complete(
                     self._update_layer_metadata(
                         layer_id=params.layer_id,
@@ -342,7 +336,6 @@ class LayerUpdateRunner(LayerReplaceMixin, SimpleToolRunner):
                         extent_wkt=table_info.get("extent_wkt"),
                         size=table_info.get("size", 0),
                         geometry_type=table_info.get("geometry_type"),
-                        attribute_mapping=attr_mapping,
                     )
                 )
 

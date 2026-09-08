@@ -1,0 +1,112 @@
+{
+ "id": "data_gv_at:014b876e-0181-4344-8b15-b3ff594c50f1",
+ "type": "Collection",
+ "links": [
+  {
+   "rel": "self",
+   "href": "collection.json",
+   "type": "application/json"
+  },
+  {
+   "rel": "root",
+   "href": "../../catalog.json",
+   "type": "application/json"
+  },
+  {
+   "rel": "parent",
+   "href": "../catalog.json",
+   "type": "application/json"
+  },
+  {
+   "rel": "via",
+   "href": "https://www.data.gv.at/katalog/datasets/014b876e-0181-4344-8b15-b3ff594c50f1",
+   "type": "text/html",
+   "title": "Source dataset"
+  },
+  {
+   "rel": "via",
+   "href": "https://ckan.govdata.de/dataset/014b876e-0181-4344-8b15-b3ff594c50f1",
+   "type": "text/html",
+   "title": "Harvested from"
+  },
+  {
+   "rel": "item",
+   "href": "items/9ade27ad-c009-47ff-b558-21e533a1ced2_vog-bd89c0891033.json",
+   "type": "application/geo+json",
+   "title": "Schnittlinien Orthofotomosaik Sommerflüge 1990er-Jahre in Vorarlberg [vogis:sw199x_seamlines]"
+  }
+ ],
+ "title": "Schnittlinien Orthofotomosaik Sommerflüge 1990er-Jahre in Vorarlberg",
+ "assets": {
+  "thumbnail": {
+   "href": "s3://p4b-catalog-test/catalog/thumbs/9ade27ad-c009-47ff-b558-21e533a1ced2_vog-bd89c0891033.svg",
+   "type": "image/svg+xml",
+   "roles": [
+    "thumbnail"
+   ],
+   "title": "Thumbnail"
+  }
+ },
+ "extent": {
+  "spatial": {
+   "bbox": [
+    [
+     9.473635207560479,
+     46.80379427374265,
+     10.267141331201309,
+     47.61267489951037
+    ]
+   ]
+  },
+  "temporal": {
+   "interval": [
+    [
+     "2026-07-28T09:56:45Z",
+     "2026-07-28T09:56:45Z"
+    ]
+   ]
+  }
+ },
+ "license": "CC-BY-4.0",
+ "keywords": [
+  "luftbilder",
+  "orthofotos"
+ ],
+ "providers": [
+  {
+   "name": "Land Vorarlberg",
+   "roles": [
+    "producer"
+   ]
+  },
+  {
+   "name": "Vorarlberg, Landesamt für Vermessung und Geoinformation, Abteilung Geoinformation, t: +43 (0) 5522 / 75482, f: +43 (0) 5522 / 754826,  Johannitergasse 6 6800 Feldkirch Austria",
+   "roles": [
+    "producer"
+   ]
+  }
+ ],
+ "summaries": {
+  "themes": [
+   {
+    "scheme": "https://goat.plan4better.de/data-categories",
+    "concepts": [
+     {
+      "id": "other"
+     }
+    ]
+   }
+  ],
+  "goat:layerType": [
+   "feature"
+  ],
+  "goat:geometryType": [
+   "polygon"
+  ]
+ },
+ "description": "Polygondatensatz mit Blattschnitt-Kacheln der im Orthofotomosaik sw199x_50cm.ecw verwendeten Orthofotos der Befliegungen 1987-1995. Wichtige Felder und Datentypen der Attributtabelle: DATUM, Real, Real, 16 BILD_NR, Str, String, 16 Datenquelle: sw199x_seamlines.shp",
+ "stac_version": "1.0.0",
+ "stac_extensions": [
+  "https://stac-extensions.github.io/collection-assets/v1.0.0/schema.json"
+ ]
+}

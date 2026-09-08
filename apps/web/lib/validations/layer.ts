@@ -6,8 +6,6 @@ import { DEFAULT_COLOR, DEFAULT_COLOR_RANGE } from "@/lib/constants/color";
 import { formatNumberTypes } from "@/lib/validations/common";
 import {
   contentMetadataSchema,
-  dataCategory,
-  dataLicense,
   dataType,
   featureDataExchangeType,
   featureLayerGeometryType,
@@ -38,6 +36,7 @@ export const shareLayerWithTeamOrOrganizationSchema = z.object({
 export const shareLayerSchema = z.object({
   teams: z.array(shareLayerWithTeamOrOrganizationSchema).optional(),
   organizations: z.array(shareLayerWithTeamOrOrganizationSchema).optional(),
+  users: z.array(z.object({ id: z.string(), role: layerShareRoleEnum })).optional(),
 });
 
 const HexColor = z.string();
@@ -63,6 +62,10 @@ const layerFieldType = z.object({
   // D2: computed-field metadata exposed by the queryables endpoint
   kind: z.string().optional(),
   is_computed: z.boolean().optional(),
+  is_locked: z.boolean().optional(),
+  allowed_values: z.array(z.union([z.string(), z.number()])).optional(),
+  allow_other: z.boolean().optional(),
+  default_value: z.union([z.string(), z.number(), z.boolean()]).nullish(),
   display_config: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -182,9 +185,7 @@ export const lineStyleSchema = z.object({
   // Generic so v2 can add "chevron" / "dot" / "tick" without a migration.
   decoration_type: z.enum(["none", "arrow"]).default("none"),
   decoration_direction: z.enum(["forward", "backward", "both"]).default("forward"),
-  decoration_placement: z
-    .enum(["repeat", "start", "end", "start_and_end", "center"])
-    .default("repeat"),
+  decoration_placement: z.enum(["repeat", "start", "end", "start_and_end", "center"]).default("repeat"),
   decoration_spacing: z.number().min(50).max(800).default(200),
   // Target arrow size in screen pixels (matches the visible arrow extent
   // because the source SVG fills its 32x32 viewBox). `.catch(32)` ensures
@@ -392,13 +393,7 @@ export const popupBlock = z.discriminatedUnion("type", [
 
 export const popupAnchor = z.enum(["top_left", "top_right", "bottom_left", "bottom_right"]);
 
-export const popupLayout = z.enum([
-  "popup",
-  "pinned",
-  "modal",
-  "left_sidebar",
-  "right_sidebar",
-]);
+export const popupLayout = z.enum(["popup", "pinned", "modal", "left_sidebar", "right_sidebar"]);
 
 export const popupHeader = z.enum(["standard", "compact", "none"]);
 
@@ -460,8 +455,7 @@ export const featureLayerPointPropertiesSchema = featureLayerBasePropertiesSchem
     cluster: clusterSchema.optional(),
   });
 
-export const featureLayerLinePropertiesSchema =
-  featureLayerBasePropertiesSchema.merge(lineStyleSchema);
+export const featureLayerLinePropertiesSchema = featureLayerBasePropertiesSchema.merge(lineStyleSchema);
 
 export const featureLayerPolygonPropertiesSchema = featureLayerBasePropertiesSchema.merge(strokeColorSchema);
 
@@ -471,23 +465,15 @@ export const featureLayerProperties = featureLayerPointPropertiesSchema
 
 export const featureLabelProperties = z.object({});
 
-// lineage, positional_accuracy, attribute_accuracy, completeness
-export const layerMetadataSchema = contentMetadataSchema.extend({
-  lineage: z.string().optional(),
-  positional_accuracy: z.string().optional(),
-  attribute_accuracy: z.string().optional(),
-  completeness: z.string().optional(),
-  upload_reference_system: z.number().optional(),
-  upload_file_type: featureDataExchangeType.optional(),
-  geographical_code: z.string().length(2).optional(),
-  language_code: z.string().optional(),
-  data_reference_year: z.coerce.number().optional(),
-  distributor_name: z.string().optional(),
-  distributor_email: z.string().email().optional(),
-  distribution_url: z.string().url().optional(),
-  license: dataLicense.optional(),
-  attribution: z.string().optional(),
-  data_category: dataCategory.optional(),
+/**
+ * What the metadata FORM edits — flat, because a form is a flat set of inputs.
+ * It is packed into `dataset_metadata` on submit and unpacked on seed, the
+ * same way a bundle's is.
+ */
+export const layerMetadataSchema = contentMetadataSchema;
+
+/** What a stored layer carries: the document, not the loose fields. */
+export const layerStoredMetadataSchema = contentMetadataSchema.extend({
   in_catalog: z.boolean().optional().default(false),
 });
 
@@ -498,19 +484,30 @@ export const tableConfigSchema = z.object({
   column_widths: z.record(z.string(), z.number()).optional(),
 });
 
-export const otherPropertiesSchmea = z.object({
-  url: z.string().optional(),
-  layers: z.array(z.string()).optional(),
-  srs: z.string().optional(),
-  width: z.number().optional(), // width of the image (only for external imagery)
-  height: z.number().optional(), // height of the image (only for external imagery)
-  legend_urls: z.array(z.string()).optional(),
-  version: z.string().optional(),
-  dpi: z.number().optional(),
-  tile_size: z.number().optional(),
-  // Per-project-layer data table preferences
-  table_config: tableConfigSchema.optional(),
-});
+export const otherPropertiesSchmea = z
+  .object({
+    url: z.string().optional(),
+    layers: z.array(z.string()).optional(),
+    srs: z.string().optional(),
+    width: z.number().optional(), // width of the image (only for external imagery)
+    height: z.number().optional(), // height of the image (only for external imagery)
+    legend_urls: z.array(z.string()).optional(),
+    version: z.string().optional(),
+    dpi: z.number().optional(),
+    tile_size: z.number().optional(),
+    // Per-project-layer data table preferences
+    table_config: tableConfigSchema.optional(),
+  })
+  /**
+   * Not a closed shape: `other_properties` is a free-form blob, and a promoted
+   * catalog layer carries `catalog_item` and `catalog_materialize` in it. A
+   * plain `z.object` STRIPS what it does not declare, so parsing a project
+   * layer through this schema quietly turned a catalog layer into an ordinary
+   * one — and everything keyed off that (the read-only marker, hiding "Set as
+   * default") went with it. The server made the same mistake with a closed
+   * Pydantic model and was fixed the same way.
+   */
+  .passthrough();
 
 // Raster styling schemas
 export const rasterStyleType = z.enum(["image", "color_range", "categories", "hillshade"]);
@@ -581,13 +578,15 @@ export const rasterLayerPropertiesSchema = layerPropertiesBaseSchema.extend({
     .default({ style_type: "image", opacity: 1.0 } as z.infer<typeof rasterStyleImageProperties>),
 });
 
-export const layerSchema = layerMetadataSchema.extend({
+export const layerSchema = layerStoredMetadataSchema.extend({
   id: z.string(),
   properties: featureLayerProperties.or(rasterLayerPropertiesSchema).or(z.record(z.any())).default({}),
-  total_count: z.number().optional(),
   extent: z.string().default(DEFAULT_WKT_EXTENT),
-  folder_id: z.string(),
-  user_id: z.string().uuid(),
+  // Both absent for a catalog layer: it belongs to the provider that published
+  // it, so it has no owner and lives in no one's folder. The API omits them
+  // rather than sending null (response_model_exclude_none).
+  folder_id: z.string().nullish(),
+  user_id: z.string().uuid().nullish(),
   type: layerType,
   size: z.number().optional(),
   other_properties: otherPropertiesSchmea.optional(),
@@ -597,8 +596,6 @@ export const layerSchema = layerMetadataSchema.extend({
   tool_type: z.string().optional(),
   job_id: z.string().optional(),
   data_type: dataType.optional(),
-  legend_urls: z.array(z.string()).optional(),
-  attribute_mapping: z.object({}).optional(),
   shared_with: shareLayerSchema.optional(),
   owned_by: publicUserSchema.optional(),
   updated_at: z.string(),
@@ -611,7 +608,7 @@ export const getLayerUniqueValuesQueryParamsSchema = paginatedSchema.extend({
   query: z.string().optional(),
 });
 
-export const createLayerBaseSchema = layerMetadataSchema.extend({
+export const createLayerBaseSchema = layerStoredMetadataSchema.extend({
   folder_id: z.string().uuid(),
 });
 
@@ -712,33 +709,13 @@ export const getDatasetSchema = z.object({
   search: z.string().optional(),
   type: layerType.array().optional(),
   feature_layer_type: featureLayerType.optional(),
-  license: z.array(dataLicense).optional(),
-  data_category: z.array(dataCategory).optional(),
-  geographical_code: z.array(z.string().length(2)).optional(),
-  language_code: z.array(z.string()).optional(),
-  distributor_name: z.array(z.string()).optional(),
   in_catalog: z.boolean().optional(),
   spatial_search: z.string().optional(),
-});
-
-export const datasetMetadataValue = z.object({
-  value: z.string(),
-  count: z.number(),
-});
-export const datasetMetadataAggregated = z.object({
-  type: z.array(datasetMetadataValue),
-  data_category: z.array(datasetMetadataValue),
-  geographical_code: z.array(datasetMetadataValue),
-  language_code: z.array(datasetMetadataValue),
-  distributor_name: z.array(datasetMetadataValue),
-  license: z.array(datasetMetadataValue),
 });
 
 export type DatasetCollectionItems = z.infer<typeof datasetCollectionItems>;
 export type GetCollectionItemsQueryParams = z.infer<typeof datasetCollectionItemsQueryParams>;
 export type GetDatasetSchema = z.infer<typeof getDatasetSchema>;
-export type DatasetMetadataValue = z.infer<typeof datasetMetadataValue>;
-export type DatasetMetadataAggregated = z.infer<typeof datasetMetadataAggregated>;
 
 export type DatasetDownloadRequest = z.infer<typeof datasetDownloadRequestSchema>;
 
@@ -806,15 +783,11 @@ export type FieldKind = z.infer<typeof fieldKindSchema>;
 
 /** The kind used to FORMAT a field's values: formula fields format as their
  * inferred result kind (number/string/boolean/datetime). */
-export const resolveDisplayKind = (field: {
-  kind?: string;
-  output_kind?: string;
-}): string | undefined =>
+export const resolveDisplayKind = (field: { kind?: string; output_kind?: string }): string | undefined =>
   field.kind === "formula" ? (field.output_kind ?? "string") : field.kind;
 
 const numericFormatSchema = z.object({
-  decimals: z.union([z.literal("auto"), z.number().int().min(0).max(10)])
-    .default("auto"),
+  decimals: z.union([z.literal("auto"), z.number().int().min(0).max(10)]).default("auto"),
   thousands_separator: z.boolean().default(false),
   abbreviate: z.boolean().default(false),
   always_show_sign: z.boolean().default(false),
@@ -822,20 +795,28 @@ const numericFormatSchema = z.object({
 
 export const stringDisplayConfigSchema = z.object({}).strict();
 export const numberDisplayConfigSchema = numericFormatSchema.strict();
-export const areaDisplayConfigSchema = numericFormatSchema.extend({
-  unit: z.enum(["auto", "mm²", "cm²", "m²", "ha", "km²"]).default("auto"),
-}).strict();
+export const areaDisplayConfigSchema = numericFormatSchema
+  .extend({
+    unit: z.enum(["auto", "mm²", "cm²", "m²", "ha", "km²"]).default("auto"),
+  })
+  .strict();
 export const lengthLikeUnitSchema = z.enum(["auto", "mm", "cm", "m", "km"]);
-export const perimeterDisplayConfigSchema = numericFormatSchema.extend({
-  unit: lengthLikeUnitSchema.default("auto"),
-}).strict();
-export const lengthDisplayConfigSchema = numericFormatSchema.extend({
-  unit: lengthLikeUnitSchema.default("auto"),
-}).strict();
-export const datetimeDisplayConfigSchema = z.object({
-  tz: z.string().default("UTC"),
-  format: z.string().nullish(),
-}).strict();
+export const perimeterDisplayConfigSchema = numericFormatSchema
+  .extend({
+    unit: lengthLikeUnitSchema.default("auto"),
+  })
+  .strict();
+export const lengthDisplayConfigSchema = numericFormatSchema
+  .extend({
+    unit: lengthLikeUnitSchema.default("auto"),
+  })
+  .strict();
+export const datetimeDisplayConfigSchema = z
+  .object({
+    tz: z.string().default("UTC"),
+    format: z.string().nullish(),
+  })
+  .strict();
 
 export const displayConfigSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("string"), config: stringDisplayConfigSchema }),
@@ -852,6 +833,10 @@ export const fieldDefinitionSchema = z.object({
   kind: fieldKindSchema,
   is_computed: z.boolean().default(false),
   display_config: z.record(z.string(), z.unknown()).default({}),
+  // A fixed vocabulary for the column: editors offer these instead of a free
+  // text box, and a write outside the list is refused unless allow_other.
+  allowed_values: z.array(z.union([z.string(), z.number()])).optional(),
+  allow_other: z.boolean().optional(),
   // Formula fields only: the SQL expression and its inferred result kind
   formula: z.string().optional(),
   output_kind: z.string().optional(),
@@ -871,11 +856,9 @@ export const createEmptyLayerSchema = z.object({
       },
       { message: "Field names must be unique" }
     )
-    .refine(
-      (fields) =>
-        fields.every((f) => !RESERVED_FIELD_NAMES.includes(f.name.toLowerCase())),
-      { message: "Field name conflicts with a reserved system column" }
-    ),
+    .refine((fields) => fields.every((f) => !RESERVED_FIELD_NAMES.includes(f.name.toLowerCase())), {
+      message: "Field name conflicts with a reserved system column",
+    }),
 });
 
 export type FieldDefinition = z.infer<typeof fieldDefinitionSchema>;
@@ -891,11 +874,19 @@ export const ALLOWED_KINDS_BY_GEOM_TYPE: Record<string, FieldKind[]> = {
   multipolygon: ["string", "number", "area", "perimeter", "datetime", "boolean", "formula"],
 };
 
+/**
+ * Kinds a *new* layer can be created with.
+ *
+ * The rest — computed kinds and formula — need `field_config` written against an
+ * existing layer for their values to be produced at all, so they belong to Edit
+ * fields rather than to creation. `layer_create` accepts exactly this set.
+ */
+const CREATABLE_KINDS = ["string", "number", "datetime", "boolean"] as const;
+export type CreatableFieldKind = (typeof CREATABLE_KINDS)[number];
+
+export const isCreatableKind = (kind: FieldKind): kind is CreatableFieldKind =>
+  (CREATABLE_KINDS as readonly string[]).includes(kind);
+
 // Kinds whose VALUES are computed by the backend (read-only in editors).
 // Formula belongs here: its values are derived, only its expression is edited.
-export const COMPUTED_KINDS: ReadonlySet<FieldKind> = new Set([
-  "area",
-  "perimeter",
-  "length",
-  "formula",
-]);
+export const COMPUTED_KINDS: ReadonlySet<FieldKind> = new Set(["area", "perimeter", "length", "formula"]);

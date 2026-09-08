@@ -40,7 +40,7 @@ class HeatmapClosestAverageTool(HeatmapToolBase):
         logger.info("Unified opportunity table created: %s", unified_table)
 
         # Extract unique DESTINATION H3 IDs from opportunities
-        destination_ids = self._extract_h3_ids(unified_table,column_name='dest_id')
+        destination_ids = self._extract_h3_ids(unified_table, column_name="dest_id")
         if not destination_ids:
             raise ValueError("No destination IDs found in opportunity data")
 
@@ -64,7 +64,9 @@ class HeatmapClosestAverageTool(HeatmapToolBase):
             reference_table_h3 = self._process_table_to_h3(
                 reference_table, meta, h3_resolution, "reference_area_h3", "dest_id"
             )
-            result_table = self._project_to_reference_area(result_table, reference_table_h3)
+            result_table = self._project_to_reference_area(
+                result_table, reference_table_h3
+            )
 
         # Export results
         output_path = Path(params.output_path)

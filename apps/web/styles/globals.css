@@ -1,3 +1,9 @@
+:root {
+  /* Shared easing for layout transitions. Same curve as the MUI theme's
+     `easing.easeInOut`, exposed so plain CSS can use it too. */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 body {
   background-color: black;
 }

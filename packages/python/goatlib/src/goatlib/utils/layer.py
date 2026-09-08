@@ -5,7 +5,9 @@ used across geoapi and processes services.
 """
 
 import logging
+import os
 import re
+from pathlib import Path
 from typing import Protocol
 
 from cachetools import TTLCache
@@ -105,6 +107,186 @@ def layer_id_to_table_name(layer_id: str) -> str:
     return f"t_{layer_id.replace('-', '')}"
 
 
+# The schema every new layer table is created in. Its `path` in the DuckLake
+# catalog is the DATA_PATH root, so a table's files land at
+# DATA_PATH/t_<layer_id>/ with no directory in between. Named `main` because
+# that is DuckDB's default schema and it never appears on disk.
+LAYER_SCHEMA = "main"
+
+
+def layer_schema_name() -> str:
+    """The DuckLake schema a **newly created** layer table goes in.
+
+    Answers only "where should a new table go". Where an *existing* table
+    lives is a question for the catalog — `resolve_layer_schema` — because
+    layers created before this naming changed are still in their old schema
+    and are never moved by application code.
+
+    Ownership is deliberately not an input: it lives on `customer.layer`, and
+    encoding it in the storage path is what this replaced.
+    """
+    return LAYER_SCHEMA
+
+
+def layer_table_path(layer_id: str) -> str:
+    """Build the fully qualified DuckLake table path for a **new** layer table.
+
+    For a table that already exists, use `resolve_layer_table_path` instead.
+
+    Args:
+        layer_id: Layer UUID, with or without hyphens
+
+    Returns:
+        Table path in format lake.<schema>.<table>
+    """
+    return f"lake.{layer_schema_name()}.{layer_id_to_table_name(layer_id)}"
+
+
+# ---------------------------------------------------------------------------
+# Promoted catalog layers
+#
+# A catalog layer is not a DuckLake table: it is one immutable parquet file,
+# written by `catalog_materialize`, read through a view that adds `rowid`. Every
+# service that touches one — the tool runners, geoapi, GC — must agree on where
+# the file is and what the relation is called, so all of that lives here.
+# ---------------------------------------------------------------------------
+
+#: The DuckDB schema the per-layer views are created in.
+CATALOG_SCHEMA = "catalog_layers"
+
+
+def catalog_layers_dir() -> Path:
+    """Where materialized catalog layers live.
+
+    `CATALOG_LAYERS_DIR` wins; otherwise `DATA_DIR/catalog/layers`. The same
+    derivation geoapi's settings use, so a deployment that overrides the
+    directory moves the writer and every reader together.
+    """
+    override = os.environ.get("CATALOG_LAYERS_DIR")
+    if override:
+        return Path(override)
+    return Path(os.environ.get("DATA_DIR", "/app/data")) / "catalog" / "layers"
+
+
+def catalog_tiles_dir() -> Path:
+    """Where a materialized catalog layer's PMTiles live.
+
+    A sibling of `catalog_layers_dir`, not the same directory: the parquet is
+    the layer's source of truth while the tiles are a cache derived from it, so
+    the tiles can be wiped to force a rebuild without touching data that would
+    otherwise have to be fetched from the catalog bucket again. It also leaves
+    each free to sit on its own storage — tiles are range-read, bulk data is
+    not.
+
+    `CATALOG_TILES_DIR` wins; otherwise `DATA_DIR/catalog/tiles`.
+    """
+    override = os.environ.get("CATALOG_TILES_DIR")
+    if override:
+        return Path(override)
+    return Path(os.environ.get("DATA_DIR", "/app/data")) / "catalog" / "tiles"
+
+
+def catalog_layer_parquet(layer_id: str) -> Path | None:
+    """The materialized file of a promoted catalog layer, or None.
+
+    Existence of the file IS the signal — the same check geoapi's resolver
+    makes — so tools and serving agree about what counts as a catalog layer.
+    A strict UUID gate runs before the id becomes a filename: `is_layer_id`
+    accepts any 36-char/4-hyphen string, so without it a crafted value with
+    '/' or '.' would traverse out of the directory.
+    """
+    if ":" in layer_id:
+        return None
+    try:
+        table = layer_id_to_table_name(normalize_layer_id(layer_id))
+    except Exception:
+        return None
+    path = catalog_layers_dir() / f"{table}.parquet"
+    return path if path.exists() else None
+
+
+def catalog_layer_relation(layer_id: str) -> str:
+    """The SQL relation a catalog layer is read through: `catalog_layers."t_…"`."""
+    return f'{CATALOG_SCHEMA}."{layer_id_to_table_name(layer_id)}"'
+
+
+def catalog_view_sql(layer_id: str, path: Path) -> list[str]:
+    """The statements that create a catalog layer's view on a connection.
+
+    `file_row_number` becomes `rowid`, so every rowid-based query — feature ids,
+    edits, tile joins — works on a catalog layer exactly as on a DuckLake table.
+    """
+    table = layer_id_to_table_name(layer_id)
+    return [
+        f"CREATE SCHEMA IF NOT EXISTS {CATALOG_SCHEMA}",
+        f'CREATE VIEW IF NOT EXISTS {CATALOG_SCHEMA}."{table}" AS '
+        f"SELECT file_row_number AS rowid, * EXCLUDE (file_row_number) "
+        f"FROM read_parquet('{path}', file_row_number=true)",
+    ]
+
+
+def is_catalog_relation(table_path: str) -> bool:
+    """True for the relation `resolve_layer_table_path` returns for a catalog layer."""
+    return table_path.startswith(f"{CATALOG_SCHEMA}.")
+
+
+def table_path_parts(table_path: str) -> tuple[str, str]:
+    """``(schema, table)`` for either relation shape a resolver can return.
+
+    `lake.<schema>.<table>` for a DuckLake table, `catalog_layers."<table>"` for
+    a catalog layer. Callers that used to `split(".", 2)` assumed the first
+    shape only and blew up on the second.
+    """
+    if is_catalog_relation(table_path):
+        table = table_path[len(CATALOG_SCHEMA) + 1 :].strip('"')
+        return CATALOG_SCHEMA, table
+    parts = table_path.split(".")
+    if len(parts) == 3 and parts[0] == "lake":
+        return parts[1].strip('"'), parts[2].strip('"')
+    raise ValueError(f"not a layer relation: {table_path!r}")
+
+
+def quoted_relation(table_path: str) -> str:
+    """The relation, quoted for use in a statement, for either shape.
+
+    `lake."schema"."table"` or `catalog_layers."table"` — the catalog schema is
+    a plain DuckDB schema on the connection, not inside the `lake` catalog.
+    """
+    schema, table = table_path_parts(table_path)
+    if schema == CATALOG_SCHEMA:
+        return f'{CATALOG_SCHEMA}."{table}"'
+    return f'lake."{schema}"."{table}"'
+
+
+def resolve_layer_schema(
+    con: "DuckDBConnection",
+    layer_id: str,
+    catalog_schema: str,
+    postgres_uri: str,
+) -> str | None:
+    """Look up which schema actually holds a layer's table.
+
+    Same indexed lookup as `get_schema_for_layer`, for callers that hold a
+    DuckDB connection rather than a DuckLake manager (the goatlib tools).
+    Queries the catalog's own Postgres tables rather than the attached lake's
+    metadata, which on DuckLake 1.5.x would lazily load every table.
+
+    Returns:
+        The schema name, or None when the catalog has no such table — which
+        is the normal answer for a layer whose table has not been created yet.
+    """
+    con.execute(f"ATTACH IF NOT EXISTS 'postgres:{postgres_uri}' AS pgmeta (READ_ONLY)")
+    row = con.execute(
+        f"SELECT s.schema_name "
+        f"FROM pgmeta.{catalog_schema}.ducklake_table t "
+        f"JOIN pgmeta.{catalog_schema}.ducklake_schema s "
+        f"ON s.schema_id = t.schema_id AND s.end_snapshot IS NULL "
+        f"WHERE t.table_name = ? AND t.end_snapshot IS NULL",
+        [layer_id_to_table_name(layer_id)],
+    ).fetchone()
+    return row[0] if row else None
+
+
 # Global schema cache - shared across service instances
 # 1 hour TTL, max 10K entries
 _schema_cache: TTLCache[str, str] = TTLCache(maxsize=10000, ttl=3600)
@@ -196,11 +378,22 @@ def clear_schema_cache() -> None:
 
 
 __all__ = [
+    "CATALOG_SCHEMA",
+    "catalog_layers_dir",
+    "catalog_layer_parquet",
+    "catalog_layer_relation",
+    "catalog_view_sql",
+    "is_catalog_relation",
+    "table_path_parts",
+    "quoted_relation",
     "InvalidLayerIdError",
     "LayerNotFoundError",
     "normalize_layer_id",
     "format_uuid",
     "layer_id_to_table_name",
+    "LAYER_SCHEMA",
+    "layer_schema_name",
+    "layer_table_path",
     "get_schema_for_layer",
     "clear_schema_cache",
 ]

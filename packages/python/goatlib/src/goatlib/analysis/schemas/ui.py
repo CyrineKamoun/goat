@@ -113,10 +113,7 @@ SECTION_DEMAND = UISection(
     depends_on={"routing_mode": {"$ne": None}},
 )
 
-SECTION_SCENARIO = UISection(
-    id="scenario", order=4, icon="scenario", collapsible=True, collapsed=True
-)
-# Section for result layer naming (order=7, before scenario which is usually 8)
+# Section for result layer naming (order=7)
 # Uses "save" icon and is only shown when form is ready to run
 SECTION_RESULT = UISection(
     id="result",
@@ -205,7 +202,9 @@ class UIFieldConfig:
     enum_icons: dict[str, str] | None = None
     enum_labels: dict[str, str] | None = None  # Maps enum values to i18n keys
     inline_group: str | None = None  # Group key for side-by-side layout
-    inline_flex: str | None = None  # CSS flex value (e.g. "1 0 0" to fill remaining space)
+    inline_flex: str | None = (
+        None  # CSS flex value (e.g. "1 0 0" to fill remaining space)
+    )
     group_label: str | None = None  # Sub-header label rendered above this field
 
     def to_dict(self: Self) -> dict[str, Any]:
@@ -458,28 +457,5 @@ def layer_selector_field(
         field_order=field_order,
         widget="layer-selector",
         widget_options=widget_options if widget_options else None,
-        **kwargs,
-    )
-
-
-def scenario_selector_field(
-    section: str = "scenario",
-    field_order: int = 0,
-    **kwargs: Any,
-) -> dict[str, Any]:
-    """Create UI config for a scenario selector field.
-
-    Args:
-        section: Section ID (default: "scenario")
-        field_order: Display order
-        **kwargs: Additional ui_field arguments
-
-    Returns:
-        json_schema_extra dict for scenario selector
-    """
-    return ui_field(
-        section=section,
-        field_order=field_order,
-        widget="scenario-selector",
         **kwargs,
     )

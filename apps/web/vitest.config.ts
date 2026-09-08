@@ -11,6 +11,11 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     include: ["**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
     exclude: ["node_modules", "dist", ".next", "playwright", "**/*.e2e.{ts,tsx}"],
+    // The dialog suites drive full MUI trees through user-event, and the
+    // slowest cases sit near a second locally. The 5s default leaves them no
+    // headroom on a two-core CI runner, where they time out at random.
+    testTimeout: 20000,
+    hookTimeout: 20000,
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

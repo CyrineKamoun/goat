@@ -40,9 +40,7 @@ class CreditUsage(SQLModel, table=True):
     organization_id: UUID = Field(
         sa_column=Column(
             UUID_PG(as_uuid=True),
-            ForeignKey(
-                f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"
-            ),
+            ForeignKey(f"{settings.SCHEMA}.organization.id", ondelete="CASCADE"),
             nullable=False,
         )
     )

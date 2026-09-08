@@ -93,14 +93,15 @@ def main(params: RebuildEditedPMTilesParams = RebuildEditedPMTilesParams()) -> d
                 ) AS snapshot_id
             FROM recently_edited re
             JOIN postgres_query('pg',
-                'SELECT schema_id, schema_name FROM {catalog}.ducklake_schema') s
-                ON s.schema_name = 'user_' || REPLACE(re.user_id, '-', '')
-            JOIN postgres_query('pg',
                 'SELECT table_id, schema_id, table_name, begin_snapshot, end_snapshot
                  FROM {catalog}.ducklake_table') t
-                ON t.schema_id = s.schema_id
-                AND t.table_name = 't_' || REPLACE(re.layer_id, '-', '')
+                ON t.table_name = 't_' || REPLACE(re.layer_id, '-', '')
                 AND t.end_snapshot IS NULL
+            -- Schema is resolved from the table, not rebuilt from the owner's
+            -- id: where a table sits is the catalog's answer to give.
+            JOIN postgres_query('pg',
+                'SELECT schema_id, schema_name FROM {catalog}.ducklake_schema') s
+                ON s.schema_id = t.schema_id
             JOIN postgres_query('pg',
                 'SELECT table_id, column_name, column_type, end_snapshot
                  FROM {catalog}.ducklake_column') c
@@ -114,21 +115,27 @@ def main(params: RebuildEditedPMTilesParams = RebuildEditedPMTilesParams()) -> d
             rows = con.execute(query).fetchall()
 
         if not rows:
-            return {"status": "ok", "rebuilt": 0, "message": "No recently-edited layers found"}
+            return {
+                "status": "ok",
+                "rebuilt": 0,
+                "message": "No recently-edited layers found",
+            }
 
         # Filter to layers actually missing PMTiles
         candidates = []
         for layer_id, user_id, schema_name, table_name, geom_col, snapshot_id in rows:
             user_id_clean = user_id.replace("-", "")
-            if not generator.pmtiles_exists(user_id_clean, layer_id):
-                candidates.append({
-                    "layer_id": layer_id,
-                    "user_id": user_id_clean,
-                    "schema_name": schema_name,
-                    "table_name": table_name,
-                    "geometry_column": geom_col,
-                    "snapshot_id": snapshot_id,
-                })
+            if not generator.pmtiles_exists(layer_id):
+                candidates.append(
+                    {
+                        "layer_id": layer_id,
+                        "user_id": user_id_clean,
+                        "schema_name": schema_name,
+                        "table_name": table_name,
+                        "geometry_column": geom_col,
+                        "snapshot_id": snapshot_id,
+                    }
+                )
 
         if not candidates:
             return {
@@ -156,7 +163,6 @@ def main(params: RebuildEditedPMTilesParams = RebuildEditedPMTilesParams()) -> d
                     pmtiles_path = generator.generate_from_table(
                         duckdb_con=con,
                         table_name=full_table,
-                        user_id=c["user_id"],
                         layer_id=c["layer_id"],
                         geometry_column=c["geometry_column"],
                         snapshot_id=c["snapshot_id"],

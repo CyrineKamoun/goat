@@ -1,14 +1,9 @@
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { DialogContentText, TextField } from "@mui/material";
 import { useState } from "react";
+
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 interface ConfirmDialogProps {
   title: string;
@@ -33,51 +28,46 @@ const ConfirmModal: React.FC<ConfirmDialogProps> = ({
 }) => {
   const [matchTextValue, setMatchTextValue] = useState("");
 
+  const close = () => {
+    if (matchText) {
+      setMatchTextValue("");
+    }
+    onClose?.();
+  };
+
   return (
-    <Dialog
+    <AppDialog
       open={open}
-      onClose={() => {
-        if (matchText) {
-          setMatchTextValue("");
-        }
-        onClose?.();
-      }}>
-      <DialogTitle>{title}</DialogTitle>
-      <DialogContent>
-        <DialogContentText>{body}</DialogContentText>
-        {matchText && (
-          <TextField
-            required
-            fullWidth
-            placeholder={matchText}
-            id="matchText"
-            onChange={(e) => setMatchTextValue(e.target.value)}
-            value={matchTextValue}
-            sx={{ my: 4 }}
-          />
-        )}
-      </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          pb: 2,
-        }}>
-        <Button onClick={onClose} variant="text">
-          <Typography variant="body2" fontWeight="bold">
-            {closeText || "Close"}
-          </Typography>
-        </Button>
-        <Button
-          onClick={onConfirm}
-          variant="text"
-          color="error"
-          disabled={!!matchText && matchTextValue !== matchText}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {confirmText || "Confirm"}
-          </Typography>
-        </Button>
-      </DialogActions>
-    </Dialog>
+      onClose={close}
+      // Every confirmation this dialog draws ends in a destructive button, so
+      // it always wears the amber tile.
+      icon={ICON_NAME.CIRCLEINFO}
+      tone="warning"
+      title={title}
+      closeLabel={closeText || "Close"}
+      footer={
+        <AppDialogFooter
+          cancelLabel={closeText || "Close"}
+          onCancel={onClose}
+          primaryLabel={confirmText || "Confirm"}
+          onPrimary={() => onConfirm?.()}
+          primaryColor="error"
+          primaryDisabled={!!matchText && matchTextValue !== matchText}
+        />
+      }>
+      <DialogContentText>{body}</DialogContentText>
+      {matchText && (
+        <TextField
+          required
+          fullWidth
+          placeholder={matchText}
+          id="matchText"
+          onChange={(e) => setMatchTextValue(e.target.value)}
+          value={matchTextValue}
+          sx={{ my: 4 }}
+        />
+      )}
+    </AppDialog>
   );
 };
 

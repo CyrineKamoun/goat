@@ -241,6 +241,11 @@ class StatusInfo(BaseModel):
     links: list[Link] = Field(default_factory=list)
     # Extended fields (not OGC standard)
     inputs: dict[str, Any] | None = None  # Job inputs for filtering
+    # A job the user did not start: `catalog_materialize` runs because they
+    # added a catalog layer, `bundle_artifact_delete` because they removed a
+    # bundle. Reported so a client can leave them out of a job list without
+    # keeping its own list of ids, while the API still returns them.
+    hidden: bool = False
     result: dict[str, Any] | None = None  # Job result/output
     # Workflow execution status (from Windmill workflow-as-code)
     workflow_as_code_status: dict[str, Any] | None = None

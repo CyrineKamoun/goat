@@ -39,6 +39,9 @@ from goatlib.analysis.schemas.ui import (
 )
 from goatlib.tools.base import SimpleToolRunner
 from goatlib.tools.schemas import ToolInputBase, ToolOutputBase
+from goatlib.utils.layer import (
+    quoted_relation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -173,9 +176,7 @@ class LayerExportRunner(SimpleToolRunner):
             )
             layer_owner_id = user_id
 
-        user_schema = f"user_{layer_owner_id.replace('-', '')}"
-        table_name = f"t_{layer_id.replace('-', '')}"
-        return f"lake.{user_schema}.{table_name}"
+        return self.resolve_layer_table_path(layer_id)
 
     def _get_column_names(self: Self, table_name: str) -> list[str]:
         """Get column names for a table.
@@ -183,9 +184,8 @@ class LayerExportRunner(SimpleToolRunner):
         DESCRIBE loads only this table's metadata; information_schema.columns
         would lazily load every table in the catalog to answer.
         """
-        schema, table = table_name.replace("lake.", "").split(".", 1)
         result = self.duckdb_con.execute(
-            f'DESCRIBE lake."{schema}"."{table}"'
+            f"DESCRIBE {quoted_relation(table_name)}"
         ).fetchall()
         return [row[0] for row in result]
 
@@ -202,9 +202,8 @@ class LayerExportRunner(SimpleToolRunner):
         """
         # Get columns with their types (DESCRIBE loads only this table's
         # metadata; information_schema would lazily load the whole catalog)
-        schema, table = table_name.replace("lake.", "").split(".", 1)
         result = self.duckdb_con.execute(
-            f'DESCRIBE lake."{schema}"."{table}"'
+            f"DESCRIBE {quoted_relation(table_name)}"
         ).fetchall()
 
         # Filter out complex/binary types not supported by OGR
@@ -288,9 +287,8 @@ class LayerExportRunner(SimpleToolRunner):
         Returns:
             True if table has a geometry column
         """
-        schema, table = table_name.replace("lake.", "").split(".", 1)
         result = self.duckdb_con.execute(
-            f'DESCRIBE lake."{schema}"."{table}"'
+            f"DESCRIBE {quoted_relation(table_name)}"
         ).fetchall()
         return any(row[0] == "geometry" for row in result)
 

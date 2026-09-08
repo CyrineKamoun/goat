@@ -17,6 +17,7 @@ import duckdb
 import pytest
 from goatlib.tools.base import ToolSettings
 from goatlib.tools.layer_import import LayerImportParams, LayerImportRunner
+from goatlib.utils.layer import layer_schema_name
 
 # Mark all tests in this module as integration tests
 pytestmark = pytest.mark.integration
@@ -129,7 +130,7 @@ class TestLayerImportFromS3:
 
             # Verify layer was created in DuckLake
             layer_id = result["layer_id"]
-            user_schema = f"user_{test_user['id'].replace('-', '')}"
+            user_schema = layer_schema_name()
             table_name = f"t_{layer_id.replace('-', '')}"
 
             count = ducklake_connection.execute(f"""

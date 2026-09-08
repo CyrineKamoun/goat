@@ -33,8 +33,6 @@ namespace routing
         Point3857 source_coord;
         Point3857 target_coord;
         std::vector<Point3857> geometry;
-        int32_t h3_3;
-        int32_t h3_6;
     };
 
     enum class RoutingMode : uint8_t
@@ -273,7 +271,6 @@ namespace routing
     struct EdgeInfo
     {
         int64_t id;
-        int32_t h3_3;
         std::vector<Point3857> geometry; // populated for jsolines only
     };
 

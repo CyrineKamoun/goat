@@ -2,6 +2,15 @@
 #include <pybind11/stl.h>
 
 #include <chrono>
+#include <cstdio>
+#include <filesystem>
+#include <stdexcept>
+
+#include "date/date.h"
+#include "nigiri/common/interval.h"
+#include "nigiri/loader/load.h"
+#include "nigiri/timetable.h"
+#include "utl/progress_tracker.h"
 
 #include "pipeline.h"
 #include "preprocessing/access_egress_table.h"
@@ -255,4 +264,50 @@ PYBIND11_MODULE(_routing, m)
           "Precompute a PT access/egress lookup table for one mode "
           "(stop_idx, h3_index, cost_minutes). Writes ZSTD parquet to "
           "config.output_path and returns the path");
+
+    m.def("build_timetable",
+          [](std::string const &gtfs_path, std::string const &out_path,
+             std::string const &start_date, int length_days,
+             unsigned link_stop_distance)
+          {
+              // Parse the "YYYY-MM-DD" start date.
+              int y = 0, mo = 0, d = 0;
+              if (std::sscanf(start_date.c_str(), "%d-%d-%d", &y, &mo, &d) != 3)
+              {
+                  throw std::invalid_argument(
+                      "start_date must be formatted YYYY-MM-DD");
+              }
+              if (length_days <= 0)
+              {
+                  throw std::invalid_argument("length_days must be positive");
+              }
+
+              auto const start = date::sys_days{
+                  date::year{y} / date::month(static_cast<unsigned>(mo)) /
+                  date::day(static_cast<unsigned>(d))};
+              auto const window = nigiri::interval<date::sys_days>{
+                  start, start + date::days{length_days}};
+
+              nigiri::loader::loader_config cfg{};
+              cfg.link_stop_distance_ = link_stop_distance;
+
+              // nigiri's loader reports progress via utl's thread-local tracker;
+              // activate a (silent) one so the loader doesn't abort.
+              utl::activate_progress_tracker("nigiri");
+
+              auto tt = nigiri::loader::load(
+                  {nigiri::loader::timetable_source{"gtfs", gtfs_path, cfg}},
+                  nigiri::loader::finalize_options{},
+                  window);
+              tt.write(std::filesystem::path{out_path});
+          },
+          py::arg("gtfs_path"),
+          py::arg("out_path"),
+          py::arg("start_date"),
+          py::arg("length_days"),
+          py::arg("link_stop_distance") = 100U,
+          py::call_guard<py::gil_scoped_release>(),
+          "Build a nigiri .bin PT timetable from a GTFS feed (zip or directory) "
+          "covering [start_date, start_date + length_days), generating transfer "
+          "footpaths within link_stop_distance metres, and write it to out_path.");
 }

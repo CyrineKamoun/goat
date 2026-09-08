@@ -1047,22 +1047,12 @@ class CatchmentAreaTool(AnalysisTool):
                     "longitude": lon_list,
                 },
                 "routing_type": routing_type,
-                "travel_cost": {
-                    "max_distance": params.distance,
-                    "steps": params.steps
-                },
+                "travel_cost": {"max_distance": params.distance, "steps": params.steps},
                 "catchment_area_type": area_type,
                 "output_format": "parquet",
             }
         if area_type == "polygon":
             payload["polygon_difference"] = params.polygon_difference
-
-        # Note: scenario_id is only sent to routing when a street_network
-        # is also provided (routing requires both). Feature-only scenarios
-        # don't affect the routing graph.
-        if params.scenario_id and hasattr(params, "street_network") and params.street_network:
-            payload["scenario_id"] = params.scenario_id
-            payload["street_network"] = params.street_network
 
         logger.info(payload)
         return await self._post_with_retry(url, payload, authorization)
@@ -1125,22 +1115,12 @@ class CatchmentAreaTool(AnalysisTool):
                     "longitude": lon_list,
                 },
                 "routing_type": "car",
-                "travel_cost": {
-                    "max_distance": params.distance,
-                    "steps": params.steps
-                },
+                "travel_cost": {"max_distance": params.distance, "steps": params.steps},
                 "catchment_area_type": area_type,
                 "output_format": "parquet",
             }
         if area_type == "polygon":
             payload["polygon_difference"] = params.polygon_difference
-
-        # Note: scenario_id is only sent to routing when a street_network
-        # is also provided (routing requires both). Feature-only scenarios
-        # don't affect the routing graph.
-        if params.scenario_id and hasattr(params, "street_network") and params.street_network:
-            payload["scenario_id"] = params.scenario_id
-            payload["street_network"] = params.street_network
 
         return await self._post_with_retry(url, payload, authorization)
 
@@ -1450,7 +1430,9 @@ class CatchmentAreaTool(AnalysisTool):
                     ).fetchone()
                     if check and (abs(check[0]) > 180):
                         is_3857 = True
-                        logger.info("Detected EPSG:3857 coordinates, will transform to EPSG:4326")
+                        logger.info(
+                            "Detected EPSG:3857 coordinates, will transform to EPSG:4326"
+                        )
                 except Exception:
                     pass
 

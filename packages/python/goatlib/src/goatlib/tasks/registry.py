@@ -105,6 +105,47 @@ TASK_REGISTRY: tuple[TaskDefinition, ...] = (
         worker_tag="tools",
     ),
     TaskDefinition(
+        name="catalog_gc",
+        display_name="Catalog GC",
+        description=(
+            "Delete promoted catalog layers with zero layer_project links "
+            "(their parquet, PMTiles and layer row); a grace period covers "
+            "the promote window and remove-then-readd."
+        ),
+        module_path="goatlib.tasks.catalog_gc",
+        params_class_name="CatalogGCParams",
+        windmill_path="f/goat/tasks/catalog_gc",
+        schedule="0 0 3 * * *",  # Daily, 03:00
+        worker_tag="tools",
+    ),
+    TaskDefinition(
+        name="sync_catalog",
+        display_name="Sync Catalog",
+        description=(
+            "Build the apps/catalog mirror from the published items.parquet "
+            "+ collections.parquet on S3 into the shared data volume "
+            "(ETag-skip when unchanged)."
+        ),
+        module_path="goatlib.tasks.sync_catalog",
+        params_class_name="SyncCatalogParams",
+        windmill_path="f/goat/tasks/sync_catalog",
+        schedule="0 */5 * * * *",  # Every 5 minutes
+        worker_tag="tools",
+    ),
+    TaskDefinition(
+        name="sync_nuts",
+        display_name="Sync NUTS",
+        description=(
+            "Build nuts.parquet from the Eurostat GISCO release into the "
+            "shared data volume (apps/catalog's spatial filter). No schedule: "
+            "NUTS releases every three years, run it when one lands."
+        ),
+        module_path="goatlib.tasks.sync_nuts",
+        params_class_name="SyncNutsParams",
+        windmill_path="f/goat/tasks/sync_nuts",
+        worker_tag="tools",
+    ),
+    TaskDefinition(
         name="ducklake_compact",
         display_name="DuckLake Compaction",
         description=(
@@ -118,6 +159,22 @@ TASK_REGISTRY: tuple[TaskDefinition, ...] = (
         # 30 min after maintenance — gives ducklake_maintenance a clear
         # window to finish before compaction starts writing.
         schedule="0 30 0 * * *",
+        worker_tag="tools",
+    ),
+    TaskDefinition(
+        name="purge_trash",
+        display_name="Purge Trash",
+        description=(
+            "Permanently delete folders, layers, templates, projects and "
+            "bundles that have been in the trash past their retention "
+            "period: DuckLake "
+            "tables first, then the rows and their resource_grant rows, "
+            "children before parents."
+        ),
+        module_path="goatlib.tasks.purge_trash",
+        params_class_name="PurgeTrashParams",
+        windmill_path="f/goat/tasks/purge_trash",
+        schedule="0 0 3 * * *",  # Daily, 03:00
         worker_tag="tools",
     ),
 )

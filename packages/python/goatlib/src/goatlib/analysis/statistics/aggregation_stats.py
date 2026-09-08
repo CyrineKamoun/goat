@@ -1,7 +1,6 @@
 """Aggregation statistics calculation."""
 
 import logging
-import re
 from typing import Any
 
 import duckdb
@@ -12,14 +11,13 @@ from goatlib.analysis.schemas.statistics import (
     SortOrder,
     StatisticsOperation,
 )
+from goatlib.analysis.statistics.columns import (
+    quote_identifier,
+    require_column,
+    table_column_names,
+)
 
 logger = logging.getLogger(__name__)
-
-_SAFE_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-
-
-def _is_safe_identifier(value: str) -> bool:
-    return bool(_SAFE_IDENTIFIER_RE.fullmatch(value))
 
 
 def calculate_aggregation_stats(
@@ -58,9 +56,10 @@ def calculate_aggregation_stats(
             f"operation_column is required for operation '{operation.value}'"
         )
 
-    table_columns = {
-        str(row[0]) for row in con.execute(f"DESCRIBE {table_name}").fetchall() if row
-    }
+    # One DESCRIBE for every identifier this call validates. Only the
+    # expression operation is exempt: there `operation_column` carries raw SQL
+    # that the caller has already put through the expression validator.
+    table_columns = table_column_names(con, table_name)
 
     for identifier_name, identifier_value in (
         ("group_by_column", group_by_column),
@@ -68,35 +67,29 @@ def calculate_aggregation_stats(
     ):
         if identifier_value is None:
             continue
-        if not _is_safe_identifier(identifier_value):
-            raise ValueError(f"Invalid SQL identifier for {identifier_name}: {identifier_value!r}")
-        if identifier_value not in table_columns:
-            raise ValueError(f"Unknown column for {identifier_name}: {identifier_value}")
+        require_column(
+            con, table_name, identifier_value, identifier_name, columns=table_columns
+        )
 
-    if (
-        operation != StatisticsOperation.expression
-        and operation_column
-        and _is_safe_identifier(operation_column)
-        and operation_column not in table_columns
-    ):
-        raise ValueError(f"Unknown operation_column: {operation_column}")
-    if operation != StatisticsOperation.expression and operation_column and not _is_safe_identifier(operation_column):
-        raise ValueError(f"Invalid SQL identifier for operation_column: {operation_column!r}")
+    if operation != StatisticsOperation.expression and operation_column:
+        require_column(
+            con, table_name, operation_column, "operation_column", columns=table_columns
+        )
 
     # Build the aggregation expression
     if operation == StatisticsOperation.count:
         if operation_column:
-            agg_expr = f'COUNT("{operation_column}")'
+            agg_expr = f"COUNT({quote_identifier(operation_column)})"
         else:
             agg_expr = "COUNT(*)"
     elif operation == StatisticsOperation.sum:
-        agg_expr = f'SUM("{operation_column}")'
+        agg_expr = f"SUM({quote_identifier(str(operation_column))})"
     elif operation == StatisticsOperation.mean:
-        agg_expr = f'AVG("{operation_column}")'
+        agg_expr = f"AVG({quote_identifier(str(operation_column))})"
     elif operation == StatisticsOperation.min:
-        agg_expr = f'MIN("{operation_column}")'
+        agg_expr = f"MIN({quote_identifier(str(operation_column))})"
     elif operation == StatisticsOperation.max:
-        agg_expr = f'MAX("{operation_column}")'
+        agg_expr = f"MAX({quote_identifier(str(operation_column))})"
     elif operation == StatisticsOperation.expression:
         # For expression operation, operation_column contains the raw SQL expression
         # Note: The expression should be validated before calling this function
@@ -110,7 +103,7 @@ def calculate_aggregation_stats(
     # Build the query
     has_secondary = group_by_column and group_by_secondary_column
     if group_by_column:
-        group_col = f'"{group_by_column}"'
+        group_col = quote_identifier(group_by_column)
 
         # Query for total count of rows
         count_query = f"""
@@ -120,7 +113,7 @@ def calculate_aggregation_stats(
         """
 
         if has_secondary:
-            sec_col = f'"{group_by_secondary_column}"'
+            sec_col = quote_identifier(str(group_by_secondary_column))
 
             # Total distinct combinations
             total_groups_query = f"""

@@ -19,6 +19,7 @@ import Collapse from "@mui/material/Collapse";
 import Typography from "@mui/material/Typography";
 import { alpha, styled } from "@mui/material/styles";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 // ----------------------------------------------------------------------
 // 1. INTERFACES
@@ -34,7 +35,19 @@ export interface BaseTreeItem {
   isSelectable?: boolean;
   isVisible?: boolean; // Add this property for visibility styling
   labelInfo?: string; // Add missing property
+  /** Replaces the icon + label (and the labelInfo caption) with a single
+   *  custom node — e.g. a locked project layer's row, which has no
+   *  geometry-preview icon to draw and shows its hint inline instead of as
+   *  a caption. Leaves the prefix, expand chevron and actions unaffected. */
+  contentOverride?: React.ReactNode;
   canExpand?: boolean; // Add missing property
+  /** Item cannot be dragged (e.g. a bundle group's member layers). */
+  dragDisabled?: boolean;
+  /** Item cannot be a drop target (e.g. a bundle group and its members, so
+   *  layers can't be dropped into a locked bundle group). */
+  dropDisabled?: boolean;
+  /** Group that is backed by a bundle (locked membership). */
+  isBundleGroup?: boolean;
 }
 
 interface DraggableTreeViewProps<T extends BaseTreeItem> {
@@ -220,6 +233,7 @@ const EmptyGroupPlaceholder = ({
   enableSelection?: boolean;
   disableDrag?: boolean;
 }) => {
+  const { t } = useTranslation("common");
   const { setNodeRef, isOver } = useDroppable({
     id: `placeholder-${parentId}`,
     data: { parentId: parentId },
@@ -238,14 +252,14 @@ const EmptyGroupPlaceholder = ({
           color: "text.disabled",
           fontStyle: "italic",
         }}>
-        (No items)
+        ({t("no_items")})
       </Typography>
     );
   }
   return (
     <EmptyPlaceholderBox ref={setNodeRef} className={isOver ? "is-over" : ""} style={indentStyle}>
       <Typography variant="caption" sx={{ ml: 1 }}>
-        Drag items here
+        {t("drag_items_here")}
       </Typography>
     </EmptyPlaceholderBox>
   );
@@ -284,7 +298,10 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
 }) => {
   const children = allData.filter((i) => i.parentId === item.id);
   const isSelected = selectedIds.includes(item.id);
-  const isDragDisabled = !enableSelection || disableDrag || isOverlay;
+  const isDragDisabled = !enableSelection || disableDrag || isOverlay || !!item.dragDisabled;
+  // A bundle group's members reject drops so nothing can be moved into the
+  // group; the group's own row stays droppable so it can be reordered.
+  const isDropDisabled = isDragDisabled || !!item.dropDisabled;
 
   const hasLegend = !!item.legendContent;
   const isExpanded = !item.collapsed;
@@ -301,7 +318,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
   });
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: item.id,
-    disabled: isDragDisabled,
+    disabled: isDropDisabled,
     data: item,
   });
 
@@ -409,10 +426,18 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
             sx={{ display: "flex", alignItems: "center", flex: 1, minWidth: 0 }}>
             <Box sx={{ ml: `${baseIndent}px` }} />
             {renderPrefix && <Box onClick={(e) => e.stopPropagation()}>{renderPrefix(item)}</Box>}
-            <LeftIconContainer>{LeftIconContent}</LeftIconContainer>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <TruncatedLabel label={item.label} />
-            </Box>
+            {item.contentOverride ? (
+              <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center" }}>
+                {item.contentOverride}
+              </Box>
+            ) : (
+              <>
+                <LeftIconContainer>{LeftIconContent}</LeftIconContainer>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <TruncatedLabel label={item.label} />
+                </Box>
+              </>
+            )}
 
             {/* Actions container - always fully visible */}
             <ActionsContainer className="tree-row-actions">
@@ -436,7 +461,7 @@ const RecursiveTreeItemInner = <T extends BaseTreeItem>({
           </Box>
 
           {/* Caption row - part of the same tree item */}
-          {item.labelInfo && (
+          {item.labelInfo && !item.contentOverride && (
             <Box
               sx={{
                 ml: `${baseIndent + 28}px`, // Align with label text (indent + icon container width + margin)
@@ -580,8 +605,14 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
     if (!enableSelection || disableDrag || !over) return;
     const activeIdStr = String(active.id);
     const overIdStr = String(over.id);
+    // Never move a layer into a bundle-backed group (locked membership).
+    const isBundleGroupId = (pid?: string | null) =>
+      items.some((i) => i.id === pid && i.isBundleGroup);
+    const activeItemEarly = items.find((i) => i.id === activeIdStr);
+    if (activeItemEarly?.dragDisabled) return;
     if (overIdStr.startsWith("placeholder-")) {
       const targetParentId = overIdStr.replace("placeholder-", "");
+      if (isBundleGroupId(targetParentId)) return;
       const oldIndex = items.findIndex((i) => i.id === activeIdStr);
       if (oldIndex > -1) {
         const newItems = [...items];
@@ -594,6 +625,9 @@ export function DraggableTreeView<T extends BaseTreeItem>(props: DraggableTreeVi
       const activeItem = items.find((i) => i.id === activeIdStr);
       const overItem = items.find((i) => i.id === overIdStr);
       if (activeItem && overItem) {
+        // Dropping would adopt the target's parent; block if that parent is a
+        // locked bundle group.
+        if (isBundleGroupId(overItem.parentId)) return;
         const oldIndex = items.findIndex((i) => i.id === activeIdStr);
         const targetIndex = items.findIndex((i) => i.id === overIdStr);
         const newItems = [...items];

@@ -1,5 +1,6 @@
 """Tests for PMTiles generation module."""
 
+import pathlib
 import tempfile
 from unittest.mock import MagicMock, patch
 
@@ -44,9 +45,10 @@ def test_get_pmtiles_path() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         generator = PMTilesGenerator(tiles_data_dir=tmpdir)
 
-        path = generator.get_pmtiles_path("abc-def-123", "xyz-789-456")
+        path = generator.get_pmtiles_path("xyz-789-456")
 
-        assert path.parent.name == "user_abcdef123"
+        # Flat: keyed only by layer id, no owner directory.
+        assert path.parent == pathlib.Path(tmpdir)
         assert path.name == "t_xyz789456.pmtiles"
 
 
@@ -55,7 +57,7 @@ def test_pmtiles_exists_false() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         generator = PMTilesGenerator(tiles_data_dir=tmpdir)
 
-        assert generator.pmtiles_exists("user1", "layer1") is False
+        assert generator.pmtiles_exists("layer1") is False
 
 
 def test_pmtiles_exists_true() -> None:
@@ -64,11 +66,11 @@ def test_pmtiles_exists_true() -> None:
         generator = PMTilesGenerator(tiles_data_dir=tmpdir)
 
         # Create the file
-        pmtiles_path = generator.get_pmtiles_path("user1", "layer1")
-        pmtiles_path.parent.mkdir(parents=True)
+        pmtiles_path = generator.get_pmtiles_path("layer1")
+        pmtiles_path.parent.mkdir(parents=True, exist_ok=True)
         pmtiles_path.touch()
 
-        assert generator.pmtiles_exists("user1", "layer1") is True
+        assert generator.pmtiles_exists("layer1") is True
 
 
 def test_delete_pmtiles_file_exists() -> None:
@@ -77,11 +79,11 @@ def test_delete_pmtiles_file_exists() -> None:
         generator = PMTilesGenerator(tiles_data_dir=tmpdir)
 
         # Create the file
-        pmtiles_path = generator.get_pmtiles_path("user1", "layer1")
-        pmtiles_path.parent.mkdir(parents=True)
+        pmtiles_path = generator.get_pmtiles_path("layer1")
+        pmtiles_path.parent.mkdir(parents=True, exist_ok=True)
         pmtiles_path.touch()
 
-        result = generator.delete_pmtiles("user1", "layer1")
+        result = generator.delete_pmtiles("layer1")
 
         assert result is True
         assert not pmtiles_path.exists()
@@ -92,7 +94,7 @@ def test_delete_pmtiles_file_not_exists() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         generator = PMTilesGenerator(tiles_data_dir=tmpdir)
 
-        result = generator.delete_pmtiles("user1", "layer1")
+        result = generator.delete_pmtiles("layer1")
 
         assert result is False
 
@@ -102,8 +104,9 @@ def test_check_dependencies_missing(mock_which: MagicMock) -> None:
     """Test that missing tippecanoe raises RuntimeError."""
     mock_which.return_value = None
 
-    with pytest.raises(RuntimeError, match="tippecanoe is required"):
-        PMTilesGenerator()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with pytest.raises(RuntimeError, match="tippecanoe is required"):
+            PMTilesGenerator(tiles_data_dir=tmpdir)
 
 
 def test_generate_disabled() -> None:
@@ -116,7 +119,6 @@ def test_generate_disabled() -> None:
         result = generator.generate_from_table(
             duckdb_con=mock_con,
             table_name="lake.test.table",
-            user_id="user1",
             layer_id="layer1",
         )
 
@@ -172,9 +174,11 @@ def test_tippecanoe_command_point_layer() -> None:
             )
 
             cmd = mock_run.call_args[0][0]
-            # Point-specific settings: retain all features and only drop if needed
+            # Point-specific settings: keep every feature, spread them evenly
+            # at low zooms by clustering on a Hilbert curve.
             assert "-r1" in cmd
-            assert "--drop-fraction-as-needed" in cmd
+            assert "--cluster-distance=5" in cmd
+            assert "--hilbert" in cmd
             assert "--extend-zooms-if-still-dropping" in cmd
             # Should NOT have polygon-specific settings
             assert "--drop-densest-as-needed" not in cmd

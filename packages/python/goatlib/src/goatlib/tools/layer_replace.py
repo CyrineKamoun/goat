@@ -13,7 +13,6 @@ The mixin expects the host class to provide ``duckdb_con``, ``settings``, and
 already do.
 """
 
-import json
 import logging
 import uuid as uuid_module
 from pathlib import Path
@@ -36,6 +35,8 @@ class _HasReplaceDeps(Protocol):
     async def get_postgres_pool(self) -> asyncpg.Pool: ...
 
     def _get_table_info(self, con: Any, table_name: str) -> dict[str, Any]: ...
+
+    def resolve_layer_table_path(self, layer_id: str) -> str: ...
 
 
 class LayerReplaceMixin:
@@ -61,7 +62,7 @@ class LayerReplaceMixin:
                 f"""
                 SELECT id, user_id, folder_id, name, type, data_type,
                        feature_layer_type, feature_layer_geometry_type,
-                       attribute_mapping, other_properties
+                       other_properties
                 FROM {self.settings.customer_schema}.layer
                 WHERE id = $1
                 """,
@@ -71,7 +72,8 @@ class LayerReplaceMixin:
             if not row:
                 raise ValueError(f"Layer not found: {layer_id}")
 
-            owner_id = str(row["user_id"])
+            # NULL owner = a catalog layer, which is nobody's to change.
+            owner_id = str(row["user_id"]) if row["user_id"] else None
             if owner_id != user_id:
                 raise PermissionError(
                     f"User {user_id} cannot update layer {layer_id} owned by {owner_id}"
@@ -86,7 +88,6 @@ class LayerReplaceMixin:
                 "data_type": row["data_type"],
                 "feature_layer_type": row["feature_layer_type"],
                 "geometry_type": row["feature_layer_geometry_type"],
-                "attribute_mapping": row["attribute_mapping"] or {},
                 "other_properties": row["other_properties"] or {},
             }
         finally:
@@ -102,9 +103,8 @@ class LayerReplaceMixin:
 
         Preserves the layer_id (and therefore the table path).
         """
-        user_schema = f"user_{owner_id.replace('-', '')}"
-        table_name = f"t_{layer_id.replace('-', '')}"
-        full_table = f"lake.{user_schema}.{table_name}"
+        full_table = self.resolve_layer_table_path(layer_id)
+        schema = full_table.split(".")[1]
 
         file_size = parquet_path.stat().st_size if parquet_path.exists() else 0
 
@@ -114,7 +114,7 @@ class LayerReplaceMixin:
         con.execute(f"DROP TABLE IF EXISTS {full_table}")
 
         # Ensure user schema exists (first export into this schema otherwise fails)
-        con.execute(f"CREATE SCHEMA IF NOT EXISTS lake.{user_schema}")
+        con.execute(f"CREATE SCHEMA IF NOT EXISTS lake.{schema}")
 
         cols = con.execute(
             f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}')"
@@ -206,9 +206,7 @@ class LayerReplaceMixin:
             "geometry_type": geometry_type,
         }
 
-    def _delete_old_pmtiles(
-        self: _HasReplaceDeps, user_id: str, layer_id: str
-    ) -> bool:
+    def _delete_old_pmtiles(self: _HasReplaceDeps, user_id: str, layer_id: str) -> bool:
         """Delete existing PMTiles file for a layer before regenerating."""
         if self.settings is None:
             return False
@@ -217,7 +215,7 @@ class LayerReplaceMixin:
             from goatlib.io.pmtiles import PMTilesGenerator
 
             generator = PMTilesGenerator(tiles_data_dir=self.settings.tiles_data_dir)
-            deleted = generator.delete_pmtiles(user_id, layer_id)
+            deleted = generator.delete_pmtiles(layer_id)
             if deleted:
                 logger.info("Deleted old PMTiles for layer: %s", layer_id)
             return deleted
@@ -233,7 +231,9 @@ class LayerReplaceMixin:
         snapshot_id: int | None = None,
     ) -> None:
         """Generate fresh PMTiles from an updated DuckLake table."""
-        if self.settings is None or not getattr(self.settings, "pmtiles_enabled", False):
+        if self.settings is None or not getattr(
+            self.settings, "pmtiles_enabled", False
+        ):
             return
 
         geom_col = table_info.get("geometry_column") or "geometry"
@@ -259,12 +259,13 @@ class LayerReplaceMixin:
                 duckdb_con=self.duckdb_con,
                 table_name=table_info["table_name"],
                 geometry_column=geom_col,
-                user_id=user_id,
                 layer_id=layer_id,
                 snapshot_id=snapshot_id,
             )
             if pmtiles_path:
-                logger.info("Generated PMTiles for layer %s: %s", layer_id, pmtiles_path)
+                logger.info(
+                    "Generated PMTiles for layer %s: %s", layer_id, pmtiles_path
+                )
         except Exception as e:
             logger.warning("PMTiles generation failed for layer %s: %s", layer_id, e)
 
@@ -275,7 +276,6 @@ class LayerReplaceMixin:
         extent_wkt: str | None,
         size: int,
         geometry_type: str | None,
-        attribute_mapping: dict[str, Any] | None,
     ) -> None:
         """UPDATE customer.layer with data-derived fields only.
 
@@ -306,11 +306,6 @@ class LayerReplaceMixin:
             if normalized_geom:
                 updates.append(f"feature_layer_geometry_type = ${param_idx}")
                 params.append(normalized_geom)
-                param_idx += 1
-
-            if attribute_mapping:
-                updates.append(f"attribute_mapping = ${param_idx}::jsonb")
-                params.append(json.dumps(attribute_mapping))
                 param_idx += 1
 
             await pool.execute(

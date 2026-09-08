@@ -9,6 +9,7 @@ import type { OGCInputSchema, ProcessedInput } from "@/types/map/ogc-processes";
 
 import ArrayInput from "@/components/map/panels/toolbox/generic/inputs/ArrayInput";
 import BooleanInput from "@/components/map/panels/toolbox/generic/inputs/BooleanInput";
+import BundleInput from "@/components/map/panels/toolbox/generic/inputs/BundleInput";
 import ChipsInput from "@/components/map/panels/toolbox/generic/inputs/ChipsInput";
 import EnumInput from "@/components/map/panels/toolbox/generic/inputs/EnumInput";
 import FieldInput from "@/components/map/panels/toolbox/generic/inputs/FieldInput";
@@ -85,6 +86,16 @@ export default function GenericInput({
           onFilterChange={onFilterChange}
           disabled={disabled}
           excludedLayerIds={excludedLayerIds}
+        />
+      );
+
+    case "bundle":
+      return (
+        <BundleInput
+          input={input}
+          value={value as string | undefined}
+          onChange={onChange}
+          disabled={disabled}
         />
       );
 

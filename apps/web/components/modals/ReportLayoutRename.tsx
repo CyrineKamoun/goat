@@ -1,16 +1,10 @@
-import { LoadingButton } from "@mui/lab";
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Stack, TextField } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
 interface ReportLayoutRenameDialogProps {
   open: boolean;
@@ -47,50 +41,38 @@ const ReportLayoutRenameModal: React.FC<ReportLayoutRenameDialogProps> = ({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>{t("rename_layout")}</DialogTitle>
-      <DialogContent>
-        <Stack sx={{ pt: 1 }}>
-          <TextField
-            autoFocus
-            size="small"
-            fullWidth
-            inputProps={{
-              style: {
-                fontSize: "0.875rem",
-                fontWeight: "bold",
-              },
-            }}
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-            }}
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions
-        disableSpacing
-        sx={{
-          pb: 2,
-        }}>
-        <Button onClick={onClose} variant="text" sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold">
-            {t("cancel")}
-          </Typography>
-        </Button>
-        <LoadingButton
-          onClick={handleRename}
-          loading={isLoading}
-          variant="text"
-          color="primary"
-          disabled={!name.trim()}
-          sx={{ borderRadius: 0 }}>
-          <Typography variant="body2" fontWeight="bold" color="inherit">
-            {t("rename")}
-          </Typography>
-        </LoadingButton>
-      </DialogActions>
-    </Dialog>
+    <AppDialog
+      open={open}
+      onClose={() => onClose?.()}
+      icon={ICON_NAME.EDITPEN}
+      title={t("rename_layout")}
+      footer={
+        <AppDialogFooter
+          onCancel={onClose}
+          primaryLabel={t("rename")}
+          onPrimary={() => void handleRename()}
+          primaryDisabled={!name.trim()}
+          primaryLoading={isLoading}
+        />
+      }>
+      <Stack sx={{ pt: 1 }}>
+        <TextField
+          autoFocus
+          size="small"
+          fullWidth
+          inputProps={{
+            style: {
+              fontSize: "0.875rem",
+              fontWeight: "bold",
+            },
+          }}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+          }}
+        />
+      </Stack>
+    </AppDialog>
   );
 };
 

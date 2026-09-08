@@ -34,7 +34,9 @@ type ExpressionProps = {
   expression: ExpressionType;
   onDelete: (expression: ExpressionType) => void;
   onUpdate: (expression: ExpressionType) => void;
-  onDuplicate: (expression: ExpressionType) => void;
+  /** Omit where duplicating has no meaning — a bundle takes exactly one
+   *  expression, so the menu entry is left out rather than shown inert. */
+  onDuplicate?: (expression: ExpressionType) => void;
   /** Optional layer ID to use instead of active layer (for workflows) */
   layerId?: string;
 };
@@ -110,17 +112,20 @@ const Expression: React.FC<ExpressionProps> = (props) => {
         icon: ICON_NAME.TRASH,
         color: theme.palette.error.main,
       },
-      {
+    ];
+
+    if (props.onDuplicate) {
+      layerStyleMoreMenuOptions.push({
         id: FilterExpressionActions.DUPLICATE,
         label: t("duplicate"),
         disabled: !isExpressionValid,
         icon: ICON_NAME.COPY,
         color: theme.palette.text.secondary,
-      },
-    ];
+      });
+    }
 
     return layerStyleMoreMenuOptions;
-  }, [isExpressionValid, t, theme.palette.error.main, theme.palette.text.secondary]);
+  }, [isExpressionValid, props.onDuplicate, t, theme.palette.error.main, theme.palette.text.secondary]);
 
   useEffect(() => {
     if (hasExpressionChanged && isExpressionValid) {
@@ -175,7 +180,7 @@ const Expression: React.FC<ExpressionProps> = (props) => {
                 props.onDelete(expression);
               }
               if (menuItem.id === FilterExpressionActions.DUPLICATE) {
-                props.onDuplicate(expression);
+                props.onDuplicate?.(expression);
               }
             }}
           />
@@ -348,7 +353,9 @@ const Expression: React.FC<ExpressionProps> = (props) => {
                             key={index}
                             kind="datetime"
                             label={index === 0 ? t("from") : t("to")}
-                            value={Array.isArray(expression.value) ? String(expression.value[index] ?? "") : ""}
+                            value={
+                              Array.isArray(expression.value) ? String(expression.value[index] ?? "") : ""
+                            }
                             onChange={(value: string) => {
                               const current = Array.isArray(expression.value)
                                 ? [...(expression.value as string[])]

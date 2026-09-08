@@ -26,8 +26,20 @@ from goatlib.analysis.schemas.ui import (
 )
 from goatlib.tools.base import SimpleToolRunner
 from goatlib.tools.schemas import ToolInputBase
+from goatlib.utils.layer import (
+    is_catalog_relation,
+    table_path_parts,
+)
 
 logger = logging.getLogger(__name__)
+
+#: Each DROP TABLE is a DuckLake commit whose memory cost scales with
+#: catalog size and accumulates on the connection; recycling periodically
+#: stops deleting many layers against a large catalog from OOMing the
+#: worker. Shared by every caller that loops layer deletions on one
+#: runner (LayerDeleteMultiRunner.run, PurgeTrashTask) so the cadence
+#: only lives in one place.
+RECYCLE_DUCKDB_EVERY = 5
 
 
 class LayerDeleteMultiParams(ToolInputBase):
@@ -84,18 +96,26 @@ class LayerDeleteMultiRunner(SimpleToolRunner):
             owner_id: Layer owner's UUID
 
         Returns:
-            True if table was deleted, False if it didn't exist or error
+            True if the table is gone (dropped now, or already absent);
+            False only when an actual error prevented checking or dropping
+            it, or when the layer is a catalog relation nobody may drop.
         """
-        user_schema = f"user_{owner_id.replace('-', '')}"
-        table_name = f"t_{layer_id.replace('-', '')}"
-        full_table = f"lake.{user_schema}.{table_name}"
+        full_table = self.resolve_layer_table_path(layer_id)
+        if is_catalog_relation(full_table):
+            # A catalog layer is shared by every project that added it and is
+            # nobody's to drop; the row is GC'd when the last link goes. This
+            # is a genuine refusal, not "nothing to delete" — the table is
+            # very much still there and still in use.
+            logger.warning("Refusing to delete catalog layer %s", layer_id)
+            return False
+        schema, table_name = table_path_parts(full_table)
 
         try:
             # Check if table exists. DESCRIBE probes only this table;
             # information_schema.tables would lazily load every table in
             # the catalog to answer.
             try:
-                self.duckdb_con.execute(f'DESCRIBE lake."{user_schema}"."{table_name}"')
+                self.duckdb_con.execute(f'DESCRIBE lake."{schema}"."{table_name}"')
                 table_exists = True
             except duckdb.CatalogException:
                 table_exists = False
@@ -103,13 +123,35 @@ class LayerDeleteMultiRunner(SimpleToolRunner):
             if table_exists:
                 self.duckdb_con.execute(f"DROP TABLE IF EXISTS {full_table}")
                 logger.info("Deleted DuckLake table: %s", full_table)
-                return True
             else:
-                logger.info("DuckLake table not found: %s", full_table)
-                return False
+                # Already gone (e.g. a "table"-type layer that never wrote
+                # data, or a retry after a previous run already dropped it)
+                # — absence is the goal state, not a failure.
+                logger.info("DuckLake table already absent: %s", full_table)
+            return True
         except Exception as e:
             logger.warning("Error deleting DuckLake table %s: %s", full_table, e)
             return False
+
+    def _delete_layer_artifacts(
+        self: Self, layer_id: str, owner_id: str
+    ) -> tuple[bool, bool]:
+        """Delete everything a layer owns: its DuckLake table, then its PMTiles.
+
+        The two deletions are independent (either is safe to attempt without
+        the other), so both always run rather than short-circuiting on the
+        first. Returns (ducklake_deleted, pmtiles_deleted). Each flag is True
+        for "gone" — whether this call just removed it or it was already
+        absent (a `table`-type layer has no PMTiles; a `feature` layer whose
+        tiles were never built has none either; a retry after a previous run
+        already dropped the DuckLake table sees no table to drop) — and
+        False only when an actual error prevented checking or removing it.
+        """
+        ducklake_deleted = self._delete_ducklake_table(
+            layer_id=layer_id, owner_id=owner_id
+        )
+        pmtiles_deleted = self._delete_pmtiles(layer_id=layer_id, owner_id=owner_id)
+        return ducklake_deleted, pmtiles_deleted
 
     def _delete_pmtiles(self: Self, layer_id: str, owner_id: str) -> bool:
         """Delete PMTiles file for a layer.
@@ -119,16 +161,21 @@ class LayerDeleteMultiRunner(SimpleToolRunner):
             owner_id: Layer owner's UUID
 
         Returns:
-            True if PMTiles was deleted, False if it didn't exist
+            True if PMTiles are gone — removed now, or never existed (a
+            `table`-type layer has none; a `feature` layer whose tiles were
+            never built has none either). False only when an actual error
+            prevented checking or removing them.
         """
         try:
             from goatlib.io.pmtiles import PMTilesGenerator
 
             generator = PMTilesGenerator(tiles_data_dir=self.settings.tiles_data_dir)
-            deleted = generator.delete_pmtiles(owner_id, layer_id)
+            deleted = generator.delete_pmtiles(layer_id)
             if deleted:
                 logger.info("Deleted PMTiles for layer: %s", layer_id)
-            return deleted
+            else:
+                logger.debug("No PMTiles found for layer: %s", layer_id)
+            return True
         except Exception as e:
             logger.warning("Error deleting PMTiles for layer %s: %s", layer_id, e)
             return False
@@ -161,10 +208,6 @@ class LayerDeleteMultiRunner(SimpleToolRunner):
             wm_labels=wm_labels,
         )
 
-        # Each DROP TABLE is a DuckLake commit whose memory cost scales with
-        # catalog size and accumulates on the connection; recycle periodically so
-        # deleting many layers against a large catalog doesn't OOM the worker.
-        recycle_every = 5
         try:
             for processed, layer_id in enumerate(params.layer_ids, start=1):
                 result = LayerDeleteResult(
@@ -172,17 +215,11 @@ class LayerDeleteMultiRunner(SimpleToolRunner):
                 )
 
                 try:
-                    # Delete DuckLake table
+                    # Delete DuckLake table + PMTiles.
                     # Note: PostgreSQL metadata is already deleted via CASCADE
                     # when the folder was deleted, so we just need user_id for
                     # the DuckLake schema path
-                    deleted = self._delete_ducklake_table(
-                        layer_id=layer_id,
-                        owner_id=params.user_id,
-                    )
-
-                    # Also delete PMTiles if they exist
-                    self._delete_pmtiles(
+                    deleted, _ = self._delete_layer_artifacts(
                         layer_id=layer_id,
                         owner_id=params.user_id,
                     )
@@ -202,7 +239,7 @@ class LayerDeleteMultiRunner(SimpleToolRunner):
 
                 output.results.append(result)
 
-                if processed % recycle_every == 0:
+                if processed % RECYCLE_DUCKDB_EVERY == 0:
                     self.recycle_duckdb_connection()
 
             logger.info(

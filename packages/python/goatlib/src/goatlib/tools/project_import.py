@@ -41,6 +41,7 @@ from goatlib.tools.project_schemas import (
     ExportWorkflow,
 )
 from goatlib.tools.schemas import ToolInputBase
+from goatlib.utils.layer import layer_schema_name, layer_table_path
 
 logger = logging.getLogger(__name__)
 
@@ -391,12 +392,11 @@ class ProjectImportRunner(SimpleToolRunner):
         if self.settings is None:
             raise RuntimeError("Settings not initialized")
 
-        user_schema = f"user_{new_user_id.replace('-', '')}"
-        table_name = f"t_{new_layer_id.replace('-', '')}"
-        table_path = f"lake.{user_schema}.{table_name}"
+        schema = layer_schema_name()
+        table_path = layer_table_path(new_layer_id)
 
         # Ensure schema exists
-        self.duckdb_con.execute(f"CREATE SCHEMA IF NOT EXISTS lake.{user_schema}")
+        self.duckdb_con.execute(f"CREATE SCHEMA IF NOT EXISTS lake.{schema}")
 
         # Read parquet columns, exclude bbox, sanitize names
         columns_result = self.duckdb_con.execute(
@@ -521,19 +521,31 @@ class ProjectImportRunner(SimpleToolRunner):
             )
 
             async with conn.transaction():
+                # The imported project and every layer it references land in
+                # `target_folder_id` — they belong to that folder's space
+                # (every folder/layer/project/bundle row carries the
+                # `space_id` of the space that owns it). Without this, both
+                # rows would be created with `space_id` NULL — unreachable
+                # through any space-scoped listing or grant.
+                target_space_id = await conn.fetchval(
+                    f"SELECT space_id FROM {schema}.folder WHERE id = $1",
+                    uuid.UUID(target_folder_id),
+                )
+
                 # 1. Insert project (builder_config deferred until layer_project IDs are known)
                 await conn.execute(
                     f"""
                     INSERT INTO {schema}.project
-                        (id, user_id, folder_id, name, description, basemap,
+                        (id, user_id, folder_id, space_id, name, description, basemap,
                          custom_basemaps, max_extent, tags,
                          created_at, updated_at)
                     VALUES
-                        ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+                        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
                     """,
                     uuid.UUID(new_project_id),
                     uuid.UUID(new_user_id),
                     uuid.UUID(target_folder_id),
+                    target_space_id,
                     project_data.name,
                     project_data.description,
                     project_data.basemap,
@@ -641,25 +653,20 @@ class ProjectImportRunner(SimpleToolRunner):
                     await conn.execute(
                         f"""
                         INSERT INTO {schema}.layer
-                            (id, user_id, folder_id, name, description, type,
+                            (id, user_id, folder_id, space_id, name, description, type,
                              feature_layer_type, feature_layer_geometry_type,
                              data_type, url, properties, other_properties,
-                             attribute_mapping, upload_reference_system,
-                             upload_file_type, size, lineage, positional_accuracy,
-                             attribute_accuracy, completeness, geographical_code,
-                             language_code, distributor_name, distributor_email,
-                             distribution_url, license, attribution,
-                             data_reference_year, data_category, field_config,
+                             size, field_config,
                              created_at, updated_at)
                         VALUES
                             ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                             $11, $12, $13, $14, $15, $16, $17, $18,
-                             $19, $20, $21, $22, $23, $24, $25, $26,
-                             $27, $28, $29, $30, NOW(), NOW())
+                             $11, $12, $13, $14, $15,
+                             NOW(), NOW())
                         """,
                         uuid.UUID(new_layer_id),
                         uuid.UUID(new_user_id),
                         uuid.UUID(target_folder_id),
+                        target_space_id,
                         layer_meta.name,
                         layer_meta.description,
                         layer_meta.type,
@@ -669,23 +676,7 @@ class ProjectImportRunner(SimpleToolRunner):
                         layer_meta.url,
                         layer_meta.properties,
                         remapped_other_properties,
-                        layer_meta.attribute_mapping,
-                        layer_meta.upload_reference_system,
-                        layer_meta.upload_file_type,
                         layer_meta.size,
-                        layer_meta.lineage,
-                        layer_meta.positional_accuracy,
-                        layer_meta.attribute_accuracy,
-                        layer_meta.completeness,
-                        layer_meta.geographical_code,
-                        layer_meta.language_code,
-                        layer_meta.distributor_name,
-                        layer_meta.distributor_email,
-                        layer_meta.distribution_url,
-                        layer_meta.license,
-                        layer_meta.attribution,
-                        layer_meta.data_reference_year,
-                        layer_meta.data_category,
                         layer_meta.field_config,
                     )
 

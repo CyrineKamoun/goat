@@ -100,21 +100,18 @@ from .ui import (
     SECTION_OPTIONS,
     SECTION_OUTPUT,
     SECTION_ROUTING,
-    SECTION_SCENARIO,
     SECTION_STATISTICS,
     SECTION_TIME,
     UIFieldConfig,
     UISection,
     layer_selector_field,
     merge_ui_field,
-    scenario_selector_field,
     ui_field,
     ui_sections,
 )
 
 __all__ = [
     # Modules
-    "vector",  # Backwards compatibility alias
     "geoprocessing",
     "geocoding",
     "data_management",
@@ -132,7 +129,6 @@ __all__ = [
     "ui_sections",
     "merge_ui_field",
     "layer_selector_field",
-    "scenario_selector_field",
     "SECTION_ROUTING",
     "SECTION_CONFIGURATION",
     "SECTION_INPUT",
@@ -140,7 +136,6 @@ __all__ = [
     "SECTION_OUTPUT",
     "SECTION_OPTIONS",
     "SECTION_OPPORTUNITIES",
-    "SECTION_SCENARIO",
     "SECTION_STATISTICS",
     "SECTION_TIME",
     "SECTION_AREA",

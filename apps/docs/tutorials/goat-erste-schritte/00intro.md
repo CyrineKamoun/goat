@@ -10,7 +10,7 @@ sidebar_label: GOAT First Steps
 
 Welcome to GOAT, the web-based GIS platform for data-driven urban, transport and environmental planning.
 
-GOAT helps you analyze accessibility, calculate indicators, and compare scenarios – all in a collaborative, web-based environment. From initial questions to meaningful maps, GOAT supports informed planning decisions.
+GOAT helps you analyze accessibility, calculate indicators, and compare planning alternatives – all in a collaborative, web-based environment. From initial questions to meaningful maps, GOAT supports informed planning decisions.
 
 ## What Will You Learn from This Tutorial?
 

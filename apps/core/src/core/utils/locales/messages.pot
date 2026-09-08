@@ -191,10 +191,6 @@ msgstr ""
 msgid "For organization with up to 50 viewers and 5 editors"
 msgstr ""
 
-#: src/schemas/plan.py:43
-msgid "Create scenarios"
-msgstr ""
-
 #: src/schemas/plan.py:44
 msgid "Increased usage quota limits"
 msgstr ""

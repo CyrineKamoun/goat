@@ -36,7 +36,9 @@ def main() -> None:
         # Get network info
         info = network.get_network_info()
         print(f"✓ Network loaded in {load_time:.2f}s")
-        print(f"  📈 Network size: {info['node_count']} nodes, {info['edge_count']} edges")
+        print(
+            f"  📈 Network size: {info['node_count']} nodes, {info['edge_count']} edges"
+        )
 
         # Get some random nodes for testing
         all_nodes = network.get_all_node_ids()
@@ -63,7 +65,7 @@ def main() -> None:
         print(f"\n📊 Calculating multiple time thresholds...")
         thresholds = [300.0, 600.0, 900.0, 1200.0]  # 5, 10, 15, 20 minutes
         threshold_names = ["5min", "10min", "15min", "20min"]
-        
+
         batch_nodes = [start_node]
         start_time = time.time()
         multi_results = network.calculate_batch_isochrones(batch_nodes, thresholds)
@@ -71,7 +73,7 @@ def main() -> None:
 
         print(f"✓ Batch calculation completed in {batch_time:.3f}s")
         print("  📈 Results by time threshold:")
-        
+
         for i, (threshold, name) in enumerate(zip(thresholds, threshold_names)):
             if i < len(multi_results):
                 nodes = multi_results[i].reachable_nodes
@@ -105,6 +107,7 @@ def main() -> None:
     except Exception as e:
         print(f"❌ Error during execution: {e}")
         import traceback
+
         traceback.print_exc()
 
 

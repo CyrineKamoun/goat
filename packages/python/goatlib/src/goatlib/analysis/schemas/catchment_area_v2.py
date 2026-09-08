@@ -93,14 +93,17 @@ class CatchmentAreaV2Params(BaseModel):
     routing_mode: RoutingMode = RoutingMode.walking
     cost_type: CostType = CostType.time
     max_cost: float = Field(
-        default=15.0, gt=0,
+        default=15.0,
+        gt=0,
         description="Budget: minutes (time) or meters (distance)",
     )
     speed: float | None = Field(
-        default=None, ge=0.0, le=60.0,
+        default=None,
+        ge=0.0,
+        le=60.0,
         description="Travel speed in km/h. None when the routing mode doesn't "
-                    "use a user-supplied speed (PT uses access/egress speeds; "
-                    "Car uses per-edge OSM maxspeed).",
+        "use a user-supplied speed (PT uses access/egress speeds; "
+        "Car uses per-edge OSM maxspeed).",
     )
     steps: int = Field(default=3, ge=1, le=20, description="Number of isochrone steps")
     cutoffs: list[int] | None = Field(
@@ -118,21 +121,61 @@ class CatchmentAreaV2Params(BaseModel):
     # PT settings
     transit_modes: list[PTMode] | None = None
     time_window: PTTimeWindow | None = None
-    max_transfers: int = Field(default=5, ge=0, le=5, description="RAPTOR transfer limit")
+    max_transfers: int = Field(
+        default=5, ge=0, le=5, description="RAPTOR transfer limit"
+    )
 
     # PT access/egress
     access_mode: AccessEgressMode = AccessEgressMode.walk
     egress_mode: AccessEgressMode = AccessEgressMode.walk
     access_cost_type: CostType = CostType.time
     egress_cost_type: CostType = CostType.time
-    access_max_cost: float = Field(default=15.0, ge=0.0, description="Access leg budget: minutes (time) or meters (distance). 0 = default (15 min / 500 m).")
-    egress_max_cost: float = Field(default=15.0, ge=0.0, description="Egress leg budget: minutes (time) or meters (distance). 0 = default (15 min / 500 m).")
-    access_speed: float | None = Field(default=None, ge=0.0, description="Access leg speed in km/h. None for car access (per-edge OSM maxspeed governs).")
-    egress_speed: float | None = Field(default=None, ge=0.0, description="Egress leg speed in km/h. None for car egress.")
+    access_max_cost: float = Field(
+        default=15.0,
+        ge=0.0,
+        description="Access leg budget: minutes (time) or meters (distance). 0 = default (15 min / 500 m).",
+    )
+    egress_max_cost: float = Field(
+        default=15.0,
+        ge=0.0,
+        description="Egress leg budget: minutes (time) or meters (distance). 0 = default (15 min / 500 m).",
+    )
+    access_speed: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Access leg speed in km/h. None for car access (per-edge OSM maxspeed governs).",
+    )
+    egress_speed: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Egress leg speed in km/h. None for car egress.",
+    )
 
     # PointGrid settings
-    grid_points_path: str | None = Field(default=None, description="Parquet with grid points (id, x_3857, y_3857)")
-    grid_snap_distance: float = Field(default=0.0, ge=0.0, description="PointGrid snap distance in meters (0 = default 500m)")
+    grid_points_path: str | None = Field(
+        default=None, description="Parquet with grid points (id, x_3857, y_3857)"
+    )
+    grid_snap_distance: float = Field(
+        default=0.0,
+        ge=0.0,
+        description="PointGrid snap distance in meters (0 = default 500m)",
+    )
+
+    # PT routing: override the timetable .bin (e.g. a bundle's routing graph).
+    # None uses the engine's default global PT network.
+    timetable_path: str | None = Field(
+        default=None,
+        description="Path to a nigiri .bin timetable to use for PT routing",
+    )
+
+    # Street routing: override the edge/node datasets (e.g. an uploaded street
+    # network bundle's graph). None uses the engine's default global network.
+    edge_path: str | None = Field(
+        default=None, description="Path to an edges parquet to use for street routing"
+    )
+    node_path: str | None = Field(
+        default=None, description="Path to a nodes parquet to use for street routing"
+    )
 
     @model_validator(mode="after")
     def validate_pt_settings(self: Self) -> Self:
@@ -144,9 +187,26 @@ class CatchmentAreaV2Params(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def validate_network_override(self: Self) -> Self:
+        # Half an override is worse than none: the engine would route over one
+        # network's edges joined to the other's nodes, which silently yields a
+        # near-empty result rather than failing.
+        if bool(self.edge_path) != bool(self.node_path):
+            raise ValueError(
+                "edge_path and node_path must be set together — a routing graph "
+                "is only coherent as a pair"
+            )
+        return self
+
+    @model_validator(mode="after")
     def validate_point_grid(self: Self) -> Self:
-        if self.catchment_type == CatchmentType.point_grid and not self.grid_points_path:
-            raise ValueError("grid_points_path is required for point_grid catchment type")
+        if (
+            self.catchment_type == CatchmentType.point_grid
+            and not self.grid_points_path
+        ):
+            raise ValueError(
+                "grid_points_path is required for point_grid catchment type"
+            )
         return self
 
     @model_validator(mode="after")

@@ -61,7 +61,6 @@ export default function Teams() {
                 sx={{ whiteSpace: "nowrap" }}
                 onClick={() => setOpenTeamCreateModal(true)}
                 startIcon={<Icon fontSize="small" iconName={ICON_NAME.PLUS} />}
-                aria-label="new-team-member"
                 name="new-team-member">
                 {t("new_team")}
               </LoadingButton>

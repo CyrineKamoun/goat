@@ -427,8 +427,6 @@ class HeatmapClosestAverageParams(HeatmapCommon):
     )
 
 
-
-
 class HeatmapConnectivityParams(HeatmapCommon):
     """Parameters for connectivity-based heatmaps."""
 
@@ -456,6 +454,7 @@ class HeatmapConnectivityParams(HeatmapCommon):
 
 class Opportunity2SFCA(OpportunityBase):
     """Opportunity dataset parameters for 2SFCA heatmaps."""
+
     sensitivity: SensitivityValue = Field(
         default=300000,
         description="Sensitivity parameter for enhanced 2SFCA methods.",
@@ -509,7 +508,7 @@ class Opportunity2SFCA(OpportunityBase):
             label_key="capacity_field",
             widget="field-selector",
             widget_options={"source_layer": "input_path", "field_types": ["number"]},
-            visible_when={"input_path": {"$ne": None},  "capacity_type": "field"},
+            visible_when={"input_path": {"$ne": None}, "capacity_type": "field"},
         ),
     )
 
@@ -546,9 +545,11 @@ class Opportunity2SFCA(OpportunityBase):
 
 class TwoSFCAType(StrEnum):
     """Type of 2SFCA method."""
+
     twosfca = "twosfca"
     e2sfca = "e2sfca"
     m2sfca = "m2sfca"
+
 
 TwoSFCAType_LABELS: dict[str, str] = {
     "twosfca": "two_sfca_type.twosfca",
@@ -564,9 +565,7 @@ class Heatmap2SFCAParams(HeatmapCommon):
         default=TwoSFCAType.twosfca,
         description="Type of 2SFCA method to use.",
         json_schema_extra=ui_field(
-            section="configuration",
-            field_order=5,
-            enum_labels=TwoSFCAType_LABELS
+            section="configuration", field_order=5, enum_labels=TwoSFCAType_LABELS
         ),
     )
 
@@ -680,7 +679,6 @@ class HuffmodelParams(HeatmapCommon):
         ),
     )
 
-
     opportunity_path: str = Field(
         ...,
         description="Path to opportunity layer dataset.",
@@ -700,7 +698,10 @@ class HuffmodelParams(HeatmapCommon):
             field_order=5,
             label_key="attractivity",
             widget="field-selector",
-            widget_options={"source_layer": "opportunity_path", "field_types": ["number"]},
+            widget_options={
+                "source_layer": "opportunity_path",
+                "field_types": ["number"],
+            },
             visible_when={"opportunity_path": {"$ne": None}},
         ),
     )
@@ -713,7 +714,6 @@ class HuffmodelParams(HeatmapCommon):
             label_key="max_cost",
         ),
     )
-
 
     attractiveness_param: float = Field(
         default=1.0,
@@ -790,3 +790,27 @@ class HuffmodelV2Params(BaseModel):
         default=None, description="Allowed transit modes."
     )
     max_transfers: int = Field(default=5, description="Max transfers.")
+
+    # ---- Street network override --------------------------------------------
+    # Point the engine at an uploaded street network bundle's graph instead of
+    # the default global network. None uses the default.
+    edge_path: str | None = Field(
+        default=None,
+        description="Path to an edges parquet to use for street routing",
+    )
+    node_path: str | None = Field(
+        default=None,
+        description="Path to a nodes parquet to use for street routing",
+    )
+
+    @model_validator(mode="after")
+    def validate_network_override(self: Self) -> Self:
+        # Half an override is worse than none: the engine would route over one
+        # network's edges joined to the other's nodes, which silently yields a
+        # near-empty result rather than failing.
+        if bool(self.edge_path) != bool(self.node_path):
+            raise ValueError(
+                "edge_path and node_path must be set together — a routing graph "
+                "is only coherent as a pair"
+            )
+        return self

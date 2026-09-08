@@ -1,11 +1,37 @@
 import { useCallback, useEffect, useRef } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 
-import { useJobs } from "@/lib/api/processes";
+import { getJobResult, useJobs } from "@/lib/api/processes";
 import { setRunningJobIds } from "@/lib/store/jobs/slice";
 
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
+
+/**
+ * Announce what an import job did: how many layers arrived, and how many were left behind.
+ *
+ * The counts have to be fetched: the job list reports `result: null` for every entry, so
+ * reading the result off the polled job silently under-reported a three-layer import as
+ * one and hid the skip entirely. When the result cannot be read, the generic success
+ * message is used — better to say less than to state a count that is not true.
+ */
+const announceImport = async (jobId: string, t: TFunction<"common">, fallback: string) => {
+  const result = await getJobResult(jobId).catch(() => null);
+  const imported = (result?.imported as unknown[] | undefined)?.length;
+  const skipped = (result?.skipped as unknown[] | undefined)?.length ?? 0;
+
+  if (imported === undefined) {
+    toast.success(fallback);
+    return;
+  }
+  const summary = t("upload_imported_n", { count: imported });
+  if (skipped > 0) {
+    toast.warning(`${summary}, ${t("upload_skipped_n", { count: skipped })}`);
+  } else {
+    toast.success(summary);
+  }
+};
 
 export function useJobStatus(onSuccess?: () => void, onFailed?: () => void) {
   const runningJobIds = useAppSelector((state) => state.jobs.runningJobIds);
@@ -70,6 +96,10 @@ export function useJobStatus(onSuccess?: () => void, onFailed?: () => void) {
           const isFinalizeJob = job.processID === "finalize_layer";
           if (isFinalizeJob) {
             toast.success(t("layer_saved_successfully"));
+          } else if (job.processID === "layer_import") {
+            // An upload can hold several datasets, and one of them failing does not fail
+            // the job — so "success" on its own would hide what was left behind.
+            void announceImport(job.jobID, t, `"${type}" - ${t("job_success")}`);
           } else if (!isDeleteJob && !isDownloadJob && !isWorkflowJob) {
             toast.success(`"${type}" - ${t("job_success")}`);
           }

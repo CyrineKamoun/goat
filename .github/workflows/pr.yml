@@ -31,7 +31,8 @@ jobs:
       python: >-
         ${{ needs.file-changes.outputs.core == 'true'
         || needs.file-changes.outputs.geoapi == 'true'
-        || needs.file-changes.outputs.processes == 'true' }}
+        || needs.file-changes.outputs.processes == 'true'
+        || needs.file-changes.outputs.catalog == 'true' }}
 
   test:
     name: test
@@ -45,9 +46,11 @@ jobs:
       goatlib: >-
         ${{ needs.file-changes.outputs.core == 'true'
         || needs.file-changes.outputs.geoapi == 'true'
-        || needs.file-changes.outputs.processes == 'true' }}
+        || needs.file-changes.outputs.processes == 'true'
+        || needs.file-changes.outputs.catalog == 'true' }}
       geoapi: ${{ needs.file-changes.outputs.geoapi == 'true' }}
       processes: ${{ needs.file-changes.outputs.processes == 'true' }}
+      catalog: ${{ needs.file-changes.outputs.catalog == 'true' }}
 
   build:
     name: build

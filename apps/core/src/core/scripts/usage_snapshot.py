@@ -232,10 +232,10 @@ async def snapshot_layers(db: AsyncSession, gauge: Instrument) -> int:
     """Emit ``goat_layers_total`` per (org, type, feature_layer_type).
 
     "Org" here is the *owning* org: ``layer.user_id -> user.organization_id``.
-    Sharing links (the ``layer_organization`` table) intentionally do not
-    contribute -- otherwise a shared layer would be double-counted across
-    every org it's shared into, and the dashboard's "total layers" panel
-    would no longer equal ``count(*)`` over the ``layer`` table.
+    Sharing links (``resource_grant`` rows) intentionally do not contribute --
+    otherwise a shared layer would be double-counted across every org it's
+    shared into, and the dashboard's "total layers" panel would no longer
+    equal ``count(*)`` over the ``layer`` table.
     """
     schema = settings.SCHEMA
     # Five dimensions on top of org:

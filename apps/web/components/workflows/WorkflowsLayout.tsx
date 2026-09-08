@@ -94,6 +94,7 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
   const {
     isExecuting,
     canExecute,
+    hasUnresolvedInputs,
     nodeStatuses,
     nodeExecutionInfo,
     tempLayerIds,
@@ -396,6 +397,7 @@ const WorkflowsLayoutInner: React.FC<WorkflowsLayoutProps> = ({
                 onDragOver={handleDragOver}
                 isExecuting={isExecuting}
                 canExecute={canExecute}
+                hasUnresolvedInputs={hasUnresolvedInputs}
                 onRun={execute}
                 onStop={cancel}
               />

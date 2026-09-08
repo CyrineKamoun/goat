@@ -49,7 +49,6 @@ class TestCatchmentAreaToolParams:
             polygon_difference=False,
             output_path="/tmp/output.geojson",
             routing_url=TEST_ROUTING_URL,
-            scenario_id="test-123",
         )
         assert params.routing_mode == CatchmentAreaRoutingMode.bicycle
         assert params.travel_time == 20

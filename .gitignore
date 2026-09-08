@@ -3,14 +3,13 @@
 
 # Superpowers brainstorm sessions
 .superpowers/
-docs/superpowers/
 
 # Playwright
 test-results/
 
-# Superpowers brainstorm sessions
-.superpowers/
-docs/superpowers/
+# Working notes, specs and runbooks -- local only, never pushed.
+# Root-anchored so the Docusaurus site (apps/docs) is untouched.
+/docs/
 
 # Logs
 logs
@@ -67,6 +66,7 @@ dist/
 wheels/
 *.egg-info
 .ruff_cache/
+.mypy_cache/
 .venv
 .pytest_cache/
 
@@ -97,9 +97,20 @@ packages/python/goatlib/tests/result/*
 .coverage
 
 data/*
+/data
 
 migration_scripts/*
 
 base_networks/*
 
 /tmp/**
+
+
+.design-sync/sb-reference/
+.design-sync/learnings/
+.design-sync/.cache/
+.design-sync/node_modules
+.design-sync/sb-build.log
+.ds-sync/
+ds-bundle/
+.design-sync

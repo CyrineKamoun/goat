@@ -223,7 +223,9 @@ class HeatmapV2Tool(HeatmapToolBase):
 
         logger.info(
             "Loaded %d opportunities (%d seeds) from %s (weight: %s)",
-            len(groups), sum(len(g[0]) for g in groups), opp.input_path,
+            len(groups),
+            sum(len(g[0]) for g in groups),
+            opp.input_path,
             opp.potential_type.value,
         )
         return groups
@@ -314,8 +316,9 @@ class HeatmapV2Tool(HeatmapToolBase):
             if params.speed is not None
             else _MODE_SPEED_DEFAULTS.get(params.routing_mode, 0.0)
         )
-        cfg.edge_dir = self._edge_dir
-        cfg.node_dir = self._node_dir
+        # An uploaded street network bundle's graph overrides the global network.
+        cfg.edge_dir = str(params.edge_path or self._edge_dir)
+        cfg.node_dir = str(params.node_path or self._node_dir)
         cfg.opportunities = [
             routing.Opportunity(
                 [routing.Point3857(sx, sy) for (sx, sy) in seeds],
@@ -355,12 +358,8 @@ class HeatmapV2Tool(HeatmapToolBase):
             cfg.egress_mode = routing_mode_map[params.egress_mode]
             cfg.access_max_time = params.access_max_time
             cfg.egress_max_time = params.egress_max_time
-            cfg.access_table_path = self._accessegress_table_path(
-                params.access_mode
-            )
-            cfg.egress_table_path = self._accessegress_table_path(
-                params.egress_mode
-            )
+            cfg.access_table_path = self._accessegress_table_path(params.access_mode)
+            cfg.egress_table_path = self._accessegress_table_path(params.egress_mode)
             # Connectivity keys its output at the fixed per-mode resolution the
             # AOI is rasterized to, so C++ output cells align with the AOI cells.
             cfg.connectivity_output_resolution = DEFAULT_H3_RESOLUTION[
@@ -381,7 +380,9 @@ class HeatmapV2Tool(HeatmapToolBase):
         Returns (centroid points in EPSG:3857 with weight=1.0, resolution used).
         """
         # Register the AOI
-        aoi_meta, aoi_table = self.import_input(reference_area_path, table_name="aoi_input")
+        aoi_meta, aoi_table = self.import_input(
+            reference_area_path, table_name="aoi_input"
+        )
 
         # Convert to H3 cells (parent helper)
         aoi_cells_table = self._process_table_to_h3(
@@ -404,7 +405,8 @@ class HeatmapV2Tool(HeatmapToolBase):
 
         logger.info(
             "Rasterized AOI to %d H3 cells at resolution %d",
-            len(rows), h3_resolution,
+            len(rows),
+            h3_resolution,
         )
         return [(float(x), float(y), 1.0) for x, y in rows], h3_resolution
 
@@ -481,7 +483,9 @@ class HeatmapV2Tool(HeatmapToolBase):
             sensitivity = opp.sensitivity
             layer_max_cost = float(opp.max_cost)
             n_destinations = opp.n_destinations
-            layers.append((label, opp_groups, sensitivity, layer_max_cost, n_destinations))
+            layers.append(
+                (label, opp_groups, sensitivity, layer_max_cost, n_destinations)
+            )
 
         total_seeds = sum(
             sum(len(g[0]) for g in groups) for _, groups, _, _, _ in layers
@@ -571,7 +575,8 @@ class HeatmapV2Tool(HeatmapToolBase):
         routing = self._get_routing_module()
         score_path = scratch_dir / f"score_{idx}.parquet"
         cfg = self._build_heatmap_cfg(
-            params, opp_groups,
+            params,
+            opp_groups,
             sensitivity=sensitivity,
             output_path=str(score_path),
             max_cost=layer_max_cost,
@@ -585,9 +590,14 @@ class HeatmapV2Tool(HeatmapToolBase):
         logger.info(
             "[Heatmap] Layer %d/%d '%s' compute_heatmap "
             "(%d opps, %d seeds, max_cost=%.1f, sensitivity=%.0f): %.0f ms",
-            idx + 1, total, col, len(opp_groups),
+            idx + 1,
+            total,
+            col,
+            len(opp_groups),
             sum(len(g[0]) for g in opp_groups),
-            layer_max_cost, sensitivity, elapsed_ms,
+            layer_max_cost,
+            sensitivity,
+            elapsed_ms,
         )
 
         score_table = f"score_{idx}"
@@ -626,8 +636,13 @@ class HeatmapV2Tool(HeatmapToolBase):
         logger.info(
             "[Heatmap] Layer %d '%s' scores: "
             "rows=%d nonzero=%d min=%.3g max=%.3g avg=%.3g",
-            idx + 1, col,
-            stats[0], stats[1], stats[2], stats[3], stats[4],
+            idx + 1,
+            col,
+            stats[0],
+            stats[1],
+            stats[2],
+            stats[3],
+            stats[4],
         )
 
     # ----------------------------------------------------------- join across layers
@@ -647,8 +662,7 @@ class HeatmapV2Tool(HeatmapToolBase):
             for idx, (col, _) in enumerate(score_tables)
         )
         sum_expr = " + ".join(
-            f"s{idx}.{col}_accessibility"
-            for idx, (col, _) in enumerate(score_tables)
+            f"s{idx}.{col}_accessibility" for idx, (col, _) in enumerate(score_tables)
         )
         # 2SFCA totals are tiny per-capita ratios; keep more precision so they
         # don't round to zero (2 dp is fine for the other formulas).
@@ -658,9 +672,7 @@ class HeatmapV2Tool(HeatmapToolBase):
                 f"(s{idx}.{col}_accessibility IS NOT NULL)::INT"
                 for idx, (col, _) in enumerate(score_tables)
             )
-            total_select = (
-                f"ROUND(({sum_expr}) / NULLIF({cnt_expr}, 0), {decimals}) AS total_accessibility"
-            )
+            total_select = f"ROUND(({sum_expr}) / NULLIF({cnt_expr}, 0), {decimals}) AS total_accessibility"
             drop_null_total = False
         else:
             total_select = f"ROUND({sum_expr}, {decimals}) AS total_accessibility"
@@ -668,16 +680,18 @@ class HeatmapV2Tool(HeatmapToolBase):
 
         from_clause = f"{score_tables[0][1]} s0"
         for i in range(1, len(score_tables)):
-            prev_coalesce = "COALESCE(" + ", ".join(
-                f"s{j}.h3_index" for j in range(i)
-            ) + ")"
+            prev_coalesce = (
+                "COALESCE(" + ", ".join(f"s{j}.h3_index" for j in range(i)) + ")"
+            )
             from_clause += (
                 f"\n        FULL OUTER JOIN {score_tables[i][1]} s{i} "
                 f"ON s{i}.h3_index = {prev_coalesce}"
             )
-        h3_coalesce = "COALESCE(" + ", ".join(
-            f"s{idx}.h3_index" for idx in range(len(score_tables))
-        ) + ")"
+        h3_coalesce = (
+            "COALESCE("
+            + ", ".join(f"s{idx}.h3_index" for idx in range(len(score_tables)))
+            + ")"
+        )
 
         inner_select = (
             f"SELECT {h3_coalesce} AS h3_index, {select_cols}, {total_select} "
@@ -688,9 +702,7 @@ class HeatmapV2Tool(HeatmapToolBase):
             if drop_null_total
             else inner_select
         )
-        self.con.execute(
-            f"CREATE OR REPLACE TEMP TABLE heatmap_v2_results AS {body}"
-        )
+        self.con.execute(f"CREATE OR REPLACE TEMP TABLE heatmap_v2_results AS {body}")
         return "heatmap_v2_results"
 
     # ----------------------------------------------------------- reference-area clip
@@ -739,7 +751,10 @@ class HeatmapV2Tool(HeatmapToolBase):
         logger.info(
             "[Heatmap] Load %d opportunity layer(s) (%d opportunities, "
             "%d seeds total): %.0f ms",
-            len(layer_specs), total_opps, total_seeds, lap(),
+            len(layer_specs),
+            total_opps,
+            total_seeds,
+            lap(),
         )
 
         with tempfile.TemporaryDirectory() as td_str:
@@ -747,33 +762,45 @@ class HeatmapV2Tool(HeatmapToolBase):
             demand_path: str | None = None
             if params.heatmap_type == HeatmapType.two_sfca:
                 demand_path = self._prepare_demand(
-                    params.demand_path, params.demand_field,
-                    DEFAULT_H3_RESOLUTION[params.routing_mode], scratch_dir,
+                    params.demand_path,
+                    params.demand_field,
+                    DEFAULT_H3_RESOLUTION[params.routing_mode],
+                    scratch_dir,
                 )
                 logger.info("[Heatmap] 2SFCA demand rasterized: %.0f ms", lap())
             score_tables: list[tuple[str, str]] = []
             for idx, (col, opp_pts, sens, max_cost, n_dest) in enumerate(layer_specs):
                 table = self._compute_layer_scores(
-                    idx, len(layer_specs),
-                    col, opp_pts, sens, max_cost, n_dest,
-                    params, scratch_dir, demand_path,
+                    idx,
+                    len(layer_specs),
+                    col,
+                    opp_pts,
+                    sens,
+                    max_cost,
+                    n_dest,
+                    params,
+                    scratch_dir,
+                    demand_path,
                 )
                 score_tables.append((col, table))
             last_t = time.perf_counter()  # per-layer prints already accounted for time
 
-            results_table = self._join_layer_scores(
-                score_tables, params.heatmap_type
-            )
+            results_table = self._join_layer_scores(score_tables, params.heatmap_type)
             n_cells = self.con.execute(
                 f"SELECT count(*) FROM {results_table}"
             ).fetchone()[0]
             logger.info(
                 "[Heatmap] Join + total (over %d layer(s)): %.0f ms — %d cells",
-                len(score_tables), lap(), n_cells,
+                len(score_tables),
+                lap(),
+                n_cells,
             )
 
         results_table = self._maybe_clip_to_reference_area(results_table, params)
-        if params.reference_area_path and params.heatmap_type != HeatmapType.connectivity:
+        if (
+            params.reference_area_path
+            and params.heatmap_type != HeatmapType.connectivity
+        ):
             logger.info("[Heatmap] Reference-area clip: %.0f ms", lap())
 
         out_path = self._export_h3_results(

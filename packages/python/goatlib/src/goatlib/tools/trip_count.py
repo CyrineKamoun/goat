@@ -26,7 +26,6 @@ from goatlib.analysis.schemas.ui import (
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import (
-    ScenarioSelectorMixin,
     ToolInputBase,
     get_default_layer_name,
 )
@@ -50,7 +49,7 @@ SECTION_RESULT_TRIP = UISection(
 )
 
 
-class TripCountToolParams(ScenarioSelectorMixin, ToolInputBase):
+class TripCountToolParams(ToolInputBase):
     """Parameters for Trip Count Station tool.
 
     Calculates public transport trip counts per station within a time window,
@@ -62,14 +61,6 @@ class TripCountToolParams(ScenarioSelectorMixin, ToolInputBase):
             SECTION_CALCULATION_TIME,
             SECTION_CONFIGURATION,
             SECTION_RESULT_TRIP,
-            UISection(
-                id="scenario",
-                order=8,
-                icon="scenario",
-                collapsible=True,
-                collapsed=True,
-                depends_on={"reference_area_layer_id": {"$ne": None}},
-            ),
         )
     }
 
@@ -235,8 +226,6 @@ class TripCountToolRunner(BaseToolRunner[TripCountToolParams]):
                 layer_id=params.reference_area_layer_id,
                 user_id=params.user_id,
                 cql_filter=params.reference_area_layer_filter,
-                scenario_id=params.scenario_id,
-                project_id=params.project_id,
             )
         )
 

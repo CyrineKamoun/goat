@@ -332,6 +332,226 @@ class TestFeatureEndpoints:
         assert response.status_code == 404
 
 
+class TestFeatureFieldValidation:
+    """Unknown `properties`/`sortby` names must 400, not 500.
+
+    Both reach the query builders as quoted identifiers; before validation
+    an unknown name failed inside DuckDB and surfaced as a 500.
+    """
+
+    COLLECTION = "/collections/abc123de-f456-7890-1234-5678901234ab/items"
+
+    @patch("geoapi.routers.features.feature_service")
+    @patch("geoapi.routers.features.layer_service")
+    def test_unknown_sortby_is_rejected(
+        self,
+        mock_layer_service,
+        mock_feature_service,
+        test_client,
+        sample_layer_metadata,
+    ):
+        mock_layer_service.get_layer_metadata = AsyncMock(
+            return_value=sample_layer_metadata
+        )
+        mock_feature_service.get_features_json = MagicMock(
+            side_effect=AssertionError("query must not run for an unknown field")
+        )
+
+        response = test_client.get(f"{self.COLLECTION}?sortby=-nope")
+        assert response.status_code == 400
+        assert "nope" in response.json()["detail"]
+
+    @patch("geoapi.routers.features.feature_service")
+    @patch("geoapi.routers.features.layer_service")
+    def test_unknown_property_is_rejected(
+        self,
+        mock_layer_service,
+        mock_feature_service,
+        test_client,
+        sample_layer_metadata,
+    ):
+        mock_layer_service.get_layer_metadata = AsyncMock(
+            return_value=sample_layer_metadata
+        )
+        mock_feature_service.get_features_json = MagicMock(
+            side_effect=AssertionError("query must not run for an unknown field")
+        )
+
+        response = test_client.get(f"{self.COLLECTION}?properties=name,nope")
+        assert response.status_code == 400
+        assert "nope" in response.json()["detail"]
+
+    @patch("geoapi.routers.features.feature_service")
+    @patch("geoapi.routers.features.layer_service")
+    def test_known_fields_still_pass(
+        self,
+        mock_layer_service,
+        mock_feature_service,
+        test_client,
+        sample_layer_metadata,
+        sample_features,
+    ):
+        mock_layer_service.get_layer_metadata = AsyncMock(
+            return_value=sample_layer_metadata
+        )
+        fragment, returned = features_json_fragment(sample_features)
+        mock_feature_service.get_features_json = MagicMock(
+            return_value=(fragment, returned, 2)
+        )
+
+        response = test_client.get(f"{self.COLLECTION}?properties=name,value&sortby=id")
+        assert response.status_code == 200
+
+    @patch("geoapi.routers.features.feature_service")
+    @patch("geoapi.routers.features.layer_service")
+    def test_unknown_property_on_single_feature_is_rejected(
+        self,
+        mock_layer_service,
+        mock_feature_service,
+        test_client,
+        sample_layer_metadata,
+    ):
+        mock_layer_service.get_layer_metadata = AsyncMock(
+            return_value=sample_layer_metadata
+        )
+        mock_feature_service.get_feature_by_id = MagicMock(
+            side_effect=AssertionError("query must not run for an unknown field")
+        )
+
+        response = test_client.get(f"{self.COLLECTION}/1?properties=nope")
+        assert response.status_code == 400
+        assert "nope" in response.json()["detail"]
+
+
+class TestTileFieldValidation:
+    """Unknown `?properties=` on the tile route must 400, not 500.
+
+    The dynamic (GeoParquet) tile path splices the requested property names
+    into the MVT query; the PMTiles fast paths ignore them.
+    """
+
+    TILE = (
+        "/collections/abc123de-f456-7890-1234-5678901234ab"
+        "/tiles/WebMercatorQuad/10/512/256"
+    )
+
+    @staticmethod
+    def _force_dynamic(mock_tile_service):
+        mock_tile_service.can_serve_from_pmtiles_by_layer_id = MagicMock(
+            return_value=False
+        )
+        mock_tile_service.can_serve_from_pmtiles = MagicMock(return_value=False)
+
+    @patch("geoapi.routers.tiles.tile_service")
+    @patch("geoapi.routers.tiles.layer_service")
+    def test_unknown_property_is_rejected(
+        self, mock_layer_service, mock_tile_service, test_client, sample_layer_metadata
+    ):
+        # Cold cache: the column list is resolved once, then validated.
+        mock_layer_service.cached_metadata = MagicMock(return_value=None)
+        mock_layer_service.get_layer_metadata = AsyncMock(
+            return_value=sample_layer_metadata
+        )
+        self._force_dynamic(mock_tile_service)
+        mock_tile_service.get_tile = AsyncMock(
+            side_effect=AssertionError("tile query must not run for an unknown field")
+        )
+
+        response = test_client.get(f"{self.TILE}?dynamic=true&properties=name,nope")
+        assert response.status_code == 400
+        assert "nope" in response.json()["detail"]
+
+    @patch("geoapi.routers.tiles.tile_service")
+    @patch("geoapi.routers.tiles.layer_service")
+    def test_known_properties_still_pass(
+        self, mock_layer_service, mock_tile_service, test_client, sample_layer_metadata
+    ):
+        mock_layer_service.get_layer_metadata = AsyncMock(
+            return_value=sample_layer_metadata
+        )
+        mock_layer_service.cached_metadata = MagicMock(
+            return_value=sample_layer_metadata
+        )
+        self._force_dynamic(mock_tile_service)
+        mock_tile_service.get_tile = AsyncMock(
+            return_value=(b"\x1a\x00", False, "geoparquet")
+        )
+
+        response = test_client.get(f"{self.TILE}?dynamic=true&properties=name,value")
+        assert response.status_code == 200
+
+    @patch("geoapi.routers.tiles.tile_service")
+    @patch("geoapi.routers.tiles.layer_service")
+    def test_pmtiles_path_rejects_the_same_unknown_property(
+        self, mock_layer_service, mock_tile_service, test_client, sample_layer_metadata
+    ):
+        """A PMTiles-served layer must answer an unknown field like the dynamic path.
+
+        Same request, same 400 — otherwise the contract depends on which
+        storage happens to back the tile.
+        """
+        mock_layer_service.cached_metadata = MagicMock(
+            return_value=sample_layer_metadata
+        )
+        mock_layer_service.get_layer_metadata = AsyncMock(
+            return_value=sample_layer_metadata
+        )
+        mock_tile_service.can_serve_from_pmtiles_by_layer_id = MagicMock(
+            return_value=True
+        )
+        mock_tile_service.get_tile_from_pmtiles_by_layer_id = AsyncMock(
+            return_value=(b"\x1a\x00", False, "pmtiles")
+        )
+
+        response = test_client.get(f"{self.TILE}?properties=name,nope")
+        assert response.status_code == 400
+        assert "nope" in response.json()["detail"]
+
+    @patch("geoapi.routers.tiles.tile_service")
+    @patch("geoapi.routers.tiles.layer_service")
+    def test_pmtiles_path_still_serves_known_properties(
+        self, mock_layer_service, mock_tile_service, test_client, sample_layer_metadata
+    ):
+        mock_layer_service.cached_metadata = MagicMock(
+            return_value=sample_layer_metadata
+        )
+        mock_layer_service.get_layer_metadata = AsyncMock(
+            return_value=sample_layer_metadata
+        )
+        mock_tile_service.can_serve_from_pmtiles_by_layer_id = MagicMock(
+            return_value=True
+        )
+        mock_tile_service.get_tile_from_pmtiles_by_layer_id = AsyncMock(
+            return_value=(b"\x1a\x00", False, "pmtiles")
+        )
+
+        response = test_client.get(f"{self.TILE}?properties=name,value")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/vnd.mapbox-vector-tile"
+
+    @patch("geoapi.routers.tiles.tile_service")
+    @patch("geoapi.routers.tiles.layer_service")
+    def test_a_warm_cache_costs_no_metadata_lookup(
+        self, mock_layer_service, mock_tile_service, test_client, sample_layer_metadata
+    ):
+        """The fast path reads the shared cache, not Postgres/DuckLake, per tile."""
+        mock_layer_service.cached_metadata = MagicMock(
+            return_value=sample_layer_metadata
+        )
+        mock_layer_service.get_layer_metadata = AsyncMock(
+            side_effect=AssertionError("a warm cache must not trigger a lookup")
+        )
+        mock_tile_service.can_serve_from_pmtiles_by_layer_id = MagicMock(
+            return_value=True
+        )
+        mock_tile_service.get_tile_from_pmtiles_by_layer_id = AsyncMock(
+            return_value=(b"\x1a\x00", False, "pmtiles")
+        )
+
+        response = test_client.get(f"{self.TILE}?properties=name")
+        assert response.status_code == 200
+
+
 class TestTileEndpoints:
     """Tests for tile endpoints."""
 

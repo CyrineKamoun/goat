@@ -8,6 +8,8 @@ import json
 import logging
 import re
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import duckdb
@@ -29,6 +31,14 @@ from goatlib.analysis.statistics import (
 )
 from goatlib.storage import build_cql_filter, configure_baked_extensions
 from goatlib.tools.custom_sql import validate_sql_query
+from goatlib.utils.layer import (
+    catalog_layer_parquet,
+    catalog_layer_relation,
+    catalog_view_sql,
+    format_uuid,
+    is_catalog_relation,
+    table_path_parts,
+)
 
 from processes.dependencies import (
     _layer_id_to_table_name,
@@ -51,18 +61,60 @@ class AnalyticsService:
     SEARCH_TIME_BUDGET_SECONDS = 8.0
 
     def _get_table_name(self, collection: str) -> str:
-        """Get the full DuckLake table name for a collection/layer ID.
+        """The relation a collection/layer ID is read from.
+
+        Two shapes, because layers have two homes. An ordinary layer is a
+        DuckLake table (`lake.<schema>.t_<id>`). A promoted catalog layer is
+        one parquet file in the shared catalog layers directory, read through a
+        `catalog_layers."t_<id>"` view — it was never registered in the
+        DuckLake catalog, so resolving it there answers `404 Layer not found`.
+        The file's existence is the signal, exactly as geoapi's resolver treats
+        it.
 
         Args:
             collection: Layer ID (UUID format)
 
         Returns:
-            Full table name like 'lake.user_xxx.t_layerid'
+            'lake.user_xxx.t_layerid' or 'catalog_layers."t_layerid"'
         """
         layer_id = normalize_layer_id(collection)
+        if catalog_layer_parquet(layer_id) is not None:
+            relation: str = catalog_layer_relation(layer_id)
+            return relation
         schema_name = get_schema_for_layer(layer_id)
         table_name = _layer_id_to_table_name(layer_id)
         return f"lake.{schema_name}.{table_name}"
+
+    def _ensure_catalog_view(
+        self, con: duckdb.DuckDBPyConnection, table_name: str
+    ) -> None:
+        """Create the view a catalog relation needs, on this connection.
+
+        A no-op for a DuckLake table. The view is per-connection state and a
+        single analytics call opens several connections, so this runs at every
+        one rather than once per layer.
+        """
+        if not is_catalog_relation(table_name):
+            return
+        _, table = table_path_parts(table_name)
+        layer_id = format_uuid(table.removeprefix("t_"))
+        path = catalog_layer_parquet(layer_id)
+        if path is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Layer not found: {layer_id}",
+            )
+        for statement in catalog_view_sql(layer_id, path):
+            con.execute(statement)
+
+    @contextmanager
+    def _connection(
+        self, table_name: str, manager: Any = None
+    ) -> Iterator[duckdb.DuckDBPyConnection]:
+        """A connection that can read `table_name`, whichever home it has."""
+        with (manager or ducklake_manager).connection() as con:
+            self._ensure_catalog_view(con, table_name)
+            yield con
 
     def _get_column_names(self, table_name: str) -> list[str]:
         """Get column names for a table.
@@ -73,7 +125,7 @@ class AnalyticsService:
         Returns:
             List of column names
         """
-        with ducklake_manager.connection() as con:
+        with self._connection(table_name) as con:
             result = con.execute(f"DESCRIBE {table_name}").fetchall()
             return [row[0] for row in result]
 
@@ -86,7 +138,7 @@ class AnalyticsService:
         Returns:
             Geometry column name (defaults to 'geometry')
         """
-        with ducklake_manager.connection() as con:
+        with self._connection(table_name) as con:
             result = con.execute(f"DESCRIBE {table_name}").fetchall()
             for row in result:
                 col_name, col_type = row[0], row[1]
@@ -121,7 +173,7 @@ class AnalyticsService:
                 filter_dict = filter_expr
 
             # Get column names and detect geometry column from the table
-            with ducklake_manager.connection() as con:
+            with self._connection(table_name) as con:
                 result = con.execute(f"DESCRIBE {table_name}").fetchall()
                 column_names = [row[0] for row in result]
                 column_types = {row[0]: row[1] for row in result}
@@ -177,7 +229,7 @@ class AnalyticsService:
             filter_expr, table_name, geometry_column
         )
 
-        with ducklake_manager.connection() as con:
+        with self._connection(table_name) as con:
             result = calculate_feature_count(
                 con,
                 table_name,
@@ -220,7 +272,7 @@ class AnalyticsService:
         if order == "ascendent":
             sort_order = SortOrder.ascendent
 
-        with ducklake_manager.connection() as con:
+        with self._connection(table_name) as con:
             result = calculate_unique_values(
                 con,
                 table_name,
@@ -267,7 +319,7 @@ class AnalyticsService:
         if method in ClassBreakMethod.__members__:
             break_method = ClassBreakMethod(method)
 
-        with ducklake_manager.connection() as con:
+        with self._connection(table_name) as con:
             result = calculate_class_breaks(
                 con,
                 table_name,
@@ -308,7 +360,7 @@ class AnalyticsService:
         if operation in AreaOperation.__members__:
             area_op = AreaOperation(operation)
 
-        with ducklake_manager.connection() as con:
+        with self._connection(table_name) as con:
             result = calculate_area_statistics(
                 con,
                 table_name,
@@ -348,7 +400,7 @@ class AnalyticsService:
             params,
         )
 
-        with ducklake_manager.connection() as con:
+        with self._connection(table_name) as con:
             result = calculate_extent(
                 con,
                 table_name,
@@ -413,7 +465,7 @@ class AnalyticsService:
         if order == "ascendent":
             sort_order = SortOrder.ascendent
 
-        with ducklake_manager.connection() as con:
+        with self._connection(table_name) as con:
             result = calculate_aggregation_stats(
                 con,
                 table_name,
@@ -464,7 +516,7 @@ class AnalyticsService:
         if method in HistogramBreakMethod.__members__:
             histogram_method = HistogramBreakMethod(method)
 
-        with ducklake_manager.connection() as con:
+        with self._connection(table_name) as con:
             result = calculate_histogram(
                 con,
                 table_name,
@@ -493,7 +545,7 @@ class AnalyticsService:
         per layer.
         """
         table_name = self._get_table_name(spec["layer_id"])
-        with search_ducklake_manager.connection() as con:
+        with self._connection(table_name, search_ducklake_manager) as con:
             geometry_column = "geometry"
             for row in con.execute(f"DESCRIBE {table_name}").fetchall():
                 col_name, col_type = row[0], row[1]
@@ -864,10 +916,8 @@ class AnalyticsService:
 
                 for alias, layer_id in ducklake_layers.items():
                     try:
-                        norm_id = normalize_layer_id(layer_id)
-                        schema_name = get_schema_for_layer(norm_id)
-                        table_name = _layer_id_to_table_name(norm_id)
-                        full_table = f"lake.{schema_name}.{table_name}"
+                        full_table = self._get_table_name(layer_id)
+                        self._ensure_catalog_view(con, full_table)
                     except Exception as e:
                         return {
                             "success": False,

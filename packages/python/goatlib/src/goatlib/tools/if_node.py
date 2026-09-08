@@ -19,6 +19,13 @@ upstream DuckLake layer; the scalar result determines the active handle.
 import logging
 from typing import Any
 
+from goatlib.utils.layer import (
+    catalog_layer_parquet,
+    get_schema_for_layer,
+    layer_id_to_table_name,
+    layer_table_path,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -118,7 +125,6 @@ def _logical_rows_to_sql_term(
     return f"(MAX(CASE WHEN ({where}) THEN 1 ELSE 0 END) = 1)"
 
 
-
 def _build_simple_condition_sql(
     condition: dict[str, Any] | None,
     column_names: list[str],
@@ -167,11 +173,14 @@ def _build_simple_condition_sql(
     return "(" + joiner.join(parts) + ")"
 
 
-def _resolve_layer_sql_ref(layer_id: str, user_id: str) -> str:
+def _resolve_layer_sql_ref(
+    layer_id: str, user_id: str, manager: Any | None = None
+) -> str:
     """Resolve a layer id to a DuckDB-queryable reference.
 
-    - Project layer (no colons): ``lake.user_<uid>.t_<lid>`` — matches the
-      pattern used everywhere else in goatlib (see `BaseToolRunner.get_layer_table_path`).
+    - Project layer (no colons): the table path. With a DuckLake manager the
+      schema is looked up in the catalog; without one it falls back to the
+      computed path.
     - Temp layer (``workflow_id:node_id[:uuid]``): a ``read_parquet(...)`` call
       against the parquet file written by the upstream tool under
       ``/data/temporary/user_<uid>/w_<wfid>/n_<node>/t_<uuid>.parquet``.
@@ -201,8 +210,24 @@ def _resolve_layer_sql_ref(layer_id: str, user_id: str) -> str:
             parquet_path = matches[0]
         return f"read_parquet('{parquet_path}')"
 
-    layer_id_clean = layer_id.replace("-", "")
-    return f"lake.user_{user_id_clean}.t_{layer_id_clean}"
+    # A promoted catalog layer is one parquet file, not a DuckLake table. Same
+    # check the base runner makes, so an if-node and the tool downstream of it
+    # agree about what they are reading.
+    catalog_path = catalog_layer_parquet(layer_id)
+    if catalog_path is not None:
+        return f"read_parquet('{catalog_path}')"
+
+    if manager is not None:
+        try:
+            schema = get_schema_for_layer(layer_id, manager)
+            return f"lake.{schema}.{layer_id_to_table_name(layer_id)}"
+        except Exception as exc:
+            logger.warning(
+                "Could not resolve schema for layer %s, using computed path: %s",
+                layer_id,
+                exc,
+            )
+    return layer_table_path(layer_id)
 
 
 def _fetch_layer_columns(layer_id: str, user_id: str) -> list[str]:
@@ -216,8 +241,6 @@ def _fetch_layer_columns(layer_id: str, user_id: str) -> list[str]:
         from goatlib.storage import BaseDuckLakeManager
         from goatlib.tools.base import ToolSettings
 
-        ref = _resolve_layer_sql_ref(layer_id, user_id)
-
         settings = ToolSettings.from_env()
         manager = BaseDuckLakeManager(read_only=True)
         manager.init_from_params(
@@ -225,6 +248,7 @@ def _fetch_layer_columns(layer_id: str, user_id: str) -> list[str]:
             storage_path=settings.ducklake_data_dir,
             catalog_schema=settings.ducklake_catalog_schema,
         )
+        ref = _resolve_layer_sql_ref(layer_id, user_id, manager)
         try:
             with manager.connection() as con:
                 rows = con.execute(f"DESCRIBE SELECT * FROM {ref} LIMIT 0").fetchall()
@@ -252,14 +276,12 @@ def _evaluate_boolean_sql_against_layer(
     given (from the upstream layer's filter), the condition is evaluated only
     over the matching rows.
 
-    Resolves project layers to ``lake.user_<uid>.t_<lid>`` and temp layers to
+    Resolves project layers to their catalog table path and temp layers to
     a ``read_parquet(...)`` reference. See `_resolve_layer_sql_ref`.
     """
     try:
         from goatlib.storage import BaseDuckLakeManager
         from goatlib.tools.base import ToolSettings
-
-        ref = _resolve_layer_sql_ref(layer_id, user_id)
 
         settings = ToolSettings.from_env()
         manager = BaseDuckLakeManager(read_only=True)
@@ -268,6 +290,7 @@ def _evaluate_boolean_sql_against_layer(
             storage_path=settings.ducklake_data_dir,
             catalog_schema=settings.ducklake_catalog_schema,
         )
+        ref = _resolve_layer_sql_ref(layer_id, user_id, manager)
         try:
             with manager.connection() as con:
                 query = f"SELECT ({boolean_sql}) AS r FROM {ref}"

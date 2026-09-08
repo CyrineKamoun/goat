@@ -19,8 +19,21 @@ import { sanitizePopupHtml } from "./sanitize";
 import { renderTemplate } from "./renderTemplate";
 
 export interface MapFeaturePopoverProps {
-  layerId: string;
-  layerName: string;
+  /**
+   * The project layer the feature belongs to; its field definitions drive
+   * formatting. Optional so a caller with no layer can pass `fields` instead —
+   * the catalog previews datasets nobody has added to a project yet, and a
+   * dataset has no layer id until promote-on-use creates one.
+   */
+  layerId?: string;
+  /** Field definitions, when the caller already holds them. */
+  fields?: LayerField[];
+  /**
+   * Shown in the header. Optional for the same reason as `layerId`, and needed
+   * by nothing when `popup.header` is `"none"` — a caller with no layer would
+   * otherwise have to invent an empty name for a header that never renders.
+   */
+  layerName?: string;
   popup: PopupProperties;
   properties: Record<string, unknown>;
   lngLat: { lng: number; lat: number };
@@ -74,6 +87,7 @@ export function MapFeaturePopover(props: MapFeaturePopoverProps) {
 
 function PopoverBody({
   layerId,
+  fields,
   layerName,
   popup,
   properties,
@@ -106,13 +120,18 @@ function PopoverBody({
       <PopupHtmlStyles />
       {popup.header !== "none" && (
         <PopupHeader
-          layerName={layerName}
+          layerName={layerName ?? ""}
           layerIcon={layerIcon}
           onClose={onClose}
           compact={popup.header === "compact"}
         />
       )}
-      <PopupContent layerId={layerId} popup={popup} properties={properties} />
+      <PopupContent
+        layerId={layerId}
+        fields={fields}
+        popup={popup}
+        properties={properties}
+      />
     </Box>
   );
 }
@@ -212,18 +231,30 @@ export function PopupHeader({
  */
 export function PopupContent({
   layerId,
+  fields,
   popup,
   properties,
   sx,
 }: {
-  layerId: string;
+  /**
+   * The project layer whose field definitions drive formatting. Optional so a
+   * caller that has no layer can pass `fields` instead: the catalog renders this
+   * body for a dataset nobody has added to a project yet, and a dataset has no
+   * layer id until promote-on-use creates one.
+   */
+  layerId?: string;
+  /** Field definitions, when the caller already holds them. */
+  fields?: LayerField[];
   popup: PopupProperties;
   properties: Record<string, unknown>;
   sx?: import("@mui/material").SxProps<import("@mui/material").Theme>;
 }) {
   const { i18n } = useTranslation("common");
   const theme = useTheme();
-  const { layerFields } = useLayerFields(layerId);
+  // Called unconditionally, as a hook must be; with no id it resolves to nothing
+  // and `fields` answers instead.
+  const { layerFields: fetched } = useLayerFields(layerId ?? "");
+  const layerFields = fields ?? fetched;
   const { byColumn } = useMemo(
     () =>
       formatFeatureProperties({

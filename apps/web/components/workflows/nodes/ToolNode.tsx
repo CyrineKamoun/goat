@@ -21,6 +21,7 @@ import { type TOOL_ICON_NAME, toolIconMap } from "@p4b/ui/assets/svg/ToolIcons";
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import type { AppDispatch } from "@/lib/store";
+import { edgeDerivedInputHandles } from "@/lib/utils/workflowHandles";
 import { selectNodes } from "@/lib/store/workflow/selectors";
 import { addNode, removeNodes } from "@/lib/store/workflow/slice";
 import {
@@ -347,12 +348,7 @@ const ToolNode: React.FC<ToolNodeProps> = ({ id, data, selected }) => {
   );
 
   // Get expected input handles from incoming edges (for when process hasn't loaded yet)
-  const edgeDerivedHandles = useMemo(() => {
-    const incomingEdges = edges.filter((e) => e.target === id);
-    return incomingEdges
-      .map((e) => e.targetHandle)
-      .filter((h): h is string => h !== null && h !== undefined && h !== "input");
-  }, [edges, id]);
+  const edgeDerivedHandles = useMemo(() => edgeDerivedInputHandles(edges, id), [edges, id]);
 
   // Combine layer inputs with edge-derived handles for rendering
   // This ensures handles exist even before process description loads

@@ -25,6 +25,7 @@ Behavior is driven entirely by env vars:
 When OTEL_ENABLED is unset or "false", the function is a complete no-op:
 no SDK initialised, no logging changes, no env mutations.
 """
+
 import logging
 import os
 
@@ -66,9 +67,7 @@ def setup_observability(
 
     environment = os.environ.get("ENVIRONMENT")
     if not environment:
-        raise RuntimeError(
-            "ENVIRONMENT env var is required when OTEL_ENABLED=true"
-        )
+        raise RuntimeError("ENVIRONMENT env var is required when OTEL_ENABLED=true")
 
     otlp_endpoint = os.environ.get(
         "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"

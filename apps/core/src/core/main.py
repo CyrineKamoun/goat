@@ -1,16 +1,13 @@
 import asyncio
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request, status
-from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
+from goatlib.api import mount_api_docs
 from goatobs import setup_observability
 from sqlalchemy.exc import IntegrityError
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import HTMLResponse
 
 import core._dotenv  # noqa: E402, F401, I001
 from core.core.config import settings
@@ -44,9 +41,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    redoc_url="/api/redoc",
+    # Both docs pages are served by goatlib.api.mount_api_docs below (see the
+    # call for why); FastAPI's built-ins cannot carry a favicon.
+    docs_url=None,
+    redoc_url=None,
     openapi_url=f"{settings.API_V2_STR}/openapi.json",
     lifespan=lifespan,
+)
+
+# Docs pages + shared GOAT favicon, one implementation for all services.
+mount_api_docs(
+    app,
+    openapi_url=f"{settings.API_V2_STR}/openapi.json",
+    swagger_ui_parameters={"persistAuthorization": True},
 )
 
 # Attach OTel auto-instrumentation directly to this app. Module-top
@@ -63,20 +70,6 @@ async def value_error_exception_handler(
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": str(exc)},
-    )
-
-
-static_path = Path(__file__).resolve().parent.parent.parent / "static"
-app.mount("/static", StaticFiles(directory=static_path), name="static")
-
-
-@app.get("/api/docs", include_in_schema=False)
-async def swagger_ui_html() -> HTMLResponse:
-    return get_swagger_ui_html(
-        swagger_favicon_url="/static/api_favicon.png",
-        openapi_url=f"{settings.API_V2_STR}/openapi.json",
-        title=settings.PROJECT_NAME,
-        swagger_ui_parameters={"persistAuthorization": True},
     )
 
 

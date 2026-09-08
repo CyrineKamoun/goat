@@ -54,14 +54,8 @@ ACCOUNTS_TABLES = [
     "cost",
     "credit_usage",
     "invitation",
-    "layer_organization",
-    "layer_team",
-    "layer_user",
     "organization",
     "permission",
-    "project_organization",
-    "project_team",
-    "project_user",
     "resource",
     "resource_grant",
     "resource_permission",
@@ -132,7 +126,9 @@ def _tables_in(conn: "psycopg.Connection", schema: str) -> list[str]:
     return [r[0] for r in rows]
 
 
-def _collisions(conn: "psycopg.Connection", target: str, tables: list[str]) -> list[str]:
+def _collisions(
+    conn: "psycopg.Connection", target: str, tables: list[str]
+) -> list[str]:
     existing = set(_tables_in(conn, target))
     return sorted(set(tables) & existing)
 
@@ -366,14 +362,18 @@ def forward(apply: bool) -> int:
                 conn.execute(f'DROP FUNCTION IF EXISTS "{schema}"."{fn}" CASCADE')
 
         conn.commit()
-        print(f"\nMoved {len(legacy_tables)} tables into '{target}' and dropped "
-              f"'{LEGACY_SCHEMA}' (with {len(legacy_funcs)} legacy function(s)).")
+        print(
+            f"\nMoved {len(legacy_tables)} tables into '{target}' and dropped "
+            f"'{LEGACY_SCHEMA}' (with {len(legacy_funcs)} legacy function(s))."
+        )
         if dead_fns:
             print(f"Dropped legacy dead functions: {dead_fns}.")
         if reconcile_plan:
             print(f"Reconciled duplicate(s): {list(reconcile_plan)}.")
-        print("NEXT: you MUST re-run initial_data now to reinstall functions/"
-              "triggers against the new schema — authz is broken until you do.")
+        print(
+            "NEXT: you MUST re-run initial_data now to reinstall functions/"
+            "triggers against the new schema — authz is broken until you do."
+        )
         return 0
 
 
@@ -387,9 +387,7 @@ def rollback(apply: bool) -> int:
             return 0
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {LEGACY_SCHEMA}")
         for t in present:
-            conn.execute(
-                f'ALTER TABLE "{target}"."{t}" SET SCHEMA {LEGACY_SCHEMA}'
-            )
+            conn.execute(f'ALTER TABLE "{target}"."{t}" SET SCHEMA {LEGACY_SCHEMA}')
         conn.commit()
         print(f"\nMoved {len(present)} tables back to '{LEGACY_SCHEMA}'.")
         return 0

@@ -50,6 +50,7 @@ from goatlib.analysis.schemas.ui import (
     ui_field,
     ui_sections,
 )
+from goatlib.bundles.artifacts.street_network import fetch_routing_network
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools._opportunity_handles import (
     NUMBERED_OPPORTUNITY_FILTER_FIELDS,
@@ -198,7 +199,10 @@ class OpportunityV2PointBase(OpportunityV2):
             widget="layer-selector",
             widget_options={
                 "geometry_types": [
-                    "Point", "MultiPoint", "Polygon", "MultiPolygon",
+                    "Point",
+                    "MultiPoint",
+                    "Polygon",
+                    "MultiPolygon",
                 ]
             },
         ),
@@ -207,9 +211,7 @@ class OpportunityV2PointBase(OpportunityV2):
     layer_project_id: int | None = Field(
         default=None,
         description="Project-layer id of the opportunity layer (auto-populated).",
-        json_schema_extra=ui_field(
-            section="opportunities", field_order=1, hidden=True
-        ),
+        json_schema_extra=ui_field(section="opportunities", field_order=1, hidden=True),
     )
 
     # Single per-opportunity travel budget — same name/meaning as the analysis
@@ -261,7 +263,6 @@ class OpportunityV2PointBase(OpportunityV2):
     )
 
 
-
 class OpportunityV2PointGravity(OpportunityV2PointBase):
     """Gravity opportunity card: re-exposes sensitivity + potential_* fields."""
 
@@ -270,7 +271,7 @@ class OpportunityV2PointGravity(OpportunityV2PointBase):
         ge=SENSITIVITY_MIN,
         le=SENSITIVITY_MAX,
         description="Sensitivity parameter for gravity decay function "
-                    "(larger = slower decay / wider reach).",
+        "(larger = slower decay / wider reach).",
         json_schema_extra=ui_field(
             section="opportunities",
             field_order=10,
@@ -573,13 +574,18 @@ class HeatmapV2WindmillParams(ToolInputBase):
     access_cost_type: Literal["time"] = Field(
         default="time",
         description="Access leg cost type. Time-only: the access/egress "
-                    "lookup tables are built on travel time.",
+        "lookup tables are built on travel time.",
         json_schema_extra={
             **ui_field(
-                section="configuration", field_order=21, label_key="measure_type",
-                enum_labels=COST_TYPE_LABELS, enum_icons=COST_TYPE_ICONS,
+                section="configuration",
+                field_order=21,
+                label_key="measure_type",
+                enum_labels=COST_TYPE_LABELS,
+                enum_icons=COST_TYPE_ICONS,
                 inline_group="access_cost",
-                visible_when={"$and": [{"routing_mode": "pt"}, {"show_advanced": True}]},
+                visible_when={
+                    "$and": [{"routing_mode": "pt"}, {"show_advanced": True}]
+                },
             ),
             "enum": ["time"],
         },
@@ -589,11 +595,16 @@ class HeatmapV2WindmillParams(ToolInputBase):
         default=DEFAULT_MAX_TIME_ACTIVE_MIN,
         description="Access leg budget (≤ the lookup table max).",
         json_schema_extra=ui_field(
-            section="configuration", field_order=22, label_key="limit", description_key="limit",
-            inline_group="access_cost", inline_flex="1 0 0",
+            section="configuration",
+            field_order=22,
+            label_key="limit",
+            description_key="limit",
+            inline_group="access_cost",
+            inline_flex="1 0 0",
             visible_when={"$and": [{"routing_mode": "pt"}, {"show_advanced": True}]},
             widget_options=leg_budget_widget_options(
-                "access_cost_type", "pt_access_time_limit_message",
+                "access_cost_type",
+                "pt_access_time_limit_message",
                 lookup_table=True,
             ),
         ),
@@ -601,7 +612,7 @@ class HeatmapV2WindmillParams(ToolInputBase):
     egress_mode: Literal["walk"] = Field(
         default="walk",
         description="Mode from transit stops to the opportunity "
-                    "(walk-only for PT heatmaps).",
+        "(walk-only for PT heatmaps).",
         # See access_mode: Literal for validation + explicit enum so the
         # frontend renders a (single-option) dropdown.
         json_schema_extra={
@@ -625,13 +636,18 @@ class HeatmapV2WindmillParams(ToolInputBase):
     egress_cost_type: Literal["time"] = Field(
         default="time",
         description="Egress leg cost type. Time-only: the access/egress "
-                    "lookup tables are built on travel time.",
+        "lookup tables are built on travel time.",
         json_schema_extra={
             **ui_field(
-                section="configuration", field_order=24, label_key="measure_type",
-                enum_labels=COST_TYPE_LABELS, enum_icons=COST_TYPE_ICONS,
+                section="configuration",
+                field_order=24,
+                label_key="measure_type",
+                enum_labels=COST_TYPE_LABELS,
+                enum_icons=COST_TYPE_ICONS,
                 inline_group="egress_cost",
-                visible_when={"$and": [{"routing_mode": "pt"}, {"show_advanced": True}]},
+                visible_when={
+                    "$and": [{"routing_mode": "pt"}, {"show_advanced": True}]
+                },
             ),
             "enum": ["time"],
         },
@@ -641,11 +657,16 @@ class HeatmapV2WindmillParams(ToolInputBase):
         default=DEFAULT_MAX_TIME_ACTIVE_MIN,
         description="Egress leg budget (≤ the lookup table max).",
         json_schema_extra=ui_field(
-            section="configuration", field_order=25, label_key="limit", description_key="limit",
-            inline_group="egress_cost", inline_flex="1 0 0",
+            section="configuration",
+            field_order=25,
+            label_key="limit",
+            description_key="limit",
+            inline_group="egress_cost",
+            inline_flex="1 0 0",
             visible_when={"$and": [{"routing_mode": "pt"}, {"show_advanced": True}]},
             widget_options=leg_budget_widget_options(
-                "egress_cost_type", "pt_egress_time_limit_message",
+                "egress_cost_type",
+                "pt_egress_time_limit_message",
                 lookup_table=True,
             ),
         ),
@@ -757,6 +778,32 @@ class HeatmapV2WindmillParams(ToolInputBase):
         ),
     )
 
+    street_network_bundle_id: str | None = Field(
+        default=None,
+        description=(
+            "Choose a custom Street Network bundle to use for routing. "
+            "If unset, the default network will be used."
+        ),
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=21,
+            label_key="street_network_bundle_id",
+            widget="bundle-selector",
+            # PT legs route on the global network, so this is for street modes.
+            visible_when={
+                "$and": [
+                    {"routing_mode": {"$in": ["walking", "bicycle", "pedelec", "car"]}},
+                    {"show_advanced": True},
+                ]
+            },
+            # Only street networks whose routing graph is built and ready.
+            widget_options={
+                "bundle_type": "street_network",
+                "artifact_kind": "street_network_graph",
+            },
+        ),
+    )
+
     # =========================================================================
     # Cost / budget / speed
     #
@@ -791,12 +838,21 @@ class HeatmapV2WindmillParams(ToolInputBase):
                 },
                 "max_value_from": {
                     "fields": [
-                        {"value": 30, "when": {"routing_mode": "walking"},
-                         "message": "walking_speed_limit_message"},
-                        {"value": 60, "when": {"routing_mode": "bicycle"},
-                         "message": "bicycle_speed_limit_message"},
-                        {"value": 60, "when": {"routing_mode": "pedelec"},
-                         "message": "pedelec_speed_limit_message"},
+                        {
+                            "value": 30,
+                            "when": {"routing_mode": "walking"},
+                            "message": "walking_speed_limit_message",
+                        },
+                        {
+                            "value": 60,
+                            "when": {"routing_mode": "bicycle"},
+                            "message": "bicycle_speed_limit_message",
+                        },
+                        {
+                            "value": 60,
+                            "when": {"routing_mode": "pedelec"},
+                            "message": "pedelec_speed_limit_message",
+                        },
                     ],
                     "min": 1,
                     "message": "walking_speed_limit_message",
@@ -819,9 +875,7 @@ class HeatmapV2WindmillParams(ToolInputBase):
             field_order=10,
             repeatable=True,
             min_items=1,
-            visible_when={
-                "heatmap_type": {"$in": ["gravity", "closest_average"]}
-            },
+            visible_when={"heatmap_type": {"$in": ["gravity", "closest_average"]}},
         ),
     )
 
@@ -842,7 +896,9 @@ class HeatmapV2WindmillParams(ToolInputBase):
     def _accept_legacy_opportunity_budget(cls, data: Any) -> Any:
         """Per-opportunity budgets used to be a time/distance pair; map a
         pre-collapse payload onto max_cost using the form's own cost type."""
-        if not isinstance(data, dict) or not isinstance(data.get("opportunities"), list):
+        if not isinstance(data, dict) or not isinstance(
+            data.get("opportunities"), list
+        ):
             return data
         ctx = {
             "routing_mode": data.get("routing_mode"),
@@ -990,12 +1046,8 @@ class HeatmapClosestAverageV2WindmillParams(
             field_order=1,
             label_key="result_layer_name",
             widget_options={
-                "default_en": get_default_layer_name(
-                    "heatmap_closest_average", "en"
-                ),
-                "default_de": get_default_layer_name(
-                    "heatmap_closest_average", "de"
-                ),
+                "default_en": get_default_layer_name("heatmap_closest_average", "en"),
+                "default_de": get_default_layer_name("heatmap_closest_average", "de"),
             },
         ),
     )
@@ -1043,9 +1095,7 @@ class HeatmapConnectivityV2WindmillParams(HeatmapV2WindmillParams):
             repeatable=True,
             min_items=1,
             hidden=True,
-            visible_when={
-                "heatmap_type": {"$in": ["gravity", "closest_average"]}
-            },
+            visible_when={"heatmap_type": {"$in": ["gravity", "closest_average"]}},
         ),
     )
 
@@ -1083,12 +1133,8 @@ class HeatmapConnectivityV2WindmillParams(HeatmapV2WindmillParams):
             field_order=1,
             label_key="result_layer_name",
             widget_options={
-                "default_en": get_default_layer_name(
-                    "heatmap_connectivity", "en"
-                ),
-                "default_de": get_default_layer_name(
-                    "heatmap_connectivity", "de"
-                ),
+                "default_en": get_default_layer_name("heatmap_connectivity", "en"),
+                "default_de": get_default_layer_name("heatmap_connectivity", "de"),
             },
         ),
     )
@@ -1105,10 +1151,12 @@ class HeatmapConnectivityV2WindmillParams(HeatmapV2WindmillParams):
     @model_validator(mode="after")
     def _check_budget(self: Self) -> Self:
         validate_budget(self.routing_mode, self.cost_type, self.max_cost)
-        validate_leg_budget(self.access_cost_type, self.access_max_cost,
-                            "access", lookup_table=True)
-        validate_leg_budget(self.egress_cost_type, self.egress_max_cost,
-                            "egress", lookup_table=True)
+        validate_leg_budget(
+            self.access_cost_type, self.access_max_cost, "access", lookup_table=True
+        )
+        validate_leg_budget(
+            self.egress_cost_type, self.egress_max_cost, "egress", lookup_table=True
+        )
         return self
 
 
@@ -1364,14 +1412,10 @@ class HeatmapV2ToolRunner(BaseToolRunner[HeatmapV2WindmillParams]):
                 layer_id=params.reference_area_layer_id,
                 user_id=params.user_id,
                 cql_filter=params.reference_area_layer_filter,
-                scenario_id=params.scenario_id,
-                project_id=params.project_id,
             )
         )
 
-    def _resolve_demand(
-        self: Self, params: HeatmapV2WindmillParams
-    ) -> str | None:
+    def _resolve_demand(self: Self, params: HeatmapV2WindmillParams) -> str | None:
         """Export the demand layer (2SFCA only) to a parquet path."""
         if not getattr(params, "demand_layer_id", None):
             return None
@@ -1380,8 +1424,6 @@ class HeatmapV2ToolRunner(BaseToolRunner[HeatmapV2WindmillParams]):
                 layer_id=params.demand_layer_id,
                 user_id=params.user_id,
                 cql_filter=getattr(params, "demand_layer_filter", None),
-                scenario_id=params.scenario_id,
-                project_id=params.project_id,
             )
         )
 
@@ -1457,6 +1499,14 @@ class HeatmapV2ToolRunner(BaseToolRunner[HeatmapV2WindmillParams]):
             # Output
             output_path=str(output_path),
         )
+
+        # An uploaded street network bundle's graph replaces the global network.
+        if params.street_network_bundle_id:
+            edge_path, node_path = fetch_routing_network(
+                self, params.street_network_bundle_id, temp_dir
+            )
+            analysis_params.edge_path = edge_path
+            analysis_params.node_path = node_path
 
         tool = self.tool_class()
         try:

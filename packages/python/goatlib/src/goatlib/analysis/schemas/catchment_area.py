@@ -538,7 +538,9 @@ class CatchmentAreaToolParams(BaseModel):
             section="routing",
             field_order=4,
             visible_when={
-                "routing_mode": {"$in": ["walking", "bicycle", "pedelec", "wheelchair"]},
+                "routing_mode": {
+                    "$in": ["walking", "bicycle", "pedelec", "wheelchair"]
+                },
                 "measure_type": CatchmentAreaMeasureType.time,
             },
         ),
@@ -644,17 +646,6 @@ class CatchmentAreaToolParams(BaseModel):
             section="configuration",
             field_order=22,
             hidden=True,  # Internal field, set by tool runner
-        ),
-    )
-
-    # === Optional Settings ===
-    scenario_id: str | None = Field(
-        default=None,
-        description="Scenario ID for network modifications",
-        json_schema_extra=ui_field(
-            section="configuration",
-            field_order=10,
-            hidden=True,  # Advanced setting
         ),
     )
 

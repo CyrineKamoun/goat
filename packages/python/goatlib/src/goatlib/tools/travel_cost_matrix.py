@@ -34,6 +34,8 @@ from goatlib.analysis.schemas.ui import (
     ui_field,
     ui_sections,
 )
+from goatlib.bundles.artifacts.gtfs import fetch_pt_timetable
+from goatlib.bundles.artifacts.street_network import fetch_routing_network
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools._routing_limits import (
     DEFAULT_MAX_TIME_ACTIVE_MIN,
@@ -91,7 +93,9 @@ SECTION_CONFIGURATION = UISection(
     order=3,
     icon="settings",
     label_key="configuration",
-    depends_on={"routing_mode": {"$in": ["walking", "bicycle", "pedelec", "car", "pt"]}},
+    depends_on={
+        "routing_mode": {"$in": ["walking", "bicycle", "pedelec", "car", "pt"]}
+    },
 )
 
 SECTION_RESULT = UISection(
@@ -142,8 +146,12 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
             field_order=1,
             label_key="destinations_layer_name",
             widget_options={
-                "default_en": get_default_layer_name("travel_cost_matrix_destinations", "en"),
-                "default_de": get_default_layer_name("travel_cost_matrix_destinations", "de"),
+                "default_en": get_default_layer_name(
+                    "travel_cost_matrix_destinations", "en"
+                ),
+                "default_de": get_default_layer_name(
+                    "travel_cost_matrix_destinations", "de"
+                ),
             },
         ),
     )
@@ -378,7 +386,7 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
     speed: float | None = Field(
         default=None,
         description="Travel speed in km/h. None when the routing mode doesn't "
-                    "use a user-supplied speed (PT/Car/flight_distance).",
+        "use a user-supplied speed (PT/Car/flight_distance).",
         json_schema_extra=ui_field(
             section="configuration",
             field_order=5,
@@ -396,12 +404,21 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
                 },
                 "max_value_from": {
                     "fields": [
-                        {"value": 30, "when": {"routing_mode": "walking"},
-                         "message": "walking_speed_limit_message"},
-                        {"value": 60, "when": {"routing_mode": "bicycle"},
-                         "message": "bicycle_speed_limit_message"},
-                        {"value": 60, "when": {"routing_mode": "pedelec"},
-                         "message": "pedelec_speed_limit_message"},
+                        {
+                            "value": 30,
+                            "when": {"routing_mode": "walking"},
+                            "message": "walking_speed_limit_message",
+                        },
+                        {
+                            "value": 60,
+                            "when": {"routing_mode": "bicycle"},
+                            "message": "bicycle_speed_limit_message",
+                        },
+                        {
+                            "value": 60,
+                            "when": {"routing_mode": "pedelec"},
+                            "message": "pedelec_speed_limit_message",
+                        },
                     ],
                     "min": 1,
                     "message": "walking_speed_limit_message",
@@ -476,7 +493,9 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
             inline_flex="1 0 0",
             visible_when={"$and": [{"routing_mode": "pt"}, {"show_advanced": True}]},
             widget_options=leg_budget_widget_options(
-                "access_cost_type", "access_budget_exceeds_limit", budget_field="max_cost_time_pt",
+                "access_cost_type",
+                "access_budget_exceeds_limit",
+                budget_field="max_cost_time_pt",
             ),
         ),
     )
@@ -495,12 +514,21 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
                 },
                 "max_value_from": {
                     "fields": [
-                        {"value": 30, "when": {"access_mode": "walk"},
-                         "message": "walking_speed_limit_message"},
-                        {"value": 60, "when": {"access_mode": "bicycle"},
-                         "message": "bicycle_speed_limit_message"},
-                        {"value": 60, "when": {"access_mode": "pedelec"},
-                         "message": "pedelec_speed_limit_message"},
+                        {
+                            "value": 30,
+                            "when": {"access_mode": "walk"},
+                            "message": "walking_speed_limit_message",
+                        },
+                        {
+                            "value": 60,
+                            "when": {"access_mode": "bicycle"},
+                            "message": "bicycle_speed_limit_message",
+                        },
+                        {
+                            "value": 60,
+                            "when": {"access_mode": "pedelec"},
+                            "message": "pedelec_speed_limit_message",
+                        },
                     ],
                     "min": 1,
                     "message": "walking_speed_limit_message",
@@ -559,7 +587,9 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
             inline_flex="1 0 0",
             visible_when={"$and": [{"routing_mode": "pt"}, {"show_advanced": True}]},
             widget_options=leg_budget_widget_options(
-                "egress_cost_type", "egress_budget_exceeds_limit", budget_field="max_cost_time_pt",
+                "egress_cost_type",
+                "egress_budget_exceeds_limit",
+                budget_field="max_cost_time_pt",
             ),
         ),
     )
@@ -578,12 +608,21 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
                 },
                 "max_value_from": {
                     "fields": [
-                        {"value": 30, "when": {"egress_mode": "walk"},
-                         "message": "walking_speed_limit_message"},
-                        {"value": 60, "when": {"egress_mode": "bicycle"},
-                         "message": "bicycle_speed_limit_message"},
-                        {"value": 60, "when": {"egress_mode": "pedelec"},
-                         "message": "pedelec_speed_limit_message"},
+                        {
+                            "value": 30,
+                            "when": {"egress_mode": "walk"},
+                            "message": "walking_speed_limit_message",
+                        },
+                        {
+                            "value": 60,
+                            "when": {"egress_mode": "bicycle"},
+                            "message": "bicycle_speed_limit_message",
+                        },
+                        {
+                            "value": 60,
+                            "when": {"egress_mode": "pedelec"},
+                            "message": "pedelec_speed_limit_message",
+                        },
                     ],
                     "min": 1,
                     "message": "walking_speed_limit_message",
@@ -600,14 +639,64 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
         ),
     )
 
+    pt_network_bundle_id: str | None = Field(
+        default=None,
+        description=(
+            "Choose a custom Public Transport Network bundle to use for routing. "
+            "If unset, the default bundle will be used."
+        ),
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=28,
+            label_key="pt_network_bundle_id",
+            widget="bundle-selector",
+            visible_when={
+                "$and": [
+                    {"routing_mode": "pt"},
+                    {"show_advanced": True},
+                ]
+            },
+            # The selector lists only public-transport bundles that have a ready
+            # routing graph.
+            widget_options={
+                "bundle_type": "pt_network_gtfs",
+                "artifact_kind": "pt_network_graph",
+            },
+        ),
+    )
+
+    street_network_bundle_id: str | None = Field(
+        default=None,
+        description=(
+            "Choose a custom Street Network bundle to use for routing. "
+            "If unset, the default network will be used."
+        ),
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=29,
+            label_key="street_network_bundle_id",
+            widget="bundle-selector",
+            # PT legs route on the global network, so this is for street modes.
+            visible_when={
+                "$and": [
+                    {"routing_mode": {"$in": ["walking", "bicycle", "pedelec", "car"]}},
+                    {"show_advanced": True},
+                ]
+            },
+            # Only street networks whose routing graph is built and ready.
+            widget_options={
+                "bundle_type": "street_network",
+                "artifact_kind": "street_network_graph",
+            },
+        ),
+    )
+
     @model_validator(mode="before")
     @classmethod
     def _accept_legacy_budget(cls, data: Any) -> Any:
         # fill_default=False: an absent street budget legitimately means
         # unbounded here. The PT legs use the shared collapse/rename mapping.
-        return resolve_leg_budget_input(
-            resolve_budget_input(data, fill_default=False)
-        )
+        return resolve_leg_budget_input(resolve_budget_input(data, fill_default=False))
 
     @model_validator(mode="after")
     def _check_budget(self: Self) -> Self:
@@ -633,6 +722,7 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
         )
         return float(value) if value is not None else None
 
+
 # =========================================================================
 # Tool Runner
 # =========================================================================
@@ -649,7 +739,9 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
     tool_class = TravelCostMatrixTool
     output_geometry_type = "Point"
     default_output_name = get_default_layer_name("travel_cost_matrix", "en")
-    default_destinations_name = get_default_layer_name("travel_cost_matrix_destinations", "en")
+    default_destinations_name = get_default_layer_name(
+        "travel_cost_matrix_destinations", "en"
+    )
 
     @classmethod
     def predict_output_schema(
@@ -674,10 +766,16 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
             con.execute("INSTALL spatial; LOAD spatial;")
 
             # Detect geometry column from parquet schema
-            cols = con.execute(f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}')").fetchall()
+            cols = con.execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}')"
+            ).fetchall()
             column_names = {c[0] for c in cols}
             geom_col = next(
-                (c[0] for c in cols if "GEOMETRY" in c[1].upper() or c[0] in ("geom", "geometry")),
+                (
+                    c[0]
+                    for c in cols
+                    if "GEOMETRY" in c[1].upper() or c[0] in ("geom", "geometry")
+                ),
                 None,
             )
             if not geom_col:
@@ -694,7 +792,7 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
             # NULLs in the chosen id column are kept as empty strings so the
             # matrix still computes for those rows (Pydantic list[str] would
             # otherwise reject None and the f-string SQL would emit 'None').
-            id_select = f'COALESCE(CAST("{id_column}" AS VARCHAR), \'\')'
+            id_select = f"COALESCE(CAST(\"{id_column}\" AS VARCHAR), '')"
 
             result = con.execute(f"""
                 SELECT
@@ -714,8 +812,12 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
 
     @staticmethod
     def _compute_flight_distance_matrix(
-        origin_lats: list[float], origin_lons: list[float], origin_ids: list[str],
-        dest_lats: list[float], dest_lons: list[float], dest_ids: list[str],
+        origin_lats: list[float],
+        origin_lons: list[float],
+        origin_ids: list[str],
+        dest_lats: list[float],
+        dest_lons: list[float],
+        dest_ids: list[str],
         output_path: Path,
     ) -> None:
         """Compute geodesic distances (WGS84 ellipsoid) between all O-D pairs."""
@@ -812,22 +914,20 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
             layer_id=params.origin_layer_id,
             user_id=params.user_id,
             cql_filter=params.origin_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
         dest_parquet = self.export_layer_to_parquet(
             layer_id=params.destination_layer_id,
             user_id=params.user_id,
             cql_filter=params.destination_layer_filter,
-            scenario_id=params.scenario_id,
-            project_id=params.project_id,
         )
 
         # Extract coordinates and IDs from exported parquets
         origin_lats, origin_lons, origin_ids = self._extract_coordinates_from_parquet(
-            origin_parquet, id_column=params.origin_id_column)
+            origin_parquet, id_column=params.origin_id_column
+        )
         dest_lats, dest_lons, dest_ids = self._extract_coordinates_from_parquet(
-            dest_parquet, id_column=params.destination_id_column)
+            dest_parquet, id_column=params.destination_id_column
+        )
 
         # Reject empty inputs before they trigger downstream crashes
         # (`min()` on empty list, `(VALUES )` in flight-distance SQL, etc.)
@@ -863,8 +963,7 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
         # Max lat/lon span between the two bbox extremes
         lat_span = max(abs(o_max_lat - d_min_lat), abs(d_max_lat - o_min_lat))
         lon_span = max(abs(o_max_lon - d_min_lon), abs(d_max_lon - o_min_lon))
-        avg_lat = math.radians(
-            (o_min_lat + o_max_lat + d_min_lat + d_max_lat) / 4.0)
+        avg_lat = math.radians((o_min_lat + o_max_lat + d_min_lat + d_max_lat) / 4.0)
         dy = math.radians(lat_span) * earth_radius_m
         dx = math.radians(lon_span) * earth_radius_m * math.cos(avg_lat)
         extent_m = math.sqrt(dx * dx + dy * dy)
@@ -890,8 +989,12 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
         if params.routing_mode == RoutingMode.flight_distance:
             # Geodesic distance — no routing needed.
             self._compute_flight_distance_matrix(
-                origin_lats, origin_lons, origin_ids,
-                dest_lats, dest_lons, dest_ids,
+                origin_lats,
+                origin_lons,
+                origin_ids,
+                dest_lats,
+                dest_lons,
+                dest_ids,
                 matrix_output_path,
             )
         else:
@@ -932,6 +1035,20 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
                 output_path=str(matrix_output_path),
             )
 
+            # A selected PT bundle's timetable replaces the global network.
+            if params.routing_mode == RoutingMode.pt and params.pt_network_bundle_id:
+                analysis_params.timetable_path = fetch_pt_timetable(
+                    self, params.pt_network_bundle_id
+                )
+
+            # An uploaded street network bundle's graph replaces the global network.
+            if params.street_network_bundle_id:
+                edge_path, node_path = fetch_routing_network(
+                    self, params.street_network_bundle_id, temp_dir
+                )
+                analysis_params.edge_path = edge_path
+                analysis_params.node_path = node_path
+
             tool = self.tool_class()
             try:
                 tool.run(analysis_params)
@@ -940,8 +1057,7 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
 
         # Build destination points with min cost joined from original layer
         self._build_destination_points_parquet(
-            matrix_output_path, dest_parquet,
-            destinations_output_path
+            matrix_output_path, dest_parquet, destinations_output_path
         )
 
         # Store for dual-output handling in run()

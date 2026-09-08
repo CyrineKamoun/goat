@@ -7,6 +7,7 @@ Tests the layer create functionality including:
 - process() method for creating empty layers
 """
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 from goatlib.tools.layer_create import (
@@ -14,6 +15,7 @@ from goatlib.tools.layer_create import (
     LayerCreateParams,
     LayerCreateToolRunner,
 )
+from pydantic import ValidationError
 
 
 class TestFieldDefinition:
@@ -262,3 +264,51 @@ class TestLayerCreateProcess:
         assert output_path.exists()
         table = pq.read_table(str(output_path))
         assert len(table) == 0
+
+
+class TestFieldKinds:
+    """The kinds a new layer can carry, and what they are stored as.
+
+    Creation used to accept only string/number, so a `datetime` field became a text
+    column and a `boolean` the strings "true"/"false" — a real bug, since adding the
+    same column to an existing layer resolves TIMESTAMPTZ and BOOLEAN.
+    """
+
+    def test_kind_is_preferred_over_legacy_type(self):
+        field = FieldDefinition(name="seen_at", kind="datetime")
+        assert field.storage_kind == "datetime"
+
+    def test_legacy_type_still_understood(self):
+        # Callers that predate `kind` keep working.
+        field = FieldDefinition(name="city", type="string")
+        assert field.storage_kind == "string"
+
+    def test_defaults_to_string_when_neither_is_given(self):
+        assert FieldDefinition(name="notes").storage_kind == "string"
+
+    def test_computed_and_formula_kinds_are_rejected(self):
+        # Their values come from field_config, which nothing writes at create time.
+        for kind in ("area", "perimeter", "length", "formula"):
+            with pytest.raises(ValidationError):
+                FieldDefinition(name="x", kind=kind)
+
+    @pytest.mark.parametrize(
+        ("kind", "expected"),
+        [
+            ("string", pa.string()),
+            ("number", pa.float64()),
+            ("datetime", pa.timestamp("us", tz="UTC")),
+            ("boolean", pa.bool_()),
+        ],
+    )
+    def test_every_kind_maps_to_its_storage_type(self, kind, expected, tmp_path):
+        runner = LayerCreateToolRunner()
+        params = LayerCreateParams(
+            user_id="00000000-0000-0000-0000-000000000001",
+            name="kinds",
+            geometry_type=None,
+            fields=[FieldDefinition(name="value", kind=kind)],
+        )
+        output, _ = runner.process(params, tmp_path)
+        schema = pq.read_schema(output)
+        assert schema.field("value").type == expected

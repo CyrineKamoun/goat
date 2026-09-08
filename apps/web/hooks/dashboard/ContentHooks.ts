@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
+import { isBundleTile } from "@/lib/api/bundles";
 import type { Layer } from "@/lib/validations/layer";
 import type { Project } from "@/lib/validations/project";
 import type { Folder } from "@/lib/validations/folder";
@@ -30,6 +31,37 @@ export const useContentMoreMenu = () => {
     // When currentUserId is absent (profile not yet loaded) treat as owner to avoid
     // hiding menu options before auth resolves; enableActions gates the button itself.
     const isOwner = !currentUserId || item.owned_by?.id === currentUserId;
+
+    // Bundles get their own action set (they are not real layers); the
+    // bundle is the unit for these actions (move/share/delete cascade to its
+    // member layers). Owner only for now.
+    if (isBundleTile(item)) {
+      return isOwner
+        ? [
+            {
+              id: ContentActions.EDIT_METADATA,
+              label: t("edit_metadata"),
+              icon: ICON_NAME.EDIT,
+            },
+            {
+              id: ContentActions.MOVE_TO_FOLDER,
+              label: t("move_to_folder"),
+              icon: ICON_NAME.FOLDER,
+            },
+            {
+              id: ContentActions.SHARE,
+              label: t("share"),
+              icon: ICON_NAME.SHARE,
+            },
+            {
+              id: ContentActions.DELETE,
+              label: t("delete"),
+              icon: ICON_NAME.TRASH,
+              color: "error.main",
+            },
+          ]
+        : [];
+    }
     const sw = (item as ItemWithSharedWith).shared_with;
     const folderId = (item as ItemWithSharedWith).folder_id;
     const folderRole = folders?.find((f) => f.id === folderId)?.role;
@@ -37,7 +69,8 @@ export const useContentMoreMenu = () => {
       isOwner ||
       sw?.teams?.some((t) => t.role?.endsWith("-editor")) ||
       sw?.organizations?.some((o) => o.role?.endsWith("-editor")) ||
-      folderRole === "folder-editor";
+      folderRole === "folder-editor" ||
+      folderRole === "folder-owner";
 
     if (contentType === "layer") {
       const layerItem = item as Layer;

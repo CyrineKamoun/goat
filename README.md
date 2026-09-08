@@ -100,6 +100,8 @@ GOAT is a **monorepo** project leveraging a modern, full-stack architecture.
 
 - 🗃️ <a href="https://docs.protomaps.com/pmtiles/" target="_blank" rel="noopener noreferrer">PMTiles</a>
 
+- 🛰️ <a href="https://stacspec.org/" target="_blank" rel="noopener noreferrer">STAC</a>
+
 <br/>
 
 
@@ -133,7 +135,7 @@ The `compose.yaml` uses profiles to control which services start:
 |---------|-------------|
 | (none) | Infrastructure only: PostgreSQL, MinIO, Redis, Windmill server/worker |
 | `dev` | Infrastructure + devcontainer with local code mounts for development |
-| `prod` | Infrastructure + all production services (core, geoapi, web, processes, workers) |
+| `prod` | Infrastructure + all production services (core, geoapi, web, processes, catalog, workers) |
 
 #### Running GOAT with Docker Compose (recommended for most users)
 
@@ -146,6 +148,7 @@ The `prod` profile provisions:
 - GOAT Core (FastAPI backend)  
 - GOAT GeoAPI (FastAPI backend for geodata)  
 - GOAT Processes (OGC API Processes)
+- GOAT Catalog (STAC API for the data catalog)
 - GOAT Web (Next.js frontend)
 
 #### 1. Clone the repository
@@ -181,6 +184,7 @@ This will automatically pull the latest images and start all services.
 | Core API | <a href="http://localhost:8000/api" target="_blank" rel="noopener noreferrer">http://localhost:8000/api</a> |
 | GeoAPI | <a href="http://localhost:8100" target="_blank" rel="noopener noreferrer">http://localhost:8100</a> |
 | Processes API | <a href="http://localhost:8300" target="_blank" rel="noopener noreferrer">http://localhost:8300</a> |
+| Catalog API (STAC) | <a href="http://localhost:8400/stac" target="_blank" rel="noopener noreferrer">http://localhost:8400/stac</a> |
 | Windmill UI | <a href="http://localhost:8110" target="_blank" rel="noopener noreferrer">http://localhost:8110</a> |
 | MinIO Console | <a href="http://localhost:9001" target="_blank" rel="noopener noreferrer">http://localhost:9001</a> |
 

@@ -185,7 +185,6 @@ class TestLayerUpdateRunner:
             "data_type": None,
             "feature_layer_type": "standard",
             "feature_layer_geometry_type": "point",
-            "attribute_mapping": {},
             "other_properties": {},
         }
 
@@ -240,7 +239,6 @@ class TestLayerUpdateIntegration:
             "data_type": None,
             "feature_layer_type": "standard",
             "geometry_type": "point",
-            "attribute_mapping": {},
             "other_properties": {},
         }
 
@@ -309,7 +307,6 @@ class TestLayerUpdateIntegration:
             "data_type": "wfs",
             "feature_layer_type": "standard",
             "geometry_type": "polygon",
-            "attribute_mapping": {},
             "other_properties": {
                 "url": "https://example.com/wfs",
                 "layers": ["test_layer"],
@@ -341,9 +338,7 @@ class TestLayerUpdateIntegration:
             ) as mock_get_info,
             patch.object(runner, "_import_from_wfs") as mock_import_wfs,
             patch.object(runner, "_replace_ducklake_table") as mock_replace,
-            patch.object(
-                runner, "_update_layer_metadata", new_callable=AsyncMock
-            ),
+            patch.object(runner, "_update_layer_metadata", new_callable=AsyncMock),
         ):
             mock_get_info.return_value = layer_info
             mock_import_wfs.return_value = mock_metadata
@@ -381,7 +376,6 @@ class TestLayerUpdateIntegration:
             "data_type": None,
             "feature_layer_type": "standard",
             "geometry_type": "point",
-            "attribute_mapping": {},
             "other_properties": {},  # No URL!
         }
 

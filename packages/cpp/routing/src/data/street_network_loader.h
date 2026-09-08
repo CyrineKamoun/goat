@@ -26,11 +26,11 @@ namespace routing::data
                                  RoutingMode mode,
                                  bool load_geometry = false);
 
-    // Variant with pre-computed H3 filter.
+    // Variant with a pre-computed spatial filter.
     std::vector<Edge> load_edges(duckdb::Connection &con,
                                  std::string const &edge_dir,
                                  std::string const &node_dir,
-                                 H3CellFilter const &h3_filter,
+                                 SpatialFilter const &filter,
                                  std::vector<std::string> const &valid_classes,
                                  RoutingMode mode,
                                  bool load_geometry = false);

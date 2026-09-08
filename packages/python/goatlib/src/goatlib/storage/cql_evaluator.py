@@ -29,20 +29,64 @@ from pygeofilter import ast, values
 from pygeofilter.backends.evaluator import Evaluator, handle
 
 
+# Function calls in a CQL2 filter reach DuckDB by name. Only vetted, pure,
+# side-effect-free scalar functions are allowed; the name emitted into SQL is
+# the canonical entry from this set, never the caller-supplied token — so a
+# crafted "quoted identifier" name cannot smuggle SQL. Everything else
+# (crucially the file/network readers: read_text, read_csv, read_parquet, and
+# any I/O or subquery-bearing construct) is rejected. Add a function here only
+# after confirming it is a pure scalar with no filesystem/network reach.
+_ALLOWED_CQL_FUNCTIONS: frozenset[str] = frozenset(
+    {
+        "abs",
+        "ceil",
+        "ceiling",
+        "floor",
+        "round",
+        "sign",
+        "sqrt",
+        "power",
+        "mod",
+        "length",
+        "lower",
+        "upper",
+        "trim",
+        "ltrim",
+        "rtrim",
+        "substr",
+        "substring",
+        "concat",
+        "coalesce",
+    }
+)
+
+
 class DuckDBCQLEvaluator(Evaluator):
     """Convert CQL2 AST to DuckDB SQL WHERE clause."""
 
     def __init__(
-        self, field_names: list[str], geometry_column: str = "geometry"
+        self,
+        field_names: list[str],
+        geometry_column: str = "geometry",
+        field_exprs: dict[str, str] | None = None,
     ) -> None:
         """Initialize evaluator.
 
         Args:
             field_names: List of valid column names in the table
             geometry_column: Name of the geometry column (default: "geometry")
+            field_exprs: Optional ``{property name: SQL expression}`` overrides,
+                consulted before any other attribute handling. A caller whose
+                filterable properties are not plain columns -- a nested JSON
+                path, or a computed value such as a year extracted from a
+                timestamp -- supplies the expression here instead of letting
+                the property name be quoted as a column reference. Keys are
+                matched case-insensitively, and a property present here needs
+                no entry in ``field_names``.
         """
         self.field_names = [f.lower() for f in field_names]
         self.geometry_column = geometry_column
+        self.field_exprs = {k.lower(): v for k, v in (field_exprs or {}).items()}
         self.params: list[Any] = []
 
     def _add_param(self, value: Any) -> str:
@@ -117,11 +161,17 @@ class DuckDBCQLEvaluator(Evaluator):
 
     @handle(ast.IsNull)
     def null(self, node, lhs) -> str:
-        """Handle IS NULL operator."""
+        """Handle IS NULL / IS NOT NULL.
+
+        ``node.not_`` carries the negation, exactly as it does for
+        ``Between``/``Like``/``In`` above. Dropping it silently inverted every
+        ``IS NOT NULL`` filter -- returning precisely the rows the caller asked
+        to exclude, with no error to notice.
+        """
         # lhs may be a list with one element
         if isinstance(lhs, list) and len(lhs) == 1:
             lhs = lhs[0]
-        return f"{lhs} IS NULL"
+        return f"{lhs} IS NOT NULL" if node.not_ else f"{lhs} IS NULL"
 
     @handle(list)
     def list_(self, node):
@@ -134,6 +184,14 @@ class DuckDBCQLEvaluator(Evaluator):
     def attribute(self, node):
         """Handle attribute (column) reference."""
         name = node.name
+
+        # An explicit expression wins over every rule below: the caller has
+        # said what this property means in SQL, and it may not be a column at
+        # all (a JSON path, a computed value), so no aliasing or column-name
+        # validation applies to it.
+        expr = self.field_exprs.get(name.lower())
+        if expr is not None:
+            return expr
 
         # Normalize common geometry column aliases to the actual geometry column
         # This handles cases where the CQL filter uses "geom" but the actual column is "geometry"
@@ -165,9 +223,18 @@ class DuckDBCQLEvaluator(Evaluator):
 
     @handle(ast.Function)
     def function(self, node, *arguments) -> str:
-        """Handle function calls."""
+        """Handle function calls, restricted to a vetted pure-scalar allowlist.
+
+        The name is matched case-insensitively and the canonical allowlisted
+        spelling is emitted — the caller's token never reaches the SQL string,
+        so it cannot inject even via a quoted-identifier name. Arguments are
+        already parameterized by their own handlers.
+        """
+        canonical = str(node.name).strip().lower()
+        if canonical not in _ALLOWED_CQL_FUNCTIONS:
+            raise ValueError(f"Unsupported function in filter: {node.name!r}")
         args_str = ", ".join(str(arg) for arg in arguments)
-        return f"{node.name}({args_str})"
+        return f"{canonical}({args_str})"
 
     # Literal handlers
     @handle(str)
@@ -320,6 +387,7 @@ def cql2_to_duckdb_sql(
     cql_ast: Any,
     field_names: list[str],
     geometry_column: str = "geometry",
+    field_exprs: dict[str, str] | None = None,
 ) -> tuple[str, list[Any]]:
     """Convert CQL2 AST to DuckDB SQL WHERE clause with parameters.
 
@@ -327,11 +395,14 @@ def cql2_to_duckdb_sql(
         cql_ast: Parsed CQL2 AST from pygeofilter
         field_names: List of valid column names
         geometry_column: Name of geometry column
+        field_exprs: Optional ``{property name: SQL expression}`` overrides for
+            properties that are not plain columns (see
+            :class:`DuckDBCQLEvaluator`)
 
     Returns:
         Tuple of (sql_where_clause, parameters)
     """
-    evaluator = DuckDBCQLEvaluator(field_names, geometry_column)
+    evaluator = DuckDBCQLEvaluator(field_names, geometry_column, field_exprs)
     sql = evaluator.evaluate(cql_ast)
     return sql, evaluator.params
 

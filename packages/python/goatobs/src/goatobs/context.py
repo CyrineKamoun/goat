@@ -5,6 +5,7 @@ verification), read transparently by the structlog processor and the
 OTel span attribute processor. Endpoints don't need to thread user
 data through every log call.
 """
+
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Iterator

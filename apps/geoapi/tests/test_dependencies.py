@@ -7,6 +7,7 @@ from goatlib.utils.layer import format_uuid
 from geoapi.dependencies import (
     LayerInfo,
     normalize_layer_id,
+    unknown_requested_fields,
 )
 
 
@@ -91,3 +92,66 @@ class TestLayerInfo:
 
         assert layer_info.schema_name == "user_abc123def456789012345678901234"
         assert layer_info.table_name == "t_789abc123def456789012345678901234"
+
+
+class TestUnknownRequestedFields:
+    """`properties`/`sortby` are validated against the layer's own columns.
+
+    Both are spliced into the query as quoted identifiers, so an unknown
+    name reaches DuckDB and fails the whole query; the routes turn a
+    non-empty result into a 400 naming the field.
+    """
+
+    COLUMNS = ["id", "name", "value"]
+
+    def test_known_property_and_sort_field_pass(self):
+        assert (
+            unknown_requested_fields(
+                column_names=self.COLUMNS,
+                properties=["id", "name"],
+                sortby="-value",
+                geometry_column="geom",
+            )
+            == []
+        )
+
+    def test_geometry_column_is_selectable(self):
+        assert (
+            unknown_requested_fields(
+                column_names=self.COLUMNS,
+                properties=["geom"],
+                geometry_column="geom",
+            )
+            == []
+        )
+
+    def test_rowid_is_selectable(self):
+        assert (
+            unknown_requested_fields(column_names=self.COLUMNS, properties=["rowid"])
+            == []
+        )
+
+    def test_unknown_property_reported(self):
+        assert unknown_requested_fields(
+            column_names=self.COLUMNS, properties=["id", "nope"]
+        ) == ["nope"]
+
+    def test_unknown_sort_field_reported_without_prefix(self):
+        assert unknown_requested_fields(column_names=self.COLUMNS, sortby="-nope") == [
+            "nope"
+        ]
+
+    def test_injection_payload_reported_verbatim(self):
+        payload = 'id" DESC, (SELECT 1) --'
+        assert unknown_requested_fields(column_names=self.COLUMNS, sortby=payload) == [
+            payload
+        ]
+
+    def test_duplicates_collapse_and_order_is_kept(self):
+        assert unknown_requested_fields(
+            column_names=self.COLUMNS, properties=["b", "a", "b"], sortby="a"
+        ) == ["b", "a"]
+
+    def test_no_resolved_columns_validates_nothing(self):
+        assert unknown_requested_fields(column_names=[], properties=["nope"]) == []
+        assert unknown_requested_fields(column_names=None, sortby="nope") == []

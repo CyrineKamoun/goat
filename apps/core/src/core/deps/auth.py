@@ -79,6 +79,22 @@ def is_superuser(
     return is_superuser
 
 
+def require_superuser(user_token: Dict[str, Any] = Depends(user_token)) -> None:
+    """401 unless the caller's token carries the `superuser` realm role.
+
+    Unlike `is_superuser`, this takes no extra parameters. `is_superuser`'s
+    `throw_error` bool has no `Depends`/`Body` marker, so FastAPI exposes it
+    as a query parameter (`?throw_error=false`) that lets any caller skip the
+    check entirely — confirmed in the generated OpenAPI schema. This
+    dependency exposes nothing a caller can override.
+    """
+    roles = user_token.get("realm_access", {}).get("roles") or []
+    if "superuser" not in roles:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+        )
+
+
 def clean_path(path: str) -> str:
     return path.replace(settings.API_V2_STR + "/", "")
 

@@ -10,13 +10,9 @@ dependencies = [
   "psycopg-binary==3.2.3",
   "shapely==2.0.6",
   "aiohttp==3.14.3",
-  "requests==2.34.2",
   "alembic==1.14.0",
   "httpx==0.27.2",
   "python-jose[cryptography]==3.5.0",
-  "geojson==3.1.0",
-  "alembic-utils>=0.8.5",
-  "rich==13.9.4",
   "pygeofilter==0.2.4",
   "pycountry==23.12.11",
   "fastapi[standard-no-fastapi-cloud-cli]==0.140.4",
@@ -45,5 +41,4 @@ build-backend = "uv_build"
 dev = [
   "asyncpg-stubs>=0.30.0",
   "pytest>=8.3.5",
-  "types-requests>=2.32.4.20250611",
 ]

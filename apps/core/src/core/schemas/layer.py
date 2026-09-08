@@ -5,6 +5,7 @@ from uuid import UUID
 # Third party imports
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
     HttpUrl,
     RootModel,
@@ -16,8 +17,6 @@ from shapely import wkt
 from core.core.config import settings
 from core.db.models._base_class import DateTimeBase, content_base_example
 from core.db.models.layer import (
-    DataCategory,
-    DataLicense,
     FeatureDataType,
     FeatureGeometryType,
     FeatureType,
@@ -25,9 +24,6 @@ from core.db.models.layer import (
     LayerBase,
     LayerType,
     RasterDataType,
-    layer_base_example,
-    validate_geographical_code,
-    validate_language_code,
 )
 from core.utils import optional
 
@@ -57,25 +53,20 @@ class ThumbnailUrlMixin(BaseModel):
 
 
 class LayerReadBaseAttributes(BaseModel):
-    user_id: UUID = Field(..., description="User ID of the owner")
+    # Reading is not the place to discover that stored data is too long: the
+    # value is already in the database and the user can do nothing about it.
+    # One over-long description used to fail the whole `GET /project/{id}/layer`
+    # response, so a single catalog layer stopped an entire project loading.
+    # The bounds that matter are on input — see `ContentBaseAttributes`, and
+    # `tests/unit/test_read_models_accept_stored_data.py`, which fails if a
+    # length constraint reaches a read model again.
+    name: str | None = Field(None, description="Layer name")
+    description: str | None = Field(None, description="Layer description")
+    user_id: UUID | None = Field(None, description="Owner, or None for a catalog layer")
     shared_with: Dict[str, Any] | None = Field(
         None, description="List of user IDs the layer is shared with"
     )
     owned_by: Dict[str, Any] | None = Field(None, description="User ID of the owner")
-
-    # Read models must serve whatever is stored: legacy metadata values that
-    # the strict write-side checks no longer accept must not fail response
-    # serialization. Same-name overrides replace LayerBase's validators via
-    # MRO — this class must precede LayerBase in every read model's bases.
-    @field_validator("geographical_code", mode="after", check_fields=False)
-    @classmethod
-    def geographical_code_valid(cls, value: str | None) -> str | None:
-        return value
-
-    @field_validator("language_code", mode="after", check_fields=False)
-    @classmethod
-    def language_code_valid(cls, value: str | None) -> str | None:
-        return value
 
 
 class LayerProperties(BaseModel):
@@ -93,7 +84,17 @@ class LayerProperties(BaseModel):
 
 
 class ExternalServiceOtherProperties(BaseModel):
-    """Model for external service properties."""
+    """The WMS/WFS fields of `other_properties`, plus whatever else is in there.
+
+    `extra="allow"` because this model is the declared type of `other_properties`
+    on every layer read schema, and the column is a free-form document: a
+    promoted catalog layer keeps its `catalog_item` snapshot and its
+    `catalog_materialize` status in it. Without this, Pydantic silently drops
+    every key not named below, so `GET /layer/{id}` returned `{}` for a catalog
+    layer and its detail page had nothing to show.
+    """
+
+    model_config = ConfigDict(extra="allow")
 
     url: str | None = Field(
         default=None,
@@ -202,9 +203,6 @@ class FeatureReadBaseAttributes(
 
     feature_layer_geometry_type: "FeatureGeometryType" = Field(
         ..., description="Feature layer geometry type"
-    )
-    attribute_mapping: Dict[str, Any] | None = Field(
-        default=None, description="Attribute mapping of the layer"
     )
     size: int | None = Field(None, description="Size of the layer in bytes")
     properties: Dict[str, Any] = Field(
@@ -495,9 +493,6 @@ class TableRead(
     """
 
     type: Literal["table"]
-    attribute_mapping: Dict[str, Any] | None = Field(
-        default=None, description="Attribute mapping of the layer"
-    )
 
 
 class ITableLayerRead(TableRead):
@@ -615,39 +610,7 @@ class LayerGetBase(BaseModel):
         None,
         description="Searches the 'name' and 'description' column of the layer. It will convert the text into lower case and see if the passed text is part of the name.",
     )
-    license: List[DataLicense] | None = Field(
-        None,
-        description="List of data licenses",
-    )
-    data_category: List[DataCategory] | None = Field(
-        None,
-        description="List of data categories",
-    )
-    geographical_code: List[str] | None = Field(
-        None,
-        description="List of geographical codes",
-    )
-    language_code: List[str] | None = Field(None, description="List of language codes")
-    distributor_name: List[str] | None = Field(
-        None, description="List of distributor names"
-    )
     spatial_search: str | None = Field(None, description="Spatial search for the layer")
-
-    @field_validator("language_code", mode="after", check_fields=False)
-    @classmethod
-    def language_code_valid(cls, value: list[str]) -> list[str]:
-        if value:
-            for code in value:
-                validate_language_code(code)
-        return value
-
-    @field_validator("geographical_code", mode="after", check_fields=False)
-    @classmethod
-    def geographical_code_valid(cls, value: list[str]) -> list[str]:
-        if value:
-            for code in value:
-                validate_geographical_code(code)
-        return value
 
     # Validate the spatial search
     @field_validator("spatial_search")
@@ -668,94 +631,18 @@ class ILayerGet(LayerGetBase):
     )
 
 
-class ICatalogLayerGet(LayerGetBase):
-    in_catalog: Literal[True] = Field(
-        True,
-        description="This field is always true. Only layers that are in the catalog will be returned.",
-    )
-
-
-class IMetadataAggregate(LayerGetBase):
-    in_catalog: Literal[True] = Field(
-        True,
-        description="This field is always true. Only layers that are in the catalog will be returned.",
-    )
-
-
-class MetadataGroupAttributes(BaseModel):
-    value: str = Field(..., description="Name of the metadata group")
-    count: int = Field(..., description="Count of the metadata group")
-
-
-class IMetadataAggregateRead(BaseModel):
-    license: List[MetadataGroupAttributes] = Field(..., description="List of licenses")
-    data_category: List[MetadataGroupAttributes] = Field(
-        ..., description="List of data categories"
-    )
-    geographical_code: List[MetadataGroupAttributes] = Field(
-        ..., description="List of geographical codes"
-    )
-    language_code: List[MetadataGroupAttributes] = Field(
-        ..., description="List of language codes"
-    )
-    type: List[MetadataGroupAttributes] = Field(..., description="List of layer types")
-    distributor_name: List[MetadataGroupAttributes] = Field(
-        ..., description="List of distributor names"
-    )
-
-
 request_examples = {
-    "get": {
-        "ids": [
-            "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
-            "e7dcaae4-1750-49b7-89a5-9510bf2761ad",
-        ],
-    },
+    # The only two consumers: the raster POST and the layer PUT
+    # (endpoints/v2/layer.py). Feature and table layers are created by the
+    # import tools, not through this API, so they have no example here.
     "create": {
-        "feature": {
-            "summary": "Layer Standard",
-            "value": {
-                "dataset_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
-                **content_base_example,
-                **layer_base_example,
-            },
-        },
         "raster": {
             "summary": "Raster Layer",
             "value": {
                 **content_base_example,
-                **layer_base_example,
                 **imagery_layer_attributes_example,
                 "type": "raster",
                 "extent": "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)), ((2 2, 2 3, 3 3, 3 2, 2 2)))",
-            },
-        },
-        "table": {
-            "summary": "Table Layer",
-            "value": {
-                "dataset_id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
-                **content_base_example,
-                **layer_base_example,
-            },
-        },
-    },
-    "export": {
-        "feature": {
-            "summary": "Layer Standard",
-            "value": {
-                "id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
-                "file_type": "csv",
-                "file_name": "test",
-            },
-        },
-        "table": {
-            "summary": "Table Layer",
-            "value": {
-                "id": "699b6116-a8fb-457c-9954-7c9efc9f83ee",
-                "file_type": "csv",
-                "file_name": "test",
-                "crs": "EPSG:3857",
-                "query": {"op": "=", "args": [{"property": "category"}, "bus_stop"]},
             },
         },
     },
@@ -764,7 +651,6 @@ request_examples = {
             "summary": "Table Layer",
             "value": {
                 **content_base_example,
-                **layer_base_example,
             },
         },
     },

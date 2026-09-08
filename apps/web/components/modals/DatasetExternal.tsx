@@ -36,6 +36,7 @@ import { toast } from "react-toastify";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
+import { useSpaces } from "@/lib/api/content";
 import { getWritableFolders, useFolders } from "@/lib/api/folders";
 import { createLayer, createRasterLayer } from "@/lib/api/layers";
 import { useJobs } from "@/lib/api/processes";
@@ -43,11 +44,11 @@ import { addProjectLayers, useProject, useProjectLayers } from "@/lib/api/projec
 import { setRunningJobIds } from "@/lib/store/jobs/slice";
 import { generateLayerGetLegendGraphicUrl, generateWmsUrl } from "@/lib/transformers/wms";
 import { convertWmtsToXYZUrl, getWmtsFlatLayers } from "@/lib/transformers/wmts";
+import { homeFolderOf, spaceDisplayName } from "@/lib/utils/content";
 import { getBaseUrl } from "@/lib/utils/helpers";
 import WFSCapabilities from "@/lib/utils/parser/ol/format/WFSCapabilities";
 import type { DataType, GetContentQueryParams } from "@/lib/validations/common";
 import { imageryDataType, vectorDataType } from "@/lib/validations/common";
-import type { Folder } from "@/lib/validations/folder";
 import type { LayerMetadata } from "@/lib/validations/layer";
 import {
   createLayerFromDatasetSchema,
@@ -59,7 +60,7 @@ import {
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { OverflowTypograpy } from "@/components/common/OverflowTypography";
-import FolderSelect from "@/components/dashboard/common/FolderSelect";
+import FolderBrowser from "@/components/dashboard/common/FolderBrowser";
 import NoValuesFound from "@/components/map/common/NoValuesFound";
 
 interface DatasetExternalProps {
@@ -471,7 +472,24 @@ const DatasetExternal: React.FC<DatasetExternalProps> = ({ open, onClose, projec
     resolver: zodResolver(layerMetadataSchema),
   });
 
-  const [selectedFolder, setSelectedFolder] = useState<Folder | null>();
+  const { spaces } = useSpaces();
+
+  /** The folder browsed to, `null` at the space root. */
+  const [browsedFolderId, setBrowsedFolderId] = useState<string | null>(null);
+
+  // There is no space picker in this flow: the space is the one the
+  // preselected folder lives in — the host project's own — and the caller's
+  // personal space when nothing is preselected.
+  const browsedFolder = (allFolders ?? []).find((folder) => folder.id === browsedFolderId);
+  const space =
+    spaces.find((candidate) => candidate.id === browsedFolder?.space_id) ??
+    spaces.find((candidate) => candidate.kind === "personal");
+  const homeFolderId = space ? (homeFolderOf(allFolders ?? [], space.id)?.id ?? null) : null;
+  const targetFolderId = browsedFolderId ?? homeFolderId;
+  const targetFolderName =
+    browsedFolderId === null
+      ? spaceDisplayName(space, t)
+      : (folders.find((folder) => folder.id === browsedFolderId)?.name ?? "");
 
   // Other
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -487,7 +505,7 @@ const DatasetExternal: React.FC<DatasetExternalProps> = ({ open, onClose, projec
         setCapabilities(urlCapabilities);
         const projectFolder = folders?.find((folder) => folder.id === project?.folder_id);
         if (projectFolder) {
-          setSelectedFolder(projectFolder);
+          setBrowsedFolderId(projectFolder.id);
         }
 
         // For COG type, set default layer name from URL filename
@@ -549,7 +567,7 @@ const DatasetExternal: React.FC<DatasetExternalProps> = ({ open, onClose, projec
       setActiveStep((prevActiveStep) => prevActiveStep + 1);
       const projectFolder = folders?.find((folder) => folder.id === project?.folder_id);
       if (projectFolder) {
-        setSelectedFolder(projectFolder);
+        setBrowsedFolderId(projectFolder.id);
       }
       if (
         (capabilities?.type === vectorDataType.Enum.wfs ||
@@ -583,7 +601,7 @@ const DatasetExternal: React.FC<DatasetExternalProps> = ({ open, onClose, projec
   const handleSave = async () => {
     const layerPayload = {
       ...getValues(),
-      folder_id: selectedFolder?.id,
+      folder_id: targetFolderId ?? undefined,
     };
     let isJobBased = false;
     try {
@@ -698,7 +716,7 @@ const DatasetExternal: React.FC<DatasetExternalProps> = ({ open, onClose, projec
   };
 
   const cleanDestinationAndMetadata = () => {
-    setSelectedFolder(null);
+    setBrowsedFolderId(null);
     reset();
   };
 
@@ -710,11 +728,11 @@ const DatasetExternal: React.FC<DatasetExternalProps> = ({ open, onClose, projec
       return !selectedDatasets?.length;
     }
     if (activeStep === 2) {
-      return !selectedFolder || !isValid;
+      return !targetFolderId || !isValid;
     }
 
     return false;
-  }, [activeStep, externalUrl, selectedDatasets?.length, selectedFolder, isValid]);
+  }, [activeStep, externalUrl, selectedDatasets?.length, targetFolderId, isValid]);
 
   return (
     <>
@@ -779,11 +797,16 @@ const DatasetExternal: React.FC<DatasetExternalProps> = ({ open, onClose, projec
             {activeStep === 2 && (
               <>
                 <Stack direction="column" spacing={4}>
-                  <FolderSelect
-                    folders={folders}
-                    selectedFolder={selectedFolder}
-                    setSelectedFolder={setSelectedFolder}
-                  />
+                  {space && (
+                    <FolderBrowser
+                      space={space}
+                      folders={folders}
+                      homeFolderId={homeFolderId}
+                      value={browsedFolderId}
+                      onChange={setBrowsedFolderId}
+                      label={t("folder")}
+                    />
+                  )}
 
                   <TextField
                     fullWidth
@@ -818,7 +841,7 @@ const DatasetExternal: React.FC<DatasetExternalProps> = ({ open, onClose, projec
                     capabilities?.type}
                 </Typography>
                 <Typography variant="body2">
-                  <b>{t("destination")}:</b> {selectedFolder?.name}
+                  <b>{t("destination")}:</b> {targetFolderName}
                 </Typography>
                 <Typography variant="body2">
                   <b>{t("name")}:</b> {getValues("name")}

@@ -49,12 +49,8 @@ class Weekday(StrEnum):
 
 class PTTimeWindow(BaseModel):
     weekday: Weekday = Weekday.weekday
-    from_time: int = Field(
-        ..., description="Start time in seconds from midnight"
-    )
-    to_time: int = Field(
-        ..., description="End time in seconds from midnight"
-    )
+    from_time: int = Field(..., description="Start time in seconds from midnight")
+    to_time: int = Field(..., description="End time in seconds from midnight")
 
 
 class TravelCostMatrixParams(BaseModel):
@@ -77,17 +73,20 @@ class TravelCostMatrixParams(BaseModel):
     routing_mode: RoutingMode = RoutingMode.walking
     cost_type: CostType = CostType.time
     max_cost: float | None = Field(
-        default=None, gt=0,
+        default=None,
+        gt=0,
         description="Optional Dijkstra cutoff: minutes (time) or meters "
-                    "(distance). None means unbounded — every reachable O-D "
-                    "pair gets a cost. The C++ matrix loader sizes its own "
-                    "network from the OD bbox, independent of this value.",
+        "(distance). None means unbounded — every reachable O-D "
+        "pair gets a cost. The C++ matrix loader sizes its own "
+        "network from the OD bbox, independent of this value.",
     )
     speed: float | None = Field(
-        default=None, ge=0.0, le=60.0,
+        default=None,
+        ge=0.0,
+        le=60.0,
         description="Travel speed in km/h (time cost type only). None when the "
-                    "mode doesn't use a user-supplied speed (PT uses "
-                    "access/egress speeds; Car uses per-edge OSM maxspeed).",
+        "mode doesn't use a user-supplied speed (PT uses "
+        "access/egress speeds; Car uses per-edge OSM maxspeed).",
     )
 
     # PT settings
@@ -98,22 +97,70 @@ class TravelCostMatrixParams(BaseModel):
     egress_mode: AccessEgressMode = AccessEgressMode.walk
     access_cost_type: CostType = CostType.time
     egress_cost_type: CostType = CostType.time
-    access_max_cost: float = Field(default=15.0, ge=0.0, description="Access leg budget: minutes (time) or meters (distance). 0 = default.")
-    egress_max_cost: float = Field(default=15.0, ge=0.0, description="Egress leg budget: minutes (time) or meters (distance). 0 = default.")
-    access_speed: float | None = Field(default=None, ge=0.0, description="Access leg speed in km/h. None for car access.")
-    egress_speed: float | None = Field(default=None, ge=0.0, description="Egress leg speed in km/h. None for car egress.")
+    access_max_cost: float = Field(
+        default=15.0,
+        ge=0.0,
+        description="Access leg budget: minutes (time) or meters (distance). 0 = default.",
+    )
+    egress_max_cost: float = Field(
+        default=15.0,
+        ge=0.0,
+        description="Egress leg budget: minutes (time) or meters (distance). 0 = default.",
+    )
+    access_speed: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Access leg speed in km/h. None for car access.",
+    )
+    egress_speed: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Egress leg speed in km/h. None for car egress.",
+    )
 
     # Output
-    output_path: str = Field(
-        ..., description="Path for the matrix parquet output."
+    output_path: str = Field(..., description="Path for the matrix parquet output.")
+
+    # ---- PT network override ------------------------------------------------
+    # Point the engine at a PT bundle's timetable instead of the default global
+    # network. None uses the default.
+    timetable_path: str | None = Field(
+        default=None,
+        description="Path to a nigiri .bin timetable to use for PT routing",
     )
+
+    # ---- Street network override --------------------------------------------
+    # Point the engine at an uploaded street network bundle's graph instead of
+    # the default global network. None uses the default.
+    edge_path: str | None = Field(
+        default=None,
+        description="Path to an edges parquet to use for street routing",
+    )
+    node_path: str | None = Field(
+        default=None,
+        description="Path to a nodes parquet to use for street routing",
+    )
+
+    @model_validator(mode="after")
+    def validate_network_override(self: Self) -> Self:
+        # Half an override is worse than none: the engine would route over one
+        # network's edges joined to the other's nodes, which silently yields a
+        # near-empty result rather than failing.
+        if bool(self.edge_path) != bool(self.node_path):
+            raise ValueError(
+                "edge_path and node_path must be set together — a routing graph "
+                "is only coherent as a pair"
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_coordinates(self: Self) -> Self:
         if len(self.origin_latitude) != len(self.origin_longitude):
             raise ValueError("Origin latitude and longitude must have the same length")
         if len(self.destination_latitude) != len(self.destination_longitude):
-            raise ValueError("Destination latitude and longitude must have the same length")
+            raise ValueError(
+                "Destination latitude and longitude must have the same length"
+            )
         if not self.origin_latitude:
             raise ValueError("At least one origin is required")
         if not self.destination_latitude:

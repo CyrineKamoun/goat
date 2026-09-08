@@ -22,6 +22,7 @@ structlog. Without the bridge, our processors only ran for the handful
 of explicit `structlog.get_logger()` calls — every other log line was
 plain-text uvicorn-style output with no user / trace context.
 """
+
 import logging
 import sys
 from typing import Any, Callable, MutableMapping
@@ -105,7 +106,8 @@ def setup_logging(
     # `wrap_for_formatter` hands the prepared event_dict over to stdlib's
     # ProcessorFormatter (configured below) for final rendering.
     structlog.configure(
-        processors=shared_processors + [
+        processors=shared_processors
+        + [
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         wrapper_class=structlog.stdlib.BoundLogger,

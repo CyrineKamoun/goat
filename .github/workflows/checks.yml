@@ -31,6 +31,10 @@ on:
         description: "Processes (Windmill workers) changed"
         value: ${{ jobs.checks.outputs.processes }}
 
+      catalog:
+        description: "Catalog (STAC service) changed"
+        value: ${{ jobs.checks.outputs.catalog }}
+
       sha-short:
         description: "Short sha"
         value: ${{ jobs.checks.outputs.sha-short }}
@@ -51,6 +55,7 @@ jobs:
       keycloak-theme: ${{ steps.changes.outputs.keycloak-theme }}
       storybook: ${{ steps.changes.outputs.storybook }}
       processes: ${{ steps.changes.outputs.processes }}
+      catalog: ${{ steps.changes.outputs.catalog }}
       sha-short: ${{ steps.sha-short.outputs.sha-short }}
     steps:
       - name: 📥 Checkout
@@ -79,6 +84,13 @@ jobs:
 
             geoapi:
                 - 'apps/geoapi/**'
+                - 'packages/python/goatlib/**'
+                - 'packages/python/goatobs/**'
+                - 'pyproject.toml'
+                - 'uv.lock'
+
+            catalog:
+                - 'apps/catalog/**'
                 - 'packages/python/goatlib/**'
                 - 'packages/python/goatobs/**'
                 - 'pyproject.toml'

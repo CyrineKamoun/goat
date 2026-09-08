@@ -172,19 +172,20 @@ class TestLayerDeleteRunner:
 
     def test_table_path_construction(self, runner):
         """Test correct table path is constructed."""
-        runner._duckdb_con.execute.return_value.fetchone.return_value = (1,)
+        runner._duckdb_con.execute.return_value.fetchone.return_value = (
+            "user_00000000000000000000000000000001",
+        )
 
         runner._delete_ducklake_table(
             layer_id="00000000-0000-0000-0000-000000000002",
             owner_id="00000000-0000-0000-0000-000000000001",
         )
 
-        # Check the SQL contains correct schema/table names
-        calls = runner._duckdb_con.execute.call_args_list
-        # First call is table existence check
-        first_call_sql = str(calls[0])
-        assert "user_00000000000000000000000000000001" in first_call_sql
-        assert "t_00000000000000000000000000000002" in first_call_sql
+        # The schema is resolved from the catalog, so the lookup runs first;
+        # assert against every statement rather than a fixed position.
+        sql = " ".join(str(c) for c in runner._duckdb_con.execute.call_args_list)
+        assert "user_00000000000000000000000000000001" in sql
+        assert "t_00000000000000000000000000000002" in sql
 
 
 class TestLayerDeleteOwnership:
@@ -243,6 +244,8 @@ class TestLayerDeleteOwnership:
             "id": uuid.UUID("00000000-0000-0000-0000-000000000002"),
             "user_id": uuid.UUID("00000000-0000-0000-0000-000000000001"),
         }
+        # No bundle_layer row: a standalone layer, which is what this case is.
+        mock_pool.fetchval.return_value = None
         mock_pool.execute = AsyncMock()
         mock_pool.close = AsyncMock()
 
@@ -256,6 +259,35 @@ class TestLayerDeleteOwnership:
         assert owner_id == "00000000-0000-0000-0000-000000000001"
         # Verify DELETE was called
         mock_pool.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_verify_ownership_refuses_a_bundle_member(self, runner):
+        """A member layer goes with its bundle, never on its own.
+
+        Deleting one directly would leave the bundle whole and `ready` with a
+        role missing and its artifacts stale.
+        """
+        import uuid
+
+        mock_pool = AsyncMock()
+        mock_pool.fetchrow.return_value = {
+            "id": uuid.UUID("00000000-0000-0000-0000-000000000002"),
+            "user_id": uuid.UUID("00000000-0000-0000-0000-000000000001"),
+        }
+        mock_pool.fetchval.return_value = 1
+        mock_pool.execute = AsyncMock()
+        mock_pool.close = AsyncMock()
+
+        with patch.object(runner, "get_postgres_pool", return_value=mock_pool):
+            with pytest.raises(PermissionError, match="belongs to a bundle"):
+                await runner._verify_ownership_and_delete(
+                    layer_id="00000000-0000-0000-0000-000000000002",
+                    user_id="00000000-0000-0000-0000-000000000001",
+                )
+
+        # The owner is allowed to delete it, so the refusal must land before
+        # the DELETE, not after.
+        mock_pool.execute.assert_not_called()
 
 
 class TestLayerDeletePMTiles:
@@ -271,8 +303,8 @@ class TestLayerDeletePMTiles:
 
     def test_delete_pmtiles_success(self, runner):
         """Test PMTiles deletion success."""
-        with patch("goatlib.io.pmtiles.PMTilesGenerator") as MockGen:
-            mock_generator = MockGen.return_value
+        with patch("goatlib.io.pmtiles.PMTilesGenerator") as mock_gen:
+            mock_generator = mock_gen.return_value
             mock_generator.delete_pmtiles.return_value = True
 
             result = runner._delete_pmtiles(
@@ -284,8 +316,8 @@ class TestLayerDeletePMTiles:
 
     def test_delete_pmtiles_not_exists(self, runner):
         """Test PMTiles deletion when file doesn't exist."""
-        with patch("goatlib.io.pmtiles.PMTilesGenerator") as MockGen:
-            mock_generator = MockGen.return_value
+        with patch("goatlib.io.pmtiles.PMTilesGenerator") as mock_gen:
+            mock_generator = mock_gen.return_value
             mock_generator.delete_pmtiles.return_value = False
 
             result = runner._delete_pmtiles(
@@ -297,8 +329,8 @@ class TestLayerDeletePMTiles:
 
     def test_delete_pmtiles_error(self, runner):
         """Test PMTiles deletion with error."""
-        with patch("goatlib.io.pmtiles.PMTilesGenerator") as MockGen:
-            MockGen.side_effect = Exception("PMTiles error")
+        with patch("goatlib.io.pmtiles.PMTilesGenerator") as mock_gen:
+            mock_gen.side_effect = Exception("PMTiles error")
 
             result = runner._delete_pmtiles(
                 layer_id="00000000-0000-0000-0000-000000000002",
