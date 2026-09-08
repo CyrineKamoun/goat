@@ -106,7 +106,12 @@
       "type": "node-terminal",
       "request": "launch",
       "envFile": "${workspaceFolder}/.env",
-      "command": "pnpm run web",
+      // `NODE_OPTIONS=` clears the js-debug bootloader that node-terminal
+      // injects. With the inspector attached, Turbopack never finishes
+      // compiling the heavier routes (`/catalog/[datasetId]`) and the dev
+      // server spins until it runs out of memory. Use `pnpm dev:inspect` when
+      // the frontend actually needs a debugger (from `apps/web`).
+      "command": "NODE_OPTIONS= pnpm run web",
       "preLaunchTask": "web-pre-launch",
       "presentation": {
         "hidden": false,
