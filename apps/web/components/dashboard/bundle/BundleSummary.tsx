@@ -6,18 +6,15 @@ import { toast } from "react-toastify";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { rebuildBundleArtifact } from "@/lib/api/bundleEdits";
-import { setRunningJobIds } from "@/lib/store/jobs/slice";
-
-import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
-
 import { useDateFnsLocale } from "@/i18n/utils";
 
+import { rebuildBundleArtifact } from "@/lib/api/bundleEdits";
 import type { BundleDependency, BundleRead } from "@/lib/api/bundles";
+import { METADATA_HEADER_ICONS } from "@/lib/constants/metadataIcons";
+import { setRunningJobIds } from "@/lib/store/jobs/slice";
 
 import { useGetMetadataValueTranslation } from "@/hooks/map/DatasetHooks";
-
-import { METADATA_HEADER_ICONS } from "@/lib/constants/metadataIcons";
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 const ContainerWrapper = styled("div")({
   containerType: "inline-size",
@@ -67,9 +64,17 @@ type MetadataField =
 interface BundleSummaryProps {
   bundle: BundleRead;
   dependencies?: BundleDependency[];
+  /** Drop the long provenance list and keep only the aggregated fields,
+   *  status and artifact state — what fits a bundle's metadata tab in the
+   *  map, where vertical space is scarce. */
+  hideMetadataSection?: boolean;
 }
 
-const BundleSummary: React.FC<BundleSummaryProps> = ({ bundle, dependencies }) => {
+const BundleSummary: React.FC<BundleSummaryProps> = ({
+  bundle,
+  dependencies,
+  hideMetadataSection = false,
+}) => {
   const theme = useTheme();
   const [isRebuilding, setIsRebuilding] = useState(false);
   const dispatch = useAppDispatch();
@@ -97,20 +102,24 @@ const BundleSummary: React.FC<BundleSummaryProps> = ({ bundle, dependencies }) =
   // stop-to-street linkage, and "something failed" is not useful without saying
   // which — so the API reports them separately and they are shown that way.
   const artifacts = bundle.artifacts ?? [];
-  const statusLabel_ = (status: string) =>
-    i18n.exists(`common:artifact_${status}`)
-      ? t(`artifact_${status}`)
-      : status.charAt(0).toUpperCase() + status.slice(1);
+  const artifactStateLabel = (state: string) =>
+    i18n.exists(`common:artifact_${state}`)
+      ? t(`artifact_${state}`)
+      : state.charAt(0).toUpperCase() + state.slice(1);
 
-  // Offered whenever any of them is unusable, which is also the way back for a
-  // bundle whose preparation never finished or failed — including an import
-  // that died before writing any artifact row at all (failed bundle, empty
-  // artifact list), which is exactly the case this button exists to rescue.
+  // Offered whenever an artifact is unusable, and for a bundle that holds no
+  // artifact row at all unless its import completed: `failed` rows predating
+  // the self-deleting import are deliberately left in the table by the
+  // migration, and an import worker killed outright (OOM/SIGKILL) never
+  // reaches that delete either, leaving the bundle at `processing` for good.
+  // Neither ever grows an artifact on its own, so this button is the only way
+  // back — and a bundle type that derives no artifact has nothing to rebuild,
+  // but it reaches `ready` and so is not offered one.
   const needsRebuild =
-    artifacts.some((artifact) => artifact.status !== "ready") ||
-    (artifacts.length === 0 && bundle.status === "failed");
+    artifacts.some((artifact) => artifact.state !== "ready") ||
+    (artifacts.length === 0 && bundle.status !== "ready");
   // A build already running makes a second click a duplicate, not a retry.
-  const isBuilding = artifacts.some((artifact) => artifact.status === "building");
+  const isBuilding = artifacts.some((artifact) => artifact.state === "building");
 
   // Bundle-specific, so they have no aggregated-field equivalent to reuse.
   const bundleAttributes: { key: string; heading: string; value?: string; icon: ICON_NAME }[] = [
@@ -120,7 +129,7 @@ const BundleSummary: React.FC<BundleSummaryProps> = ({ bundle, dependencies }) =
       heading: i18n.exists(`common:artifact_kind.${artifact.kind}`)
         ? t(`artifact_kind.${artifact.kind}`)
         : artifact.kind,
-      value: statusLabel_(artifact.status),
+      value: artifactStateLabel(artifact.state),
       icon: ICON_NAME.STREET_NETWORK,
     })),
     {
@@ -149,66 +158,67 @@ const BundleSummary: React.FC<BundleSummaryProps> = ({ bundle, dependencies }) =
   return (
     <ContainerWrapper>
       <LayoutContainer>
-        <MetadataSection>
-          <Stack spacing={4} sx={{ width: "100%" }}>
-            {metadataFields.map(({ field, heading, type }) => {
-              // Description is the bundle's own column; the rest live in the
-              // provenance document.
-              const value =
-                field === "description" ? bundle.description : bundle.dataset_metadata?.[field];
-              return (
-                <Stack key={field} spacing={1}>
-                  <Typography variant="caption">{heading}</Typography>
-                  <Divider />
-                  {!value && (
-                    <Typography variant="body2" sx={{ fontStyle: "italic" }}>
-                      {t(`metadata.no_metadata_available.${field}`)}
-                    </Typography>
-                  )}
-                  {!!value && type === "email" && (
-                    <Link href={`mailto:${value}`} target="_blank" rel="noopener noreferrer">
-                      {String(value)}
-                    </Link>
-                  )}
-                  {!!value && type === "url" && (
-                    <Link href={String(value)} target="_blank" rel="noopener noreferrer">
-                      {String(value)}
-                    </Link>
-                  )}
-                  {!!value && type === "text" && <Typography variant="body2">{String(value)}</Typography>}
-                </Stack>
-              );
-            })}
-
-            {!!dependencies?.length && (
-              <Stack spacing={1}>
-                <Typography variant="caption">{t("bundle_dependencies")}</Typography>
-                <Divider />
-                {dependencies.map((dependency) => (
-                  <Stack
-                    key={`${dependency.dependency_kind}-${dependency.depends_on_bundle_id}`}
-                    direction="row"
-                    spacing={2}
-                    alignItems="center">
-                    <Icon
-                      iconName={ICON_NAME.LINK}
-                      style={{ fontSize: 14 }}
-                      htmlColor={theme.palette.text.secondary}
-                    />
-                    <Link href={`/bundles/${dependency.depends_on_bundle_id}`} variant="body2">
-                      {dependency.depends_on_name}
-                    </Link>
-                    <Typography variant="caption" color="text.secondary">
-                      {i18n.exists(`common:${dependency.depends_on_type}`)
-                        ? t(dependency.depends_on_type)
-                        : dependency.depends_on_type}
-                    </Typography>
+        {!hideMetadataSection && (
+          <MetadataSection>
+            <Stack spacing={4} sx={{ width: "100%" }}>
+              {metadataFields.map(({ field, heading, type }) => {
+                // Description is the bundle's own column; the rest live in the
+                // provenance document.
+                const value = field === "description" ? bundle.description : bundle.dataset_metadata?.[field];
+                return (
+                  <Stack key={field} spacing={1}>
+                    <Typography variant="caption">{heading}</Typography>
+                    <Divider />
+                    {!value && (
+                      <Typography variant="body2" sx={{ fontStyle: "italic" }}>
+                        {t(`metadata.no_metadata_available.${field}`)}
+                      </Typography>
+                    )}
+                    {!!value && type === "email" && (
+                      <Link href={`mailto:${value}`} target="_blank" rel="noopener noreferrer">
+                        {String(value)}
+                      </Link>
+                    )}
+                    {!!value && type === "url" && (
+                      <Link href={String(value)} target="_blank" rel="noopener noreferrer">
+                        {String(value)}
+                      </Link>
+                    )}
+                    {!!value && type === "text" && <Typography variant="body2">{String(value)}</Typography>}
                   </Stack>
-                ))}
-              </Stack>
-            )}
-          </Stack>
-        </MetadataSection>
+                );
+              })}
+
+              {!!dependencies?.length && (
+                <Stack spacing={1}>
+                  <Typography variant="caption">{t("bundle_dependencies")}</Typography>
+                  <Divider />
+                  {dependencies.map((dependency) => (
+                    <Stack
+                      key={`${dependency.dependency_kind}-${dependency.depends_on_bundle_id}`}
+                      direction="row"
+                      spacing={2}
+                      alignItems="center">
+                      <Icon
+                        iconName={ICON_NAME.LINK}
+                        style={{ fontSize: 14 }}
+                        htmlColor={theme.palette.text.secondary}
+                      />
+                      <Link href={`/bundles/${dependency.depends_on_bundle_id}`} variant="body2">
+                        {dependency.depends_on_name}
+                      </Link>
+                      <Typography variant="caption" color="text.secondary">
+                        {i18n.exists(`common:${dependency.depends_on_type}`)
+                          ? t(dependency.depends_on_type)
+                          : dependency.depends_on_type}
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+            </Stack>
+          </MetadataSection>
+        )}
 
         <MainContentSection>
           <Stack spacing={2}>
@@ -228,9 +238,7 @@ const BundleSummary: React.FC<BundleSummaryProps> = ({ bundle, dependencies }) =
                   <Typography variant="body2" fontWeight="bold" noWrap>
                     {getMetadataValueTranslation(
                       key,
-                      key === "type"
-                        ? bundle.bundle_type
-                        : (bundle.dataset_metadata?.[key] ?? "")
+                      key === "type" ? bundle.bundle_type : (bundle.dataset_metadata?.[key] ?? "")
                     )}
                   </Typography>
                 </div>

@@ -21,15 +21,30 @@ from typing import Any, Iterable, Sequence
 from goatlib.bundles.topology import EdgeCandidate, NodeCandidate
 from shapely import wkt
 
-# _feature_id_to_rowid: one definition of the rowid convention (a public
-# feature id is rowid + 1, because MapLibre treats MVT feature id 0 as
-# "unset"). BBOX_STRUCT_SQL: one definition of the bbox upkeep, shared so it
-# cannot drift between the two writers.
-from geoapi.services.feature_write_service import BBOX_STRUCT_SQL, _feature_id_to_rowid
+from geoapi.services.computed_columns import parse_computed_columns
+
+# One definition of the rowid convention (a public feature id is rowid + 1,
+# because MapLibre treats MVT feature id 0 as "unset"), and one of the
+# GeoParquet bbox struct every write path keeps in step with the geometry.
+from geoapi.services.feature_write_service import _feature_id_to_rowid, bbox_struct_sql
 
 logger = logging.getLogger(__name__)
 
 TO_3857 = "ST_Transform({geom}, 'EPSG:4326', 'EPSG:3857', always_xy := true)"
+TO_4326 = "ST_Transform({geom}, 'EPSG:3857', 'EPSG:4326', always_xy := true)"
+
+
+def _projected(expr: str) -> str:
+    """A point or sub-line a fraction along a stored 4326 geometry, measured the
+    way the fraction was: in projected metres.
+
+    The fraction comes from ``goatlib.bundles.topology``, which works in
+    EPSG:3857. Applying it to the 4326 line directly puts the point somewhere
+    else, because Mercator stretches north-south by a factor that varies with
+    latitude — 0.43 m along a 4.4 km street at Munich, more further north and on
+    longer edges. So the line is projected, cut, and the result brought back.
+    """
+    return TO_4326.format(geom=expr.format(geom=TO_3857.format(geom='"geometry"')))
 
 
 def mint_id() -> str:
@@ -148,6 +163,63 @@ def fetch_candidates(
     return nodes, edges
 
 
+def node_position(con: Any, nodes_table: str, node_id: str) -> tuple[float, float]:
+    """A node's stored 4326 coordinate.
+
+    Read back rather than recomputed: a drawn vertex is moved onto the node it
+    resolved to, and the node table is what the graph joins on, so the vertex
+    has to match the row exactly and not a second derivation of it.
+    """
+    row = con.execute(
+        f'SELECT ST_X(geometry), ST_Y(geometry) FROM {nodes_table} WHERE "id" = ?',
+        [node_id],
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"Node {node_id} is not in the nodes layer.")
+    return float(row[0]), float(row[1])
+
+
+def node_references(
+    con: Any,
+    edges_table: str,
+    node_ids: Iterable[str],
+    exclude_edge_ids: Iterable[str] = (),
+) -> dict[str, set[str]]:
+    """Which edges reference each node — the graph's degree, before the batch.
+
+    Distinct from ``fetch_candidates``, which answers a different question and
+    so needs different exclusions. Snapping must not target a row the batch is
+    rewriting, or an edge would snap to its own former self. Degree must count
+    those rows, because an edge being moved still holds its node until it is
+    rewritten; only a row being deleted stops counting.
+    """
+    ids = list(dict.fromkeys(node_ids))
+    if not ids:
+        return {}
+    placeholders = ", ".join(["?"] * len(ids))
+    params: list[Any] = ids + ids
+    excluded = ""
+    dropped = list(dict.fromkeys(exclude_edge_ids))
+    if dropped:
+        excluded = f'AND "id" NOT IN ({", ".join(["?"] * len(dropped))})'
+        params += dropped
+    rows = con.execute(
+        f"""
+        SELECT "id", source_node, target_node FROM {edges_table}
+        WHERE (source_node IN ({placeholders}) OR target_node IN ({placeholders}))
+          {excluded}
+        """,
+        params,
+    ).fetchall()
+    wanted = set(ids)
+    references: dict[str, set[str]] = {node_id: set() for node_id in ids}
+    for edge_id, source, target in rows:
+        for node_id in (source, target):
+            if node_id in wanted:
+                references[node_id].add(edge_id)
+    return references
+
+
 def _node_insert_sql(nodes_table: str, columns: Sequence[str], geom_expr: str) -> str:
     """INSERT for a node, writing only the columns the layer actually has.
 
@@ -163,10 +235,7 @@ def _node_insert_sql(nodes_table: str, columns: Sequence[str], geom_expr: str) -
     select.append("g")
     if "bbox" in columns:
         target.append('"bbox"')
-        select.append(
-            "struct_pack(xmin := ST_XMin(g), ymin := ST_YMin(g), "
-            "xmax := ST_XMax(g), ymax := ST_YMax(g))"
-        )
+        select.append(bbox_struct_sql("g"))
     for axis, fn in (
         ("xmin", "ST_XMin"),
         ("ymin", "ST_YMin"),
@@ -207,11 +276,9 @@ def insert_node_on_edge(
     edge_id: str,
     fraction: float,
 ) -> None:
-    """Add a node at a fraction along an edge, exactly on its stored geometry."""
-    geom_expr = (
-        f"SELECT ST_LineInterpolatePoint(geometry, {float(fraction)}) AS g "
-        f'FROM {edges_table} WHERE "id" = ?'
-    )
+    """Add a node at a fraction along an edge, exactly on its geometry."""
+    point = _projected(f"ST_LineInterpolatePoint({{geom}}, {float(fraction)})")
+    geom_expr = f'SELECT {point} AS g FROM {edges_table} WHERE "id" = ?'
     con.execute(_node_insert_sql(nodes_table, columns, geom_expr), [node_id, edge_id])
 
 
@@ -224,44 +291,44 @@ def split_edge(
     left_id: str,
     right_id: str,
     new_node_id: str,
+    field_config: dict[str, Any] | None = None,
 ) -> None:
     """Replace an edge with two halves meeting at a new node.
 
-    Both halves inherit every attribute of the original. Nothing length-derived
-    needs recomputing: the edges layer stores no length, the artifact build
-    measures it.
+    Both halves inherit every attribute of the original except what its geometry
+    derived — those are recomputed in the insert itself, or each half would
+    claim the whole original's length.
     """
+    derived = _derived(columns, '"geometry"', field_config)
     for new_id, start, end, source, target in (
         (left_id, 0.0, fraction, None, new_node_id),
         (right_id, fraction, 1.0, new_node_id, None),
     ):
-        half = f"ST_LineSubstring(geometry, {float(start)}, {float(end)})"
         replacements = [
             '? AS "id"',
-            f"{half} AS geometry",
             "coalesce(?, source_node) AS source_node",
             "coalesce(?, target_node) AS target_node",
         ]
-        if "bbox" in columns:
-            replacements.append(
-                f"struct_pack(xmin := ST_XMin({half}), ymin := ST_YMin({half}), "
-                f"xmax := ST_XMax({half}), ymax := ST_YMax({half})) AS bbox"
-            )
-        for axis, fn in (
-            ("xmin", "ST_XMin"),
-            ("ymin", "ST_YMin"),
-            ("xmax", "ST_XMax"),
-            ("ymax", "ST_YMax"),
-        ):
-            if axis in columns:
-                replacements.append(f"{fn}({half}) AS {axis}")
+        replacements += [f'{sql} AS "{name}"' for name, sql in derived]
+        # The half replaces the geometry first, so everything above reads it
+        # rather than the original's.
+        cut = _projected(f"ST_LineSubstring({{geom}}, {float(start)}, {float(end)})")
+        half = (
+            f'SELECT * REPLACE ({cut} AS "geometry") '
+            f'FROM {edges_table} WHERE "id" = ?'
+        )
         con.execute(
             f"INSERT INTO {edges_table} BY NAME "
-            f"SELECT * REPLACE ({', '.join(replacements)}) "
-            f'FROM {edges_table} WHERE "id" = ?',
+            f"SELECT * REPLACE ({', '.join(replacements)}) FROM ({half})",
             [new_id, source, target, edge_id],
         )
     con.execute(f'DELETE FROM {edges_table} WHERE "id" = ?', [edge_id])
+
+
+# The new geometry, named so that computed and bbox expressions can read it
+# without the GeoJSON being passed as a parameter once per expression.
+_NEW_GEOM = '"new_geom"'
+_NEW_GEOM_SOURCE = 'SELECT ST_MakeValid(ST_GeomFromGeoJSON(?)) AS "new_geom"'
 
 
 def insert_edge(
@@ -273,41 +340,31 @@ def insert_edge(
     properties: dict[str, Any],
     source_node: str,
     target_node: str,
+    field_config: dict[str, Any] | None = None,
 ) -> None:
     """Add an edge with its resolved endpoints."""
-    geom_json = json.dumps(geometry)
-    columns = ['"id"', '"geometry"', '"source_node"', '"target_node"']
-    placeholders = ["?", "ST_MakeValid(ST_GeomFromGeoJSON(?))", "?", "?"]
-    values: list[Any] = [edge_id, geom_json, source_node, target_node]
+    derived = _derived(column_names, _NEW_GEOM, field_config)
+    reserved = {"id", "geometry", "source_node", "target_node"} | {
+        name for name, _ in derived
+    }
 
+    columns = ['"id"', '"geometry"', '"source_node"', '"target_node"']
+    selects = ["?", _NEW_GEOM, "?", "?"]
+    values: list[Any] = [edge_id, source_node, target_node]
     for key, value in properties.items():
-        if key in ("id", "geometry", "source_node", "target_node", "bbox"):
-            continue
-        if key not in column_names:
+        if key in reserved or key not in column_names:
             continue
         columns.append(f'"{key}"')
-        placeholders.append("?")
+        selects.append("?")
         values.append(value)
-
-    if "bbox" in column_names:
-        columns.append('"bbox"')
-        placeholders.append(BBOX_STRUCT_SQL)
-        values.extend([geom_json] * 4)
-    for axis, fn in (
-        ("xmin", "ST_XMin"),
-        ("ymin", "ST_YMin"),
-        ("xmax", "ST_XMax"),
-        ("ymax", "ST_YMax"),
-    ):
-        if axis in column_names:
-            columns.append(f'"{axis}"')
-            placeholders.append(f"{fn}(ST_MakeValid(ST_GeomFromGeoJSON(?)))")
-            values.append(geom_json)
+    for name, sql in derived:
+        columns.append(f'"{name}"')
+        selects.append(sql)
 
     con.execute(
         f"INSERT INTO {edges_table} ({', '.join(columns)}) "
-        f"VALUES ({', '.join(placeholders)})",
-        values,
+        f"SELECT {', '.join(selects)} FROM ({_NEW_GEOM_SOURCE})",
+        values + [json.dumps(geometry)],
     )
 
 
@@ -320,40 +377,33 @@ def update_edge(
     properties: dict[str, Any],
     source_node: str,
     target_node: str,
+    field_config: dict[str, Any] | None = None,
 ) -> None:
     """Replace an edge's geometry, endpoints and attributes."""
-    geom_json = json.dumps(geometry)
-    assignments = [
-        '"geometry" = ST_MakeValid(ST_GeomFromGeoJSON(?))',
-        '"source_node" = ?',
-        '"target_node" = ?',
-    ]
-    values: list[Any] = [geom_json, source_node, target_node]
+    src = f"src.{_NEW_GEOM}"
+    derived = _derived(column_names, src, field_config)
+    reserved = {"id", "geometry", "source_node", "target_node"} | {
+        name for name, _ in derived
+    }
 
+    # Numbered rather than positional: DuckDB binds an UPDATE ... FROM by
+    # walking the FROM clause before the SET list, so "?" would put the
+    # geometry where the first assignment's value belongs.
+    values: list[Any] = [json.dumps(geometry), source_node, target_node]
+    assignments = [f'"geometry" = {src}', '"source_node" = $2', '"target_node" = $3']
     for key, value in properties.items():
-        if key in ("id", "geometry", "source_node", "target_node", "bbox"):
+        if key in reserved or key not in column_names:
             continue
-        if key not in column_names:
-            continue
-        assignments.append(f'"{key}" = ?')
         values.append(value)
-
-    if "bbox" in column_names:
-        assignments.append(f'"bbox" = {BBOX_STRUCT_SQL}')
-        values.extend([geom_json] * 4)
-    for axis, fn in (
-        ("xmin", "ST_XMin"),
-        ("ymin", "ST_YMin"),
-        ("xmax", "ST_XMax"),
-        ("ymax", "ST_YMax"),
-    ):
-        if axis in column_names:
-            assignments.append(f'"{axis}" = {fn}(ST_MakeValid(ST_GeomFromGeoJSON(?)))')
-            values.append(geom_json)
-
+        assignments.append(f'"{key}" = ${len(values)}')
+    assignments += [f'"{name}" = {sql}' for name, sql in derived]
     values.append(edge_id)
+
     con.execute(
-        f"UPDATE {edges_table} SET {', '.join(assignments)} WHERE \"id\" = ?", values
+        f"UPDATE {edges_table} SET {', '.join(assignments)} "
+        f"FROM (SELECT ST_MakeValid(ST_GeomFromGeoJSON($1)) AS \"new_geom\") AS src "
+        f'WHERE {edges_table}."id" = ${len(values)}',
+        values,
     )
     changed = con.execute(
         f'SELECT count(*) FROM {edges_table} WHERE "id" = ?', [edge_id]
@@ -363,6 +413,43 @@ def update_edge(
             f"Edge {edge_id} is no longer in the layer, so the edit could not be "
             "applied. Reload before saving."
         )
+
+
+def _derived(
+    columns: Sequence[str], geom_sql: str, field_config: dict[str, Any] | None
+) -> list[tuple[str, str]]:
+    """Every column derived from an edge's geometry, as (name, SQL).
+
+    The layer's computed columns plus the bbox upkeep, in one place so the three
+    write paths cannot drift. ``geom_sql`` is how the new geometry is spelled in
+    the statement being built.
+
+    Spliced into the write itself, never applied afterwards: updating a row that
+    was inserted in the same transaction leaves DuckLake's transaction-local row
+    id (around 1e18) on it for good, and the tile query hands ``rowid`` to
+    ST_AsMVT as an int32 feature id — so every tile covering an edited edge
+    would fail to render.
+    """
+    derived: list[tuple[str, str]] = []
+    if field_config:
+        derived += [
+            (spec.name, spec.compute_sql)
+            for spec in parse_computed_columns(field_config, geom_column="__geom__")
+            if spec.name in columns
+        ]
+    if "bbox" in columns:
+        derived.append(("bbox", bbox_struct_sql('"__geom__"')))
+    derived += [
+        (axis, f'{fn}("__geom__")')
+        for axis, fn in (
+            ("xmin", "ST_XMin"),
+            ("ymin", "ST_YMin"),
+            ("xmax", "ST_XMax"),
+            ("ymax", "ST_YMax"),
+        )
+        if axis in columns
+    ]
+    return [(name, sql.replace('"__geom__"', geom_sql)) for name, sql in derived]
 
 
 def delete_edges_by_id(con: Any, edges_table: str, edge_ids: Sequence[str]) -> None:
@@ -388,21 +475,22 @@ def delete_edges_by_id(con: Any, edges_table: str, edge_ids: Sequence[str]) -> N
     )
 
 
-def surviving_edge_endpoints(
-    con: Any, edges_table: str, node_ids: Sequence[str]
-) -> list[tuple[str, str]]:
-    """Endpoint pairs of every edge still referencing any of these nodes."""
-    if not node_ids:
-        return []
-    placeholders = ", ".join(["?"] * len(node_ids))
+def edge_endpoints(con: Any, edges_table: str, edge_ids: Sequence[str]) -> set[str]:
+    """Node ids the given edges currently reference.
+
+    The nodes a save might orphan: the endpoints of everything it removes or
+    moves. Which of them actually end up orphaned is ``node_references``.
+    """
+    ids = list(edge_ids)
+    if not ids:
+        return set()
+    placeholders = ", ".join(["?"] * len(ids))
     rows = con.execute(
-        f"""
-        SELECT source_node, target_node FROM {edges_table}
-        WHERE source_node IN ({placeholders}) OR target_node IN ({placeholders})
-        """,
-        list(node_ids) * 2,
+        f"SELECT source_node, target_node FROM {edges_table} "
+        f'WHERE "id" IN ({placeholders})',
+        ids,
     ).fetchall()
-    return [(r[0], r[1]) for r in rows]
+    return {value for row in rows for value in row if value}
 
 
 def delete_nodes_by_id(con: Any, nodes_table: str, node_ids: Iterable[str]) -> int:

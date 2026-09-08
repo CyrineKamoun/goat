@@ -446,7 +446,7 @@ def test_build_raises_when_an_edge_references_a_missing_node(tmp_path, con) -> N
     con.execute(f"""
         COPY (
             SELECT 'e1' AS id, 'residential' AS "class", 'n1' AS source_node,
-                   'ghost' AS target_node, NULL AS surface,
+                   'ghost' AS target_node, NULL AS surface, 74.4 AS length_m,
                    30 AS speed_limit_kph_forward, 30 AS speed_limit_kph_backward,
                    ST_GeomFromText('LINESTRING(11 48, 11.001 48)') AS geometry
         ) TO '{edges}' (FORMAT PARQUET)
@@ -461,9 +461,9 @@ def test_build_raises_when_an_edge_references_a_missing_node(tmp_path, con) -> N
         )
 
 
-def test_fetch_explains_a_stale_artifact(tmp_path) -> None:
+def test_fetch_explains_an_outdated_artifact(tmp_path) -> None:
     with pytest.raises(ValueError, match="being updated"):
-        fetch_routing_network(_FakeSource(None, "stale"), "bundle-1", tmp_path)
+        fetch_routing_network(_FakeSource(None, "outdated"), "bundle-1", tmp_path)
 
 
 def test_fetch_explains_a_build_in_progress(tmp_path) -> None:
@@ -494,13 +494,14 @@ def _write_network(con, root: Path, edge_targets: Tuple[str, str]) -> Tuple[str,
         COPY (
             SELECT * FROM (VALUES
                 ('e1', 'residential', CAST(NULL AS VARCHAR), 30, 30,
-                 'n1', '{edge_targets[0]}',
+                 'n1', '{edge_targets[0]}', 74.4,
                  ST_GeomFromText('LINESTRING (11.0 48.0, 11.001 48.0)')),
                 ('e2', 'residential', CAST(NULL AS VARCHAR), 30, 30,
-                 'n1', '{edge_targets[1]}',
+                 'n1', '{edge_targets[1]}', 148.9,
                  ST_GeomFromText('LINESTRING (11.0 48.0, 11.002 48.0)'))
             ) t("id", "class", surface, speed_limit_kph_forward,
-                speed_limit_kph_backward, source_node, target_node, geometry)
+                speed_limit_kph_backward, source_node, target_node, length_m,
+                geometry)
         ) TO '{edges}' (FORMAT PARQUET)
     """)
     return edges, nodes
@@ -548,3 +549,119 @@ def test_a_layer_where_no_edge_resolves_is_refused(tmp_path, con) -> None:
             )
     finally:
         build_con.close()
+
+
+# --- length_m: the layer's column, or the geometry ---------------------------
+
+
+def _legacy_network(con, root: Path, *, length_sql: str | None) -> Tuple[str, str]:
+    """A one-edge network whose edges layer carries `length_m` only if asked.
+
+    `length_sql` is the column's SQL (`'74.4'`, `'NULL::DOUBLE'`, …); None
+    leaves the column out entirely, which is what every edges layer imported
+    before the column existed looks like.
+    """
+    nodes, edges = str(root / "nodes.parquet"), str(root / "edges.parquet")
+    con.execute(f"""
+        COPY (
+            SELECT * FROM (VALUES
+                ('n1', ST_Point(11.0, 48.0)),
+                ('n2', ST_Point(11.001, 48.0))
+            ) t("id", geometry)
+        ) TO '{nodes}' (FORMAT PARQUET)
+    """)
+    length_column = f", {length_sql} AS length_m" if length_sql is not None else ""
+    con.execute(f"""
+        COPY (
+            SELECT 'e1' AS id, 'residential' AS "class",
+                   CAST(NULL AS VARCHAR) AS surface,
+                   30 AS speed_limit_kph_forward, 30 AS speed_limit_kph_backward,
+                   'n1' AS source_node, 'n2' AS target_node,
+                   ST_GeomFromText('LINESTRING (11.0 48.0, 11.001 48.0)')
+                       AS geometry
+                   {length_column}
+        ) TO '{edges}' (FORMAT PARQUET)
+    """)
+    return edges, nodes
+
+
+def _built_lengths(tmp_path: Path, con, *, length_sql: str | None) -> list:
+    from goatlib.bundles.artifacts.street_network import _transform
+
+    edges, nodes = _legacy_network(con, tmp_path, length_sql=length_sql)
+    out = str(tmp_path / "edges_out.parquet")
+    build_con = duckdb.connect()
+    build_con.execute("INSTALL spatial; LOAD spatial")
+    try:
+        _transform(build_con, edges, nodes, out, str(tmp_path / "nodes_out.parquet"))
+    finally:
+        build_con.close()
+    rows = con.execute(f"SELECT length_m FROM read_parquet('{out}')").fetchall()
+    return [row[0] for row in rows]
+
+
+def test_a_legacy_edges_layer_without_length_m_still_builds(tmp_path, con) -> None:
+    """Every street-network bundle imported before the column existed has no
+    `length_m`, and its first edit queues a rebuild — so refusing here would
+    mean those bundles can never rebuild again."""
+    lengths = _built_lengths(tmp_path, con, length_sql=None)
+    # Measured from the geometry with the computed kind's own formula.
+    assert lengths == [pytest.approx(74.4, abs=0.5)]
+
+
+def test_a_null_length_m_is_measured_from_the_geometry(tmp_path, con) -> None:
+    """The column can exist and be unfilled. The engine reads a zero-length
+    edge as free to traverse, so a null must not reach the graph."""
+    lengths = _built_lengths(tmp_path, con, length_sql="CAST(NULL AS DOUBLE)")
+    assert lengths == [pytest.approx(74.4, abs=0.5)]
+
+
+def test_the_layers_length_m_wins_when_it_is_filled(tmp_path, con) -> None:
+    """Once the column exists it is the source of truth, so the length a user
+    reads in the table is the length the engine routes on — even where it
+    disagrees with what the geometry alone would say."""
+    lengths = _built_lengths(tmp_path, con, length_sql="999.0")
+    assert lengths == [pytest.approx(999.0, abs=1e-6)]
+
+
+# --- one refusal mapping for every artifact kind -----------------------------
+
+
+@pytest.mark.parametrize(
+    ("state", "fragment"),
+    [
+        ("outdated", "being updated"),
+        ("building", "still being prepared"),
+        ("failed", "last update failed"),
+        (None, "not ready to route on"),
+    ],
+)
+def test_both_fetch_helpers_refuse_in_the_same_words(state, fragment) -> None:
+    """The refusal mapping was copied per artifact kind with the noun changed,
+    which is how the two drifted ("once it finishes" against "once the update
+    finishes"). One function now, so a fifth state cannot be handled in one
+    place and forgotten in the other."""
+    from goatlib.bundles.artifacts.gtfs import fetch_pt_timetable
+
+    with pytest.raises(ValueError, match=fragment) as street:
+        fetch_routing_network(_FakeSource(None, state), "bundle-1", "/tmp")
+    with pytest.raises(ValueError, match=fragment) as transit:
+        fetch_pt_timetable(_FakeSource(None, state), "bundle-1")
+
+    # Same sentence, and the noun is the only thing that differs — it names
+    # what the user picked, not the artifact behind it.
+    assert str(street.value).replace("street network", "<noun>") == str(
+        transit.value
+    ).replace("public-transport network", "<noun>")
+
+
+def test_the_refusal_names_what_the_user_chose(tmp_path) -> None:
+    from goatlib.bundles.artifacts.base import require_ready_artifact
+
+    with pytest.raises(ValueError, match="This bicycle network is being updated"):
+        require_ready_artifact(
+            _FakeSource(None, "outdated"),
+            "bundle-1",
+            "street_network_graph",
+            "bicycle network",
+        )

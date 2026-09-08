@@ -34,12 +34,22 @@ import logging
 import os
 import tarfile
 from pathlib import Path
-from typing import Dict, List, Protocol, Tuple
+from typing import Dict, List, Tuple
 
 import duckdb
 
-from goatlib.bundles.artifacts.base import ArtifactBuilder, BuiltArtifact
-from goatlib.models.bundle import ROUTING_CLASSES, BundleArtifactKind, BundleTypeName
+from goatlib.bundles.artifacts.base import (
+    ArtifactBuilder,
+    ArtifactSource,
+    BuiltArtifact,
+    require_ready_artifact,
+)
+from goatlib.computed_columns import COMPUTED_KIND_REGISTRY
+from goatlib.models.bundle import (
+    ROUTING_CLASSES,
+    BundleArtifactKind,
+    BundleTypeName,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -137,19 +147,6 @@ class StreetNetworkArtifactBuilder(ArtifactBuilder):
         ]
 
 
-class RoutingArtifactSource(Protocol):
-    """The one capability ``fetch_routing_network`` needs of a tool runner.
-
-    A Protocol rather than ``BaseToolRunner`` keeps the dependency pointing from
-    tools to bundles: ``bundles.runner`` already imports ``tools``, so importing
-    it back would close a cycle.
-    """
-
-    def resolve_bundle_artifact(
-        self, bundle_id: str, kind: str
-    ) -> Tuple[str | None, str | None]: ...
-
-
 def unpack_routing_network(
     archive: str | Path, dest_dir: str | Path
 ) -> Tuple[str, str]:
@@ -178,36 +175,19 @@ def unpack_routing_network(
 
 
 def fetch_routing_network(
-    source: RoutingArtifactSource, bundle_id: str, dest_dir: str | Path
+    source: ArtifactSource, bundle_id: str, dest_dir: str | Path
 ) -> Tuple[str, str]:
     """Fetch and unpack a bundle's routing graph for any tool that routes.
 
     Returns the ``(edges, nodes)`` paths to hand to the analysis params, so a
     consumer needs one call and no knowledge of the artifact's packaging.
     """
-    archive, status = source.resolve_bundle_artifact(
-        bundle_id, BundleArtifactKind.street_network_graph.value
+    archive = require_ready_artifact(
+        source,
+        bundle_id,
+        BundleArtifactKind.street_network_graph,
+        "street network",
     )
-    if not archive:
-        # The status separates "not ready yet" from "was ready until someone
-        # edited it", which are different things to tell a user.
-        if status == "stale":
-            raise ValueError(
-                "This street network is being updated after an edit. Try again "
-                "once the update finishes."
-            )
-        if status == "building":
-            raise ValueError(
-                "This street network is still being prepared. Try again shortly."
-            )
-        if status == "failed":
-            raise ValueError(
-                "This street network's last update failed. Update it from the "
-                "bundle before using it."
-            )
-        raise ValueError(
-            "The selected street network bundle is not ready to route on yet."
-        )
     return unpack_routing_network(archive, dest_dir)
 
 
@@ -233,7 +213,16 @@ def _transform(
         CREATE TABLE edge_src AS
         SELECT * FROM read_parquet('{edges_layer}')
     """)
-    con.execute(f"COPY ({_edge_query()}) TO '{edges_out}' (FORMAT PARQUET)")
+
+    edge_columns = {
+        row[0]
+        for row in con.execute("SELECT column_name FROM (DESCRIBE edge_src)").fetchall()
+    }
+
+    con.execute(
+        f"COPY ({_edge_query('length_m' in edge_columns)}) "
+        f"TO '{edges_out}' (FORMAT PARQUET)"
+    )
 
     edge_count = con.execute(
         f"SELECT count(*) FROM read_parquet('{edges_out}')"
@@ -283,31 +272,61 @@ def _node_query() -> str:
     """
 
 
-def _edge_query() -> str:
+def _length_expression(layer_has_length: bool) -> str:
+    """SQL for the edge's `length_m`, given whether the layer carries one.
+
+    Two paths, because two kinds of edges layer exist and both have to build:
+
+    * The layer has the column — the importer declared it and the editor
+      rewrites it on every geometry change, so it is the source of truth. Its
+      value wins, and the length a user reads in the table is the length the
+      engine routes on. `coalesce` still covers individual nulls: the column
+      can exist and be unfilled (added by a backfill, or by an importer that
+      declared it without filling it), and the engine reads a zero-length edge
+      as free to traverse, which would silently distort every route through it.
+    * The layer has no such column — every street-network bundle imported
+      before the column existed. Refusing here would mean those bundles could
+      never rebuild, and a rebuild is what their first edit queues, so the
+      build measures the geometry itself instead.
+
+    Either way the formula is the computed kind's own, from
+    `goatlib.computed_columns`, so a length derived here cannot disagree with
+    one the layer computes later.
+
+    Belongs in the `projected` CTE, where `edge_src` is the only relation in
+    scope: the outer select joins `node_ids`, which carries a `geometry`
+    column of its own, and an unqualified reference there would be ambiguous.
+    """
+    computed = COMPUTED_KIND_REGISTRY["length"].compute_sql("geometry")
+    if not layer_has_length:
+        return computed
+    return f"coalesce(length_m, {computed})"
+
+
+def _edge_query(layer_has_length: bool) -> str:
     surface_case = " ".join(
         f"WHEN e.surface = '{name}' THEN {value}"
         for name, value in SURFACE_IMPEDANCE.items()
     )
     class_list = ", ".join(f"'{c}'" for c in sorted(ROUTING_CLASSES))
+    length_m = _length_expression(layer_has_length)
     return f"""
         WITH projected AS (
             SELECT
                 e.*,
                 ST_Transform(e.geometry, 'EPSG:4326', 'EPSG:3857', always_xy := true) AS geom_3857,
-                -- ST_Length_Spheroid reads coordinates as (latitude, longitude),
-                -- so unflipped input inflates an east-west length by ~50% at
-                -- Augsburg's latitude. Verified against pyproj.
-                ST_Length_Spheroid(ST_FlipCoordinates(e.geometry))::DOUBLE AS length_m,
                 CASE WHEN e."class" IN ({class_list})
                      THEN e."class" ELSE 'unknown' END AS routing_class,
-                CASE {surface_case} ELSE {DEFAULT_SURFACE_IMPEDANCE} END AS surface_imp
+                CASE {surface_case} ELSE {DEFAULT_SURFACE_IMPEDANCE} END AS surface_imp,
+                {length_m} AS length_m_built
             FROM edge_src e
         )
         SELECT
             row_number() OVER (ORDER BY p.id)::BIGINT AS id,
             s.int_id::BIGINT AS source,
             t.int_id::BIGINT AS target,
-            p.length_m,
+            -- Cast because the loader reinterpret_casts DOUBLE.
+            p.length_m_built::DOUBLE AS length_m,
             ST_Length(p.geom_3857)::DOUBLE AS length_3857,
             p.routing_class::VARCHAR AS class_,
             -- No DEM in an upload, so uploaded networks route as though flat.

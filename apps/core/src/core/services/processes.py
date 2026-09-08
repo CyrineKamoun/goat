@@ -7,6 +7,27 @@ from fastapi import HTTPException, status
 logger = logging.getLogger(__name__)
 
 
+def dispatch_never_started(error: BaseException) -> bool:
+    """Whether an ``execute_process`` failure rules out the job having started.
+
+    Only two failures do: the processes service is not configured, so no
+    request left this process, and the connection was never established, so
+    nothing was sent. Everything else is ambiguous — a timeout, a 502 from the
+    ingress, a disconnect while waiting — because the submission may have been
+    accepted and the job may already be running. A caller that compensates by
+    removing what the job operates on must therefore only do so when this
+    returns True; otherwise it would pull the ground out from under a live job.
+    """
+    if isinstance(error, HTTPException):
+        # `execute_process` maps every response it did get to 502; 503 is the
+        # unconfigured-service guard, raised before any request is made.
+        return error.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    # Connecting failed (DNS, refused, TLS): the request was never sent. A
+    # ServerDisconnectedError is deliberately not included — that one happens
+    # after the request went out.
+    return isinstance(error, aiohttp.ClientConnectorError)
+
+
 async def execute_process(
     *,
     process_id: str,

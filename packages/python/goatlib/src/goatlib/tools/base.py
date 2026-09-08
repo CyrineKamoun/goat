@@ -52,6 +52,7 @@ from goatlib.io.config import (
     PARQUET_ROW_GROUP_SIZE,
     PARQUET_VERSION,
 )
+from goatlib.models.bundle import BundleArtifactState, artifact_state
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.db import ToolDatabaseService
 from goatlib.tools.schemas import ToolInputBase, ToolOutputBase
@@ -1093,12 +1094,19 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
 
     def resolve_bundle_artifact(
         self: Self, bundle_id: str, kind: str
-    ) -> tuple[str | None, str | None]:
-        """Path and status of a bundle's artifact of ``kind``.
+    ) -> "tuple[str | None, BundleArtifactState | None]":
+        """Path and state of a bundle's artifact of ``kind``.
 
-        The path is only handed back for a ready artifact whose file is still
-        there; the status comes back either way, so a caller can tell "being
-        rebuilt after an edit" from "never built" and say so.
+        The path comes back only for a ``ready`` artifact. The state comes back
+        either way, so a caller can tell "being rebuilt after an edit" from "the
+        last build failed" and say so; ``None`` means no build has been
+        attempted at all.
+
+        Currency is computed from the revisions rather than read from a stored
+        flag. A layer write advances ``layers_revision`` in the same statement
+        that claims it, so nothing has to remember to mark anything stale — and
+        a graph that silently disagreed with the layers would give wrong answers
+        rather than an error.
 
         Artifacts live on the data volume, so this is the stored file itself —
         no copy. Callers must treat it as read-only."""
@@ -1109,12 +1117,23 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
         )
         if not row:
             return None, None
-        status = row.get("status")
-        storage_path = row.get("storage_path")
-        if status != "ready" or not storage_path:
-            return None, status
-        resolved = resolve_artifact(self.settings.bundles_data_dir, storage_path)
-        return (str(resolved) if resolved else None), status
+
+        state = artifact_state(
+            row.get("build_status"),
+            row.get("revision"),
+            row["layers_revision"],
+            row.get("storage_path"),
+        )
+        if state is not BundleArtifactState.ready:
+            return None, state
+
+        resolved = resolve_artifact(self.settings.bundles_data_dir, row["storage_path"])
+        if resolved is None:
+            # The row is current and complete but its file is gone — a volume
+            # restored from a backup that predates the build. Rebuildable, so it
+            # reads as a failed build rather than as something to route on.
+            return None, BundleArtifactState.failed
+        return str(resolved), state
 
     def export_layer_to_parquet(
         self: Self,

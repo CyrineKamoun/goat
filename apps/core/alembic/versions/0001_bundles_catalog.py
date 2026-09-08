@@ -166,7 +166,7 @@ def _create_bundle_tables() -> None:
                 postgresql.JSONB(astext_type=sa.Text()),
                 nullable=True,
             ),
-            sa.Column("status", sa.Text(), server_default="ready", nullable=False),
+            sa.Column("status", sa.Text(), server_default="processing", nullable=False),
             # Bumped on every member-layer edit; artifact builds record the
             # revision they read and publish only if it is still current.
             sa.Column(
@@ -204,7 +204,11 @@ def _create_bundle_tables() -> None:
             ),
             sa.Column("bundle_id", sa.UUID(), nullable=False),
             sa.Column("kind", sa.Text(), nullable=False),
-            sa.Column("status", sa.Text(), server_default="pending", nullable=False),
+            # What the last build attempt did. Whether the artifact may be
+            # routed on is derived from this, `revision` against the bundle's
+            # `layers_revision`, and whether a file is there — see
+            # goatlib.models.bundle.artifact_state.
+            sa.Column("build_status", sa.Text(), nullable=False),
             # Path on the bundles data volume, relative to the data dir.
             sa.Column("storage_path", sa.Text(), nullable=True),
             sa.Column("size", sa.BigInteger(), nullable=True),
@@ -322,6 +326,88 @@ def _fold_bundle_provenance() -> None:
     h.drop_column_if_present("bundle", "properties", S)
 
 
+def _bundle_status_shape() -> None:
+    """Bring a pre-existing `bundle`/`bundle_artifact` pair to the current shape.
+
+    A database that got both tables from `_create_bundle_tables` above, or from
+    `init`, already has this shape and every statement here is skipped. One that
+    carried the tables before them needs three things.
+
+    `bundle_artifact.status` becomes `build_status`. The old column conflated
+    what the last build did with whether the artifact still matches the layers,
+    and only the first is a fact the row can hold: the second is `revision`
+    against the bundle's `layers_revision`, so storing it as well meant a second
+    write on every layer change, and one missed write meant routing on a graph
+    that no longer matched the data. `ready` and `stale` both meant a build
+    completed and become `complete`. `pending` meant a row existed before
+    anything was built; nothing creates that state now (the row is written when
+    a build starts), so those become `failed`, which is how the UI offers the
+    way back.
+
+    A `ready` row is stamped with the bundle's current `layers_revision` first.
+    Currency is derived from the revisions now, and artifacts built by an import
+    never recorded one — without this they would all read `outdated`, and a
+    bundle whose artifacts cannot be rebuilt from its member layers (GTFS) would
+    have no way back but a re-import.
+
+    `bundle.status` defaults to `processing`. The row is committed before its
+    import job runs — it is the foreign key its member layers and dependencies
+    point at — so it exists holding nothing until the job finishes, and
+    defaulting to `ready` claimed the opposite. `status` also loses its `failed`
+    value in this release: an import that fails deletes its own bundle, because
+    nothing can complete a half-ingested one and the job carries the failure.
+    Rows written by earlier releases are left alone — they still read back (the
+    column is text) and removing them is an operator's decision:
+
+        DELETE FROM customer.bundle WHERE status = 'failed';
+    """
+    h.add_column_if_missing(
+        "bundle",
+        sa.Column("layers_revision", sa.Integer(), server_default="0", nullable=False),
+        S,
+    )
+    h.add_column_if_missing(
+        "bundle_artifact", sa.Column("revision", sa.Integer(), nullable=True), S
+    )
+
+    if h.column_exists("bundle_artifact", "status", S) and not h.column_exists(
+        "bundle_artifact", "build_status", S
+    ):
+        op.alter_column(
+            "bundle_artifact",
+            "status",
+            new_column_name="build_status",
+            server_default=None,
+            schema=S,
+        )
+        op.execute(
+            f"""
+            UPDATE {S}.bundle_artifact a
+            SET revision = b.layers_revision
+            FROM {S}.bundle b
+            WHERE b.id = a.bundle_id
+              AND a.build_status = 'ready'
+              AND a.revision IS NULL
+            """
+        )
+        op.execute(
+            f"""
+            UPDATE {S}.bundle_artifact
+            SET build_status = CASE build_status
+                WHEN 'ready' THEN 'complete'
+                WHEN 'stale' THEN 'complete'
+                WHEN 'pending' THEN 'failed'
+                ELSE build_status
+            END
+            """
+        )
+
+    if h.column_exists("bundle", "status", S):
+        op.execute(
+            f"ALTER TABLE {S}.bundle ALTER COLUMN status SET DEFAULT 'processing'"
+        )
+
+
 def upgrade() -> None:
     # Every ALTER and DROP on customer.layer below takes ACCESS EXCLUSIVE for
     # the whole alembic transaction. The statements are metadata-only and fast,
@@ -332,6 +418,7 @@ def upgrade() -> None:
     op.execute("SET lock_timeout = '5s'")
 
     _create_bundle_tables()
+    _bundle_status_shape()
 
     h.add_column_if_missing(
         "layer", sa.Column("catalog_external_uid", sa.Text(), nullable=True), S

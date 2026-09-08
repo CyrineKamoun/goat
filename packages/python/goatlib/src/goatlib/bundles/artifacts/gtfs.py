@@ -16,9 +16,14 @@ from typing import List, Tuple
 from goatlib.bundles.artifacts.base import (
     ArtifactBuilder,
     ArtifactBuilderUnavailableError,
+    ArtifactSource,
     BuiltArtifact,
+    require_ready_artifact,
 )
-from goatlib.models.bundle import BundleArtifactKind, BundleTypeName
+from goatlib.models.bundle import (
+    BundleArtifactKind,
+    BundleTypeName,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,3 +98,19 @@ class GtfsArtifactBuilder(ArtifactBuilder):
                 logger.warning("Invalid GTFS service dates (%s..%s): %s", lo, hi, e)
 
         return date.today().isoformat(), _MAX_DAYS
+
+
+def fetch_pt_timetable(source: ArtifactSource, bundle_id: str) -> str:
+    """Path to a PT bundle's timetable, for any tool that routes on transit.
+
+    The counterpart of ``fetch_routing_network``: one call, and the caller needs
+    no knowledge of the artifact's packaging. A timetable is a single ``.bin``,
+    so unlike a street graph there is nothing to unpack — the path is the stored
+    file on the data volume and must be treated as read-only.
+    """
+    return require_ready_artifact(
+        source,
+        bundle_id,
+        BundleArtifactKind.pt_network_graph,
+        "public-transport network",
+    )

@@ -8,11 +8,72 @@ runner stores them (S3 + ``bundle_artifact`` rows). Builders never touch the DB.
 """
 
 from abc import ABC
-from typing import Dict, List
+from typing import Dict, List, Protocol, Tuple
 
 from pydantic import BaseModel
 
-from goatlib.models.bundle import BundleArtifactKind, BundleTypeName
+from goatlib.models.bundle import (
+    BundleArtifactKind,
+    BundleArtifactState,
+    BundleTypeName,
+)
+
+
+class ArtifactSource(Protocol):
+    """The one capability the ``fetch_*`` helpers need of a tool runner.
+
+    A Protocol rather than ``BaseToolRunner`` keeps the dependency pointing from
+    tools to bundles: ``bundles.runner`` already imports ``tools``, so importing
+    it back would close a cycle.
+    """
+
+    def resolve_bundle_artifact(
+        self, bundle_id: str, kind: str
+    ) -> Tuple[str | None, BundleArtifactState | None]: ...
+
+
+def require_ready_artifact(
+    source: ArtifactSource,
+    bundle_id: str,
+    kind: "BundleArtifactKind | str",
+    noun: str,
+) -> str:
+    """The stored path of a bundle's artifact, or a refusal that says why not.
+
+    Every consumer of every artifact kind needs the same four sentences, and
+    what differs between them is one noun — so the mapping lives here once
+    rather than being copied per kind with the noun changed. ``noun`` names
+    what the user chose ("street network", "public-transport network"), not the
+    artifact: the person who picked a bundle in a dropdown has no idea an
+    artifact exists.
+
+    The state is what makes the refusals distinguishable. "Being updated after
+    an edit", "still being prepared" and "the last update failed" call for
+    three different things from a user — wait, wait, or press Update — and
+    ``None`` (no build has ever been attempted) is a fourth. Collapsing them
+    into "not available" would leave someone waiting on a build that is not
+    running.
+    """
+    path, state = source.resolve_bundle_artifact(
+        bundle_id, getattr(kind, "value", kind)
+    )
+    if path:
+        return path
+    refusal = {
+        BundleArtifactState.outdated: (
+            f"This {noun} is being updated. Try again once the update finishes."
+        ),
+        BundleArtifactState.building: (
+            f"This {noun} is still being prepared. Try again shortly."
+        ),
+        BundleArtifactState.failed: (
+            f"This {noun}'s last update failed. Update it from the bundle "
+            "before using it."
+        ),
+    }
+    raise ValueError(
+        refusal.get(state, f"The selected {noun} is not ready to route on yet.")
+    )
 
 
 class ArtifactBuilderUnavailableError(Exception):

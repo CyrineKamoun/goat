@@ -32,7 +32,9 @@ from goatlib.analysis.schemas.ui import (
     ui_sections,
 )
 from goatlib.bundles.artifacts.storage import delete_bundle_artifacts
-from goatlib.tools.base import SimpleToolRunner
+from goatlib.tools.authz import authorize_artifact_cleanup
+from goatlib.tools.base import SimpleToolRunner, _get_or_create_event_loop
+from goatlib.tools.db import ToolDatabaseService
 from goatlib.tools.schemas import ToolInputBase
 
 logger = logging.getLogger(__name__)
@@ -80,6 +82,33 @@ class BundleArtifactDeleteOutput(BaseModel):
 class BundleArtifactDeleteRunner(SimpleToolRunner):
     """Runner for BundleArtifactDelete tool."""
 
+    async def _authorize(self: Self, params: BundleArtifactDeleteParams) -> None:
+        """Refuse ids that name a bundle the caller may not change.
+
+        `bundle_ids` arrives as a tool input and the processes service
+        authorizes nothing before dispatch, so unchecked this tool deletes
+        files for any id named — including a live bundle's routing graph, which
+        goes while the rows still point at it and leaves it unroutable until
+        someone rebuilds.
+
+        The usual "may you write this bundle" cannot be asked, because core
+        deletes the rows *before* dispatching this job: every id in a
+        legitimate call names a bundle that no longer exists.
+        ``authorize_artifact_cleanup`` holds the rule that works either way.
+
+        Run before the loop, so a refusal removes nothing at all.
+        """
+        assert self.settings is not None
+        pool = await self.get_postgres_pool()
+        try:
+            await authorize_artifact_cleanup(
+                ToolDatabaseService(pool, schema=self.settings.customer_schema),
+                user_id=params.user_id,
+                bundle_ids=params.bundle_ids,
+            )
+        finally:
+            await pool.close()
+
     def run(self: Self, params: BundleArtifactDeleteParams) -> dict:
         """Remove every artifact file of each given bundle."""
         if self.settings is None:
@@ -99,6 +128,8 @@ class BundleArtifactDeleteRunner(SimpleToolRunner):
             total=len(params.bundle_ids),
             wm_labels=wm_labels,
         )
+
+        _get_or_create_event_loop().run_until_complete(self._authorize(params))
 
         try:
             for bundle_id in params.bundle_ids:

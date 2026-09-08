@@ -1,7 +1,6 @@
+import { apiRequestAuth } from "@/lib/api/fetcher";
 import { COLLECTIONS_API_BASE_URL } from "@/lib/api/layers";
 import { type Job, executeProcessAsync } from "@/lib/api/processes";
-import { apiRequestAuth } from "@/lib/api/fetcher";
-
 import type { PendingFeature } from "@/lib/store/featureEditor/types";
 
 /** An edit batch for a bundle's editable member layer.
@@ -18,7 +17,6 @@ export interface BundleEditPayload {
 
 export interface BundleEditResponse {
   revision: number;
-  artifact_status: string;
   bundle_id: string;
   /** The bundle's nodes layer, whose tiles also need refreshing after a save. */
   nodes_layer_id: string;

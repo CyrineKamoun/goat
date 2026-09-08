@@ -121,6 +121,14 @@ class TravelCostMatrixParams(BaseModel):
     # Output
     output_path: str = Field(..., description="Path for the matrix parquet output.")
 
+    # ---- PT network override ------------------------------------------------
+    # Point the engine at a PT bundle's timetable instead of the default global
+    # network. None uses the default.
+    timetable_path: str | None = Field(
+        default=None,
+        description="Path to a nigiri .bin timetable to use for PT routing",
+    )
+
     # ---- Street network override --------------------------------------------
     # Point the engine at an uploaded street network bundle's graph instead of
     # the default global network. None uses the default.

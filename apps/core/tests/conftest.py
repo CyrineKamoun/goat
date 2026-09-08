@@ -1,5 +1,5 @@
 # Standard library imports
-import asyncio
+import asyncio  # noqa: I001
 import contextlib
 import logging
 import os

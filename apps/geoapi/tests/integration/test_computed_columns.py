@@ -34,8 +34,13 @@ from geoapi.routers.metadata import (
 from geoapi.services.computed_columns import (
     DEPENDS_ON_ANY,
     ComputedColumnSpec,
+    allowed_value_columns,
+    apply_defaults,
+    coerce_allowed_values,
+    locked_column_names,
     parse_computed_columns,
     select_recompute_specs,
+    validate_allowed_values,
 )
 from geoapi.services.feature_write_service import FeatureWriteService
 
@@ -588,3 +593,215 @@ class TestFormulaColumns:
         assert row is not None
         assert row[0] == "Renamed"
         assert row[1] == 999, "score must not recompute when no dependency changed"
+
+
+# ---------------------------------------------------------------------------
+# Locked columns
+# ---------------------------------------------------------------------------
+
+
+def test_a_locked_column_is_reported_and_refused() -> None:
+    """Locked is not computed: there is no formula to recompute, only a value
+    whose owner maintains it, so a write must leave it alone."""
+    con, layer_info = _setup_db()
+    try:
+        con.execute(
+            "INSERT INTO lake.test_schema.features "
+            "VALUES (ST_Point(0, 0), 'kept', 1.0, NULL)"
+        )
+        field_config: dict[str, Any] = {"name": {"is_locked": True}}
+
+        assert locked_column_names(field_config) == {"name"}
+        # A locked column declares no computed kind, so nothing recomputes it.
+        assert parse_computed_columns(field_config) == []
+
+        properties = {"name": {"type": "string"}, "area_m2": {"type": "number"}}
+        _apply_field_config_to_properties(properties, field_config)
+        assert properties["name"]["is_locked"] is True
+        assert properties["name"]["is_computed"] is False
+        assert properties["area_m2"]["is_locked"] is False
+
+        # A client round-trips the whole feature, so the locked value comes back
+        # with the edited ones: it is dropped, the rest is written.
+        with patch(
+            "geoapi.services.feature_write_service.ducklake_write_manager",
+            _FakeManager(con),
+        ):
+            FeatureWriteService().update_feature_properties(
+                layer_info=layer_info,
+                feature_id="1",
+                properties={"name": "overwritten", "area_m2": 2.0},
+                column_names=["geometry", "name", "area_m2", "bbox"],
+                field_config=field_config,
+            )
+        assert con.execute(
+            "SELECT name, area_m2 FROM lake.test_schema.features"
+        ).fetchone() == ("kept", 2.0)
+
+        # Nothing but locked columns leaves nothing to write, which is an error
+        # rather than a silent no-op — the same as for computed columns.
+        with patch(
+            "geoapi.services.feature_write_service.ducklake_write_manager",
+            _FakeManager(con),
+        ):
+            try:
+                FeatureWriteService().update_feature_properties(
+                    layer_info=layer_info,
+                    feature_id="1",
+                    properties={"name": "overwritten"},
+                    column_names=["geometry", "name", "area_m2", "bbox"],
+                    field_config=field_config,
+                )
+            except ValueError as e:
+                assert "No valid properties" in str(e)
+            else:
+                raise AssertionError("a locked-only update should not be accepted")
+    finally:
+        con.close()
+
+
+# ---------------------------------------------------------------------------
+# Constrained columns
+# ---------------------------------------------------------------------------
+
+
+def test_a_constrained_column_refuses_a_value_outside_its_vocabulary() -> None:
+    """Refused, not dropped: unlike a computed or locked column, the caller was
+    invited to set this one and got it wrong, so silently keeping the old value
+    would look like a successful edit."""
+    con, layer_info = _setup_db()
+    try:
+        con.execute(
+            "INSERT INTO lake.test_schema.features "
+            "VALUES (ST_Point(0, 0), 'asphalt', NULL, NULL)"
+        )
+        field_config: dict[str, Any] = {
+            "name": {"allowed_values": ["asphalt", "gravel"], "allow_other": False}
+        }
+        assert allowed_value_columns(field_config) == {"name": ["asphalt", "gravel"]}
+
+        properties = {"name": {"type": "string"}}
+        _apply_field_config_to_properties(properties, field_config)
+        assert properties["name"]["allowed_values"] == ["asphalt", "gravel"]
+        assert properties["name"]["allow_other"] is False
+
+        # Clearing is not a vocabulary violation: no value is a different thing
+        # from a value nobody allows.
+        validate_allowed_values(field_config, {"name": None})
+
+        with _fails_with("not an accepted value"):
+            with patch(
+                "geoapi.services.feature_write_service.ducklake_write_manager",
+                _FakeManager(con),
+            ):
+                FeatureWriteService().update_feature_properties(
+                    layer_info=layer_info,
+                    feature_id="1",
+                    properties={"name": "moon dust"},
+                    column_names=["geometry", "name", "area_m2", "bbox"],
+                    field_config=field_config,
+                )
+        assert (
+            con.execute("SELECT name FROM lake.test_schema.features").fetchone()[0]
+            == "asphalt"
+        )
+
+        # allow_other turns the list into suggestions the editor offers.
+        field_config["name"]["allow_other"] = True
+        assert allowed_value_columns(field_config) == {}
+        validate_allowed_values(field_config, {"name": "moon dust"})
+    finally:
+        con.close()
+
+
+def test_a_default_fills_a_blank_on_creation_only() -> None:
+    """Applied on create so a new feature carries the value the editor showed;
+    not on update, where an omitted column means "leave it alone"."""
+    field_config: dict[str, Any] = {"name": {"default_value": "unknown"}}
+
+    assert apply_defaults(field_config, {"area_m2": 1.0}) == {
+        "area_m2": 1.0,
+        "name": "unknown",
+    }
+    # A stated value wins, and an explicit null is a choice the default must
+    # not override — otherwise the column could never be cleared.
+    assert apply_defaults(field_config, {"name": "stated"})["name"] == "stated"
+    assert apply_defaults(field_config, {"name": None})["name"] is None
+
+
+def test_the_bulk_path_applies_the_same_default_and_vocabulary_rule() -> None:
+    """The bulk path derives both maps once for the whole request rather than
+    per feature, so the rule the loop applies has to stay the one a single
+    create applies."""
+    con, layer_info = _setup_db()
+    try:
+        field_config: dict[str, Any] = {
+            "name": {
+                "default_value": "unknown",
+                "allowed_values": ["unknown", "asphalt"],
+                "allow_other": False,
+            }
+        }
+        with patch(
+            "geoapi.services.feature_write_service.ducklake_write_manager",
+            _FakeManager(con),
+        ):
+            ids = FeatureWriteService().create_features_bulk(
+                layer_info=layer_info,
+                features=[
+                    {"geometry": POLYGON_GEOJSON, "properties": {}},
+                    {"geometry": POLYGON_GEOJSON, "properties": {"name": "asphalt"}},
+                ],
+                column_names=COLUMN_NAMES,
+                geometry_column="geometry",
+                field_config=field_config,
+            )
+        assert len(ids) == 2
+        assert [
+            r[0]
+            for r in con.execute(
+                "SELECT name FROM lake.test_schema.features ORDER BY rowid"
+            ).fetchall()
+        ] == ["unknown", "asphalt"]
+
+        with _fails_with("not an accepted value"):
+            with patch(
+                "geoapi.services.feature_write_service.ducklake_write_manager",
+                _FakeManager(con),
+            ):
+                FeatureWriteService().create_features_bulk(
+                    layer_info=layer_info,
+                    features=[
+                        {"geometry": POLYGON_GEOJSON, "properties": {"name": "moon"}}
+                    ],
+                    column_names=COLUMN_NAMES,
+                    geometry_column="geometry",
+                    field_config=field_config,
+                )
+    finally:
+        con.close()
+
+
+def test_a_vocabulary_is_stored_as_the_column_type() -> None:
+    """A number column holding the string "30" would never match the 30 a write
+    sends, so the dropdown would offer a value that then fails validation."""
+    assert coerce_allowed_values("number", ["30", 50, 7.5]) == [30, 50, 7.5]
+    assert coerce_allowed_values("string", ["a", 3]) == ["a", "3"]
+
+    with _fails_with("is not a number"):
+        coerce_allowed_values("number", ["fast"])
+
+    numeric = {"speed": {"kind": "number", "allowed_values": [30, 50]}}
+    validate_allowed_values(numeric, {"speed": 30})
+    with _fails_with("not an accepted value"):
+        validate_allowed_values(numeric, {"speed": "30"})
+
+
+@contextmanager
+def _fails_with(fragment: str) -> Generator[None, None, None]:
+    try:
+        yield
+    except ValueError as e:
+        assert fragment in str(e), str(e)
+    else:
+        raise AssertionError(f"expected a refusal mentioning {fragment!r}")

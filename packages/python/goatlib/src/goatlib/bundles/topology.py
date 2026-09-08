@@ -10,9 +10,21 @@ rebuilt graph stops being reproducible.
 """
 
 from dataclasses import dataclass
-from typing import Iterable, Sequence, Tuple, TypeVar, Union
+from typing import (
+    Callable,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 from shapely.geometry import LineString, Point
+
+# A projected (x, y) in metres.
+Position = Tuple[float, float]
 
 
 class DegenerateEdgeError(ValueError):
@@ -132,3 +144,98 @@ def validate_edge_endpoints(source_id: str, target_id: str) -> None:
             "An edge cannot start and end at the same node. Move one endpoint "
             "further from the other, or draw two edges."
         )
+
+
+# --- breaking a drawn line where it meets the existing network -------------
+
+
+@dataclass(frozen=True)
+class DrawnSegment:
+    """One edge to write from a drawn line, as vertex indices into it.
+
+    Indices rather than coordinates so the caller slices its own stored 4326
+    geometry: resolution works in projected metres and round-tripping the
+    vertices back would move them.
+    """
+
+    start: int
+    end: int
+    source_node: str
+    target_node: str
+
+
+def interior_join(
+    point: Point,
+    nodes: Sequence[NodeCandidate],
+    edges: Sequence[EdgeCandidate],
+    tolerance_m: float,
+    is_junction: Callable[[str], bool] = lambda _node_id: True,
+) -> Optional[Union[ReuseNode, SplitEdge]]:
+    """How an interior vertex of a drawn line meets the existing network.
+
+    The same resolution the endpoints get, minus ``MintNode``: an interior
+    vertex in open space is a shape point, and minting a node there would
+    fragment the edge for no reason the user expressed. ``None`` says so.
+
+    Only a vertex counts. A line that merely crosses another street without a
+    vertex on it joins nowhere — the user drew a bridge or an underpass unless
+    they said otherwise by placing a point.
+
+    ``is_junction`` decides whether reaching an existing node is a reason to
+    break, and answering it needs the graph, so the caller owns it. Extending a
+    street past its own dead end runs the line straight over the node it used
+    to finish at; breaking there would hand back two edges where the user
+    extended one. Splitting an edge always breaks, because that manufactures a
+    junction where there was none.
+
+    Resolved one vertex at a time rather than for the whole line at once,
+    because materialising a ``SplitEdge`` replaces the edge it names: a second
+    vertex measured against the original would split a row that no longer
+    exists.
+    """
+    decision = resolve_endpoint(point, nodes, edges, tolerance_m)
+    if isinstance(decision, MintNode):
+        return None
+    if isinstance(decision, ReuseNode) and not is_junction(decision.node_id):
+        return None
+    return decision
+
+
+def segments_from_breaks(
+    vertex_count: int,
+    source_node: str,
+    target_node: str,
+    resolved: Sequence[Tuple[int, str]],
+) -> List[DrawnSegment]:
+    """The edges a drawn line becomes, given the nodes its vertices resolved to.
+
+    A line drawn across three junctions is three streets, not one: left whole it
+    would connect only at its ends, and the graph would let traffic pass the
+    middle junctions with no way to turn at them.
+
+    Takes already-materialised node ids, since a break may have required
+    minting a node and splitting an existing edge, which only the caller can
+    do. Repeated ids collapse — two vertices resolving to one node describe one
+    junction, and honouring both would ask for an edge from a node to itself.
+    The vertices between a collapsed break and its neighbour stay as shape
+    points, so nothing the user drew is lost.
+    """
+    last = vertex_count - 1
+    if last < 1:
+        return []
+
+    breaks: List[Tuple[int, str]] = []
+    for index, node_id in resolved:
+        if node_id == (breaks[-1][1] if breaks else source_node):
+            continue
+        breaks.append((index, node_id))
+    while breaks and breaks[-1][1] == target_node:
+        breaks.pop()
+
+    segments: List[DrawnSegment] = []
+    start, incoming = 0, source_node
+    for index, node_id in breaks:
+        segments.append(DrawnSegment(start, index, incoming, node_id))
+        start, incoming = index, node_id
+    segments.append(DrawnSegment(start, last, incoming, target_node))
+    return segments

@@ -45,14 +45,14 @@ async def share_orgs_teams_for_layer(
     # Layers that belong to a bundle are never shared individually —
     # they inherit the bundle's sharing. Reject the attempt and point the
     # caller at the bundle share endpoint.
-    in_package = (
+    in_bundle = (
         await db.execute(
             select(BundleLayerLink.id)
             .where(BundleLayerLink.layer_id == layer_id)
             .limit(1)
         )
     ).scalar_one_or_none()
-    if in_package is not None:
+    if in_bundle is not None:
         raise HTTPException(
             status_code=409,
             detail=(

@@ -632,6 +632,9 @@ export interface AddColumnPayload {
   kind: FieldKind;
   display_config?: Record<string, unknown>;
   default_value?: unknown;
+  /** The values the column accepts; `allow_other` makes them suggestions. */
+  allowed_values?: (string | number)[];
+  allow_other?: boolean;
   /** SQL expression for kind="formula" (validated server-side) */
   formula?: string;
 }
@@ -649,48 +652,45 @@ export const addColumn = async (layerId: string, payload: AddColumnPayload) => {
   return response.json();
 };
 
-export const updateColumnFormula = async (layerId: string, columnName: string, formula: string) => {
-  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/columns/${columnName}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ formula }),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || "Failed to update formula");
-  }
-  return response.json();
-};
+/** What a PATCH may change about a column; the endpoint takes any subset. */
+export interface ColumnPatch {
+  new_name?: string;
+  /** SQL expression for a formula column; revalidated and recomputed. */
+  formula?: string;
+  /** An empty list removes the vocabulary, leaving the column free text. */
+  allowed_values?: (string | number)[];
+  allow_other?: boolean;
+  display_config?: Record<string, unknown>;
+  default_value?: unknown;
+}
 
-export const renameColumn = async (layerId: string, columnName: string, newName: string) => {
-  const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/columns/${columnName}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ new_name: newName }),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || "Failed to rename column");
-  }
-  return response.json();
-};
-
-export const updateColumnDisplayConfig = async (
+/**
+ * Change a column. Every field of `ColumnUpdate` travels in one request, so
+ * two edits to the same column are one round trip and one revision.
+ */
+export const patchColumn = async (
   layerId: string,
   columnName: string,
-  displayConfig: Record<string, unknown>
+  body: ColumnPatch,
+  failureMessage = "Failed to update column"
 ) => {
   const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/columns/${columnName}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ display_config: displayConfig }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     const error = await response.json();
-    throw new Error(error.detail || "Failed to update column");
+    throw new Error(error.detail || failureMessage);
   }
   return response.json();
 };
+
+export const updateColumnFormula = (layerId: string, columnName: string, formula: string) =>
+  patchColumn(layerId, columnName, { formula }, "Failed to update formula");
+
+export const renameColumn = (layerId: string, columnName: string, newName: string) =>
+  patchColumn(layerId, columnName, { new_name: newName }, "Failed to rename column");
 
 export const deleteColumn = async (layerId: string, columnName: string) => {
   const response = await apiRequestAuth(`${COLLECTIONS_API_BASE_URL}/${layerId}/columns/${columnName}`, {

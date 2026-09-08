@@ -109,9 +109,13 @@ class Bundle(ContentBaseAttributes, DateTimeBase, table=True):
         ),
     )
     status: BundleStatus = Field(
-        default=BundleStatus.ready,
-        sa_column=Column(Text, nullable=False, server_default=BundleStatus.ready),
-        description="Processing lifecycle status (import sets processing → ready/failed)",
+        default=BundleStatus.processing,
+        sa_column=Column(Text, nullable=False, server_default=BundleStatus.processing),
+        description=(
+            "Whether the import has finished: processing until the job "
+            "completes, then ready. A failed import deletes the bundle, so "
+            "there is no failed value"
+        ),
     )
     layers_revision: int = Field(
         default=0,

@@ -1,16 +1,16 @@
 import { useCallback, useState } from "react";
 
 import { startEditing } from "@/lib/store/featureEditor/slice";
-import { setDataPanelLayerId } from "@/lib/store/map/slice";
+import { setDataPanelLayerId, setIsDataPanelOpen } from "@/lib/store/map/slice";
 
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 interface StartEditingPayload {
   layerId: string;
   geometryType: "point" | "line" | "polygon" | null;
-  /** layer_project id — when the data panel is open, it follows the edit
-   * session to this layer (otherwise the panel guard would end the session
-   * immediately for targeting a different layer than the table). */
+  /** layer_project id — the data panel follows the edit session to this layer
+   * (otherwise the panel guard would end the session immediately for targeting
+   * a different layer than the table), and for a table layer it is opened. */
   projectLayerId?: number;
 }
 
@@ -36,9 +36,16 @@ export const useStartEditingGuard = () => {
   const beginEditing = useCallback(
     (payload: StartEditingPayload) => {
       dispatch(startEditing({ layerId: payload.layerId, geometryType: payload.geometryType }));
-      // Keep the open data table in lockstep with the edit session
-      if (isDataPanelOpen && payload.projectLayerId !== undefined) {
+      // A table layer has nothing on the map, so the data table is the editor:
+      // starting a session without it would leave the user editing a layer they
+      // cannot see. A geospatial layer is edited on the map, so its table is
+      // only kept in lockstep when it already happens to be open.
+      const isTableLayer = payload.geometryType === null;
+      if (payload.projectLayerId !== undefined && (isDataPanelOpen || isTableLayer)) {
         dispatch(setDataPanelLayerId(payload.projectLayerId));
+      }
+      if (isTableLayer) {
+        dispatch(setIsDataPanelOpen(true));
       }
     },
     [dispatch, isDataPanelOpen]

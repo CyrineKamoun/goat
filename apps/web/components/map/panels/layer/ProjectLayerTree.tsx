@@ -30,7 +30,7 @@ import { projectLayersKey } from "@/lib/api/projects";
 import { useUserProfile } from "@/lib/api/users";
 import { MAX_EDITABLE_LAYER_SIZE } from "@/lib/constants";
 import { emitInteractionEvent } from "@/lib/store/interaction/slice";
-import { setSelectedLayers } from "@/lib/store/layer/slice";
+import { setSelectedBundle, setSelectedLayers } from "@/lib/store/layer/slice";
 import { setActiveRightPanel, setDataPanelLayerId, setIsDataPanelOpen } from "@/lib/store/map/slice";
 import { isBundleMemberLayer, isEditableBundleMember } from "@/lib/utils/bundleEditable";
 import {
@@ -41,6 +41,7 @@ import {
 } from "@/lib/utils/catalog-layer";
 import { rgbToHex } from "@/lib/utils/helpers";
 import { canEditLayerFeatures } from "@/lib/utils/layerPermissions";
+import { selectedTreeItemIds } from "@/lib/utils/map/layerTreeSelection";
 import { getLegendColorMap, getLegendMarkerMap, resolveFeatureMarker } from "@/lib/utils/map/legend";
 import { zoomToLayer, zoomToProjectLayer } from "@/lib/utils/map/navigate";
 // API & Store
@@ -495,6 +496,7 @@ export const ProjectLayerTree = ({
   const activeLayerId = useAppSelector((state) => state.layers.activeLayerId);
   const activeRightPanel = useAppSelector((state) => state.map.activeRightPanel);
   const selectedLayerIds = useAppSelector((state) => state.layers.selectedLayerIds || []);
+  const selectedBundleId = useAppSelector((state) => state.layers.selectedBundleId);
   const mapMode = useAppSelector((state) => state.map.mapMode);
   const {
     getLayerMoreMenuOptions,
@@ -627,16 +629,12 @@ export const ProjectLayerTree = ({
     }
   }, [treeData, catalogStatusLabel]);
 
-  const treeSelectedIds = useMemo(() => {
-    if (selectedLayerIds.length === 0) return [];
-    return items
-      .filter((item) => {
-        const node = item.data;
-        // Safety check for node existence
-        return node && selectedLayerIds.includes(node.id);
-      })
-      .map((item) => item.id);
-  }, [selectedLayerIds, items]);
+  // What the tree highlights is what is actually open — a selected bundle
+  // included, whose row is a group and so has no entry in `selectedLayerIds`.
+  const treeSelectedIds = useMemo(
+    () => selectedTreeItemIds(items, { selectedLayerIds, selectedBundleId }),
+    [selectedLayerIds, selectedBundleId, items]
+  );
 
   // --- Handlers ---
 
@@ -736,7 +734,14 @@ export const ProjectLayerTree = ({
       const clickedItem = items.find((i) => i.id === compositeIds[0]);
       if (clickedItem?.data?.type === "group") {
         dispatch(emitInteractionEvent({ type: "group_activated", sourceId: realIds[0] }));
-        // Groups should not be selected or open panels — only emit the interaction event
+        // A bundle-backed group stands for the bundle itself, which has its own
+        // metadata and can be filtered as a whole — so it opens a panel where a
+        // plain group has nothing to show.
+        const bundleId = clickedItem.data.bundle_id;
+        if (isEditMode && bundleId) {
+          dispatch(setSelectedBundle(bundleId));
+          dispatch(setActiveRightPanel(MapSidebarItemID.PROPERTIES));
+        }
         return;
       }
     }
@@ -776,6 +781,7 @@ export const ProjectLayerTree = ({
         }
       }
     } else {
+      dispatch(setSelectedBundle(null));
       dispatch(setActiveRightPanel(undefined));
     }
   };
@@ -1166,7 +1172,11 @@ export const ProjectLayerTree = ({
             />
           ),
           isVisible: nodeVisibility,
-          isSelectable: false,
+          // A plain group is only a container, so selecting it would open a
+          // panel with nothing in it. A bundle-backed group stands for the
+          // bundle, which has metadata of its own and can be filtered as a
+          // whole — but only in edit mode, where that panel exists at all.
+          isSelectable: !!item.isBundleGroup && isEditMode,
           labelInfo: legendCaption,
         };
       }
@@ -1349,7 +1359,7 @@ export const ProjectLayerTree = ({
         labelInfo: legendCaption ?? item.labelInfo,
       };
     });
-  }, [items, theme, currentZoom, viewMode, hideLegendHeading, groupIcons, simpleLegendLayerIds]);
+  }, [items, theme, currentZoom, viewMode, isEditMode, hideLegendHeading, groupIcons, simpleLegendLayerIds]);
 
   const renderPrefix = useCallback(
     togglePosition === "left"

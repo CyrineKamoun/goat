@@ -42,13 +42,44 @@ def test_artifacts_are_reported_individually():
     them failed" is not useful without saying which. The storage path stays
     internal."""
     summary = BundleArtifactSummary(
-        kind="street_network_graph", status="stale", revision=7
+        kind="street_network_graph",
+        build_status="complete",
+        state="outdated",
+        revision=7,
     )
-    assert (summary.kind, summary.status, summary.revision) == (
+    assert (summary.kind, summary.state, summary.revision) == (
         "street_network_graph",
-        "stale",
+        "outdated",
         7,
     )
     assert "storage_path" not in BundleArtifactSummary.model_fields
     # A bundle with nothing built reports an empty list, not a null status.
     assert BundleRead.model_fields["artifacts"].default_factory() == []
+
+
+@pytest.mark.parametrize(
+    ("build_status", "revision", "layers_revision", "storage_path", "expected"),
+    [
+        ("complete", 4, 4, "p.tar", "ready"),
+        ("complete", 3, 4, "p.tar", "outdated"),
+        # Provenance missing, so nothing says which layers it came from.
+        ("complete", None, 0, "p.tar", "outdated"),
+        # A finished build with nothing to point at is not routable.
+        ("complete", 4, 4, None, "failed"),
+        ("building", 3, 4, None, "building"),
+        ("failed", 4, 4, "p.tar", "failed"),
+        # A value from a newer release.
+        ("something_else", 4, 4, "p.tar", "failed"),
+    ],
+)
+def test_artifact_state_is_derived_not_stored(
+    build_status, revision, layers_revision, storage_path, expected
+):
+    """One definition, shared by the read DTO and by the consumer that decides
+    whether a tool may route on the artifact, so the two cannot disagree."""
+    from goatlib.models.bundle import artifact_state
+
+    assert (
+        artifact_state(build_status, revision, layers_revision, storage_path).value
+        == expected
+    )

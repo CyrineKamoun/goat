@@ -1,13 +1,19 @@
+import contextlib
+import logging
 import os
 import tempfile
-from typing import List, Literal
+from collections import defaultdict
+from collections.abc import Sequence
+from typing import Any, List, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, status
 from fastapi.concurrency import run_in_threadpool
 from goatlib.bundles.importers import get_importer, infer_bundle_type
 from goatlib.models.bundle import (
+    BundleArtifactState,
     BundleStatus,
+    artifact_state,
     get_spec,
 )
 from pydantic import UUID4
@@ -54,8 +60,10 @@ from core.schemas.bundle import (
     BundleUpdate,
     request_examples,
 )
-from core.services.processes import execute_process
+from core.services.processes import dispatch_never_started, execute_process
 from core.services.s3 import s3_service
+
+logger = logging.getLogger(__name__)
 
 RESOURCE_TYPE = "bundle"
 
@@ -223,6 +231,83 @@ async def _authorize_bundle_read_or_project_reach(
 ### Bundle CRUD endpoints
 
 
+async def _artifacts_by_bundle(
+    async_session: AsyncSession, bundle_ids: Sequence[UUID]
+) -> defaultdict[UUID, list[BundleArtifact]]:
+    """Every bundle's artifact rows, grouped, in one query.
+
+    A listing reports artifacts too, so fetching them per bundle would be one
+    round trip per row. Total by construction — a bundle with no artifacts
+    indexes to an empty list — so callers do not special-case it.
+    """
+    grouped: defaultdict[UUID, list[BundleArtifact]] = defaultdict(list)
+    if not bundle_ids:
+        return grouped
+    rows = (
+        (
+            await async_session.execute(
+                select(BundleArtifact)
+                .where(BundleArtifact.bundle_id.in_(bundle_ids))
+                .order_by(BundleArtifact.bundle_id, BundleArtifact.kind)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for artifact in rows:
+        grouped[artifact.bundle_id].append(artifact)
+    return grouped
+
+
+def _artifact_state(
+    artifact: BundleArtifact, layers_revision: int
+) -> BundleArtifactState:
+    """Where one artifact row stands, from the single definition in goatlib.
+
+    Loaded values may be the enum or the raw string, depending on whether
+    SQLModel coerced the column, so the raw value is what goes in.
+    """
+    return artifact_state(
+        getattr(artifact.build_status, "value", artifact.build_status),
+        artifact.revision,
+        layers_revision,
+        artifact.storage_path,
+    )
+
+
+def _bundle_read(
+    bundle: Bundle,
+    *,
+    artifacts: Sequence[BundleArtifact] = (),
+    owned_by: dict[str, Any] | None = None,
+) -> BundleRead:
+    """A bundle as the API reports it.
+
+    The single place a ``BundleRead`` is built, so every route answers with the
+    same shape: a bundle carries its artifacts and their derived state whether
+    it was just created, listed, read or updated. Artifacts are passed in
+    rather than lazy-loaded — an async session cannot resolve a relationship on
+    access, and a listing needs them fetched in bulk anyway.
+    """
+    return BundleRead(
+        **bundle.model_dump(),
+        owned_by=owned_by,
+        artifacts=[
+            BundleArtifactSummary(
+                # Loaded values may be the enum or the raw string, depending on
+                # whether SQLModel coerced the column.
+                kind=getattr(a.kind, "value", a.kind),
+                build_status=getattr(a.build_status, "value", a.build_status),
+                state=_artifact_state(a, bundle.layers_revision),
+                revision=a.revision,
+                size=a.size,
+                updated_at=a.updated_at,
+            )
+            for a in artifacts
+        ],
+    )
+
+
 @router.post(
     "",
     summary="Create a new bundle",
@@ -234,17 +319,18 @@ async def create_bundle(
     *,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
-    package_in: BundleCreate = Body(..., example=request_examples["create"]),
+    bundle_in: BundleCreate = Body(..., example=request_examples["create"]),
 ) -> BundleRead:
     """Create a new bundle in a folder the caller owns."""
-    folder = await async_session.get(Folder, package_in.folder_id)
+    folder = await async_session.get(Folder, bundle_in.folder_id)
     if folder is None or folder.user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
         )
-    package_in.user_id = user_id
-    created = await crud_bundle.create(async_session, obj_in=package_in)
-    return BundleRead(**created.model_dump())
+    bundle_in.user_id = user_id
+    created = await crud_bundle.create(async_session, obj_in=bundle_in)
+    # No artifacts yet: nothing has been imported into it.
+    return _bundle_read(created)
 
 
 @router.post(
@@ -414,13 +500,36 @@ async def import_bundle(
             },
             access_token=access_token,
         )
-    except Exception:
-        # The shell is committed; mark it failed so it isn't stuck "processing".
-        bundle.status = BundleStatus.failed
-        await async_session.commit()
+    except Exception as error:
+        # Remove the committed shell only when the dispatch cannot have taken
+        # effect: an import that never started cannot be resumed, and a bundle
+        # stuck at "processing" offers no action that would fix it. A timeout or
+        # a 502 says nothing about whether the job was accepted, and an ingest
+        # that is already running needs this row — it is the foreign key its
+        # member layers point at — so an ambiguous failure leaves the bundle
+        # alone and the job carries the outcome.
+        if dispatch_never_started(error):
+            # Read before the cleanup: a session that fails leaves the instance
+            # in a state where reloading an attribute fails too.
+            bundle_id = bundle.id
+            try:
+                await async_session.delete(bundle)
+                await async_session.commit()
+            except Exception:
+                # A session that is itself broken must not replace the reason
+                # the dispatch failed with an error about the cleanup.
+                with contextlib.suppress(Exception):
+                    await async_session.rollback()
+                logger.exception(
+                    "Could not remove the shell of bundle %s after its import "
+                    "failed to start",
+                    bundle_id,
+                )
         raise
 
-    return BundleImportResponse(bundle=BundleRead(**bundle.model_dump()), job_id=job_id)
+    # The ingest has only just been queued, so the bundle has no artifacts to
+    # report; the client polls the job and re-reads it.
+    return BundleImportResponse(bundle=_bundle_read(bundle), job_id=job_id)
 
 
 @router.get(
@@ -475,19 +584,34 @@ async def list_bundles(
         stmt = stmt.where(Bundle.user_id == user_id)
     if bundle_type:
         stmt = stmt.where(Bundle.bundle_type == bundle_type)
-    if artifact_kind:
-        # Restrict to bundles with a ready artifact of the requested kind
-        # (e.g. only PT bundles whose routing graph is built).
-        ready_ids = select(BundleArtifact.bundle_id).where(
-            BundleArtifact.kind == artifact_kind,
-            BundleArtifact.status == "ready",
-        )
-        stmt = stmt.where(Bundle.id.in_(ready_ids))
     stmt = stmt.order_by(Bundle.updated_at.desc())
     rows = (await async_session.execute(stmt)).all()
+    # One query for every listed bundle's artifacts, whether or not they are
+    # also being filtered on.
+    artifacts = await _artifacts_by_bundle(
+        async_session, [bundle.id for bundle, *_ in rows]
+    )
+    if artifact_kind:
+        # Restrict to bundles with a ready artifact of the requested kind (e.g.
+        # only PT bundles whose routing graph is built). Readiness is asked of
+        # `artifact_state` over the rows already loaded, not respelled as SQL:
+        # a second copy of the rule cannot see whether the file is there and
+        # cannot treat a build_status from another release as failed, so the
+        # listing and the read DTO would disagree about the same bundle.
+        rows = [
+            row
+            for row in rows
+            if any(
+                getattr(a.kind, "value", a.kind) == artifact_kind
+                and _artifact_state(a, row[0].layers_revision)
+                is BundleArtifactState.ready
+                for a in artifacts[row[0].id]
+            )
+        ]
     return [
-        BundleRead(
-            **bundle.model_dump(),
+        _bundle_read(
+            bundle,
+            artifacts=artifacts[bundle.id],
             # None when the row has no owner left (the creator's account was
             # removed), matching `build_shared_with_object`'s `owned_by`.
             owned_by=(
@@ -520,32 +644,8 @@ async def read_bundle(
 ) -> BundleRead:
     """Retrieve a bundle the caller owns or has been shared."""
     bundle = await authorize_bundle(async_session, bundle_id, user_id, "read")
-    artifacts = (
-        (
-            await async_session.execute(
-                select(BundleArtifact)
-                .where(BundleArtifact.bundle_id == bundle_id)
-                .order_by(BundleArtifact.kind)
-            )
-        )
-        .scalars()
-        .all()
-    )
-    return BundleRead(
-        **bundle.model_dump(),
-        artifacts=[
-            BundleArtifactSummary(
-                # Loaded values may be the enum or the raw string, depending on
-                # whether SQLModel coerced the column.
-                kind=getattr(a.kind, "value", a.kind),
-                status=getattr(a.status, "value", a.status),
-                revision=a.revision,
-                size=a.size,
-                updated_at=a.updated_at,
-            )
-            for a in artifacts
-        ],
-    )
+    artifacts = await _artifacts_by_bundle(async_session, [bundle_id])
+    return _bundle_read(bundle, artifacts=artifacts[bundle_id])
 
 
 @router.put(
@@ -560,7 +660,7 @@ async def update_bundle(
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
     bundle_id: UUID4 = Path(..., description="The bundle ID"),
-    package_in: BundleUpdate = Body(...),
+    bundle_in: BundleUpdate = Body(...),
 ) -> BundleRead:
     """Update a bundle (owner or editor). Moving the bundle to a new
     folder (``folder_id``) moves its member layers along with it, so the bundle
@@ -571,18 +671,18 @@ async def update_bundle(
     # to the owner's folders, so a shared editor moving it into one of their
     # own folders would hide it from its owner — and deleting that folder
     # would cascade the owner's bundle away.
-    if package_in.folder_id is not None:
-        folder = await async_session.get(Folder, package_in.folder_id)
+    if bundle_in.folder_id is not None:
+        folder = await async_session.get(Folder, bundle_in.folder_id)
         if folder is None or folder.user_id != bundle.user_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
             )
 
-    updated = await crud_bundle.update(async_session, db_obj=bundle, obj_in=package_in)
+    updated = await crud_bundle.update(async_session, db_obj=bundle, obj_in=bundle_in)
 
     # Keep member layers in the bundle's folder (they are hidden, but folder
     # location still drives folder-scoped access checks).
-    if package_in.folder_id is not None:
+    if bundle_in.folder_id is not None:
         await async_session.execute(
             sql_update(Layer)
             .where(
@@ -592,11 +692,12 @@ async def update_bundle(
                     )
                 )
             )
-            .values(folder_id=package_in.folder_id)
+            .values(folder_id=bundle_in.folder_id)
         )
         await async_session.commit()
 
-    return BundleRead(**updated.model_dump())
+    artifacts = await _artifacts_by_bundle(async_session, [bundle_id])
+    return _bundle_read(updated, artifacts=artifacts[bundle_id])
 
 
 @router.delete(

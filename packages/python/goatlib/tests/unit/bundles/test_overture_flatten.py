@@ -627,13 +627,50 @@ def test_writer_schema_matches_the_flattened_record() -> None:
     dropped on write; one removed would be written as all-null.
     """
     from goatlib.bundles.importers.street_network.overture.writer import (
+        EDGE_COMPUTED,
         EDGE_SCHEMA,
         NODE_SCHEMA,
     )
 
     edge = flatten_segment(_piece())
-    expected = (set(edge) - {"coordinates"}) | {"geometry"}
+    # Computed columns are filled from the geometry on write, so they are the
+    # one kind of column that legitimately has no record key.
+    expected = (set(edge) - {"coordinates"}) | {"geometry"} | set(EDGE_COMPUTED)
     assert set(EDGE_SCHEMA.names) == expected
 
     node = flatten_connector({"id": "c", "coordinate": (11.0, 48.0)})
     assert set(NODE_SCHEMA.names) == (set(node) - {"coordinate"}) | {"geometry"}
+
+
+def test_writer_schema_types_match_the_file(tmp_path) -> None:
+    """Declared types are only worth anything if the file agrees with them.
+
+    `SELECT * REPLACE (<expr> AS col)` keeps the declared column order but
+    takes the *expression's* type, so a computed column comes out at its kind's
+    width whatever the schema says. Names alone would not catch that: the
+    column would be there, one width off, and every reader would trust the
+    declaration.
+    """
+    import pyarrow.parquet as pq
+    from goatlib.bundles.importers.street_network.overture.writer import (
+        EDGE_SCHEMA,
+        NODE_SCHEMA,
+        write_edges,
+        write_nodes,
+    )
+
+    edge = flatten_segment(_piece())
+    written = pq.read_schema(write_edges([edge], str(tmp_path / "edges.parquet")))
+    for field in EDGE_SCHEMA:
+        # Geometry alone is expected to change type: it goes in as WKB and
+        # comes out a real geometry column.
+        if field.name == "geometry":
+            continue
+        assert written.field(field.name).type == field.type, field.name
+
+    node = flatten_connector({"id": "n", "coordinate": (11.0, 48.0)})
+    written = pq.read_schema(write_nodes([node], str(tmp_path / "nodes.parquet")))
+    for field in NODE_SCHEMA:
+        if field.name == "geometry":
+            continue
+        assert written.field(field.name).type == field.type, field.name

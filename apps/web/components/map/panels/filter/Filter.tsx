@@ -36,6 +36,32 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import Selector from "@/components/map/panels/common/Selector";
 import Expression from "@/components/map/panels/filter/Expression";
 
+/** A fresh, empty expression of one kind, ready to be filled in. */
+export const createExpression = (type: FilterType): ExpressionType => ({
+  id: v4(),
+  attribute: "",
+  expression: "",
+  value: "",
+  type,
+});
+
+/**
+ * Whether every expression is complete enough to build a query from.
+ *
+ * The operators that test for absence carry no value of their own, so they
+ * count as answered without one.
+ */
+export const validateExpressions = (expressions: ExpressionType[]): boolean =>
+  expressions.every((expression) => {
+    const valueless =
+      expression.expression === "is_empty_string" ||
+      expression.expression === "is_not_empty_string" ||
+      expression.expression === "is_blank" ||
+      expression.expression === "is_not_blank";
+    const hasValue = valueless || !!expression.value?.toString();
+    return !!expression.attribute && !!expression.expression && hasValue;
+  });
+
 const FilterPanel = ({ activeLayer, projectId }: { activeLayer: ProjectLayer; projectId: string }) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
@@ -53,7 +79,7 @@ const FilterPanel = ({ activeLayer, projectId }: { activeLayer: ProjectLayer; pr
     if (activeLayer?.type === layerType.Values.feature) {
       setAddExpressionAnchorEl(event.currentTarget);
     } else {
-      createExpression(FilterType.Logical);
+      addExpression(FilterType.Logical);
     }
   };
   const handleAddExpressionClose = () => {
@@ -94,18 +120,9 @@ const FilterPanel = ({ activeLayer, projectId }: { activeLayer: ProjectLayer; pr
 
   const [logicalOperator, setLogicalOperator] = useState<SelectorItem | undefined>(defaultLogicalOperator);
 
-  const createExpression = (type: FilterType) => {
+  const addExpression = (type: FilterType) => {
     if (expressions) {
-      setExpressions([
-        ...expressions,
-        {
-          id: v4(),
-          attribute: "",
-          expression: "",
-          value: "",
-          type,
-        },
-      ]);
+      setExpressions([...expressions, createExpression(type)]);
     }
   };
 
@@ -129,21 +146,6 @@ const FilterPanel = ({ activeLayer, projectId }: { activeLayer: ProjectLayer; pr
     }
     setExpressions(existingExpressions);
   }, [activeLayer, expressions.length, cqlArgsCount, logicalOperators, previousLayerId]);
-
-  const validateExpressions = (expressions) => {
-    return expressions.every((expression) => {
-      let hasValue = !!expression.value.toString();
-      if (
-        expression.expression === "is_empty_string" ||
-        expression.expression === "is_not_empty_string" ||
-        expression.expression === "is_blank" ||
-        expression.expression === "is_not_blank"
-      ) {
-        hasValue = true;
-      }
-      return expression.attribute && expression.expression && hasValue;
-    });
-  };
 
   const areAllExpressionsValid = useMemo(() => {
     return validateExpressions(expressions);
@@ -295,7 +297,7 @@ const FilterPanel = ({ activeLayer, projectId }: { activeLayer: ProjectLayer; pr
                       <MenuItem
                         key={index}
                         onClick={() => {
-                          createExpression(item.sourceType);
+                          addExpression(item.sourceType);
                           handleAddExpressionClose();
                         }}>
                         <ListItemIcon>

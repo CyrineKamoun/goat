@@ -288,8 +288,8 @@ class Layer(LayerBase, GeospatialAttributes, DateTimeBase, table=True):
         description=(
             "Per-column metadata keyed by column name. "
             "Each entry has shape "
-            '{"kind": str, "is_computed": bool, "depends_on": [str], '
-            '"display_config": {...}}. '
+            '{"kind": str, "is_computed": bool, "is_locked": bool, '
+            '"depends_on": [str], "display_config": {...}}. '
             "Columns with no entry use default config inferred from the "
             "DuckDB type."
         ),

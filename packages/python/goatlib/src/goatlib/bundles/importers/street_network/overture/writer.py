@@ -20,6 +20,7 @@ import duckdb
 import pyarrow as pa
 from shapely.geometry import LineString, Point
 
+from goatlib.computed_columns import COMPUTED_KIND_REGISTRY
 from goatlib.io.parquet import write_optimized_parquet
 
 logger = logging.getLogger(__name__)
@@ -30,16 +31,26 @@ _GEOMETRY = ("geometry", pa.binary())
 EDGE_SCHEMA = pa.schema(
     [
         ("id", pa.string()),
-        ("original_id", pa.string()),
+        ("name", pa.string()),
         ("class", pa.string()),
         ("subclass", pa.string()),
-        ("name", pa.string()),
-        ("source_node", pa.string()),
-        ("target_node", pa.string()),
+        # float64, not float32: the value is written by the `length` computed
+        # kind's own SQL, which is DOUBLE, and `SELECT * REPLACE (<expr> AS
+        # length_m)` takes the expression's type — so a narrower declaration
+        # here would simply be false about the file. Widening the declaration
+        # rather than narrowing the expression, because DOUBLE is also what the
+        # routing artifact reads the column as and what a later recompute
+        # produces: one width the whole way through, and no rounding step that
+        # would make the length a user sees differ from the length the engine
+        # routes on.
+        ("length_m", pa.float64()),
         ("surface", pa.string()),
         ("speed_limit_kph_forward", pa.int32()),
         ("speed_limit_kph_backward", pa.int32()),
+        ("source_node", pa.string()),
+        ("target_node", pa.string()),
         ("other", pa.string()),
+        ("original_id", pa.string()),
         _GEOMETRY,
     ]
 )
@@ -53,9 +64,28 @@ NODE_SCHEMA = pa.schema(
 )
 
 
+#: Edge columns filled from the geometry at write time rather than carried on the
+#: flattened record. The routing artifact reads `length_m` from the layer instead
+#: of deriving its own, so a layer written without it cannot be built from.
+EDGE_COMPUTED = {"length_m": COMPUTED_KIND_REGISTRY["length"]}
+
+
 def write_edges(records: Sequence[Dict[str, Any]], path: str) -> str:
-    """Write edge records, converting ``coordinates`` to LineString geometry."""
-    return _write(records, path, EDGE_SCHEMA, "coordinates", _line_wkb)
+    """Write edge records, converting ``coordinates`` to LineString geometry.
+
+    ``length_m`` is filled here rather than left to the import: the routing
+    artifact reads the column instead of deriving its own, so a layer written
+    without it cannot be built from. The expression is the computed kind's own,
+    so the value is identical to what a later recompute produces.
+    """
+    return _write(
+        records,
+        path,
+        EDGE_SCHEMA,
+        "coordinates",
+        _line_wkb,
+        computed=EDGE_COMPUTED,
+    )
 
 
 def write_nodes(records: Sequence[Dict[str, Any]], path: str) -> str:
@@ -69,6 +99,7 @@ def _write(
     schema: pa.Schema,
     geometry_key: str,
     to_wkb: Any,
+    computed: Dict[str, Any] | None = None,
 ) -> str:
     rows: List[Dict[str, Any]] = []
     for record in records:
@@ -86,11 +117,31 @@ def _write(
         con.register("records", table)
         # Same optimiser every other layer goes through — bbox struct for
         # row-group pruning, Hilbert ordering, Parquet V2 — so a bundle's layers
-        # aren't second-class for tile and feature queries. REPLACE keeps the
-        # declared column order and types; only geometry changes type.
+        # aren't second-class for tile and feature queries.
+        #
+        # REPLACE keeps the declared column *order*. It does not keep types: a
+        # replaced column takes the type of the expression that replaces it,
+        # which is why geometry comes out a geometry and why a computed column
+        # comes out at its kind's own width. The declared schema has to agree
+        # with those expressions — `test_writer_schema_types_match_the_file`
+        # is what holds it — since the declaration is what anything reading the
+        # layer trusts.
+        #
+        # Geometry first, then anything computed from it: a computed expression
+        # needs a real geometry, not the WKB the records carry.
+        geom_query = (
+            "SELECT * REPLACE (ST_GeomFromWKB(geometry) AS geometry) FROM records"
+        )
+        if computed:
+            fills = ", ".join(
+                f"{kind.compute_sql()} AS {column}" for column, kind in computed.items()
+            )
+            query = f"SELECT * REPLACE ({fills}) FROM ({geom_query})"
+        else:
+            query = geom_query
         write_optimized_parquet(
             con,
-            "SELECT * REPLACE (ST_GeomFromWKB(geometry) AS geometry) FROM records",
+            query,
             path,
             geometry_column="geometry",
         )

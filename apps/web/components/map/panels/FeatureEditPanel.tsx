@@ -2,34 +2,30 @@ import { Button, Stack, Typography } from "@mui/material";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
+import TemporalPicker from "@p4b/ui/components/TemporalPicker";
+
+import { useDraw } from "@/lib/providers/DrawProvider";
 import {
-  addPendingFeature,
   commitFeature,
   markForDeletion,
   pushSnapshot,
-  setMode,
   removePendingFeature,
+  setMode,
   updatePendingGeometry,
   updatePendingProperties,
 } from "@/lib/store/featureEditor/slice";
-import { useDraw } from "@/lib/providers/DrawProvider";
-import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
-import useLayerFields from "@/hooks/map/CommonHooks";
-
+import { fieldEditability, selectedVocabularyItem } from "@/lib/utils/allowedValues";
+import { BOOLEAN_SELECT_ITEMS, booleanToSelectValue, parseBooleanInput } from "@/lib/utils/fieldInput";
 import { formatFieldValue } from "@/lib/utils/formatFieldValue";
 import type { FieldKind } from "@/lib/validations/layer";
 import { resolveDisplayKind } from "@/lib/validations/layer";
 
-import TemporalPicker from "@p4b/ui/components/TemporalPicker";
-
-import {
-  BOOLEAN_SELECT_ITEMS,
-  booleanToSelectValue,
-  parseBooleanInput,
-} from "@/lib/utils/fieldInput";
+import useLayerFields from "@/hooks/map/CommonHooks";
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import Container from "@/components/map/panels/Container";
 import Selector from "@/components/map/panels/common/Selector";
+import SelectorFreeSolo from "@/components/map/panels/common/SelectorFreeSolo";
 import TextFieldInput from "@/components/map/panels/common/TextFieldInput";
 
 const FeatureEditPanel: React.FC = () => {
@@ -58,27 +54,6 @@ const FeatureEditPanel: React.FC = () => {
     (f) => f.type === "string" || f.type === "number" || f.type === "date" || f.type === "boolean"
   );
 
-  // In draw mode, eagerly create a pending feature so user can fill attributes before drawing
-  const createdForDrawRef = useRef(false);
-  useEffect(() => {
-    if (mode === "draw" && activeLayerId && !activeFeatureId && !createdForDrawRef.current) {
-      createdForDrawRef.current = true;
-      dispatch(
-        addPendingFeature({
-          id: crypto.randomUUID(),
-          drawFeatureId: null,
-          geometry: null,
-          properties: {},
-          committed: false,
-          action: "create",
-        })
-      );
-    }
-    if (mode !== "draw") {
-      createdForDrawRef.current = false;
-    }
-  }, [mode, activeLayerId, activeFeatureId, dispatch]);
-
   // Track which fields have had a snapshot pushed (reset on feature change)
   const snapshotPushedFieldsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -101,9 +76,14 @@ const FeatureEditPanel: React.FC = () => {
     // Compare geometry and properties with originals
     const geomChanged = JSON.stringify(feature.geometry) !== JSON.stringify(feature.originalGeometry);
     const filterInternal = (props: Record<string, unknown>) => {
-      const f = { ...props }; delete f._fillColor; delete f._fillOpacity; return f;
+      const f = { ...props };
+      delete f._fillColor;
+      delete f._fillOpacity;
+      return f;
     };
-    const propsChanged = JSON.stringify(filterInternal(feature.properties)) !== JSON.stringify(filterInternal(feature.originalProperties || {}));
+    const propsChanged =
+      JSON.stringify(filterInternal(feature.properties)) !==
+      JSON.stringify(filterInternal(feature.originalProperties || {}));
     return geomChanged || propsChanged;
   })();
 
@@ -119,16 +99,27 @@ const FeatureEditPanel: React.FC = () => {
     const fieldType = filteredFields.find((f) => f.name === fieldName)?.type;
     const parsedValue =
       fieldType === "number"
-        ? (value === "" ? null : Number(value))
+        ? value === ""
+          ? null
+          : Number(value)
         : fieldType === "boolean"
           ? parseBooleanInput(value)
-          : (value || null);
+          : value || null;
     dispatch(
       updatePendingProperties({
         id: activeFeatureId,
         properties: { ...feature.properties, [fieldName]: parsedValue },
       })
     );
+  };
+
+  // A table layer has no tool to stay armed with: its draw mode *is* the one
+  // blank row being filled in, added on the way into that mode. So a finished
+  // or discarded row ends it, which is also what leaves the toolbar's "Add
+  // row" — its only mode button — able to arm the next one. A geospatial layer
+  // keeps drawing: there the mode is the user's choice.
+  const leaveTableDrawMode = () => {
+    if (isTableLayer && mode === "draw") dispatch(setMode("select"));
   };
 
   const handleDone = () => {
@@ -142,11 +133,11 @@ const FeatureEditPanel: React.FC = () => {
       drawControl.delete(feature.drawFeatureId);
     }
     pushHistory();
+    // Committing clears the selection, which is what re-arms drawing on a
+    // geospatial layer: the mode is left alone there, so finishing one feature
+    // leaves the user ready for the next without picking the tool up again.
     dispatch(commitFeature(activeFeatureId));
-    // Return to draw mode only if this was a new feature, otherwise stay in select
-    if (feature.action === "create") {
-      dispatch(setMode("draw"));
-    }
+    leaveTableDrawMode();
   };
 
   const handleCancel = () => {
@@ -156,7 +147,9 @@ const FeatureEditPanel: React.FC = () => {
       }
       dispatch(removePendingFeature(activeFeatureId));
     }
-    dispatch(setMode("select"));
+    // On a geospatial layer the mode is the user's choice, not this button's:
+    // discarding a shape while drawing leaves them drawing.
+    leaveTableDrawMode();
   };
 
   const handleDelete = () => {
@@ -179,27 +172,66 @@ const FeatureEditPanel: React.FC = () => {
       body={
         <Stack spacing={2}>
           {filteredFields.map((field) => {
-            const isComputed = field.is_computed === true;
+            const current = feature?.properties[field.name];
+            const {
+              computed: isComputed,
+              locked: isLocked,
+              readOnly: isReadOnly,
+              vocabulary: isVocabulary,
+              suggestions: hasSuggestions,
+              items,
+            } = fieldEditability(field, current);
             let displayValue = "";
             if (isComputed) {
-              const raw = feature?.properties[field.name];
-              if (raw != null && raw !== "") {
+              if (current != null && current !== "") {
                 displayValue = formatFieldValue(
-                  raw,
+                  current,
                   (resolveDisplayKind(field) as FieldKind) ?? "number",
-                  field.display_config ?? {},
+                  field.display_config ?? {}
                 );
               } else if (mode === "draw") {
                 displayValue = t("computed_on_save");
               }
-            } else {
+            } else if (isLocked) {
               displayValue =
-                feature?.properties[field.name] != null
-                  ? String(feature.properties[field.name])
-                  : "";
+                current != null && current !== "" ? String(current) : mode === "draw" ? t("set_on_save") : "";
+            } else {
+              displayValue = current != null ? String(current) : "";
             }
 
-            if (!isComputed && field.type === "date") {
+            if (isVocabulary) {
+              return (
+                <Selector
+                  key={field.name}
+                  label={field.name}
+                  enableSearch={items.length > 8}
+                  selectedItems={selectedVocabularyItem(items, current)}
+                  setSelectedItems={(item) => {
+                    const value = Array.isArray(item) ? item[0]?.value : item?.value;
+                    handlePropertyChange(field.name, String(value ?? ""));
+                  }}
+                  items={items}
+                />
+              );
+            }
+
+            // "Allow other values": the vocabulary is offered, and anything
+            // else can still be typed.
+            if (hasSuggestions) {
+              return (
+                <SelectorFreeSolo
+                  key={field.name}
+                  label={field.name}
+                  options={items}
+                  selectedItem={selectedVocabularyItem(items, current)}
+                  inputType={field.type === "number" ? "number" : "text"}
+                  commitOnBlur
+                  onSelect={(item) => handlePropertyChange(field.name, String(item?.value ?? ""))}
+                />
+              );
+            }
+
+            if (!isReadOnly && field.type === "date") {
               return (
                 <TemporalPicker
                   key={field.name}
@@ -211,7 +243,7 @@ const FeatureEditPanel: React.FC = () => {
               );
             }
 
-            if (!isComputed && field.type === "boolean") {
+            if (!isReadOnly && field.type === "boolean") {
               const current = booleanToSelectValue(feature?.properties[field.name]);
               return (
                 <Selector
@@ -231,18 +263,16 @@ const FeatureEditPanel: React.FC = () => {
               <TextFieldInput
                 key={field.name}
                 label={field.name}
-                type={isComputed || field.type !== "number" ? "text" : "number"}
+                type={isReadOnly || field.type !== "number" ? "text" : "number"}
                 placeholder={
-                  isComputed
-                    ? ""
-                    : field.type === "number"
-                      ? t("enter_a_number")
-                      : t("enter_text")
+                  isReadOnly ? "" : field.type === "number" ? t("enter_a_number") : t("enter_text")
                 }
                 value={displayValue}
-                disabled={isComputed}
+                disabled={isReadOnly}
+                locked={isLocked}
+                tooltip={isLocked ? t("field_locked_tooltip") : undefined}
                 onChange={(value) => {
-                  if (isComputed) return;
+                  if (isReadOnly) return;
                   handlePropertyChange(field.name, value);
                 }}
                 clearable={false}
@@ -264,7 +294,10 @@ const FeatureEditPanel: React.FC = () => {
             </Button>
           ) : (
             <Typography variant="caption" color="text.secondary">
-              {!hasGeometry ? t("draw_geometry_first") : ""}
+              {/* A table layer has no geometry to draw, and its rows are
+                  saveable as soon as they are created — the empty caption
+                  stays so the Done button keeps its place in the row. */}
+              {!isTableLayer && !hasGeometry ? t("draw_geometry_first") : ""}
             </Typography>
           )}
           <Button

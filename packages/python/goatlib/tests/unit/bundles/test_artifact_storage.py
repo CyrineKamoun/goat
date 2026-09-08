@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 from goatlib.bundles.artifacts.storage import (
     artifact_relative_path,
+    delete_artifact_file,
     delete_bundle_artifacts,
     resolve_artifact,
     store_artifact,
@@ -29,9 +30,9 @@ def built(tmp_path: Path) -> str:
 def test_path_is_relative_and_keyed_by_bundle() -> None:
     """Relative so the mount point can move; bundle-keyed because a shared
     bundle may be rebuilt by someone other than its importer."""
-    relative = artifact_relative_path(BUNDLE, "pt_network_graph", ".bin")
+    relative = artifact_relative_path(BUNDLE, "pt_network_graph", ".bin", 7, "abc123")
 
-    assert relative == f"{BUNDLE}/pt_network_graph.bin"
+    assert relative == f"{BUNDLE}/pt_network_graph-r7-abc123.bin"
     assert not Path(relative).is_absolute()
 
 
@@ -44,6 +45,8 @@ def test_store_writes_under_the_data_dir(tmp_path: Path, built: str) -> None:
         bundle_id=BUNDLE,
         kind="pt_network_graph",
         suffix=".bin",
+        revision=1,
+        token="aaaaaaaa",
     )
 
     stored = data_dir / relative
@@ -61,12 +64,19 @@ def test_store_creates_missing_directories(tmp_path: Path, built: str) -> None:
         bundle_id=BUNDLE,
         kind="street_network_graph",
         suffix=".tar",
+        revision=1,
+        token="aaaaaaaa",
     )
 
     assert (data_dir / relative).is_file()
 
 
-def test_rebuild_replaces_in_place(tmp_path: Path, built: str) -> None:
+def test_each_build_gets_its_own_file(tmp_path: Path, built: str) -> None:
+    """Two rebuilds can be in flight at once and only one of them publishes.
+
+    Sharing a name would let the loser's bytes land under the winner's row, so
+    the row would promise one revision while the file held another.
+    """
     data_dir = tmp_path / "bundles"
     first = store_artifact(
         built,
@@ -74,6 +84,8 @@ def test_rebuild_replaces_in_place(tmp_path: Path, built: str) -> None:
         bundle_id=BUNDLE,
         kind="pt_network_graph",
         suffix=".bin",
+        revision=1,
+        token="aaaaaaaa",
     )
 
     rebuilt = tmp_path / "build" / "graph2.bin"
@@ -84,13 +96,17 @@ def test_rebuild_replaces_in_place(tmp_path: Path, built: str) -> None:
         bundle_id=BUNDLE,
         kind="pt_network_graph",
         suffix=".bin",
+        revision=1,
+        token="bbbbbbbb",
     )
 
-    assert first == second, "the path is stable, so stored rows stay valid"
+    assert first != second
+    assert (data_dir / first).read_bytes() == b"graph-v1"
     assert (data_dir / second).read_bytes() == b"graph-v2"
-    assert [p.name for p in (data_dir / BUNDLE).iterdir()] == [
-        "pt_network_graph.bin"
-    ], "no staging file left behind"
+    # A published build removes the file it displaced, not the whole directory.
+    delete_artifact_file(str(data_dir), first)
+    assert not (data_dir / first).exists()
+    assert (data_dir / second).is_file()
 
 
 def test_a_failed_store_leaves_no_partial_file(tmp_path: Path) -> None:
@@ -104,6 +120,8 @@ def test_a_failed_store_leaves_no_partial_file(tmp_path: Path) -> None:
             bundle_id=BUNDLE,
             kind="pt_network_graph",
             suffix=".bin",
+            revision=1,
+            token="aaaaaaaa",
         )
 
     assert list((data_dir / BUNDLE).iterdir()) == []
@@ -117,6 +135,8 @@ def test_resolve_returns_the_absolute_path(tmp_path: Path, built: str) -> None:
         bundle_id=BUNDLE,
         kind="pt_network_graph",
         suffix=".bin",
+        revision=1,
+        token="aaaaaaaa",
     )
 
     resolved = resolve_artifact(str(data_dir), relative)
@@ -128,7 +148,9 @@ def test_resolve_returns_the_absolute_path(tmp_path: Path, built: str) -> None:
 def test_resolve_reports_a_row_whose_file_is_gone(tmp_path: Path) -> None:
     """A restored volume can predate a build; artifacts are regenerable, so the
     caller is told 'absent' rather than handed a path that fails to open."""
-    assert resolve_artifact(str(tmp_path), f"{BUNDLE}/pt_network_graph.bin") is None
+    assert (
+        resolve_artifact(str(tmp_path), f"{BUNDLE}/pt_network_graph-r1-a.bin") is None
+    )
 
 
 def test_delete_removes_every_artifact_of_the_bundle(
@@ -142,6 +164,8 @@ def test_delete_removes_every_artifact_of_the_bundle(
             bundle_id=BUNDLE,
             kind=kind,
             suffix=suffix,
+            revision=1,
+            token="aaaaaaaa",
         )
     other = "0000ffff-5717-4562-b3fc-2c963f66afa6"
     store_artifact(
@@ -150,6 +174,8 @@ def test_delete_removes_every_artifact_of_the_bundle(
         bundle_id=other,
         kind="pt_network_graph",
         suffix=".bin",
+        revision=1,
+        token="aaaaaaaa",
     )
 
     removed = delete_bundle_artifacts(str(data_dir), BUNDLE)

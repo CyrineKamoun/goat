@@ -6,22 +6,19 @@ import { Popup } from "react-map-gl/maplibre";
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import TemporalPicker from "@p4b/ui/components/TemporalPicker";
 
+import { fieldEditability, selectedVocabularyItem } from "@/lib/utils/allowedValues";
+import { BOOLEAN_SELECT_ITEMS, booleanToSelectValue, parseBooleanInput } from "@/lib/utils/fieldInput";
+import { formatFieldValue } from "@/lib/utils/formatFieldValue";
+import type { FieldKind } from "@/lib/validations/layer";
+import { resolveDisplayKind } from "@/lib/validations/layer";
+
 import type { MapPopoverEditorProps } from "@/types/map/popover";
 import { EditorModes } from "@/types/map/popover";
 
 import useLayerFields from "@/hooks/map/CommonHooks";
 
-import { formatFieldValue } from "@/lib/utils/formatFieldValue";
-import type { FieldKind } from "@/lib/validations/layer";
-import { resolveDisplayKind } from "@/lib/validations/layer";
-
-import {
-  BOOLEAN_SELECT_ITEMS,
-  booleanToSelectValue,
-  parseBooleanInput,
-} from "@/lib/utils/fieldInput";
-
 import Selector from "@/components/map/panels/common/Selector";
+import SelectorFreeSolo from "@/components/map/panels/common/SelectorFreeSolo";
 import TextFieldInput from "@/components/map/panels/common/TextFieldInput";
 
 const MapPopoverEditor: React.FC<MapPopoverEditorProps> = ({
@@ -66,7 +63,7 @@ const MapPopoverEditor: React.FC<MapPopoverEditorProps> = ({
         field.type === "string" ||
         field.type === "number" ||
         field.type === "date" ||
-        field.type === "boolean",
+        field.type === "boolean"
     );
   }, [layerFields]);
 
@@ -128,29 +125,82 @@ const MapPopoverEditor: React.FC<MapPopoverEditorProps> = ({
             {(editMode === EditorModes.MODIFY_ATTRIBUTES || editMode === EditorModes.DRAW) && (
               <Stack sx={{ pt: 2, px: 2 }} direction="column" spacing={2} minWidth="300px">
                 {filteredLayerFields.map((field) => {
-                  const isComputed = field.is_computed === true;
+                  const current = featureProperties[field.name];
+                  // Locked and computed columns are not offered here either —
+                  // see FeatureEditPanel. Derived once, in one place.
+                  const {
+                    computed: isComputed,
+                    locked: isLocked,
+                    readOnly: isReadOnly,
+                    vocabulary: isVocabulary,
+                    suggestions: hasSuggestions,
+                    items,
+                  } = fieldEditability(field, current);
+                  const isPicker = isVocabulary || hasSuggestions;
                   let displayValue = "";
                   if (isComputed) {
                     // Format the computed value via the shared formatter so the
                     // user sees the same string they get in the data table.
-                    const raw = featureProperties[field.name];
-                    if (raw !== undefined && raw !== null && raw !== "") {
+                    if (current !== undefined && current !== null && current !== "") {
                       displayValue = formatFieldValue(
-                        raw,
+                        current,
                         (resolveDisplayKind(field) as FieldKind) ?? "number",
-                        field.display_config ?? {},
+                        field.display_config ?? {}
                       );
                     } else if (editMode === EditorModes.DRAW) {
                       displayValue = t("computed_on_save");
                     }
+                  } else if (isLocked) {
+                    displayValue =
+                      current !== null && current !== undefined && current !== ""
+                        ? String(current)
+                        : editMode === EditorModes.DRAW
+                          ? t("set_on_save")
+                          : "";
                   } else {
-                    const raw = featureProperties[field.name];
-                    displayValue = raw !== null && raw !== undefined && raw !== "" ? String(raw) : "";
+                    displayValue =
+                      current !== null && current !== undefined && current !== "" ? String(current) : "";
                   }
+
+                  const setProperty = (value: string | number | undefined) =>
+                    setFeatureProperties((prev) => ({
+                      ...prev,
+                      [field.name]: value === "" || value === undefined ? null : value,
+                    }));
 
                   return (
                     <Stack key={field.name} direction="row" spacing={2} alignItems="center">
-                      {!isComputed && field.type === "date" && (
+                      {isVocabulary && (
+                        <Selector
+                          label={field.name}
+                          enableSearch={items.length > 8}
+                          selectedItems={selectedVocabularyItem(items, current)}
+                          setSelectedItems={(item) => {
+                            const value = Array.isArray(item) ? item[0]?.value : item?.value;
+                            setProperty(value);
+                          }}
+                          items={items}
+                        />
+                      )}
+                      {/* "Allow other values": the vocabulary is a set of
+                          suggestions, and anything else can still be typed. */}
+                      {hasSuggestions && (
+                        <SelectorFreeSolo
+                          label={field.name}
+                          options={items}
+                          selectedItem={selectedVocabularyItem(items, current)}
+                          inputType={field.type === "number" ? "number" : "text"}
+                          commitOnBlur
+                          onSelect={(item) =>
+                            setProperty(
+                              field.type === "number" && item?.value !== undefined && item.value !== ""
+                                ? Number(item.value)
+                                : item?.value
+                            )
+                          }
+                        />
+                      )}
+                      {!isPicker && !isReadOnly && field.type === "date" && (
                         <TemporalPicker
                           kind="datetime"
                           label={field.name}
@@ -160,7 +210,7 @@ const MapPopoverEditor: React.FC<MapPopoverEditorProps> = ({
                           }}
                         />
                       )}
-                      {!isComputed && field.type === "boolean" && (
+                      {!isPicker && !isReadOnly && field.type === "boolean" && (
                         <Selector
                           label={field.name}
                           selectedItems={BOOLEAN_SELECT_ITEMS.find(
@@ -176,20 +226,25 @@ const MapPopoverEditor: React.FC<MapPopoverEditorProps> = ({
                           items={[...BOOLEAN_SELECT_ITEMS]}
                         />
                       )}
-                      {(field.type === "string" || field.type === "number" || (isComputed && (field.type === "date" || field.type === "boolean"))) && (
-                        <TextFieldInput
-                          type={isComputed || field.type !== "number" ? "text" : "number"}
-                          label={field.name}
-                          clearable={false}
-                          disabled={isComputed}
-                          value={displayValue}
-                          onChange={(value: string) => {
-                            if (isComputed) return;
-                            const parsedValue = field.type === "number" ? Number(value) : value;
-                            setFeatureProperties((prev) => ({ ...prev, [field.name]: parsedValue }));
-                          }}
-                        />
-                      )}
+                      {!isPicker &&
+                        (field.type === "string" ||
+                          field.type === "number" ||
+                          (isReadOnly && (field.type === "date" || field.type === "boolean"))) && (
+                          <TextFieldInput
+                            type={isReadOnly || field.type !== "number" ? "text" : "number"}
+                            label={field.name}
+                            clearable={false}
+                            disabled={isReadOnly}
+                            locked={isLocked}
+                            tooltip={isLocked ? t("field_locked_tooltip") : undefined}
+                            value={displayValue}
+                            onChange={(value: string) => {
+                              if (isReadOnly) return;
+                              const parsedValue = field.type === "number" ? Number(value) : value;
+                              setFeatureProperties((prev) => ({ ...prev, [field.name]: parsedValue }));
+                            }}
+                          />
+                        )}
                     </Stack>
                   );
                 })}

@@ -19,12 +19,34 @@ import asyncpg
 from pydantic import BaseModel, Field, model_validator
 
 from goatlib.models.bundle import (
+    BundleArtifactBuildStatus,
     BundleStatus,
     BundleTypeName,
 )
 from goatlib.tools.style import get_default_style
 
 logger = logging.getLogger(__name__)
+
+
+def _decode_jsonb(value: Any) -> dict[str, Any] | None:
+    """A JSONB column as a dict.
+
+    asyncpg hands JSONB back as the raw text unless a codec is registered on
+    the connection, and these pools register none — so a caller that treated
+    the value as a dict would silently get a string. None and an empty value
+    stay None, which is what "the column holds nothing" means everywhere it is
+    read.
+    """
+    if not value:
+        return None
+    if isinstance(value, dict):
+        return value
+    try:
+        decoded = json.loads(value)
+    except (TypeError, ValueError):
+        logger.warning("Could not decode JSONB value: %r", value)
+        return None
+    return decoded if isinstance(decoded, dict) else None
 
 
 def normalize_geometry_type(geom_type: str | None) -> str | None:
@@ -145,6 +167,52 @@ class ToolDatabaseService:
                 f"Folder {folder_id} has no space_id; cannot create a reachable record"
             )
         return row["space_id"]
+
+    async def user_can(
+        self: Self,
+        resource_type: Literal["layer", "project", "bundle", "folder", "template"],
+        resource_id: str,
+        user_id: str,
+        action: Literal["read", "write", "share", "delete"],
+    ) -> bool:
+        """Whether ``user_id`` may do ``action`` to a resource.
+
+        Delegates to ``customer.can``, the one authorization rule core and
+        geoapi both go through, rather than re-spelling reachability in SQL
+        here: a bundle is reachable through its space role, a grant on it, a
+        grant on any ancestor folder, or — for a layer — its bundle's grant,
+        and only the function knows all of that. A tool that resolves ids it
+        was handed has to ask the same question the HTTP surface would, or the
+        job becomes a way around it.
+
+        Returns False for an id that does not exist, so a caller gets one
+        refusal rather than having to tell "gone" from "not yours" — which is
+        also what the endpoints do, so a tool cannot be used to probe for
+        existence.
+        """
+        row = await self.pool.fetchrow(
+            f"SELECT {self.schema}.can($1, $2::uuid, $3::uuid, $4) AS ok",
+            resource_type,
+            uuid_module.UUID(resource_id),
+            uuid_module.UUID(user_id),
+            action,
+        )
+        return bool(row and row["ok"])
+
+    async def bundle_exists(self: Self, bundle_id: str) -> bool:
+        """Whether the bundle row is still there.
+
+        ``customer.can`` answers False for a row that is gone and for a row
+        that is not yours, which is right for an endpoint — a caller should not
+        be able to tell those apart — but not for a cleanup job that runs
+        *after* the row is deleted. Separating the two is what lets such a job
+        authorize itself: see ``authorize_artifact_cleanup``.
+        """
+        row = await self.pool.fetchrow(
+            f"SELECT 1 AS ok FROM {self.schema}.bundle WHERE id = $1",
+            uuid_module.UUID(bundle_id),
+        )
+        return row is not None
 
     async def get_project_folder_id(self: Self, project_id: str) -> str | None:
         """Get the folder_id for a project.
@@ -280,40 +348,6 @@ class ToolDatabaseService:
         )
         return properties
 
-    async def create_bundle(
-        self: Self,
-        bundle_id: str,
-        user_id: str,
-        folder_id: str,
-        name: str,
-        bundle_type: "BundleTypeName | str",
-        description: str | None = None,
-        properties: dict[str, Any] | None = None,
-    ) -> None:
-        """Create a bundle record in customer.bundle."""
-        type_value = getattr(bundle_type, "value", bundle_type)
-        space_id = await self._resolve_folder_space_id(folder_id)
-        await self.pool.execute(
-            f"""
-            INSERT INTO {self.schema}.bundle (
-                id, user_id, folder_id, space_id, name, description,
-                bundle_type, properties, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW(), NOW())
-            """,
-            uuid_module.UUID(bundle_id),
-            uuid_module.UUID(user_id),
-            uuid_module.UUID(folder_id),
-            space_id,
-            name,
-            description,
-            type_value,
-            json.dumps(properties) if properties else None,
-        )
-        logger.info(
-            f"Created bundle: {bundle_id} ({name}) "
-            f"type={type_value} in folder {folder_id}"
-        )
-
     async def get_bundle_name(self: Self, bundle_id: str) -> str | None:
         """Return the bundle's display name (customer.bundle.name)."""
         row = await self.pool.fetchrow(
@@ -322,7 +356,58 @@ class ToolDatabaseService:
         )
         return row["name"] if row else None
 
-    async def update_package_status(
+    async def create_bundle(
+        self: Self,
+        bundle_id: str,
+        user_id: str,
+        folder_id: str,
+        name: str,
+        bundle_type: "BundleTypeName | str",
+        status: "BundleStatus | str" = BundleStatus.processing,
+        description: str | None = None,
+        dataset_metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Create a bundle record in customer.bundle.
+
+        ``status`` is explicit rather than left to the column default: a bundle
+        that exists but has not been filled in is ``processing``, and a caller
+        that forgot to say so would publish an empty one as ready.
+        """
+        space_id = await self._resolve_folder_space_id(folder_id)
+        await self.pool.execute(
+            f"""
+            INSERT INTO {self.schema}.bundle (
+                id, user_id, folder_id, space_id, name, description,
+                bundle_type, status, dataset_metadata, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, NOW(), NOW())
+            """,
+            uuid_module.UUID(bundle_id),
+            uuid_module.UUID(user_id),
+            uuid_module.UUID(folder_id),
+            space_id,
+            name,
+            description,
+            getattr(bundle_type, "value", bundle_type),
+            getattr(status, "value", status),
+            json.dumps(dataset_metadata) if dataset_metadata else None,
+        )
+        logger.info(f"Created bundle {bundle_id} ({bundle_type})")
+
+    async def delete_bundle(self: Self, bundle_id: str) -> None:
+        """Remove a bundle row. Its artifact rows go with it (FK cascade).
+
+        Used when an import fails: the layers it managed to write are removed
+        first, so what is left is a bundle that holds nothing and can never be
+        completed — there is no retry that could fill it in. The Windmill job
+        carries the failure, so nothing is lost by removing the row.
+        """
+        await self.pool.execute(
+            f"DELETE FROM {self.schema}.bundle WHERE id = $1",
+            uuid_module.UUID(bundle_id),
+        )
+        logger.info(f"Deleted bundle {bundle_id}")
+
+    async def update_bundle_status(
         self: Self,
         bundle_id: str,
         status: "BundleStatus | str",
@@ -340,7 +425,7 @@ class ToolDatabaseService:
         )
         logger.info(f"Bundle {bundle_id} status -> {status_value}")
 
-    async def update_package_metadata(
+    async def update_bundle_metadata(
         self: Self,
         bundle_id: str,
         metadata: dict,
@@ -386,24 +471,48 @@ class ToolDatabaseService:
         self: Self,
         bundle_id: str,
         kind: str,
-        status: str = "building",
+        build_status: BundleArtifactBuildStatus = BundleArtifactBuildStatus.building,
         job_id: str | None = None,
+        built_revision: int | None = None,
     ) -> str:
         """Create or reclaim the bundle_artifact row for (bundle_id, kind).
 
         Upserts against the (bundle_id, kind) unique constraint: a rebuild or a
         retried import takes over the existing row instead of dying on it.
+
+        Only ``build_status`` is touched. ``revision`` and ``storage_path`` are
+        left as they were, so a rebuild that fails or is superseded leaves the
+        previous artifact still pointing at its own file and its own revision —
+        which is what keeps a working graph usable for the whole build rather
+        than taking it offline the moment a rebuild starts.
+
+        ``built_revision`` is what makes that promise hold. The row is shared by
+        every build of this (bundle, kind), so writing ``building`` on it while
+        it already points at an artifact built from this revision or a newer one
+        would report a perfectly good graph as under construction for the whole
+        build — and a rebuild at the same revision is exactly what the Update
+        button does. The guard is in the statement, not around it, so two
+        workers cannot interleave a read and a write. Omit it and the status is
+        written unconditionally, which is right only when no artifact can exist
+        yet.
+
         Returns the row id."""
         kind_value = getattr(kind, "value", kind)
-        status_value = getattr(status, "value", status)
+        status_value = build_status.value
         row = await self.pool.fetchrow(
             f"""
-            INSERT INTO {self.schema}.bundle_artifact (
-                bundle_id, kind, status, job_id, created_at, updated_at
+            INSERT INTO {self.schema}.bundle_artifact AS a (
+                bundle_id, kind, build_status, job_id, created_at, updated_at
             )
             VALUES ($1, $2, $3, $4, NOW(), NOW())
             ON CONFLICT (bundle_id, kind) DO UPDATE SET
-                status = EXCLUDED.status,
+                build_status = CASE
+                    WHEN $5::int IS NULL
+                         OR a.revision IS NULL
+                         OR a.revision < $5::int
+                    THEN EXCLUDED.build_status
+                    ELSE a.build_status
+                END,
                 job_id = EXCLUDED.job_id,
                 updated_at = NOW()
             RETURNING id
@@ -412,66 +521,114 @@ class ToolDatabaseService:
             kind_value,
             status_value,
             uuid_module.UUID(job_id) if job_id else None,
+            built_revision,
         )
         logger.info(
-            f"Created artifact {row['id']} ({kind_value}) for bundle {bundle_id}"
+            f"Artifact {row['id']} ({kind_value}) for bundle {bundle_id}: "
+            f"{status_value}"
         )
         return str(row["id"])
 
-    async def update_artifact_status(
+    async def set_artifact_build_status(
         self: Self,
         artifact_id: str,
-        status: str,
-        storage_path: str | None = None,
-        size: int | None = None,
+        status: BundleArtifactBuildStatus,
+        built_revision: int | None = None,
     ) -> None:
-        """Update an artifact's build status and (on success) where it landed."""
-        status_value = getattr(status, "value", status)
+        """Record what an artifact's build attempt did.
+
+        Only the outcome: where the file landed and which revision it came from
+        are written by ``publish_artifact_if_current``, and only for the build
+        that won. A failed or superseded attempt must not touch them, or it
+        would take the previous good artifact with it.
+
+        ``built_revision`` keeps the outcome from contradicting the row it is
+        written on. The row is shared by every build of this (bundle, kind), so
+        a build that lost a race would otherwise stamp ``failed`` over the
+        status of the newer build that published on it — leaving
+        ``artifact_state`` reporting ``failed`` for a graph that is current and
+        valid, with nothing to re-queue a build that already happened. The
+        comparison is in the WHERE clause rather than read first and written
+        after, so two workers finishing together cannot interleave.
+        """
+        status_value = status.value
         await self.pool.execute(
             f"""
             UPDATE {self.schema}.bundle_artifact
-            SET status = $2,
-                storage_path = COALESCE($3, storage_path),
-                size = COALESCE($4, size),
-                updated_at = NOW()
+            SET build_status = $2, updated_at = NOW()
             WHERE id = $1
+              AND ($3::int IS NULL OR revision IS NULL OR revision < $3::int)
             """,
             uuid_module.UUID(artifact_id),
             status_value,
-            storage_path,
-            size,
+            built_revision,
         )
-        logger.info(f"Artifact {artifact_id} status -> {status_value}")
+        logger.info(f"Artifact {artifact_id} build -> {status_value}")
 
-    async def mark_bundle_artifacts_failed(self: Self, bundle_id: str) -> None:
-        """Mark every artifact row of a bundle failed.
+    async def mark_bundle_artifacts_failed(
+        self: Self, bundle_id: str, built_revision: int | None = None
+    ) -> None:
+        """Mark a bundle's artifact rows failed, except any newer than this build.
 
         For a build that dies before reaching any specific artifact row (the
         export or the builder itself raised): without this the rows stay
-        'stale'/'building' and consumers keep promising an update that is not
-        running, instead of saying the update failed."""
+        'building' and consumers keep promising an update that is not running,
+        instead of saying the update failed.
+
+        ``built_revision`` is the same guard ``set_artifact_build_status``
+        carries, and it matters more here because this writes every row of the
+        bundle at once: a build that dies while a newer build has already
+        published would otherwise mark that newer, valid artifact failed —
+        leaving a current graph reported as broken with nothing to re-queue a
+        build that already happened. Omit it and every row is marked, which is
+        right only when no artifact can have been published yet.
+        """
         await self.pool.execute(
             f"""
             UPDATE {self.schema}.bundle_artifact
-            SET status = 'failed', updated_at = NOW()
+            SET build_status = $2, updated_at = NOW()
             WHERE bundle_id = $1
+              AND ($3::int IS NULL OR revision IS NULL OR revision < $3::int)
             """,
             uuid_module.UUID(bundle_id),
+            BundleArtifactBuildStatus.failed.value,
+            built_revision,
+        )
+
+    async def set_layer_field_config(
+        self: Self, layer_id: str, field_config: "dict[str, Any]"
+    ) -> None:
+        """Replace a layer's field_config JSONB.
+
+        The same blob geoapi's column endpoints maintain — written here so an
+        importer can declare a computed column at creation time, which those
+        endpoints cannot do (they only ever edit a layer that already exists).
+        """
+        await self.pool.execute(
+            f"UPDATE {self.schema}.layer SET field_config = $2::jsonb WHERE id = $1",
+            uuid_module.UUID(layer_id),
+            json.dumps(field_config),
         )
 
     async def get_bundle_artifact(
         self: Self, bundle_id: str, kind: str
     ) -> "dict | None":
-        """Stored path and status of a bundle's artifact of the given kind.
+        """Stored path, status and provenance of a bundle's artifact of a kind.
 
-        Returns the row whatever its status, so a caller can tell "being
-        rebuilt after an edit" from "never built".
+        ``layers_revision`` comes back alongside the artifact's own ``revision``
+        so a caller can tell whether the file still matches the layers. That
+        comparison is the real answer; the stored status only records what the
+        last build attempt did. Reading both means a layer write whose
+        stale-marking never landed cannot leave a tool routing on a graph that
+        no longer matches the data.
         """
         kind_value = getattr(kind, "value", kind)
         row = await self.pool.fetchrow(
             f"""
-            SELECT storage_path, status FROM {self.schema}.bundle_artifact
-            WHERE bundle_id = $1 AND kind = $2
+            SELECT a.storage_path, a.build_status, a.revision, b.layers_revision
+            FROM {self.schema}.bundle_artifact a
+            JOIN {self.schema}.bundle b ON b.id = a.bundle_id
+            WHERE a.bundle_id = $1 AND a.kind = $2
             LIMIT 1
             """,
             uuid_module.UUID(bundle_id),
@@ -480,17 +637,29 @@ class ToolDatabaseService:
         return dict(row) if row else None
 
     async def get_bundle(self: Self, bundle_id: str) -> "dict":
-        """Type and owner of a bundle, for a build that was handed only an id."""
+        """A bundle's type, owner, revision and stated metadata, for a job that
+        was handed only an id.
+
+        ``description`` and ``dataset_metadata`` are here because a copy of a
+        bundle carries them over — what the source says about itself describes
+        the copy just as well, and re-typing it is the user's choice, not
+        something losing it should force. ``dataset_metadata`` is decoded, so a
+        caller gets the same dict shape it would pass back to
+        ``create_bundle``.
+        """
         row = await self.pool.fetchrow(
             f"""
-            SELECT bundle_type, user_id, layers_revision
+            SELECT bundle_type, user_id, layers_revision, description,
+                   dataset_metadata
             FROM {self.schema}.bundle WHERE id = $1
             """,
             uuid_module.UUID(bundle_id),
         )
         if row is None:
             raise ValueError(f"Bundle {bundle_id} not found")
-        return dict(row)
+        bundle = dict(row)
+        bundle["dataset_metadata"] = _decode_jsonb(bundle.get("dataset_metadata"))
+        return bundle
 
     async def get_bundle_revision(self: Self, bundle_id: str) -> int:
         """Current layers_revision of a bundle."""
@@ -524,31 +693,57 @@ class ToolDatabaseService:
         built_revision: int,
         storage_path: str,
         size: int,
-    ) -> bool:
+    ) -> "tuple[bool, str | None]":
         """Mark an artifact ready, unless the layers have moved on since.
 
         The revision comparison sits in the WHERE clause, so there is no window
         between checking and writing for a concurrent save to slip through.
+
+        Returns (published, displaced_path): the path this build replaced, so
+        the caller can remove a file nothing points at any more. Only the build
+        that wins the comparison gets one, so two concurrent rebuilds cannot
+        both decide to delete the same file.
         """
-        result = await self.pool.execute(
+        row = await self.pool.fetchrow(
             f"""
             UPDATE {self.schema}.bundle_artifact a
-            SET status = 'ready',
+            SET build_status = $6,
                 storage_path = $3,
                 size = $4,
                 revision = $5,
                 updated_at = NOW()
-            FROM {self.schema}.bundle b
-            WHERE a.id = $1 AND b.id = $2 AND a.bundle_id = b.id
+            FROM {self.schema}.bundle b,
+                 -- The path being replaced, read through the same statement
+                 -- that replaces it and under a row lock. The lock is what
+                 -- makes the answer true when two builds of the same revision
+                 -- publish at once: the second blocks here, then re-reads the
+                 -- committed row and reports the *first* winner's fresh
+                 -- archive as displaced. Reading it without the lock would
+                 -- report the path from before either commit, and the first
+                 -- winner's file would be left on the volume with nothing
+                 -- pointing at it.
+                 (
+                     SELECT id, storage_path
+                     FROM {self.schema}.bundle_artifact
+                     WHERE id = $1
+                     FOR UPDATE
+                 ) prev
+            WHERE a.id = $1 AND prev.id = a.id AND b.id = $2
+              AND a.bundle_id = b.id
               AND b.layers_revision = $5
+            RETURNING prev.storage_path AS displaced_path
             """,
             uuid_module.UUID(artifact_id),
             uuid_module.UUID(bundle_id),
             storage_path,
             size,
             built_revision,
+            BundleArtifactBuildStatus.complete.value,
         )
-        return str(result).endswith("1")
+        if row is None:
+            return False, None
+        displaced = row["displaced_path"]
+        return True, (displaced if displaced != storage_path else None)
 
     async def list_bundle_layers(self: Self, bundle_id: str) -> "list[dict]":
         """Role and layer id of each member layer of a bundle."""
@@ -561,7 +756,7 @@ class ToolDatabaseService:
         )
         return [dict(r) for r in rows]
 
-    async def add_layer_to_package(
+    async def add_layer_to_bundle(
         self: Self,
         bundle_id: str,
         layer_id: str,
@@ -740,7 +935,7 @@ class ToolDatabaseService:
         row = await self.pool.fetchrow(
             f"""
             SELECT id, name, user_id, folder_id, type, feature_layer_type,
-                   feature_layer_geometry_type
+                   feature_layer_geometry_type, field_config
             FROM {self.schema}.layer
             WHERE id = $1
             """,
@@ -756,6 +951,11 @@ class ToolDatabaseService:
                 "type": row["type"],
                 "feature_layer_type": row["feature_layer_type"],
                 "geometry_type": row["feature_layer_geometry_type"],
+                # The per-column metadata — computed columns, locked flags,
+                # vocabularies, defaults. A copy of a layer is the same kind of
+                # layer, so it has to carry these over; without the column here
+                # the copy would silently come out with none of them.
+                "field_config": _decode_jsonb(row["field_config"]),
             }
         return None
 

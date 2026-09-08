@@ -1,13 +1,14 @@
 import type { DragEndEvent } from "@dnd-kit/core";
-import dynamic from "next/dynamic";
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { DragIndicator as DragIndicatorIcon } from "@mui/icons-material";
 import {
+  Autocomplete,
   Box,
   Button,
+  Chip,
   FormControlLabel,
   IconButton,
   Input,
@@ -15,25 +16,29 @@ import {
   Select,
   Stack,
   Switch,
+  TextField,
   Typography,
   alpha,
   useTheme,
 } from "@mui/material";
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import FieldKindIcon from "@/components/common/FieldKindIcon";
-import { type FormulaField } from "@/components/modals/FormulaBuilder";
-const FormulaBuilder = dynamic(() => import("@/components/modals/FormulaBuilder"), { ssr: false });
 import { formatFieldValue } from "@/lib/utils/formatFieldValue";
 import type { FieldDefinition, FieldKind } from "@/lib/validations/layer";
 import { ALLOWED_KINDS_BY_GEOM_TYPE, COMPUTED_KINDS, RESERVED_FIELD_NAMES } from "@/lib/validations/layer";
 
 import type { SelectorItem } from "@/types/map/common";
 
+import FieldKindIcon from "@/components/common/FieldKindIcon";
+import FormLabelHelper from "@/components/common/FormLabelHelper";
 import Selector from "@/components/map/panels/common/Selector";
+import { type FormulaField } from "@/components/modals/FormulaBuilder";
+
+const FormulaBuilder = dynamic(() => import("@/components/modals/FormulaBuilder"), { ssr: false });
 
 const DECIMALS_OPTIONS: ("auto" | number)[] = ["auto", 0, 1, 2, 3, 4, 5];
 
@@ -69,14 +74,7 @@ interface FieldEditorProps {
   /** IDs of fields whose type cannot be changed (existing DB columns) */
   lockedFieldIds?: Set<string>;
   /** Layer geometry type — controls which computed kinds are offered. */
-  geometryType?:
-    | "point"
-    | "multipoint"
-    | "line"
-    | "multiline"
-    | "polygon"
-    | "multipolygon"
-    | null;
+  geometryType?: "point" | "multipoint" | "line" | "multiline" | "polygon" | "multipolygon" | null;
   /**
    * When provided, clicking "Add field" calls this instead of creating an
    * in-place stub. Use this to open an AddFieldDialog from the parent.
@@ -146,9 +144,7 @@ const SortableFieldRow = ({
           borderLeft: isSelected
             ? `3px solid ${error ? theme.palette.error.main : theme.palette.primary.main}`
             : "3px solid transparent",
-          backgroundColor: isSelected
-            ? alpha(theme.palette.primary.main, 0.08)
-            : "transparent",
+          backgroundColor: isSelected ? alpha(theme.palette.primary.main, 0.08) : "transparent",
           "&:hover": {
             backgroundColor: isSelected
               ? alpha(theme.palette.primary.main, 0.12)
@@ -191,11 +187,7 @@ const SortableFieldRow = ({
         />
 
         {/* Action buttons — visible on hover */}
-        <Stack
-          className="field-actions"
-          direction="row"
-          spacing={0}
-          sx={{ flexShrink: 0, opacity: 0 }}>
+        <Stack className="field-actions" direction="row" spacing={0} sx={{ flexShrink: 0, opacity: 0 }}>
           <IconButton
             size="small"
             onClick={(e) => {
@@ -224,18 +216,12 @@ const SortableFieldRow = ({
       </Stack>
       {/* Error or warning message */}
       {error && (
-        <Typography
-          variant="caption"
-          color="error"
-          sx={{ pl: 6, pb: 0.5, display: "block" }}>
+        <Typography variant="caption" color="error" sx={{ pl: 6, pb: 0.5, display: "block" }}>
           {error}
         </Typography>
       )}
       {!error && warning && (
-        <Typography
-          variant="caption"
-          color="warning.main"
-          sx={{ pl: 6, pb: 0.5, display: "block" }}>
+        <Typography variant="caption" color="warning.main" sx={{ pl: 6, pb: 0.5, display: "block" }}>
           {warning}
         </Typography>
       )}
@@ -244,6 +230,89 @@ const SortableFieldRow = ({
 };
 
 // --- Main FieldEditor ---
+
+/**
+ * The vocabulary editor for a column.
+ *
+ * Matches the chips input the tool forms use (`toolbox/generic/inputs/
+ * ChipsInput`): a value is committed on Enter *or* on blur, so typing one and
+ * clicking away does not silently discard it. That component is bound to the
+ * OGC-processes form model and is numbers-only, so the interaction is mirrored
+ * here rather than shared.
+ */
+const AllowedValuesInput = ({
+  values,
+  onChange,
+  label,
+  placeholder,
+  helperText,
+  numeric,
+  invalidMessage,
+}: {
+  values: (string | number)[];
+  onChange: (values: (string | number)[]) => void;
+  label: string;
+  placeholder: string;
+  helperText: string;
+  numeric: boolean;
+  invalidMessage: string;
+}) => {
+  const [inputValue, setInputValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const commit = (next: (string | number)[]) => {
+    // Trimmed and de-duplicated: a stray duplicate or a trailing space would
+    // look identical in the dropdown while never matching what is stored.
+    const cleaned = next.map((v) => String(v).trim()).filter(Boolean);
+    // A number column holding the string "30" would never match the 30 a write
+    // sends, so the value is stored as the column's own type — and a value that
+    // cannot be one is refused rather than dropped without a word.
+    const rejected = numeric ? cleaned.filter((v) => !Number.isFinite(Number(v))) : [];
+    setError(rejected.length > 0 ? invalidMessage : null);
+    const kept = cleaned.filter((v) => !rejected.includes(v)).map((v) => (numeric ? Number(v) : v));
+    const deduped = Array.from(new Set(kept));
+    setInputValue("");
+    // A value that is already in the vocabulary changes nothing, so the field
+    // is not reported as edited either.
+    const unchanged = deduped.length === values.length && deduped.every((v, i) => v === values[i]);
+    if (!unchanged) onChange(deduped);
+  };
+
+  return (
+    <Stack>
+      <FormLabelHelper label={label} color="inherit" />
+      <Autocomplete
+        multiple
+        freeSolo
+        size="small"
+        options={[] as string[]}
+        value={values.map(String)}
+        inputValue={inputValue}
+        onInputChange={(_event, next) => setInputValue(next)}
+        onChange={(_event, next) => commit(next as string[])}
+        // Both commit paths — Enter and blur — are the `commit` above, which
+        // de-duplicates, so entering a value that is already a chip is a no-op.
+        // Without this, MUI matches the typed value against the chips itself
+        // and treats an already-selected option as a toggle; the two paths
+        // would then disagree about what entering a duplicate means.
+        isOptionEqualToValue={() => false}
+        inputMode={numeric ? "numeric" : "text"}
+        onBlur={() => {
+          if (inputValue.trim()) commit([...values, inputValue]);
+        }}
+        renderTags={(tagValues, getTagProps) =>
+          tagValues.map((option, index) => {
+            const { key, ...tagProps } = getTagProps({ index });
+            return <Chip key={key} size="small" label={option} {...tagProps} />;
+          })
+        }
+        renderInput={(params) => (
+          <TextField {...params} error={!!error} placeholder={placeholder} helperText={error ?? helperText} />
+        )}
+      />
+    </Stack>
+  );
+};
 
 const FieldEditor: React.FC<FieldEditorProps> = ({
   fields,
@@ -290,11 +359,9 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
   // present). At creation there is no `field_config` yet to carry the expression
   // or the compute SQL, so such a column would be made and never filled.
   const baseKinds: FieldKind[] = geometryType
-    ? ALLOWED_KINDS_BY_GEOM_TYPE[geometryType] ?? ["string", "number", "datetime", "boolean", "formula"]
+    ? (ALLOWED_KINDS_BY_GEOM_TYPE[geometryType] ?? ["string", "number", "datetime", "boolean", "formula"])
     : ["string", "number", "datetime", "boolean", "formula"];
-  const availableKinds: FieldKind[] = baseKinds.filter(
-    (k) => !COMPUTED_KINDS.has(k) || !!layerId
-  );
+  const availableKinds: FieldKind[] = baseKinds.filter((k) => !COMPUTED_KINDS.has(k) || !!layerId);
 
   const fieldTypeItems: SelectorItem[] = availableKinds.map((k) => ALL_FIELD_TYPE_ITEMS[k]);
   const hasFields = fields.length > 0;
@@ -401,21 +468,48 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
     onChange(fields.map((f) => (f.id === id ? { ...f, name: newName } : f)));
   };
 
-  const handleTypeChange = (id: string, item: SelectorItem | SelectorItem[] | undefined) => {
-    if (!item || Array.isArray(item)) return;
-    onChange(fields.map((f) => (f.id === id ? { ...f, kind: item.value as FieldKind } : f)));
+  const handleAllowedValuesChange = (id: string, values: (string | number)[]) => {
+    // Already trimmed, de-duplicated and typed by the input.
+    onChange(
+      fields.map((f) => (f.id === id ? { ...f, allowed_values: values.length > 0 ? values : undefined } : f))
+    );
   };
 
-  const handleDisplayConfigChange = (
-    id: string,
-    partial: Record<string, unknown>,
-  ) => {
+  const handleAllowOtherChange = (id: string, allowOther: boolean) => {
+    onChange(fields.map((f) => (f.id === id ? { ...f, allow_other: allowOther } : f)));
+  };
+
+  const handleTypeChange = (id: string, item: SelectorItem | SelectorItem[] | undefined) => {
+    if (!item || Array.isArray(item)) return;
+    const kind = item.value as FieldKind;
+    onChange(
+      fields.map((f) => {
+        if (f.id !== id) return f;
+        // A vocabulary belongs to the type it was written for. Values that
+        // still fit the new one are kept — "30" is a fine number — and the
+        // rest go, rather than being stored as something that can never match
+        // what a write sends. Only these two kinds carry one at all.
+        const allowed =
+          kind === "number"
+            ? f.allowed_values?.map(Number).filter((v) => Number.isFinite(v))
+            : kind === "string"
+              ? f.allowed_values?.map(String)
+              : undefined;
+        return {
+          ...f,
+          kind,
+          allowed_values: allowed?.length ? allowed : undefined,
+          allow_other: allowed?.length ? f.allow_other : undefined,
+        };
+      })
+    );
+  };
+
+  const handleDisplayConfigChange = (id: string, partial: Record<string, unknown>) => {
     onChange(
       fields.map((f) =>
-        f.id === id
-          ? { ...f, display_config: { ...(f.display_config ?? {}), ...partial } }
-          : f,
-      ),
+        f.id === id ? { ...f, display_config: { ...(f.display_config ?? {}), ...partial } } : f
+      )
     );
   };
 
@@ -434,16 +528,8 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
   // Empty state — no fields defined yet
   if (!hasFields) {
     return (
-      <Stack
-        sx={{ height: 340 }}
-        alignItems="center"
-        justifyContent="center"
-        spacing={2}>
-        <Icon
-          iconName={ICON_NAME.TABLE}
-          fontSize="small"
-          htmlColor={theme.palette.text.secondary}
-        />
+      <Stack sx={{ height: 340 }} alignItems="center" justifyContent="center" spacing={2}>
+        <Icon iconName={ICON_NAME.TABLE} fontSize="small" htmlColor={theme.palette.text.secondary} />
         <Typography variant="body2" color="text.secondary">
           {t("no_fields")}
         </Typography>
@@ -475,9 +561,7 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
             collisionDetection={closestCenter}
             modifiers={[restrictToVerticalAxis]}
             onDragEnd={handleDragEnd}>
-            <SortableContext
-              items={fields.map((f) => f.id)}
-              strategy={verticalListSortingStrategy}>
+            <SortableContext items={fields.map((f) => f.id)} strategy={verticalListSortingStrategy}>
               {fields.map((field) => (
                 <SortableFieldRow
                   key={field.id}
@@ -535,9 +619,9 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
             // until first saved (the backend infers it), so no formatting
             // options are offered for a brand-new formula field.
             const isFormula = selectedField.kind === "formula";
-            const formatKind = (
-              isFormula ? selectedField.output_kind : selectedField.kind
-            ) as FieldKind | undefined;
+            const formatKind = (isFormula ? selectedField.output_kind : selectedField.kind) as
+              | FieldKind
+              | undefined;
             const showFormat = !!formatKind && NUMERIC_KINDS.includes(formatKind);
             const unitOptions = formatKind ? UNIT_OPTIONS_BY_KIND[formatKind] : [];
             const previewValues = formatKind ? PREVIEW_VALUES_BY_KIND[formatKind] : [];
@@ -564,6 +648,33 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
                   items={fieldTypeItems}
                   disabled={lockedFieldIds?.has(selectedField.id)}
                 />
+
+                {(selectedField.kind === "string" || selectedField.kind === "number") && (
+                  <Stack spacing={1}>
+                    <AllowedValuesInput
+                      key={selectedField.id}
+                      label={t("allowed_values")}
+                      placeholder={t("type_value_enter")}
+                      helperText={t("allowed_values_help")}
+                      numeric={selectedField.kind === "number"}
+                      invalidMessage={t("allowed_values_must_be_numbers")}
+                      values={selectedField.allowed_values ?? []}
+                      onChange={(values) => handleAllowedValuesChange(selectedField.id, values)}
+                    />
+                    {(selectedField.allowed_values?.length ?? 0) > 0 && (
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            size="small"
+                            checked={!!selectedField.allow_other}
+                            onChange={(e) => handleAllowOtherChange(selectedField.id, e.target.checked)}
+                          />
+                        }
+                        label={<Typography variant="caption">{t("allow_other_values")}</Typography>}
+                      />
+                    )}
+                  </Stack>
+                )}
 
                 {isFormula && (
                   <Stack spacing={1}>
@@ -654,11 +765,7 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
                           }
                         />
                       }
-                      label={
-                        <Typography variant="caption">
-                          {t("show_thousands_separator")}
-                        </Typography>
-                      }
+                      label={<Typography variant="caption">{t("show_thousands_separator")}</Typography>}
                     />
                     <FormControlLabel
                       control={
@@ -672,11 +779,7 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
                           }
                         />
                       }
-                      label={
-                        <Typography variant="caption">
-                          {t("abbreviate_large_numbers")}
-                        </Typography>
-                      }
+                      label={<Typography variant="caption">{t("abbreviate_large_numbers")}</Typography>}
                     />
                     <FormControlLabel
                       control={
@@ -690,11 +793,7 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
                           }
                         />
                       }
-                      label={
-                        <Typography variant="caption">
-                          {t("always_show_sign")}
-                        </Typography>
-                      }
+                      label={<Typography variant="caption">{t("always_show_sign")}</Typography>}
                     />
 
                     {previewValues.length > 0 && (

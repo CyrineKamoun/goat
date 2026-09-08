@@ -34,6 +34,7 @@ from goatlib.analysis.schemas.ui import (
     ui_field,
     ui_sections,
 )
+from goatlib.bundles.artifacts.gtfs import fetch_pt_timetable
 from goatlib.bundles.artifacts.street_network import fetch_routing_network
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools._routing_limits import (
@@ -638,6 +639,32 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
         ),
     )
 
+    pt_network_bundle_id: str | None = Field(
+        default=None,
+        description=(
+            "Choose a custom Public Transport Network bundle to use for routing. "
+            "If unset, the default bundle will be used."
+        ),
+        json_schema_extra=ui_field(
+            section="configuration",
+            field_order=28,
+            label_key="pt_network_bundle_id",
+            widget="bundle-selector",
+            visible_when={
+                "$and": [
+                    {"routing_mode": "pt"},
+                    {"show_advanced": True},
+                ]
+            },
+            # The selector lists only public-transport bundles that have a ready
+            # routing graph.
+            widget_options={
+                "bundle_type": "pt_network_gtfs",
+                "artifact_kind": "pt_network_graph",
+            },
+        ),
+    )
+
     street_network_bundle_id: str | None = Field(
         default=None,
         description=(
@@ -646,7 +673,7 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
         ),
         json_schema_extra=ui_field(
             section="configuration",
-            field_order=28,
+            field_order=29,
             label_key="street_network_bundle_id",
             widget="bundle-selector",
             # PT legs route on the global network, so this is for street modes.
@@ -1007,6 +1034,12 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
                 egress_speed=params.egress_speed,
                 output_path=str(matrix_output_path),
             )
+
+            # A selected PT bundle's timetable replaces the global network.
+            if params.routing_mode == RoutingMode.pt and params.pt_network_bundle_id:
+                analysis_params.timetable_path = fetch_pt_timetable(
+                    self, params.pt_network_bundle_id
+                )
 
             # An uploaded street network bundle's graph replaces the global network.
             if params.street_network_bundle_id:

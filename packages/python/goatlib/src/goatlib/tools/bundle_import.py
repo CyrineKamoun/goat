@@ -50,7 +50,7 @@ def main(params: BundleImportParams) -> Dict[str, Any]:
             runner.settings.s3_bucket_name, params.s3_key, tmp_path
         )
         result = _get_or_create_event_loop().run_until_complete(
-            runner.ingest_into_package(
+            runner.ingest_into_bundle(
                 bundle_id=params.bundle_id,
                 source_path=tmp_path,
                 bundle_type=params.bundle_type,

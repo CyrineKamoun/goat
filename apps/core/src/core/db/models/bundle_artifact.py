@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from goatlib.models.bundle import (
+    BundleArtifactBuildStatus,
     BundleArtifactKind,
-    BundleArtifactStatus,
 )
 from pydantic import field_serializer
 from sqlalchemy import BigInteger, ForeignKey, Integer, Text
@@ -62,12 +62,13 @@ class BundleArtifact(DateTimeBase, table=True):
         sa_column=Column(Text, nullable=False),
         description="Artifact kind (e.g. pt_network_graph, pt_network_linkage)",
     )
-    status: BundleArtifactStatus = Field(
-        default=BundleArtifactStatus.pending,
-        sa_column=Column(
-            Text, nullable=False, server_default=BundleArtifactStatus.pending
+    build_status: BundleArtifactBuildStatus = Field(
+        sa_column=Column(Text, nullable=False),
+        description=(
+            "What the last build attempt did. Not whether the artifact is "
+            "usable — that is derived from this and `revision` vs the bundle's "
+            "`layers_revision`; see goatlib.models.bundle.artifact_state"
         ),
-        description="Build state of the artifact",
     )
     storage_path: str | None = Field(
         default=None,
@@ -96,6 +97,6 @@ class BundleArtifact(DateTimeBase, table=True):
     # Relationships
     bundle: "Bundle" = Relationship(back_populates="artifacts")
 
-    @field_serializer("kind", "status")
+    @field_serializer("kind", "build_status")
     def serialize_enums(self, value: object) -> "str | None":
         return serialize_str_enum(value)

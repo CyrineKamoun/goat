@@ -663,6 +663,20 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         job_hidden=True,
     ),
     ToolDefinition(
+        name="bundle_create_filtered",
+        display_name="Bundle Create Filtered",
+        description=(
+            "Create a new bundle from a spatially filtered copy of an existing "
+            "one, with its own derived artifacts"
+        ),
+        module_path="goatlib.tools.bundle_create_filtered",
+        params_class_name="BundleCreateFilteredParams",
+        windmill_path="f/goat/tools/bundle_create_filtered",
+        category="data",
+        keywords=("bundle", "filter", "clip", "subset", "copy"),
+        toolbox_hidden=True,
+    ),
+    ToolDefinition(
         name="bundle_artifact_rebuild",
         display_name="Bundle Artifact Rebuild",
         description="Rebuild a bundle's derived artifacts from its member layers",

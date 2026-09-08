@@ -5,12 +5,13 @@ import { mutate as globalMutate } from "swr";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
+import type { ColumnPatch } from "@/lib/api/layers";
 import {
   COLLECTIONS_API_BASE_URL,
   addColumn,
   deleteColumn,
+  patchColumn,
   renameColumn,
-  updateColumnDisplayConfig,
   updateColumnFormula,
   useDataset,
   useLayerQueryables,
@@ -88,6 +89,8 @@ const EditFieldsModal: React.FC<EditFieldsModalProps> = ({
           kind?: FieldKind;
           is_computed?: boolean;
           display_config?: Record<string, unknown>;
+          allowed_values?: (string | number)[];
+          allow_other?: boolean;
           type?: string;
           formula?: string;
           output_kind?: string;
@@ -98,6 +101,8 @@ const EditFieldsModal: React.FC<EditFieldsModalProps> = ({
           kind: s.kind ?? (s.type === "number" || s.type === "integer" ? "number" : "string"),
           is_computed: s.is_computed ?? false,
           display_config: s.display_config ?? {},
+          allowed_values: s.allowed_values,
+          allow_other: s.allow_other ?? false,
           formula: s.formula,
           output_kind: s.output_kind,
         };
@@ -190,6 +195,9 @@ const EditFieldsModal: React.FC<EditFieldsModalProps> = ({
             name: field.name,
             kind: field.kind,
             display_config: field.display_config ?? {},
+            ...(field.allowed_values?.length
+              ? { allowed_values: field.allowed_values, allow_other: !!field.allow_other }
+              : {}),
             ...(field.kind === "formula" ? { formula: field.formula } : {}),
           });
         } else {
@@ -202,11 +210,24 @@ const EditFieldsModal: React.FC<EditFieldsModalProps> = ({
           if (orig && field.kind === "formula" && field.formula && field.formula !== orig.formula) {
             await updateColumnFormula(layerId, field.name, field.formula);
           }
-          // Persist display_config edits on existing fields
+          // Vocabulary and formatting edits travel together: one PATCH per
+          // field, so a field whose values and display both changed is one
+          // round trip. An emptied list is sent as [] so the backend removes
+          // the constraint rather than leaving the old one in place.
+          const patch: ColumnPatch = {};
+          const origValues = JSON.stringify(orig?.allowed_values ?? []);
+          const nextValues = JSON.stringify(field.allowed_values ?? []);
+          if (origValues !== nextValues || !!orig?.allow_other !== !!field.allow_other) {
+            patch.allowed_values = field.allowed_values ?? [];
+            patch.allow_other = !!field.allow_other;
+          }
           const origConfig = JSON.stringify(orig?.display_config ?? {});
           const nextConfig = JSON.stringify(field.display_config ?? {});
           if (orig && origConfig !== nextConfig) {
-            await updateColumnDisplayConfig(layerId, field.name, field.display_config ?? {});
+            patch.display_config = field.display_config ?? {};
+          }
+          if (Object.keys(patch).length > 0) {
+            await patchColumn(layerId, field.name, patch);
           }
           // Note: kind changes on existing columns are not supported.
         }
@@ -231,6 +252,11 @@ const EditFieldsModal: React.FC<EditFieldsModalProps> = ({
       if (!orig) return true; // new field
       if (orig.name !== f.name) return true;
       if ((orig.formula ?? "") !== (f.formula ?? "")) return true;
+      if (
+        JSON.stringify(orig.allowed_values ?? []) !== JSON.stringify(f.allowed_values ?? []) ||
+        !!orig.allow_other !== !!f.allow_other
+      )
+        return true;
       return JSON.stringify(orig.display_config ?? {}) !== JSON.stringify(f.display_config ?? {});
     });
   }, [fields, originalFields, originalMap]);

@@ -4,6 +4,7 @@ from goatlib.bundles.artifacts.base import (
     ArtifactBuilder,
     ArtifactBuilderUnavailableError,
     BuiltArtifact,
+    require_ready_artifact,
 )
 from goatlib.bundles.artifacts.gtfs import GtfsArtifactBuilder
 from goatlib.bundles.artifacts.registry import (
@@ -33,4 +34,5 @@ __all__ = [
     "resolve_artifact",
     "store_artifact",
     "register_artifact_builder",
+    "require_ready_artifact",
 ]

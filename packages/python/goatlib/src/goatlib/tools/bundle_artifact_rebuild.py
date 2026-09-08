@@ -27,7 +27,9 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field
 
 from goatlib.analysis.schemas.ui import SECTION_INPUT, ui_field, ui_sections
+from goatlib.bundles.artifacts import get_artifact_builder
 from goatlib.bundles.artifacts.build_mixin import BundleArtifactBuildMixin
+from goatlib.tools.authz import authorize_bundle_rebuild
 from goatlib.tools.base import SimpleToolRunner
 from goatlib.tools.db import ToolDatabaseService
 from goatlib.tools.schemas import ToolInputBase
@@ -93,10 +95,38 @@ class BundleArtifactRebuildRunner(BundleArtifactBuildMixin, SimpleToolRunner):
         db = ToolDatabaseService(pool, schema=self.settings.customer_schema)
 
         try:
+            # `bundle_id` arrives as a tool input and the processes service
+            # authorizes no id before dispatch. Unchecked, this tool is the
+            # sharpest of the bundle tools: it builds as `bundle["user_id"]`
+            # below, so any authenticated caller could cause work under
+            # somebody else's identity, on a bundle they cannot see, and
+            # replace the artifact everything routing through it reads.
+            await authorize_bundle_rebuild(
+                db, user_id=params.user_id, bundle_id=params.bundle_id
+            )
+
             bundle = await db.get_bundle(params.bundle_id)
             members = await db.list_bundle_layers(params.bundle_id)
             built_revision = int(bundle["layers_revision"])
             output.built_revision = built_revision
+
+            # Only a builder that reads the member layers can be rebuilt. One
+            # that reads the uploaded source cannot: the source was a temporary
+            # download during the import and is not kept, so there is nothing
+            # here to build from. Said plainly rather than left to fail on an
+            # empty path deep inside the builder.
+            builder = get_artifact_builder(bundle["bundle_type"])
+            if builder is not None and not builder.builds_from_layers:
+                raise ValueError(
+                    f"A '{bundle['bundle_type']}' bundle's artifacts are built "
+                    "from the uploaded source, which is not kept, so they "
+                    "cannot be rebuilt. Import the source again."
+                )
+            if not members:
+                raise ValueError(
+                    "This bundle holds no member layers, so there is nothing to "
+                    "build from. Import the source again."
+                )
 
             logger.info(
                 "Rebuilding artifacts for bundle %s from revision %d "

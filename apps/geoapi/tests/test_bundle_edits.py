@@ -42,6 +42,24 @@ def _allow_edit():
         yield
 
 
+def _edges_field_config():
+    """The edges layer's field_config as the import writes it.
+
+    Built from the spec so the two cannot drift: the endpoint reads the layer's
+    copy, which is what a real bundle carries.
+    """
+    from goatlib.models.bundle import BundleTypeName, get_spec
+
+    role = get_spec(BundleTypeName.street_network).role("edges")
+    config: dict = {}
+    for column, values in role.allowed_values.items():
+        config.setdefault(column, {})["allowed_values"] = list(values)
+        config[column]["allow_other"] = False
+    for column, value in role.default_values.items():
+        config.setdefault(column, {})["default_value"] = value
+    return config
+
+
 def _member(role="edges", user_id="owner-a"):
     return {
         "bundle_id": BUNDLE,
@@ -80,6 +98,7 @@ def _post(
     nodes_owner="owner-a",
     apply_raises=None,
     mocks: dict | None = None,
+    field_config=None,
 ):
     """Post a batch with the surrounding lookups stubbed.
 
@@ -120,11 +139,15 @@ def _post(
             "geoapi.routers.bundle_edits.member_layer_of_role",
             AsyncMock(return_value={"layer_id": LAYER, "user_id": nodes_owner}),
         ),
-        patch(
-            "geoapi.routers.bundle_edits.mark_artifacts_stale",
-            AsyncMock(return_value=None),
-        ),
         patch("geoapi.routers.bundle_edits.get_layer_info_sync"),
+        patch(
+            "geoapi.routers.bundle_edits._load_field_config",
+            AsyncMock(
+                return_value=(
+                    _edges_field_config() if field_config is None else field_config
+                )
+            ),
+        ),
         patch(
             "geoapi.routers.bundle_edits._invalidate_caches_and_pmtiles",
             AsyncMock(return_value=None),
@@ -214,10 +237,10 @@ def test_a_degenerate_edge_is_a_bad_request_not_a_server_error(client):
     )
     assert response.status_code == 400
     assert "same node" in response.json()["detail"]
-    # The write failed, so the claimed revision goes back (the client's base
-    # stays valid) and a rebuild is still queued over the staled artifacts.
+    # Handing the claimed revision back is the whole repair: the artifacts are
+    # current again at the revision they were built from, so no rebuild runs.
     mocks["release"].assert_awaited_once()
-    mocks["dispatch"].assert_awaited_once()
+    mocks["dispatch"].assert_not_awaited()
 
 
 def test_a_successful_save_reports_the_queued_rebuild(client):
@@ -241,20 +264,94 @@ def test_class_and_speed_defaults():
     """An unclassified edge must still be routable, and a footway must not be
     drivable: the build coalesces a null speed to 0, which the engine reads as
     impassable."""
-    from goatlib.models.bundle import CLASS_DEFAULT_MAXSPEED, ROUTING_CLASSES
+    from goatlib.models.bundle import CLASS_DEFAULT_MAXSPEED
 
-    from geoapi.routers.bundle_edits import DEFAULT_EDGE_CLASS, _fill_class_defaults
+    from geoapi.routers.bundle_edits import _fill_class_defaults
 
-    assert DEFAULT_EDGE_CLASS in ROUTING_CLASSES
-    filled = _fill_class_defaults({})
-    assert filled["class"] == DEFAULT_EDGE_CLASS
-    assert (
-        filled["speed_limit_kph_forward"] == CLASS_DEFAULT_MAXSPEED[DEFAULT_EDGE_CLASS]
-    )
+    # The default travels on the layer's field_config, the same place the
+    # editor read it from to preselect it.
+    config = _edges_field_config()
+    edge_class = config["class"]["default_value"]
+    assert edge_class in config["class"]["allowed_values"]
 
-    stated = _fill_class_defaults({"class": "footway"})
+    filled = _fill_class_defaults({}, config)
+    assert filled["class"] == edge_class
+    assert filled["speed_limit_kph_forward"] == CLASS_DEFAULT_MAXSPEED[edge_class]
+
+    # A cleared class falls back to the default rather than saving as blank —
+    # the editor sends "" and the web nulls it, so both spellings count as
+    # blank on a write that replaces the row whole.
+    assert _fill_class_defaults({"class": ""}, config)["class"] == edge_class
+    assert _fill_class_defaults({"class": None}, config)["class"] == edge_class
+
+    # A stated class wins, and its speeds follow from it rather than the default.
+    stated = _fill_class_defaults({"class": "footway"}, config)
     assert stated["class"] == "footway"
     assert "speed_limit_kph_forward" not in stated
+
+
+def test_a_cleared_class_is_defaulted_not_refused(client):
+    """The editor sends "" for a field the user emptied, and the type's default
+    is what an unclassified edge is meant to get — so the value has to be
+    validated as it will be written, after the default is filled in."""
+    response = _post(client, _payload(properties={"class": ""}))
+    assert response.status_code == 200, response.json()
+
+
+def test_a_layer_with_no_field_config_keeps_the_bundle_type_contract(client):
+    """field_config only exists on layers the current importer wrote (and only
+    where a PG pool is configured). The type's own vocabulary is the floor, or a
+    pre-existing network would accept a typo that the artifact build maps to a
+    drivable road."""
+    bogus = _post(client, _payload(properties={"class": "motorwayy"}), field_config={})
+    assert bogus.status_code == 400
+    assert "motorwayy" in bogus.json()["detail"]
+    # And a real class still saves.
+    assert (
+        _post(
+            client, _payload(properties={"class": "residential"}), field_config={}
+        ).status_code
+        == 200
+    )
+
+
+def test_the_type_supplies_the_class_default_when_the_layer_does_not():
+    """An edge drawn without a class on such a layer must not be written with
+    class NULL and NULL speeds: the build coalesces those to speed 0, which the
+    engine reads as impassable for cars."""
+    from goatlib.models.bundle import (
+        CLASS_DEFAULT_MAXSPEED,
+        BundleTypeName,
+        get_spec,
+    )
+
+    from geoapi.routers.bundle_edits import _fill_class_defaults, _with_role_contract
+
+    role = get_spec(BundleTypeName.street_network).role("edges")
+    floor = _with_role_contract({}, role)
+    filled = _fill_class_defaults({}, floor)
+    assert filled["class"] == role.default_values["class"]
+    assert filled["speed_limit_kph_forward"] == CLASS_DEFAULT_MAXSPEED[filled["class"]]
+
+    # The layer's own config wins where it has one, key by key: a narrowed
+    # vocabulary is a user's decision, and the floor only fills the silence.
+    narrowed = _with_role_contract({"class": {"allowed_values": ["residential"]}}, role)
+    assert narrowed["class"]["allowed_values"] == ["residential"]
+    assert narrowed["class"]["default_value"] == role.default_values["class"]
+
+
+def test_a_three_dimensional_edge_is_refused(client):
+    """A Z ordinate passes _validate_line and then dies mid-transaction with
+    "Inconsistent coordinate dimensionality", because the resolved vertices come
+    back as 2-tuples: refuse it up front instead."""
+    payload = _payload()
+    payload["create"][0]["geometry"]["coordinates"] = [
+        [11.0, 48.0, 515.0],
+        [11.001, 48.0, 517.0],
+    ]
+    response = _post(client, payload)
+    assert response.status_code == 400
+    assert "2D" in response.json()["detail"]
 
 
 # --- topology within one batch ---------------------------------------------
@@ -264,14 +361,14 @@ def test_a_second_split_lands_on_a_half_not_on_a_free_floating_node():
     """Two endpoints crossing the same street in one batch.
 
     The first crossing splits the street; the second must split the surviving
-    half. Before the halves were fed back as candidates, the second endpoint
-    fell through to MintNode and wrote a free-floating node on the half's
-    interior — a non-intersection the routing graph published silently.
+    half. Unless the halves are fed back as candidates, the second endpoint
+    falls through to MintNode and writes a free-floating node on a half's
+    interior — a non-intersection the routing graph publishes silently.
     """
     from goatlib.bundles.topology import EdgeCandidate, NodeCandidate
     from shapely.geometry import LineString
 
-    from geoapi.routers.bundle_edits import EdgeChanges, NodeChanges, _resolve_ends
+    from geoapi.routers.bundle_edits import EdgeChanges, NodeChanges, _Batch, _plan
 
     # ~111 m of street along the equator, where degrees ≈ metres / 111320 and
     # the 3857 projection is the identity scale.
@@ -281,45 +378,55 @@ def test_a_second_split_lands_on_a_half_not_on_a_free_floating_node():
         target_node="n-east",
         geometry=LineString([(0.0, 0.0), (111.32, 0.0)]),
     )
-    candidate_nodes = [
-        NodeCandidate(node_id="n-west", x=0.0, y=0.0),
-        NodeCandidate(node_id="n-east", x=111.32, y=0.0),
-    ]
-    candidate_edges = [street]
+    batch = _Batch(
+        con=None,
+        edges_table="edges",
+        nodes_table="nodes",
+        edge_columns=[],
+        node_columns=[],
+        candidate_nodes=[
+            NodeCandidate(node_id="n-west", x=0.0, y=0.0),
+            NodeCandidate(node_id="n-east", x=111.32, y=0.0),
+        ],
+        candidate_edges=[street],
+        references={"n-west": {"street"}, "n-east": {"street"}},
+        tolerance=1.0,
+        field_config=None,
+        edges=EdgeChanges(),
+        nodes=NodeChanges(),
+    )
 
     splits: list[str] = []
 
-    def record_split(con, table, columns, edge_id, fraction, left, right, node_id):
+    def record_split(con, table, columns, edge_id, fraction, left, right, node, fc):
         splits.append(edge_id)
 
-    edge_changes, node_changes = EdgeChanges(), NodeChanges()
     with (
         patch("geoapi.services.bundle_edit_service.insert_node_on_edge"),
         patch(
             "geoapi.services.bundle_edit_service.split_edge", side_effect=record_split
         ),
         patch("geoapi.services.bundle_edit_service.insert_node"),
+        # The node row is not written here, so its position is stubbed; the
+        # candidate coordinate the next crossing measures against is derived
+        # from the split edge itself, not from this.
+        patch(
+            "geoapi.services.bundle_edit_service.node_position",
+            return_value=(0.0, 0.0),
+        ),
     ):
         for crossing_lon in (0.0003, 0.0007):
-            _resolve_ends(
-                None,
-                "edges",
-                "nodes",
-                [],
-                [],
+            _plan(
+                batch,
                 {
                     "type": "LineString",
                     "coordinates": [[crossing_lon, 0.0], [crossing_lon, 0.0005]],
                 },
-                candidate_nodes,
-                candidate_edges,
-                edge_changes,
-                node_changes,
             )
 
     assert splits[0] == "street"
     assert len(splits) == 2
-    assert edge_changes.split[1].original_id in edge_changes.split[0].halves
+    assert batch.edges.split[1].original_id in batch.edges.split[0].halves
 
 
 # --- feature ids and no-op writes ------------------------------------------

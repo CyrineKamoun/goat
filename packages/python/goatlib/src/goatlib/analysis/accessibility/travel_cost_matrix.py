@@ -158,7 +158,8 @@ class TravelCostMatrixTool(AnalysisTool):
         cfg.output_path = params.output_path
 
         if params.routing_mode == RoutingMode.pt:
-            cfg.timetable_path = str(self._timetable_path)
+            # A selected PT bundle's timetable overrides the global network.
+            cfg.timetable_path = str(params.timetable_path or self._timetable_path)
             cfg.departure_time = self._pt_departure_unix_minutes(params)
             cfg.max_transfers = params.max_transfers
             cfg.access_mode = access_mode_map[params.access_mode]
