@@ -244,6 +244,8 @@ class TestLayerDeleteOwnership:
             "id": uuid.UUID("00000000-0000-0000-0000-000000000002"),
             "user_id": uuid.UUID("00000000-0000-0000-0000-000000000001"),
         }
+        # No bundle_layer row: a standalone layer, which is what this case is.
+        mock_pool.fetchval.return_value = None
         mock_pool.execute = AsyncMock()
         mock_pool.close = AsyncMock()
 
@@ -257,6 +259,35 @@ class TestLayerDeleteOwnership:
         assert owner_id == "00000000-0000-0000-0000-000000000001"
         # Verify DELETE was called
         mock_pool.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_verify_ownership_refuses_a_bundle_member(self, runner):
+        """A member layer goes with its bundle, never on its own.
+
+        Deleting one directly would leave the bundle whole and `ready` with a
+        role missing and its artifacts stale.
+        """
+        import uuid
+
+        mock_pool = AsyncMock()
+        mock_pool.fetchrow.return_value = {
+            "id": uuid.UUID("00000000-0000-0000-0000-000000000002"),
+            "user_id": uuid.UUID("00000000-0000-0000-0000-000000000001"),
+        }
+        mock_pool.fetchval.return_value = 1
+        mock_pool.execute = AsyncMock()
+        mock_pool.close = AsyncMock()
+
+        with patch.object(runner, "get_postgres_pool", return_value=mock_pool):
+            with pytest.raises(PermissionError, match="belongs to a bundle"):
+                await runner._verify_ownership_and_delete(
+                    layer_id="00000000-0000-0000-0000-000000000002",
+                    user_id="00000000-0000-0000-0000-000000000001",
+                )
+
+        # The owner is allowed to delete it, so the refusal must land before
+        # the DELETE, not after.
+        mock_pool.execute.assert_not_called()
 
 
 class TestLayerDeletePMTiles:
