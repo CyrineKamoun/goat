@@ -422,9 +422,22 @@ async def import_bundle(
                     "segments and connectors GeoParquet)"
                 ),
             )
-        validation = await run_in_threadpool(
-            get_importer(bundle_type).validate, tmp_path
-        )
+        try:
+            validation = await run_in_threadpool(
+                get_importer(bundle_type).validate, tmp_path
+            )
+        except ImportError as e:
+            # Validating this bundle type reads its payload, which needs the
+            # geospatial stack this service deliberately does not install
+            # (goatlib without the `full` extra). Refuse rather than accept an
+            # unvalidated upload.
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    f"validation of {bundle_type.value} bundles is not "
+                    f"available on this service"
+                ),
+            ) from e
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)

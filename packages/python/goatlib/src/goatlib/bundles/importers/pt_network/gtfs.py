@@ -15,8 +15,6 @@ import shutil
 import zipfile
 from typing import Dict, List, Optional, Set
 
-import duckdb
-
 from goatlib.bundles.importers.base import (
     BundleImporter,
     BundleMetadata,
@@ -281,6 +279,11 @@ class GtfsImporter(BundleImporter):
         they first appear past the sample. ``strict_mode=false`` also tolerates
         the minor RFC deviations real-world feeds commonly have.
         """
+        # Imported here, not at module scope: `core` depends on goatlib
+        # without the `full` extra, so it must be able to import this module
+        # (the registry does) without duckdb present. Only conversion needs it.
+        import duckdb
+
         src = txt_path.replace("'", "''")
         dst = out_path.replace("'", "''")
         con = duckdb.connect()

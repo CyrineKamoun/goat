@@ -22,26 +22,19 @@ import shutil
 import zipfile
 from typing import List, NamedTuple, Optional, Tuple
 
-import pyarrow.parquet as pq
-
 from goatlib.bundles.importers.base import (
     BundleImporter,
     ExtractedLayer,
     ValidationResult,
     register_importer,
 )
-from goatlib.bundles.importers.street_network.overture.flatten import flatten_network
-from goatlib.bundles.importers.street_network.overture.reader import (
-    OvertureReadError,
-    read_connectors,
-    read_segments,
-)
-from goatlib.bundles.importers.street_network.overture.splitter import split_network
-from goatlib.bundles.importers.street_network.overture.writer import (
-    write_edges,
-    write_nodes,
-)
 from goatlib.models.bundle import BundleTypeName
+
+# pyarrow, and the reader/splitter/flatten/writer modules that pull duckdb and
+# shapely, are imported inside the methods that use them rather than here.
+# Importing this module registers the importer, and `core` does exactly that
+# via the registry while depending on goatlib WITHOUT the `full` extra -- a
+# module-scope import of the geospatial stack makes core unable to start.
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +130,8 @@ class OvertureImporter(BundleImporter):
         )
 
     def _check_columns(self, source_path: str, entries: _Entries) -> List[str]:
+        import pyarrow.parquet as pq
+
         errors: List[str] = []
         with zipfile.ZipFile(source_path) as zf:
             for entry, required, label in (
@@ -164,6 +159,22 @@ class OvertureImporter(BundleImporter):
     # -- extraction --------------------------------------------------------
 
     def extract_layers(self, source_path: str, workdir: str) -> List[ExtractedLayer]:
+        from goatlib.bundles.importers.street_network.overture.flatten import (
+            flatten_network,
+        )
+        from goatlib.bundles.importers.street_network.overture.reader import (
+            OvertureReadError,
+            read_connectors,
+            read_segments,
+        )
+        from goatlib.bundles.importers.street_network.overture.splitter import (
+            split_network,
+        )
+        from goatlib.bundles.importers.street_network.overture.writer import (
+            write_edges,
+            write_nodes,
+        )
+
         segments_path, connectors_path = self._unpack(source_path, workdir)
 
         segments = read_segments(segments_path)
@@ -205,6 +216,10 @@ class OvertureImporter(BundleImporter):
         ]
 
     def _unpack(self, source_path: str, workdir: str) -> Tuple[str, str]:
+        from goatlib.bundles.importers.street_network.overture.reader import (
+            OvertureReadError,
+        )
+
         """Extract the two GeoParquet entries to ``workdir``, flattening paths."""
         with zipfile.ZipFile(source_path) as zf:
             entries = _locate(zf.namelist())
