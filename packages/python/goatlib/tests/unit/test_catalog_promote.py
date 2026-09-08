@@ -9,7 +9,7 @@ from pathlib import Path
 
 import duckdb
 import pytest
-from goatlib.tools.catalog_promote import (
+from goatlib.catalog.promote import (
     CatalogItemNotFoundError,
     _jsonable,
     layer_type,
