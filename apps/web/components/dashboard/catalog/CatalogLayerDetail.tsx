@@ -21,7 +21,7 @@ import {
   DetailHeader,
   DetailTabs,
   KeywordSection,
-  AttributionHint,
+  LicenseNotices,
   LicenseBadge,
   LicenseTerms,
   type MetaField,
@@ -70,7 +70,6 @@ const CatalogLayerDetail = ({
   const title = inBundle ? props.title : collection?.title || props.title;
   // `other` is STAC's "unknown", not a licence — see `licenseLabel`.
   const licenseLabel = labels.licenseLabel(props.license);
-  // The item's own licence link, else the dataset's, else its source page.
   const licenseHref =
     linkHref(item.links, "license") ??
     linkHref(collection?.links, "license") ??
@@ -129,10 +128,10 @@ const CatalogLayerDetail = ({
       label: t("metadata.headings.language"),
       value: labels.languageLabel(props.language?.code),
     },
-    // Attribution rides with the licence in every case, not just an unnamed one:
-    // 92% of notices sit on a named CC-BY / DL-DE-BY licence, whose "BY" IS the
-    // obligation to reproduce them.
-    (!!licenseLabel || !!licenseHref || !!collection?.attribution) && {
+    (!!licenseLabel ||
+      !!licenseHref ||
+      !!collection?.attribution ||
+      !!props["processing:lineage"]) && {
       icon: ICON_NAME.LICENSE,
       label: t("metadata.headings.license"),
       value: (
@@ -142,7 +141,10 @@ const CatalogLayerDetail = ({
           ) : (
             <LicenseTerms href={licenseHref} />
           )}
-          {collection?.attribution && <AttributionHint attribution={collection?.attribution} />}
+          <LicenseNotices
+            attribution={collection?.attribution}
+            lineage={props["processing:lineage"]}
+          />
         </Stack>
       ),
     },

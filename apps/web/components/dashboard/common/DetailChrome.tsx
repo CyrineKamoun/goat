@@ -406,7 +406,7 @@ export const LicenseBadge = ({ license, href }: { license: string; href?: string
   );
 };
 
-/** Where the licence has no name: point at the terms instead. */
+/** Where the licence has no name: link its terms. */
 export const LicenseTerms = ({ href }: { href?: string }) => {
   const { t } = useTranslation("common");
   if (!href) return null;
@@ -422,23 +422,57 @@ export const LicenseTerms = ({ href }: { href?: string }) => {
   );
 };
 
-/** The notice behind an info icon: these run to 830 characters, too long to set inline. */
-export const AttributionHint = ({ attribution }: { attribution: string }) => {
+export const LicenseNotices = ({
+  attribution,
+  lineage,
+}: {
+  attribution?: string | null;
+  lineage?: string | null;
+}) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
+  if (!attribution && !lineage) return null;
+  const notice = (heading: string, body: string) => (
+    <Box sx={{ "&:not(:first-of-type)": { mt: 0.5 } }}>
+      <Typography
+        component="span"
+        sx={{
+          display: "block",
+          fontSize: 9,
+          fontWeight: 700,
+          lineHeight: 1,
+          mb: 0.125,
+          letterSpacing: 0.5,
+          textTransform: "uppercase",
+          opacity: 0.7,
+        }}>
+        {heading}
+      </Typography>
+      {body}
+    </Box>
+  );
   return (
     <Tooltip
-      title={attribution}
       placement="top"
-      slotProps={{ tooltip: { sx: { maxWidth: 320, whiteSpace: "pre-wrap" } } }}>
-      <Box component="span" sx={{ display: "inline-flex", cursor: "help" }}>
+      slotProps={{
+        tooltip: {
+          sx: { maxWidth: 320, whiteSpace: "pre-wrap", py: 0.25, px: 1, lineHeight: 1.25 },
+        },
+      }}
+      title={
+        <>
+          {attribution && notice(t("metadata.headings.attribution"), attribution)}
+          {lineage && notice(t("metadata.headings.lineage"), lineage)}
+        </>
+      }>
+      <Box component="span" tabIndex={0} sx={{ display: "inline-flex", cursor: "help" }}>
         <Icon
           iconName={ICON_NAME.CIRCLEINFO}
           style={{ fontSize: 12 }}
           htmlColor={theme.palette.text.secondary}
         />
         <Box component="span" sx={visuallyHidden}>
-          {t("metadata.headings.attribution")}
+          {t("metadata.headings.license")}
         </Box>
       </Box>
     </Tooltip>

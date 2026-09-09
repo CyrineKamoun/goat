@@ -93,6 +93,7 @@ export type CatalogItemProperties = {
    * and 569 of 1,207 bundles mix geometry types.
    */
   "goat:member_count"?: number | null;
+  "processing:lineage"?: string | null;
   "table:row_count"?: number | null;
   "table:columns"?: CatalogColumn[] | null;
   themes?: CatalogTheme[] | null;

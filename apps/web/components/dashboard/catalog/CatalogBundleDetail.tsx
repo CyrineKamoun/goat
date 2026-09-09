@@ -18,7 +18,7 @@ import {
   DetailHeader,
   DetailTabs,
   KeywordSection,
-  AttributionHint,
+  LicenseNotices,
   LicenseBadge,
   LicenseTerms,
   type MetaField,
@@ -58,7 +58,6 @@ const CatalogBundleDetail = ({
   const dataDate = labels.periodField(datasetPeriod(collection, members));
   // `other` is STAC's "unknown", not a licence — see `licenseLabel`.
   const licenseLabel = labels.licenseLabel(collection.license);
-  // The licence link where the source published one, else its source page.
   const licenseHref =
     linkHref(collection.links, "license") ?? linkHref(collection.links, "via");
   const allSaved = members.length > 0 && members.every((member) => starred[member.id]);
@@ -79,9 +78,6 @@ const CatalogBundleDetail = ({
       label: t("metadata.headings.geographical_code"),
       value: labels.regionLabel(collection["goat:geographical_code"]),
     },
-    // Attribution rides with the licence in every case, not just an unnamed one:
-    // 92% of notices sit on a named CC-BY / DL-DE-BY licence, whose "BY" IS the
-    // obligation to reproduce them.
     (!!licenseLabel || !!licenseHref || !!collection.attribution) && {
       icon: ICON_NAME.LICENSE,
       label: t("metadata.headings.license"),
@@ -92,7 +88,7 @@ const CatalogBundleDetail = ({
           ) : (
             <LicenseTerms href={licenseHref} />
           )}
-          {collection.attribution && <AttributionHint attribution={collection.attribution} />}
+          <LicenseNotices attribution={collection.attribution} />
         </Stack>
       ),
     },

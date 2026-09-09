@@ -88,14 +88,6 @@ export const useCatalogFacetBuckets = ({
   /** The value universe, carrying current counts — zero for a value the filters exclude. */
   const buckets: Record<string, CatalogAggregationBucket[]> = {};
   for (const facet of facets) {
-    // Applied to the baseline too, or the value returns as a zero-count row.
-    const suppressed = FACET_HIDDEN_VALUES[facet.name];
-    const offered = (list: CatalogAggregationBucket[]) =>
-      // A null key is the server's "no value stated" bucket, never a named one.
-      suppressed
-        ? list.filter((bucket) => bucket.key == null || !suppressed.has(bucket.key))
-        : list;
-
     const current = new Map(
       (data?.[facet.name] ?? []).map((bucket) => [bucket.key, bucket] as const)
     );
@@ -103,12 +95,19 @@ export const useCatalogFacetBuckets = ({
     if (!universe) {
       // Until the baseline lands, show what the filtered query returned rather
       // than nothing.
-      buckets[facet.name] = offered(data?.[facet.name] ?? []);
-      continue;
+      buckets[facet.name] = data?.[facet.name] ?? [];
+    } else {
+      buckets[facet.name] = universe.map(
+        (bucket) => current.get(bucket.key) ?? { ...bucket, frequency: 0 }
+      );
     }
-    buckets[facet.name] = offered(universe).map(
-      (bucket) => current.get(bucket.key) ?? { ...bucket, frequency: 0 }
-    );
+
+    const suppressed = FACET_HIDDEN_VALUES[facet.name];
+    if (suppressed) {
+      buckets[facet.name] = buckets[facet.name].filter(
+        (bucket) => bucket.key === null || !suppressed.has(bucket.key)
+      );
+    }
   }
 
   return { buckets, isLoading, isError: error };

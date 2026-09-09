@@ -46,6 +46,7 @@ _ITEM_COLUMNS = [
     "title",
     "description",
     "license",
+    "attribution",
     "category",
     "publisher",
     "keywords",
