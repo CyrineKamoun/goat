@@ -2862,6 +2862,7 @@
   "n_datasets_one": "{{count}} Datensatz",
   "n_layers": "{{count}} Layer",
   "n_layers_one": "{{count}} Layer",
+  "sort_relevance": "Relevanz",
   "sort_last_updated": "Zuletzt aktualisiert",
   "sort_title_asc": "A–Z",
   "sort_title_desc": "Z–A",

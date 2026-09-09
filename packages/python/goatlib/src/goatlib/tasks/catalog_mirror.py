@@ -101,7 +101,9 @@ __all__ = [
 #: v8: items inherit their collection's `attribution` — the notice an
 #:     attribution licence obliges the user to reproduce. It is published on the
 #:     Collection only, and has to reach a layer the way `license` does.
-MIRROR_FORMAT_VERSION = 8
+#: v9: `goat:topicRelevance` on a Collection — Plan4Better's topic relevance
+#:     tier, one input to relevance rather than all of it.
+MIRROR_FORMAT_VERSION = 9
 
 ITEMS_FILENAME = "items.parquet"
 COLLECTIONS_FILENAME = "collections.parquet"
@@ -141,6 +143,8 @@ GUARANTEED_COLLECTION_COLUMNS: tuple[tuple[str, str], ...] = (
     ("datetime", "TIMESTAMPTZ"),
     ("datetime_start", "TIMESTAMPTZ"),
     ("datetime_end", "TIMESTAMPTZ"),
+    # Named in the service's own ORDER BY, so an older file yields typed NULLs.
+    ("goat:topicRelevance", "VARCHAR"),
 )
 
 #: Physical row order of the written files -- what a reader's row-group

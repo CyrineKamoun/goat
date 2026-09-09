@@ -135,7 +135,11 @@ def test_collection_queryables_404(client: TestClient) -> None:
 
 
 def test_collections_datetime_param(client: TestClient) -> None:
-    r = client.get("/stac/collections", params={"datetime": "2026-01-01T00:00:00Z/.."})
+    # `limit` past the default page: the relevance order moves src-1 off it.
+    r = client.get(
+        "/stac/collections",
+        params={"datetime": "2026-01-01T00:00:00Z/..", "limit": 200},
+    )
     assert r.status_code == 200
     body = r.json()
     assert body["numberMatched"] >= 1

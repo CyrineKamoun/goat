@@ -23,6 +23,7 @@ import duckdb
 from pydantic import BaseModel, ConfigDict, Field
 
 from catalog.errors import ApiError
+from catalog.relevance import HOME_RANK_SQL, RELEVANCE_RANK_SQL, SIZE_RANK_SQL
 from catalog.services.registry import Queryable, QueryableRegistry
 from catalog.store import CatalogStore
 
@@ -771,6 +772,14 @@ def _build_order_by(
     q_terms = _parse_q_terms(p.q)
     if q_terms and not p.sortby:
         prefix += _q_rank_sql(q_terms, add) + ", "
+
+    # Place outranks the tier because the tier says how useful a dataset is FOR
+    # ITS OWN PLACE, so it cannot say which place. Gated on the tier column, which
+    # only collections carry.
+    if not p.sortby and registry.resolve("relevance") is not None:
+        prefix += f"{HOME_RANK_SQL} DESC, "
+        prefix += f"{RELEVANCE_RANK_SQL} DESC, "
+        prefix += f"{SIZE_RANK_SQL} DESC, "
 
     if not p.sortby:
         # `id` as the tiebreaker: `updated` is far from unique (3,834 datasets
