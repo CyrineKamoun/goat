@@ -233,6 +233,11 @@ export const SectionCard = ({
         boxShadow: surfaceShadows(theme).rest,
         p: pad,
         overflow: bleed ? "hidden" : undefined,
+        // Harvested metadata is arbitrary text: publisher names, keywords and
+        // URLs arrive with single tokens wider than the card, which the default
+        // `normal` will not break and so spills past the border. Inherited, so
+        // one declaration covers every panel body.
+        overflowWrap: "anywhere",
       }}>
       {title && (
         <Stack direction="row" alignItems="baseline" spacing={3} sx={{ mb: note ? 1.5 : 3.5 }}>
