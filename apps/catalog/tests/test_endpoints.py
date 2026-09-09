@@ -73,6 +73,42 @@ def test_landing_conformsto_in_body(client: TestClient) -> None:
     assert any("queryables" in rel for rel in rels)
 
 
+def test_forwarded_proto_sets_href_scheme(client: TestClient) -> None:
+    """Behind a TLS-terminating proxy every absolute href must be https.
+
+    An http asset href on an https page is active mixed content, which the
+    browser blocks -- the style then never loads and the preview falls back to
+    an unstyled footprint.
+    """
+    plain = client.get("/stac").json()
+    assert next(
+        link["href"] for link in plain["links"] if link["rel"] == "self"
+    ).startswith("http://")
+
+    fwd = client.get("/stac", headers={"X-Forwarded-Proto": "https"}).json()
+    for link in fwd["links"]:
+        assert not link["href"].startswith("http://"), link
+
+    # Asset hrefs are built from the same base, and are the ones the browser fetches.
+    items = client.get(
+        "/stac/collections/src-1/items", headers={"X-Forwarded-Proto": "https"}
+    ).json()
+    for feature in items["features"]:
+        for asset in (feature.get("assets") or {}).values():
+            assert not asset["href"].startswith("http://"), asset
+
+
+def test_forwarded_proto_ignores_junk(client: TestClient) -> None:
+    """Only a scheme this API is served over, and only the first proxy's value."""
+    first = client.get("/stac", headers={"X-Forwarded-Proto": "https, http"}).json()
+    first_self = next(link["href"] for link in first["links"] if link["rel"] == "self")
+    assert first_self.startswith("https://")
+
+    junk = client.get("/stac", headers={"X-Forwarded-Proto": "gopher"}).json()
+    junk_self = next(link["href"] for link in junk["links"] if link["rel"] == "self")
+    assert junk_self.startswith("http://")
+
+
 def test_queryables_media_type(client: TestClient) -> None:
     r = client.get("/stac/queryables")
     assert r.status_code == 200
