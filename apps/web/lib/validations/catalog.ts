@@ -126,6 +126,8 @@ export type CatalogCollection = {
   title?: string | null;
   description?: string | null;
   license?: string | null;
+  /** The notice an attribution licence obliges a user to reproduce. */
+  attribution?: string | null;
   keywords?: string[] | null;
   providers?: {
     name: string;

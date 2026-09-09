@@ -18,11 +18,14 @@ import {
   DetailHeader,
   DetailTabs,
   KeywordSection,
+  AttributionHint,
   LicenseBadge,
+  LicenseTerms,
   type MetaField,
   MetaSidebar,
   SectionCard,
 } from "@/components/dashboard/common/DetailChrome";
+import MarkdownProse from "@/components/dashboard/common/MarkdownProse";
 
 /** A bundle: the dataset's description, its layers as result cards, and the shared metadata beside them. */
 const CatalogBundleDetail = ({
@@ -55,6 +58,9 @@ const CatalogBundleDetail = ({
   const dataDate = labels.periodField(datasetPeriod(collection, members));
   // `other` is STAC's "unknown", not a licence — see `licenseLabel`.
   const licenseLabel = labels.licenseLabel(collection.license);
+  // The licence link where the source published one, else its source page.
+  const licenseHref =
+    linkHref(collection.links, "license") ?? linkHref(collection.links, "via");
   const allSaved = members.length > 0 && members.every((member) => starred[member.id]);
 
   const fields: (MetaField | false | undefined)[] = [
@@ -73,10 +79,22 @@ const CatalogBundleDetail = ({
       label: t("metadata.headings.geographical_code"),
       value: labels.regionLabel(collection["goat:geographical_code"]),
     },
-    !!licenseLabel && {
+    // Attribution rides with the licence in every case, not just an unnamed one:
+    // 92% of notices sit on a named CC-BY / DL-DE-BY licence, whose "BY" IS the
+    // obligation to reproduce them.
+    (!!licenseLabel || !!licenseHref || !!collection.attribution) && {
       icon: ICON_NAME.LICENSE,
       label: t("metadata.headings.license"),
-      value: <LicenseBadge license={licenseLabel} href={linkHref(collection.links, "license")} />,
+      value: (
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          {licenseLabel ? (
+            <LicenseBadge license={licenseLabel} href={licenseHref} />
+          ) : (
+            <LicenseTerms href={licenseHref} />
+          )}
+          {collection.attribution && <AttributionHint attribution={collection.attribution} />}
+        </Stack>
+      ),
     },
     // A Collection states its time as `extent.temporal`, and since 2026-08-04 it does so on every row — so the extent wins here and the fallback to the layers' own dates covers only a Collection that states nothing.
     !!dataDate && {
@@ -139,9 +157,7 @@ const CatalogBundleDetail = ({
         <Stack spacing={4} sx={{ flex: 1, minWidth: 0 }}>
           <SectionCard title={t("metadata.headings.description")}>
             {collection.description ? (
-              <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
-                {collection.description}
-              </Typography>
+              <MarkdownProse>{collection.description}</MarkdownProse>
             ) : (
               <Typography variant="body2" color="text.secondary">
                 {t("catalog_no_description")}

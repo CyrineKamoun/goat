@@ -98,7 +98,10 @@ __all__ = [
 #:     `extent.temporal` states a closed one.
 #: v7: `thumbnail_item` — which layer's thumbnail stands for the dataset, so a
 #:     dataset card has a picture without fetching its members.
-MIRROR_FORMAT_VERSION = 7
+#: v8: items inherit their collection's `attribution` — the notice an
+#:     attribution licence obliges the user to reproduce. It is published on the
+#:     Collection only, and has to reach a layer the way `license` does.
+MIRROR_FORMAT_VERSION = 8
 
 ITEMS_FILENAME = "items.parquet"
 COLLECTIONS_FILENAME = "collections.parquet"
@@ -552,6 +555,7 @@ def build_mirror(
             "goat:layerType",
             "goat:geographical_code",
             "license",
+            "attribution",
             "publisher",
             "category",
             "description",
@@ -568,6 +572,8 @@ def build_mirror(
                 {_text(geographical_code)}                    AS "goat:geographical_code",
                 {_text(f"COALESCE({item_expr(_opt(items, 'license', 'i.license'))}, "
                        f"{coll_expr(_opt(collections, 'license', 'c.license'))})")} AS license,
+                {_text(f"COALESCE({item_expr(_opt(items, 'attribution', 'i.attribution'))}, "
+                       f"{coll_expr(_opt(collections, 'attribution', 'c.attribution'))})")} AS attribution,
                 {_text(publisher)}                             AS publisher,
                 {_text(f"COALESCE({item_expr(_first_theme(items, 'i'))}, "
                        f"{coll_expr(_first_theme(collections, 'c'))})")} AS category,

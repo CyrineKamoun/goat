@@ -8,6 +8,8 @@ import {
 import { fetcher } from "@/lib/api/fetcher";
 import type { CatalogAggregationBucket, CatalogAggregations } from "@/lib/validations/catalog";
 
+import { FACET_HIDDEN_VALUES } from "@/hooks/catalog/useCatalogFacetSections";
+
 /** Facet counts, each computed with that facet's *own* selection excluded. */
 export const useCatalogFacetBuckets = ({
   facets,
@@ -86,6 +88,14 @@ export const useCatalogFacetBuckets = ({
   /** The value universe, carrying current counts — zero for a value the filters exclude. */
   const buckets: Record<string, CatalogAggregationBucket[]> = {};
   for (const facet of facets) {
+    // Applied to the baseline too, or the value returns as a zero-count row.
+    const suppressed = FACET_HIDDEN_VALUES[facet.name];
+    const offered = (list: CatalogAggregationBucket[]) =>
+      // A null key is the server's "no value stated" bucket, never a named one.
+      suppressed
+        ? list.filter((bucket) => bucket.key == null || !suppressed.has(bucket.key))
+        : list;
+
     const current = new Map(
       (data?.[facet.name] ?? []).map((bucket) => [bucket.key, bucket] as const)
     );
@@ -93,10 +103,10 @@ export const useCatalogFacetBuckets = ({
     if (!universe) {
       // Until the baseline lands, show what the filtered query returned rather
       // than nothing.
-      buckets[facet.name] = data?.[facet.name] ?? [];
+      buckets[facet.name] = offered(data?.[facet.name] ?? []);
       continue;
     }
-    buckets[facet.name] = universe.map(
+    buckets[facet.name] = offered(universe).map(
       (bucket) => current.get(bucket.key) ?? { ...bucket, frequency: 0 }
     );
   }

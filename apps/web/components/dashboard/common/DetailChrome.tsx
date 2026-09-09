@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Chip, Link as MuiLink, Stack, Typography, useTheme } from "@mui/material";
+import { Box, Chip, Link as MuiLink, Stack, Tooltip, Typography, useTheme } from "@mui/material";
+import { visuallyHidden } from "@mui/utils";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
@@ -402,6 +403,45 @@ export const LicenseBadge = ({ license, href }: { license: string; href?: string
     <MuiLink href={target} target="_blank" rel="noreferrer noopener" underline="none" title={license}>
       {badge}
     </MuiLink>
+  );
+};
+
+/** Where the licence has no name: point at the terms instead. */
+export const LicenseTerms = ({ href }: { href?: string }) => {
+  const { t } = useTranslation("common");
+  if (!href) return null;
+  return (
+    <MuiLink
+      href={href}
+      target="_blank"
+      rel="noreferrer noopener"
+      variant="body2"
+      sx={{ overflowWrap: "anywhere" }}>
+      {t("catalog_license_terms_at_source")}
+    </MuiLink>
+  );
+};
+
+/** The notice behind an info icon: these run to 830 characters, too long to set inline. */
+export const AttributionHint = ({ attribution }: { attribution: string }) => {
+  const { t } = useTranslation("common");
+  const theme = useTheme();
+  return (
+    <Tooltip
+      title={attribution}
+      placement="top"
+      slotProps={{ tooltip: { sx: { maxWidth: 320, whiteSpace: "pre-wrap" } } }}>
+      <Box component="span" sx={{ display: "inline-flex", cursor: "help" }}>
+        <Icon
+          iconName={ICON_NAME.CIRCLEINFO}
+          style={{ fontSize: 12 }}
+          htmlColor={theme.palette.text.secondary}
+        />
+        <Box component="span" sx={visuallyHidden}>
+          {t("metadata.headings.attribution")}
+        </Box>
+      </Box>
+    </Tooltip>
   );
 };
 

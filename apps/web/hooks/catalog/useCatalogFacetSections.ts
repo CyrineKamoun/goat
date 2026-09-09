@@ -67,6 +67,15 @@ const MIN_BUCKETS_TO_OFFER = 2;
 export const FACET_HIDDEN = new Set(["geographical_code"]);
 
 /**
+ * Bucket values a facet does not offer. `other` is STAC's "unknown", not a
+ * licence, so it is not a choice to offer; the detail page states the terms
+ * instead. Still filterable through the API — this narrows the picker only.
+ */
+export const FACET_HIDDEN_VALUES: Record<string, Set<string>> = {
+  license: new Set(["other", "proprietary"]),
+};
+
+/**
  * Sidebar order, most-asked question first.
  *
  * The server returns aggregations in mirror-column order, which put Geometry above
