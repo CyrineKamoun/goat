@@ -49,8 +49,6 @@ from typing import Any
 import duckdb
 from goatlib.tasks.catalog_mirror import build_mirror
 
-from catalog.relevance import TOPIC_TIERS
-
 TOPICS = [
     "Flurstücke",
     "Radverkehrsnetz",
@@ -581,6 +579,10 @@ def _build_collection_document(
     }
 
 
+#: The published vocabulary, best first, with its score (7, 5, 3, 1).
+_TOPIC_TIERS = ("base", "statutory", "nice_to_have", "low_priority")
+
+
 def build_document(
     row: Row, member_bboxes: list[list[float]] | None = None
 ) -> dict[str, Any]:
@@ -682,8 +684,8 @@ def _write_published(
         doc = build_document(row, members.get(row.id))
         if doc.get("type") == "Collection":
             out = {k: norm(k, v) for k, v in doc.items() if k != "type"}
-            at = row.idx % len(TOPIC_TIERS)
-            out["goat:topicRelevance"] = TOPIC_TIERS[at]
+            at = row.idx % len(_TOPIC_TIERS)
+            out["goat:topicRelevance"] = _TOPIC_TIERS[at]
             out["goat:topicRelevanceScore"] = 7 - at * 2
         else:
             out = {k: v for k, v in doc.items() if k in structural}
