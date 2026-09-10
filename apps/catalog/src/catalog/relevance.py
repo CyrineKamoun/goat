@@ -2,7 +2,12 @@
 
 TOPIC_FIELD = "goat:topicRelevance"
 
-#: Best first. The order IS the ranking -- every weight below derives from it.
+#: The published score, HIGHER IS BETTER. Ordering reads this, never the tier
+#: name: the harvester owns that vocabulary, and a rename or a new tier there
+#: must not need a release here.
+TOPIC_SCORE_FIELD = "goat:topicRelevanceScore"
+
+#: For a facet label and the test fixture. Nothing orders by these.
 TOPIC_TIERS: tuple[str, ...] = (
     "base",
     "statutory",
@@ -10,16 +15,11 @@ TOPIC_TIERS: tuple[str, ...] = (
     "low_priority",
 )
 
-#: Nothing known is worth no more than known-to-be-marginal, and no less.
+#: What an unscored row gets: the bottom of the published scale. Nothing
+#: known is worth no more than known-to-be-marginal, and no less.
 UNGRADED_RELEVANCE = 1
 
-RELEVANCE_RANK_SQL = "CASE {} ELSE {} END".format(
-    " ".join(
-        f"WHEN \"{TOPIC_FIELD}\" = '{tier}' THEN {len(TOPIC_TIERS) - i}"
-        for i, tier in enumerate(TOPIC_TIERS)
-    ),
-    UNGRADED_RELEVANCE,
-)
+RELEVANCE_RANK_SQL = f'COALESCE("{TOPIC_SCORE_FIELD}", {UNGRADED_RELEVANCE})'
 
 #: Where the viewer is. A stand-in for their organisation's own country, applied
 #: here rather than baked into a grade, so the tier stays country-neutral.

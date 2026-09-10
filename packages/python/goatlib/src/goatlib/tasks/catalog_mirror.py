@@ -102,7 +102,8 @@ __all__ = [
 #:     attribution licence obliges the user to reproduce. It is published on the
 #:     Collection only, and has to reach a layer the way `license` does.
 #: v9: `goat:topicRelevance` on a Collection — Plan4Better's topic relevance
-#:     tier, one input to relevance rather than all of it.
+#:     tier — with `goat:topicRelevanceScore`, the same judgement as a number so
+#:     ordering needs no knowledge of that vocabulary. Higher is better.
 MIRROR_FORMAT_VERSION = 9
 
 ITEMS_FILENAME = "items.parquet"
@@ -145,6 +146,7 @@ GUARANTEED_COLLECTION_COLUMNS: tuple[tuple[str, str], ...] = (
     ("datetime_end", "TIMESTAMPTZ"),
     # Named in the service's own ORDER BY, so an older file yields typed NULLs.
     ("goat:topicRelevance", "VARCHAR"),
+    ("goat:topicRelevanceScore", "BIGINT"),
 )
 
 #: Physical row order of the written files -- what a reader's row-group

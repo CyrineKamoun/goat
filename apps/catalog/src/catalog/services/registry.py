@@ -38,7 +38,7 @@ schema). Everything else comes from the file.
 from dataclasses import dataclass
 from typing import Any
 
-from catalog.relevance import RELEVANCE_RANK_SQL, TOPIC_FIELD
+from catalog.relevance import RELEVANCE_RANK_SQL, TOPIC_SCORE_FIELD
 
 _GEOJSON_GEOMETRY_SCHEMA = "https://geojson.org/schema/Geometry.json"
 
@@ -184,6 +184,7 @@ _FIELD_DEFS: dict[str, _Seed] = {
     ),
     # Not facetable: a ranking input, not a filter a reader would pick from.
     "goat:topicRelevance": _Seed("Plan4Better topic relevance tier"),
+    "goat:topicRelevanceScore": _Seed("Topic relevance as a score, higher first"),
     "year": _Seed("Calendar year of the data", json_type="integer", filter_param=True),
 }
 
@@ -214,7 +215,7 @@ _VIRTUAL_FIELDS: dict[str, _Virtual] = {
     "relevance": _Virtual(
         expr=RELEVANCE_RANK_SQL,
         json_type="integer",
-        requires=TOPIC_FIELD,
+        requires=TOPIC_SCORE_FIELD,
     ),
     # The year a row's data STARTS in -- not every year it covers. A single
     # expression cannot say "overlaps 2016" (that needs two comparisons), and

@@ -682,7 +682,9 @@ def _write_published(
         doc = build_document(row, members.get(row.id))
         if doc.get("type") == "Collection":
             out = {k: norm(k, v) for k, v in doc.items() if k != "type"}
-            out["goat:topicRelevance"] = TOPIC_TIERS[row.idx % len(TOPIC_TIERS)]
+            at = row.idx % len(TOPIC_TIERS)
+            out["goat:topicRelevance"] = TOPIC_TIERS[at]
+            out["goat:topicRelevanceScore"] = 7 - at * 2
         else:
             out = {k: v for k, v in doc.items() if k in structural}
             bbox = doc.get("bbox")

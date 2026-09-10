@@ -102,6 +102,7 @@ _COLLECTION_COLUMNS_SQL = """
     datetime_end TIMESTAMPTZ,
     "goat:geometryType" VARCHAR,
     "goat:topicRelevance" VARCHAR,
+    "goat:topicRelevanceScore" BIGINT,
     thumbnail_item VARCHAR,
     bbox_xmin DOUBLE,
     bbox_ymin DOUBLE,
