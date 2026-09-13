@@ -185,6 +185,25 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
     }
   }, [geometryType]);
 
+  /**
+   * Run the mode reconciler again when nothing it watches has changed.
+   *
+   * The reconciler below derives the control's mode from the store, so it runs
+   * when the store changes. Two things move without the store hearing them:
+   * the control leaving a draw mode on its own (Escape deletes the half-drawn
+   * shape and drops to simple_select), and a save emptying the canvas under a
+   * control already resting there. Both leave the toolbar showing a tool that
+   * the control is no longer holding, and the next click does nothing.
+   *
+   * On the next frame, because every caller is mid-transition: a mode event
+   * fires before the control's selection settles, and a save dispatches before
+   * the state those dispatches produce has been rendered.
+   */
+  const [drawSyncNonce, setDrawSyncNonce] = useState(0);
+  const requestDrawSync = useCallback(() => {
+    requestAnimationFrame(() => setDrawSyncNonce((n) => n + 1));
+  }, []);
+
   // Sync draw mode with Redux state
   // Put whatever is selected into MapboxDraw's editing mode for its geometry.
   const selectForEditing = useCallback(
@@ -305,6 +324,10 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
     mode,
     activeLayerId,
     activeFeatureId,
+    // Not state of its own: the nonce is how a change the store cannot see
+    // (the control leaving draw mode, a save emptying the canvas) asks for the
+    // same reconciliation the store's own changes get.
+    drawSyncNonce,
     drawControl,
     dispatch,
     getDrawMode,
@@ -625,6 +648,24 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
     };
   }, [mapRef, drawControl, activeLayerId, handleFeatureCreate, handleFeatureUpdate, handleMapClick]);
 
+  // The control can leave a draw mode on its own — Escape is the one users
+  // hit. Reconciling on every landing in simple_select covers that without
+  // naming the key: finishing a shape lands there too, and the reconciler
+  // keeps that selection rather than arming over it.
+  useEffect(() => {
+    const map = mapRef?.current?.getMap();
+    if (!map || !drawControl || !activeLayerId) return;
+
+    const onModeChange = (e: { mode: string }) => {
+      if (e.mode === MapboxDraw.constants.modes.SIMPLE_SELECT) requestDrawSync();
+    };
+
+    map.on("draw.modechange", onModeChange);
+    return () => {
+      map.off("draw.modechange", onModeChange);
+    };
+  }, [mapRef, drawControl, activeLayerId, requestDrawSync]);
+
   // Clean up when editing stops
   useEffect(() => {
     if (!activeLayerId && drawControl) {
@@ -874,6 +915,7 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
         if (!result) return;
         drawControl?.deleteAll();
         dispatch(clearPendingFeatures());
+        requestDrawSync();
         toast.success(t("features_saved"));
         refreshAfterSave([activeLayerId, result.nodes_layer_id]);
       } catch (error) {
@@ -937,6 +979,7 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
       // Clean up MapboxDraw before clearing Redux state
       drawControl?.deleteAll();
       dispatch(clearPendingFeatures());
+      requestDrawSync();
       toast.success(t("features_saved"));
       refreshAfterSave([activeLayerId]);
     } catch (error) {
@@ -955,6 +998,7 @@ export function useFeatureEditor(mapRef: React.RefObject<MapRef | null> | null) 
     isMembershipUnresolved,
     saveBundleEdits,
     refreshAfterSave,
+    requestDrawSync,
   ]);
 
   // --- Discard handler ---
