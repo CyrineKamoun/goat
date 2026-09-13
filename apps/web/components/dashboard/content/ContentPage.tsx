@@ -1,16 +1,6 @@
 "use client";
 
-import {
-  Box,
-  Button,
-  Chip,
-  Stack,
-  SwipeableDrawer,
-  Typography,
-  alpha,
-  useMediaQuery,
-  useTheme,
-} from "@mui/material";
+import { Box, Button, Stack, SwipeableDrawer, useMediaQuery, useTheme } from "@mui/material";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import type { DragEvent } from "react";
