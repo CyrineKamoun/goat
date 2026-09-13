@@ -5,16 +5,17 @@ import { useEffect, useMemo, useState } from "react";
 import type { ContentItem, ContentPage } from "@/lib/validations/content";
 
 /** Whether a page already accumulated is the one just fetched. SWR hands
- * back fresh objects on every revalidation, so the rows are compared by what
- * identifies them and by when they last changed, not by reference — storing
- * an equal page again would re-render for nothing, and re-render endlessly
- * where the fetched object is new on every render. */
+ * back fresh objects on every revalidation, so the rows are compared by
+ * content, not by reference — storing an equal page again would re-render
+ * for nothing, and re-render endlessly where the fetched object is new on
+ * every render. Identity and `updated_at` alone are not enough: sharing,
+ * restricting or publishing an item changes its row without touching
+ * `updated_at`, and the page must pick those up so the audience chip
+ * follows the change without a reload. */
 const samePage = (stored: ContentItem[] | undefined, fetched: ContentItem[]): boolean =>
   !!stored &&
   stored.length === fetched.length &&
-  stored.every(
-    (item, index) => item.id === fetched[index].id && item.updated_at === fetched[index].updated_at
-  );
+  stored.every((item, index) => JSON.stringify(item) === JSON.stringify(fetched[index]));
 
 export interface AccumulatedPages {
   /** Every page listed so far for this collection, in page order. */
@@ -66,19 +67,32 @@ export const useAccumulatedPages = (
     );
   }, [fetchedPage, requestedPage]);
 
-  const items = useMemo(
-    () =>
-      Object.keys(fetched.pages)
-        .map(Number)
-        .sort((a, b) => a - b)
-        .flatMap((number) => fetched.pages[number]),
-    [fetched]
-  );
+  // Pages are read one at a time, so a row that lands after an earlier page
+  // was read shifts every later page down by one and the next page fetched
+  // begins with a row already listed. Each row is listed once, at its first
+  // position, keyed on type and id — the feed can hand the same id back as
+  // two kinds only across views, never inside one collection.
+  const { items, fetchedCount } = useMemo(() => {
+    const rows = Object.keys(fetched.pages)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .flatMap((number) => fetched.pages[number]);
+    const seen = new Set<string>();
+    const unique = rows.filter((row) => {
+      const key = `${row.type}-${row.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return { items: unique, fetchedCount: rows.length };
+  }, [fetched]);
 
   return {
     items,
     total: fetched.total,
     loaded: items.length > 0 || !!fetchedPage,
-    hasMore: fetched.total > items.length,
+    // Counted over the rows as fetched, repeats included, so the pages read
+    // line up with the total the way the endpoint paged them.
+    hasMore: fetched.total > fetchedCount,
   };
 };

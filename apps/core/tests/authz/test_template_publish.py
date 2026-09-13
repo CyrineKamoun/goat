@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 from core.core.config import settings
 from core.db.models.folder import Folder
+from core.db.models.layer import Layer
 from core.db.models.organization import Organization
 from core.db.models.space import Space, SpaceKind
 from core.db.models.team import Team
@@ -149,14 +150,110 @@ async def test_publish_succeeds_when_every_ship_input_is_catalog_origin(
     assert tid in {i["id"] for i in listing.json()["items"]}
 
 
+async def _team_space_layer(
+    db_session: AsyncSession,
+    *,
+    owner: User,
+    make_user: Callable[..., Awaitable[User]],
+    make_team: Callable[..., Awaitable[Team]],
+    make_space: Callable[..., Awaitable[Space]],
+) -> Layer:
+    """A layer the caller may read and edit but does not own: it lives in a
+    team space where the caller is a plain member (editor by the space
+    default), and making a dataset public is the owner's call."""
+    colleague = await make_user()
+    team = await make_team(owner, colleague)
+    space = await make_space(SpaceKind.team, team=team)
+    folder = Folder(
+        id=uuid4(), user_id=owner.id, space_id=space.id, name=f"team-{uuid4().hex[:6]}"
+    )
+    db_session.add(folder)
+    await db_session.flush()
+    layer = Layer(
+        id=uuid4(),
+        user_id=owner.id,
+        folder_id=folder.id,
+        space_id=space.id,
+        name=f"team-layer-{uuid4().hex[:6]}",
+        type="feature",
+        feature_layer_type="standard",
+        feature_layer_geometry_type="polygon",
+    )
+    db_session.add(layer)
+    await db_session.flush()
+    return layer
+
+
+async def _layer_public_read(db_session: AsyncSession, layer_id: UUID) -> bool:
+    return bool(
+        (
+            await db_session.execute(
+                text(f"SELECT public_read FROM {S}.layer WHERE id = :id"),
+                {"id": layer_id},
+            )
+        ).scalar_one()
+    )
+
+
 @pytest.mark.asyncio
-async def test_publish_409s_naming_a_non_catalog_shipped_layer(
+async def test_publish_409s_naming_a_shipped_layer_the_caller_does_not_own(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_get_home_folder: dict[str, object],
+    make_user: Callable[..., Awaitable[User]],
+    make_team: Callable[..., Awaitable[Team]],
+    make_space: Callable[..., Awaitable[Space]],
+) -> None:
+    """A shipped dataset that is neither a catalog dataset nor public, and
+    that the publisher does not own, is refused — and publishing must not
+    have touched its flag: someone else's data never becomes public as a
+    side effect of curating the shelf."""
+    home = str(fixture_get_home_folder["id"])
+    owner = await db_session.get(User, fixture_create_user)
+    assert owner is not None
+    layer = await _team_space_layer(
+        db_session,
+        owner=owner,
+        make_user=make_user,
+        make_team=make_team,
+        make_space=make_space,
+    )
+    await db_session.commit()
+
+    tid = await _project_template_with_layer(
+        client, db_session, home=home, layer_id=layer.id, name="Team data"
+    )
+
+    publish_resp = await client.post(f"{settings.API_V2_STR}/template/{tid}/publish")
+    assert publish_resp.status_code == 409, publish_resp.text
+    detail = publish_resp.json()["detail"]
+    assert detail["code"] == "template_dataset_not_public"
+    assert detail["layers"] == [{"id": str(layer.id), "name": layer.name}]
+    assert await _layer_public_read(db_session, layer.id) is False
+
+    read_resp = await client.get(f"{settings.API_V2_STR}/template/{tid}")
+    assert read_resp.status_code == 200, read_resp.text
+    (shipped,) = read_resp.json()["inputs"]
+    assert shipped["from_catalog"] is False
+    assert shipped["public_read"] is False
+
+
+@pytest.mark.asyncio
+async def test_publish_makes_the_publishers_own_datasets_public(
     client: AsyncClient,
     db_session: AsyncSession,
     fixture_create_user: UUID,
     fixture_get_home_folder: dict[str, object],
     make_layer: Callable[..., Awaitable[Any]],
+    make_user: Callable[..., Awaitable[User]],
 ) -> None:
+    """A shipped dataset the publisher owns becomes a public dataset:
+    publishing sets `public_read`, so every signed-in user reads it as
+    viewer (anonymous still gets nothing), the owner keeps owning it, it is
+    reported as public on the template's inputs, and the template counts as
+    shipping data. It never enters the STAC catalog: `catalog_external_uid`
+    stays NULL."""
     home = str(fixture_get_home_folder["id"])
     owner = await db_session.get(User, fixture_create_user)
     assert owner is not None
@@ -166,14 +263,45 @@ async def test_publish_409s_naming_a_non_catalog_shipped_layer(
     await db_session.commit()
 
     tid = await _project_template_with_layer(
-        client, db_session, home=home, layer_id=layer.id, name="Private data"
+        client, db_session, home=home, layer_id=layer.id, name="Sample data"
     )
+    before = await client.get(f"{settings.API_V2_STR}/template/{tid}")
+    (shipped,) = before.json()["inputs"]
+    assert shipped["public_read"] is False
+    assert before.json()["ships_data"] is False
 
     publish_resp = await client.post(f"{settings.API_V2_STR}/template/{tid}/publish")
-    assert publish_resp.status_code == 409, publish_resp.text
-    detail = publish_resp.json()["detail"]
-    assert detail["code"] == "template_dataset_not_public"
-    assert detail["layers"] == [{"id": str(layer.id), "name": layer.name}]
+    assert publish_resp.status_code == 200, publish_resp.text
+    body = publish_resp.json()
+    assert body["catalog_status"] == "published"
+    assert body["ships_data"] is True
+    (shipped,) = body["inputs"]
+    assert shipped["from_catalog"] is False
+    assert shipped["public_read"] is True
+
+    assert await _layer_public_read(db_session, layer.id) is True
+    uid = (
+        await db_session.execute(
+            text(f"SELECT catalog_external_uid FROM {S}.layer WHERE id = :id"),
+            {"id": layer.id},
+        )
+    ).scalar_one()
+    assert uid is None
+
+    stranger = await make_user()
+    await db_session.commit()
+
+    async def role_of(who: UUID | None) -> str | None:
+        return (
+            await db_session.execute(
+                text(f"SELECT {S}.effective_role('layer', :l, :u)"),
+                {"l": layer.id, "u": who},
+            )
+        ).scalar_one_or_none()
+
+    assert await role_of(stranger.id) == "viewer"
+    assert await role_of(None) is None
+    assert await role_of(owner.id) == "owner"
 
 
 @pytest.mark.asyncio

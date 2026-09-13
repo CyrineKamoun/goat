@@ -12,6 +12,7 @@ import { matchesContentListKey } from "@/lib/api/datasets";
 import { deleteLayer, useDataset } from "@/lib/api/layers";
 import { deleteProjectLayer, useProjectLayers } from "@/lib/api/projects";
 import type { ProjectLayer } from "@/lib/validations/project";
+import { isCatalogLayer } from "@/lib/utils/catalog-layer";
 
 import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
@@ -83,7 +84,7 @@ const ProjectLayerDeleteModal: React.FC<ProjectLayerDeleteDialogProps> = ({
           components={{ b: <b /> }}
         />
       </DialogContentText>
-      {!projectLayer.in_catalog && (
+      {!isCatalogLayer(projectLayer) && (
         <Stack sx={{ mt: 2 }}>
           <FormControlLabel
             control={

@@ -14,6 +14,7 @@ import type { FeatureDataExchangeType } from "@/lib/validations/common";
 import { featureDataExchangeType, tableDataExchangeType } from "@/lib/validations/common";
 import type { DatasetDownloadRequest, Layer } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
+import { isCatalogLayer } from "@/lib/utils/catalog-layer";
 
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
@@ -48,10 +49,13 @@ const DatasetDownloadModal: React.FC<DownloadDatasetDialogProps> = ({
   const isSpatialLayer = layerType === "feature" || layerType === "raster";
 
   // Catalog layers can only be downloaded by their owner (not applicable in public mode)
-  const inCatalog = (dataset as { in_catalog?: boolean }).in_catalog;
   const layerOwnerId = (dataset as { user_id?: string }).user_id;
   const isCatalogNotOwned =
-    !isPublicMode && inCatalog && layerOwnerId && userProfile?.id && layerOwnerId !== userProfile.id;
+    !isPublicMode &&
+    isCatalogLayer(dataset) &&
+    layerOwnerId &&
+    userProfile?.id &&
+    layerOwnerId !== userProfile.id;
 
   // Compute CRS suggestions based on the layer extent
   const crsSuggestions = useMemo(() => {

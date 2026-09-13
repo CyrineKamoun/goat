@@ -37,7 +37,7 @@ const template = (overrides: Partial<TemplateRead>): TemplateRead => ({
   payload_kind: "workflow",
   kinds: ["workflow"],
   inputs: [],
-  ships_sample_data: false,
+  ships_data: false,
   catalog_status: "published",
   source_ref: {},
   datasets_needing_share: [],
@@ -152,12 +152,12 @@ describe("StarterCard", () => {
 
   it("shows the sample data badge only when the template ships one", () => {
     const { rerender } = render(
-      <StarterCard template={template({ ships_sample_data: false })} onOpen={vi.fn()} />
+      <StarterCard template={template({ ships_data: false })} onOpen={vi.fn()} />
     );
-    expect(screen.queryByText("sample_data")).not.toBeInTheDocument();
+    expect(screen.queryByText("includes_data")).not.toBeInTheDocument();
 
-    rerender(<StarterCard template={template({ ships_sample_data: true })} onOpen={vi.fn()} />);
-    expect(screen.getByText("sample_data")).toBeInTheDocument();
+    rerender(<StarterCard template={template({ ships_data: true })} onOpen={vi.fn()} />);
+    expect(screen.getByText("includes_data")).toBeInTheDocument();
   });
 
   it("marks the band's bottom-left corner with the page, or with sample data", () => {
@@ -176,9 +176,9 @@ describe("StarterCard", () => {
 
     // A workflow's shipped sample data takes the same corner: only one of the
     // two can ever apply to one template.
-    rerender(<StarterCard template={template({ ships_sample_data: true })} onOpen={vi.fn()} />);
+    rerender(<StarterCard template={template({ ships_data: true })} onOpen={vi.fn()} />);
 
-    expect(screen.getByText("sample_data").parentElement).toHaveStyle({ bottom: "8px", left: "8px" });
+    expect(screen.getByText("includes_data").parentElement).toHaveStyle({ bottom: "8px", left: "8px" });
     expect(screen.queryByText(/·/)).not.toBeInTheDocument();
   });
 

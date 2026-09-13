@@ -13,6 +13,7 @@ import type {
   LayerClassBreaks,
 } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
+import { isCatalogLayer } from "@/lib/utils/catalog-layer";
 
 import { ContentActions, MapLayerActions } from "@/types/common";
 import type { RGBColor } from "@/types/map/color";
@@ -459,7 +460,7 @@ export function Legend(props: LegendProps) {
                 {props.enableActions && (
                   <Stack direction="row" spacing={1} alignItems="right">
                     <MoreMenu
-                      menuItems={getLayerMoreMenuOptions(layer.type, false, layer.in_catalog, true)}
+                      menuItems={getLayerMoreMenuOptions(layer.type, false, isCatalogLayer(layer), true)}
                       menuButton={
                         <Tooltip title={t("more_options")} arrow placement="top">
                           <IconButton size="small">

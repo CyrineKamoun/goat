@@ -79,6 +79,13 @@ def is_superuser(
     return is_superuser
 
 
+def token_is_superuser(user_token: Dict[str, Any]) -> bool:
+    """Whether the token carries the `superuser` realm role. Pure function,
+    no dependency injection, for handlers that branch on the role instead
+    of refusing the request."""
+    return "superuser" in (user_token.get("realm_access", {}).get("roles") or [])
+
+
 def require_superuser(user_token: Dict[str, Any] = Depends(user_token)) -> None:
     """401 unless the caller's token carries the `superuser` realm role.
 
@@ -88,8 +95,7 @@ def require_superuser(user_token: Dict[str, Any] = Depends(user_token)) -> None:
     check entirely — confirmed in the generated OpenAPI schema. This
     dependency exposes nothing a caller can override.
     """
-    roles = user_token.get("realm_access", {}).get("roles") or []
-    if "superuser" not in roles:
+    if not token_is_superuser(user_token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
         )

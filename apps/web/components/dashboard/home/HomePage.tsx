@@ -73,7 +73,7 @@ const HomePage = () => {
       return;
     }
     const starter = (goatTemplatesPage?.items ?? []).find(
-      (item) => item.ships_sample_data && item.kinds.includes("workflow")
+      (item) => item.ships_data && item.kinds.includes("workflow")
     );
     setTemplateBrowser({ initialSource: "goat", initialTemplateId: starter?.id });
   };
@@ -117,7 +117,7 @@ const HomePage = () => {
       {usingTemplate && (
         <UseTemplateFlow
           template={usingTemplate}
-          context={{ kind: "new_project" }}
+          context={{ kind: "outside_project" }}
           onClose={() => setUsingTemplate(null)}
           onDone={(result) => {
             const template = usingTemplate;

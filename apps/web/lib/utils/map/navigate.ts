@@ -7,6 +7,7 @@ import { getExtent } from "@/lib/api/processes";
 import type { ProjectLayer } from "@/lib/validations/project";
 
 import { wktToGeoJSON } from "@/lib/utils/map/wkt";
+import { isCatalogLayer } from "@/lib/utils/catalog-layer";
 
 export function zoomToLayer(map: MapRef, wkt_extent: string) {
   const geojson = wktToGeoJSON(wkt_extent);
@@ -79,7 +80,7 @@ export async function zoomToProjectLayer(
   // layer's stored extent is the bbox the provider published for the dataset,
   // which is not measured from the rows: it is often the provider's whole
   // territory, or a world box where nothing was published. Both ask the data.
-  if ((hasCqlFilter || layer.in_catalog) && layer.layer_id) {
+  if ((hasCqlFilter || isCatalogLayer(layer)) && layer.layer_id) {
     try {
       console.log("zoomToProjectLayer: Fetching extent for", layer.layer_id);
       const cqlFilter = hasCqlFilter ? JSON.stringify(layer.query?.cql) : undefined;

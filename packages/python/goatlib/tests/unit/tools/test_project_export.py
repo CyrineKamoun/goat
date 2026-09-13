@@ -294,7 +294,7 @@ class TestProjectExportRunner:
             "size": None,
             "thumbnail_url": None,
             "tags": None,
-            "in_catalog": False,
+            "public_read": False,
             "user_id": user_id,
             "folder_id": uuid.UUID("00000000-0000-0000-0000-ffffffffffff"),
             "field_config": field_config,

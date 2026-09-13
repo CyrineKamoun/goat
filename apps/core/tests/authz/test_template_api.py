@@ -1373,3 +1373,377 @@ async def test_a_patch_can_relabel_a_layout_templates_page(
     assert patch_resp.status_code == 200, patch_resp.text
     assert patch_resp.json()["page_size"] == "Letter"
     assert patch_resp.json()["page_orientation"] == "portrait"
+
+
+@pytest.mark.asyncio
+async def test_a_template_shared_with_me_is_listed_under_all(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_get_home_folder: dict[str, object],
+    roles: dict[str, UUID],
+    make_user: Callable[..., Awaitable[Any]],
+    make_layer: Callable[..., Awaitable[Any]],
+) -> None:
+    """A grant on a template is how it reaches someone outside its space,
+    and the pickers ask for `source=all` — so a shared template that is not
+    in that answer cannot be used from a project or a workflow at all. It
+    is still not "mine"."""
+    home = str(fixture_get_home_folder["id"])
+    owner = await db_session.get(User, fixture_create_user)
+    assert owner is not None
+    home_folder = await db_session.get(Folder, UUID(home))
+    assert home_folder is not None
+    layer = await make_layer(owner, home_folder)
+    await db_session.commit()
+    project_id = await _create_project(client, home)
+    workflow_id = await _create_workflow(
+        client, project_id, _dataset_workflow_config(layer.id)
+    )
+    source = {"kind": "workflow", "project_id": project_id, "workflow_id": workflow_id}
+    preview = await client.post(
+        f"{settings.API_V2_STR}/template/preview",
+        json={"source": source, "folder_id": home},
+    )
+    assert preview.status_code == 200, preview.text
+    create_resp = await client.post(
+        f"{settings.API_V2_STR}/template",
+        json={
+            "name": "Shared with a colleague",
+            "folder_id": home,
+            "source": source,
+            "inputs": preview.json()["detected_inputs"],
+        },
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    tid = create_resp.json()["id"]
+
+    colleague = await make_user(owner.organization_id)
+    await db_session.execute(
+        text(
+            f"INSERT INTO {S}.resource_grant "
+            "(resource_type, resource_id, grantee_type, grantee_id, role_id, granted_by) "
+            "VALUES ('template', :t, 'user', :u, :r, :o)"
+        ),
+        {"t": tid, "u": colleague.id, "r": roles["template-viewer"], "o": owner.id},
+    )
+    await db_session.commit()
+    headers = {"Authorization": f"Bearer {_unverified_bearer(colleague.id)}"}
+
+    everything = await client.get(
+        f"{settings.API_V2_STR}/template", params={"source": "all"}, headers=headers
+    )
+    assert everything.status_code == 200, everything.text
+    shared = next((i for i in everything.json()["items"] if i["id"] == tid), None)
+    assert shared is not None
+    assert shared["my_role"] == "viewer"
+
+    mine = await client.get(
+        f"{settings.API_V2_STR}/template", params={"source": "mine"}, headers=headers
+    )
+    assert all(i["id"] != tid for i in mine.json()["items"])
+
+
+@pytest.mark.asyncio
+async def test_granting_a_template_shares_its_shipped_datasets(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_get_home_folder: dict[str, object],
+    make_user: Callable[..., Awaitable[Any]],
+    make_folder: Callable[..., Awaitable[Any]],
+    make_layer: Callable[..., Awaitable[Any]],
+) -> None:
+    """A shipped input only resolves for someone who may read its layer, so
+    a template handed over without its datasets arrived as an empty
+    workflow. The grant on the template now carries a viewer grant on each
+    shipped dataset, the way saving into a team space already did."""
+    home = str(fixture_get_home_folder["id"])
+    owner = await db_session.get(User, fixture_create_user)
+    assert owner is not None
+    home_folder = await db_session.get(Folder, UUID(home))
+    assert home_folder is not None
+    layer = await make_layer(owner, home_folder)
+    await db_session.commit()
+    project_id = await _create_project(client, home)
+    workflow_id = await _create_workflow(
+        client, project_id, _dataset_workflow_config(layer.id)
+    )
+    source = {"kind": "workflow", "project_id": project_id, "workflow_id": workflow_id}
+    preview = await client.post(
+        f"{settings.API_V2_STR}/template/preview",
+        json={"source": source, "folder_id": home},
+    )
+    create_resp = await client.post(
+        f"{settings.API_V2_STR}/template",
+        json={
+            "name": "Comes with its data",
+            "folder_id": home,
+            "source": source,
+            "inputs": preview.json()["detected_inputs"],
+        },
+    )
+    assert create_resp.status_code == 201, create_resp.text
+    tid = create_resp.json()["id"]
+
+    colleague = await make_user(owner.organization_id)
+    colleague_folder = await make_folder(colleague)
+    await db_session.commit()
+
+    grant = await client.post(
+        f"{settings.API_V2_STR}/template/{tid}/grant",
+        json={
+            "grantee_type": "user",
+            "grantee_id": str(colleague.id),
+            "role": "template-viewer",
+        },
+    )
+    assert grant.status_code == 201, grant.text
+
+    headers = {"Authorization": f"Bearer {_unverified_bearer(colleague.id)}"}
+    use_resp = await client.post(
+        f"{settings.API_V2_STR}/template/{tid}/use",
+        json={"target_folder_id": str(colleague_folder.id)},
+        headers=headers,
+    )
+    assert use_resp.status_code == 200, use_resp.text
+    body = use_resp.json()
+    assert body["unresolved_inputs"] == []
+    assert len(body["added_layer_project_ids"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_list_templates_filters_by_source(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_get_home_folder: dict[str, object],
+    make_layer: Callable[..., Awaitable[Any]],
+) -> None:
+    """The save dialog asks "which templates were saved from this workflow?"
+    — a filter on the stored source reference, one condition per given id."""
+    home = str(fixture_get_home_folder["id"])
+    owner = await db_session.get(User, fixture_create_user)
+    assert owner is not None
+    home_folder = await db_session.get(Folder, UUID(home))
+    assert home_folder is not None
+    layer = await make_layer(owner, home_folder)
+    await db_session.commit()
+    project_id = await _create_project(client, home)
+    wf_a = await _create_workflow(
+        client, project_id, _dataset_workflow_config(layer.id)
+    )
+    wf_b = await _create_workflow(
+        client, project_id, _dataset_workflow_config(layer.id)
+    )
+
+    async def save(workflow_id: str, name: str) -> str:
+        source = {
+            "kind": "workflow",
+            "project_id": project_id,
+            "workflow_id": workflow_id,
+        }
+        preview = await client.post(
+            f"{settings.API_V2_STR}/template/preview",
+            json={"source": source, "folder_id": home},
+        )
+        assert preview.status_code == 200, preview.text
+        created = await client.post(
+            f"{settings.API_V2_STR}/template",
+            json={
+                "name": name,
+                "folder_id": home,
+                "source": source,
+                "inputs": preview.json()["detected_inputs"],
+            },
+        )
+        assert created.status_code == 201, created.text
+        return str(created.json()["id"])
+
+    a1 = await save(wf_a, "A first")
+    a2 = await save(wf_a, "A second")
+    b1 = await save(wf_b, "B only")
+
+    r = await client.get(
+        f"{settings.API_V2_STR}/template",
+        params={
+            "source": "all",
+            "source_project_id": project_id,
+            "source_workflow_id": wf_a,
+        },
+    )
+    assert r.status_code == 200, r.text
+    ids = {i["id"] for i in r.json()["items"]}
+    assert ids == {a1, a2}
+    assert b1 not in ids
+
+    r = await client.get(
+        f"{settings.API_V2_STR}/template",
+        params={"source": "all", "source_project_id": project_id},
+    )
+    assert {i["id"] for i in r.json()["items"]} >= {a1, a2, b1}
+
+
+@pytest.mark.asyncio
+async def test_read_resolves_the_source_and_its_availability(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_get_home_folder: dict[str, object],
+    make_layer: Callable[..., Awaitable[Any]],
+) -> None:
+    """The edit dialog links to where the template came from and disables
+    "Update from source" when that is gone — names and a flag, resolved on
+    the single read only."""
+    home = str(fixture_get_home_folder["id"])
+    owner = await db_session.get(User, fixture_create_user)
+    assert owner is not None
+    home_folder = await db_session.get(Folder, UUID(home))
+    assert home_folder is not None
+    layer = await make_layer(owner, home_folder)
+    await db_session.commit()
+    project_id = await _create_project(client, home)
+    workflow_id = await _create_workflow(
+        client, project_id, _dataset_workflow_config(layer.id)
+    )
+    source = {"kind": "workflow", "project_id": project_id, "workflow_id": workflow_id}
+    preview = await client.post(
+        f"{settings.API_V2_STR}/template/preview",
+        json={"source": source, "folder_id": home},
+    )
+    created = await client.post(
+        f"{settings.API_V2_STR}/template",
+        json={
+            "name": "Resolved",
+            "folder_id": home,
+            "source": source,
+            "inputs": preview.json()["detected_inputs"],
+        },
+    )
+    assert created.status_code == 201, created.text
+    tid = created.json()["id"]
+
+    read = await client.get(f"{settings.API_V2_STR}/template/{tid}")
+    assert read.status_code == 200, read.text
+    info = read.json()["source"]
+    assert info["kind"] == "workflow"
+    assert info["project_id"] == project_id
+    assert info["workflow_id"] == workflow_id
+    assert info["project_name"]
+    assert info["workflow_name"]
+    assert info["available"] is True
+
+    # The list never pays for the resolution.
+    listed = await client.get(
+        f"{settings.API_V2_STR}/template", params={"source": "mine"}
+    )
+    row = next(i for i in listed.json()["items"] if i["id"] == tid)
+    assert row["source"] is None
+
+    # Delete the workflow: the reference stays, availability drops.
+    deleted = await client.delete(
+        f"{settings.API_V2_STR}/project/{project_id}/workflow/{workflow_id}"
+    )
+    assert deleted.status_code in (200, 204), deleted.text
+    read = await client.get(f"{settings.API_V2_STR}/template/{tid}")
+    info = read.json()["source"]
+    assert info["workflow_id"] == workflow_id
+    assert info["workflow_name"] is None
+    assert info["available"] is False
+
+
+@pytest.mark.asyncio
+async def test_a_template_under_a_shared_folder_is_listed_under_all(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_get_home_folder: dict[str, object],
+    roles: dict[str, UUID],
+    make_user: Callable[..., Awaitable[Any]],
+    make_layer: Callable[..., Awaitable[Any]],
+) -> None:
+    """Most templates travel through a folder shared with a team or an
+    organisation, not through a grant on the template itself. "Everyone"
+    in the template browser has to reach them the way a single read does —
+    through any folder above the template — or a colleague sees only their
+    own templates there."""
+    home = str(fixture_get_home_folder["id"])
+    owner = await db_session.get(User, fixture_create_user)
+    assert owner is not None
+    home_folder = await db_session.get(Folder, UUID(home))
+    assert home_folder is not None
+    layer = await make_layer(owner, home_folder)
+    # A shared folder with a subfolder: the template sits two levels down.
+    shared_folder_id = (
+        await db_session.execute(
+            text(
+                f"INSERT INTO {S}.folder (id, name, user_id, space_id, parent_id, updated_at) "
+                "VALUES (gen_random_uuid(), 'shared', :u, :s, :p, now()) RETURNING id"
+            ),
+            {"u": owner.id, "s": home_folder.space_id, "p": home_folder.id},
+        )
+    ).scalar_one()
+    sub_folder_id = (
+        await db_session.execute(
+            text(
+                f"INSERT INTO {S}.folder (id, name, user_id, space_id, parent_id, updated_at) "
+                "VALUES (gen_random_uuid(), 'nested', :u, :s, :p, now()) RETURNING id"
+            ),
+            {"u": owner.id, "s": home_folder.space_id, "p": shared_folder_id},
+        )
+    ).scalar_one()
+    await db_session.commit()
+    project_id = await _create_project(client, home)
+    workflow_id = await _create_workflow(
+        client, project_id, _dataset_workflow_config(layer.id)
+    )
+    source = {"kind": "workflow", "project_id": project_id, "workflow_id": workflow_id}
+    preview = await client.post(
+        f"{settings.API_V2_STR}/template/preview",
+        json={"source": source, "folder_id": str(sub_folder_id)},
+    )
+    assert preview.status_code == 200, preview.text
+    created = await client.post(
+        f"{settings.API_V2_STR}/template",
+        json={
+            "name": "Under a shared folder",
+            "folder_id": str(sub_folder_id),
+            "source": source,
+            "inputs": preview.json()["detected_inputs"],
+        },
+    )
+    assert created.status_code == 201, created.text
+    tid = created.json()["id"]
+
+    colleague = await make_user(owner.organization_id)
+    # The grant sits on the top folder, two levels above the template.
+    await db_session.execute(
+        text(
+            f"INSERT INTO {S}.resource_grant "
+            "(resource_type, resource_id, grantee_type, grantee_id, role_id, granted_by) "
+            "VALUES ('folder', :f, 'user', :c, :r, :u)"
+        ),
+        {
+            "f": shared_folder_id,
+            "c": colleague.id,
+            "r": roles["folder-viewer"],
+            "u": owner.id,
+        },
+    )
+    await db_session.commit()
+    headers = {"Authorization": f"Bearer {_unverified_bearer(colleague.id)}"}
+
+    everything = await client.get(
+        f"{settings.API_V2_STR}/template", params={"source": "all"}, headers=headers
+    )
+    assert everything.status_code == 200, everything.text
+    listed = next((i for i in everything.json()["items"] if i["id"] == tid), None)
+    assert (
+        listed is not None
+    ), "a template under a shared folder is missing from Everyone"
+    assert listed["my_role"] == "viewer"
+
+    mine = await client.get(
+        f"{settings.API_V2_STR}/template", params={"source": "mine"}, headers=headers
+    )
+    assert all(i["id"] != tid for i in mine.json()["items"])

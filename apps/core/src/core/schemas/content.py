@@ -144,7 +144,7 @@ class ContentItem(BaseModel):
         description="`type: template` rows only: the GOAT catalog shelf "
         "state (T4). None for every other row.",
     )
-    template_ships_sample_data: bool = Field(
+    template_ships_data: bool = Field(
         default=False,
         description="`type: template` rows only: true once any declared "
         "input (T5) is a shipped, catalog-origin dataset. Always False for "

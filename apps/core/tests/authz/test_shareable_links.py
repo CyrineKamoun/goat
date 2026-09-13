@@ -447,7 +447,10 @@ async def test_catalog_layer_link_is_always_shareable(
         db_session, make_layer, lead, await make_folder(lead, "Catalog source")
     )
     await db_session.execute(
-        text(f"UPDATE {S}.layer SET in_catalog = TRUE WHERE id = :l"),
+        text(
+            f"UPDATE {S}.layer SET catalog_external_uid = 'stac:' || CAST(:l AS text), "
+            "catalog_version = '1' WHERE id = :l"
+        ),
         {"l": catalog_layer.id},
     )
 
@@ -863,7 +866,10 @@ async def test_copy_never_widens_a_link_beyond_the_copier(
     added_by_b = await _styled_layer(db_session, make_layer, a, a_folder)
     catalog_layer = await _styled_layer(db_session, make_layer, a, a_folder)
     await db_session.execute(
-        text(f"UPDATE {S}.layer SET in_catalog = TRUE WHERE id = :l"),
+        text(
+            f"UPDATE {S}.layer SET catalog_external_uid = 'stac:' || CAST(:l AS text), "
+            "catalog_version = '1' WHERE id = :l"
+        ),
         {"l": catalog_layer.id},
     )
 

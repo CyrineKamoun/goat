@@ -118,7 +118,7 @@ const fakeTemplate: TemplateRead = {
   payload_kind: "layout",
   kinds: ["layout"],
   inputs: [],
-  ships_sample_data: false,
+  ships_data: false,
   catalog_status: "published",
   source_ref: {},
   datasets_needing_share: [],

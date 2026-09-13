@@ -1,45 +1,24 @@
 "use client";
 
-import {
-  Box,
-  Button,
-  Chip,
-  Stack,
-  SwipeableDrawer,
-  Typography,
-  alpha,
-  useMediaQuery,
-  useTheme,
-} from "@mui/material";
+import { Box, Button, Stack, SwipeableDrawer, useMediaQuery, useTheme } from "@mui/material";
 import { useRouter } from "next/navigation";
 import type { DragEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 
-import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
+import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { useDocuments } from "@/lib/api/assets";
 import { refreshContentFeed, useContent, useSharedWithSpace, useSpaces } from "@/lib/api/content";
 import { useFolders } from "@/lib/api/folders";
-import {
-  publishTemplateWithDetail,
-  refreshTemplate,
-  refreshTemplates,
-  unpublishTemplate,
-  useTemplate,
-} from "@/lib/api/templates";
+import { readTemplate, useTemplate } from "@/lib/api/templates";
 import type { ContentSectionKey } from "@/lib/providers/ContentUiStateProvider";
 import { useContentUiState } from "@/lib/providers/ContentUiStateProvider";
 import {
-  regenerateTemplateThumbnail,
-  regenerateTemplateThumbnailResult,
-} from "@/lib/templates/thumbnailSnapshot";
-import {
   folderLocationLabel,
+  folderPath,
   homeFolderOf,
-  iconFor,
-  lastRoleSegment,
   sectionOf,
   spaceDisplayName,
   spaceIconFor,
@@ -78,7 +57,6 @@ import ContentDetailsPanel, {
 } from "@/components/dashboard/content/ContentDetailsPanel";
 import ContentFeedSkeleton from "@/components/dashboard/content/ContentFeedSkeleton";
 import ContentFolderCard from "@/components/dashboard/content/ContentFolderCard";
-import ContentKebab from "@/components/dashboard/content/ContentKebab";
 import ContentPreviewDialog from "@/components/dashboard/content/ContentPreviewDialog";
 import ContentRow from "@/components/dashboard/content/ContentRow";
 import ContentSection from "@/components/dashboard/content/ContentSection";
@@ -96,6 +74,7 @@ import ShareDialog from "@/components/modals/content/ShareDialog";
 import SpaceSettingsDialog from "@/components/modals/content/SpaceSettingsDialog";
 import TransferDialog from "@/components/modals/content/TransferDialog";
 import TrashDialog from "@/components/modals/content/TrashDialog";
+import SaveTemplateDialog from "@/components/templates/SaveTemplateDialog";
 import TemplatePreviewDialog from "@/components/templates/TemplatePreviewDialog";
 import UseTemplateFlow from "@/components/templates/UseTemplateFlow";
 
@@ -133,17 +112,6 @@ const SECTION_LABEL_KEYS: Record<SectionKey, string> = {
 /** Section order for the feed's own render — templates sit between projects
  * and datasets, folders/shortcuts leading as they always have. */
 const SECTION_ORDER: SectionKey[] = ["folders", "shortcuts", "projects", "templates", "datasets"];
-
-/** The role a team/org space's own grant gives on an item shared into it —
- * distinct from `item.my_role`, which is the caller's own role, not the
- * space's. Looked up by matching the grant's team/organization id against
- * the space's own `team_id`/`organization_id`. */
-const sharedRoleFor = (item: ContentItem, space: Space): string | undefined => {
-  const teamRole = item.shared_with?.teams?.find((entry) => entry.id === space.team_id)?.role;
-  const orgRole = item.shared_with?.organizations?.find((entry) => entry.id === space.organization_id)?.role;
-  const role = teamRole ?? orgRole;
-  return role ? lastRoleSegment(role) : undefined;
-};
 
 /** Where the route says we are: a space (optionally a folder inside it) or
  * one of the cross-space views. Every one of these comes from the URL path,
@@ -231,6 +199,7 @@ const ContentPage = ({
   const [templateOpen, setTemplateOpen] = useState<{ id: string; autoUse: boolean } | null>(null);
   const { template: loadedTemplate } = useTemplate(templateOpen?.id ?? null);
   const [templateToUse, setTemplateToUse] = useState<TemplateRead | null>(null);
+  const [editTemplate, setEditTemplate] = useState<TemplateRead | null>(null);
   useEffect(() => {
     if (templateOpen?.autoUse && loadedTemplate) {
       setTemplateToUse(loadedTemplate);
@@ -303,7 +272,21 @@ const ContentPage = ({
   const sharedWithSpaceScopeSpaceId = space && space.kind !== "personal" && !folderId ? space.id : null;
   const { page: sharedWithSpacePage } = useSharedWithSpace(sharedWithSpaceScopeSpaceId);
 
-  const items = feed.items;
+  // Items shared into a team/organisation space are listed with the space's
+  // own: the page heading already names the space, and each such item carries
+  // its "Shared" chip, so they sort into the same kind sections rather than
+  // a section of their own. Merged in the feed's own order.
+  const items = useMemo(() => {
+    const shared = sharedWithSpacePage?.items ?? [];
+    if (shared.length === 0) return feed.items;
+    const merged = [...feed.items, ...shared];
+    const dir = order === "ascendent" ? 1 : -1;
+    return merged.sort((a, b) => {
+      const av = String(a[orderBy] ?? "");
+      const bv = String(b[orderBy] ?? "");
+      return (orderBy === "name" ? av.localeCompare(bv) : av < bv ? -1 : av > bv ? 1 : 0) * dir;
+    });
+  }, [feed.items, sharedWithSpacePage?.items, orderBy, order]);
   const grouped: Record<SectionKey, ContentItem[]> = {
     folders: items.filter((i) => sectionOf(i) === "folders"),
     shortcuts: items.filter((i) => sectionOf(i) === "shortcuts"),
@@ -412,6 +395,24 @@ const ContentPage = ({
   // browsed, plus how many items of each kind sit here (from `grouped`,
   // already computed above for the feed's own section headers).
   const currentFolder = folderId ? (folders ?? []).find((f) => f.id === folderId) : undefined;
+  // The address names a space that is not one of the caller's: a folder in
+  // someone else's personal space, opened from "Shared with me" or by link.
+  // Its contents are still listed (the folder's grant admits the caller);
+  // the page then stands in that view's place rather than in no space.
+  const spaceUnknown = !!spaceId && !space && !spacesLoading && spaces.length > 0;
+  // A folder shared into the browsed space heads the trail of anything
+  // opened inside it — its own ancestors belong to the space it came from.
+  const sharedRootFolderId = useMemo(() => {
+    if (!sharedWithSpacePage?.items.length || !folderId) return null;
+    const sharedFolders = new Set(
+      sharedWithSpacePage.items.filter((i) => i.type === "folder").map((i) => i.id)
+    );
+    const trail = folderPath(folders ?? [], folderId);
+    for (let i = trail.length - 1; i >= 0; i -= 1) {
+      if (sharedFolders.has(trail[i].id)) return trail[i].id;
+    }
+    return null;
+  }, [sharedWithSpacePage, folders, folderId]);
   const locationInfo: ContentDetailsLocation =
     active.kind === "view"
       ? {
@@ -433,12 +434,7 @@ const ContentPage = ({
           ),
         };
 
-  // A layer can be previewed from the feed or from the "Shared with {space}"
-  // section, which is a separate listing — resolve the row from both so the
-  // dialog's own Share/Move gates see the real item either way.
-  const previewTarget = previewLayerId
-    ? [...items, ...(sharedWithSpacePage?.items ?? [])].find((i) => i.id === previewLayerId)
-    : undefined;
+  const previewTarget = previewLayerId ? items.find((i) => i.id === previewLayerId) : undefined;
 
   const openItem = (item: ContentItem) => {
     if (item.is_shortcut) {
@@ -452,8 +448,13 @@ const ContentPage = ({
       return;
     }
     if (item.type === "folder") {
-      // In a cross-space view the folder's own space comes from the item.
-      goFolderIn(item.space_id, item.id);
+      // A folder opened from a space stays under that space in the address,
+      // even one shared in from another space: the space list and the trail
+      // keep the caller's place, and the backend accepts any of the caller's
+      // own spaces as the context for a folder they may read. In a
+      // cross-space view there is no such context, so the folder's own space
+      // comes from the item.
+      goFolderIn(spaceId ?? item.space_id, item.id);
       return;
     }
     if (item.type === "layer") {
@@ -465,77 +466,6 @@ const ContentPage = ({
       return;
     }
     router.push(ROW_KIND_TO_ROUTE[item.type](item.id));
-  };
-
-  const handleUpdateTemplateFromSource = async (id: string) => {
-    try {
-      const refreshed = await refreshTemplate(id);
-      // The frozen config has just been replaced, so the picture of it is
-      // stale: it is re-drawn and re-stored from the config the refresh
-      // left behind, the same drawing the save dialog stores.
-      const updated = await regenerateTemplateThumbnail(refreshed, t);
-      refreshTemplates();
-      refreshContentFeed();
-      if (updated.datasets_needing_share.length > 0) {
-        toast.info(t("template_datasets_need_sharing", { count: updated.datasets_needing_share.length }));
-      } else {
-        toast.success(t("template_updated_from_source"));
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("error_updating_template"));
-    }
-  };
-
-  /** Draws a template's picture from the config it carries and stores it,
-   * with a layout's page label along with it — the backfill for the
-   * templates saved before either existed. Explicit and per template, since
-   * a picture the author uploaded by hand is indistinguishable from a
-   * generated one and would be overwritten by any automatic pass. */
-  const handleRegenerateThumbnail = async (item: ContentItem) => {
-    const result = await regenerateTemplateThumbnailResult(item, t);
-    if (result.status === "updated") {
-      refreshTemplates();
-      refreshContentFeed();
-      toast.success(t("template_thumbnail_updated"));
-      return;
-    }
-    if (result.status === "failed") {
-      toast.error(t("error_updating_template"));
-      return;
-    }
-    toast.info(
-      result.status === "no_config"
-        ? t("template_thumbnail_no_config")
-        : t("template_thumbnail_nothing_to_draw")
-    );
-  };
-
-  const handlePublishTemplate = async (id: string) => {
-    try {
-      const result = await publishTemplateWithDetail(id);
-      if (!result.ok) {
-        toast.error(
-          t("template_dataset_not_public", { names: result.layers.map((layer) => layer.name).join(", ") })
-        );
-        return;
-      }
-      refreshTemplates();
-      refreshContentFeed();
-      toast.success(t("template_published"));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("error_publishing_template"));
-    }
-  };
-
-  const handleUnpublishTemplate = async (id: string) => {
-    try {
-      await unpublishTemplate(id);
-      refreshTemplates();
-      refreshContentFeed();
-      toast.success(t("template_unpublished"));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : t("error_unpublishing_template"));
-    }
   };
 
   const handleMenuSelect = (menuItem: PopperMenuItem, item: ContentItem) => {
@@ -554,20 +484,12 @@ const ContentPage = ({
       setTemplateOpen({ id: item.id, autoUse: true });
       return;
     }
-    if (menuItem.id === ContentActions.UPDATE_TEMPLATE_FROM_SOURCE && item.type === "template") {
-      void handleUpdateTemplateFromSource(item.id);
-      return;
-    }
-    if (menuItem.id === ContentActions.REGENERATE_THUMBNAIL && item.type === "template") {
-      void handleRegenerateThumbnail(item);
-      return;
-    }
-    if (menuItem.id === ContentActions.PUBLISH_TO_GOAT_CATALOG && item.type === "template") {
-      void handlePublishTemplate(item.id);
-      return;
-    }
-    if (menuItem.id === ContentActions.UNPUBLISH_FROM_GOAT_CATALOG && item.type === "template") {
-      void handleUnpublishTemplate(item.id);
+    if (menuItem.id === ContentActions.EDIT_TEMPLATE && item.type === "template") {
+      // The dialog edits the template as read in full — the feed row lacks
+      // the inputs and the resolved source it shows.
+      void readTemplate(item.id)
+        .then(setEditTemplate)
+        .catch(() => toast.error(t("error_updating_template")));
       return;
     }
     setDialog({ action: menuItem.id as ContentActions, items: [item] });
@@ -624,18 +546,11 @@ const ContentPage = ({
   // page re-keys the feed, and blanking the rows already on screen for it
   // would throw the reader back to the top of the list.
   const showSkeleton = !noTypesSelected && isLoading && items.length === 0;
-  const showSharedWithSpaceSection =
-    !!sharedWithSpaceScopeSpaceId && (sharedWithSpacePage?.items?.length ?? 0) > 0;
-  // A team/organisation space that owns nothing yet but has items shared
-  // into it is not empty — the "Shared with {space}" section renders inside
-  // the non-empty branch (D2/D10).
+  // `items` already holds whatever is shared into a team/organisation space,
+  // so a space that owns nothing but has items shared into it is not empty.
   const isEmpty =
     noTypesSelected ||
-    (!isLoading &&
-      items.length === 0 &&
-      (!isSpace || documents.length === 0) &&
-      !showSharedWithSpaceSection &&
-      feed.loaded);
+    (!isLoading && items.length === 0 && (!isSpace || documents.length === 0) && feed.loaded);
 
   const renderCard = (item: ContentItem) => {
     const selectionProps = {
@@ -744,7 +659,7 @@ const ContentPage = ({
     <ContentSpacesPanel
       spaces={spaces}
       loading={spacesLoading}
-      active={active}
+      active={spaceUnknown ? { kind: "view", view: "shared_with_me" } : active}
       onSelectSpace={(id) => {
         goSpace(id);
         onPicked?.();
@@ -782,7 +697,6 @@ const ContentPage = ({
   const detailsPanel = (isMobile?: boolean) => (
     <ContentDetailsPanel
       selected={selection.selectedItems}
-      space={space}
       spaces={spaces}
       folders={folders ?? []}
       location={locationInfo}
@@ -859,6 +773,9 @@ const ContentPage = ({
                   folderId={folderId}
                   onNavigate={goFolder}
                   view={active.kind === "view" ? active.view : undefined}
+                  rootFolderId={sharedRootFolderId}
+                  fallbackView={spaceUnknown ? "shared_with_me" : undefined}
+                  onNavigateView={goView}
                   dragOverRoot={drag.dropTarget === "root"}
                   onDragOverRoot={isSpace ? handleDragOverRoot : undefined}
                   onDragLeaveRoot={isSpace ? handleDragLeaveRoot : undefined}
@@ -912,12 +829,6 @@ const ContentPage = ({
             onClick={() => {
               if (selection.anySelected) selection.clear();
             }}>
-            {active.kind === "view" && active.view === "shared_with_me" && (
-              <Typography component="div" sx={{ fontSize: 12.5, color: theme.palette.text.disabled, mb: 2 }}>
-                {t("shared_with_me_note")}
-              </Typography>
-            )}
-
             {showSkeleton && (
               <ContentFeedSkeleton layout={layout === "grid" ? "tiles" : "list"} mobile={mobile} />
             )}
@@ -965,85 +876,6 @@ const ContentPage = ({
                         <DocumentCard key={document.id} document={document} />
                       ))}
                     </Box>
-                  </ContentSection>
-                )}
-
-                {showSharedWithSpaceSection && space && (
-                  <ContentSection
-                    labelKey="shared_with_space"
-                    label={t("shared_with_space", { name: space.name })}
-                    count={sharedWithSpacePage?.items?.length ?? 0}
-                    open={openSections.shared_with_space}
-                    onToggle={() => toggleSection("shared_with_space")}>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                      {(sharedWithSpacePage?.items ?? []).map((item) => {
-                        const role = sharedRoleFor(item, space);
-                        return (
-                          <Box
-                            key={`shared-${item.type}-${item.id}`}
-                            onClick={() => openItem(item)}
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "12px",
-                              padding: "11px 14px",
-                              cursor: "pointer",
-                              backgroundColor: theme.palette.background.paper,
-                              border: `1px solid ${theme.palette.divider}`,
-                              borderRadius: "10px",
-                              "&:hover": { borderColor: alpha(theme.palette.text.primary, 0.24) },
-                            }}>
-                            <Box
-                              sx={{
-                                width: 32,
-                                height: 32,
-                                borderRadius: "8px",
-                                flexShrink: 0,
-                                backgroundColor: alpha(theme.palette.text.primary, 0.08),
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                              }}>
-                              <Icon
-                                iconName={iconFor(item)}
-                                style={{ fontSize: 16, color: theme.palette.text.secondary }}
-                              />
-                            </Box>
-                            <Box sx={{ flex: "1 1 40%", minWidth: 0 }}>
-                              <Typography component="div" noWrap sx={{ fontSize: 13.5, fontWeight: 700 }}>
-                                {item.name}
-                              </Typography>
-                              <Typography
-                                component="div"
-                                sx={{ fontSize: 11.5, color: theme.palette.text.secondary }}>
-                                {spaceDisplayName(spaceOf(item), t)}
-                              </Typography>
-                            </Box>
-                            {role && (
-                              <Chip
-                                label={role}
-                                size="small"
-                                sx={{
-                                  height: 18,
-                                  fontSize: 10,
-                                  flexShrink: 0,
-                                  "& .MuiChip-label": { px: 1 },
-                                }}
-                              />
-                            )}
-                            <ContentKebab
-                              items={getMenuItems(item, undefined)}
-                              onSelect={(menuItem) => handleMenuSelect(menuItem, item)}
-                            />
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                    <Typography
-                      component="div"
-                      sx={{ fontSize: 12.5, color: theme.palette.text.disabled, mt: "8px" }}>
-                      {t("shared_with_space_note", { name: space.name })}
-                    </Typography>
                   </ContentSection>
                 )}
               </Box>
@@ -1102,14 +934,29 @@ const ContentPage = ({
             loadedTemplate ? templateSourceLabel(templateShelfOf(loadedTemplate, spaces), t) : undefined
           }
           onClose={() => setTemplateOpen(null)}
-          onUse={() => loadedTemplate && setTemplateToUse(loadedTemplate)}
+          onUse={() => {
+            if (!loadedTemplate) return;
+            setTemplateToUse(loadedTemplate);
+            setTemplateOpen(null);
+          }}
+        />
+      )}
+
+      {editTemplate && (
+        <SaveTemplateDialog
+          template={editTemplate}
+          onClose={() => setEditTemplate(null)}
+          onSaved={() => {
+            setEditTemplate(null);
+            refreshContentFeed();
+          }}
         />
       )}
 
       {templateToUse && (
         <UseTemplateFlow
           template={templateToUse}
-          context={{ kind: "new_project" }}
+          context={{ kind: "outside_project" }}
           onClose={() => setTemplateToUse(null)}
           onDone={(result) => {
             setTemplateToUse(null);

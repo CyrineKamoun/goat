@@ -1,18 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  TEMPLATES_EMPTY_SHELF_HINT_KEY,
-  TEMPLATE_SOURCE_ORDER,
+  publicOnPublishInputs,
   compareTemplateShelves,
+  sourceLink,
   stripMarkdown,
+  TEMPLATE_SOURCE_ORDER,
   templateBrowserEmptyCopy,
   templateBrowserTitleKey,
+  TEMPLATES_EMPTY_SHELF_HINT_KEY,
   templateShelfOf,
   templateSourceLabel,
   templateSourceOf,
 } from "@/lib/utils/templates";
 import type { Space } from "@/lib/validations/content";
-import type { TemplateRead } from "@/lib/validations/template";
+import type { TemplateInput, TemplateRead, TemplateSourceInfo } from "@/lib/validations/template";
 
 const t = (key: string) => key;
 
@@ -39,7 +41,7 @@ const template = (overrides: Partial<TemplateRead>): TemplateRead => ({
   payload_kind: "workflow",
   kinds: ["workflow"],
   inputs: [],
-  ships_sample_data: false,
+  ships_data: false,
   catalog_status: "none",
   source_ref: {},
   datasets_needing_share: [],
@@ -73,6 +75,18 @@ describe("templateSourceOf", () => {
     expect(templateSourceOf(template({ space_id: "s1", created_by: other }), spaces)).toBe("mine");
   });
 
+  it("reads a template in a space the caller is not in as shared with them", () => {
+    // Reached through a grant on it or on a folder above it — most often
+    // someone else's personal space, which must not read as "Mine".
+    expect(templateSourceOf(template({ space_id: "someone-elses", created_by: other }), spaces)).toBe(
+      "shared"
+    );
+    expect(templateShelfOf(template({ space_id: "someone-elses" }), spaces)).toEqual({
+      key: "shared",
+      source: "shared",
+    });
+  });
+
   it("reads a template by the kind of space it lives in", () => {
     expect(templateSourceOf(template({ space_id: "s2", created_by: other }), spaces)).toBe("team");
     expect(templateSourceOf(template({ space_id: "s4", created_by: other }), spaces)).toBe("team");
@@ -80,12 +94,12 @@ describe("templateSourceOf", () => {
     expect(templateSourceOf(template({ space_id: "s1", created_by: other }), spaces)).toBe("mine");
   });
 
-  it("falls back to Mine for a space the caller is not in", () => {
-    expect(templateSourceOf(template({ space_id: "s9" }), spaces)).toBe("mine");
+  it("never reads a space the caller is not in as Mine", () => {
+    expect(templateSourceOf(template({ space_id: "s9" }), spaces)).toBe("shared");
   });
 
-  it("orders the groups GOAT first, then the caller's own shelves", () => {
-    expect(TEMPLATE_SOURCE_ORDER).toEqual(["goat", "mine", "team", "org"]);
+  it("orders the groups GOAT first, then the caller's own shelves, then what was shared", () => {
+    expect(TEMPLATE_SOURCE_ORDER).toEqual(["goat", "mine", "team", "org", "shared"]);
   });
 });
 
@@ -141,6 +155,15 @@ describe("compareTemplateShelves", () => {
       "s4",
       "s3",
     ]);
+  });
+
+  it("stacks what others shared last, after the organization", () => {
+    const shelves = [
+      { key: "shared", source: "shared" as const },
+      { key: "s3", source: "org" as const, space: org },
+      { key: "mine", source: "mine" as const },
+    ];
+    expect([...shelves].sort(compareTemplateShelves).map((shelf) => shelf.key)).toEqual(["mine", "s3", "shared"]);
   });
 });
 
@@ -211,5 +234,59 @@ describe("stripMarkdown", () => {
 
   it("answers empty for a description that is only syntax", () => {
     expect(stripMarkdown("---")).toBe("");
+  });
+});
+
+const input = (over: Partial<TemplateInput>): TemplateInput => ({
+  key: "k",
+  label: "L",
+  mode: "ask",
+  layer_id: null,
+  layer_type: null,
+  geometry_type: null,
+  from_catalog: false,
+  public_read: false,
+  ...over,
+});
+
+describe("sourceLink", () => {
+  const base: TemplateSourceInfo = {
+    kind: "workflow",
+    project_id: "00000000-0000-0000-0000-0000000000p1".replace("p1", "0001"),
+    project_name: "P",
+    workflow_id: "00000000-0000-0000-0000-000000000011",
+    workflow_name: "W",
+    layout_id: null,
+    layout_name: null,
+    available: true,
+  };
+  const p = base.project_id;
+
+  it("opens the project on the workflow it was saved from", () => {
+    expect(sourceLink(base)).toEqual({ project: `/map/${p}`, payload: `/map/${p}?mode=workflows&workflow=${base.workflow_id}` });
+  });
+
+  it("opens the project on the layout for a layout template", () => {
+    const layoutId = "00000000-0000-0000-0000-000000000022";
+    expect(sourceLink({ ...base, kind: "layout", workflow_id: null, layout_id: layoutId })).toEqual({
+      project: `/map/${p}`,
+      payload: `/map/${p}?mode=reports&layout=${layoutId}`,
+    });
+  });
+
+  it("has no payload link for a project template", () => {
+    expect(sourceLink({ ...base, kind: "project", workflow_id: null }).payload).toBeNull();
+  });
+});
+
+describe("publicOnPublishInputs", () => {
+  it("lists shipped inputs that are neither catalog nor public, and nothing else", () => {
+    const rows = [
+      input({ key: "a", mode: "ship", layer_id: "00000000-0000-0000-0000-000000000001" }),
+      input({ key: "b", mode: "ship", layer_id: "00000000-0000-0000-0000-000000000002", from_catalog: true }),
+      input({ key: "c", mode: "ask" }),
+      input({ key: "d", mode: "ship", layer_id: "00000000-0000-0000-0000-000000000004", public_read: true }),
+    ];
+    expect(publicOnPublishInputs(rows).map((r) => r.key)).toEqual(["a"]);
   });
 });

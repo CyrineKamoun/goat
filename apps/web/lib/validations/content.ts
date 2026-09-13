@@ -68,8 +68,8 @@ export const contentItemSchema = z.object({
   template_catalog_status: z.enum(["none", "proposed", "published", "declined"]).nullable().optional(),
   /** `type: "template"` rows only: true once any declared input is a
    * shipped, catalog-origin dataset (T5). Optional for the same reason as
-   * `template_kinds` above — read as `item.template_ships_sample_data ?? false`. */
-  template_ships_sample_data: z.boolean().optional(),
+   * `template_kinds` above — read as `item.template_ships_data ?? false`. */
+  template_ships_data: z.boolean().optional(),
 });
 
 export const contentPageSchema = z.object({

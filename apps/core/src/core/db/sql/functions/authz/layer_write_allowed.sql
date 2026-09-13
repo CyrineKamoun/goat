@@ -8,10 +8,13 @@ LANGUAGE plpgsql STABLE AS $$
    own space also does, directly or through one of that space's admins.
    Project access alone never grants write. A layer with no space (a
    genuine orphan — never claimed into one, or one whose space was
-   deleted out from under it) is writable by nobody; a catalog-flagged
-   layer that does have a space (in_catalog TRUE or catalog_external_uid
-   set) is writable by its space owner only — no grant path, including
-   the shared-workspace one, may raise it above viewer for anyone else.
+   deleted out from under it) is writable by nobody, which covers every
+   catalog dataset: promote gives them no space. Should a catalog dataset
+   ever carry a space, it is still writable by its space owner only — no
+   grant path, including the shared-workspace one, may raise it above
+   viewer for anyone else. A public dataset (public_read) is not a catalog
+   dataset: the flag opens reading to every signed-in user and changes
+   nothing about who may write.
    Losing user_id alone (e.g. the creator's account was removed) does not
    lock the layer: the space is still the source of truth for ownership.
    Restricted (D9) narrows write as well as read: a restricted layer — or one

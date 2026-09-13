@@ -39,6 +39,11 @@ _ORDER_COLUMNS: dict[str, str] = {
     "name": "i.name",
     "last_opened_at": "last_opened_at",
 }
+# Every view's ORDER BY ends in `i.type, i.id` in the same direction: a bulk
+# import leaves dozens of rows tied on `updated_at`/`created_at`, each page
+# is its own LIMIT/OFFSET query, and Postgres orders ties any way it likes
+# per query — without the tiebreak a tie group straddling a page boundary
+# repeats rows on the next page and drops others.
 _ORDER_DIRECTIONS: dict[str, str] = {
     "ascendent": "ASC",
     "descendent": "DESC",
@@ -144,8 +149,8 @@ def _restricted_cols(
 
 def _public_col(schema: str, alias: str) -> str:
     """Whether this project has a published public snapshot (a
-    `project_public` row). Only projects can be published, so every other
-    branch selects FALSE in this position."""
+    `project_public` row). A layer's branch selects `l.public_read` in this
+    position instead (a public dataset); folders and bundles select FALSE."""
     return (
         f"EXISTS (SELECT 1 FROM {schema}.project_public pp "
         f"WHERE pp.project_id = {alias}.id) AS is_public"
@@ -229,7 +234,7 @@ WITH RECURSIVE scope AS (
        AND NOT p.is_template_source
     UNION ALL
     SELECT 'layer', l.id, l.name, l.space_id, l.folder_id, l.updated_at, l.created_at, l.type::text, l.feature_layer_geometry_type::text, l.thumbnail_url,
-           FALSE, FALSE,
+           l.public_read, FALSE,
            {_restricted_cols(schema, "layer", "l", "l.folder_id")},
            l.user_id AS created_by_id
       FROM {schema}.layer l
@@ -282,7 +287,7 @@ WITH RECURSIVE scope AS (
        AND NOT p.is_template_source
     UNION ALL
     SELECT 'layer', l.id, l.name, l.space_id, cs.folder_id, l.updated_at, l.created_at, l.type::text, l.feature_layer_geometry_type::text, l.thumbnail_url,
-           FALSE, TRUE,
+           l.public_read, TRUE,
            {_restricted_cols(schema, "layer", "l", "l.folder_id")},
            l.user_id AS created_by_id
       FROM {schema}.content_shortcut cs
@@ -300,7 +305,7 @@ WITH RECURSIVE scope AS (
        {_item_scope("cs.folder_id")}
 )
 {_ITEMS_TAIL.format(S=schema)}
- ORDER BY (i.type = 'folder') DESC, {order_col} {order_dir}
+ ORDER BY (i.type = 'folder') DESC, {order_col} {order_dir}, i.type {order_dir}, i.id {order_dir}
  LIMIT :size OFFSET :offset
 """
 
@@ -326,7 +331,7 @@ def _granted_items_cte(schema: str) -> str:
        AND NOT p.is_template_source
     UNION ALL
     SELECT 'layer', l.id, l.name, l.space_id, l.folder_id, l.updated_at, l.created_at, l.type::text, l.feature_layer_geometry_type::text, l.thumbnail_url,
-           FALSE,
+           l.public_read,
            {_restricted_cols(schema, "layer", "l", "l.folder_id")},
            l.user_id AS created_by_id
       FROM {schema}.layer l
@@ -353,7 +358,7 @@ def _shared_with_me_view_sql(schema: str, order_col: str, order_dir: str) -> str
 WITH items AS ({_granted_items_cte(schema)})
 {_ITEMS_TAIL.format(S=schema)}
    AND {schema}.space_rank(i.space_id, :user_id) = 0
- ORDER BY {order_col} {order_dir}
+ ORDER BY {order_col} {order_dir}, i.type {order_dir}, i.id {order_dir}
  LIMIT :size OFFSET :offset
 """
 
@@ -363,7 +368,7 @@ def _shared_with_space_view_sql(schema: str, order_col: str, order_dir: str) -> 
 WITH items AS ({_granted_items_cte(schema)})
 {_ITEMS_TAIL.format(S=schema)}
    AND i.space_id IS DISTINCT FROM :space_id
- ORDER BY {order_col} {order_dir}
+ ORDER BY {order_col} {order_dir}, i.type {order_dir}, i.id {order_dir}
  LIMIT :size OFFSET :offset
 """
 
@@ -390,7 +395,7 @@ WITH items AS (
        AND NOT p.is_template_source
     UNION ALL
     SELECT 'layer', l.id, l.name, l.space_id, l.folder_id, l.updated_at, l.created_at, l.type::text, l.feature_layer_geometry_type::text, l.thumbnail_url,
-           FALSE,
+           l.public_read,
            {_restricted_cols(schema, "layer", "l", "l.folder_id")},
            l.user_id AS created_by_id
       FROM {schema}.layer l
@@ -419,7 +424,7 @@ WITH items AS (
             OR t.catalog_status = 'published')
 )
 {_ITEMS_TAIL.format(S=schema)}
- ORDER BY {order_col} {order_dir}
+ ORDER BY {order_col} {order_dir}, i.type {order_dir}, i.id {order_dir}
  LIMIT :size OFFSET :offset
 """
 
@@ -543,10 +548,21 @@ class CRUDContent:
                     status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
                 )
             if folder.space_id != space_id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="folder_id does not belong to space_id",
-                )
+                # A folder shared into a space is opened under that space —
+                # the one the caller browsed from — so the page keeps its
+                # place in the space list and the trail. That context space
+                # has to be one of the caller's own; the folder itself is
+                # gated below like any other.
+                context = await db.get(Space, space_id)
+                if context is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND, detail="Space not found"
+                    )
+                if await crud_space.my_role(db, space=context, user_id=user_id) is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Not a member of this space",
+                    )
             if not await authz.can(db, "folder", folder_id, user_id, "read"):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
@@ -903,8 +919,8 @@ class CRUDContent:
         payload reads the frozen source project via `_project_payload_kinds`
         — Dashboard/Workflow/Layout depending on what it actually holds,
         batched in one extra query rather than one per template.
-        `template_ships_sample_data` is true once any declared input (T5) is
-        a shipped, catalog-origin dataset.
+        `template_ships_data` is true once any declared input (T5) is a
+        shipped catalog or public dataset.
         """
         if not template_ids:
             return {}
@@ -933,17 +949,17 @@ class CRUDContent:
                     has_workflows=False,
                     has_layouts=False,
                 )
-            ships_sample_data = any(
+            ships_data = any(
                 isinstance(inp, dict)
                 and inp.get("mode") == "ship"
-                and inp.get("from_catalog")
+                and (inp.get("from_catalog") or inp.get("public_read"))
                 for inp in (r.inputs or [])
             )
             details[r.id] = {
                 "template_payload_kind": r.payload_kind,
                 "template_kinds": kinds,
                 "template_catalog_status": r.catalog_status,
-                "template_ships_sample_data": ships_sample_data,
+                "template_ships_data": ships_data,
             }
         return details
 

@@ -1067,3 +1067,131 @@ async def test_a_page_past_the_last_one_still_reports_the_total(
     past_the_end = await _feed(client, space_id=str(sid), page=50, size=2)
     assert past_the_end["items"] == []
     assert past_the_end["total"] == total
+
+
+@pytest.mark.asyncio
+async def test_shared_folder_opens_under_the_grantee_s_own_space_as_context(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    roles: dict[str, UUID],
+    make_user: Callable[..., Awaitable[User]],
+    make_org: Callable[[], Awaitable[Organization]],
+    make_folder: Callable[..., Awaitable[Folder]],
+    make_layer: Callable[..., Awaitable[Layer]],
+) -> None:
+    """The Content page keeps the browsed space in the address when it steps
+    into a folder shared in from another space, so `space_id` may name one
+    of the caller's own spaces rather than the folder's — the folder itself
+    is still gated by its grant, and the context space by membership."""
+    me = fixture_create_user
+    org = await make_org()
+    other = await make_user(org.id)
+    shared_folder = await make_folder(other, "shared")
+    inside_layer = await make_layer(other, shared_folder)
+    await db_session.execute(
+        text(
+            f"INSERT INTO {S}.resource_grant (resource_type, resource_id, grantee_type, "
+            "grantee_id, role_id, granted_by) VALUES ('folder', :r, 'user', :u, :role, :o)"
+        ),
+        {"r": shared_folder.id, "u": me, "role": roles["folder-viewer"], "o": other.id},
+    )
+    await db_session.commit()
+    my_space_id = (await crud_space.ensure_personal(db_session, me)).id
+
+    page = await _feed(
+        client, space_id=str(my_space_id), folder_id=str(shared_folder.id)
+    )
+    ids = {i["id"] for i in page["items"]}
+    assert str(inside_layer.id) in ids
+    rows = {i["id"]: i for i in page["items"]}
+    assert rows[str(inside_layer.id)]["my_role"] == "viewer"
+    # The rows keep the folder's real space; the context is only the address.
+    assert rows[str(inside_layer.id)]["space_id"] != str(my_space_id)
+
+    # A space the caller is not a member of is no context of theirs.
+    bystander = await make_user(org.id)
+    bystander_space_id = (await crud_space.ensure_personal(db_session, bystander.id)).id
+    await db_session.commit()
+    r = await client.get(
+        f"{settings.API_V2_STR}/content",
+        params={
+            "space_id": str(bystander_space_id),
+            "folder_id": str(shared_folder.id),
+        },
+    )
+    assert r.status_code == 403, r.text
+
+    # The context space does not stand in for the folder's grant.
+    r = await client.get(
+        f"{settings.API_V2_STR}/content",
+        params={
+            "space_id": str(bystander_space_id),
+            "folder_id": str(shared_folder.id),
+        },
+        headers={"Authorization": f"Bearer {_unverified_bearer(bystander.id)}"},
+    )
+    assert r.status_code == 403, r.text
+
+
+@pytest.mark.asyncio
+async def test_rows_tied_on_the_sort_column_page_without_repeating(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_get_home_folder: dict[str, object],
+) -> None:
+    """A bulk import leaves dozens of rows with one identical `updated_at`.
+    Each page is its own LIMIT/OFFSET query, and Postgres orders ties any way
+    it likes per query, so without a deterministic tiebreak a tie group
+    straddling a page boundary repeats rows on the next page and drops
+    others. Ties break on (type, id), so the tie group reads the same way
+    on every page."""
+    me = fixture_create_user
+    home_id = UUID(str(fixture_get_home_folder["id"]))
+    sid = str((await crud_space.ensure_personal(db_session, me)).id)
+    # Written in descending id order so a plain heap scan hands them back
+    # the opposite way from the tiebreak.
+    ids = sorted((uuid4() for _ in range(6)), reverse=True)
+    for layer_id in ids:
+        db_session.add(
+            Layer(
+                id=layer_id,
+                user_id=me,
+                folder_id=home_id,
+                space_id=UUID(sid),
+                name=f"tied-{layer_id.hex[:6]}",
+                type="feature",
+                feature_layer_type="standard",
+                feature_layer_geometry_type="polygon",
+            )
+        )
+        await db_session.flush()
+    await db_session.execute(
+        text(
+            f"UPDATE {S}.layer SET updated_at = '2026-01-01T00:00:00Z' WHERE id = ANY(:ids)"
+        ),
+        {"ids": ids},
+    )
+    await db_session.commit()
+
+    listed: list[str] = []
+    page = 1
+    while True:
+        r = await _feed(
+            client,
+            space_id=sid,
+            types="layer",
+            order_by="updated_at",
+            order="ascendent",
+            page=page,
+            size=2,
+        )
+        if not r["items"]:
+            break
+        listed.extend(i["id"] for i in r["items"])
+        page += 1
+
+    assert len(listed) == len(set(listed)), "no row is listed on two pages"
+    assert set(listed) == {str(i) for i in ids}
+    assert listed == sorted(str(i) for i in ids), "ties read in id order"

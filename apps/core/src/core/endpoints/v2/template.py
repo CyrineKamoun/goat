@@ -9,7 +9,7 @@ from pydantic import UUID4
 
 from core.crud.crud_template import template as crud_template
 from core.db.session import AsyncSession
-from core.deps.auth import auth_z, require_superuser
+from core.deps.auth import auth_z, require_superuser, token_is_superuser
 from core.deps.auth import user_token as get_user_token
 from core.endpoints.deps import get_db, get_user_id
 from core.schemas.template import (
@@ -99,6 +99,17 @@ async def list_templates(
         description="Comma-separated categories; a template matches only when "
         "it carries every one of them (compared case-insensitively).",
     ),
+    source_project_id: UUID | None = Query(
+        None,
+        description="Only templates saved from this project (source_ref.project_id)",
+    ),
+    source_workflow_id: UUID | None = Query(
+        None,
+        description="Only templates saved from this workflow (source_ref.workflow_id)",
+    ),
+    source_layout_id: UUID | None = Query(
+        None, description="Only templates saved from this layout (source_ref.layout_id)"
+    ),
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
 ) -> TemplatePage:
@@ -116,6 +127,9 @@ async def list_templates(
         kind=kind,
         search=search,
         categories=categories,
+        source_project_id=source_project_id,
+        source_workflow_id=source_workflow_id,
+        source_layout_id=source_layout_id,
         page=page,
         size=size,
     )
@@ -278,10 +292,6 @@ async def refresh_template(
     )
 
 
-def _is_superuser(user_token: dict[str, Any]) -> bool:
-    return "superuser" in (user_token.get("realm_access", {}).get("roles") or [])
-
-
 @router.post(
     "/{template_id}/publish",
     summary="Publish a template to the GOAT catalog (superuser only)",
@@ -305,7 +315,7 @@ async def publish_template(
         async_session,
         template_id=template_id,
         user_id=user_id,
-        is_superuser=_is_superuser(token),
+        is_superuser=token_is_superuser(token),
     )
 
 
@@ -330,7 +340,7 @@ async def unpublish_template(
         async_session,
         template_id=template_id,
         user_id=user_id,
-        is_superuser=_is_superuser(token),
+        is_superuser=token_is_superuser(token),
     )
 
 

@@ -179,7 +179,7 @@ describe("canEditLayerFields", () => {
 
   it("refuses an unowned layer, which is what a promoted catalog layer is", () => {
     // Catalog layers carry no owner at all (`layer.user_id IS NULL`), so this
-    // holds even where `in_catalog` is not set on the project layer.
+    // holds even where the project layer carries no catalog marker.
     expect(
       canEditLayerFields({
         currentUserId: USER,

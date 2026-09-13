@@ -61,6 +61,12 @@ class TemplateInput(BaseModel):
     "ask" clears ``layer_id`` and turns the reference into a named, typed
     slot the user fills in on use. ``layer_type`` holds ``None`` for an input
     whose type is not one of the three types.
+
+    The two dataset flags are recomputed server-side from the layer row,
+    never trusted from the client: ``from_catalog`` (a catalog dataset,
+    ``catalog_external_uid`` set) and ``public_read`` (a public dataset,
+    readable by every signed-in user). Either one lets the dataset ship
+    with a published GOAT template.
     """
 
     key: str
@@ -70,6 +76,7 @@ class TemplateInput(BaseModel):
     layer_type: Literal["feature", "table", "raster"] | None = None
     geometry_type: str | None = None
     from_catalog: bool = False
+    public_read: bool = False
 
     @field_validator("layer_type", mode="before")
     @classmethod
@@ -88,6 +95,22 @@ class TemplateSource(BaseModel):
     project_id: UUID
     workflow_id: UUID | None = None
     layout_id: UUID | None = None
+
+
+class TemplateSourceInfo(BaseModel):
+    """Where a template was saved from, resolved for the caller: names for
+    the edit dialog's links, and whether "Update from source" can work —
+    the project must still be readable and the workflow/layout still exist.
+    Only ``GET /template/{id}`` fills this in; list rows carry ``None``."""
+
+    kind: Literal["workflow", "layout", "project"]
+    project_id: UUID | None
+    project_name: str | None
+    workflow_id: UUID | None = None
+    workflow_name: str | None = None
+    layout_id: UUID | None = None
+    layout_name: str | None = None
+    available: bool
 
 
 class TemplatePreviewRequest(BaseModel):
@@ -180,9 +203,10 @@ class TemplateRead(BaseModel):
     payload_kind: Literal["workflow", "layout", "project"]
     kinds: list[str]
     inputs: list[TemplateInput]
-    ships_sample_data: bool
+    ships_data: bool
     catalog_status: Literal["none", "proposed", "published", "declined"]
     source_ref: dict[str, Any]
+    source: TemplateSourceInfo | None = None
     my_role: Literal["owner", "editor", "viewer"]
     created_at: datetime
     updated_at: datetime
