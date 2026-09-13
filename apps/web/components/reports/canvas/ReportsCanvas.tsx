@@ -19,16 +19,15 @@ import { Rnd } from "react-rnd";
 import ThemeProvider from "@p4b/ui/theme/ThemeProvider";
 
 import type { AtlasPage } from "@/lib/print/atlas-utils";
-import { PAGE_SIZES, mmToPx, pxToMm } from "@/lib/print/units";
+import { mmToPx, pxToMm, resolvePageMm } from "@/lib/print/units";
+import { setReportCanvasZoom } from "@/lib/store/map/slice";
 import type { Project, ProjectLayer } from "@/lib/validations/project";
 import type { ReportElement, ReportLayoutConfig } from "@/lib/validations/reportLayout";
 
-import { setReportCanvasZoom } from "@/lib/store/map/slice";
-
-import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import { useBasemap } from "@/hooks/map/MapHooks";
 import { useAtlasFeatures } from "@/hooks/reports/useAtlasFeatures";
 import { usePrintConfig } from "@/hooks/reports/usePrintConfig";
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { FixedRulerWrapper, RULER_SIZE } from "@/components/reports/canvas/Ruler";
 import { ElementContentRenderer } from "@/components/reports/elements/renderers/ElementRenderers";
@@ -614,7 +613,16 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
       });
       onInteractionEnd?.();
     },
-    [element.id, element.position, onUpdate, onInteractionEnd, zoom, snapPoints, onSnapGuidesChange, isSnappingEnabled]
+    [
+      element.id,
+      element.position,
+      onUpdate,
+      onInteractionEnd,
+      zoom,
+      snapPoints,
+      onSnapGuidesChange,
+      isSnappingEnabled,
+    ]
   );
 
   // Custom resize handle styles
@@ -688,13 +696,9 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
             ? `rgba(${parseInt(elementBackgroundColor.slice(1, 3), 16)}, ${parseInt(elementBackgroundColor.slice(3, 5), 16)}, ${parseInt(elementBackgroundColor.slice(5, 7), 16)}, ${elementBackgroundOpacity})`
             : "transparent",
           // Apply element border (if enabled)
-          border: elementBorderEnabled
-            ? `${elementBorderWidthPx}px solid ${elementBorderColor}`
-            : "none",
+          border: elementBorderEnabled ? `${elementBorderWidthPx}px solid ${elementBorderColor}` : "none",
           // Selection indicator uses outline (doesn't affect layout/content position)
-          outline: isSelected
-            ? `2px solid ${theme.palette.primary.main}`
-            : "none",
+          outline: isSelected ? `2px solid ${theme.palette.primary.main}` : "none",
           outlineOffset: 0,
           borderRadius: 0,
           overflow: "hidden",
@@ -885,12 +889,7 @@ const ReportsCanvas: React.FC<ReportsCanvasProps> = ({
 
   // Get paper dimensions in pixels based on size, orientation, and DPI
   const paperDimensions = useMemo(() => {
-    const sizeKey = pageConfig.size === "Custom" ? "A4" : pageConfig.size;
-    const size = PAGE_SIZES[sizeKey] || PAGE_SIZES.A4;
-
-    // Get dimensions in mm based on orientation
-    const widthMm = pageConfig.orientation === "landscape" ? size.height : size.width;
-    const heightMm = pageConfig.orientation === "landscape" ? size.width : size.height;
+    const { width: widthMm, height: heightMm } = resolvePageMm(pageConfig);
 
     // Convert mm to pixels at screen DPI for preview
     const widthPx = mmToPx(widthMm, SCREEN_DPI);
@@ -902,7 +901,7 @@ const ReportsCanvas: React.FC<ReportsCanvasProps> = ({
       widthPx,
       heightPx,
     };
-  }, [pageConfig.size, pageConfig.orientation]);
+  }, [pageConfig]);
 
   // Droppable area for the paper
   const { setNodeRef, isOver } = useDroppable({
@@ -1255,7 +1254,9 @@ const ReportsCanvas: React.FC<ReportsCanvasProps> = ({
                         onSelect={(id) => onElementSelect?.(id)}
                         onDelete={(id) => onElementDelete?.(id)}
                         onUpdate={(id, updates) => onElementUpdate?.(id, updates)}
-                        onInteractionEnd={() => { lastInteractionRef.current = Date.now(); }}
+                        onInteractionEnd={() => {
+                          lastInteractionRef.current = Date.now();
+                        }}
                       />
                     ))}
                   </ThemeProvider>

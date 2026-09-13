@@ -1,11 +1,11 @@
 /**
  * Task 6: the layouts panel opens the shared template browser (locked to
- * "layout", GOAT-first) instead of the old hardcoded picker, and its kebab
+ * "layout", every source shown) instead of the old hardcoded picker, and its kebab
  * gains "Save as template". The heavy template components (`TemplateBrowser`,
  * `UseTemplateFlow`, `SaveTemplateDialog`) are stubbed so this suite can
  * assert on the props the panel wires them with and drive their callbacks.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,6 +23,7 @@ const {
   templateFlowPropsSpy,
   saveTemplateDialogPropsSpy,
   toastSuccessMock,
+  updateReportLayoutMock,
 } = vi.hoisted(() => ({
   useReportLayoutsMock: vi.fn(),
   createReportLayoutMock: vi.fn(),
@@ -31,6 +32,7 @@ const {
   templateFlowPropsSpy: vi.fn(),
   saveTemplateDialogPropsSpy: vi.fn(),
   toastSuccessMock: vi.fn(),
+  updateReportLayoutMock: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
@@ -51,7 +53,7 @@ vi.mock("@/lib/api/reportLayouts", () => ({
   createReportLayout: (...args: unknown[]) => createReportLayoutMock(...args),
   deleteReportLayout: vi.fn(),
   duplicateReportLayout: vi.fn(),
-  updateReportLayout: vi.fn(),
+  updateReportLayout: (...args: unknown[]) => updateReportLayoutMock(...args),
 }));
 
 vi.mock("@/lib/api/layers", () => ({
@@ -158,6 +160,7 @@ beforeEach(() => {
   templateFlowPropsSpy.mockReset();
   saveTemplateDialogPropsSpy.mockReset();
   toastSuccessMock.mockReset();
+  updateReportLayoutMock.mockReset().mockResolvedValue(undefined);
   useReportLayoutsMock.mockReturnValue({
     reportLayouts: [layoutA],
     isLoading: false,
@@ -168,7 +171,7 @@ beforeEach(() => {
 });
 
 describe("ReportsConfigPanel — template browser integration", () => {
-  it("opens the template browser locked to layout, GOAT source first, from the New menu", async () => {
+  it("opens the template browser locked to layout, with no source filter, from the New menu", async () => {
     const user = userEvent.setup();
     render(<ReportsConfigPanel project={project} selectedReport={null} onSelectReport={vi.fn()} />);
 
@@ -180,8 +183,9 @@ describe("ReportsConfigPanel — template browser integration", () => {
     await user.click(await screen.findByRole("menuitem", { name: "from_template" }));
 
     expect(templateBrowserPropsSpy).toHaveBeenLastCalledWith(
-      expect.objectContaining({ open: true, lockedKind: "layout", initialSource: "goat" })
+      expect.objectContaining({ open: true, lockedKind: "layout" })
     );
+    expect(templateBrowserPropsSpy.mock.lastCall?.[0]).not.toHaveProperty("initialSource");
     expect(screen.getByText("fake-use-template")).toBeInTheDocument();
   });
 
@@ -313,5 +317,192 @@ describe("ReportsConfigPanel — template browser integration", () => {
     );
 
     expect(onSelectReport).toHaveBeenCalledWith(expect.objectContaining({ id: "layout-a" }));
+  });
+});
+
+/**
+ * Page settings: the sheet the layout prints on. A2, A1 and a Custom size
+ * join the named sizes; the DPI list greys out what the sheet cannot render;
+ * a sheet change on a layout with elements asks whether to stretch them onto
+ * the new sheet.
+ */
+const withPage = (page: Record<string, unknown>, elements: unknown[] = []): ReportLayout =>
+  ({
+    ...layoutA,
+    config: {
+      ...layoutA.config,
+      page: { ...layoutA.config.page, ...page },
+      elements,
+    },
+  }) as unknown as ReportLayout;
+
+const mapElement = {
+  id: "el-1",
+  type: "map",
+  position: { x: 15, y: 32, width: 180, height: 150, z_index: 0 },
+  config: {},
+};
+
+/** Opens the MUI select whose rendered value reads `displayed`. */
+const openSelect = (displayed: string) => {
+  const trigger = screen.getByText(displayed).closest('[role="combobox"]');
+  if (!trigger) throw new Error(`no select shows ${displayed}`);
+  fireEvent.mouseDown(trigger);
+  return screen.findByRole("listbox");
+};
+
+const renderWith = (layout: ReportLayout) => {
+  useReportLayoutsMock.mockReturnValue({
+    reportLayouts: [layout],
+    isLoading: false,
+    isError: undefined,
+    mutate: mutateMock,
+    isValidating: false,
+  });
+  return render(<ReportsConfigPanel project={project} selectedReport={layout} onSelectReport={vi.fn()} />);
+};
+
+const savedPage = () => {
+  const call = updateReportLayoutMock.mock.calls.at(-1);
+  if (!call) throw new Error("nothing saved");
+  return (call[2] as { config: { page: Record<string, unknown>; elements: (typeof mapElement)[] } }).config;
+};
+
+describe("ReportsConfigPanel — page sizes", () => {
+  it("offers A2 and A1 among the page sizes", async () => {
+    renderWith(layoutA);
+    const list = await openSelect("A4");
+    expect(within(list).getByRole("option", { name: "A2" })).toBeInTheDocument();
+    expect(within(list).getByRole("option", { name: "A1" })).toBeInTheDocument();
+  });
+
+  it("switching to Custom shows width and height prefilled with the current sheet and saves them", async () => {
+    const user = userEvent.setup();
+    renderWith(layoutA);
+    const list = await openSelect("A4");
+    await user.click(within(list).getByRole("option", { name: "custom" }));
+
+    await waitFor(() => expect(screen.getByRole("spinbutton", { name: "width" })).toHaveValue(210));
+    await waitFor(() => expect(screen.getByRole("spinbutton", { name: "height" })).toHaveValue(297));
+    await waitFor(() =>
+      expect(savedPage().page).toEqual(expect.objectContaining({ size: "Custom", width: 210, height: 297 }))
+    );
+  });
+
+  it("does not save a custom side outside 50–1500 mm and says why", async () => {
+    const user = userEvent.setup();
+    renderWith(withPage({ size: "Custom", width: 300, height: 200 }));
+    const width = screen.getByRole("spinbutton", { name: "width" });
+    await user.clear(width);
+    await user.type(width, "20");
+    await user.tab();
+
+    expect(screen.getByText(/page_side_out_of_range/)).toBeInTheDocument();
+    expect(updateReportLayoutMock).not.toHaveBeenCalled();
+  });
+
+  it("saves a valid custom width once typed and left", async () => {
+    const user = userEvent.setup();
+    renderWith(withPage({ size: "Custom", width: 300, height: 200 }));
+    const width = screen.getByRole("spinbutton", { name: "width" });
+    await user.clear(width);
+    await user.type(width, "400");
+    await user.tab();
+
+    await waitFor(() =>
+      expect(savedPage().page).toEqual(expect.objectContaining({ width: 400, height: 200 }))
+    );
+  });
+
+  it("on a Custom page, choosing the other orientation swaps width and height", async () => {
+    const user = userEvent.setup();
+    renderWith(withPage({ size: "Custom", width: 300, height: 200 }));
+    // 300 × 200 is the wider way round, so the control reads horizontal.
+    const list = await openSelect("horizontal");
+    await user.click(within(list).getByRole("option", { name: "vertical" }));
+
+    await waitFor(() =>
+      expect(savedPage().page).toEqual(expect.objectContaining({ width: 200, height: 300 }))
+    );
+  });
+
+  it("greys out DPI options the sheet cannot render and shows the export size", async () => {
+    renderWith(withPage({ size: "A1", orientation: "portrait", dpi: 300 }));
+    expect(screen.getByText(/export_pixels.*7016.*9933/)).toBeInTheDocument();
+    const list = await openSelect("300 (High)");
+    await waitFor(() =>
+      expect(within(list).getByRole("option", { name: /600 \(Print\)/ })).toHaveAttribute(
+        "aria-disabled",
+        "true"
+      )
+    );
+    await waitFor(() =>
+      expect(within(list).getByRole("option", { name: /300 \(High\)/ })).not.toHaveAttribute(
+        "aria-disabled",
+        "true"
+      )
+    );
+  });
+
+  it("asks whether to scale the elements when the sheet changes on a layout that has some", async () => {
+    const user = userEvent.setup();
+    renderWith(withPage({}, [mapElement]));
+    const list = await openSelect("A4");
+    await user.click(within(list).getByRole("option", { name: "A3" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("scale_elements_title")).toBeInTheDocument();
+    expect(within(dialog).getByText(/scale_elements_prompt.*"count":1/)).toBeInTheDocument();
+    expect(updateReportLayoutMock).not.toHaveBeenCalled();
+  });
+
+  it("Scale elements saves the elements stretched onto the new sheet", async () => {
+    const user = userEvent.setup();
+    renderWith(withPage({}, [mapElement]));
+    const list = await openSelect("A4");
+    await user.click(within(list).getByRole("option", { name: "A3" }));
+    await user.click(await screen.findByRole("button", { name: "scale_elements" }));
+
+    await waitFor(() => expect(updateReportLayoutMock).toHaveBeenCalled());
+    const saved = savedPage();
+    expect(saved.page.size).toBe("A3");
+    expect(saved.elements[0].position.x).toBeCloseTo(15 * (297 / 210), 3);
+    expect(saved.elements[0].position.height).toBeCloseTo(150 * (420 / 297), 3);
+  });
+
+  it("Keep sizes saves the new sheet with the elements where they were", async () => {
+    const user = userEvent.setup();
+    renderWith(withPage({}, [mapElement]));
+    const list = await openSelect("A4");
+    await user.click(within(list).getByRole("option", { name: "A3" }));
+    await user.click(await screen.findByRole("button", { name: "keep_sizes" }));
+
+    await waitFor(() => expect(updateReportLayoutMock).toHaveBeenCalled());
+    const saved = savedPage();
+    expect(saved.page.size).toBe("A3");
+    expect(saved.elements[0].position).toEqual(mapElement.position);
+  });
+
+  it("closing the prompt cancels the change and puts the old size back", async () => {
+    const user = userEvent.setup();
+    renderWith(withPage({}, [mapElement]));
+    const list = await openSelect("A4");
+    await user.click(within(list).getByRole("option", { name: "A3" }));
+    await screen.findByRole("dialog");
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(updateReportLayoutMock).not.toHaveBeenCalled();
+    expect(screen.getByText("A4")).toBeInTheDocument();
+  });
+
+  it("changes the sheet without asking when the layout has no elements", async () => {
+    const user = userEvent.setup();
+    renderWith(layoutA);
+    const list = await openSelect("A4");
+    await user.click(within(list).getByRole("option", { name: "A3" }));
+
+    await waitFor(() => expect(savedPage().page.size).toBe("A3"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

@@ -7,6 +7,7 @@ import {
   Button,
   Checkbox,
   CircularProgress,
+  DialogContentText,
   Divider,
   FormControlLabel,
   IconButton,
@@ -36,7 +37,18 @@ import {
   updateReportLayout,
   useReportLayouts,
 } from "@/lib/api/reportLayouts";
-import { PAGE_SIZES, type PageSize } from "@/lib/print/units";
+import { scaleElementsToPage } from "@/lib/print/pageResize";
+import {
+  CUSTOM_PAGE_MAX_MM,
+  CUSTOM_PAGE_MIN_MM,
+  EXPORT_DPI_OPTIONS,
+  type PageMm,
+  clampDpi,
+  isCustomSideValid,
+  isDpiAllowed,
+  outputPixels,
+  resolvePageMm,
+} from "@/lib/print/units";
 import type { Project, ProjectLayer } from "@/lib/validations/project";
 import type {
   AtlasConfig,
@@ -54,6 +66,7 @@ import { useAtlasFeatures } from "@/hooks/reports/useAtlasFeatures";
 import { usePrintConfig } from "@/hooks/reports/usePrintConfig";
 import { type ExportFormat, useExportReport } from "@/hooks/useExportReport";
 
+import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 import NewMenuButton from "@/components/common/NewMenuButton";
 import MoreMenu from "@/components/common/PopperMenu";
 import type { PopperMenuItem } from "@/components/common/PopperMenu";
@@ -61,6 +74,7 @@ import { SIDE_PANEL_WIDTH, SidePanelContainer } from "@/components/common/SidePa
 import SectionHeader from "@/components/map/panels/common/SectionHeader";
 import SectionOptions from "@/components/map/panels/common/SectionOptions";
 import Selector from "@/components/map/panels/common/Selector";
+import TextFieldInput from "@/components/map/panels/common/TextFieldInput";
 import ConfirmModal from "@/components/modals/Confirm";
 import ReportLayoutRenameModal from "@/components/modals/ReportLayoutRename";
 import SaveTemplateDialog from "@/components/templates/SaveTemplateDialog";
@@ -80,6 +94,13 @@ const PanelContainer = styled(SidePanelContainer)(({ theme }) => ({
   position: "relative",
   zIndex: 1,
 }));
+
+const DPI_LABELS: Record<(typeof EXPORT_DPI_OPTIONS)[number], string> = {
+  72: "72 (Screen)",
+  150: "150 (Low)",
+  300: "300 (High)",
+  600: "600 (Print)",
+};
 
 interface ReportsConfigPanelProps {
   project?: Project;
@@ -116,6 +137,16 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
   // Local state for settings (derived from selected report)
   const [pageSize, setPageSize] = useState<PageConfig["size"]>("A4");
   const [orientation, setOrientation] = useState<PageConfig["orientation"]>("portrait");
+  // A Custom page's sides as typed, so an out-of-range value can stay on
+  // screen with its error while the saved page keeps the last valid one.
+  const [customWidth, setCustomWidth] = useState<string>("");
+  const [customHeight, setCustomHeight] = useState<string>("");
+  /** A sheet change waiting on the reader's answer to "scale the elements?". */
+  const [pendingSheetChange, setPendingSheetChange] = useState<{
+    page: ReportLayoutConfig["page"];
+    from: PageMm;
+    to: PageMm;
+  } | null>(null);
   const [snapToGuides, setSnapToGuides] = useState<boolean>(false);
   const [showRulers, setShowRulers] = useState<boolean>(false);
   const [dpi, setDpi] = useState<number>(300);
@@ -150,12 +181,24 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
     () => [
       { label: "A4", value: "A4" },
       { label: "A3", value: "A3" },
+      { label: "A2", value: "A2" },
+      { label: "A1", value: "A1" },
       { label: "Letter", value: "Letter" },
       { label: "Legal", value: "Legal" },
       { label: "Tabloid", value: "Tabloid" },
+      { label: t("custom"), value: "Custom" },
     ],
-    []
+    [t]
   );
+
+  /** The sheet the selected layout prints on, in millimetres. */
+  const currentPageMm: PageMm = useMemo(
+    () => resolvePageMm(selectedReport?.config.page ?? { size: "A4", orientation: "portrait" }),
+    [selectedReport?.config.page]
+  );
+
+  /** Whether the Custom sides as typed describe a printable sheet. */
+  const customSidesValid = isCustomSideValid(Number(customWidth)) && isCustomSideValid(Number(customHeight));
 
   const orientationItems: SelectorItem[] = useMemo(
     () => [
@@ -165,15 +208,22 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
     [t]
   );
 
+  // A DPI the sheet cannot render stays listed, greyed and labelled, so the
+  // reader learns why the option is gone instead of missing it.
   const dpiItems: SelectorItem[] = useMemo(
-    () => [
-      { label: "72 (Screen)", value: 72 },
-      { label: "150 (Low)", value: 150 },
-      { label: "300 (High)", value: 300 },
-      { label: "600 (Print)", value: 600 },
-    ],
-    []
+    () =>
+      EXPORT_DPI_OPTIONS.map((value) => {
+        const allowed = isDpiAllowed(currentPageMm, value);
+        return {
+          label: allowed ? DPI_LABELS[value] : `${DPI_LABELS[value]} — ${t("too_large")}`,
+          value,
+          disabled: !allowed,
+        };
+      }),
+    [currentPageMm, t]
   );
+
+  const exportPixels = useMemo(() => outputPixels(currentPageMm, dpi), [currentPageMm, dpi]);
 
   const exportFormatItems: SelectorItem[] = useMemo(
     () => [
@@ -234,6 +284,8 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
         // Page settings
         setPageSize(report.config.page.size);
         setOrientation(report.config.page.orientation);
+        setCustomWidth(report.config.page.width != null ? String(report.config.page.width) : "");
+        setCustomHeight(report.config.page.height != null ? String(report.config.page.height) : "");
         setSnapToGuides(report.config.page.snapToGuides ?? false);
         setShowRulers(report.config.page.showRulers ?? false);
         setDpi(report.config.page.dpi ?? 300);
@@ -399,19 +451,12 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
   );
 
   // Save settings to database when they change
-  const handleSettingChange = useCallback(
-    async (updates: Partial<ReportLayoutConfig["page"]>) => {
+  const saveConfig = useCallback(
+    async (updatedConfig: ReportLayoutConfig) => {
       if (!project?.id || !selectedReport) return;
 
       setIsSaving(true);
       try {
-        const updatedConfig: ReportLayoutConfig = {
-          ...selectedReport.config,
-          page: {
-            ...selectedReport.config.page,
-            ...updates,
-          },
-        };
         const updatedReport = { ...selectedReport, config: updatedConfig };
         await updateReportLayout(project.id, selectedReport.id, {
           config: updatedConfig,
@@ -432,15 +477,123 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
     [project?.id, selectedReport, reportLayouts, mutate, onSelectReport]
   );
 
+  /**
+   * Saves a page-settings change. When the change alters the sheet, the DPI
+   * is brought back under the render cap; and if the layout has elements the
+   * save waits for the reader to say whether they move with the sheet.
+   */
+  const handleSettingChange = useCallback(
+    async (updates: Partial<ReportLayoutConfig["page"]>) => {
+      if (!selectedReport) return;
+      const previous = selectedReport.config.page;
+      const page: ReportLayoutConfig["page"] = { ...previous, ...updates };
+      const from = resolvePageMm(previous);
+      const to = resolvePageMm(page);
+      const sheetChanged = from.width !== to.width || from.height !== to.height;
+
+      if (sheetChanged) {
+        const allowedDpi = clampDpi(to, page.dpi ?? 300);
+        if (allowedDpi !== (page.dpi ?? 300)) {
+          page.dpi = allowedDpi;
+          setDpi(allowedDpi);
+        }
+        if ((selectedReport.config.elements ?? []).length > 0) {
+          setPendingSheetChange({ page, from, to });
+          return;
+        }
+      }
+      await saveConfig({ ...selectedReport.config, page });
+    },
+    [selectedReport, saveConfig]
+  );
+
+  /** Answers the prompt: the sheet changes either way, the elements only when asked. */
+  const resolveSheetChange = useCallback(
+    async (scale: boolean) => {
+      if (!selectedReport || !pendingSheetChange) return;
+      const { page, from, to } = pendingSheetChange;
+      setPendingSheetChange(null);
+      const elements = scale
+        ? scaleElementsToPage(selectedReport.config.elements ?? [], from, to)
+        : selectedReport.config.elements;
+      await saveConfig({ ...selectedReport.config, page, elements });
+    },
+    [selectedReport, pendingSheetChange, saveConfig]
+  );
+
+  /** Dismissing the prompt drops the change and shows the saved sheet again. */
+  const cancelSheetChange = useCallback(() => {
+    setPendingSheetChange(null);
+    const page = selectedReport?.config.page;
+    if (!page) return;
+    setPageSize(page.size);
+    setOrientation(page.orientation);
+    setCustomWidth(page.width != null ? String(page.width) : "");
+    setCustomHeight(page.height != null ? String(page.height) : "");
+    setDpi(page.dpi ?? 300);
+  }, [selectedReport?.config.page]);
+
+  /** The pending sheet, named the way its card would name it. */
+  const pendingSheetLabel = useMemo(() => {
+    if (!pendingSheetChange) return "";
+    const { page, to } = pendingSheetChange;
+    if (page.size === "Custom") return t("page_dimensions_mm", { width: to.width, height: to.height });
+    return `${page.size} · ${t(to.width > to.height ? "landscape" : "portrait")}`;
+  }, [pendingSheetChange, t]);
+
   const handlePageSizeChange = (newSize: PageConfig["size"]) => {
     setPageSize(newSize);
+    if (newSize === "Custom") {
+      // A Custom page starts as the sheet the layout is on, so nothing moves
+      // until a side is actually typed.
+      const width = Math.round(currentPageMm.width * 10) / 10;
+      const height = Math.round(currentPageMm.height * 10) / 10;
+      setCustomWidth(String(width));
+      setCustomHeight(String(height));
+      handleSettingChange({ size: newSize, width, height });
+      return;
+    }
     handleSettingChange({ size: newSize });
   };
 
   const handleOrientationChange = (newOrientation: PageConfig["orientation"]) => {
+    if (pageSize === "Custom") {
+      // A Custom page's orientation is whichever way its sides point, so the
+      // other orientation means swapping them.
+      swapCustomSides();
+      return;
+    }
     setOrientation(newOrientation);
     handleSettingChange({ orientation: newOrientation });
   };
+
+  const swapCustomSides = () => {
+    const width = Number(customHeight);
+    const height = Number(customWidth);
+    setCustomWidth(String(width));
+    setCustomHeight(String(height));
+    if (isCustomSideValid(width) && isCustomSideValid(height)) {
+      handleSettingChange({ width, height, orientation: width > height ? "landscape" : "portrait" });
+    }
+  };
+
+  /** Saves the typed Custom sides once both are printable. */
+  const commitCustomSides = () => {
+    const width = Number(customWidth);
+    const height = Number(customHeight);
+    if (!isCustomSideValid(width) || !isCustomSideValid(height)) return;
+    const page = selectedReport?.config.page;
+    if (page?.width === width && page?.height === height) return;
+    handleSettingChange({ width, height, orientation: width > height ? "landscape" : "portrait" });
+  };
+
+  /** Which way the sheet points: derived from the sides on a Custom page. */
+  const displayedOrientation: PageConfig["orientation"] =
+    pageSize === "Custom"
+      ? currentPageMm.width > currentPageMm.height
+        ? "landscape"
+        : "portrait"
+      : orientation;
 
   const handleSnapToGuidesChange = (enabled: boolean) => {
     setSnapToGuides(enabled);
@@ -734,12 +887,7 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
   const handlePrintReport = useCallback(async () => {
     if (!project?.id || !selectedReport) return;
 
-    // Calculate paper dimensions based on size and orientation
-    const pageConfig = selectedReport.config.page;
-    const sizeKey = (pageConfig.size === "Custom" ? "A4" : pageConfig.size) as PageSize;
-    const size = PAGE_SIZES[sizeKey] || PAGE_SIZES.A4;
-    const paperWidthMm = pageConfig.orientation === "landscape" ? size.height : size.width;
-    const paperHeightMm = pageConfig.orientation === "landscape" ? size.width : size.height;
+    const { width: paperWidthMm, height: paperHeightMm } = resolvePageMm(selectedReport.config.page);
 
     try {
       await exportReport({
@@ -919,10 +1067,68 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                       disabled={!selectedReport || isSaving}
                     />
 
+                    {/* Custom page sides */}
+                    {pageSize === "Custom" && (
+                      <Stack spacing={1}>
+                        <Stack direction="row" spacing={1} alignItems="flex-end">
+                          <TextFieldInput
+                            label={t("width")}
+                            type="number"
+                            clearable={false}
+                            value={customWidth}
+                            onChange={setCustomWidth}
+                            onBlur={commitCustomSides}
+                            disabled={!selectedReport || isSaving}
+                            unit="mm"
+                            inputProps={{
+                              "aria-label": t("width"),
+                              min: CUSTOM_PAGE_MIN_MM,
+                              max: CUSTOM_PAGE_MAX_MM,
+                              step: 1,
+                            }}
+                          />
+                          <TextFieldInput
+                            label={t("height")}
+                            type="number"
+                            clearable={false}
+                            value={customHeight}
+                            onChange={setCustomHeight}
+                            onBlur={commitCustomSides}
+                            disabled={!selectedReport || isSaving}
+                            unit="mm"
+                            inputProps={{
+                              "aria-label": t("height"),
+                              min: CUSTOM_PAGE_MIN_MM,
+                              max: CUSTOM_PAGE_MAX_MM,
+                              step: 1,
+                            }}
+                          />
+                          <Tooltip title={t("swap_width_height")}>
+                            <IconButton
+                              size="small"
+                              aria-label={t("swap_width_height")}
+                              onClick={swapCustomSides}
+                              disabled={!selectedReport || isSaving}
+                              sx={{ width: 40, height: 40, flexShrink: 0 }}>
+                              <Icon iconName={ICON_NAME.REVERSE} style={{ fontSize: 15 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </Stack>
+                        <Typography variant="caption" color={customSidesValid ? "text.secondary" : "error"}>
+                          {customSidesValid
+                            ? t("custom_page_bounds", { min: CUSTOM_PAGE_MIN_MM, max: CUSTOM_PAGE_MAX_MM })
+                            : t("page_side_out_of_range", {
+                                min: CUSTOM_PAGE_MIN_MM,
+                                max: CUSTOM_PAGE_MAX_MM,
+                              })}
+                        </Typography>
+                      </Stack>
+                    )}
+
                     {/* Orientation */}
                     <Selector
                       label={t("orientation")}
-                      selectedItems={orientationItems.find((item) => item.value === orientation)}
+                      selectedItems={orientationItems.find((item) => item.value === displayedOrientation)}
                       setSelectedItems={(item: SelectorItem | SelectorItem[] | undefined) => {
                         if (item && !Array.isArray(item)) {
                           handleOrientationChange(item.value as PageConfig["orientation"]);
@@ -946,6 +1152,9 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                       items={dpiItems}
                       disabled={!selectedReport || isSaving}
                     />
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: -2 }}>
+                      {t("export_pixels", { width: exportPixels.width, height: exportPixels.height })}
+                    </Typography>
 
                     {/* Export Format */}
                     <Selector
@@ -1198,6 +1407,30 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
         </Stack>
       </Box>
 
+      {/* Scale-elements prompt for a sheet change */}
+      <AppDialog
+        open={!!pendingSheetChange}
+        onClose={cancelSheetChange}
+        icon={ICON_NAME.CIRCLEINFO}
+        title={t("scale_elements_title")}
+        ariaLabel={t("scale_elements_title")}
+        closeLabel={t("cancel")}
+        footer={
+          <AppDialogFooter
+            cancelLabel={t("keep_sizes")}
+            onCancel={() => resolveSheetChange(false)}
+            primaryLabel={t("scale_elements")}
+            onPrimary={() => resolveSheetChange(true)}
+          />
+        }>
+        <DialogContentText>
+          {t("scale_elements_prompt", {
+            count: selectedReport?.config.elements?.length ?? 0,
+            page: pendingSheetLabel,
+          })}
+        </DialogContentText>
+      </AppDialog>
+
       {/* Delete Confirmation Modal */}
       {deleteModalOpen && (
         <ConfirmModal
@@ -1249,7 +1482,6 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
           open
           onClose={() => setTemplateBrowserOpen(false)}
           lockedKind="layout"
-          initialSource="goat"
           onUse={handleUseTemplate}
         />
       )}

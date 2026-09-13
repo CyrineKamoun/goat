@@ -14,9 +14,7 @@ export type BuiltInBasemap = {
   thumbnail: string;
 };
 
-export type Basemap =
-  | BuiltInBasemap
-  | (CustomBasemap & { source: "custom"; value: string });
+export type Basemap = BuiltInBasemap | (CustomBasemap & { source: "custom"; value: string });
 
 export interface IMarker {
   id: string;
@@ -43,4 +41,6 @@ export type SelectorItem = {
   icon?: ICON_NAME;
   /** Custom indicator (e.g. FieldKindIcon chip) — takes precedence over `icon`. */
   iconNode?: ReactNode;
+  /** Shown but not choosable. */
+  disabled?: boolean;
 };

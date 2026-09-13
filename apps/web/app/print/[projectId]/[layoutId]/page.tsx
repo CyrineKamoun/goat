@@ -9,9 +9,10 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ThemeProvider from "@p4b/ui/theme/ThemeProvider";
 
 import { useProject } from "@/lib/api/projects";
+import { useProjectLayerGroups } from "@/lib/api/projects";
 import { useReportLayout } from "@/lib/api/reportLayouts";
 import type { AtlasPage } from "@/lib/print/atlas-utils";
-import { PAGE_SIZES, mmToPx } from "@/lib/print/units";
+import { mmToPx, resolvePageMm } from "@/lib/print/units";
 import { orderLayersByTree } from "@/lib/utils/map/layerTreeOrder";
 import type { CustomBasemap, ProjectLayer } from "@/lib/validations/project";
 import type { ReportLayoutConfig } from "@/lib/validations/reportLayout";
@@ -20,7 +21,6 @@ import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 import { useBasemap } from "@/hooks/map/MapHooks";
 import { useAtlasFeatures } from "@/hooks/reports/useAtlasFeatures";
 import { usePrintConfig } from "@/hooks/reports/usePrintConfig";
-import { useProjectLayerGroups } from "@/lib/api/projects";
 
 import { ElementContentRenderer } from "@/components/reports/elements/renderers/ElementRenderers";
 
@@ -165,11 +165,7 @@ export default function PrintPage() {
 
   // Calculate paper dimensions in pixels at screen DPI
   const paperDimensions = useMemo(() => {
-    const sizeKey = pageConfig.size === "Custom" ? "A4" : pageConfig.size;
-    const size = PAGE_SIZES[sizeKey] || PAGE_SIZES.A4;
-
-    const widthMm = pageConfig.orientation === "landscape" ? size.height : size.width;
-    const heightMm = pageConfig.orientation === "landscape" ? size.width : size.height;
+    const { width: widthMm, height: heightMm } = resolvePageMm(pageConfig);
 
     return {
       widthMm,
@@ -177,7 +173,7 @@ export default function PrintPage() {
       widthPx: mmToPx(widthMm, SCREEN_DPI),
       heightPx: mmToPx(heightMm, SCREEN_DPI),
     };
-  }, [pageConfig.size, pageConfig.orientation]);
+  }, [pageConfig]);
 
   if (isLoading || isProjectLoading || isLayersLoading || (isAtlasEnabled && isAtlasLoading)) {
     return (
@@ -263,7 +259,11 @@ export default function PrintPage() {
         data-atlas-enabled={isAtlasEnabled}
         data-atlas-total-pages={atlasTotalPages}
         data-atlas-current-page={atlasPageIndex}
-        data-atlas-feature-properties={currentAtlasPage?.feature?.properties ? JSON.stringify(currentAtlasPage.feature.properties) : undefined}
+        data-atlas-feature-properties={
+          currentAtlasPage?.feature?.properties
+            ? JSON.stringify(currentAtlasPage.feature.properties)
+            : undefined
+        }
         data-atlas-page-label={currentAtlasPage?.label || undefined}
         style={{ display: "none" }}
       />
@@ -300,9 +300,7 @@ const ReportElements: React.FC<ReportElementsProps> = ({
 
   // Handle element config updates (e.g. map writing back viewState after atlas page change)
   const handleElementUpdate = useCallback((elementId: string, newConfig: Record<string, unknown>) => {
-    setElements((prev) =>
-      prev.map((el) => (el.id === elementId ? { ...el, config: newConfig } : el))
-    );
+    setElements((prev) => prev.map((el) => (el.id === elementId ? { ...el, config: newConfig } : el)));
   }, []);
 
   if (elements.length === 0) {
