@@ -1,6 +1,9 @@
+import { useMemo } from "react";
 import useSWR from "swr";
 
 import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
+import { LAYERS_API_BASE_URL } from "@/lib/api/layers";
+import type { Layer } from "@/lib/validations/layer";
 
 export const BUNDLES_API_BASE_URL = new URL("api/v2/bundle", process.env.NEXT_PUBLIC_API_URL).href;
 
@@ -258,6 +261,46 @@ export const useBundleLayers = (bundleId: string | null) => {
     fetcher
   );
   return { members: data, isLoading, isError: !!error };
+};
+
+/**
+ * The member layers themselves, for drawing a bundle on a map.
+ *
+ * `useBundleLayers` answers with ids and roles; a map needs each layer's
+ * extent and styling. There is no endpoint that takes a list, and a hook
+ * cannot be called once per member, so they are fetched together into one SWR
+ * entry — the same shape `useBundleMemberGates` uses for the same reason. A
+ * member that cannot be read is left out rather than failing the map: a bundle
+ * mid-import has rows whose layers are not there yet.
+ *
+ * Only the members a map can draw. A GTFS feed is mostly tables — agency,
+ * calendar, trips — and fetching those to discard them is five wasted requests
+ * every time a bundle is opened. The listing already says which is which.
+ */
+export const useBundleMemberLayers = (members: BundleMember[] | undefined) => {
+  const layerIds = useMemo(
+    () =>
+      (members ?? [])
+        .filter((member) => member.type === "feature" || member.type === "raster")
+        .map((member) => member.layer_id)
+        .sort(),
+    [members]
+  );
+
+  const { data, isLoading } = useSWR<Layer[]>(
+    layerIds.length ? ["bundle-member-layers", ...layerIds] : null,
+    async () => {
+      const settled = await Promise.all(
+        layerIds.map(async (id) => {
+          const response = await apiRequestAuth(`${LAYERS_API_BASE_URL}/${id}`);
+          return response.ok ? ((await response.json()) as Layer) : null;
+        })
+      );
+      return settled.filter((layer): layer is Layer => !!layer);
+    }
+  );
+
+  return { memberLayers: data, isLoading };
 };
 
 /** The bundle a layer belongs to, or undefined for an ordinary layer.

@@ -23,6 +23,12 @@ const ContentPreviewDialog = dynamic(() => import("@/components/dashboard/conten
   ssr: false,
 });
 
+/** A bundle's preview carries a map of every member, so it is loaded the same
+ * way and for the same reason. */
+const BundlePreviewDialog = dynamic(() => import("@/components/dashboard/bundle/BundlePreviewDialog"), {
+  ssr: false,
+});
+
 /** How long focus is held after a blur before the results close — long
  * enough that a `mousedown`→`click` on a row still lands before it. */
 const BLUR_DELAY_MS = 120;
@@ -69,7 +75,7 @@ const HomeSearch = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const { rows, previewLayerId, closePreview } = useHomeSearch(value);
+  const { rows, previewLayerId, previewBundleId, closePreview } = useHomeSearch(value);
   const { scope, query } = parseScope(value);
   // A prefix with nothing worth searching after it yet. The hook answers that
   // state with the scoped group and its prompt; the tips stay up so the user
@@ -153,6 +159,7 @@ const HomeSearch = () => {
   return (
     <Box sx={{ position: "relative" }}>
       {previewLayerId && <ContentPreviewDialog layerId={previewLayerId} onClose={closePreview} />}
+      {previewBundleId && <BundlePreviewDialog bundleId={previewBundleId} onClose={closePreview} />}
       <SearchInput
         ref={inputRef}
         size="hero"
