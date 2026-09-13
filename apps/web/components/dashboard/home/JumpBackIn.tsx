@@ -96,7 +96,7 @@ const JumpBackIn = () => {
           variant="text"
           size="small"
           endIcon={<Icon iconName={ICON_NAME.CHEVRON_RIGHT} style={{ fontSize: 12 }} />}
-          onClick={() => router.push(contentPath({ view: "recent" }))}
+          onClick={() => router.push(`${contentPath({ view: "recent" })}?types=project`)}
           sx={{ borderRadius: 0 }}>
           {t("all_projects")}
         </Button>

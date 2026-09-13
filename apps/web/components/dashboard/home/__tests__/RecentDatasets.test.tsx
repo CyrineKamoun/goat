@@ -154,12 +154,12 @@ describe("RecentDatasets", () => {
     expect(pushMock).toHaveBeenCalledWith("/content/s1");
   });
 
-  it("routes all_datasets to the Content page's recent view", () => {
+  it("routes all_datasets to the Content page's cross-space feed, filtered to datasets", () => {
     useContentMock.mockReturnValue({ page: page([datasetItem({})]), isLoading: false });
 
     render(<RecentDatasets />);
     fireEvent.click(screen.getByText("all_datasets"));
 
-    expect(pushMock).toHaveBeenCalledWith("/content/recent");
+    expect(pushMock).toHaveBeenCalledWith("/content/recent?types=layer,bundle");
   });
 });
