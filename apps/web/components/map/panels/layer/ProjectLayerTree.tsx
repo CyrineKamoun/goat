@@ -543,7 +543,7 @@ export const ProjectLayerTree = ({
         other_properties: layer.other_properties,
         // A catalog layer has no owner; the tree's node type says "unknown".
         user_id: layer.user_id ?? undefined,
-        in_catalog: layer.in_catalog || isCatalogLayer(layer),
+        is_catalog: isCatalogLayer(layer),
         locked: layer.locked,
       });
     });
@@ -857,7 +857,7 @@ export const ProjectLayerTree = ({
         menuOptions = getLayerMoreMenuOptions(
           (node.layer_type as "table" | "feature" | "raster") || "feature",
           !!node.query,
-          !!node.in_catalog,
+          !!node.is_catalog,
           false,
           // Catalog and size are handled by the filters below.
           canEditLayerFeatures({
@@ -892,7 +892,7 @@ export const ProjectLayerTree = ({
       }
 
       // Catalogue layers cannot be renamed, duplicated, or have features edited
-      if (node.in_catalog) {
+      if (node.is_catalog) {
         menuOptions = filterMenuForCatalogLayer(menuOptions);
       }
 

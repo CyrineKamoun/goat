@@ -63,11 +63,11 @@ const TemplateInputsTable = ({ inputs, modeFor, onModeChange, allowAsk, disabled
                 {typeLabel(input)}
               </Typography>
             </Box>
-            {input.from_catalog && (
+            {(input.from_catalog || input.public_read) && (
               <Chip
                 size="small"
                 icon={<Icon iconName={ICON_NAME.DATABASE} style={{ fontSize: 12 }} />}
-                label={t("sample_data")}
+                label={t(input.from_catalog ? "catalog" : "public")}
                 sx={{ height: 22, fontSize: 11, backgroundColor: alpha(theme.palette.info.main, 0.12) }}
               />
             )}

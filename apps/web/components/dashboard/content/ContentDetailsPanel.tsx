@@ -415,7 +415,11 @@ const ContentDetailsPanel = ({
                       }}>
                       {t("public")}
                     </Typography>
-                    <Chip label={t("anyone_with_link")} size="small" sx={roleChipSx} />
+                    <Chip
+                      label={t(item.type === "layer" ? "every_goat_user" : "anyone_with_link")}
+                      size="small"
+                      sx={roleChipSx}
+                    />
                   </Box>
                 )}
                 {/* A restricted item withholds the space default (D9), so the

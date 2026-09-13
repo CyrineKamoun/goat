@@ -298,7 +298,9 @@ describe("ContentDetailsPanel", () => {
     renderPanel({ selected: [{ ...ownerLayer, is_public: true }] });
 
     expect(screen.getByText("public")).toBeInTheDocument();
-    expect(screen.getByText("anyone_with_link")).toBeInTheDocument();
+    // A public dataset is open to every signed-in GOAT user, not to anyone
+    // with a link — that wording belongs to published projects.
+    expect(screen.getByText("every_goat_user")).toBeInTheDocument();
     // The team grant still follows it.
     expect(screen.getByText("Marketing")).toBeInTheDocument();
   });

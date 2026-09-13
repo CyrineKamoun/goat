@@ -119,8 +119,8 @@ const TemplateInputsList = ({ template }: { template: TemplateRead }) => {
     <Box sx={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       {(template.inputs ?? []).map((input) => (
         <Box key={input.key} sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          {input.from_catalog && (
-            <Tooltip title={t("sample_data")} placement="top" disableInteractive>
+          {(input.from_catalog || input.public_read) && (
+            <Tooltip title={t(input.from_catalog ? "catalog" : "public")} placement="top" disableInteractive>
               <Box sx={{ display: "inline-flex" }}>
                 <Icon
                   iconName={ICON_NAME.DATABASE}

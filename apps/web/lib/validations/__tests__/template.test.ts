@@ -30,7 +30,7 @@ const template = {
   payload_kind: "workflow",
   kinds: ["workflow"],
   inputs: [input],
-  ships_sample_data: true,
+  ships_data: true,
   catalog_status: "published",
   source_ref: {},
   my_role: "viewer",

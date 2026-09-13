@@ -474,7 +474,7 @@ export const layerMetadataSchema = contentMetadataSchema;
 
 /** What a stored layer carries: the document, not the loose fields. */
 export const layerStoredMetadataSchema = contentMetadataSchema.extend({
-  in_catalog: z.boolean().optional().default(false),
+  public_read: z.boolean().optional().default(false),
 });
 
 export const tableConfigSchema = z.object({
@@ -709,7 +709,7 @@ export const getDatasetSchema = z.object({
   search: z.string().optional(),
   type: layerType.array().optional(),
   feature_layer_type: featureLayerType.optional(),
-  in_catalog: z.boolean().optional(),
+  public_read: z.boolean().optional(),
   spatial_search: z.string().optional(),
 });
 

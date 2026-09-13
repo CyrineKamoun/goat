@@ -27,7 +27,7 @@ export const useLayerSettingsMoreMenu = () => {
   const getLayerMoreMenuOptions = useCallback(function getLayerMoreMenuOptions(
     layerType: ProjectLayer["type"],
     viewChart?: boolean,
-    _inCatalog?: ProjectLayer["in_catalog"],
+    _inCatalog?: boolean,
     readOnly?: boolean,
     canEdit?: boolean,
     mapView?: boolean,

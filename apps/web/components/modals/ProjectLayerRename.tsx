@@ -11,6 +11,7 @@ import { matchesContentListKey } from "@/lib/api/datasets";
 import { updateDataset, useDataset } from "@/lib/api/layers";
 import { updateProjectLayer, useProjectLayers } from "@/lib/api/projects";
 import type { ProjectLayer } from "@/lib/validations/project";
+import { isCatalogLayer } from "@/lib/utils/catalog-layer";
 
 import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 
@@ -98,7 +99,7 @@ const ProjectLayerRenameModal: React.FC<ProjectLayerRenameDialogProps> = ({
           }}
         />
       </Stack>
-      {!projectLayer.in_catalog && (
+      {!isCatalogLayer(projectLayer) && (
         <Stack sx={{ mt: 2 }}>
           <FormControlLabel
             control={

@@ -36,7 +36,7 @@ const tpl = (id: string, name: string, updated: string): TemplateRead =>
     payload_kind: "workflow",
     kinds: ["workflow"],
     inputs: [],
-    ships_sample_data: false,
+    ships_data: false,
     catalog_status: "none",
     source_ref: {},
     my_role: "owner",

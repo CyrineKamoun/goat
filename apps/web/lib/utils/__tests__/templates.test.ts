@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  blockedShipInputs,
+  publicOnPublishInputs,
   compareTemplateShelves,
   sourceLink,
   stripMarkdown,
@@ -41,7 +41,7 @@ const template = (overrides: Partial<TemplateRead>): TemplateRead => ({
   payload_kind: "workflow",
   kinds: ["workflow"],
   inputs: [],
-  ships_sample_data: false,
+  ships_data: false,
   catalog_status: "none",
   source_ref: {},
   datasets_needing_share: [],
@@ -245,6 +245,7 @@ const input = (over: Partial<TemplateInput>): TemplateInput => ({
   layer_type: null,
   geometry_type: null,
   from_catalog: false,
+  public_read: false,
   ...over,
 });
 
@@ -278,13 +279,14 @@ describe("sourceLink", () => {
   });
 });
 
-describe("blockedShipInputs", () => {
-  it("names shipped inputs that are not catalog layers, and nothing else", () => {
+describe("publicOnPublishInputs", () => {
+  it("lists shipped inputs that are neither catalog nor public, and nothing else", () => {
     const rows = [
-      input({ key: "a", mode: "ship", layer_id: "00000000-0000-0000-0000-000000000001", from_catalog: false }),
+      input({ key: "a", mode: "ship", layer_id: "00000000-0000-0000-0000-000000000001" }),
       input({ key: "b", mode: "ship", layer_id: "00000000-0000-0000-0000-000000000002", from_catalog: true }),
       input({ key: "c", mode: "ask" }),
+      input({ key: "d", mode: "ship", layer_id: "00000000-0000-0000-0000-000000000004", public_read: true }),
     ];
-    expect(blockedShipInputs(rows).map((r) => r.key)).toEqual(["a"]);
+    expect(publicOnPublishInputs(rows).map((r) => r.key)).toEqual(["a"]);
   });
 });

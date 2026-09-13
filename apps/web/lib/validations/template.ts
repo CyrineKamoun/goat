@@ -24,6 +24,8 @@ export const templateInputSchema = z.object({
   layer_type: z.enum(["feature", "table", "raster"]).nullable(),
   geometry_type: z.string().nullable(),
   from_catalog: z.boolean().default(false),
+  /** A public dataset: readable by every signed-in user, so it ships with a published template as-is. */
+  public_read: z.boolean().default(false),
 });
 
 /** Where a template is saved from, or re-snapshotted from on refresh (T8) —
@@ -228,7 +230,7 @@ export const templateReadSchema = z.object({
   payload_kind: templatePayloadKind,
   kinds: z.array(templateKind),
   inputs: z.array(templateInputSchema).default([]),
-  ships_sample_data: z.boolean().default(false),
+  ships_data: z.boolean().default(false),
   catalog_status: templateCatalogStatus,
   source_ref: z.record(z.unknown()).default({}),
   source: templateSourceInfoSchema.nullable().optional(),

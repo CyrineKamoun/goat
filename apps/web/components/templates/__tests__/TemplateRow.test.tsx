@@ -23,7 +23,7 @@ const template = (overrides: Partial<TemplateRead>): TemplateRead => ({
   payload_kind: "workflow",
   kinds: ["workflow"],
   inputs: [],
-  ships_sample_data: false,
+  ships_data: false,
   catalog_status: "published",
   source_ref: {},
   datasets_needing_share: [],

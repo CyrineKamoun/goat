@@ -238,7 +238,11 @@ export const sourceLink = (source: TemplateSourceInfo): { project: string; paylo
   return { project, payload: null };
 };
 
-/** Shipped inputs that would stop a publish: only GOAT catalog layers may
- * ship with a published template (`crud_template.publish`). */
-export const blockedShipInputs = (inputs: TemplateInput[]): TemplateInput[] =>
-  inputs.filter((input) => input.mode === "ship" && !!input.layer_id && !input.from_catalog);
+/** Shipped inputs that publishing to the GOAT catalog makes public: the
+ * datasets that are neither catalog datasets nor public yet. The backend
+ * flips the ones the publisher may share and refuses the rest by name
+ * (`crud_template.publish`). */
+export const publicOnPublishInputs = (inputs: TemplateInput[]): TemplateInput[] =>
+  inputs.filter(
+    (input) => input.mode === "ship" && !!input.layer_id && !input.public_read && !input.from_catalog
+  );

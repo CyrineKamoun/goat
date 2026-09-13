@@ -46,7 +46,7 @@ import UseTemplateFlow from "@/components/templates/UseTemplateFlow";
 /**
  * The catalog: search, filter and browse the datasets served by the STAC API
  * (apps/catalog). Replaces the previous page, which read `customer.layer` rows
- * flagged `in_catalog`.
+ * flagged for the catalog.
  *
  * Two properties are deliberate:
  *

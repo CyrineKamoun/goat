@@ -54,7 +54,7 @@ import {
 import { homeFolderOf, spaceDisplayName, spaceIconFor } from "@/lib/utils/content";
 import { tagColor } from "@/lib/utils/tagColor";
 import type { Space } from "@/lib/validations/content";
-import { blockedShipInputs } from "@/lib/utils/templates";
+import { publicOnPublishInputs } from "@/lib/utils/templates";
 import type {
   TemplateKind,
   TemplatePreview,
@@ -447,6 +447,12 @@ const SaveTemplateDialog = ({
   const sharedCount = shareRows.filter((row) => layerIncluded(row.layer_id)).length;
 
   const [publishSwitchOn, setPublishSwitchOn] = useState(false);
+  // What the catalog switch reasons about: the detected inputs under the
+  // author's current ship/ask choices.
+  const switchInputs = (preview?.detected_inputs ?? []).map((input) => ({
+    ...input,
+    mode: modeFor(input.key),
+  }));
   // A chosen template's catalog state is where its switch starts.
   const publishTargetId = editing ? current?.id : updateTarget?.id;
   const publishTargetPublished =
@@ -553,11 +559,6 @@ const SaveTemplateDialog = ({
         if (isSuperuser) {
           const wasPublished = current.catalog_status === "published";
           if (publishSwitchOn && !wasPublished) {
-            const blocked = blockedShipInputs(current.inputs);
-            if (blocked.length > 0) {
-              setPublishBlocked({ template: patched, names: blocked.map((input) => input.label) });
-              return;
-            }
             const result = await publishTemplateWithDetail(patched.id);
             if (!result.ok) {
               setPublishBlocked({ template: patched, names: result.layers.map((layer) => layer.name) });
@@ -586,11 +587,6 @@ const SaveTemplateDialog = ({
         if (isSuperuser) {
           const wasPublished = updateTarget.catalog_status === "published";
           if (publishSwitchOn && !wasPublished) {
-            const blocked = blockedShipInputs(refreshed.inputs);
-            if (blocked.length > 0) {
-              setPublishBlocked({ template: patched, names: blocked.map((input) => input.label) });
-              return;
-            }
             const result = await publishTemplateWithDetail(patched.id);
             if (!result.ok) {
               setPublishBlocked({ template: patched, names: result.layers.map((layer) => layer.name) });
@@ -637,13 +633,6 @@ const SaveTemplateDialog = ({
       // closes this dialog from `onSaved`, so a refusal reported afterwards
       // would land on an unmounted dialog and never reach the author.
       if (isSuperuser && publishSwitchOn) {
-        // The same rule the backend applies, checked first so a refusal
-        // names the dataset before a round trip that would fail anyway.
-        const blocked = blockedShipInputs(inputs);
-        if (blocked.length > 0) {
-          setPublishBlocked({ template: created, names: blocked.map((input) => input.label) });
-          return;
-        }
         const result = await publishTemplateWithDetail(created.id);
         if (!result.ok) {
           setPublishBlocked({ template: created, names: result.layers.map((layer) => layer.name) });
@@ -714,7 +703,7 @@ const SaveTemplateDialog = ({
       payload_kind: source.kind,
       kinds: previewKinds,
       inputs: [],
-      ships_sample_data: false,
+      ships_data: false,
       catalog_status: "none",
       source_ref: {},
       my_role: "owner",
@@ -1125,9 +1114,7 @@ const SaveTemplateDialog = ({
               updating={updating}
               checked={publishSwitchOn}
               onChange={setPublishSwitchOn}
-              blocked={blockedShipInputs(
-                (preview?.detected_inputs ?? []).map((input) => ({ ...input, mode: modeFor(input.key) }))
-              )}
+              becomingPublic={publicOnPublishInputs(switchInputs)}
               disabled={submitting}
             />
           )}

@@ -103,6 +103,7 @@ const askInput: TemplateInput = {
   layer_type: "feature",
   geometry_type: "point",
   from_catalog: false,
+  public_read: false,
 };
 
 const baseTemplate: TemplateRead = {
@@ -117,7 +118,7 @@ const baseTemplate: TemplateRead = {
   payload_kind: "workflow",
   kinds: ["workflow"],
   inputs: [],
-  ships_sample_data: false,
+  ships_data: false,
   datasets_needing_share: [],
   catalog_status: "none",
   source_ref: {},

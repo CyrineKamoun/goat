@@ -38,7 +38,7 @@ const item = (overrides: Partial<ContentItem>): ContentItem => ({
   template_payload_kind: null,
   template_kinds: [],
   template_catalog_status: null,
-  template_ships_sample_data: false,
+  template_ships_data: false,
   ...overrides,
 });
 
