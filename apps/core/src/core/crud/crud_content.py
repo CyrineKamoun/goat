@@ -149,8 +149,8 @@ def _restricted_cols(
 
 def _public_col(schema: str, alias: str) -> str:
     """Whether this project has a published public snapshot (a
-    `project_public` row). Only projects can be published, so every other
-    branch selects FALSE in this position."""
+    `project_public` row). A layer's branch selects `l.public_read` in this
+    position instead (a public dataset); folders and bundles select FALSE."""
     return (
         f"EXISTS (SELECT 1 FROM {schema}.project_public pp "
         f"WHERE pp.project_id = {alias}.id) AS is_public"
@@ -234,7 +234,7 @@ WITH RECURSIVE scope AS (
        AND NOT p.is_template_source
     UNION ALL
     SELECT 'layer', l.id, l.name, l.space_id, l.folder_id, l.updated_at, l.created_at, l.type::text, l.feature_layer_geometry_type::text, l.thumbnail_url,
-           FALSE, FALSE,
+           l.public_read, FALSE,
            {_restricted_cols(schema, "layer", "l", "l.folder_id")},
            l.user_id AS created_by_id
       FROM {schema}.layer l
@@ -287,7 +287,7 @@ WITH RECURSIVE scope AS (
        AND NOT p.is_template_source
     UNION ALL
     SELECT 'layer', l.id, l.name, l.space_id, cs.folder_id, l.updated_at, l.created_at, l.type::text, l.feature_layer_geometry_type::text, l.thumbnail_url,
-           FALSE, TRUE,
+           l.public_read, TRUE,
            {_restricted_cols(schema, "layer", "l", "l.folder_id")},
            l.user_id AS created_by_id
       FROM {schema}.content_shortcut cs
@@ -331,7 +331,7 @@ def _granted_items_cte(schema: str) -> str:
        AND NOT p.is_template_source
     UNION ALL
     SELECT 'layer', l.id, l.name, l.space_id, l.folder_id, l.updated_at, l.created_at, l.type::text, l.feature_layer_geometry_type::text, l.thumbnail_url,
-           FALSE,
+           l.public_read,
            {_restricted_cols(schema, "layer", "l", "l.folder_id")},
            l.user_id AS created_by_id
       FROM {schema}.layer l
@@ -395,7 +395,7 @@ WITH items AS (
        AND NOT p.is_template_source
     UNION ALL
     SELECT 'layer', l.id, l.name, l.space_id, l.folder_id, l.updated_at, l.created_at, l.type::text, l.feature_layer_geometry_type::text, l.thumbnail_url,
-           FALSE,
+           l.public_read,
            {_restricted_cols(schema, "layer", "l", "l.folder_id")},
            l.user_id AS created_by_id
       FROM {schema}.layer l
@@ -919,8 +919,8 @@ class CRUDContent:
         payload reads the frozen source project via `_project_payload_kinds`
         — Dashboard/Workflow/Layout depending on what it actually holds,
         batched in one extra query rather than one per template.
-        `template_ships_sample_data` is true once any declared input (T5) is
-        a shipped, catalog-origin dataset.
+        `template_ships_data` is true once any declared input (T5) is a
+        shipped catalog or public dataset.
         """
         if not template_ids:
             return {}
@@ -949,17 +949,17 @@ class CRUDContent:
                     has_workflows=False,
                     has_layouts=False,
                 )
-            ships_sample_data = any(
+            ships_data = any(
                 isinstance(inp, dict)
                 and inp.get("mode") == "ship"
-                and inp.get("from_catalog")
+                and (inp.get("from_catalog") or inp.get("public_read"))
                 for inp in (r.inputs or [])
             )
             details[r.id] = {
                 "template_payload_kind": r.payload_kind,
                 "template_kinds": kinds,
                 "template_catalog_status": r.catalog_status,
-                "template_ships_sample_data": ships_sample_data,
+                "template_ships_data": ships_data,
             }
         return details
 

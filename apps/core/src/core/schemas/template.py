@@ -61,6 +61,12 @@ class TemplateInput(BaseModel):
     "ask" clears ``layer_id`` and turns the reference into a named, typed
     slot the user fills in on use. ``layer_type`` holds ``None`` for an input
     whose type is not one of the three types.
+
+    The two dataset flags are recomputed server-side from the layer row,
+    never trusted from the client: ``from_catalog`` (a catalog dataset,
+    ``catalog_external_uid`` set) and ``public_read`` (a public dataset,
+    readable by every signed-in user). Either one lets the dataset ship
+    with a published GOAT template.
     """
 
     key: str
@@ -70,6 +76,7 @@ class TemplateInput(BaseModel):
     layer_type: Literal["feature", "table", "raster"] | None = None
     geometry_type: str | None = None
     from_catalog: bool = False
+    public_read: bool = False
 
     @field_validator("layer_type", mode="before")
     @classmethod
@@ -196,7 +203,7 @@ class TemplateRead(BaseModel):
     payload_kind: Literal["workflow", "layout", "project"]
     kinds: list[str]
     inputs: list[TemplateInput]
-    ships_sample_data: bool
+    ships_data: bool
     catalog_status: Literal["none", "proposed", "published", "declined"]
     source_ref: dict[str, Any]
     source: TemplateSourceInfo | None = None

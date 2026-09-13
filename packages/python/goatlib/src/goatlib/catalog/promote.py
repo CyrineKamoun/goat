@@ -384,7 +384,7 @@ async def promote(
             id, name, description, type,
             feature_layer_type, feature_layer_geometry_type, extent,
             properties, other_properties,
-            in_catalog, catalog_external_uid, catalog_version,
+            public_read, catalog_external_uid, catalog_version,
             created_at, updated_at
         ) VALUES (
             $1, $2, $3, $4,

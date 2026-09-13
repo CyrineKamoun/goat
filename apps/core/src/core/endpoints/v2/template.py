@@ -9,7 +9,7 @@ from pydantic import UUID4
 
 from core.crud.crud_template import template as crud_template
 from core.db.session import AsyncSession
-from core.deps.auth import auth_z, require_superuser
+from core.deps.auth import auth_z, require_superuser, token_is_superuser
 from core.deps.auth import user_token as get_user_token
 from core.endpoints.deps import get_db, get_user_id
 from core.schemas.template import (
@@ -292,10 +292,6 @@ async def refresh_template(
     )
 
 
-def _is_superuser(user_token: dict[str, Any]) -> bool:
-    return "superuser" in (user_token.get("realm_access", {}).get("roles") or [])
-
-
 @router.post(
     "/{template_id}/publish",
     summary="Publish a template to the GOAT catalog (superuser only)",
@@ -319,7 +315,7 @@ async def publish_template(
         async_session,
         template_id=template_id,
         user_id=user_id,
-        is_superuser=_is_superuser(token),
+        is_superuser=token_is_superuser(token),
     )
 
 
@@ -344,7 +340,7 @@ async def unpublish_template(
         async_session,
         template_id=template_id,
         user_id=user_id,
-        is_superuser=_is_superuser(token),
+        is_superuser=token_is_superuser(token),
     )
 
 

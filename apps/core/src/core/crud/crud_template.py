@@ -116,15 +116,15 @@ class CRUDTemplate:
         """T6's exact rule: does shipping ``layer`` into ``destination_space``
         widen who can read it?
 
-        ``from_catalog`` → never (promote-on-use already resolves it for
-        everyone). Same space as the destination → never (the audience
-        already has whatever access it has today). Otherwise: needs share
-        unless a grant to the destination's own team/organisation already
-        exists — a personal destination has no team/organisation to grant
-        to, so it never needs one either.
+        A catalog or public dataset → never (every signed-in user already
+        reads it). Same space as the destination → never (the audience
+        already has whatever access it has today). Otherwise:
+        needs share unless a grant to the destination's own
+        team/organisation already exists — a personal destination has no
+        team/organisation to grant to, so it never needs one either.
         """
         assert layer.id is not None
-        if layer.catalog_external_uid is not None:
+        if layer.public_read or layer.catalog_external_uid is not None:
             return False
         if layer.space_id is not None and layer.space_id == destination_space.id:
             return False
@@ -199,7 +199,9 @@ class CRUDTemplate:
                     avatar=user.avatar or None,
                 )
         inputs = [TemplateInput(**i) for i in (row.inputs or [])]
-        ships_sample_data = any(i.mode == "ship" and i.from_catalog for i in inputs)
+        ships_data = any(
+            i.mode == "ship" and (i.from_catalog or i.public_read) for i in inputs
+        )
         assert row.id is not None
         return TemplateRead(
             id=row.id,
@@ -215,7 +217,7 @@ class CRUDTemplate:
             payload_kind=row.payload_kind,  # type: ignore[arg-type]
             kinds=kinds,
             inputs=inputs,
-            ships_sample_data=ships_sample_data,
+            ships_data=ships_data,
             catalog_status=row.catalog_status,  # type: ignore[arg-type]
             source_ref=dict(row.source_ref or {}),
             my_role=my_role,  # type: ignore[arg-type]
@@ -271,28 +273,40 @@ class CRUDTemplate:
             info.available = bool(readable and layout is not None)
         return info
 
-    async def _with_from_catalog(
+    @staticmethod
+    def _layer_flags(layer: Layer | None) -> dict[str, bool]:
+        """The two dataset flags of `TemplateInput`, read off the layer row
+        (both False for a missing layer)."""
+        if layer is None:
+            return {"from_catalog": False, "public_read": False}
+        return {
+            "from_catalog": layer.catalog_external_uid is not None,
+            "public_read": bool(layer.public_read),
+        }
+
+    async def _with_layer_flags(
         self, db: AsyncSession, inputs: list[TemplateInput]
     ) -> list[TemplateInput]:
-        """Recompute `from_catalog` server-side from `layer.catalog_external_uid`
-        — the author's declared value (if any) is never trusted. An "ask"
-        input also has its `layer_id` cleared here regardless of what the
-        client submitted: an ask slot carries no dataset reference (T5), so
-        a client-supplied `layer_id` on one is dropped, not just ignored."""
+        """Recompute `from_catalog` / `public_read` server-side
+        from the layer row — the author's declared values (if any) are never
+        trusted. An "ask" input also has its `layer_id` cleared here
+        regardless of what the client submitted: an ask slot carries no
+        dataset reference (T5), so a client-supplied `layer_id` on one is
+        dropped, not just ignored."""
         out: list[TemplateInput] = []
         for i in inputs:
             if i.mode == "ask":
                 out.append(
-                    i.model_copy(update={"layer_id": None, "from_catalog": False})
+                    i.model_copy(
+                        update={
+                            "layer_id": None,
+                            **self._layer_flags(None),
+                        }
+                    )
                 )
                 continue
-            from_catalog = False
-            if i.layer_id is not None:
-                layer = await db.get(Layer, i.layer_id)
-                from_catalog = bool(
-                    layer is not None and layer.catalog_external_uid is not None
-                )
-            out.append(i.model_copy(update={"from_catalog": from_catalog}))
+            layer = await db.get(Layer, i.layer_id) if i.layer_id is not None else None
+            out.append(i.model_copy(update=self._layer_flags(layer)))
         return out
 
     async def _assert_ship_inputs_readable(
@@ -329,7 +343,8 @@ class CRUDTemplate:
             await db.execute(
                 text(
                     "SELECT DISTINCT l.id, l.name, l.type, "
-                    "l.feature_layer_geometry_type, l.catalog_external_uid "
+                    "l.feature_layer_geometry_type, l.catalog_external_uid, "
+                    "l.public_read "
                     f"FROM {schema}.layer_project lp "
                     f"JOIN {schema}.layer l ON l.id = lp.layer_id "
                     "WHERE lp.project_id = :project_id"
@@ -346,6 +361,7 @@ class CRUDTemplate:
                 layer_type=r.type,  # type: ignore[arg-type]
                 geometry_type=r.feature_layer_geometry_type,
                 from_catalog=r.catalog_external_uid is not None,
+                public_read=bool(r.public_read),
             )
             for r in rows
         ]
@@ -473,12 +489,17 @@ class CRUDTemplate:
         """
         for raw in row.inputs or []:
             i = TemplateInput(**raw)
-            if i.mode != "ship" or i.layer_id is None or i.from_catalog:
+            if (
+                i.mode != "ship"
+                or i.layer_id is None
+                or i.public_read
+                or i.from_catalog
+            ):
                 continue
             layer = await db.get(Layer, i.layer_id)
             if layer is None or layer.deleted_at is not None:
                 continue
-            if layer.catalog_external_uid is not None:
+            if layer.public_read or layer.catalog_external_uid is not None:
                 continue
             if not await authz.can(db, "layer", i.layer_id, user_id, "share"):
                 continue
@@ -533,9 +554,6 @@ class CRUDTemplate:
         inputs: list[TemplateInput] = []
         for d in detected:
             layer = await db.get(Layer, d.layer_id)
-            from_catalog = bool(
-                layer is not None and layer.catalog_external_uid is not None
-            )
             may_read = await authz.can(db, "layer", d.layer_id, user_id, "read")
             mode: Literal["ship", "ask"] = "ship" if may_read else "ask"
             inputs.append(
@@ -546,7 +564,7 @@ class CRUDTemplate:
                     layer_id=d.layer_id if mode == "ship" else None,
                     layer_type=d.layer_type,
                     geometry_type=d.geometry_type,
-                    from_catalog=from_catalog,
+                    **self._layer_flags(layer),
                 )
             )
         return inputs
@@ -644,7 +662,7 @@ class CRUDTemplate:
                         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                         detail=f"input {i.key!r} layer_id does not match the detected reference",
                     )
-            inputs = await self._with_from_catalog(db, inputs)
+            inputs = await self._with_layer_flags(db, inputs)
             config = freeze_workflow_config(dict(wf.config or {}), inputs)
             if thumbnail_url is None:
                 thumbnail_url = wf.thumbnail_url
@@ -1137,9 +1155,9 @@ class CRUDTemplate:
             # `layerId` and no `templateInput` marker (never read-checked,
             # never counted by the publish guard). Reconcile against a fresh
             # detection instead of reusing the stored list as-is: a
-            # surviving key keeps its author-chosen mode (and has
-            # `from_catalog` recomputed live, since the layer's catalog
-            # registration can have changed); a newly-detected key has no
+            # surviving key keeps its author-chosen mode (and has its
+            # dataset flags recomputed live, since the layer's catalog
+            # registration and visibility can have changed); a newly-detected key has no
             # prior author decision, so it defaults to "ask"; a key that no
             # longer appears in the source is dropped.
             old_by_key = {i["key"]: TemplateInput(**i) for i in (row.inputs or [])}
@@ -1166,10 +1184,9 @@ class CRUDTemplate:
                             layer_id=None,
                             layer_type=d.layer_type,
                             geometry_type=d.geometry_type,
-                            from_catalog=False,
                         )
                     )
-            reconciled = await self._with_from_catalog(db, reconciled)
+            reconciled = await self._with_layer_flags(db, reconciled)
             await self._assert_ship_inputs_readable(db, reconciled, user_id)
             row.inputs = [i.model_dump(mode="json") for i in reconciled]
             row.config = freeze_workflow_config(dict(wf.config or {}), reconciled)
@@ -1506,13 +1523,16 @@ class CRUDTemplate:
         they're publishing (B1); this does not widen who may publish beyond
         the superuser check above, it only narrows it further.
 
-        Every ``mode == "ship"`` input's dataset must be catalog-origin.
-        The author's stored ``from_catalog`` is never trusted for this: each
-        such input is re-checked live against `layer.catalog_external_uid`,
-        since a layer's catalog registration can change after the template
-        was saved. Any input that fails raises 409 with
-        ``{"code": "template_dataset_not_public", "layers": [{"id", "name"}]}``
-        naming every offending layer.
+        Every ``mode == "ship"`` input's dataset must be readable by every
+        signed-in user once the template is on the shelf: a catalog dataset
+        or a public one, checked live against the layer row (the stored
+        flags are never trusted). A dataset that is neither is made public
+        by the publish itself when the caller owns it (effective role
+        owner — the same level the Share dialog's Public switch takes), so
+        curating the shelf can never open someone else's data. Any input
+        that fails raises 409 with ``{"code": "template_dataset_not_public",
+        "layers": [{"id", "name"}]}`` naming every offending layer, and
+        nothing is flipped.
         """
         if not is_superuser:
             raise HTTPException(
@@ -1522,17 +1542,29 @@ class CRUDTemplate:
         row = await self._get_live(db, template_id)
         inputs = [TemplateInput(**i) for i in (row.inputs or [])]
         bad_layers: list[dict[str, str]] = []
+        to_make_public: list[Layer] = []
         for i in inputs:
             if i.mode != "ship" or i.layer_id is None:
                 continue
             layer = await db.get(Layer, i.layer_id)
-            if layer is None or layer.catalog_external_uid is None:
-                bad_layers.append(
-                    {
-                        "id": str(i.layer_id),
-                        "name": (layer.name if layer is not None else None) or i.label,
-                    }
-                )
+            if layer is not None and (
+                layer.public_read or layer.catalog_external_uid is not None
+            ):
+                continue
+            if (
+                layer is not None
+                and layer.deleted_at is None
+                and await authz.effective_role(db, "layer", i.layer_id, user_id)
+                == "owner"
+            ):
+                to_make_public.append(layer)
+                continue
+            bad_layers.append(
+                {
+                    "id": str(i.layer_id),
+                    "name": (layer.name if layer is not None else None) or i.label,
+                }
+            )
         if bad_layers:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1541,6 +1573,14 @@ class CRUDTemplate:
                     "layers": bad_layers,
                 },
             )
+        for layer in to_make_public:
+            layer.public_read = True
+            db.add(layer)
+        # The stored inputs carry the flags the web reads; refresh them so
+        # the response and every later read show the datasets as public.
+        row.inputs = [
+            i.model_dump(mode="json") for i in await self._with_layer_flags(db, inputs)
+        ]
 
         row.catalog_status = TemplateCatalogStatus.published
         row.catalog_published_at = datetime.now(timezone.utc)

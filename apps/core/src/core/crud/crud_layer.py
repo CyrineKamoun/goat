@@ -91,7 +91,7 @@ class CRUDLayer(CRUDBase):
                 not in (
                     "search",
                     "spatial_search",
-                    "in_catalog",
+                    "public_read",
                 )
                 and value is not None
             ):
@@ -100,16 +100,16 @@ class CRUDLayer(CRUDBase):
                     value = [value]
                 filters.append(getattr(Layer, key).in_(value))
 
-        if params.in_catalog is not None:
+        if params.public_read is not None:
             if not team_id and not organization_id:
                 filters.append(
                     and_(
-                        Layer.in_catalog == bool(params.in_catalog),
+                        Layer.public_read == bool(params.public_read),
                         Layer.user_id == user_id,
                     )
                 )
             else:
-                filters.append(Layer.in_catalog == bool(params.in_catalog))
+                filters.append(Layer.public_read == bool(params.public_read))
         elif not team_id and not organization_id:
             filters.append(Layer.user_id == user_id)
             # My Content is folder-scoped navigation: a layer sitting in

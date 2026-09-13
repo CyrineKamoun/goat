@@ -38,24 +38,19 @@ LANGUAGE sql STABLE AS $$
       )
 $$;
 
-/* Whether a layer is a catalog layer: readable by everyone (including
-   anonymous) and writable only through its owner_id column — explicitly
-   flagged in_catalog, backed by an external STAC item, or a genuine orphan
-   (no space AND no user — the promote-on-use placeholder before it is
-   claimed). A layer that lost its user_id (e.g. the creator's account was
-   removed) but still belongs to a space is NOT a catalog layer: the space
-   still owns it, so offboarding must not turn team-space content into a
-   public, write-locked catalog row. Shared by effective_role and
+/* Whether a layer is a catalog dataset: a materialization of an external
+   STAC item (`catalog_external_uid` set), shared by every organization
+   that added it. Readable by everyone, anonymous included, capped at
+   viewer, and writable by nobody — promote gives it no space, and
+   layer_write_allowed refuses a spaceless layer before any other rule.
+   Provenance, not the `public_read` flag, decides this: a public dataset
+   is ordinary content whose owner opened it to every signed-in user, and
+   its editors keep editing it. Shared by effective_role and
    layer_write_allowed so the predicate is defined once. */
 CREATE OR REPLACE FUNCTION customer.layer_is_catalog(layer_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql STABLE AS $$
-    SELECT (
-        l.in_catalog = TRUE
-     OR l.catalog_external_uid IS NOT NULL
-     OR (l.space_id IS NULL AND l.user_id IS NULL)
-    )
-    FROM customer.layer l WHERE l.id = layer_id
+    SELECT l.catalog_external_uid IS NOT NULL FROM customer.layer l WHERE l.id = layer_id
 $$;
 
 /* A folder and its ancestors, nearest first; the depth trigger keeps this to at most 4 rows. */
@@ -104,7 +99,7 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 /* THE rule (spec §3.2). Space owner/admin > space default for members > direct grant > ancestor-folder
-   grants > bundle grant > project→layer read > catalog read. Max role wins; the one exception is
+   grants > bundle grant > project→layer read > public dataset read > catalog read. Max role wins; the one exception is
    Restricted (D9), which withholds the space default. A soft-deleted item is visible to the space
    owner/admin only. Returns 'owner' | 'editor' | 'viewer' | NULL. */
 CREATE OR REPLACE FUNCTION customer.effective_role(resource_type_input TEXT, resource_id_input UUID, user_id_input UUID)
@@ -153,7 +148,7 @@ BEGIN
         RETURN 'owner';
     END IF;
 
-    /* catalog layers: readable by everyone, including anonymous; never more than viewer for non-owners */
+    /* catalog datasets: readable by everyone, including anonymous; never more than viewer */
     IF is_catalog THEN
         RETURN 'viewer';
     END IF;
@@ -195,6 +190,17 @@ BEGIN
              WHERE lp.layer_id = resource_id_input
                AND lp.shareable
                AND customer.effective_role('project', lp.project_id, user_id_input) IS NOT NULL
+        ) THEN
+            best := 1;
+        END IF;
+
+        /* 6b. public dataset: its owner opened it to every signed-in user, in any
+              organization. A floor, never a cap — the space role, grants and the
+              project path above still decide anything higher, so editors keep
+              editing. Anonymous callers returned NULL above and never reach it. */
+        IF best < 1 AND EXISTS (
+            SELECT 1 FROM customer.layer l
+             WHERE l.id = resource_id_input AND l.public_read
         ) THEN
             best := 1;
         END IF;
