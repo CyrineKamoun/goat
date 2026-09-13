@@ -30,6 +30,10 @@ x-env-core: &env-core
   AUTH: ${AUTH}
   POSTGRES_DB: goat
   REGION_MAPPING_PT_TABLE: basic.region_mapping_pt_04022025
+  # Core and geoapi both start background jobs through the processes service
+  # (layer cleanup, bundle imports, the rebuild after a bundle edit); unset,
+  # those triggers fail while everything else still works.
+  GOAT_PROCESSES_URL: http://processes:8000
 
 x-env-windmill: &env-windmill
   DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_SERVER}:5432/windmill?sslmode=disable
@@ -181,10 +185,6 @@ x-service-core: &service-core
     dockerfile: apps/core/Dockerfile
   environment:
     <<: *env-core
-    # Core triggers background jobs (layer cleanup on folder/bundle delete,
-    # bundle imports) through the processes service; unset, those triggers
-    # fail with 503 while everything else still works.
-    GOAT_PROCESSES_URL: http://processes:8000
   # Only the catalog subtree, read-only: promote reads the mirror from it and
   # nothing else on the volume is core's business. (Kubernetes equivalent: a
   # volumeMount with subPath: catalog and readOnly: true.)
@@ -574,8 +574,10 @@ services:
     environment:
       <<: *env-core
       TILES_DATA_DIR: /app/data/tiles
+    # Not read-only: geoapi writes features into DuckLake under /app/data and
+    # deletes a layer's PMTiles on save so tiles fall back to dynamic generation.
     volumes:
-      - goat-data:/app/data:ro
+      - goat-data:/app/data
     depends_on:
       db:
         condition: service_healthy
