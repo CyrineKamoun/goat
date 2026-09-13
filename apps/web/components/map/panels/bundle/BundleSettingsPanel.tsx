@@ -70,8 +70,7 @@ const BundleSettingsPanel = ({ projectId }: { projectId: string }) => {
   // and what a tab click dispatches — so it is derived, not mirrored. Clamped
   // to a tab that exists: the slot can ask for Filter on a bundle that has no
   // Filter tab.
-  const activeTab =
-    canFilter && activeRightPanel === MapSidebarItemID.FILTER ? FILTER_TAB : METADATA_TAB;
+  const activeTab = canFilter && activeRightPanel === MapSidebarItemID.FILTER ? FILTER_TAB : METADATA_TAB;
   const isTabLive = useLazyTabs(activeTab, selectedBundleId);
 
   const handleTabChange = (value: number) => {
@@ -125,7 +124,7 @@ const BundleSettingsPanel = ({ projectId }: { projectId: string }) => {
                 carry nine fields. Padding matches the layer metadata tab. */}
             {isTabLive(METADATA_TAB) && (
               <Stack spacing={4} sx={{ p: 2 }}>
-                <BundleSummary bundle={bundle} hideMetadataSection />
+                <BundleSummary bundle={bundle} />
               </Stack>
             )}
           </Box>

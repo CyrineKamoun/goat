@@ -1,6 +1,7 @@
 "use client";
 
 import { Box, Button, Stack, SwipeableDrawer, useMediaQuery, useTheme } from "@mui/material";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import type { DragEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -78,14 +79,19 @@ import SaveTemplateDialog from "@/components/templates/SaveTemplateDialog";
 import TemplatePreviewDialog from "@/components/templates/TemplatePreviewDialog";
 import UseTemplateFlow from "@/components/templates/UseTemplateFlow";
 
+/** A bundle's preview carries a map of every member, so the map stack is
+ * loaded only once a bundle is actually opened. */
+const BundlePreviewDialog = dynamic(() => import("@/components/dashboard/bundle/BundlePreviewDialog"), {
+  ssr: false,
+});
+
 const FEED_PAGE_SIZE = 50;
 
 const ROW_KIND_TO_ROUTE: Record<
-  Exclude<ContentItem["type"], "folder" | "template" | "layer">,
+  Exclude<ContentItem["type"], "folder" | "template" | "layer" | "bundle">,
   (id: string) => string
 > = {
   project: (id) => `/map/${id}`,
-  bundle: (id) => `/bundles/${id}`,
 };
 
 /** Actions `ContentActionDialogs` renders a dialog for. SHARE, MOVE and
@@ -190,6 +196,9 @@ const ContentPage = ({
   // away; kept separate from `dialog` since it isn't one of the kebab/
   // action-bar actions — clicking the row itself opens it.
   const [previewLayerId, setPreviewLayerId] = useState<string | null>(null);
+  // A bundle reads the same way a layer does, over the feed rather than on a
+  // page of its own.
+  const [previewBundleId, setPreviewBundleId] = useState<string | null>(null);
 
   // A template opens the same way (T7): OPEN (row click or kebab) shows the
   // preview panel, while a USE_TEMPLATE kebab pick skips straight to
@@ -434,7 +443,13 @@ const ContentPage = ({
           ),
         };
 
-  const previewTarget = previewLayerId ? items.find((i) => i.id === previewLayerId) : undefined;
+  // A layer can be previewed from the feed or from the "Shared with {space}"
+  // section, which is a separate listing — resolve the row from both so the
+  // dialog's own Share/Move gates see the real item either way.
+  const previewedId = previewLayerId ?? previewBundleId;
+  const previewTarget = previewedId
+    ? [...items, ...(sharedWithSpacePage?.items ?? [])].find((i) => i.id === previewedId)
+    : undefined;
 
   const openItem = (item: ContentItem) => {
     if (item.is_shortcut) {
@@ -459,6 +474,10 @@ const ContentPage = ({
     }
     if (item.type === "layer") {
       setPreviewLayerId(item.id);
+      return;
+    }
+    if (item.type === "bundle") {
+      setPreviewBundleId(item.id);
       return;
     }
     if (item.type === "template") {
@@ -906,6 +925,23 @@ const ContentPage = ({
           }}>
           {detailsPanel(true)}
         </SwipeableDrawer>
+      )}
+
+      {previewBundleId && (
+        <BundlePreviewDialog
+          bundleId={previewBundleId}
+          onClose={() => setPreviewBundleId(null)}
+          onShare={
+            previewTarget && canActOn(previewTarget)
+              ? () => setDialog({ action: ContentActions.SHARE, items: [previewTarget] })
+              : undefined
+          }
+          onMove={
+            previewTarget && canActOn(previewTarget)
+              ? () => setDialog({ action: ContentActions.MOVE, items: [previewTarget] })
+              : undefined
+          }
+        />
       )}
 
       {previewLayerId && (

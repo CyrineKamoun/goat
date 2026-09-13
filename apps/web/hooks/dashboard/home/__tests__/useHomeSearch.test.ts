@@ -334,8 +334,10 @@ describe("useHomeSearch", () => {
     rerender({ raw: "bus" });
 
     const [bundle, catalog] = itemRows(result.current.rows);
+    // A bundle opens in its preview dialog, as a layer does — no navigation.
     act(() => bundle.go());
-    expect(pushMock).toHaveBeenLastCalledWith("/bundles/b1");
+    expect(result.current.previewBundleId).toBe("b1");
+    expect(pushMock).not.toHaveBeenCalled();
     act(() => catalog.go());
     expect(pushMock).toHaveBeenLastCalledWith("/catalog/c1");
   });

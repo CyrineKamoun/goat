@@ -57,7 +57,14 @@ export const parseScope = (raw: string): { scope: SearchScope; query: string } =
 /** A recent place, kept in `localStorage` — pushed to on every `go()`. A
  * layer carries its id too: picking it opens the preview dialog in place,
  * the way the Content page opens a layer, instead of leaving Home. */
-type RecentPlace = { id: string; label: string; meta: string; href: string; layerId?: string };
+type RecentPlace = {
+  id: string;
+  label: string;
+  meta: string;
+  href: string;
+  layerId?: string;
+  bundleId?: string;
+};
 
 const RECENT_KEY = "goat.home.recent";
 const MAX_RECENT = 5;
@@ -102,7 +109,13 @@ const writeRecent = (entry: RecentPlace): void => {
  */
 export const useHomeSearch = (
   raw: string
-): { rows: SearchRow[]; isLoading: boolean; previewLayerId: string | null; closePreview: () => void } => {
+): {
+  rows: SearchRow[];
+  isLoading: boolean;
+  previewLayerId: string | null;
+  previewBundleId: string | null;
+  closePreview: () => void;
+} => {
   const router = useRouter();
   const { t } = useTranslation("common");
   const debounced = useDebouncedValue(raw, DEBOUNCE_MS);
@@ -128,11 +141,16 @@ export const useHomeSearch = (
   }, []);
 
   const [previewLayerId, setPreviewLayerId] = useState<string | null>(null);
+  const [previewBundleId, setPreviewBundleId] = useState<string | null>(null);
 
   const activate = (entry: RecentPlace) => {
     writeRecent(entry);
     if (entry.layerId) {
       setPreviewLayerId(entry.layerId);
+      return;
+    }
+    if (entry.bundleId) {
+      setPreviewBundleId(entry.bundleId);
       return;
     }
     router.push(entry.href);
@@ -141,22 +159,27 @@ export const useHomeSearch = (
   const contentItemRow = (item: ContentItem): SearchRow => {
     const meta = t(typeLabelKey(item));
     // Each row opens the thing itself, as a click on the Content page does:
-    // a project in the builder, a bundle on its page, a layer in the preview
-    // dialog; anything else lands in its space.
-    const href =
-      item.type === "project"
-        ? `/map/${item.id}`
-        : item.type === "bundle"
-          ? `/bundles/${item.id}`
-          : contentPath({ spaceId: item.space_id });
+    // a project in the builder, a layer or a bundle in its preview dialog;
+    // anything else lands in its space. The href is what a stored recent falls
+    // back to, so a previewed row keeps its space as the destination.
+    const href = item.type === "project" ? `/map/${item.id}` : contentPath({ spaceId: item.space_id });
     const layerId = item.type === "layer" ? item.id : undefined;
+    const bundleId = item.type === "bundle" ? item.id : undefined;
     return {
       kind: "item",
       id: item.id,
       icon: iconFor(item),
       label: item.name,
       meta,
-      go: () => activate({ id: item.id, label: item.name, meta, href, ...(layerId ? { layerId } : {}) }),
+      go: () =>
+        activate({
+          id: item.id,
+          label: item.name,
+          meta,
+          href,
+          ...(layerId ? { layerId } : {}),
+          ...(bundleId ? { bundleId } : {}),
+        }),
     };
   };
 
@@ -218,6 +241,10 @@ export const useHomeSearch = (
     rows,
     isLoading: (asksContent && contentLoading) || (asksCatalog && catalogLoading),
     previewLayerId,
-    closePreview: () => setPreviewLayerId(null),
+    previewBundleId,
+    closePreview: () => {
+      setPreviewLayerId(null);
+      setPreviewBundleId(null);
+    },
   };
 };

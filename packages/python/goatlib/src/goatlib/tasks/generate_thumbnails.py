@@ -63,6 +63,7 @@ TABLE_THUMBNAIL_CELL_VALUE_MAX_LEN = 25
 # S3 paths for thumbnails
 THUMBNAIL_DIR_PROJECT = "thumbnails/projects/"
 THUMBNAIL_DIR_LAYER = "thumbnails/layers/"
+THUMBNAIL_DIR_BUNDLE = "thumbnails/bundles/"
 
 # Default thumbnail for table layers with no data/columns
 DEFAULT_TABLE_THUMBNAIL_URL = (
@@ -96,9 +97,17 @@ class ThumbnailTaskParams(BaseModel):
         default=True,
         description="Generate thumbnails for table layers (spreadsheet-style thumbnails)",
     )
+    include_bundles: bool = Field(
+        default=True,
+        description="Generate thumbnails for bundles (every member layer on one map)",
+    )
     project_ids: list[str] = Field(
         default_factory=list,
         description="Specific project UUIDs to generate thumbnails for (forces regeneration)",
+    )
+    bundle_ids: list[str] = Field(
+        default_factory=list,
+        description="Specific bundle UUIDs to generate thumbnails for (forces regeneration)",
     )
     layer_ids: list[str] = Field(
         default_factory=list,
@@ -133,7 +142,7 @@ class ThumbnailTaskParams(BaseModel):
 class ThumbnailResult(BaseModel):
     """Result of thumbnail generation for a single item."""
 
-    item_type: Literal["project", "layer"]
+    item_type: Literal["project", "layer", "bundle"]
     item_id: str
     layer_type: Literal["feature", "raster", "table"] | None = None  # Only for layers
     success: bool
@@ -147,6 +156,7 @@ class ThumbnailTaskOutput(BaseModel):
     total_processed: int
     projects_processed: int
     layers_processed: int  # Total layers (feature + raster + table)
+    bundles_processed: int = 0
     feature_layers_processed: int = 0
     raster_layers_processed: int = 0
     table_layers_processed: int = 0
@@ -163,7 +173,7 @@ class ItemToProcess:
     For table layers, uses matplotlib rendering instead of Playwright.
     """
 
-    type: Literal["project", "layer"]
+    type: Literal["project", "layer", "bundle"]
     id: UUID
     updated_at: datetime
     old_thumbnail_url: str | None
@@ -611,6 +621,157 @@ class ThumbnailGeneratorTask:
             layers.append(layer_data)
 
         return layers
+
+    async def _fetch_bundle_layers(
+        self: Self, conn: Any, bundle_id: UUID
+    ) -> list[dict]:
+        """A bundle's member layers, in the shape the thumbnail route renders.
+
+        Only the members that can be drawn: a GTFS feed is mostly tables
+        (agency, calendar, trips), and those carry no geometry. Ordered
+        lines-then-points so a node is not drawn beneath the edge it joins —
+        the same order the bundle's preview map uses, because the thumbnail is
+        meant to be that map.
+        """
+        rows = await conn.fetch(
+            """
+            SELECT
+                l.id,
+                l.name,
+                l.type,
+                l.feature_layer_geometry_type,
+                l.properties::text as layer_properties,
+                l.url,
+                l.extent::text as extent,
+                l.folder_id
+            FROM customer.bundle_layer bl
+            JOIN customer.layer l ON l.id = bl.layer_id
+            WHERE bl.bundle_id = $1
+              AND l.type IN ('feature', 'raster')
+            ORDER BY
+                CASE l.feature_layer_geometry_type
+                    WHEN 'polygon' THEN 0
+                    WHEN 'line' THEN 1
+                    WHEN 'point' THEN 2
+                    ELSE 1
+                END,
+                l.id
+            """,
+            bundle_id,
+        )
+
+        layers = []
+        for row in rows:
+            properties = row["layer_properties"]
+            if isinstance(properties, str):
+                properties = json.loads(properties) or {}
+            if not isinstance(properties, dict):
+                properties = {}
+            # A member's own visibility flag is about a project's layer list,
+            # not about whether the bundle contains it.
+            properties["visibility"] = True
+
+            layers.append(
+                {
+                    "id": str(row["id"]),
+                    "layer_id": str(row["id"]),
+                    "name": row["name"],
+                    "type": row["type"],
+                    "feature_layer_geometry_type": row["feature_layer_geometry_type"],
+                    "properties": properties,
+                    "url": row["url"],
+                    "extent": row["extent"],
+                    "folder_id": str(row["folder_id"]) if row["folder_id"] else None,
+                    "query": None,
+                }
+            )
+        return layers
+
+    async def _fetch_bundles_to_update(
+        self: Self,
+        limit: int,
+        bundle_ids: list[str] | None = None,
+        use_bounds: bool = True,
+        since: datetime | None = None,
+    ) -> list[ItemToProcess]:
+        """Fetch bundles for thumbnail processing.
+
+        A bundle has no geometry of its own — its picture is every member drawn
+        together, which is why this gathers layers the way a project does
+        rather than rendering one of them.
+
+        `updated_at` on the bundle moves when the bundle does, not when a
+        member's data changes; the content hash covers the rest, since it is
+        computed from the members' own properties and extents.
+        """
+        pool = await self._get_pg_pool()
+
+        async with pool.acquire() as conn:
+            if bundle_ids:
+                rows = await conn.fetch(
+                    """
+                    SELECT b.id, b.updated_at, b.thumbnail_url
+                    FROM customer.bundle b
+                    WHERE b.id = ANY($1::uuid[])
+                    ORDER BY b.updated_at DESC
+                    LIMIT $2
+                    """,
+                    bundle_ids,
+                    limit,
+                )
+            elif since:
+                # A member's edit is what changes a bundle's picture, so the
+                # window is checked against the members too — a bundle row
+                # untouched since import would otherwise never be revisited.
+                rows = await conn.fetch(
+                    """
+                    SELECT DISTINCT b.id, b.updated_at, b.thumbnail_url
+                    FROM customer.bundle b
+                    LEFT JOIN customer.bundle_layer bl ON bl.bundle_id = b.id
+                    LEFT JOIN customer.layer l ON l.id = bl.layer_id
+                    WHERE b.updated_at > $1 OR l.updated_at > $1
+                    ORDER BY b.updated_at DESC
+                    LIMIT $2
+                    """,
+                    since,
+                    limit,
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT b.id, b.updated_at, b.thumbnail_url
+                    FROM customer.bundle b
+                    ORDER BY b.updated_at DESC
+                    LIMIT $1
+                    """,
+                    limit,
+                )
+
+            items: list[ItemToProcess] = []
+            for row in rows:
+                layers = await self._fetch_bundle_layers(conn, row["id"])
+                if not layers:
+                    # Nothing drawable — an import that is still running, or a
+                    # type whose members are all tabular. The borrowed member
+                    # thumbnail stands in.
+                    continue
+
+                bounds = self._compute_bounds_from_layers(layers)
+                item = ItemToProcess(
+                    type="bundle",
+                    id=row["id"],
+                    updated_at=row["updated_at"],
+                    old_thumbnail_url=row["thumbnail_url"],
+                    basemap="light",
+                    view_state=self._calculate_view_state_from_bounds(bounds),
+                    layers=layers,
+                    bounds=bounds,
+                    use_bounds=use_bounds and bounds is not None,
+                )
+                item.content_hash = item.compute_content_hash()
+                items.append(item)
+
+        return items
 
     async def _fetch_layers_to_update(
         self: Self,
@@ -1249,7 +1410,7 @@ class ThumbnailGeneratorTask:
     def _upload_thumbnail(
         self: Self,
         png_bytes: bytes,
-        item_type: Literal["project", "layer"],
+        item_type: Literal["project", "layer", "bundle"],
         item_id: str,
         content_hash: str,
     ) -> str:
@@ -1267,6 +1428,8 @@ class ThumbnailGeneratorTask:
         # Build S3 key with content hash (enables change detection)
         if item_type == "project":
             s3_key = f"{THUMBNAIL_DIR_PROJECT}{item_id}_{content_hash}.png"
+        elif item_type == "bundle":
+            s3_key = f"{THUMBNAIL_DIR_BUNDLE}{item_id}_{content_hash}.png"
         else:
             s3_key = f"{THUMBNAIL_DIR_LAYER}{item_id}_{content_hash}.png"
 
@@ -1287,14 +1450,14 @@ class ThumbnailGeneratorTask:
 
     async def _update_thumbnail_url(
         self: Self,
-        item_type: Literal["project", "layer"],
+        item_type: Literal["project", "layer", "bundle"],
         item_id: UUID,
         thumbnail_url: str,
     ) -> None:
         """Update the thumbnail_url in the database without changing updated_at."""
         pool = await self._get_pg_pool()
 
-        table = "project" if item_type == "project" else "layer"
+        table = item_type if item_type in ("project", "bundle") else "layer"
 
         logger.info(f"Updating {table} {item_id} thumbnail_url to: {thumbnail_url}")
 
@@ -1314,17 +1477,18 @@ class ThumbnailGeneratorTask:
     def _delete_old_thumbnail(
         self: Self,
         old_key: str | None,
-        item_type: Literal["project", "layer"],
+        item_type: Literal["project", "layer", "bundle"],
     ) -> None:
         """Delete old thumbnail from S3 if it exists."""
         if not old_key:
             return
 
-        # Check if it's one of our thumbnails (not a default placeholder)
-        thumb_dir = (
-            THUMBNAIL_DIR_PROJECT if item_type == "project" else THUMBNAIL_DIR_LAYER
-        )
-        if not old_key.startswith(thumb_dir):
+        # Check if it's one of our thumbnails (not a default placeholder).
+        # Any of the directories counts: a bundle's picture written before
+        # bundles had one of their own still has to be cleaned up.
+        if not old_key.startswith(
+            (THUMBNAIL_DIR_PROJECT, THUMBNAIL_DIR_LAYER, THUMBNAIL_DIR_BUNDLE)
+        ):
             return
 
         try:
@@ -1696,7 +1860,9 @@ class ThumbnailGeneratorTask:
                 return await self._run_dry_run(params)
 
             # Check if specific IDs are provided
-            has_specific_ids = bool(params.project_ids or params.layer_ids)
+            has_specific_ids = bool(
+                params.project_ids or params.layer_ids or params.bundle_ids
+            )
 
             # Determine the 'since' filter for fetching items
             since: datetime | None = None
@@ -1777,12 +1943,30 @@ class ThumbnailGeneratorTask:
                         logger.error(f"Failed to fetch table layers: {e}")
                         fetch_errors.append(f"table layers fetch: {e}")
 
+            if params.include_bundles and (params.bundle_ids or not has_specific_ids):
+                remaining = params.batch_size - len(items)
+                if remaining > 0:
+                    try:
+                        logger.info("Fetching bundles from database...")
+                        bundles = await self._fetch_bundles_to_update(
+                            remaining,
+                            bundle_ids=params.bundle_ids if params.bundle_ids else None,
+                            use_bounds=params.use_bounds,
+                            since=since,
+                        )
+                        items.extend(bundles)
+                        logger.info(f"Found {len(bundles)} bundles to check")
+                    except Exception as e:
+                        logger.error(f"Failed to fetch bundles: {e}")
+                        fetch_errors.append(f"bundles fetch: {e}")
+
             if not items:
                 logger.info("No items found to check")
                 return ThumbnailTaskOutput(
                     total_processed=0,
                     projects_processed=0,
                     layers_processed=0,
+                    bundles_processed=0,
                     feature_layers_processed=0,
                     raster_layers_processed=0,
                     table_layers_processed=0,
@@ -1907,10 +2091,15 @@ class ThumbnailGeneratorTask:
                 f"Completed: {success_count} successful, {error_count + len(fetch_errors)} failed"
             )
 
+            bundles_processed = sum(
+                1 for r in results if r.item_type == "bundle" and r.success
+            )
+
             return ThumbnailTaskOutput(
                 total_processed=len(results),
                 projects_processed=projects_processed,
                 layers_processed=layers_processed,
+                bundles_processed=bundles_processed,
                 feature_layers_processed=feature_layers_processed,
                 raster_layers_processed=raster_layers_processed,
                 table_layers_processed=table_layers_processed,

@@ -923,6 +923,8 @@
   "features_saved": "Features saved",
   "bundle_update_not_started": "The edits are saved, but the bundle update could not be started. Update it from the bundle.",
   "bundle_membership_unresolved": "Could not check whether this layer belongs to a bundle. Your edits are kept — try saving again.",
+  "no_map_preview_available": "No map preview available",
+  "no_bundle_dependencies": "This bundle depends on no others",
   "update_bundle": "Update bundle",
   "bundle_update_started": "Updating the bundle",
   "bundle_update_failed_to_start": "Could not start the update",

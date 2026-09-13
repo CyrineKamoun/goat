@@ -76,8 +76,8 @@ function parseThumbnailData(dataParam: string | null): ThumbnailData | null {
  * This page is designed to be rendered without any UI chrome - just the map.
  *
  * URL pattern: /thumbnail/[type]/[id]?data=<base64-encoded-json>
- * - type: "project" or "layer"
- * - id: UUID of the project or layer
+ * - type: "project", "layer" or "bundle"
+ * - id: UUID of the project, layer or bundle
  * - data: Base64-encoded JSON containing viewState, basemap, layers, and optional bounds
  *
  * The data param contains all necessary information to render the map,
@@ -89,7 +89,7 @@ export default function ThumbnailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
 
-  const type = params.type as "project" | "layer";
+  const type = params.type as "project" | "layer" | "bundle";
   const id = params.id as string;
   const dataParam = searchParams.get("data");
 
@@ -170,7 +170,8 @@ export default function ThumbnailPage() {
 
         // Calculate appropriate padding based on thumbnail type
         // For single layers, use moderate padding for visual balance
-        // For projects with multiple layers, use slightly more padding for context
+        // For projects and bundles, which draw several layers together, use
+        // slightly more padding for context
         const isLayer = type === "layer";
         const padding = isLayer ? 30 : 40;
 
