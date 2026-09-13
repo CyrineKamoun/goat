@@ -197,6 +197,13 @@ class TemplateRead(BaseModel):
         "project payload.",
     )
     page_orientation: Literal["portrait", "landscape"] | None = None
+    page_width_mm: float | None = Field(
+        default=None,
+        description="For a layout payload: the sheet's width in millimetres, "
+        "turned the way it prints, read off the frozen config on every read "
+        "so a Custom page is described as well as a named one.",
+    )
+    page_height_mm: float | None = None
     space_id: UUID
     folder_id: UUID
     created_by: ContentCreator | None
