@@ -14,7 +14,7 @@ export type CanEditLayerFieldsArgs = {
   projectOwnerId?: string | null;
   /** Whether the user holds project-owner/project-editor on this project. */
   isProjectEditor: boolean;
-  /** Catalog layers are read-only regardless of role. */
+  /** Catalog datasets are read-only regardless of role. */
   inCatalog?: boolean | null;
   /** Bundle member layers are written through the bundle's batch endpoint
    *  only; geoapi 403s every per-feature/column write to them. Callers with

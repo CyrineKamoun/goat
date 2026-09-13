@@ -191,13 +191,13 @@ const StarterCard = ({ template, pinned, onTogglePin, onOpen, mobile }: StarterC
         <Box sx={{ position: "absolute", top: 10, left: 10 }}>
           <KindBadges kinds={template.kinds ?? []} />
         </Box>
-        {/* One marker in the bottom-left corner: shipped sample data, or the
-            page a layout prints on. The two cannot both apply — sample data
-            comes from shipped input layers, which only a workflow or project
-            payload has, and the page only a layout payload. */}
-        {(template.ships_sample_data || page) && (
+        {/* One marker in the bottom-left corner: shipped data, or the page a
+            layout prints on. The two cannot both apply — data comes from
+            shipped input layers, which only a workflow or project payload
+            has, and the page only a layout payload. */}
+        {(template.ships_data || page) && (
           <Box sx={{ position: "absolute", bottom: 8, left: 8 }}>
-            <TypeTag label={template.ships_sample_data ? t("sample_data") : (page?.label ?? "")} />
+            <TypeTag label={template.ships_data ? t("includes_data") : (page?.label ?? "")} />
           </Box>
         )}
       </Box>

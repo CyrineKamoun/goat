@@ -216,6 +216,15 @@ async def update_layer(
         ..., examples=[layer_request_examples["update"]], description="Layer to update"
     ),
 ) -> ILayerRead:
+    # `public_read` opens the dataset to every signed-in user in every
+    # organization: an owner's decision. Editors may write the data and even
+    # share it inside their own circle, but not open it to everyone.
+    if "public_read" in layer_in:
+        role = await authz.effective_role(async_session, "layer", layer_id, user_id)
+        if role != "owner":
+            raise HTTPException(
+                status_code=403, detail="Only the owner may change public_read"
+            )
     target_folder_id = layer_in.get("folder_id")
     if target_folder_id is not None:
         # Outside HTTPErrorHandler below: authz.require raises HTTPException

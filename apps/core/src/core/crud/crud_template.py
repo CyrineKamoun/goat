@@ -46,6 +46,7 @@ from core.schemas.share import (
     LayerShareRoleEnum,
     ShareLayerSchema,
     ShareLayerWithTeamOrOrganizationSchema,
+    ShareWithUserSchema,
 )
 from core.schemas.template import (
     DatasetShareLine,
@@ -61,6 +62,7 @@ from core.schemas.template import (
     TemplatePreviewRequest,
     TemplateRead,
     TemplateSource,
+    TemplateSourceInfo,
     TemplateUpdate,
     TemplateUseRequest,
     TemplateUseResult,
@@ -114,15 +116,15 @@ class CRUDTemplate:
         """T6's exact rule: does shipping ``layer`` into ``destination_space``
         widen who can read it?
 
-        ``from_catalog`` → never (promote-on-use already resolves it for
-        everyone). Same space as the destination → never (the audience
-        already has whatever access it has today). Otherwise: needs share
-        unless a grant to the destination's own team/organisation already
-        exists — a personal destination has no team/organisation to grant
-        to, so it never needs one either.
+        A catalog or public dataset → never (every signed-in user already
+        reads it). Same space as the destination → never (the audience
+        already has whatever access it has today). Otherwise:
+        needs share unless a grant to the destination's own
+        team/organisation already exists — a personal destination has no
+        team/organisation to grant to, so it never needs one either.
         """
         assert layer.id is not None
-        if layer.catalog_external_uid is not None:
+        if layer.public_read or layer.catalog_external_uid is not None:
             return False
         if layer.space_id is not None and layer.space_id == destination_space.id:
             return False
@@ -197,7 +199,9 @@ class CRUDTemplate:
                     avatar=user.avatar or None,
                 )
         inputs = [TemplateInput(**i) for i in (row.inputs or [])]
-        ships_sample_data = any(i.mode == "ship" and i.from_catalog for i in inputs)
+        ships_data = any(
+            i.mode == "ship" and (i.from_catalog or i.public_read) for i in inputs
+        )
         assert row.id is not None
         return TemplateRead(
             id=row.id,
@@ -213,7 +217,7 @@ class CRUDTemplate:
             payload_kind=row.payload_kind,  # type: ignore[arg-type]
             kinds=kinds,
             inputs=inputs,
-            ships_sample_data=ships_sample_data,
+            ships_data=ships_data,
             catalog_status=row.catalog_status,  # type: ignore[arg-type]
             source_ref=dict(row.source_ref or {}),
             my_role=my_role,  # type: ignore[arg-type]
@@ -222,28 +226,87 @@ class CRUDTemplate:
             datasets_needing_share=datasets_needing_share or [],
         )
 
-    async def _with_from_catalog(
+    async def _resolve_source(
+        self, db: AsyncSession, row: Template, user_id: UUID
+    ) -> TemplateSourceInfo | None:
+        """Names and availability of the recorded source, for the caller:
+        the project must be live and readable, the workflow/layout must
+        still exist. Resolved on the single read only — a list row never
+        pays for it."""
+        ref = row.source_ref or {}
+        project_id_raw = ref.get("project_id")
+        if project_id_raw is None:
+            return None
+        project_id = UUID(str(project_id_raw))
+        project = await db.get(Project, project_id)
+        project_live = project is not None and project.deleted_at is None
+        readable = project_live and await authz.can(
+            db, "project", project_id, user_id, "read"
+        )
+        info = TemplateSourceInfo(
+            kind=row.payload_kind,  # type: ignore[arg-type]
+            project_id=project_id,
+            project_name=project.name if readable and project is not None else None,
+            available=bool(readable),
+        )
+        if row.payload_kind == "workflow" and ref.get("workflow_id"):
+            info.workflow_id = UUID(str(ref["workflow_id"]))
+            wf = (
+                await crud_workflow.get_by_project_and_id(
+                    db, project_id=project_id, workflow_id=info.workflow_id
+                )
+                if readable
+                else None
+            )
+            info.workflow_name = wf.name if wf is not None else None
+            info.available = bool(readable and wf is not None)
+        elif row.payload_kind == "layout" and ref.get("layout_id"):
+            info.layout_id = UUID(str(ref["layout_id"]))
+            layout = (
+                await crud_report_layout.get_by_project_and_id(
+                    db, project_id=project_id, layout_id=info.layout_id
+                )
+                if readable
+                else None
+            )
+            info.layout_name = layout.name if layout is not None else None
+            info.available = bool(readable and layout is not None)
+        return info
+
+    @staticmethod
+    def _layer_flags(layer: Layer | None) -> dict[str, bool]:
+        """The two dataset flags of `TemplateInput`, read off the layer row
+        (both False for a missing layer)."""
+        if layer is None:
+            return {"from_catalog": False, "public_read": False}
+        return {
+            "from_catalog": layer.catalog_external_uid is not None,
+            "public_read": bool(layer.public_read),
+        }
+
+    async def _with_layer_flags(
         self, db: AsyncSession, inputs: list[TemplateInput]
     ) -> list[TemplateInput]:
-        """Recompute `from_catalog` server-side from `layer.catalog_external_uid`
-        — the author's declared value (if any) is never trusted. An "ask"
-        input also has its `layer_id` cleared here regardless of what the
-        client submitted: an ask slot carries no dataset reference (T5), so
-        a client-supplied `layer_id` on one is dropped, not just ignored."""
+        """Recompute `from_catalog` / `public_read` server-side
+        from the layer row — the author's declared values (if any) are never
+        trusted. An "ask" input also has its `layer_id` cleared here
+        regardless of what the client submitted: an ask slot carries no
+        dataset reference (T5), so a client-supplied `layer_id` on one is
+        dropped, not just ignored."""
         out: list[TemplateInput] = []
         for i in inputs:
             if i.mode == "ask":
                 out.append(
-                    i.model_copy(update={"layer_id": None, "from_catalog": False})
+                    i.model_copy(
+                        update={
+                            "layer_id": None,
+                            **self._layer_flags(None),
+                        }
+                    )
                 )
                 continue
-            from_catalog = False
-            if i.layer_id is not None:
-                layer = await db.get(Layer, i.layer_id)
-                from_catalog = bool(
-                    layer is not None and layer.catalog_external_uid is not None
-                )
-            out.append(i.model_copy(update={"from_catalog": from_catalog}))
+            layer = await db.get(Layer, i.layer_id) if i.layer_id is not None else None
+            out.append(i.model_copy(update=self._layer_flags(layer)))
         return out
 
     async def _assert_ship_inputs_readable(
@@ -280,7 +343,8 @@ class CRUDTemplate:
             await db.execute(
                 text(
                     "SELECT DISTINCT l.id, l.name, l.type, "
-                    "l.feature_layer_geometry_type, l.catalog_external_uid "
+                    "l.feature_layer_geometry_type, l.catalog_external_uid, "
+                    "l.public_read "
                     f"FROM {schema}.layer_project lp "
                     f"JOIN {schema}.layer l ON l.id = lp.layer_id "
                     "WHERE lp.project_id = :project_id"
@@ -297,6 +361,7 @@ class CRUDTemplate:
                 layer_type=r.type,  # type: ignore[arg-type]
                 geometry_type=r.feature_layer_geometry_type,
                 from_catalog=r.catalog_external_uid is not None,
+                public_read=bool(r.public_read),
             )
             for r in rows
         ]
@@ -336,39 +401,62 @@ class CRUDTemplate:
         user_id: UUID,
     ) -> None:
         """Add a viewer grant on `layer_id` for `destination_space`'s own
-        team/organisation (T6), preserving every OTHER existing grant on
-        that family.
-
-        `crud_share.share_resource` prunes every row of a grantee family
-        (teams/organizations/users) that is present in its payload but not
-        named there — so a payload naming only the destination grantee would
-        silently delete every other team/org this layer was already shared
-        with. To avoid that, the existing grants for the affected family are
-        read first and carried forward unchanged; the destination grantee is
-        added only if it is not already there (never downgrading an existing
-        higher role for it — this call only ever wants "at least viewer").
-        A personal destination has no team/organisation to grant to and is a
-        no-op.
-        """
+        team/organisation (T6). A personal destination has no team/organisation
+        to grant to and is a no-op."""
         if destination_space.kind == SpaceKind.team:
-            grantee_id = destination_space.team_id
-            family = "teams"
+            grantee_type, grantee_id = "team", destination_space.team_id
         elif destination_space.kind == SpaceKind.organization:
-            grantee_id = destination_space.organization_id
-            family = "organizations"
+            grantee_type, grantee_id = "organization", destination_space.organization_id
         else:
             return
         if grantee_id is None:
             return
+        await self._add_viewer_grant_to(
+            db,
+            layer_id=layer_id,
+            grantee_type=grantee_type,
+            grantee_id=str(grantee_id),
+            user_id=user_id,
+        )
+
+    async def _add_viewer_grant_to(
+        self,
+        db: AsyncSession,
+        *,
+        layer_id: UUID,
+        grantee_type: str,
+        grantee_id: str,
+        user_id: UUID,
+    ) -> None:
+        """Add a viewer grant on `layer_id` for one grantee, preserving every
+        OTHER existing grant on that family.
+
+        `crud_share.share_resource` prunes every row of a grantee family
+        (teams/organizations/users) that is present in its payload but not
+        named there — so a payload naming only this grantee would silently
+        delete every other team/org/user this layer was already shared with.
+        The existing grants for the affected family are therefore read first
+        and carried forward unchanged; the grantee is added only if it is not
+        already there (never downgrading an existing higher role — this call
+        only ever wants "at least viewer").
+        """
+        family = {"team": "teams", "organization": "organizations", "user": "users"}[
+            grantee_type
+        ]
         existing = await crud_share.get_grants(
             db=db, resource_type="layer", resource_id=layer_id
         )
         items = list(getattr(existing, family) or [])
-        grantee_id_str = str(grantee_id)
-        if not any(item.id == grantee_id_str for item in items):
+        if any(item.id == grantee_id for item in items):
+            return
+        if family == "users":
+            items.append(
+                ShareWithUserSchema(id=grantee_id, role=LayerShareRoleEnum.layer_viewer)
+            )
+        else:
             items.append(
                 ShareLayerWithTeamOrOrganizationSchema(
-                    id=grantee_id_str, role=LayerShareRoleEnum.layer_viewer
+                    id=grantee_id, role=LayerShareRoleEnum.layer_viewer
                 )
             )
         shared_with = ShareLayerSchema(**{family: items})
@@ -379,6 +467,49 @@ class CRUDTemplate:
             shared_with=shared_with,
             granted_by=user_id,
         )
+
+    async def _share_shipped_datasets_with(
+        self,
+        db: AsyncSession,
+        *,
+        row: Template,
+        grantee_type: str,
+        grantee_id: str,
+        user_id: UUID,
+    ) -> None:
+        """Let a template's grantee read the datasets it ships.
+
+        A "ship" input is resolved on use only if the user may read that
+        layer, so a template shared without its datasets arrives as an empty
+        workflow. Saving into a team or organisation space already grants the
+        datasets to that space (T6); a grant on the template does the same for
+        its grantee. Catalog layers are readable by everyone, and a layer the
+        owner may not share is left alone — the template then resolves that
+        input as unbound for the grantee, exactly as before.
+        """
+        for raw in row.inputs or []:
+            i = TemplateInput(**raw)
+            if (
+                i.mode != "ship"
+                or i.layer_id is None
+                or i.public_read
+                or i.from_catalog
+            ):
+                continue
+            layer = await db.get(Layer, i.layer_id)
+            if layer is None or layer.deleted_at is not None:
+                continue
+            if layer.public_read or layer.catalog_external_uid is not None:
+                continue
+            if not await authz.can(db, "layer", i.layer_id, user_id, "share"):
+                continue
+            await self._add_viewer_grant_to(
+                db,
+                layer_id=i.layer_id,
+                grantee_type=grantee_type,
+                grantee_id=grantee_id,
+                user_id=user_id,
+            )
 
     async def _caller_spaces(
         self, db: AsyncSession, user_id: UUID
@@ -423,9 +554,6 @@ class CRUDTemplate:
         inputs: list[TemplateInput] = []
         for d in detected:
             layer = await db.get(Layer, d.layer_id)
-            from_catalog = bool(
-                layer is not None and layer.catalog_external_uid is not None
-            )
             may_read = await authz.can(db, "layer", d.layer_id, user_id, "read")
             mode: Literal["ship", "ask"] = "ship" if may_read else "ask"
             inputs.append(
@@ -436,7 +564,7 @@ class CRUDTemplate:
                     layer_id=d.layer_id if mode == "ship" else None,
                     layer_type=d.layer_type,
                     geometry_type=d.geometry_type,
-                    from_catalog=from_catalog,
+                    **self._layer_flags(layer),
                 )
             )
         return inputs
@@ -534,7 +662,7 @@ class CRUDTemplate:
                         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                         detail=f"input {i.key!r} layer_id does not match the detected reference",
                     )
-            inputs = await self._with_from_catalog(db, inputs)
+            inputs = await self._with_layer_flags(db, inputs)
             config = freeze_workflow_config(dict(wf.config or {}), inputs)
             if thumbnail_url is None:
                 thumbnail_url = wf.thumbnail_url
@@ -664,6 +792,9 @@ class CRUDTemplate:
         source: str,
         kind: str | None,
         categories: str | None,
+        source_project_id: UUID | None = None,
+        source_workflow_id: UUID | None = None,
+        source_layout_id: UUID | None = None,
     ) -> tuple[list[str], dict[str, Any]] | None:
         """The WHERE conditions and bound parameters shared by every query
         over the caller's readable templates.
@@ -686,9 +817,29 @@ class CRUDTemplate:
         if not scoped_space_ids and not include_goat:
             return None
 
+        schema = settings.SCHEMA
+        # A template shared with the caller (T3) lives in someone else's space,
+        # so no space bucket reaches it; `all` takes it in through its grant —
+        # a direct user grant, or one to a team or the organisation the caller
+        # belongs to. `effective_role` still decides afterwards whether the
+        # grant actually confers read.
+        # A template reaches a non-member through a grant on the template
+        # itself or on any folder above it — the same walk `effective_role`
+        # makes for a single read, so the list agrees with what a read would
+        # allow. Most templates travel that way: a folder shared with a team
+        # or an organisation, not a grant on each template.
+        granted = (
+            f"""({schema}.direct_grant_rank('template', t.id, :user_id) > 0
+                 OR EXISTS (SELECT 1 FROM {schema}.folder_chain(t.folder_id) AS fc(folder_id)
+                             WHERE {schema}.direct_grant_rank('folder', fc.folder_id, :user_id) > 0))"""
+            if source == "all"
+            else "FALSE"
+        )
         conditions = [
             "t.deleted_at IS NULL",
-            "(t.space_id = ANY(:space_ids) OR (:include_goat AND t.catalog_status = 'published'))",
+            "(t.space_id = ANY(:space_ids)"
+            " OR (:include_goat AND t.catalog_status = 'published')"
+            f" OR {granted})",
         ]
         params: dict[str, Any] = {
             "space_ids": scoped_space_ids,
@@ -708,6 +859,16 @@ class CRUDTemplate:
             params["kind"] = kind
         elif kind == "dashboard":
             conditions.append("t.payload_kind = 'project'")
+        # The save dialog's "templates already saved from this source": one
+        # exact condition per given id on the stored source reference.
+        for column, value in (
+            ("project_id", source_project_id),
+            ("workflow_id", source_workflow_id),
+            ("layout_id", source_layout_id),
+        ):
+            if value is not None:
+                conditions.append(f"t.source_ref->>'{column}' = :source_{column}")
+                params[f"source_{column}"] = str(value)
         wanted = self.parse_categories(categories)
         if wanted:
             # All-of, case-insensitive: the row's lowercased categories must
@@ -731,12 +892,22 @@ class CRUDTemplate:
         kind: str | None,
         search: str | None,
         categories: str | None = None,
+        source_project_id: UUID | None = None,
+        source_workflow_id: UUID | None = None,
+        source_layout_id: UUID | None = None,
         page: int,
         size: int,
     ) -> TemplatePage:
         schema = settings.SCHEMA
         prepared = await self._readable_conditions(
-            db, user_id=user_id, source=source, kind=kind, categories=categories
+            db,
+            user_id=user_id,
+            source=source,
+            kind=kind,
+            categories=categories,
+            source_project_id=source_project_id,
+            source_workflow_id=source_workflow_id,
+            source_layout_id=source_layout_id,
         )
         if prepared is None:
             return TemplatePage(items=[], total=0)
@@ -878,6 +1049,7 @@ class CRUDTemplate:
         my_role = await authz.effective_role(db, "template", template_id, user_id)
         assert my_role is not None
         read = await self._to_read(db, row, my_role=my_role)
+        read.source = await self._resolve_source(db, row, user_id)
         if (
             include_config
             and my_role in ("owner", "editor")
@@ -983,9 +1155,9 @@ class CRUDTemplate:
             # `layerId` and no `templateInput` marker (never read-checked,
             # never counted by the publish guard). Reconcile against a fresh
             # detection instead of reusing the stored list as-is: a
-            # surviving key keeps its author-chosen mode (and has
-            # `from_catalog` recomputed live, since the layer's catalog
-            # registration can have changed); a newly-detected key has no
+            # surviving key keeps its author-chosen mode (and has its
+            # dataset flags recomputed live, since the layer's catalog
+            # registration and visibility can have changed); a newly-detected key has no
             # prior author decision, so it defaults to "ask"; a key that no
             # longer appears in the source is dropped.
             old_by_key = {i["key"]: TemplateInput(**i) for i in (row.inputs or [])}
@@ -1012,10 +1184,9 @@ class CRUDTemplate:
                             layer_id=None,
                             layer_type=d.layer_type,
                             geometry_type=d.geometry_type,
-                            from_catalog=False,
                         )
                     )
-            reconciled = await self._with_from_catalog(db, reconciled)
+            reconciled = await self._with_layer_flags(db, reconciled)
             await self._assert_ship_inputs_readable(db, reconciled, user_id)
             row.inputs = [i.model_dump(mode="json") for i in reconciled]
             row.config = freeze_workflow_config(dict(wf.config or {}), reconciled)
@@ -1352,13 +1523,16 @@ class CRUDTemplate:
         they're publishing (B1); this does not widen who may publish beyond
         the superuser check above, it only narrows it further.
 
-        Every ``mode == "ship"`` input's dataset must be catalog-origin.
-        The author's stored ``from_catalog`` is never trusted for this: each
-        such input is re-checked live against `layer.catalog_external_uid`,
-        since a layer's catalog registration can change after the template
-        was saved. Any input that fails raises 409 with
-        ``{"code": "template_dataset_not_public", "layers": [{"id", "name"}]}``
-        naming every offending layer.
+        Every ``mode == "ship"`` input's dataset must be readable by every
+        signed-in user once the template is on the shelf: a catalog dataset
+        or a public one, checked live against the layer row (the stored
+        flags are never trusted). A dataset that is neither is made public
+        by the publish itself when the caller owns it (effective role
+        owner — the same level the Share dialog's Public switch takes), so
+        curating the shelf can never open someone else's data. Any input
+        that fails raises 409 with ``{"code": "template_dataset_not_public",
+        "layers": [{"id", "name"}]}`` naming every offending layer, and
+        nothing is flipped.
         """
         if not is_superuser:
             raise HTTPException(
@@ -1368,17 +1542,29 @@ class CRUDTemplate:
         row = await self._get_live(db, template_id)
         inputs = [TemplateInput(**i) for i in (row.inputs or [])]
         bad_layers: list[dict[str, str]] = []
+        to_make_public: list[Layer] = []
         for i in inputs:
             if i.mode != "ship" or i.layer_id is None:
                 continue
             layer = await db.get(Layer, i.layer_id)
-            if layer is None or layer.catalog_external_uid is None:
-                bad_layers.append(
-                    {
-                        "id": str(i.layer_id),
-                        "name": (layer.name if layer is not None else None) or i.label,
-                    }
-                )
+            if layer is not None and (
+                layer.public_read or layer.catalog_external_uid is not None
+            ):
+                continue
+            if (
+                layer is not None
+                and layer.deleted_at is None
+                and await authz.effective_role(db, "layer", i.layer_id, user_id)
+                == "owner"
+            ):
+                to_make_public.append(layer)
+                continue
+            bad_layers.append(
+                {
+                    "id": str(i.layer_id),
+                    "name": (layer.name if layer is not None else None) or i.label,
+                }
+            )
         if bad_layers:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1387,6 +1573,14 @@ class CRUDTemplate:
                     "layers": bad_layers,
                 },
             )
+        for layer in to_make_public:
+            layer.public_read = True
+            db.add(layer)
+        # The stored inputs carry the flags the web reads; refresh them so
+        # the response and every later read show the datasets as public.
+        row.inputs = [
+            i.model_dump(mode="json") for i in await self._with_layer_flags(db, inputs)
+        ]
 
         row.catalog_status = TemplateCatalogStatus.published
         row.catalog_published_at = datetime.now(timezone.utc)
@@ -1541,6 +1735,15 @@ class CRUDTemplate:
                 },
             )
         ).one()
+        template_row = await db.get(Template, template_id)
+        if template_row is not None:
+            await self._share_shipped_datasets_with(
+                db,
+                row=template_row,
+                grantee_type=obj_in.grantee_type,
+                grantee_id=str(obj_in.grantee_id),
+                user_id=user_id,
+            )
         await db.commit()
         return TemplateGrantRead(
             id=row.id,

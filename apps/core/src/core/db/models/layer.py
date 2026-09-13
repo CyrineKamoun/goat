@@ -110,10 +110,14 @@ class GeospatialAttributes(SQLModel):
 class LayerBase(ContentBaseAttributes):
     """Base model for layers."""
 
-    in_catalog: bool | None = Field(
+    public_read: bool | None = Field(
         default=False,
         sa_column=Column(Boolean, nullable=False, server_default="False"),
-        description="If the layer should be added in the catalog",
+        description=(
+            "Public dataset: readable by every signed-in user in any "
+            "organization. Set by the owner; changes nothing about who may "
+            "write. Catalog datasets are identified by catalog_external_uid."
+        ),
     )
     thumbnail_url: str | None = Field(
         default=settings.DEFAULT_LAYER_THUMBNAIL,

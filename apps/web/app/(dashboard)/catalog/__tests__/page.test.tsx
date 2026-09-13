@@ -77,7 +77,7 @@ const templateFixture: TemplateRead = {
   payload_kind: "project",
   kinds: ["layout"],
   inputs: [],
-  ships_sample_data: false,
+  ships_data: false,
   catalog_status: "published",
   source_ref: {},
   my_role: "viewer",

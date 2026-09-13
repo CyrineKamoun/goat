@@ -369,7 +369,7 @@ export const projectLayerTreeNodeSchema = z.object({
   other_properties: z.record(z.any()).nullable().optional(),
   query: z.record(z.any()).nullable().optional(),
   user_id: z.string().optional(),
-  in_catalog: z.boolean().optional(),
+  is_catalog: z.boolean().optional(),
   // See projectLayerSchema: a locked node carries no style/data to draw.
   locked: z.boolean().optional(),
 });

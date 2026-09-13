@@ -5,7 +5,7 @@ owner; an editor-or-owner via a direct, folder, or bundle grant
 (``effective_role('layer', ...)``); or the shared-workspace rule — a
 project containing the layer where the owner and the requester both hold an
 edit-or-owner role on that project. A catalog layer (owner NULL, or flagged
-``in_catalog``/``catalog_external_uid``) is never writable by anyone but its
+``catalog_external_uid``) is never writable by anyone but its
 owner column — no grant path, including the shared-workspace one, may raise
 it above viewer.
 
@@ -146,22 +146,27 @@ async def _make_folder(conn: asyncpg.Connection, user_id: uuid.UUID) -> uuid.UUI
 
 
 async def _make_layer(
-    conn: asyncpg.Connection, owner_id: uuid.UUID, *, in_catalog: bool = False
+    conn: asyncpg.Connection, owner_id: uuid.UUID, *, catalog: bool = False
 ) -> uuid.UUID:
+    """A layer in the owner's personal space; `catalog=True` gives it catalog
+    provenance (`catalog_external_uid`), which is what write-locks it."""
     folder_id = await _make_folder(conn, owner_id)
     space_id = await _ensure_personal_space(conn, owner_id)
+    layer_id = uuid.uuid4()
     return await conn.fetchval(
         """
         INSERT INTO customer.layer
-            (id, user_id, folder_id, space_id, name, type, in_catalog, updated_at)
-        VALUES ($1, $2, $3, $4, 'test-layer', 'feature', $5, NOW())
+            (id, user_id, folder_id, space_id, name, type,
+             catalog_external_uid, catalog_version, updated_at)
+        VALUES ($1, $2, $3, $4, 'test-layer', 'feature', $5, $6, NOW())
         RETURNING id
         """,
-        uuid.uuid4(),
+        layer_id,
         owner_id,
         folder_id,
         space_id,
-        in_catalog,
+        f"stac:{layer_id}" if catalog else None,
+        "1" if catalog else None,
     )
 
 
@@ -306,7 +311,7 @@ async def test_adding_a_catalog_layer_to_your_own_project_grants_no_write(
     dataset."""
     owner = await _make_user(conn)
     outsider = await _make_user(conn)
-    layer = await _make_layer(conn, owner, in_catalog=True)
+    layer = await _make_layer(conn, owner, catalog=True)
     outsiders_project = await _make_project(conn, outsider)
     await _add_layer_to_project(conn, layer, outsiders_project)
 

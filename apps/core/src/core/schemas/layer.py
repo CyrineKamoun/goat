@@ -625,9 +625,9 @@ class LayerGetBase(BaseModel):
 
 
 class ILayerGet(LayerGetBase):
-    in_catalog: bool | None = Field(
+    public_read: bool | None = Field(
         None,
-        description="This field is left optional. If true, only layers that are in the catalog will be returned.",
+        description="This field is left optional. If true, only layers readable by every user are returned.",
     )
 
 

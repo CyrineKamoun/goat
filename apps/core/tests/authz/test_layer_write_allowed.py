@@ -111,7 +111,7 @@ async def test_catalog_layer_shared_workspace_grants_no_write(
     make_layer: Callable[..., Awaitable[Layer]],
     make_project: Callable[..., Awaitable[Project]],
 ) -> None:
-    """A catalog-flagged layer stays owner-only even through the
+    """A catalog layer stays owner-only even through the
     shared-workspace path: the owner puts it in a project they own and
     grants a collaborator project-editor there, but the collaborator must
     not gain write on the catalog layer itself."""
@@ -120,7 +120,10 @@ async def test_catalog_layer_shared_workspace_grants_no_write(
     folder = await make_folder(owner)
     layer = await make_layer(owner, folder)
     await db_session.execute(
-        text(f"UPDATE {S}.layer SET in_catalog = TRUE WHERE id = :l"),
+        text(
+            f"UPDATE {S}.layer SET catalog_external_uid = 'stac:' || CAST(:l AS text), "
+            "catalog_version = '1' WHERE id = :l"
+        ),
         {"l": layer.id},
     )
     project = await make_project(owner, folder)

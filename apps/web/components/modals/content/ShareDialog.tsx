@@ -64,6 +64,7 @@ import {
 import type { RolePrefix } from "@/components/modals/content/RolePicker";
 import SharePeopleTab from "@/components/modals/content/SharePeopleTab";
 import ShareTeamsTab from "@/components/modals/content/ShareTeamsTab";
+import ShareDatasetPublicTab from "@/components/modals/share/ShareDatasetPublicTab";
 import ShareWithPublicTab from "@/components/modals/share/ShareWithPublicTab";
 
 interface ShareDialogProps {
@@ -216,7 +217,7 @@ const ShareDialog = ({ item, space, folders, onClose, onTransfer }: ShareDialogP
   // the owner knows what else to share for the template to actually run.
   const { template } = useTemplate(isTemplate ? item.id : null);
   const shippedDatasetCount = (template?.inputs ?? []).filter(
-    (input) => input.mode === "ship" && input.layer_id !== null && !input.from_catalog
+    (input) => input.mode === "ship" && input.layer_id !== null && !input.public_read && !input.from_catalog
   ).length;
 
   // `canActOn` already requires owner and rules out a shortcut (which carries
@@ -274,9 +275,9 @@ const ShareDialog = ({ item, space, folders, onClose, onTransfer }: ShareDialogP
       { value: "people", label: t("people"), count: shares.users.length },
       { value: "teams", label: t("teams"), count: shares.teams.length + shares.organizations.length },
     ];
-    if (item.type === "project") items.push({ value: "public", label: t("public"), count: 0 });
+    if (isLayerOrProject) items.push({ value: "public", label: t("public"), count: 0 });
     return items;
-  }, [item.type, shares, t]);
+  }, [isLayerOrProject, shares, t]);
   const activeTabValue = tabItems[tab]?.value;
 
   const kindLabel = space.kind === "team" ? t("team") : t("organization");
@@ -624,6 +625,9 @@ const ShareDialog = ({ item, space, folders, onClose, onTransfer }: ShareDialogP
           />
         )}
         {activeTabValue === "public" &&
+          item.type === "layer" && <ShareDatasetPublicTab item={item} canToggle={canActOn(item)} />}
+        {activeTabValue === "public" &&
+          item.type === "project" &&
           (fullProject ? (
             <ShareWithPublicTab project={fullProject} />
           ) : (

@@ -48,7 +48,7 @@ class CRUDDatasets:
         "type",
         "feature_layer_type",
         "spatial_search",
-        "in_catalog",
+        "public_read",
     )
 
     @staticmethod

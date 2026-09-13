@@ -16,7 +16,7 @@ const catalogProjectLayer = {
   layer_id: "f99556c1-3442-4712-a947-c0dc804e1e9f",
   name: "Quartiere Biel",
   type: "feature",
-  in_catalog: false,
+  public_read: false,
   created_at: "2026-08-30T18:49:26.000Z",
   updated_at: "2026-08-30T18:49:26.000Z",
   properties: { visibility: true },

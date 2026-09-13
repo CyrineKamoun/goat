@@ -27,7 +27,7 @@ describe("zoomToProjectLayer", () => {
     vi.mocked(getExtent).mockResolvedValue({ bbox: [10.9, 49.3, 11.2, 49.6] } as never);
     const m = map();
 
-    await zoomToProjectLayer(m as never, layer({ in_catalog: true }));
+    await zoomToProjectLayer(m as never, layer({ other_properties: { catalog_item: {} } }));
 
     expect(getExtent).toHaveBeenCalledWith("layer-1", undefined);
     expect(m.fitBounds).toHaveBeenCalledWith([10.9, 49.3, 11.2, 49.6], expect.anything());
@@ -37,7 +37,7 @@ describe("zoomToProjectLayer", () => {
     vi.mocked(getExtent).mockResolvedValue({ bbox: null } as never);
     const m = map();
 
-    await zoomToProjectLayer(m as never, layer({ in_catalog: true }));
+    await zoomToProjectLayer(m as never, layer({ other_properties: { catalog_item: {} } }));
 
     expect(m.fitBounds).toHaveBeenCalledWith([-61.8, -21.4, 55.8, 78.9], expect.anything());
   });
@@ -45,7 +45,7 @@ describe("zoomToProjectLayer", () => {
   it("uses the stored extent for an unfiltered layer of the user's own", async () => {
     const m = map();
 
-    await zoomToProjectLayer(m as never, layer({ in_catalog: false }));
+    await zoomToProjectLayer(m as never, layer({ other_properties: {} }));
 
     expect(getExtent).not.toHaveBeenCalled();
     expect(m.fitBounds).toHaveBeenCalledTimes(1);

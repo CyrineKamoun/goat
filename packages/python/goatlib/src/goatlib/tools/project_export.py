@@ -163,7 +163,7 @@ class ProjectExportRunner(SimpleToolRunner):
                            data_type, feature_layer_type,
                            feature_layer_geometry_type, tool_type, job_id,
                            properties, other_properties, size,
-                           thumbnail_url, tags, in_catalog,
+                           thumbnail_url, tags, public_read,
                            user_id, folder_id, field_config
                     FROM {schema}.layer
                     WHERE id = ANY($1)
@@ -190,7 +190,7 @@ class ProjectExportRunner(SimpleToolRunner):
                         "size": row["size"],
                         "thumbnail_url": row["thumbnail_url"],
                         "tags": list(row["tags"]) if row["tags"] else None,
-                        "in_catalog": row["in_catalog"],
+                        "public_read": row["public_read"],
                         "user_id": str(row["user_id"]) if row["user_id"] else None,
                         "folder_id": (
                             str(row["folder_id"]) if row["folder_id"] else None
