@@ -19,6 +19,7 @@ import { Rnd } from "react-rnd";
 import ThemeProvider from "@p4b/ui/theme/ThemeProvider";
 
 import type { AtlasPage } from "@/lib/print/atlas-utils";
+import { resolveElementFrame } from "@/lib/print/elementFrame";
 import { mmToPx, pxToMm, resolvePageMm } from "@/lib/print/units";
 import { setReportCanvasZoom } from "@/lib/store/map/slice";
 import type { Project, ProjectLayer } from "@/lib/validations/project";
@@ -610,11 +611,18 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
           width: newWidthMm,
           height: newHeightMm,
         },
+        // A scalebar's rectangle is refit to its bar after the update; the
+        // dragged width is the maximum the bar may grow to.
+        ...(element.type === "scalebar" && {
+          config: { ...element.config, maxWidthMm: newWidthMm },
+        }),
       });
       onInteractionEnd?.();
     },
     [
       element.id,
+      element.type,
+      element.config,
       element.position,
       onUpdate,
       onInteractionEnd,
@@ -647,25 +655,7 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
       }
     : undefined;
 
-  // Extract border and background styles from element
-  const elementStyle = (element.style ?? {}) as Record<string, unknown>;
-  const borderStyle = (elementStyle.border ?? {}) as { enabled?: boolean; color?: string; width?: number };
-  const backgroundStyle = (elementStyle.background ?? {}) as {
-    enabled?: boolean;
-    color?: string;
-    opacity?: number;
-  };
-
-  // Calculate element border (convert mm to px)
-  const elementBorderEnabled = borderStyle.enabled ?? false;
-  const elementBorderColor = borderStyle.color ?? "#000000";
-  const elementBorderWidthMm = borderStyle.width ?? 0.5;
-  const elementBorderWidthPx = mmToPx(elementBorderWidthMm, SCREEN_DPI) * zoom;
-
-  // Calculate element background
-  const elementBackgroundEnabled = backgroundStyle.enabled ?? false;
-  const elementBackgroundColor = backgroundStyle.color ?? "#ffffff";
-  const elementBackgroundOpacity = backgroundStyle.opacity ?? 1;
+  const frame = resolveElementFrame(element.style, zoom);
 
   return (
     <Rnd
@@ -691,12 +681,8 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
         sx={{
           width: "100%",
           height: "100%",
-          // Apply element background (if enabled)
-          backgroundColor: elementBackgroundEnabled
-            ? `rgba(${parseInt(elementBackgroundColor.slice(1, 3), 16)}, ${parseInt(elementBackgroundColor.slice(3, 5), 16)}, ${parseInt(elementBackgroundColor.slice(5, 7), 16)}, ${elementBackgroundOpacity})`
-            : "transparent",
-          // Apply element border (if enabled)
-          border: elementBorderEnabled ? `${elementBorderWidthPx}px solid ${elementBorderColor}` : "none",
+          backgroundColor: frame.backgroundColor,
+          border: frame.border,
           // Selection indicator uses outline (doesn't affect layout/content position)
           outline: isSelected ? `2px solid ${theme.palette.primary.main}` : "none",
           outlineOffset: 0,

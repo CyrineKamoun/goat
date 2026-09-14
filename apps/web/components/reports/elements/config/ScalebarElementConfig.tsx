@@ -79,6 +79,11 @@ export interface ScalebarElementConfig {
   segmentsLeft?: number;
   /** Number of segments on the right (main divisions) */
   segmentsRight?: number;
+  /**
+   * Widest the rectangle may be, in mm: the width the user dragged. The
+   * rectangle itself is refit to the bar, which is never wider than this.
+   */
+  maxWidthMm?: number;
   /** Typography style for labels */
   typography?: TypographyStyle;
 }

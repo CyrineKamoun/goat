@@ -12,6 +12,8 @@ import { useProject } from "@/lib/api/projects";
 import { useProjectLayerGroups } from "@/lib/api/projects";
 import { useReportLayout } from "@/lib/api/reportLayouts";
 import type { AtlasPage } from "@/lib/print/atlas-utils";
+import { resolveElementFrame } from "@/lib/print/elementFrame";
+import { snapScalebarWidths } from "@/lib/print/scalebar";
 import { mmToPx, resolvePageMm } from "@/lib/print/units";
 import { orderLayersByTree } from "@/lib/utils/map/layerTreeOrder";
 import type { CustomBasemap, ProjectLayer } from "@/lib/validations/project";
@@ -296,11 +298,15 @@ const ReportElements: React.FC<ReportElementsProps> = ({
   // mapsLoadedCount increments) cause `config.elements` to be re-evaluated and
   // a sync-effect would race against the atlas writeback — overwriting it on
   // every page and leaving the scalebar stuck at the persisted snapshot.
-  const [elements, setElements] = useState(config.elements || []);
+  const [elements, setElements] = useState(() => snapScalebarWidths(config.elements || []));
 
   // Handle element config updates (e.g. map writing back viewState after atlas page change)
   const handleElementUpdate = useCallback((elementId: string, newConfig: Record<string, unknown>) => {
-    setElements((prev) => prev.map((el) => (el.id === elementId ? { ...el, config: newConfig } : el)));
+    // The atlas map writes its view state back per page; refit the scalebar
+    // rectangles to the bar for that page in the same update.
+    setElements((prev) =>
+      snapScalebarWidths(prev.map((el) => (el.id === elementId ? { ...el, config: newConfig } : el)))
+    );
   }, []);
 
   if (elements.length === 0) {
@@ -328,30 +334,7 @@ const ReportElements: React.FC<ReportElementsProps> = ({
         const widthPx = mmToPx(element.position.width, SCREEN_DPI);
         const heightPx = mmToPx(element.position.height, SCREEN_DPI);
 
-        // Extract border style (width is in mm, needs conversion to px)
-        const borderStyle = (element.style?.border ?? {}) as {
-          enabled?: boolean;
-          color?: string;
-          width?: number;
-        };
-        const borderEnabled = borderStyle.enabled ?? false;
-        const borderColor = borderStyle.color ?? "#000000";
-        const borderWidthPx = borderEnabled ? mmToPx(borderStyle.width ?? 0.5, SCREEN_DPI) : 0;
-
-        // Extract background style
-        const backgroundStyle = (element.style?.background ?? {}) as {
-          enabled?: boolean;
-          color?: string;
-          opacity?: number;
-        };
-        const backgroundEnabled = backgroundStyle.enabled ?? false;
-        const backgroundColor = backgroundStyle.color ?? "#ffffff";
-        const backgroundOpacity = backgroundStyle.opacity ?? 1;
-
-        // Create rgba background color
-        const backgroundRgba = backgroundEnabled
-          ? `rgba(${parseInt(backgroundColor.slice(1, 3), 16)}, ${parseInt(backgroundColor.slice(3, 5), 16)}, ${parseInt(backgroundColor.slice(5, 7), 16)}, ${backgroundOpacity})`
-          : "transparent";
+        const frame = resolveElementFrame(element.style);
 
         return (
           <Box
@@ -365,13 +348,11 @@ const ReportElements: React.FC<ReportElementsProps> = ({
               width: widthPx,
               height: heightPx,
               zIndex: element.position.z_index,
-              backgroundColor: backgroundRgba,
+              backgroundColor: frame.backgroundColor,
               opacity: element.style?.opacity ?? 1,
               // No rounded borders in print view
               borderRadius: 0,
-              borderWidth: borderEnabled ? borderWidthPx : 0,
-              borderColor: borderEnabled ? borderColor : "transparent",
-              borderStyle: borderEnabled ? "solid" : "none",
+              border: frame.border,
               overflow: "hidden",
               // Ensure backgrounds print correctly
               WebkitPrintColorAdjust: "exact",
