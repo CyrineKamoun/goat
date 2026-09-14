@@ -7,8 +7,12 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { DOCS_URL } from "@/lib/constants";
 
-/** Not on the docs site — the video lives on the product's own channel. */
-const HELP_VIDEO_URL = "https://www.youtube.com/@plan4better";
+/** The catchment-area walkthrough on the product's own channel, one cut per
+ * UI language; the same videos are embedded on the docs' catchment page. */
+const HELP_VIDEO_URL: Record<"en" | "de", string> = {
+  en: "https://www.youtube.com/watch?v=_clsR386b9w",
+  de: "https://www.youtube.com/watch?v=GA_6PbhAA6k",
+};
 
 interface HelpStripProps {
   /** Below `md`, the three tiles stack one to a row instead of three across. */
@@ -16,21 +20,26 @@ interface HelpStripProps {
 }
 
 /**
- * H12: three onboarding tiles under the quick actions — the docs home page
- * (framed as "getting started" and as "documentation") and a short video.
- * Shown in New and Getting started only; Established drops it, since the
- * header's own docs icon is the entry point from then on.
+ * H12: three onboarding tiles under the quick actions — the docs' quickstart
+ * guide, the docs home page and the catchment-area video. Shown until the
+ * caller has a project and a workflow, skipped onboarding or not; from then
+ * on the header's own docs icon is the entry point.
  */
 const HelpStrip = ({ mobile }: HelpStripProps) => {
   const { t, i18n } = useTranslation("common");
   const theme = useTheme();
-  const lng = i18n.language === "de" ? "/de" : "";
-  const docsUrl = `${DOCS_URL}${lng}`;
+  const lang = i18n.language === "de" ? "de" : "en";
+  const docsUrl = lang === "de" ? `${DOCS_URL}/de` : DOCS_URL;
 
   const tiles: { key: string; icon: ICON_NAME; href: string; meta: string }[] = [
-    { key: "help_getting_started", icon: ICON_NAME.ROCKET, href: docsUrl, meta: t("min_read", { n: 6 }) },
+    {
+      key: "help_getting_started",
+      icon: ICON_NAME.ROCKET,
+      href: `${docsUrl}/getting_started/quickstart_guide`,
+      meta: t("min_read", { n: 6 }),
+    },
     { key: "help_docs", icon: ICON_NAME.BOOK, href: docsUrl, meta: t("help_docs_sub") },
-    { key: "help_video", icon: ICON_NAME.PLAY, href: HELP_VIDEO_URL, meta: t("video") },
+    { key: "help_video", icon: ICON_NAME.PLAY, href: HELP_VIDEO_URL[lang], meta: t("video") },
   ];
 
   return (
