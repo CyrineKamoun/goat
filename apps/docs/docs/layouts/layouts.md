@@ -27,7 +27,7 @@ The Settings Panel allows you to create a new layout, customize the overall layo
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Configure the Layout Settings by selecting your preferred <code>page size</code> (A4, A3, Letter), <code>orientation</code> (Portrait or Landscape), <code>resolution</code>, and <code>export format</code> (PDF, PNG, or JPEG).</div>
+  <div class="content">Configure the Layout Settings by selecting your preferred <code>page size</code> (A4, A3, A2, A1, Letter, Legal, Tabloid, or Custom with your own width and height from 50 to 1500 mm). When you change the page of a layout that already has elements, GOAT asks whether to <b>Scale elements</b> to the new page or <b>Keep sizes</b>, <code>orientation</code> (Portrait or Landscape), <code>resolution</code>, and <code>export format</code> (PDF, PNG, or JPEG).</div>
 </div>
 
 <div class="step">

@@ -98,4 +98,16 @@ describe("HomeHero", () => {
     expect(screen.getByText("help_docs")).toBeInTheDocument();
     expect(screen.getByText("help_video")).toBeInTheDocument();
   });
+
+  it("points the help tiles at the quickstart guide, the docs home and the catchment video", () => {
+    renderHero({ stage: "new", showHelp: true });
+
+    const href = (name: RegExp) => screen.getByRole("link", { name }).getAttribute("href");
+
+    expect(href(/help_getting_started/)).toBe(
+      "https://goat.plan4better.de/docs/getting_started/quickstart_guide"
+    );
+    expect(href(/help_docs/)).toBe("https://goat.plan4better.de/docs");
+    expect(href(/help_video/)).toBe("https://www.youtube.com/watch?v=_clsR386b9w");
+  });
 });

@@ -172,7 +172,7 @@ describe("JumpBackIn", () => {
     expect(pushMock).toHaveBeenCalledWith("/map/a");
   });
 
-  it("routes all_projects to the Content page's recent view", () => {
+  it("routes all_projects to the Content page's cross-space feed, filtered to projects", () => {
     const item = projectItem({ id: "a", name: "Only Project" });
     useContentMock.mockReturnValue({ page: page([item]), isLoading: false });
     useFavoriteStarsMock.mockReturnValue({ starred: {}, toggleStar: toggleStarMock });
@@ -180,6 +180,6 @@ describe("JumpBackIn", () => {
     render(<JumpBackIn />);
     fireEvent.click(screen.getByText("all_projects"));
 
-    expect(pushMock).toHaveBeenCalledWith("/content/recent");
+    expect(pushMock).toHaveBeenCalledWith("/content/recent?types=project");
   });
 });

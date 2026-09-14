@@ -132,7 +132,9 @@ const HomePage = () => {
        * the same in every stage but New, so it opens on the Established
        * shape and only the greeting waits, as a skeleton. What a stage read
        * now would get wrong stays out: the New-only hero, and the help strip
-       * that Established hides. */}
+       * that real usage hides. The strip ignores the skip flag on purpose:
+       * skipping dismisses the checklist, not the docs, so it stays until
+       * the caller has a project and has run a workflow. */}
       <HomeHero
         stage={stage ?? "established"}
         firstName={userProfile?.firstname ?? ""}
@@ -141,7 +143,7 @@ const HomePage = () => {
         onAddDataset={addDataset}
         onBrowseCatalog={browseCatalog}
         loading={stageLoading || !stage}
-        showHelp={!!stage && stage !== "established"}
+        showHelp={!!stage && !(facts?.has_project && facts?.has_workflow)}
         mobile={mobile}
       />
 

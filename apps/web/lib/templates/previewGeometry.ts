@@ -1,4 +1,4 @@
-import { PAGE_SIZES } from "@/lib/print/units";
+import { PAGE_SIZES, type PageSizeConfig, resolvePageMm } from "@/lib/print/units";
 import type {
   TemplateLayoutPreview,
   TemplatePreviewElementStyle,
@@ -516,8 +516,9 @@ export interface LayoutPageDescription {
   /** The standard size's name, or the translated "Custom". */
   name: string;
   label: string;
-  width: number;
-  height: number;
+  /** Null for a Custom page: its sides live in the frozen config, which a card never has. */
+  width: number | null;
+  height: number | null;
 }
 
 /** The page a layout carries, as the template stores it: the size's own
@@ -525,6 +526,9 @@ export interface LayoutPageDescription {
 export interface LayoutPageFields {
   page_size?: string | null;
   page_orientation?: "portrait" | "landscape" | null;
+  /** The sheet in millimetres as the template stores it; the name lookup is the fallback. */
+  page_width_mm?: number | null;
+  page_height_mm?: number | null;
 }
 
 /**
@@ -542,14 +546,26 @@ export const layoutPageDescription = (
   if (!template.page_size) return null;
   const size = tableEntry(PREVIEW_PAGE_SIZE, template.page_size);
   const named = size ? template.page_size : translate("custom", { defaultValue: "Custom" });
-  const { width: portraitWidth, height: portraitHeight } = size ?? PREVIEW_PAGE_SIZE.A4;
   const landscape = template.page_orientation === "landscape";
-  const width = landscape ? portraitHeight : portraitWidth;
-  const height = landscape ? portraitWidth : portraitHeight;
   const orientation = translate(landscape ? "landscape" : "portrait", {
     defaultValue: landscape ? "Landscape" : "Portrait",
   });
-  return { name: named, label: `${named} · ${orientation}`, width: round1(width), height: round1(height) };
+  // A Custom page has no orientation of its own to speak of: its shape is
+  // whatever was typed, so the tag is the bare name and the millimetres
+  // under the picture say the rest.
+  const label = size ? `${named} · ${orientation}` : named;
+  if (template.page_width_mm != null && template.page_height_mm != null) {
+    return {
+      name: named,
+      label,
+      width: round1(template.page_width_mm),
+      height: round1(template.page_height_mm),
+    };
+  }
+  if (!size) return { name: named, label, width: null, height: null };
+  const width = landscape ? size.height : size.width;
+  const height = landscape ? size.width : size.height;
+  return { name: named, label, width: round1(width), height: round1(height) };
 };
 
 /**
@@ -802,11 +818,16 @@ export const descriptorFromLayoutConfig = (
 ): TemplateLayoutPreview | null => {
   if (!isRecord(config)) return null;
   const page = isRecord(config.page) ? config.page : {};
-  const orientation = page.orientation === "landscape" ? "landscape" : "portrait";
-  const size =
-    (typeof page.size === "string" ? tableEntry(PREVIEW_PAGE_SIZE, page.size) : undefined) ??
-    PREVIEW_PAGE_SIZE.A4;
-  const pageBox = orientation === "landscape" ? { width: size.height, height: size.width } : { ...size };
+  // The sheet as the layout canvas resolves it: a named size turned by its
+  // orientation, a Custom page its own typed sides, anything else A4.
+  const sheet = resolvePageMm({
+    size: (typeof page.size === "string" ? page.size : "A4") as PageSizeConfig["size"],
+    orientation: page.orientation === "landscape" ? "landscape" : "portrait",
+    width: numberOf(page.width) ?? undefined,
+    height: numberOf(page.height) ?? undefined,
+  });
+  const pageBox = { width: round1(sheet.width), height: round1(sheet.height) };
+  const orientation = pageBox.width > pageBox.height ? "landscape" : "portrait";
 
   const rawElements = config.elements;
   if (rawElements !== undefined && rawElements !== null && !Array.isArray(rawElements)) return null;

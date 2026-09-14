@@ -474,7 +474,20 @@ describe("descriptorFromLayoutConfig", () => {
     });
   });
 
-  it("defaults to an A4 portrait page, and reads Custom as A4 too", () => {
+  it("reads a Custom page's own width and height, as typed, whatever its orientation says", () => {
+    expect(
+      descriptorFromLayoutConfig({
+        page: { size: "Custom", orientation: "portrait", width: 500, height: 300 },
+      })?.page
+    ).toEqual({ width: 500, height: 300 });
+    expect(
+      descriptorFromLayoutConfig({
+        page: { size: "Custom", orientation: "portrait", width: 500, height: 300 },
+      })?.orientation
+    ).toBe("landscape");
+  });
+
+  it("defaults to an A4 portrait page, also for a Custom page without dimensions", () => {
     expect(descriptorFromLayoutConfig({})?.page).toEqual({ width: 210, height: 297 });
     expect(descriptorFromLayoutConfig({ page: { size: "Custom" } })?.page).toEqual({
       width: 210,
@@ -782,15 +795,6 @@ describe("layoutPageDescription", () => {
     });
   });
 
-  it("calls a size it has no millimetres for Custom, on A4's page", () => {
-    expect(layoutPageDescription({ page_size: "Custom", page_orientation: "landscape" }, t)).toEqual({
-      name: "Custom",
-      label: "Custom · Landscape",
-      width: 297,
-      height: 210,
-    });
-  });
-
   it("reads a template with no orientation as portrait", () => {
     expect(layoutPageDescription({ page_size: "A3" }, t)?.label).toBe("A3 · Portrait");
   });
@@ -915,5 +919,45 @@ describe("sanitizeNoteHtml", () => {
     // The visible characters are capped; the markup around them is not text.
     const text = (html as string).replace(/<[^>]*>/g, "");
     expect(text.length).toBe(NOTE_TEXT_CAP);
+  });
+});
+
+describe("layoutPageDescription", () => {
+  const t = (key: string, o?: { defaultValue?: string }) => o?.defaultValue ?? key;
+
+  it("names a Custom page plainly, with no orientation and no invented millimetres", () => {
+    const page = layoutPageDescription({ page_size: "Custom", page_orientation: "landscape" }, t);
+    expect(page).toEqual({ name: "Custom", label: "Custom", width: null, height: null });
+  });
+
+  it("still gives a named page its millimetres", () => {
+    expect(layoutPageDescription({ page_size: "A3", page_orientation: "landscape" }, t)).toEqual({
+      name: "A3",
+      label: "A3 · Landscape",
+      width: 420,
+      height: 297,
+    });
+  });
+});
+
+describe("layoutPageDescription with stored millimetres", () => {
+  const t = (key: string, o?: { defaultValue?: string }) => o?.defaultValue ?? key;
+
+  it("gives a Custom page the millimetres the template stores for it", () => {
+    expect(
+      layoutPageDescription(
+        { page_size: "Custom", page_orientation: "landscape", page_width_mm: 500, page_height_mm: 300 },
+        t
+      )
+    ).toEqual({ name: "Custom", label: "Custom", width: 500, height: 300 });
+  });
+
+  it("prefers stored millimetres over the name lookup for a named page too", () => {
+    expect(
+      layoutPageDescription(
+        { page_size: "A4", page_orientation: "portrait", page_width_mm: 210, page_height_mm: 297 },
+        t
+      )
+    ).toEqual({ name: "A4", label: "A4 · Portrait", width: 210, height: 297 });
   });
 });

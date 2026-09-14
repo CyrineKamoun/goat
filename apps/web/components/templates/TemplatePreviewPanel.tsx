@@ -303,7 +303,7 @@ const TemplatePreviewPanel = ({
         thumbnailBox
       )}
 
-      {page && (
+      {page && page.width !== null && page.height !== null && (
         <Typography
           component="div"
           data-testid="template-preview-page-size"

@@ -208,6 +208,49 @@ describe("HomePage", () => {
     expect(screen.queryByText("get_some_data_in")).not.toBeInTheDocument();
   });
 
+  it("keeps the help strip after skipping onboarding until a project and a workflow exist", () => {
+    useHomeStageMock.mockReturnValue(
+      stage({
+        stage: "established",
+        skipped: true,
+        facts: {
+          has_project: false,
+          has_uploaded_layer: false,
+          has_catalog_layer: false,
+          has_workflow: false,
+          has_team: false,
+        },
+      })
+    );
+
+    render(<HomePage />);
+
+    expect(screen.getByText("help_getting_started")).toBeInTheDocument();
+    expect(screen.getByText("help_docs")).toBeInTheDocument();
+    expect(screen.getByText("help_video")).toBeInTheDocument();
+  });
+
+  it("drops the help strip once a project and a workflow exist, skipped or not", () => {
+    useHomeStageMock.mockReturnValue(
+      stage({
+        stage: "established",
+        facts: {
+          has_project: true,
+          has_uploaded_layer: false,
+          has_catalog_layer: false,
+          has_workflow: true,
+          has_team: false,
+        },
+      })
+    );
+
+    render(<HomePage />);
+
+    expect(screen.queryByText("help_getting_started")).not.toBeInTheDocument();
+    expect(screen.queryByText("help_docs")).not.toBeInTheDocument();
+    expect(screen.queryByText("help_video")).not.toBeInTheDocument();
+  });
+
   it("routes the checklist's team step to Settings > Teams", () => {
     useHomeStageMock.mockReturnValue(
       stage({

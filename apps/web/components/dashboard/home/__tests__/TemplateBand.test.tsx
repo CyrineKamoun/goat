@@ -200,7 +200,7 @@ describe("TemplateBand", () => {
 
     expect(screen.getByText("start_from_a_template")).toBeInTheDocument();
     expect(container.querySelectorAll(".MuiSkeleton-root").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "source_goat" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "source_everyone" })).not.toBeInTheDocument();
   });
 
   it("does not flash skeletons on a background refetch once a page is cached", () => {
@@ -228,7 +228,7 @@ describe("TemplateBand", () => {
     render(<TemplateBand />);
     fireEvent.click(screen.getByText("Bus network"));
 
-    // Scoped to the dialog: the band's own source segments carry the same
+    // Scoped to the dialog: the band's own source menu could carry the same
     // label behind it.
     expect(within(screen.getByRole("dialog")).getByText("source_mine")).toBeInTheDocument();
   });
@@ -274,7 +274,8 @@ describe("TemplateBand", () => {
     useTemplatesMock.mockReturnValue({ page: page([]), isLoading: false, isError: undefined });
 
     render(<TemplateBand />);
-    fireEvent.click(screen.getByRole("button", { name: "source_goat" }));
+    fireEvent.click(screen.getByRole("button", { name: "source_everyone" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "source_goat" }));
     fireEvent.click(screen.getByText("browse_goat_templates"));
 
     expect(pushMock).toHaveBeenCalledWith("/catalog?tab=templates");
@@ -284,7 +285,8 @@ describe("TemplateBand", () => {
     useTemplatesMock.mockReturnValue({ page: page([]), isLoading: false, isError: undefined });
 
     render(<TemplateBand />);
-    fireEvent.click(screen.getByRole("button", { name: "source_mine" }));
+    fireEvent.click(screen.getByRole("button", { name: "source_everyone" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "source_mine" }));
     fireEvent.click(screen.getByText("show_in_content"));
 
     expect(pushMock).toHaveBeenCalledWith("/content/s1?types=template");

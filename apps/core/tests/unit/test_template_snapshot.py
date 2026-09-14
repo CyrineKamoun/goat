@@ -10,6 +10,7 @@ from core.templates.snapshot import (
     detect_workflow_inputs,
     freeze_workflow_config,
     kinds_for,
+    layout_page_mm,
     strip_layout_bindings,
 )
 
@@ -499,3 +500,38 @@ def test_bind_never_rewrites_a_tool_param_twice() -> None:
         "second": 9,
         "distance": 100,
     }
+
+
+class TestLayoutPageMm:
+    """The millimetres a layout template's card shows: read off the frozen
+    config so a Custom page is as well described as a named one."""
+
+    def test_custom_page_reads_its_own_sides(self) -> None:
+        config = {
+            "page": {
+                "size": "Custom",
+                "orientation": "portrait",
+                "width": 500,
+                "height": 300,
+            }
+        }
+        assert layout_page_mm(config) == (500.0, 300.0)
+
+    def test_named_page_is_turned_by_its_orientation(self) -> None:
+        assert layout_page_mm({"page": {"size": "A3", "orientation": "landscape"}}) == (
+            420.0,
+            297.0,
+        )
+        assert layout_page_mm({"page": {"size": "A1", "orientation": "portrait"}}) == (
+            594.0,
+            841.0,
+        )
+
+    def test_unknown_or_missing_page_gives_nothing(self) -> None:
+        assert layout_page_mm({"page": {"size": "Poster"}}) is None
+        assert (
+            layout_page_mm({"page": {"size": "Custom", "width": 10, "height": 300}})
+            is None
+        )
+        assert layout_page_mm({}) is None
+        assert layout_page_mm(None) is None

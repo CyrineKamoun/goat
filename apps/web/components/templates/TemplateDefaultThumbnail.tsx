@@ -151,7 +151,10 @@ const TemplateDefaultThumbnail = ({ payloadKind, page, variant = "card" }: Templ
       : ({ ...frameBase, width: "100%", height: "100%" } as const);
 
   if (payloadKind === "layout") {
-    const size = page ?? PREVIEW_PAGE_SIZE.A4;
+    const size =
+      page && page.width !== null && page.height !== null
+        ? { width: page.width, height: page.height }
+        : PREVIEW_PAGE_SIZE.A4;
     const landscape = size.width > size.height;
     // The page is sized off the frame's height in both orientations and
     // capped in width, so a landscape sheet stays inside a narrow band
