@@ -33,7 +33,7 @@ import { ALLOWED_KINDS_BY_GEOM_TYPE, COMPUTED_KINDS, RESERVED_FIELD_NAMES } from
 
 import type { SelectorItem } from "@/types/map/common";
 
-import FieldKindIcon from "@/components/common/FieldKindIcon";
+import FieldKindIcon, { FIELD_KIND_LABEL_KEYS } from "@/components/common/FieldKindIcon";
 import FormLabelHelper from "@/components/common/FormLabelHelper";
 import Selector from "@/components/map/panels/common/Selector";
 import { type FormulaField } from "@/components/modals/FormulaBuilder";
@@ -87,16 +87,16 @@ interface FieldEditorProps {
   layerId?: string;
 }
 
-const ALL_FIELD_TYPE_ITEMS: Record<FieldKind, SelectorItem> = {
-  string: { value: "string", label: "Text", iconNode: <FieldKindIcon kind="string" /> },
-  number: { value: "number", label: "Number", iconNode: <FieldKindIcon kind="number" /> },
-  area: { value: "area", label: "Area", iconNode: <FieldKindIcon kind="area" /> },
-  perimeter: { value: "perimeter", label: "Perimeter", iconNode: <FieldKindIcon kind="perimeter" /> },
-  length: { value: "length", label: "Length", iconNode: <FieldKindIcon kind="length" /> },
-  datetime: { value: "datetime", label: "Date", iconNode: <FieldKindIcon kind="datetime" /> },
-  boolean: { value: "boolean", label: "Boolean", iconNode: <FieldKindIcon kind="boolean" /> },
-  formula: { value: "formula", label: "Formula", iconNode: <FieldKindIcon kind="formula" /> },
-};
+const ALL_FIELD_KINDS: FieldKind[] = [
+  "string",
+  "number",
+  "area",
+  "perimeter",
+  "length",
+  "datetime",
+  "boolean",
+  "formula",
+];
 
 const NUMERIC_KINDS: FieldKind[] = ["number", "area", "perimeter", "length"];
 
@@ -123,6 +123,7 @@ const SortableFieldRow = ({
   onDuplicate,
   onRemove,
 }: SortableFieldRowProps) => {
+  const { t } = useTranslation("common");
   const theme = useTheme();
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: field.id });
 
@@ -172,7 +173,7 @@ const SortableFieldRow = ({
           onChange={(e) => onRename(e.target.value)}
           onFocus={onSelect}
           disableUnderline
-          placeholder="Field name"
+          placeholder={t("field_name")}
           autoFocus={isSelected}
           error={!!error}
           inputProps={{ maxLength: 128 }}
@@ -363,7 +364,17 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
     : ["string", "number", "datetime", "boolean", "formula"];
   const availableKinds: FieldKind[] = baseKinds.filter((k) => !COMPUTED_KINDS.has(k) || !!layerId);
 
-  const fieldTypeItems: SelectorItem[] = availableKinds.map((k) => ALL_FIELD_TYPE_ITEMS[k]);
+  const allFieldTypeItems = useMemo(
+    () =>
+      Object.fromEntries(
+        ALL_FIELD_KINDS.map((k) => [
+          k,
+          { value: k, label: t(FIELD_KIND_LABEL_KEYS[k]), iconNode: <FieldKindIcon kind={k} /> },
+        ])
+      ) as Record<FieldKind, SelectorItem>,
+    [t]
+  );
+  const fieldTypeItems: SelectorItem[] = availableKinds.map((k) => allFieldTypeItems[k]);
   const hasFields = fields.length > 0;
 
   // Compute per-field validation errors
@@ -641,7 +652,7 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
                 <Selector
                   label={t("field_type")}
                   selectedItems={
-                    ALL_FIELD_TYPE_ITEMS[selectedField.kind] ??
+                    allFieldTypeItems[selectedField.kind] ??
                     fieldTypeItems.find((i) => i.value === selectedField.kind)
                   }
                   setSelectedItems={(item) => handleTypeChange(selectedField.id, item)}

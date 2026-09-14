@@ -195,7 +195,7 @@ describe("templateBrowserTitleKey", () => {
   it("titles the dialog with the kind being created", () => {
     expect(templateBrowserTitleKey("workflow")).toBe("new_workflow_from_template");
     expect(templateBrowserTitleKey("layout")).toBe("new_layout_from_template");
-    expect(templateBrowserTitleKey("dashboard")).toBe("new_dashboard_from_template");
+    expect(templateBrowserTitleKey("project")).toBe("new_project_from_template");
   });
 
   it("titles the unlocked browser with the shelf itself", () => {

@@ -291,4 +291,97 @@ describe("TemplateBand", () => {
 
     expect(pushMock).toHaveBeenCalledWith("/content/s1?types=template");
   });
+
+  describe("under All", () => {
+    /** Answers each `useTemplates` call from the page for its `kind`
+     * (`all` for the kind-less request); a `null` request stays idle. */
+    const answerByKind = (pages: Record<string, TemplatePage>) =>
+      useTemplatesMock.mockImplementation((params: { kind?: string } | null) =>
+        params === null
+          ? { page: undefined, isLoading: false, isError: undefined }
+          : { page: pages[params.kind ?? "all"] ?? page([]), isLoading: false, isError: undefined }
+      );
+    const named = (items: TemplateRead[]) =>
+      screen
+        .getAllByText(/^(W|D|L)\d$/)
+        .map((el) => el.textContent)
+        .filter((name) => items.some((i) => i.name === name));
+
+    it("interleaves the kinds round robin so no kind crowds the others out", () => {
+      const workflows = [1, 2, 3].map((i) =>
+        template({ id: `w${i}`, name: `W${i}`, payload_kind: "workflow" })
+      );
+      const dashboards = [1, 2].map((i) => template({ id: `d${i}`, name: `D${i}`, payload_kind: "project" }));
+      const layouts = [1, 2, 3].map((i) => template({ id: `l${i}`, name: `L${i}`, payload_kind: "layout" }));
+      answerByKind({
+        all: page(layouts.concat(workflows, dashboards), 8),
+        workflow: page(workflows),
+        project: page(dashboards),
+        layout: page(layouts),
+      });
+
+      render(<TemplateBand />);
+
+      expect(named(workflows.concat(dashboards, layouts))).toEqual(["W1", "D1", "L1", "W2", "D2", "L2"]);
+    });
+
+    it("backfills from the kinds that have more once one runs out", () => {
+      const workflows = [1].map((i) => template({ id: `w${i}`, name: `W${i}`, payload_kind: "workflow" }));
+      const layouts = [1, 2, 3, 4, 5, 6].map((i) =>
+        template({ id: `l${i}`, name: `L${i}`, payload_kind: "layout" })
+      );
+      answerByKind({
+        all: page(layouts.concat(workflows), 7),
+        workflow: page(workflows),
+        layout: page(layouts),
+      });
+
+      render(<TemplateBand />);
+
+      expect(named(workflows.concat(layouts))).toEqual(["W1", "L1", "L2", "L3", "L4", "L5"]);
+    });
+
+    it("ranks GOAT-published templates before a user's own within a kind", () => {
+      const own = template({ id: "l1", name: "L1", payload_kind: "layout", catalog_status: "none" });
+      const goat = template({ id: "l2", name: "L2", payload_kind: "layout", catalog_status: "published" });
+      answerByKind({ all: page([own, goat]), layout: page([own, goat]) });
+
+      render(<TemplateBand />);
+
+      expect(named([own, goat])).toEqual(["L2", "L1"]);
+    });
+
+    it("keeps pinned templates first across kinds", () => {
+      const workflows = [1, 2].map((i) => template({ id: `w${i}`, name: `W${i}`, payload_kind: "workflow" }));
+      const layouts = [1, 2].map((i) => template({ id: `l${i}`, name: `L${i}`, payload_kind: "layout" }));
+      answerByKind({
+        all: page(workflows.concat(layouts)),
+        workflow: page(workflows),
+        layout: page(layouts),
+      });
+      useFavoriteStarsMock.mockReturnValue({ starred: { l2: true }, toggleStar: toggleStarMock });
+
+      render(<TemplateBand />);
+
+      expect(named(workflows.concat(layouts))).toEqual(["L2", "W1", "L1", "W2"]);
+    });
+
+    it("shows only that kind, in feed order, once a kind pill is selected", () => {
+      const workflows = [1, 2].map((i) => template({ id: `w${i}`, name: `W${i}`, payload_kind: "workflow" }));
+      const layouts = [1, 2].map((i) => template({ id: `l${i}`, name: `L${i}`, payload_kind: "layout" }));
+      answerByKind({
+        all: page(workflows.concat(layouts)),
+        workflow: page(workflows),
+        layout: page(layouts),
+      });
+
+      render(<TemplateBand />);
+      fireEvent.click(screen.getByRole("button", { name: "template_kind_layout" }));
+
+      expect(named(workflows.concat(layouts))).toEqual(["L1", "L2"]);
+      // The per-kind requests go idle outside All.
+      const lastCalls = useTemplatesMock.mock.calls.slice(-4).map((call) => call[0]);
+      expect(lastCalls.filter((params) => params === null)).toHaveLength(3);
+    });
+  });
 });

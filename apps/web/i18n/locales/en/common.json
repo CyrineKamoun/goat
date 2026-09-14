@@ -57,7 +57,7 @@
   "layouts_carry_no_datasets": "Layouts don't carry datasets — users fill the frames with their own layers.",
   "measurement": "Measurement",
   "merge": "Merge",
-  "new_dashboard_from_template": "New dashboard from a template",
+  "new_project_from_template": "New project from a template",
   "new_layout_from_template": "New layout from a template",
   "new_workflow_from_template": "New workflow from a template",
   "no_templates_in_scope_title": "No templates in {{scope}} yet",

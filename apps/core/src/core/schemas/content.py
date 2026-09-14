@@ -131,7 +131,7 @@ class ContentItem(BaseModel):
         description="`type: template` rows only: what the template's config "
         "carries (T1). None for every other row.",
     )
-    template_kinds: list[Literal["workflow", "dashboard", "layout"]] = Field(
+    template_kinds: list[Literal["project", "dashboard", "workflow", "layout"]] = Field(
         default_factory=list,
         description="`type: template` rows only: the kinds shown on the "
         "card, derived from `template_payload_kind` (T1). Empty for every "

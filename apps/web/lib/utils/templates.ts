@@ -2,6 +2,7 @@ import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import type { Space } from "@/lib/validations/content";
 import type {
+  TemplateBadgeKind,
   TemplateInput,
   TemplateKind,
   TemplateRead,
@@ -169,11 +170,12 @@ export const templateSourceOptions = (
 export const templateBrowserTitleKey = (lockedKind: TemplateKind | undefined): string =>
   lockedKind ? `new_${lockedKind}_from_template` : "templates";
 
-/** The glyph a template kind is marked with, wherever it is marked — the
- * badges over a card's thumbnail and the tile leading a browser row. */
-export const TEMPLATE_KIND_ICON: Record<TemplateKind, ICON_NAME> = {
-  workflow: ICON_NAME.WORKFLOW,
+/** The glyph a template kind or badge is marked with, wherever it is marked —
+ * the badges over a card's thumbnail and the tile leading a browser row. */
+export const TEMPLATE_KIND_ICON: Record<TemplateBadgeKind, ICON_NAME> = {
+  project: ICON_NAME.MAP,
   dashboard: ICON_NAME.CHART,
+  workflow: ICON_NAME.WORKFLOW,
   layout: ICON_NAME.REPORT,
 };
 

@@ -30,14 +30,27 @@ export const DIALOG_PAPER_GUTTER = "64px";
 
 /** `PaperProps.sx` for a Content dialog: the prototype's width, held inside
  * the room the paper's margins leave, and a 16px radius — both dropped on a
- * full-screen (mobile) dialog where the paper is the whole viewport. */
-export const contentDialogPaperSx = (maxWidth: number | string, fullScreen: boolean): SxProps<Theme> => {
+ * full-screen (mobile) dialog where the paper is the whole viewport.
+ *
+ * `height` fixes the paper's height as well, capped the way MUI caps it. A
+ * dialog whose tabs swap content of different heights (a map for a table
+ * that is still loading) otherwise resizes with every switch; with a fixed
+ * height the body scrolls inside it instead. Full screen, the paper is
+ * already the viewport. */
+export const contentDialogPaperSx = (
+  maxWidth: number | string,
+  fullScreen: boolean,
+  options?: { height?: number }
+): SxProps<Theme> => {
   if (fullScreen) return { borderRadius: 0 };
   // A number is a plain pixel cap; a string is a width expression a dialog
   // states for itself (the Add-layer sources size to the viewport).
   const stated = typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth;
   const width = `min(${stated}, calc(100% - ${DIALOG_PAPER_GUTTER}))`;
-  return { width, maxWidth: width, borderRadius: "16px" };
+  const height = options?.height
+    ? `min(${options.height}px, calc(100% - ${DIALOG_PAPER_GUTTER}))`
+    : undefined;
+  return { width, maxWidth: width, ...(height ? { height } : {}), borderRadius: "16px" };
 };
 
 interface ContentDialogHeaderProps {

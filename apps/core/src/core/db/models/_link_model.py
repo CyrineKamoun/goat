@@ -163,6 +163,7 @@ class UserProjectLink(DateTimeBase, table=True):
     __tablename__ = "user_project"
     __table_args__ = (
         Index("ix_user_project_project_id_user_id", "project_id", "user_id"),
+        UniqueConstraint("project_id", "user_id", name="unique_user_project"),
         {"schema": settings.SCHEMA},
     )
 
@@ -195,9 +196,6 @@ class UserProjectLink(DateTimeBase, table=True):
 
     # Relationships
     project: "Project" = Relationship(back_populates="user_projects")
-
-    # Constraints
-    (UniqueConstraint("project_id", "user_id", name="unique_user_project"),)
 
 
 class UserTeamLink(SQLModel, table=True):

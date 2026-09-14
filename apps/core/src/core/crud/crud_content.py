@@ -383,6 +383,7 @@ WITH items AS (
            f.user_id AS created_by_id
       FROM {schema}.folder f
      WHERE f.deleted_at IS NULL AND f.space_id IS NOT NULL
+       AND f.parent_id IS NOT NULL
        AND (f.space_id = ANY(:my_space_ids) OR f.id = ANY(:folder_ids))
     UNION ALL
     SELECT 'project', p.id, p.name, p.space_id, p.folder_id, p.updated_at, p.created_at, NULL, NULL, p.thumbnail_url,
@@ -941,7 +942,7 @@ class CRUDContent:
         details: dict[UUID, dict[str, Any]] = {}
         for r in rows:
             if r.payload_kind == "project":
-                kinds = project_kinds.get(r.source_project_id, ["dashboard"])
+                kinds = project_kinds.get(r.source_project_id, ["project"])
             else:
                 kinds = kinds_for(
                     r.payload_kind,

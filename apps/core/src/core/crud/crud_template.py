@@ -147,8 +147,8 @@ class CRUDTemplate:
 
     async def _project_kinds(self, db: AsyncSession, project_id: UUID) -> list[str]:
         """T1's kind derivation for a project payload's frozen source:
-        Dashboard if it has a builder config, plus Workflow/Layout for any
-        workflow/report_layout row it holds — never empty."""
+        Project, plus Dashboard if it has a builder config and Workflow/Layout
+        for any workflow/report_layout row it holds."""
         schema = settings.SCHEMA
         flags = (
             await db.execute(
@@ -162,7 +162,7 @@ class CRUDTemplate:
             )
         ).first()
         if flags is None:
-            return ["dashboard"]
+            return ["project"]
         return kinds_for(
             "project",
             has_builder=bool(flags.has_builder),
@@ -176,7 +176,7 @@ class CRUDTemplate:
         if row.payload_kind == "layout":
             return ["layout"]
         if row.source_project_id is None:
-            return ["dashboard"]
+            return ["project"]
         return await self._project_kinds(db, row.source_project_id)
 
     async def _to_read(
@@ -850,19 +850,12 @@ class CRUDTemplate:
             "include_goat": include_goat,
             "user_id": user_id,
         }
-        # A workflow/layout payload's kinds are always exactly its one
-        # `payload_kind`, so that filter is exact in SQL. "dashboard" can
-        # only come from a project payload, but not every project payload
-        # carries it (`kinds_for`) — the SQL condition below is a superset
-        # (every project row). `list_templates` applies the exact check in
-        # Python on the page it already fetched, so its `total` (and the
-        # counts of `list_categories`) are that superset's, not the exact
-        # dashboard count (documented trade-off, not a bug).
-        if kind in ("workflow", "layout"):
+        # The three filterable kinds are the three payload kinds, so the
+        # filter is exact in SQL; the extra badges a project payload carries
+        # (`kinds_for`) describe what it includes and are not filters.
+        if kind in ("workflow", "layout", "project"):
             conditions.append("t.payload_kind = :kind")
             params["kind"] = kind
-        elif kind == "dashboard":
-            conditions.append("t.payload_kind = 'project'")
         # The save dialog's "templates already saved from this source": one
         # exact condition per given id on the stored source reference.
         for column, value in (
@@ -966,8 +959,6 @@ class CRUDTemplate:
             if row is None:
                 continue
             read = await self._to_read(db, row, my_role=r.role)
-            if kind == "dashboard" and kind not in read.kinds:
-                continue
             items.append(read)
 
         return TemplatePage(items=items, total=total)

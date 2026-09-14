@@ -22,7 +22,7 @@ export const FIELD_KIND_ICONS: Record<FieldIndicatorKind, ICON_NAME> = {
   geometry: ICON_NAME.MAP,
 };
 
-const FIELD_KIND_LABEL_KEYS: Record<FieldIndicatorKind, string> = {
+export const FIELD_KIND_LABEL_KEYS: Record<FieldIndicatorKind, string> = {
   string: "field_kind_text",
   number: "field_kind_number",
   area: "field_kind_area",

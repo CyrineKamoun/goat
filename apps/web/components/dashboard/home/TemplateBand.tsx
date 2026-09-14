@@ -10,6 +10,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import { useSpaces } from "@/lib/api/content";
 import { useFavoriteStars } from "@/lib/api/favorites";
 import { useTemplates } from "@/lib/api/templates";
+import { interleaveTemplateStrip, rankTemplateStrip } from "@/lib/utils/templateStrip";
 import {
   TEMPLATE_EMPTY_HINT_KEY,
   templateEmptyTitle,
@@ -72,24 +73,39 @@ const TemplateBand = () => {
   const [using, setUsing] = useState<TemplateRead | null>(null);
   const [browserOpen, setBrowserOpen] = useState(false);
 
+  const allKinds = kind === "all";
+  // The kind-less page carries the footer's total and the single-kind grid;
+  // under All the cards come from one feed per kind, interleaved, so the
+  // newest kind never crowds the others off a six-card strip.
   const { page, isLoading, isError } = useTemplates({
     source,
-    kind: kind === "all" ? undefined : kind,
+    kind: allKinds ? undefined : kind,
     size: GRID_SIZE,
   });
+  const workflows = useTemplates(allKinds ? { source, kind: "workflow", size: MAX_CARDS } : null);
+  const projects = useTemplates(allKinds ? { source, kind: "project", size: MAX_CARDS } : null);
+  const layouts = useTemplates(allKinds ? { source, kind: "layout", size: MAX_CARDS } : null);
   const { spaces } = useSpaces();
   const { starred, toggleStar } = useFavoriteStars("template");
 
   const templates = useMemo(() => {
-    const items = page?.items ?? [];
-    const pinned = items.filter((item) => starred[item.id]);
-    const rest = items.filter((item) => !starred[item.id]);
-    return [...pinned, ...rest].slice(0, mobile ? MAX_CARDS_MOBILE : MAX_CARDS);
-  }, [page, starred, mobile]);
+    const limit = mobile ? MAX_CARDS_MOBILE : MAX_CARDS;
+    if (!allKinds) return rankTemplateStrip(page?.items ?? [], starred, limit);
+    return interleaveTemplateStrip(
+      {
+        workflow: workflows.page?.items,
+        project: projects.page?.items,
+        layout: layouts.page?.items,
+      },
+      starred,
+      limit
+    );
+  }, [allKinds, page, workflows.page, projects.page, layouts.page, starred, mobile]);
 
-  if (isError) return null;
+  if (isError || workflows.isError || projects.isError || layouts.isError) return null;
 
-  const showSkeleton = isLoading && !page;
+  const perKindLoading = [workflows, projects, layouts].some((feed) => feed.isLoading && !feed.page);
+  const showSkeleton = (isLoading && !page) || perKindLoading;
   const showEmpty = !showSkeleton && templates.length === 0;
   const narrowedSource = source === "mine" || source === "team" || source === "org";
 

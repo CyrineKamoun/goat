@@ -2,9 +2,16 @@ import * as z from "zod";
 
 import { contentCreatorSchema, contentRole } from "@/lib/validations/content";
 
-/** The three kinds shown on a template card (T1) — derived server-side from
- * `payload_kind`, not chosen by the author. */
-export const templateKind = z.enum(["workflow", "dashboard", "layout"]);
+/** The three kinds a template can be filtered by (T1) — one per payload
+ * kind: using one adds a workflow or a layout to a project, or creates a
+ * whole project. */
+export const templateKind = z.enum(["workflow", "project", "layout"]);
+
+/** The badges a card carries: the template's kind, plus — on a project
+ * template — what the frozen project includes (`dashboard` for a builder
+ * config, `workflow`/`layout` for the rows it holds). Derived server-side,
+ * not chosen by the author. */
+export const templateBadgeKind = z.enum(["project", "dashboard", "workflow", "layout"]);
 
 /** What a template's frozen payload actually is (T1/T2): a workflow or
  * layout config snapshot, or a hidden frozen project copy. */
@@ -232,7 +239,7 @@ export const templateReadSchema = z.object({
   folder_id: z.string().uuid(),
   created_by: contentCreatorSchema.nullable().optional(),
   payload_kind: templatePayloadKind,
-  kinds: z.array(templateKind),
+  kinds: z.array(templateBadgeKind),
   inputs: z.array(templateInputSchema).default([]),
   ships_data: z.boolean().default(false),
   catalog_status: templateCatalogStatus,
@@ -304,6 +311,7 @@ export const templateGrantsResponseSchema = z.object({
 export type TemplateSourceFilter = "all" | "goat" | "mine" | "team" | "org";
 
 export type TemplateKind = z.infer<typeof templateKind>;
+export type TemplateBadgeKind = z.infer<typeof templateBadgeKind>;
 export type TemplatePayloadKind = z.infer<typeof templatePayloadKind>;
 export type TemplateCatalogStatus = z.infer<typeof templateCatalogStatus>;
 export type TemplateInput = z.infer<typeof templateInputSchema>;

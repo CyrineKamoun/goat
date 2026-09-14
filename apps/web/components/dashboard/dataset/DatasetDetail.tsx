@@ -74,14 +74,25 @@ const SectionHeading = ({ children }: { children: React.ReactNode }) => (
 /** The rows themselves, paged. Its own component so the feature request is
  * made only once the tab is opened. */
 const DataTab = ({ dataset }: { dataset: Layer }) => {
-  const { fields, areFieldsLoading, data, rowsPerPage, page, totalCount, onPageChange, onRowsPerPageChange } =
-    useFeaturePage(dataset.id, { limit: 25 });
+  const {
+    fields,
+    areFieldsLoading,
+    data,
+    isLoading,
+    rowsPerPage,
+    page,
+    totalCount,
+    onPageChange,
+    onRowsPerPageChange,
+  } = useFeaturePage(dataset.id, { limit: 25 });
 
   return (
     <FeatureTableFrame
       fields={fields}
       data={data}
-      isLoading={areFieldsLoading}
+      // Rows as well as fields: the fields alone land first, and the table
+      // would show its empty state for the moment before the first page.
+      isLoading={areFieldsLoading || isLoading}
       footer={
         <TablePagination
           component="div"

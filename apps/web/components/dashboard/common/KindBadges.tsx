@@ -6,10 +6,10 @@ import { useTranslation } from "react-i18next";
 import { Icon } from "@p4b/ui/components/Icon";
 
 import { TEMPLATE_KIND_ICON } from "@/lib/utils/templates";
-import type { TemplateKind } from "@/lib/validations/template";
+import type { TemplateBadgeKind } from "@/lib/validations/template";
 
 interface KindBadgesProps {
-  kinds: TemplateKind[];
+  kinds: TemplateBadgeKind[];
   /** Circle diameter in px — the glyph itself is drawn at half that. */
   size?: number;
 }
