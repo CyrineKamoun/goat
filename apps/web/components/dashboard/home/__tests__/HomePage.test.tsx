@@ -277,7 +277,7 @@ describe("HomePage", () => {
     useTemplatesMock.mockReturnValue({
       // A published project starter that also ships sample data must not win
       // the pick — the step promises a workflow.
-      page: { items: [{ id: "other", kinds: ["dashboard"], ships_data: true }, starter], total: 2 },
+      page: { items: [{ id: "other", kinds: ["project"], ships_data: true }, starter], total: 2 },
       isLoading: false,
       isError: undefined,
     });
