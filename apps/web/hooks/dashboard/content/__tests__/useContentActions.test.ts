@@ -92,13 +92,17 @@ describe("useContentActions.getMenuItems", () => {
     ]);
   });
 
-  it("an editor on a bundle only gets OPEN, DETAILS — bundle actions are owner-only", () => {
+  it("an editor on a bundle may describe it, as an editor on a layer may", () => {
     const { result } = renderHook(() => useContentActions());
     const bundle = item({ type: "bundle", my_role: "editor" });
 
+    // Provenance is edited on the same terms as a layer's metadata: whoever may
+    // change the data may describe it. Moving, sharing and deleting stay with
+    // the owner.
     expect(ids(result.current.getMenuItems(bundle, undefined))).toEqual([
       ContentActions.OPEN,
       ContentActions.DETAILS,
+      ContentActions.EDIT_METADATA,
     ]);
   });
 
@@ -116,6 +120,7 @@ describe("useContentActions.getMenuItems", () => {
     expect(ids(result.current.getMenuItems(bundle, undefined))).toEqual([
       ContentActions.OPEN,
       ContentActions.DETAILS,
+      ContentActions.EDIT_METADATA,
       ContentActions.MOVE,
       ContentActions.SHARE,
       ContentActions.DELETE,

@@ -90,9 +90,29 @@ class UISection:
 
 # Common section definitions for reuse
 SECTION_ROUTING = UISection(id="routing", order=1, icon="route")
+#: Which network the routing runs on, when the project holds one of its own.
+#:
+#: After routing rather than before it: which network is relevant follows from
+#: the mode that was chosen, so the question cannot be asked first. Both sit at
+#: the same order because a tool never shows both — the mode decides which.
+#:
+#: The sections disappear on their own where the project has no bundle of the
+#: kind: their one field hides, and an empty section is not rendered.
+SECTION_STREET_NETWORK = UISection(
+    id="street_network",
+    order=2,
+    icon="route",
+    depends_on={"routing_mode": {"$ne": None}},
+)
+SECTION_PT_NETWORK = UISection(
+    id="pt_network",
+    order=2,
+    icon="route",
+    depends_on={"routing_mode": {"$ne": None}},
+)
 SECTION_CONFIGURATION = UISection(
     id="configuration",
-    order=2,
+    order=3,
     icon="settings",
     depends_on={"routing_mode": {"$ne": None}},
 )

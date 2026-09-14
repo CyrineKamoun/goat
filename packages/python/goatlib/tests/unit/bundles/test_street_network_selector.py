@@ -77,10 +77,18 @@ def test_the_selector_lists_only_routable_street_bundles(tool_name: str) -> None
 
 
 @pytest.mark.parametrize("tool_name", ROUTING_TOOLS)
-def test_the_selector_stays_behind_advanced(tool_name: str) -> None:
-    """It is an override of the default network, not a required input."""
+def test_the_selector_is_asked_only_where_there_is_a_choice(tool_name: str) -> None:
+    """Asked where the project holds a street network, not behind `advanced`.
+
+    A project with no street network of its own has nothing to choose between,
+    so the field hides and the section it sits in is not rendered. Where there
+    is one, the question is put plainly rather than buried: someone who added a
+    network to the project is the person most likely to want to route on it.
+    """
     ui = _properties(tool_name)["street_network_bundle_id"]["x-ui"]
-    assert "show_advanced" in json.dumps(ui["visible_when"])
+    condition = json.dumps(ui["visible_when"])
+    assert "_project_has_street_network_bundle" in condition
+    assert "show_advanced" not in condition
 
 
 @pytest.mark.parametrize("tool_name", ROUTING_TOOLS)

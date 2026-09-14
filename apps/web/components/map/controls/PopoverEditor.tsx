@@ -6,6 +6,8 @@ import { Popup } from "react-map-gl/maplibre";
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import TemporalPicker from "@p4b/ui/components/TemporalPicker";
 
+import { useDayjsLocale } from "@/i18n/utils";
+
 import { fieldEditability, selectedVocabularyItem } from "@/lib/utils/allowedValues";
 import { BOOLEAN_SELECT_ITEMS, booleanToSelectValue, parseBooleanInput } from "@/lib/utils/fieldInput";
 import { formatFieldValue } from "@/lib/utils/formatFieldValue";
@@ -31,6 +33,7 @@ const MapPopoverEditor: React.FC<MapPopoverEditorProps> = ({
   editMode,
 }) => {
   const { t } = useTranslation("common");
+  const dayjsLocale = useDayjsLocale();
   const popup = useMemo(() => {
     if (editMode === EditorModes.DELETE) {
       return {
@@ -202,6 +205,7 @@ const MapPopoverEditor: React.FC<MapPopoverEditorProps> = ({
                       )}
                       {!isPicker && !isReadOnly && field.type === "date" && (
                         <TemporalPicker
+                          locale={dayjsLocale}
                           kind="datetime"
                           label={field.name}
                           value={(featureProperties[field.name] as string) ?? ""}

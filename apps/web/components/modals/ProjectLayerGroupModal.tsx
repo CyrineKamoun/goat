@@ -93,6 +93,11 @@ const ProjectLayerGroupModal = ({
     onClose();
   };
 
+  // Membership, not existence: deleting the group drops the project's links to
+  // the bundle's layers. The bundle and its data are untouched, so the wording
+  // says "remove" where the generic group says "delete".
+  const isBundleGroup = !!existingGroup?.bundle_id;
+
   const getDialogTitle = () => {
     switch (mode) {
       case "create":
@@ -100,7 +105,7 @@ const ProjectLayerGroupModal = ({
       case "rename":
         return t("rename_group");
       case "delete":
-        return t("delete_group");
+        return isBundleGroup ? t("remove_bundle") : t("delete_group");
       default:
         return t("group");
     }
@@ -113,7 +118,7 @@ const ProjectLayerGroupModal = ({
       case "rename":
         return t("rename");
       case "delete":
-        return t("delete");
+        return isBundleGroup ? t("remove") : t("delete");
       default:
         return t("submit");
     }
@@ -157,7 +162,9 @@ const ProjectLayerGroupModal = ({
         <>
           <DialogContentText>
             <Trans
-              i18nKey="common:are_you_sure_to_delete_group"
+              i18nKey={
+                isBundleGroup ? "common:are_you_sure_to_remove_bundle" : "common:are_you_sure_to_delete_group"
+              }
               values={{ group: existingGroup?.name }}
               components={{ b: <b /> }}
             />
@@ -166,7 +173,7 @@ const ProjectLayerGroupModal = ({
             <Alert severity="warning" sx={{ mt: 2 }}>
               <Stack>
                 <Trans
-                  i18nKey="common:group_delete_warning"
+                  i18nKey={isBundleGroup ? "common:bundle_remove_warning" : "common:group_delete_warning"}
                   values={{
                     layerCount: childLayers.length,
                     groupCount: childGroups.length,
@@ -178,7 +185,7 @@ const ProjectLayerGroupModal = ({
                     <b>{t("layers")}:</b> {childLayers.map((layer) => layer.name).join(", ")}
                   </Typography>
                 )}
-                {childGroups.length > 0 && (
+                {!isBundleGroup && childGroups.length > 0 && (
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
                     <b>{t("subgroups")}:</b> {childGroups.map((group) => group.name).join(", ")}
                   </Typography>

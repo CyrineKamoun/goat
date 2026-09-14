@@ -16,11 +16,14 @@ import { useEffect, useMemo } from "react";
 
 import TemporalPicker from "@p4b/ui/components/TemporalPicker";
 
-import type { ProcessedInput } from "@/types/map/ogc-processes";
+import { useDayjsLocale } from "@/i18n/utils";
 
 import { useBundle } from "@/lib/api/bundles";
 
+import type { ProcessedInput } from "@/types/map/ogc-processes";
+
 import FormLabelHelper from "@/components/common/FormLabelHelper";
+import { DEFAULT_NETWORK_BUNDLE } from "@/components/map/panels/toolbox/generic/inputs/BundleInput";
 
 interface DateInputProps {
   input: ProcessedInput;
@@ -41,18 +44,18 @@ const isoToday = (): string => {
   return asIsoDate(new Date(now.getTime() - now.getTimezoneOffset() * 60_000));
 };
 
-export default function DateInput({
-  input,
-  value,
-  onChange,
-  disabled,
-  formValues,
-}: DateInputProps) {
+export default function DateInput({ input, value, onChange, disabled, formValues }: DateInputProps) {
+  const dayjsLocale = useDayjsLocale();
   const options = input.uiMeta?.widget_options ?? {};
   const boundsFrom = options.bounds_from as string | undefined;
   const boundsArtifact = options.bounds_artifact as string | undefined;
 
-  const bundleId = boundsFrom ? (formValues?.[boundsFrom] as string | undefined) : undefined;
+  // `DEFAULT_NETWORK_BUNDLE` is the selector's answer for "the default
+  // network", not a bundle id: it bounds nothing, so the field reads as it did
+  // before any bundle was chosen — the default timetable's span is not one this
+  // asks about, and a request for a bundle called "default" would only 404.
+  const selectedBundle = boundsFrom ? (formValues?.[boundsFrom] as string | undefined) : undefined;
+  const bundleId = selectedBundle === DEFAULT_NETWORK_BUNDLE ? undefined : selectedBundle;
   const { bundle } = useBundle(bundleId ?? null);
 
   /**
@@ -101,6 +104,7 @@ export default function DateInput({
     <Stack>
       <FormLabelHelper label={input.title} tooltip={input.description} color="inherit" />
       <TemporalPicker
+        locale={dayjsLocale}
         kind="date"
         bold
         value={value ?? (input.defaultValue as string) ?? ""}

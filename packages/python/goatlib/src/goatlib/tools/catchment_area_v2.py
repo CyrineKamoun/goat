@@ -35,7 +35,9 @@ from goatlib.analysis.schemas.catchment_area_v2 import (
     Weekday,
 )
 from goatlib.analysis.schemas.ui import (
+    SECTION_PT_NETWORK,
     SECTION_ROUTING,
+    SECTION_STREET_NETWORK,
     UISection,
     ui_field,
     ui_sections,
@@ -47,7 +49,7 @@ from goatlib.bundles.artifacts.street_network import (
 )
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.catchment_area import CatchmentAreaToolRunner
-from goatlib.tools.pt_network import pt_date_field
+from goatlib.tools.pt_network import ensure_pt_date, pt_date_field
 from goatlib.tools.schemas import ToolInputBase, get_default_layer_name
 
 logger = logging.getLogger(__name__)
@@ -90,7 +92,7 @@ __all__ = [
 
 SECTION_CONFIGURATION = UISection(
     id="configuration",
-    order=2,
+    order=3,
     icon="settings",
     label_key="configuration",
     depends_on={"routing_mode": {"$ne": None}},
@@ -200,6 +202,8 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
     model_config = {
         "json_schema_extra": ui_sections(
             SECTION_ROUTING,
+            SECTION_STREET_NETWORK,
+            SECTION_PT_NETWORK,
             SECTION_CONFIGURATION,
             SECTION_STARTING,
             SECTION_RESULT_CATCHMENT,
@@ -300,18 +304,18 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
     pt_network_bundle_id: str | None = Field(
         default=None,
         description=(
-            "Choose a custom Public Transport Network bundle to use for routing. "
-            "If unset, the default bundle will be used."
+            "The public transport network used for routing: the default "
+            "network, or a public transport bundle added to this project."
         ),
         json_schema_extra=ui_field(
-            section="configuration",
+            section="pt_network",
             field_order=18,
             label_key="pt_network_bundle_id",
             widget="bundle-selector",
             visible_when={
                 "$and": [
                     {"routing_mode": "pt"},
-                    {"show_advanced": True},
+                    {"_project_has_pt_network_bundle": True},
                 ]
             },
             # The selector lists only public-transport bundles that have a ready
@@ -326,11 +330,11 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
     street_network_bundle_id: str | None = Field(
         default=None,
         description=(
-            "Choose a custom Street Network bundle to use for routing. "
-            "If unset, the default network will be used."
+            "The street network used for routing: the default network, or a "
+            "street network bundle added to this project."
         ),
         json_schema_extra=ui_field(
-            section="configuration",
+            section="street_network",
             field_order=19,
             label_key="street_network_bundle_id",
             widget="bundle-selector",
@@ -343,7 +347,7 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
             visible_when={
                 "$and": [
                     {"routing_mode": {"$in": ["walking", "bicycle", "pedelec", "car"]}},
-                    {"show_advanced": True},
+                    {"_project_has_street_network_bundle": True},
                 ]
             },
             # Only street networks whose routing graph is built and ready.
@@ -507,7 +511,7 @@ class CatchmentAreaV2WindmillParams(ToolInputBase):
             visible_when={
                 "$and": [
                     {"routing_mode": "pt"},
-                    {"pt_network_bundle_id": {"$exists": False}},
+                    {"_pt_network_bundle_id_is_custom": False},
                 ]
             },
         ),
@@ -1032,6 +1036,7 @@ class CatchmentAreaV2ToolRunner(CatchmentAreaToolRunner):
             params.routing_mode == CatchmentAreaRoutingMode.pt
             and params.pt_network_bundle_id
         ):
+            ensure_pt_date(params.pt_network_bundle_id, params.pt_date)
             analysis_params.timetable_path = fetch_pt_timetable(
                 self, params.pt_network_bundle_id
             )

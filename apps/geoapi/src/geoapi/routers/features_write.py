@@ -17,6 +17,7 @@ from goatlib.computed_columns import (
     is_computed_kind,
     validate_display_config,
 )
+from goatlib.utils.field_config import coerce_allowed_values
 from pydantic import ValidationError
 
 from geoapi.catalog_events import notify_catalog_changed, refresh_local_pins
@@ -38,7 +39,6 @@ from geoapi.models import (
 )
 from geoapi.routers.tiles import bump_layer_version
 from geoapi.services.computed_columns import (
-    coerce_allowed_values,
     fetch_field_config,
     write_field_config,
 )

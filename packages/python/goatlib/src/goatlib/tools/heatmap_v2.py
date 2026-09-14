@@ -74,9 +74,12 @@ from goatlib.tools.catchment_area_v2 import (
     COST_TYPE_LABELS,
     PT_MODE_LABELS,
     SECTION_CONFIGURATION,
+    SECTION_PT_NETWORK,
+    SECTION_STREET_NETWORK,
 )
 from goatlib.tools.pt_network import (
     apply_pt_bundle_override,
+    ensure_pt_date,
     pt_date_field,
     pt_network_bundle_field,
 )
@@ -415,6 +418,8 @@ class HeatmapV2WindmillParams(ToolInputBase):
     model_config = ConfigDict(
         json_schema_extra=ui_sections(
             SECTION_ROUTING_HM,
+            SECTION_STREET_NETWORK,
+            SECTION_PT_NETWORK,
             SECTION_CONFIGURATION,
             SECTION_OPPORTUNITIES_HM,
             SECTION_RESULT_HM,
@@ -532,7 +537,7 @@ class HeatmapV2WindmillParams(ToolInputBase):
             visible_when={
                 "$and": [
                     {"routing_mode": "pt"},
-                    {"pt_network_bundle_id": {"$exists": False}},
+                    {"_pt_network_bundle_id_is_custom": False},
                 ]
             },
         ),
@@ -795,11 +800,11 @@ class HeatmapV2WindmillParams(ToolInputBase):
     street_network_bundle_id: str | None = Field(
         default=None,
         description=(
-            "Choose a custom Street Network bundle to use for routing. "
-            "If unset, the default network will be used."
+            "The street network used for routing: the default network, or a "
+            "street network bundle added to this project."
         ),
         json_schema_extra=ui_field(
-            section="configuration",
+            section="street_network",
             field_order=18,
             label_key="street_network_bundle_id",
             widget="bundle-selector",
@@ -808,7 +813,7 @@ class HeatmapV2WindmillParams(ToolInputBase):
             visible_when={
                 "$and": [
                     {"routing_mode": {"$in": ["walking", "bicycle", "pedelec", "car"]}},
-                    {"show_advanced": True},
+                    {"_project_has_street_network_bundle": True},
                 ]
             },
             # Only street networks whose routing graph is built and ready.
@@ -1078,6 +1083,8 @@ class HeatmapConnectivityV2WindmillParams(HeatmapV2WindmillParams):
     model_config = ConfigDict(
         json_schema_extra=ui_sections(
             SECTION_ROUTING_HM,
+            SECTION_STREET_NETWORK,
+            SECTION_PT_NETWORK,
             SECTION_CONFIGURATION,
             SECTION_REFERENCE_AREA,
             SECTION_OPPORTUNITIES_HM,
@@ -1217,6 +1224,8 @@ class Heatmap2SFCAV2WindmillParams(
     model_config = ConfigDict(
         json_schema_extra=ui_sections(
             SECTION_ROUTING_HM,
+            SECTION_STREET_NETWORK,
+            SECTION_PT_NETWORK,
             SECTION_CONFIGURATION,
             SECTION_DEMAND_HM,
             SECTION_OPPORTUNITIES_HM,
@@ -1514,6 +1523,7 @@ class HeatmapV2ToolRunner(BaseToolRunner[HeatmapV2WindmillParams]):
         # An uploaded PT bundle replaces the global network: its timetable and
         # its stop-to-street linkage, in the analysis layer's mode spelling.
         if params.routing_mode == HeatmapRoutingMode.pt and params.pt_network_bundle_id:
+            ensure_pt_date(params.pt_network_bundle_id, params.pt_date)
             apply_pt_bundle_override(
                 self,
                 analysis_params,

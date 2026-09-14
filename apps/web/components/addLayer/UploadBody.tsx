@@ -119,7 +119,7 @@ const UploadBody = ({
     () => [
       {
         value: DEFAULT_STREET_NETWORK,
-        label: t("default_street_network"),
+        label: t("default_network"),
         // The same glyph as the bundles below it: the row stands in the same
         // list for the same decision, and a second icon made the field's
         // appearance depend on which was chosen.

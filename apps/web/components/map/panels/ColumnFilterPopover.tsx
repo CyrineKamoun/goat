@@ -8,6 +8,8 @@ import { v4 } from "uuid";
 
 import TemporalPicker from "@p4b/ui/components/TemporalPicker";
 
+import { useDayjsLocale } from "@/i18n/utils";
+
 import { createTheCQLBasedOnExpression } from "@/lib/transformers/filter";
 import {
   type FilterColumnType,
@@ -56,6 +58,7 @@ const ColumnFilterPopover: React.FC<ColumnFilterPopoverProps> = ({
   onClose,
 }) => {
   const { t } = useTranslation("common");
+  const dayjsLocale = useDayjsLocale();
   const { layerFields } = useLayerFields(layerId);
 
   const columnExpressions = useMemo(
@@ -212,6 +215,7 @@ const ColumnFilterPopover: React.FC<ColumnFilterPopoverProps> = ({
         return (
           <Box sx={{ px: 2, py: 2 }}>
             <TemporalPicker
+              locale={dayjsLocale}
               kind="datetime"
               label={t("select_date")}
               value={draft.first}
@@ -224,6 +228,7 @@ const ColumnFilterPopover: React.FC<ColumnFilterPopoverProps> = ({
           <Stack direction="column" spacing={2} sx={{ px: 2, py: 2 }}>
             {(["first", "second"] as const).map((key) => (
               <TemporalPicker
+                locale={dayjsLocale}
                 key={key}
                 kind="datetime"
                 label={key === "first" ? t("from") : t("to")}

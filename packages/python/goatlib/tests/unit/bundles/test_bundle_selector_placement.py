@@ -1,9 +1,12 @@
-"""Where the bundle selectors sit in the routing tools' advanced settings.
+"""Where the bundle selectors sit among a routing tool's fields.
 
-Both selectors belong to the public-transport settings block: they name the
-network the journey is routed on, so they follow the transfer limit and come
-before the access and egress legs, which are routed on that network. A
-selector ordered into one of the leg groups reads as a setting of that leg.
+Each selector has a section of its own — "Street Network", "Public Transport
+Network" — placed after routing and before configuration. After routing because
+which network is relevant follows from the mode that was chosen; before
+configuration because it decides what the settings there apply to.
+
+Only one of the two is ever on screen: the mode decides which, so they share a
+position rather than stacking.
 """
 
 import pytest
@@ -34,10 +37,12 @@ def _order(ui: dict[str, dict], name: str) -> int:
 
 @pytest.mark.parametrize("tool_name", ROUTING_TOOLS)
 @pytest.mark.parametrize("selector", BUNDLE_SELECTORS)
-def test_the_selector_follows_the_transfer_limit(tool_name: str, selector: str) -> None:
+def test_the_selector_has_its_own_section(tool_name: str, selector: str) -> None:
+    """Its own section, not the one the rest of the settings live in."""
     ui = _ui(tool_name)
-    assert ui[selector]["section"] == ui["pt_max_transfers"]["section"]
-    assert _order(ui, selector) > _order(ui, "pt_max_transfers")
+    expected = "pt_network" if selector.startswith("pt_") else "street_network"
+    assert ui[selector]["section"] == expected
+    assert ui[selector]["section"] != ui["pt_max_transfers"]["section"]
 
 
 @pytest.mark.parametrize("tool_name", ROUTING_TOOLS)

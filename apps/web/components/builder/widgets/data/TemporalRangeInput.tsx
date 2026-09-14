@@ -8,6 +8,8 @@ import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts
 import TemporalPicker from "@p4b/ui/components/TemporalPicker";
 import { TEMPORAL_VALUE_FORMAT } from "@p4b/ui/components/temporalFormats";
 
+import { useDayjsLocale } from "@/i18n/utils";
+
 import { useDatasetCollectionItems } from "@/lib/api/layers";
 import { useProjectLayerHistogramStats } from "@/lib/api/projects";
 import type { HistogramStatsQueryParams } from "@/lib/validations/project";
@@ -50,6 +52,7 @@ export default function TemporalRangeInput({
 }: TemporalRangeInputProps) {
   const theme = useTheme();
   const { t } = useTranslation("common");
+  const dayjsLocale = useDayjsLocale();
   const isPicker = inputStyle === "picker";
   const unit: Granularity = granularity ?? "day";
 
@@ -135,8 +138,20 @@ export default function TemporalRangeInput({
   if (isPicker) {
     return (
       <Stack direction="column" spacing={2} sx={{ pt: 1 }}>
-        <TemporalPicker kind="datetime" label={t("from")} value={from} onChange={(v) => updatePicker(0, v)} />
-        <TemporalPicker kind="datetime" label={t("to")} value={to} onChange={(v) => updatePicker(1, v)} />
+        <TemporalPicker
+          locale={dayjsLocale}
+          kind="datetime"
+          label={t("from")}
+          value={from}
+          onChange={(v) => updatePicker(0, v)}
+        />
+        <TemporalPicker
+          locale={dayjsLocale}
+          kind="datetime"
+          label={t("to")}
+          value={to}
+          onChange={(v) => updatePicker(1, v)}
+        />
       </Stack>
     );
   }

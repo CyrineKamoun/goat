@@ -1,19 +1,26 @@
 import { FormControl, FormHelperText, Stack, useTheme } from "@mui/material";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { type Dayjs } from "dayjs";
+import "dayjs/locale/de";
+import "dayjs/locale/en-gb";
+import localizedFormat from "dayjs/plugin/localizedFormat";
 import utc from "dayjs/plugin/utc";
 import { useState } from "react";
 
 import {
+  TEMPORAL_DATETIME_PICKER_FORMAT,
   TEMPORAL_DATE_FORMAT,
-  TEMPORAL_DISPLAY_FORMAT,
+  TEMPORAL_DATE_PICKER_FORMAT,
   TEMPORAL_VALUE_FORMAT,
+  type TemporalLocale,
 } from "./temporalFormats";
 
 dayjs.extend(utc);
+// `L` in the display formats resolves against the loaded locale.
+dayjs.extend(localizedFormat);
 
 // Values are UTC instants (or naive wall times, which the platform treats as
 // UTC). Parse in UTC so offset-suffixed values show their UTC wall time
@@ -38,6 +45,9 @@ type TemporalPickerProps = {
   /** `YYYY-MM-DD` bounds, for a field whose valid dates are a known range. */
   min?: string;
   max?: string;
+  /** Locale to display in. The emitted value is unaffected — only the reading
+   * of it changes. Defaults to day-first English. */
+  locale?: TemporalLocale;
 };
 
 export default function TemporalPicker(props: TemporalPickerProps) {
@@ -46,6 +56,7 @@ export default function TemporalPicker(props: TemporalPickerProps) {
 
   const dateOnly = props.kind === "date";
   const valueFormat = dateOnly ? TEMPORAL_DATE_FORMAT : TEMPORAL_VALUE_FORMAT;
+  const locale: TemporalLocale = props.locale ?? "en-gb";
 
   const handleChange = (next: Dayjs | null) => {
     props.onChange(next && next.isValid() ? next.format(valueFormat) : "");
@@ -79,7 +90,7 @@ export default function TemporalPicker(props: TemporalPickerProps) {
   };
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={locale}>
       <FormControl size="small" fullWidth>
         {/* Label above the input, matching the platform's panel inputs
             (FormLabelHelper pattern) instead of MUI's floating label. */}
@@ -95,9 +106,9 @@ export default function TemporalPicker(props: TemporalPickerProps) {
           </Stack>
         )}
         {dateOnly ? (
-          <DatePicker {...commonProps} format={TEMPORAL_DATE_FORMAT} />
+          <DatePicker {...commonProps} format={TEMPORAL_DATE_PICKER_FORMAT} />
         ) : (
-          <DateTimePicker {...commonProps} format={TEMPORAL_DISPLAY_FORMAT} ampm={false} />
+          <DateTimePicker {...commonProps} format={TEMPORAL_DATETIME_PICKER_FORMAT} ampm={false} />
         )}
       </FormControl>
     </LocalizationProvider>

@@ -1,6 +1,7 @@
 import logging
 import re
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 from typing import Self
 
@@ -107,6 +108,18 @@ def sanitize_sql_name(name: str, fallback_idx: int = 0) -> str:
     if not safe_name:
         safe_name = f"opp_{fallback_idx}"
     return safe_name
+
+
+#: `calendar.txt`'s day columns, in Python's `date.weekday()` order.
+_GTFS_WEEKDAY_COLUMNS = (
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+)
 
 
 class HeatmapToolBase(AnalysisTool):
@@ -561,6 +574,115 @@ class PTToolBase(AnalysisTool):
                 is_sunday,
                 h3_3
             FROM read_parquet('{stop_times_path}')
+        """)
+
+    # -- GTFS from an uploaded bundle --------------------------------------
+    #
+    # The shipped feed arrives pre-digested: `stop_times_optimized` carries the
+    # route type, an h3 cell and three booleans for an *average* weekday,
+    # Saturday and Sunday. A bundle carries the feed as published, so the same
+    # columns are derived here — and for one real date rather than an average,
+    # which is what the user picks. Service on a date is what `calendar` says
+    # for that weekday within its window, plus or minus what `calendar_dates`
+    # says about that date specifically.
+
+    def _import_bundle_gtfs_stops(self: Self, stops_path: str) -> None:
+        """`gtfs_stops` from a bundle's stops layer.
+
+        The same view the shipped feed produces, with `h3_3` computed here: the
+        published file has no such column, and the join in `_count_pt_services`
+        is on it as well as the stop id.
+        """
+        self.con.execute("INSTALL h3 FROM community; LOAD h3;")
+        self.con.execute(f"""
+            CREATE OR REPLACE VIEW gtfs_stops AS
+            SELECT
+                stop_id,
+                stop_name,
+                CAST(stop_lat AS DOUBLE) AS stop_lat,
+                CAST(stop_lon AS DOUBLE) AS stop_lon,
+                location_type,
+                parent_station,
+                h3_latlng_to_cell(CAST(stop_lat AS DOUBLE), CAST(stop_lon AS DOUBLE), 3)
+                    AS h3_3,
+                ST_Point(CAST(stop_lon AS DOUBLE), CAST(stop_lat AS DOUBLE)) AS geom
+            FROM read_parquet('{stops_path}')
+            WHERE stop_lat IS NOT NULL
+              AND stop_lon IS NOT NULL
+              AND (location_type IS NULL OR location_type IN ('0', ''))
+        """)
+
+    def _import_bundle_gtfs_stop_times(
+        self: Self,
+        stop_times_path: str,
+        trips_path: str,
+        routes_path: str,
+        service_date: str,
+        calendar_path: str | None = None,
+        calendar_dates_path: str | None = None,
+    ) -> None:
+        """`gtfs_stop_times` for one date, from a bundle's published tables.
+
+        `service_date` is ``YYYY-MM-DD``. The three day booleans survive because
+        everything downstream filters on them: exactly one is set, the one the
+        date falls on, so a caller that asks for "the Saturday window" of a date
+        that is a Saturday gets what it expects and the counting SQL is
+        unchanged.
+
+        Either calendar file may be absent — GTFS requires one of them, not both
+        — so each contributes only if it is there.
+        """
+        day = datetime.strptime(service_date, "%Y-%m-%d").date()
+        gtfs_date = day.strftime("%Y%m%d")
+        weekday_column = _GTFS_WEEKDAY_COLUMNS[day.weekday()]
+        is_weekday = day.weekday() < 5
+        is_saturday = day.weekday() == 5
+        is_sunday = day.weekday() == 6
+
+        # Services running on the date: the regular schedule, minus removals,
+        # plus additions. `calendar_dates` is the authority where it speaks.
+        regular = (
+            f"""
+            SELECT service_id FROM read_parquet('{calendar_path}')
+            WHERE {weekday_column} IN ('1', 1)
+              AND CAST(start_date AS VARCHAR) <= '{gtfs_date}'
+              AND CAST(end_date AS VARCHAR) >= '{gtfs_date}'
+            """
+            if calendar_path
+            else "SELECT NULL AS service_id WHERE FALSE"
+        )
+        added = removed = "SELECT NULL AS service_id WHERE FALSE"
+        if calendar_dates_path:
+            added = f"""
+                SELECT service_id FROM read_parquet('{calendar_dates_path}')
+                WHERE CAST(date AS VARCHAR) = '{gtfs_date}'
+                  AND CAST(exception_type AS VARCHAR) = '1'
+            """
+            removed = f"""
+                SELECT service_id FROM read_parquet('{calendar_dates_path}')
+                WHERE CAST(date AS VARCHAR) = '{gtfs_date}'
+                  AND CAST(exception_type AS VARCHAR) = '2'
+            """
+
+        self.con.execute(f"""
+            CREATE OR REPLACE VIEW gtfs_stop_times AS
+            WITH active_services AS (
+                (({regular}) EXCEPT ({removed})) UNION ({added})
+            )
+            SELECT
+                st.stop_id,
+                r.route_type,
+                st.arrival_time,
+                {str(is_weekday).lower()} AS is_weekday,
+                {str(is_saturday).lower()} AS is_saturday,
+                {str(is_sunday).lower()} AS is_sunday,
+                s.h3_3
+            FROM read_parquet('{stop_times_path}') st
+            JOIN read_parquet('{trips_path}') t ON t.trip_id = st.trip_id
+            JOIN read_parquet('{routes_path}') r ON r.route_id = t.route_id
+            JOIN active_services a ON a.service_id = t.service_id
+            JOIN gtfs_stops s ON s.stop_id = st.stop_id
+            WHERE st.arrival_time IS NOT NULL
         """)
 
     def _get_stations_in_area(self: Self, ref_geom_col: str) -> None:

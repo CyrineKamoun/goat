@@ -11,11 +11,12 @@ from typing import Any, Literal, Self
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from goatlib.models.io import DatasetMetadata
-from goatlib.tools.base import BaseToolRunner
+from goatlib.tools.base import BaseToolRunner, _get_or_create_event_loop
 from goatlib.tools.schemas import ToolInputBase
+from goatlib.utils.field_config import coerce_allowed_values
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +39,9 @@ FIELD_TYPE_MAP: dict[str, pa.DataType] = {
 }
 
 #: Kinds a new layer can carry. Computed kinds (area/perimeter/length) and formula
-#: are deliberately absent: their values come from `field_config`, which is written
-#: when a column is added to a layer that already exists — nothing writes it during
-#: creation, so the column would be created and never filled.
+#: are deliberately absent: they need the compute SQL geoapi builds when a column is
+#: added to a layer that already exists, which creation does not run — the column
+#: would be created and never filled.
 FieldKind = Literal["string", "number", "datetime", "boolean"]
 
 
@@ -56,11 +57,52 @@ class FieldDefinition(BaseModel):
         None,
         description="Legacy alias for `kind`, kept for callers that predate it",
     )
+    allowed_values: list[Any] | None = Field(
+        None,
+        description="The only values this column may hold, if it is constrained",
+    )
+    allow_other: bool = Field(
+        False,
+        description="Treat allowed_values as suggestions rather than the only "
+        "values a write may set",
+    )
 
     @property
     def storage_kind(self: Self) -> str:
         """The kind to store as, preferring `kind` and falling back to `type`."""
         return self.kind or self.type or "string"
+
+    @model_validator(mode="after")
+    def _coerce_vocabulary(self: Self) -> Self:
+        """A number column's vocabulary has to be numbers.
+
+        Coerced while the parameters are being parsed, so a feed of the wrong
+        type fails before the layer exists rather than after — the entry is
+        written once the layer is there, and a failure then leaves a real
+        column the user cannot correct from the create dialog.
+        """
+        if self.allowed_values:
+            self.allowed_values = coerce_allowed_values(
+                self.storage_kind, self.allowed_values
+            )
+        return self
+
+    def field_config_entry(self: Self) -> dict[str, Any]:
+        """What `field_config` records about this column.
+
+        The same shape geoapi writes when a column is added to an existing
+        layer, so a column means the same thing however it got there.
+        """
+        entry: dict[str, Any] = {
+            "kind": self.storage_kind,
+            "is_computed": False,
+            "depends_on": [],
+            "display_config": {},
+        }
+        if self.allowed_values:
+            entry["allowed_values"] = self.allowed_values
+            entry["allow_other"] = self.allow_other
+        return entry
 
 
 class LayerCreateParams(ToolInputBase):
@@ -241,7 +283,50 @@ class LayerCreateToolRunner(BaseToolRunner[LayerCreateParams]):
         # Store params so _ingest_to_ducklake override can access geometry_type
         self._create_params = params
 
-        return super().run(params)
+        result = super().run(params)
+        self._write_field_config(params, result)
+        return result
+
+    def _write_field_config(
+        self: Self, params: LayerCreateParams, result: dict
+    ) -> None:
+        """Record what the new layer's columns mean.
+
+        Storage type alone does not carry a column's vocabulary or its
+        formatting — those live only in `field_config` — so without this a
+        layer created with its columns declared up front loses everything the
+        create dialog asked for beyond name and kind, while the same column
+        added to an existing layer keeps it.
+
+        Written after the layer exists, and never in temp mode, where there is
+        no layer row to attach it to. A failure here is logged rather than
+        raised: the layer and its columns are real by this point, and the
+        vocabulary can be set again from Edit fields.
+        """
+        if getattr(params, "temp_mode", False):
+            return
+        layer_id = result.get("layer_id")
+        if not layer_id or not params.fields:
+            return
+
+        config = {f.name: f.field_config_entry() for f in params.fields}
+        try:
+            _get_or_create_event_loop().run_until_complete(
+                self._persist_field_config(str(layer_id), config)
+            )
+        except Exception as e:
+            logger.warning("Could not write field_config for layer %s: %s", layer_id, e)
+
+    async def _persist_field_config(
+        self: Self, layer_id: str, config: dict[str, Any]
+    ) -> None:
+        """Open a pool, write, and close it again — `run` closed its own."""
+        await self._init_db_service()
+        try:
+            if self.db_service is not None:
+                await self.db_service.set_layer_field_config(layer_id, config)
+        finally:
+            await self._close_db_service()
 
 
 def main(params: LayerCreateParams) -> dict:

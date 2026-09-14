@@ -28,7 +28,6 @@ from typing import Any
 from pygeofilter import ast, values
 from pygeofilter.backends.evaluator import Evaluator, handle
 
-
 # Function calls in a CQL2 filter reach DuckDB by name. Only vetted, pure,
 # side-effect-free scalar functions are allowed; the name emitted into SQL is
 # the canonical entry from this set, never the caller-supplied token — so a
