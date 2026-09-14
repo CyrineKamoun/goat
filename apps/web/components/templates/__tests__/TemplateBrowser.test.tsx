@@ -159,11 +159,11 @@ describe("TemplateBrowser (inline)", () => {
     // Read off the DOM property rather than a matcher: the repo's ESLint
     // setup reads jest-dom's `toBeDisabled`/`toBeEnabled` as Playwright's
     // (async) matchers of the same name.
-    for (const name of [/template_kind_workflow/, /template_kind_dashboard/, /template_kind_layout/]) {
+    for (const name of [/template_kind_workflow/, /template_kind_project/, /template_kind_layout/]) {
       const pill = screen.getByRole("button", { name }) as HTMLButtonElement;
       expect(pill.disabled).toBe(false);
     }
-    expect(screen.getByRole("button", { name: "template_kind_dashboard" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "template_kind_project" })).toBeInTheDocument();
     // One request, not a second kind-unfiltered one for the pill counts.
     expect(useTemplatesMock).toHaveBeenCalledTimes(1);
   });

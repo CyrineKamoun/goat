@@ -10,7 +10,7 @@ interface TemplateKindFilterProps {
   onChange: (kind: TemplateKind | "all") => void;
 }
 
-const KIND_OPTIONS: TemplateKind[] = ["workflow", "dashboard", "layout"];
+const KIND_OPTIONS: TemplateKind[] = ["workflow", "project", "layout"];
 
 /** T7/§4's kind pills: All plus the three template kinds. They are filters,
  * not statistics — every kind stays selectable, and the count of what the

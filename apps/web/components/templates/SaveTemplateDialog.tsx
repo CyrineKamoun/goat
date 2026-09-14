@@ -55,8 +55,9 @@ import { homeFolderOf, spaceDisplayName, spaceIconFor } from "@/lib/utils/conten
 import { tagColor } from "@/lib/utils/tagColor";
 import { publicOnPublishInputs } from "@/lib/utils/templates";
 import type { Space } from "@/lib/validations/content";
+import { templateBadgeKind } from "@/lib/validations/template";
 import type {
-  TemplateKind,
+  TemplateBadgeKind,
   TemplatePreview,
   TemplatePreviewDescriptor,
   TemplateRead,
@@ -670,12 +671,12 @@ const SaveTemplateDialog = ({
 
   /** The kinds the preview badges: the ones the backend derived for this
    * source, and the source's own kind until the preview comes back. */
-  const previewKinds = useMemo<TemplateKind[]>(() => {
-    const derived = (preview?.kinds ?? []).filter(
-      (kind): kind is TemplateKind => kind === "workflow" || kind === "dashboard" || kind === "layout"
+  const previewKinds = useMemo<TemplateBadgeKind[]>(() => {
+    const derived = (preview?.kinds ?? []).filter((kind): kind is TemplateBadgeKind =>
+      templateBadgeKind.options.includes(kind as TemplateBadgeKind)
     );
     if (derived.length > 0) return derived;
-    return [source.kind === "project" ? "dashboard" : source.kind];
+    return [source.kind];
   }, [preview, source.kind]);
 
   const authorName = [userProfile?.firstname, userProfile?.lastname].filter(Boolean).join(" ");
