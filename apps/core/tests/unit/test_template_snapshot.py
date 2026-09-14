@@ -258,19 +258,19 @@ def test_kinds_for_layout_payload_is_always_just_layout() -> None:
 def test_kinds_for_project_payload_combines_in_fixed_order() -> None:
     assert kinds_for(
         "project", has_builder=True, has_workflows=True, has_layouts=True
-    ) == ["dashboard", "workflow", "layout"]
+    ) == ["project", "dashboard", "workflow", "layout"]
     assert kinds_for(
         "project", has_builder=False, has_workflows=True, has_layouts=False
-    ) == ["workflow"]
+    ) == ["project", "workflow"]
     assert kinds_for(
         "project", has_builder=False, has_workflows=False, has_layouts=True
-    ) == ["layout"]
+    ) == ["project", "layout"]
 
 
-def test_kinds_for_project_payload_never_empty() -> None:
+def test_kinds_for_bare_project_payload_is_just_project() -> None:
     assert kinds_for(
         "project", has_builder=False, has_workflows=False, has_layouts=False
-    ) == ["dashboard"]
+    ) == ["project"]
 
 
 # ---------------------------------------------------------------------------

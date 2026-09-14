@@ -942,7 +942,7 @@ class CRUDContent:
         details: dict[UUID, dict[str, Any]] = {}
         for r in rows:
             if r.payload_kind == "project":
-                kinds = project_kinds.get(r.source_project_id, ["dashboard"])
+                kinds = project_kinds.get(r.source_project_id, ["project"])
             else:
                 kinds = kinds_for(
                     r.payload_kind,

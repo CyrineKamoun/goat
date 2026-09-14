@@ -192,7 +192,7 @@ async def test_project_payload_template_derives_kinds_from_the_frozen_source(
         space_id=sid,
         folder_id=home,
         creator=me,
-        name="Dashboard template",
+        name="Project template",
         payload_kind="project",
         source_project_id=source_id,
     )
@@ -201,7 +201,7 @@ async def test_project_payload_template_derives_kinds_from_the_frozen_source(
     page = await _feed(client, space_id=str(sid), types="template")
     row = next(i for i in page["items"] if i["id"] == str(tid))
     assert row["template_payload_kind"] == "project"
-    assert set(row["template_kinds"]) == {"dashboard", "workflow"}
+    assert row["template_kinds"] == ["project", "dashboard", "workflow"]
     # The frozen source project itself never surfaces as a row of its own.
     assert source_id not in {i["id"] for i in page["items"]}
 

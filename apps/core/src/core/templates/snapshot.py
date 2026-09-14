@@ -106,24 +106,23 @@ def kinds_for(
     """Derive the kind badges for a template's payload.
 
     A workflow or layout payload is always exactly that one kind. A project
-    payload can carry several at once — ``"dashboard"``, ``"workflow"``,
-    ``"layout"``, in that fixed order — one per content the source project
-    actually had; a project with none of the three still counts as a
-    dashboard template, since its map and builder canvas are what get copied
-    either way.
+    payload is always ``"project"`` first — using it creates a whole project —
+    followed by what the source project carried, in a fixed order:
+    ``"dashboard"`` for a builder config, ``"workflow"`` and ``"layout"`` for
+    any workflow/report_layout rows. A bare map is just ``["project"]``.
     """
     if payload_kind == "workflow":
         return ["workflow"]
     if payload_kind == "layout":
         return ["layout"]
-    kinds: list[str] = []
+    kinds: list[str] = ["project"]
     if has_builder:
         kinds.append("dashboard")
     if has_workflows:
         kinds.append("workflow")
     if has_layouts:
         kinds.append("layout")
-    return kinds or ["dashboard"]
+    return kinds
 
 
 def _replace_scalars(value: Any, mapping: dict[tuple[str, Any], Any]) -> Any:

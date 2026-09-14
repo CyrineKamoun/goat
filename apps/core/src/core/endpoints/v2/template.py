@@ -90,8 +90,8 @@ async def list_templates(
     source: Literal["all", "goat", "mine", "team", "org"] = Query(
         "all", description="goat | mine | team | org | all"
     ),
-    kind: Literal["workflow", "dashboard", "layout"] | None = Query(
-        None, description="workflow | dashboard | layout"
+    kind: Literal["workflow", "project", "layout"] | None = Query(
+        None, description="workflow | project | layout"
     ),
     search: str | None = Query(None),
     categories: str | None = Query(
@@ -149,8 +149,8 @@ async def list_template_categories(
     source: Literal["all", "goat", "mine", "team", "org"] = Query(
         "all", description="goat | mine | team | org | all"
     ),
-    kind: Literal["workflow", "dashboard", "layout"] | None = Query(
-        None, description="workflow | dashboard | layout"
+    kind: Literal["workflow", "project", "layout"] | None = Query(
+        None, description="workflow | project | layout"
     ),
 ) -> list[TemplateCategoryFacet]:
     """The categories in use on the caller's readable templates, with a
