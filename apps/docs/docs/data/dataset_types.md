@@ -45,7 +45,7 @@ A street network is made up of two layers that GOAT keeps together:
 - **Edges** — the routable segments. This is the layer you edit when you change the network.
 - **Nodes** — the points where edges meet. GOAT maintains these for you whenever you save an edge, so the network stays routable.
 
-Street networks power GOAT's [Walking](../routing/walking), [Cycling](../routing/bicycle), [E-bike](../routing/bicycle), and [Car](../routing/car) routing. To import one, see [Adding datasets](../workspace/datasets.md#adding-datasets); for what GOAT's built-in network contains and how to bring your own, see [Network Datasets](./builtin_datasets.md#bringing-your-own-networks).
+Street networks power GOAT's [Walking](../routing/walking), [Cycling](../routing/bicycle), [E-bike](../routing/bicycle), and [Car](../routing/car) routing. To import one, see [Adding content](../workspace/content.md#adding-content); for what GOAT's built-in network contains and how to bring your own, see [Network Datasets](./builtin_datasets.md#bringing-your-own-networks).
 
 ## Public Transport Networks
 
@@ -59,7 +59,7 @@ The member layers follow the GTFS feed itself: **Stops**, **Routes**, **Trips** 
 GOAT connects stops to streets so that it can route the walk to and from a stop. You therefore choose a Street Network while uploading the GTFS file — either one of your own or GOAT's built-in `Default (Europe)` network — which means the street network has to exist first.
 :::
 
-Public transport networks power GOAT's [Public Transport](../routing/public_transport) routing. To import one, see [Adding datasets](../workspace/datasets.md#adding-datasets); for what GOAT's built-in network contains and how to bring your own, see [Network Datasets](./builtin_datasets.md#bringing-your-own-networks).
+Public transport networks power GOAT's [Public Transport](../routing/public_transport) routing. To import one, see [Adding content](../workspace/content.md#adding-content); for what GOAT's built-in network contains and how to bring your own, see [Network Datasets](./builtin_datasets.md#bringing-your-own-networks).
 
 ## Datasets made of several layers
 

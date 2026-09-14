@@ -148,7 +148,7 @@ Sie können Layer aus [verschiedenen Quellen](../data/dataset_types) zu Ihrer Ka
 
 :::tip Tipp
 
-Sie können alle Ihre Datensätze auf der [Datensätze-Seite](../workspace/datasets) verwalten. 
+Sie können alle Ihre Datensätze auf der [Inhalt-Seite](../workspace/content) verwalten. 
 
 :::
 

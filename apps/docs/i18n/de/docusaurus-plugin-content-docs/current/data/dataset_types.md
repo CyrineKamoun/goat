@@ -45,7 +45,7 @@ Ein Straßennetz besteht aus zwei Layern, die GOAT zusammenhält:
 - **Edges** — die routingfähigen Segmente. Dies ist der Layer, den Sie bearbeiten, wenn Sie das Netz ändern.
 - **Nodes** — die Punkte, an denen Edges zusammentreffen. GOAT pflegt sie für Sie, sobald Sie eine Edge speichern, damit das Netz routingfähig bleibt.
 
-Straßennetze sind die Grundlage für das Routing zu [Fuß](../routing/walking), mit dem [Fahrrad](../routing/bicycle), dem [E-Bike](../routing/bicycle) und dem [Auto](../routing/car) in GOAT. Zum Importieren siehe [Datensätze hinzufügen](../workspace/datasets.md#datensätze-hinzufügen); was das integrierte Netz von GOAT enthält und wie Sie eigene importieren, finden Sie unter [Netz-Datensätze](./builtin_datasets.md#eigene-netze-importieren).
+Straßennetze sind die Grundlage für das Routing zu [Fuß](../routing/walking), mit dem [Fahrrad](../routing/bicycle), dem [E-Bike](../routing/bicycle) und dem [Auto](../routing/car) in GOAT. Zum Importieren siehe [Inhalte hinzufügen](../workspace/content.md#inhalte-hinzufügen); was das integrierte Netz von GOAT enthält und wie Sie eigene importieren, finden Sie unter [Netz-Datensätze](./builtin_datasets.md#eigene-netze-importieren).
 
 ## ÖPNV-Netze
 
@@ -59,7 +59,7 @@ Die enthaltenen Layer entsprechen dem GTFS-Feed selbst: **Stops**, **Routes**, *
 GOAT verbindet Haltestellen mit Straßen, um den Weg zur und von der Haltestelle routen zu können. Deshalb wählen Sie beim Hochladen der GTFS-Datei ein Straßennetz aus — entweder eines Ihrer eigenen oder das integrierte Netz `Standard (Europa)`. Das Straßennetz muss also bereits vorhanden sein.
 :::
 
-ÖPNV-Netze sind die Grundlage für das [ÖPNV](../routing/public_transport)-Routing in GOAT. Zum Importieren siehe [Datensätze hinzufügen](../workspace/datasets.md#datensätze-hinzufügen); was das integrierte Netz von GOAT enthält und wie Sie eigene importieren, finden Sie unter [Netz-Datensätze](./builtin_datasets.md#eigene-netze-importieren).
+ÖPNV-Netze sind die Grundlage für das [ÖPNV](../routing/public_transport)-Routing in GOAT. Zum Importieren siehe [Inhalte hinzufügen](../workspace/content.md#inhalte-hinzufügen); was das integrierte Netz von GOAT enthält und wie Sie eigene importieren, finden Sie unter [Netz-Datensätze](./builtin_datasets.md#eigene-netze-importieren).
 
 ## Datensätze aus mehreren Layern
 

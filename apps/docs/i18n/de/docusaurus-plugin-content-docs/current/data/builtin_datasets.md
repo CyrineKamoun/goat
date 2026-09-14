@@ -16,7 +16,7 @@ Das Verständnis dieser zugrundeliegenden Datensätze hilft Ihnen:
 - **Ergebnisse zu interpretieren** mit Kenntnis der Datenquellen
 
 :::info Netze vs. eigene Datensätze
-Auf dieser Seite geht es um die **Netz-Datensätze**, die hinter GOATs Routing- und Erreichbarkeitsanalysen stehen. Wie Sie eigene Datensätze hochladen oder fertige verwenden, erfahren Sie unter [Datensätze](../workspace/datasets.md) und im [Katalog](../workspace/catalog.md).
+Auf dieser Seite geht es um die **Netz-Datensätze**, die hinter GOATs Routing- und Erreichbarkeitsanalysen stehen. Wie Sie eigene Datensätze hochladen oder fertige verwenden, erfahren Sie unter [Inhalt](../workspace/content.md) und im [Katalog](../workspace/catalog.md).
 :::
 
 ## Die integrierten Netze von GOAT
@@ -87,4 +87,4 @@ Ein importiertes Straßennetz lässt sich **auf der Karte bearbeiten**: Zeichnen
 
 Da GOAT den Weg zu und von jeder Haltestelle routet, muss ein ÖPNV-Netz mit einem **Straßennetz verknüpft** sein. Sie wählen dieses Netz beim Hochladen aus, entweder eines Ihrer eigenen oder das integrierte `Standard (Europa)`. Das Straßennetz muss also bereits vorhanden sein. Durch die Verknüpfung mit Ihrem eigenen Straßennetz berücksichtigt eine Fahrplananalyse auch die Straßen, die Sie geändert haben.
 
-Aus welchen Dateiformaten diese Netze importiert werden und aus welchen Layern sie bestehen, erfahren Sie unter [Datensatz-Typen](./dataset_types.md#straßennetze). Die Importschritte finden Sie unter [Datensätze hinzufügen](../workspace/datasets.md#datensätze-hinzufügen).
+Aus welchen Dateiformaten diese Netze importiert werden und aus welchen Layern sie bestehen, erfahren Sie unter [Datensatz-Typen](./dataset_types.md#straßennetze). Die Importschritte finden Sie unter [Inhalte hinzufügen](../workspace/content.md#inhalte-hinzufügen).

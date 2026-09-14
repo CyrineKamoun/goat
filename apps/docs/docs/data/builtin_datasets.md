@@ -15,7 +15,7 @@ Understanding these underlying datasets helps you:
 - **Interpret results** with knowledge of the data sources
 
 :::info Networks vs. your own datasets
-This page is about the **network datasets** behind GOAT's routing and accessibility analyses. To upload ordinary datasets of your own, or to use ready-made ones, see [Datasets](../workspace/datasets.md) and the [Catalog](../workspace/catalog.md).
+This page is about the **network datasets** behind GOAT's routing and accessibility analyses. To upload ordinary datasets of your own, or to use ready-made ones, see [Content](../workspace/content.md) and the [Catalog](../workspace/catalog.md).
 :::
 
 ## GOAT's built-in networks
@@ -86,4 +86,4 @@ A street network you imported can be **edited on the map**: draw a street and GO
 
 Because GOAT routes the walk to and from each stop, a public transport network has to be **linked to a street network**. You choose that network while uploading, either one of your own or the built-in `Default (Europe)`, so the street network has to exist first. Linking to your own street network is what lets a timetable analysis account for streets you changed.
 
-For the file formats these networks are imported from and the layers they are made of, see [Dataset Types](./dataset_types.md#street-networks). For the import steps, see [Adding datasets](../workspace/datasets.md#adding-datasets).
+For the file formats these networks are imported from and the layers they are made of, see [Dataset Types](./dataset_types.md#street-networks). For the import steps, see [Adding content](../workspace/content.md#adding-content).

@@ -79,5 +79,5 @@ Nachdem Sie Ihr erstes Projekt in GOAT erstellt haben, ist es Zeit, es mit ander
 
 <div class="step">
   <div class="step-number">11</div>
-  <div class="content">Klicken Sie auf <code>URL kopieren</code>, um einen direkten Link zu teilen, oder auf <code>iframe-Code kopieren</code>, um die Karte in eine Website einzubetten. Weitere Details finden Sie unter <a href="../workspace/projects">Projekte</a>.</div>
+  <div class="content">Klicken Sie auf <code>URL kopieren</code>, um einen direkten Link zu teilen, oder auf <code>iframe-Code kopieren</code>, um die Karte in eine Website einzubetten. Weitere Details finden Sie unter <a href="../workspace/content">Inhalt</a>.</div>
 </div>
