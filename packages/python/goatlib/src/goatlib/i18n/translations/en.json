@@ -1,6 +1,8 @@
 {
   "sections": {
-    "sql": {"label": "SQL"},
+    "sql": {
+      "label": "SQL"
+    },
     "routing": {
       "label": "Routing"
     },
@@ -105,23 +107,50 @@
     },
     "result_layer_section": {
       "label": "Result layer"
+    },
+    "street_network": {
+      "label": "Street Network"
+    },
+    "pt_network": {
+      "label": "Public Transport Network"
     }
   },
   "fields": {
-    "size_field": {"label": "Size Field", "description": "Numeric field to use for zone balancing"},
-    "polygon_union": {"label": "Merge overlapping buffers", "description": "Merge buffers at the same distance that overlap into one polygon"},
-    "egress_mode": {"label": "Egress mode", "description": "How the last leg from the transit stop to the destination is travelled"},
-    "input_layer_1": {"label": "Input layer 1", "description": "First input layer (connected from the workflow)"},
-    "input_layer_2": {"label": "Input layer 2", "description": "Second input layer (connected from the workflow)"},
-    "input_layer_3": {"label": "Input layer 3", "description": "Third input layer (connected from the workflow)"},
-    "sql_query": {"label": "SQL query", "description": "SQL SELECT statement to run against the input layers"},
+    "size_field": {
+      "label": "Size Field",
+      "description": "Numeric field to use for zone balancing"
+    },
+    "polygon_union": {
+      "label": "Merge overlapping buffers",
+      "description": "Merge buffers at the same distance that overlap into one polygon"
+    },
+    "egress_mode": {
+      "label": "Egress mode",
+      "description": "How the last leg from the transit stop to the destination is travelled"
+    },
+    "input_layer_1": {
+      "label": "Input layer 1",
+      "description": "First input layer (connected from the workflow)"
+    },
+    "input_layer_2": {
+      "label": "Input layer 2",
+      "description": "Second input layer (connected from the workflow)"
+    },
+    "input_layer_3": {
+      "label": "Input layer 3",
+      "description": "Third input layer (connected from the workflow)"
+    },
+    "sql_query": {
+      "label": "SQL query",
+      "description": "SQL SELECT statement to run against the input layers"
+    },
     "pt_network_bundle_id": {
       "label": "Public Transport Network bundle",
-      "description": "Choose a custom Public Transport Network bundle to use for routing. If unset, the default bundle will be used."
+      "description": "The public transport network used for routing: the default network, or one added to this project"
     },
     "street_network_bundle_id": {
       "label": "Street Network bundle",
-      "description": "Choose a custom Street Network bundle to use for routing. If unset, the default network will be used."
+      "description": "The street network used for routing: the default network, or one added to this project"
     },
     "routing_mode": {
       "label": "Transport mode",

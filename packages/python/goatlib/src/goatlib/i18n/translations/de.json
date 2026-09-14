@@ -1,6 +1,8 @@
 {
   "sections": {
-    "sql": {"label": "SQL"},
+    "sql": {
+      "label": "SQL"
+    },
     "routing": {
       "label": "Routing"
     },
@@ -105,22 +107,46 @@
     },
     "result_layer_section": {
       "label": "Ergebnis-Layer"
+    },
+    "street_network": {
+      "label": "Straßennetz"
+    },
+    "pt_network": {
+      "label": "ÖPNV-Netz"
     }
   },
   "fields": {
-    "polygon_union": {"label": "Überlappende Puffer zusammenführen", "description": "Puffer gleicher Distanz, die sich überlappen, zu einem Polygon zusammenführen"},
-    "egress_mode": {"label": "Abgangsmodus", "description": "Fortbewegungsart auf dem letzten Abschnitt von der Haltestelle zum Ziel"},
-    "input_layer_1": {"label": "Eingabeebene 1", "description": "Erste Eingabeebene (aus dem Workflow verbunden)"},
-    "input_layer_2": {"label": "Eingabeebene 2", "description": "Zweite Eingabeebene (aus dem Workflow verbunden)"},
-    "input_layer_3": {"label": "Eingabeebene 3", "description": "Dritte Eingabeebene (aus dem Workflow verbunden)"},
-    "sql_query": {"label": "SQL-Abfrage", "description": "SQL-SELECT-Anweisung, die auf den Eingabeebenen ausgeführt wird"},
+    "polygon_union": {
+      "label": "Überlappende Puffer zusammenführen",
+      "description": "Puffer gleicher Distanz, die sich überlappen, zu einem Polygon zusammenführen"
+    },
+    "egress_mode": {
+      "label": "Abgangsmodus",
+      "description": "Fortbewegungsart auf dem letzten Abschnitt von der Haltestelle zum Ziel"
+    },
+    "input_layer_1": {
+      "label": "Eingabeebene 1",
+      "description": "Erste Eingabeebene (aus dem Workflow verbunden)"
+    },
+    "input_layer_2": {
+      "label": "Eingabeebene 2",
+      "description": "Zweite Eingabeebene (aus dem Workflow verbunden)"
+    },
+    "input_layer_3": {
+      "label": "Eingabeebene 3",
+      "description": "Dritte Eingabeebene (aus dem Workflow verbunden)"
+    },
+    "sql_query": {
+      "label": "SQL-Abfrage",
+      "description": "SQL-SELECT-Anweisung, die auf den Eingabeebenen ausgeführt wird"
+    },
     "pt_network_bundle_id": {
       "label": "ÖPNV-Netz-Bundle",
-      "description": "Wählen Sie ein benutzerdefiniertes ÖPNV-Netz-Bundle für das Routing. Wenn nicht gesetzt, wird das Standard-Bundle verwendet."
+      "description": "Das für das Routing verwendete ÖPNV-Netz: das Standardnetz oder ein dem Projekt hinzugefügtes Netz"
     },
     "street_network_bundle_id": {
       "label": "Straßennetz-Bundle",
-      "description": "Wählen Sie ein benutzerdefiniertes Straßennetz-Bundle für das Routing. Wenn nicht gesetzt, wird das Standardnetz verwendet."
+      "description": "Das für das Routing verwendete Straßennetz: das Standardnetz oder ein dem Projekt hinzugefügtes Netz"
     },
     "routing_mode": {
       "label": "Verkehrsmittel",

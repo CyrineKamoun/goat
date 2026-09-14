@@ -39,7 +39,7 @@ def pt_date_field(field_order: int) -> Any:
             visible_when={
                 "$and": [
                     {"routing_mode": "pt"},
-                    {"pt_network_bundle_id": {"$exists": True}},
+                    {"_pt_network_bundle_id_is_custom": True},
                 ]
             },
             widget_options={
@@ -60,18 +60,18 @@ def pt_network_bundle_field(field_order: int) -> Any:
     return Field(
         default=None,
         description=(
-            "Choose a custom Public Transport bundle to use for routing. "
-            "If unset, the default network will be used."
+            "The public transport network used for routing: the default "
+            "network, or a public transport bundle added to this project."
         ),
         json_schema_extra=ui_field(
-            section="configuration",
+            section="pt_network",
             field_order=field_order,
             label_key="pt_network_bundle_id",
             widget="bundle-selector",
             visible_when={
                 "$and": [
                     {"routing_mode": {"$eq": "pt"}},
-                    {"show_advanced": True},
+                    {"_project_has_pt_network_bundle": True},
                 ]
             },
             widget_options={

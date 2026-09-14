@@ -29,7 +29,9 @@ from goatlib.analysis.schemas.travel_cost_matrix import (
     Weekday,
 )
 from goatlib.analysis.schemas.ui import (
+    SECTION_PT_NETWORK,
     SECTION_ROUTING,
+    SECTION_STREET_NETWORK,
     UISection,
     ui_field,
     ui_sections,
@@ -127,6 +129,8 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
         "json_schema_extra": ui_sections(
             SECTION_INPUT,
             SECTION_ROUTING,
+            SECTION_STREET_NETWORK,
+            SECTION_PT_NETWORK,
             SECTION_CONFIGURATION,
             SECTION_RESULT,
         )
@@ -306,7 +310,7 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
             visible_when={
                 "$and": [
                     {"routing_mode": "pt"},
-                    {"pt_network_bundle_id": {"$exists": False}},
+                    {"_pt_network_bundle_id_is_custom": False},
                 ]
             },
         ),
@@ -656,18 +660,18 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
     pt_network_bundle_id: str | None = Field(
         default=None,
         description=(
-            "Choose a custom Public Transport Network bundle to use for routing. "
-            "If unset, the default bundle will be used."
+            "The public transport network used for routing: the default "
+            "network, or a public transport bundle added to this project."
         ),
         json_schema_extra=ui_field(
-            section="configuration",
+            section="pt_network",
             field_order=14,
             label_key="pt_network_bundle_id",
             widget="bundle-selector",
             visible_when={
                 "$and": [
                     {"routing_mode": "pt"},
-                    {"show_advanced": True},
+                    {"_project_has_pt_network_bundle": True},
                 ]
             },
             # The selector lists only public-transport bundles that have a ready
@@ -682,11 +686,11 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
     street_network_bundle_id: str | None = Field(
         default=None,
         description=(
-            "Choose a custom Street Network bundle to use for routing. "
-            "If unset, the default network will be used."
+            "The street network used for routing: the default network, or a "
+            "street network bundle added to this project."
         ),
         json_schema_extra=ui_field(
-            section="configuration",
+            section="street_network",
             field_order=15,
             label_key="street_network_bundle_id",
             widget="bundle-selector",
@@ -699,7 +703,7 @@ class TravelCostMatrixWindmillParams(ToolInputBase):
             visible_when={
                 "$and": [
                     {"routing_mode": {"$in": ["walking", "bicycle", "pedelec", "car"]}},
-                    {"show_advanced": True},
+                    {"_project_has_street_network_bundle": True},
                 ]
             },
             # Only street networks whose routing graph is built and ready.

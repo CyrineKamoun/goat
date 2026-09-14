@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "react-toastify";
 
-
+import { useBundle } from "@/lib/api/bundles";
 import { refreshContentFeed } from "@/lib/api/content";
 import { useDataset } from "@/lib/api/layers";
 import { executeProcessAsync } from "@/lib/api/processes";
@@ -19,6 +19,7 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import ContentDialogWrapper from "@/components/modals/ContentDialogWrapper";
 import FolderModal from "@/components/modals/Folder";
+import MetadataModal from "@/components/modals/Metadata";
 
 interface ContentActionDialogsProps {
   action: ContentActions;
@@ -54,6 +55,10 @@ const ContentActionDialogs = ({ action, item, onClose }: ContentActionDialogsPro
   const needsContent = DIALOG_ACTIONS.has(action);
   const { dataset } = useDataset(item.type === "layer" && needsContent ? item.id : "");
   const { project } = useProject(item.type === "project" && needsContent ? item.id : undefined);
+  // A bundle describes where its data came from, which is edited in the same
+  // dialog. The feed's row carries only a summary, so the bundle itself is
+  // loaded for the provenance the form writes back.
+  const { bundle } = useBundle(item.type === "bundle" && needsContent ? item.id : null);
 
   // Guards the one-shot actions against StrictMode's double effect
   // invocation, which would otherwise duplicate the export job or the copy.
@@ -120,6 +125,12 @@ const ContentActionDialogs = ({ action, item, onClose }: ContentActionDialogsPro
   }
   if (item.type === "project" && project) {
     return <ContentDialogWrapper action={action} type="project" content={project} onClose={handleClose} />;
+  }
+  // Straight to the metadata dialog rather than through the wrapper: a bundle's
+  // other actions (move, share, delete) have dialogs of their own on the
+  // Content page, so this is the only one it ever reaches here.
+  if (item.type === "bundle" && bundle && action === ContentActions.EDIT_METADATA) {
+    return <MetadataModal open type="bundle" content={bundle} onClose={handleClose} />;
   }
 
   return null;

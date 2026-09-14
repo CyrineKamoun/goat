@@ -18,13 +18,24 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
-import type { SelectorItem } from "@/types/map/common";
-import type { ProcessedInput } from "@/types/map/ogc-processes";
-
 import { useBundles } from "@/lib/api/bundles";
 import { useProjectLayerGroups } from "@/lib/api/projects";
 
+import type { SelectorItem } from "@/types/map/common";
+import type { ProcessedInput } from "@/types/map/ogc-processes";
+
 import Selector from "@/components/map/panels/common/Selector";
+
+/**
+ * The selector's value for "no bundle of my own — use the network GOAT ships".
+ *
+ * An option rather than the initial state, exactly as the GTFS upload asks the
+ * same question: the section only appears where the project holds a network, so
+ * which one to route on is a decision worth making rather than inheriting. It is
+ * not a bundle id and is never sent — `GenericTool` drops it from the payload,
+ * and the tool falls back to the default network on its own.
+ */
+export const DEFAULT_NETWORK_BUNDLE = "default";
 
 interface BundleInputProps {
   input: ProcessedInput;
@@ -58,16 +69,27 @@ export default function BundleInput({ input, value, onChange, disabled }: Bundle
   );
 
   const bundleItems: SelectorItem[] = useMemo(
-    () =>
-      (bundles ?? [])
+    () => [
+      // The network GOAT ships leads the list, as the answer most runs want —
+      // but it is not preselected: picking it is still a choice someone makes.
+      {
+        value: DEFAULT_NETWORK_BUNDLE,
+        label: t("default_network"),
+        // The same glyph as the bundles below it: the row stands in the same
+        // list for the same decision.
+        icon: ICON_NAME.CUBE,
+      },
+      ...(bundles ?? [])
         .filter((bundle) => groupNameByBundle.has(bundle.id))
         .map((bundle) => ({
           value: bundle.id,
           // The bundle's own name as a fallback: a group with no name of its
           // own would otherwise render as an unlabelled row.
           label: groupNameByBundle.get(bundle.id) || bundle.name,
+          icon: ICON_NAME.CUBE,
         })),
-    [bundles, groupNameByBundle]
+    ],
+    [bundles, groupNameByBundle, t]
   );
 
   const selectedItem = useMemo(

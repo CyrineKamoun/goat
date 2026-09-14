@@ -74,6 +74,11 @@ export const useContentActions = () => {
       ];
 
       if (item.type === "bundle") {
+        // A bundle states provenance of its own, and it is edited on the same
+        // terms as a layer's: whoever may change the data may describe it.
+        if (role === "owner" || role === "editor") {
+          items.push({ id: ContentActions.EDIT_METADATA, label: t("edit_metadata"), icon: ICON_NAME.EDIT });
+        }
         if (role === "owner") {
           items.push(
             { id: ContentActions.MOVE, label: `${t("move_to")}…`, icon: ICON_NAME.FOLDER },

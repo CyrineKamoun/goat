@@ -34,6 +34,7 @@ import type { IndicatorBaseProps } from "@/types/map/toolbox";
 
 import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 import { useProcessDescription, useProcessExecution } from "@/hooks/map/useOgcProcesses";
+import { useProjectBundleKinds } from "@/hooks/map/useProjectBundleKinds";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import Container from "@/components/map/panels/Container";
@@ -43,6 +44,7 @@ import ToolboxActionButtons from "@/components/map/panels/common/ToolboxActionBu
 import ToolsHeader from "@/components/map/panels/common/ToolsHeader";
 import LearnMore from "@/components/map/panels/toolbox/common/LearnMore";
 import { GenericInput } from "@/components/map/panels/toolbox/generic/inputs";
+import { DEFAULT_NETWORK_BUNDLE } from "@/components/map/panels/toolbox/generic/inputs/BundleInput";
 import OevStationConfigInput from "@/components/map/panels/toolbox/generic/inputs/OevStationConfigInput";
 import { processObjectProperties } from "@/components/map/panels/toolbox/generic/inputs/RepeatableObjectInput";
 
@@ -201,6 +203,41 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
     return sections.flatMap((section) => section.inputs);
   }, [sections]);
 
+  // Which networks this project holds, for the sections that ask which one to
+  // route on. A project fact rather than anything derived from the form, so it
+  // is computed once and merged in beside the geometry flags below.
+  // Each selector answers for itself: its own bundle type and artifact kind
+  // decide whether the project holds something it could offer.
+  const bundleSelectors = useMemo(
+    () =>
+      allInputs
+        .filter((input) => input.uiMeta?.widget === "bundle-selector")
+        .map((input) => ({
+          name: input.name,
+          bundleType: input.uiMeta?.widget_options?.bundle_type as string | undefined,
+          artifactKind: input.uiMeta?.widget_options?.artifact_kind as string | undefined,
+        })),
+    [allInputs]
+  );
+  const projectBundleValues = useProjectBundleKinds(projectId as string, bundleSelectors);
+
+  // Whether each selector names a bundle, as opposed to the default network.
+  // Fields that used to key off the selector being unset cannot ask that any
+  // more: the default is now an answer with a value, so "is there a value" and
+  // "is a bundle chosen" have come apart. A PT date picker belongs to an
+  // uploaded feed's window; the weekday dropdown belongs to the default
+  // network's anchors — this is what still tells them apart.
+  const bundleChoiceValues = useMemo((): Record<string, unknown> => {
+    const merged = { ...defaultValues, ...values };
+    const flags: Record<string, unknown> = {};
+    for (const selector of bundleSelectors) {
+      const chosen = merged[selector.name];
+      flags[`_${selector.name}_is_custom`] =
+        typeof chosen === "string" && chosen !== "" && chosen !== DEFAULT_NETWORK_BUNDLE;
+    }
+    return flags;
+  }, [bundleSelectors, values, defaultValues]);
+
   // Compute layer geometry types for visibility conditions
   // Creates computed values like _target_layer_id_has_geometry, _join_layer_id_has_geometry
   const layerGeometryValues = useMemo(() => {
@@ -316,7 +353,13 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
     if (!process) return false;
 
     // Merge defaults with user values and computed layer geometry for validation checks
-    const effectiveValues = { ...defaultValues, ...values, ...layerGeometryValues };
+    const effectiveValues = {
+      ...defaultValues,
+      ...values,
+      ...layerGeometryValues,
+      ...projectBundleValues,
+      ...bundleChoiceValues,
+    };
 
     // Helper to check if a value is empty
     const isEmpty = (value: unknown): boolean => {
@@ -400,7 +443,16 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
     }
 
     return true;
-  }, [process, sections, values, defaultValues, layerGeometryValues, fieldErrors]);
+  }, [
+    process,
+    sections,
+    values,
+    defaultValues,
+    layerGeometryValues,
+    projectBundleValues,
+    bundleChoiceValues,
+    fieldErrors,
+  ]);
 
   // Execute the process
   const handleRun = async () => {
@@ -410,7 +462,13 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
     }
 
     // Merge defaults with user values and computed layer geometry
-    const effectiveValues = { ...defaultValues, ...values, ...layerGeometryValues };
+    const effectiveValues = {
+      ...defaultValues,
+      ...values,
+      ...layerGeometryValues,
+      ...projectBundleValues,
+      ...bundleChoiceValues,
+    };
 
     // Build filter fields from layer filters
     // Convention: layer field "input_layer_id" -> filter field "input_layer_filter"
@@ -439,6 +497,11 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
     const visibleValues: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(effectiveValues)) {
       if (visibleInputNames.has(key)) {
+        // "Use the network GOAT ships" is an answer to the question, not a
+        // bundle: the field is asked so the choice is made deliberately, and
+        // the backend hears it as the absence of a bundle, which is what it
+        // already treats as the default network.
+        if (value === DEFAULT_NETWORK_BUNDLE) continue;
         visibleValues[key] = value;
       }
     }
@@ -646,7 +709,13 @@ export default function GenericTool({ processId, onBack, onClose }: GenericToolP
           {/* Render sections dynamically */}
           {sections.map((section) => {
             // Merge defaults with user values and computed layer geometry for visibility checks
-            const effectiveValues = { ...defaultValues, ...values, ...layerGeometryValues };
+            const effectiveValues = {
+              ...defaultValues,
+              ...values,
+              ...layerGeometryValues,
+              ...projectBundleValues,
+              ...bundleChoiceValues,
+            };
             let visibleInputs = getVisibleInputs(section.inputs, effectiveValues);
             const sectionEnabled = isSectionEnabled(section, effectiveValues);
 

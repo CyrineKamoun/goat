@@ -6,7 +6,13 @@ import { mutate } from "swr";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
-import { type BundleDatasetMetadata, isBundleTile, updateBundle, useBundle } from "@/lib/api/bundles";
+import {
+  type BundleDatasetMetadata,
+  type BundleRead,
+  isBundleTile,
+  updateBundle,
+  useBundle,
+} from "@/lib/api/bundles";
 import { matchesContentListKey } from "@/lib/api/datasets";
 import { updateDataset } from "@/lib/api/layers";
 import { PROJECTS_API_BASE_URL, updateProject } from "@/lib/api/projects";
@@ -24,7 +30,12 @@ import FormLabelHelper from "@/components/common/FormLabelHelper";
 import Selector from "@/components/map/panels/common/Selector";
 import TextFieldInput from "@/components/map/panels/common/TextFieldInput";
 
-interface MetadataDialogProps extends ContentDialogBaseProps {}
+interface MetadataDialogProps extends Omit<ContentDialogBaseProps, "type" | "content"> {
+  /** A bundle edits its provenance here too — the other content dialogs take
+   * only a layer or a project, so the widening stops at this one. */
+  type: "project" | "layer" | "bundle";
+  content: ContentDialogBaseProps["content"] | BundleRead;
+}
 
 /** A group heading inside the form: the same 12px secondary label as a field,
  * set apart by the space above it. */
@@ -76,7 +87,7 @@ const Metadata: React.FC<MetadataDialogProps> = ({ open, onClose, content, type 
   // A layer, a project and a bundle all edit name and description here; only a
   // bundle also states where its data came from, so the provenance inputs
   // render for bundles alone.
-  const isBundle = isBundleTile(content);
+  const isBundle = type === "bundle" || isBundleTile(content);
   const tile = content as { name: string; description?: string | null; tags?: string[] | null };
 
   const [name, setName] = useState(tile.name);

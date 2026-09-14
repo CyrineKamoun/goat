@@ -46,6 +46,8 @@ from goatlib.tools.catchment_area_v2 import (
     COST_TYPE_LABELS,
     PT_MODE_LABELS,
     SECTION_CONFIGURATION,
+    SECTION_PT_NETWORK,
+    SECTION_STREET_NETWORK,
 )
 from goatlib.tools.heatmap_v2 import (
     HM_ROUTING_MODE_ICONS,
@@ -81,6 +83,8 @@ class HuffModelV2ToolParams(ToolInputBase, HuffmodelV2Params):
     model_config = ConfigDict(
         json_schema_extra=ui_sections(
             SECTION_ROUTING_HM,
+            SECTION_STREET_NETWORK,
+            SECTION_PT_NETWORK,
             SECTION_CONFIGURATION,
             SECTION_DEMAND_HM,
             SECTION_OPPORTUNITIES_HM,
@@ -143,11 +147,11 @@ class HuffModelV2ToolParams(ToolInputBase, HuffmodelV2Params):
     street_network_bundle_id: str | None = Field(
         default=None,
         description=(
-            "Choose a custom Street Network bundle to use for routing. "
-            "If unset, the default network will be used."
+            "The street network used for routing: the default network, or a "
+            "street network bundle added to this project."
         ),
         json_schema_extra=ui_field(
-            section="configuration",
+            section="street_network",
             field_order=20,
             label_key="street_network_bundle_id",
             widget="bundle-selector",
@@ -156,7 +160,7 @@ class HuffModelV2ToolParams(ToolInputBase, HuffmodelV2Params):
             visible_when={
                 "$and": [
                     {"routing_mode": {"$in": ["walking", "bicycle", "pedelec", "car"]}},
-                    {"show_advanced": True},
+                    {"_project_has_street_network_bundle": True},
                 ]
             },
             # Only street networks whose routing graph is built and ready.
@@ -249,7 +253,7 @@ class HuffModelV2ToolParams(ToolInputBase, HuffmodelV2Params):
             visible_when={
                 "$and": [
                     {"routing_mode": "pt"},
-                    {"pt_network_bundle_id": {"$exists": False}},
+                    {"_pt_network_bundle_id_is_custom": False},
                 ]
             },
         ),
