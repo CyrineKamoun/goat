@@ -91,10 +91,6 @@ Datasets are added to a project from inside that project, so the `+ Add layer` d
   <div class="content">Select one or more datasets and click <code>Add to project</code>.</div>
 </div>
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/catalog/catalog_add-layer.gif').default} alt="Adding a catalog dataset to a project" style={{ maxHeight: "700px", maxWidth: "800px"}}/>
-</div>
-
 <p></p>
 
 The first time a catalog dataset is added, GOAT prepares a copy of it for your project. The layer shows `Preparing data …` while that runs and becomes available when it finishes.
