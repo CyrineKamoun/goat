@@ -31,7 +31,10 @@ interface HomeHeroProps {
 }
 
 /**
- * The top of Home: greeting, then — everywhere except New, where there is
+ * The top of Home: greeting ("Welcome to GOAT" until the caller is
+ * Established — a caller leaves New the moment their first project exists,
+ * often in the same sitting, so only Established is "back"), then —
+ * everywhere except New, where there is
  * nothing yet to search for or act on — the search slot and the quick
  * actions (H11), and finally the help strip (H12). All three bands are
  * driven by the same per-caller stage, which is why they live in one
@@ -81,9 +84,9 @@ const HomeHero = ({
               fontWeight: 600,
               letterSpacing: "-0.3px",
             }}>
-            {stage === "new"
-              ? t("welcome_to_goat", { name: firstName })
-              : t("welcome_back", { name: firstName })}
+            {stage === "established"
+              ? t("welcome_back", { name: firstName })
+              : t("welcome_to_goat", { name: firstName })}
           </Typography>
           <Typography
             sx={{ mt: "6px", textAlign: "center", fontSize: 14.5, color: theme.palette.text.secondary }}>
