@@ -16,8 +16,7 @@ Here, you can explore your datasets and projects, create new ones, and manage yo
 The list below explains the navigation toolbar in the Workspace.
 
 - <img src={require('/img/icons/home.png').default} alt="Home" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Home</code>: The landing page when you login
-- <img src={require('/img/icons/projects.png').default} alt="Projects" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Projects</code>: Here, you can manage your projects
-- <img src={require('/img/icons/datasets.png').default} alt="Datasets" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Datasets</code>: Here, you can manage your datasets
+- <img src={require('/img/icons/projects.png').default} alt="Content" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Content</code>: Your projects, datasets and templates, organised into [spaces](../workspace/content)
 - <img src={require('/img/icons/catalog.png').default} alt="Catalog" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Catalog</code>: Here, you can browse all the datasets available within GOAT
 - <img src={require('/img/icons/settings.png').default} alt="Settings" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Settings</code>: The page where you can edit your profile and preferences settings
 
