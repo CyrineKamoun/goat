@@ -53,8 +53,8 @@ import {
 } from "@/lib/templates/thumbnailSnapshot";
 import { homeFolderOf, spaceDisplayName, spaceIconFor } from "@/lib/utils/content";
 import { tagColor } from "@/lib/utils/tagColor";
-import type { Space } from "@/lib/validations/content";
 import { publicOnPublishInputs } from "@/lib/utils/templates";
+import type { Space } from "@/lib/validations/content";
 import type {
   TemplateKind,
   TemplatePreview,
@@ -68,9 +68,9 @@ import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 import FormLabelHelper from "@/components/common/FormLabelHelper";
 import FolderBrowser from "@/components/dashboard/common/FolderBrowser";
 import TextFieldInput from "@/components/map/panels/common/TextFieldInput";
+import TemplateCatalogSwitch from "@/components/templates/TemplateCatalogSwitch";
 import TemplateInputsTable from "@/components/templates/TemplateInputsTable";
 import type { TemplateInputMode } from "@/components/templates/TemplateInputsTable";
-import TemplateCatalogSwitch from "@/components/templates/TemplateCatalogSwitch";
 import TemplatePreviewPanel from "@/components/templates/TemplatePreviewPanel";
 import TemplateSnapshotLine from "@/components/templates/TemplateSnapshotLine";
 import TemplateSourceChoice from "@/components/templates/TemplateSourceChoice";
@@ -292,9 +292,14 @@ const SaveTemplateDialog = ({
   const payload = isLayout ? reportLayout : workflow;
   const payloadLoading = isLayout ? layoutLoading : workflowLoading;
   const payloadError = isLayout ? layoutError : workflowError;
-  const snapshotKey = wantsSnapshot && payload ? `${payload.id}:${payload.updated_at ?? ""}` : "";
+  const descriptor = isLayout ? layoutDescriptor : workflowDescriptor;
+  // The key also carries the drawing itself: a layout read exposes no
+  // updated_at, so a config that changed under the same id must still redraw.
+  const descriptorSignature = useMemo(() => (descriptor ? JSON.stringify(descriptor) : ""), [descriptor]);
+  const snapshotKey =
+    wantsSnapshot && payload ? `${payload.id}:${payload.updated_at ?? ""}:${descriptorSignature}` : "";
   const descriptorRef = useRef<TemplatePreviewDescriptor | null>(null);
-  descriptorRef.current = isLayout ? layoutDescriptor : workflowDescriptor;
+  descriptorRef.current = descriptor;
   // A workflow snapshot writes the titles the canvas writes, which are
   // translated where they are drawn — the descriptor itself stays
   // language-neutral. A layout carries no text at all.
@@ -554,7 +559,9 @@ const SaveTemplateDialog = ({
           name: name.trim(),
           description: description.trim() || null,
           categories,
-          ...(savedThumbnailUrl !== (current.thumbnail_url ?? null) ? { thumbnail_url: savedThumbnailUrl } : {}),
+          ...(savedThumbnailUrl !== (current.thumbnail_url ?? null)
+            ? { thumbnail_url: savedThumbnailUrl }
+            : {}),
         });
         if (isSuperuser) {
           const wasPublished = current.catalog_status === "published";
@@ -697,6 +704,10 @@ const SaveTemplateDialog = ({
       thumbnail_url: thumbnailUrl,
       page_size: layoutPage.page_size,
       page_orientation: layoutPage.page_orientation,
+      // The sheet as the backend will report it once saved, so the draft's
+      // picture carries the same millimetre line as the saved card.
+      page_width_mm: layoutDescriptor?.page.width ?? null,
+      page_height_mm: layoutDescriptor?.page.height ?? null,
       space_id: selectedSpace?.id ?? "",
       folder_id: targetFolderId ?? "",
       created_by: userProfile ? { id: userProfile.id, name: authorName || t("you") } : null,
@@ -717,6 +728,7 @@ const SaveTemplateDialog = ({
       categories,
       thumbnailUrl,
       layoutPage,
+      layoutDescriptor,
       selectedSpace,
       targetFolderId,
       userProfile,
@@ -939,62 +951,66 @@ const SaveTemplateDialog = ({
               while updating: the template stays where it is. */}
             {!updating && !editing && (
               <>
-            <Box>
-              <FormLabelHelper label={t("location")} color={theme.palette.text.secondary} />
-              <Box sx={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {spaces.map((space) => {
-                  const on = space.id === selectedSpace?.id;
-                  return (
-                    <ButtonBase
-                      key={space.id}
-                      onClick={() => {
-                        setSelectedSpace(space);
-                        setBrowsedFolderId(null);
-                      }}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "7px",
-                        padding: "6px 11px",
-                        borderRadius: "999px",
-                        border: `1.5px solid ${on ? theme.palette.primary.main : theme.palette.divider}`,
-                        backgroundColor: on
-                          ? alpha(theme.palette.primary.main, 0.12)
-                          : theme.palette.background.paper,
-                      }}>
-                      <Icon
-                        iconName={spaceIconFor(space)}
-                        style={{
-                          fontSize: 13,
-                          color: on ? theme.palette.primary.main : theme.palette.text.secondary,
-                        }}
-                      />
-                      <Typography
-                        sx={{ fontSize: 12.5, fontWeight: 700, color: on ? "primary.main" : "text.primary" }}>
-                        {space.kind === "personal"
-                          ? t("my_content")
-                          : space.kind === "organization"
-                            ? t("organization")
-                            : space.name}
-                      </Typography>
-                    </ButtonBase>
-                  );
-                })}
-              </Box>
-            </Box>
+                <Box>
+                  <FormLabelHelper label={t("location")} color={theme.palette.text.secondary} />
+                  <Box sx={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    {spaces.map((space) => {
+                      const on = space.id === selectedSpace?.id;
+                      return (
+                        <ButtonBase
+                          key={space.id}
+                          onClick={() => {
+                            setSelectedSpace(space);
+                            setBrowsedFolderId(null);
+                          }}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "7px",
+                            padding: "6px 11px",
+                            borderRadius: "999px",
+                            border: `1.5px solid ${on ? theme.palette.primary.main : theme.palette.divider}`,
+                            backgroundColor: on
+                              ? alpha(theme.palette.primary.main, 0.12)
+                              : theme.palette.background.paper,
+                          }}>
+                          <Icon
+                            iconName={spaceIconFor(space)}
+                            style={{
+                              fontSize: 13,
+                              color: on ? theme.palette.primary.main : theme.palette.text.secondary,
+                            }}
+                          />
+                          <Typography
+                            sx={{
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              color: on ? "primary.main" : "text.primary",
+                            }}>
+                            {space.kind === "personal"
+                              ? t("my_content")
+                              : space.kind === "organization"
+                                ? t("organization")
+                                : space.name}
+                          </Typography>
+                        </ButtonBase>
+                      );
+                    })}
+                  </Box>
+                </Box>
 
-            {selectedSpace && (
-              <FolderBrowser
-                space={selectedSpace}
-                folders={foldersInSpace}
-                homeFolderId={homeFolderId}
-                value={browsedFolderId}
-                onChange={setBrowsedFolderId}
-                label={t("folder")}
-                helperText={t("template_folder_hint")}
-                maxHeight={180}
-              />
-            )}
+                {selectedSpace && (
+                  <FolderBrowser
+                    space={selectedSpace}
+                    folders={foldersInSpace}
+                    homeFolderId={homeFolderId}
+                    value={browsedFolderId}
+                    onChange={setBrowsedFolderId}
+                    label={t("folder")}
+                    helperText={t("template_folder_hint")}
+                    maxHeight={180}
+                  />
+                )}
               </>
             )}
           </Stack>

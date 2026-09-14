@@ -223,7 +223,7 @@ const Selector = (props: SelectorProps) => {
         )}
 
         {displayedItems.map((item) => (
-          <MenuItem sx={{ px: 2, py: 2 }} key={item.value} value={item.value}>
+          <MenuItem sx={{ px: 2, py: 2 }} key={item.value} value={item.value} disabled={item.disabled}>
             {multiple && Array.isArray(selectedValue) && (
               <Checkbox
                 sx={{ mr: 2, p: 0 }}

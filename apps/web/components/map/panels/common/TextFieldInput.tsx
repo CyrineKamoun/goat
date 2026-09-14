@@ -1,5 +1,5 @@
 import ClearIcon from "@mui/icons-material/Clear";
-import { FormControl, IconButton, InputAdornment, OutlinedInput, useTheme } from "@mui/material";
+import { FormControl, IconButton, InputAdornment, OutlinedInput, Typography, useTheme } from "@mui/material";
 import type { InputBaseComponentProps } from "@mui/material";
 import React, { useState } from "react";
 
@@ -14,6 +14,10 @@ type TextFieldInputProps = {
   disabled?: boolean;
   tooltip?: string;
   onFocus?: () => void;
+  /** Runs when the field loses focus, for values committed on leave. */
+  onBlur?: () => void;
+  /** A unit printed after the value ("mm"); replaces the clear button. */
+  unit?: string;
   type?: "text" | "number" | "date";
   clearable?: boolean;
   /** Something other than the user maintains this value. Shows a lock rather
@@ -36,6 +40,8 @@ const TextFieldInput: React.FC<TextFieldInputProps> = ({
   disabled,
   tooltip,
   onFocus,
+  onBlur,
+  unit,
   type,
   placeholder = "",
   locked,
@@ -52,7 +58,13 @@ const TextFieldInput: React.FC<TextFieldInputProps> = ({
       {!!label && (
         <FormLabelHelper
           label={label}
-          color={disabled ? theme.palette.secondary.main : focused ? theme.palette.primary.main : "inherit"}
+          color={
+            disabled
+              ? theme.palette.secondary.main
+              : focused
+                ? theme.palette.primary.main
+                : theme.palette.text.secondary
+          }
           tooltip={tooltip}
         />
       )}
@@ -68,16 +80,33 @@ const TextFieldInput: React.FC<TextFieldInputProps> = ({
         rows={multiline ? rows : undefined}
         autoFocus={autoFocus}
         placeholder={placeholder}
-        onBlur={() => setFocused(false)}
+        onBlur={() => {
+          setFocused(false);
+          if (onBlur) onBlur();
+        }}
         disabled={disabled}
         size="small"
-        sx={{ pr: 0, fontSize: "0.875rem" }}
+        sx={{
+          pr: 0,
+          fontSize: "0.875rem",
+          // A unit field is narrow and shows its unit instead of a spinner,
+          // so the native spin buttons would only steal room from the digits.
+          ...(unit
+            ? {
+                "& input[type=number]": { MozAppearance: "textfield" },
+                "& input::-webkit-outer-spin-button, & input::-webkit-inner-spin-button": {
+                  WebkitAppearance: "none",
+                  margin: 0,
+                },
+              }
+            : {}),
+        }}
         inputProps={{
           type,
           ...inputProps,
           style: {
             width: "100%",
-            padding: multiline ? "8px 15px 8px 12px" : "0px 15px 0px 12px",
+            padding: multiline ? "8px 15px 8px 12px" : unit ? "0px 4px 0px 12px" : "0px 15px 0px 12px",
             // A multiline field is sized by its rows: the autosize shadow
             // textarea shares this style, and any height key here (even an
             // undefined one) replaces the shadow's zero height and inflates
@@ -96,6 +125,12 @@ const TextFieldInput: React.FC<TextFieldInputProps> = ({
                 htmlColor={theme.palette.text.disabled}
                 style={{ fontSize: "14px" }}
               />
+            </InputAdornment>
+          ) : unit ? (
+            <InputAdornment position="end" sx={{ mr: 1.5 }}>
+              <Typography variant="caption" color="text.secondary">
+                {unit}
+              </Typography>
             </InputAdornment>
           ) : (
             !disabled &&

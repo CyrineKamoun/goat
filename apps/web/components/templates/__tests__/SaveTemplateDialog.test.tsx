@@ -1055,6 +1055,61 @@ describe("SaveTemplateDialog — the thumbnail", () => {
     expect(screen.queryByTestId("template-preview-thumbnail-loading")).not.toBeInTheDocument();
   });
 
+  it("redraws the snapshot when the layout's config changes, even though a layout carries no updated_at", async () => {
+    const { updated_at: _ignored, ...layoutWithoutStamp } = layoutWithOneElement;
+    useReportLayoutMock.mockReturnValue({
+      reportLayout: layoutWithoutStamp,
+      isLoading: false,
+      isError: undefined,
+    });
+
+    const view = render(
+      <SaveTemplateDialog source={layoutSource} defaultName="My Layout" onClose={noop} onSaved={noop} />
+    );
+    await waitFor(() => expect(renderLayoutSnapshotMock).toHaveBeenCalledTimes(1));
+
+    // The layout the reader just turned to portrait arrives from the API.
+    useReportLayoutMock.mockReturnValue({
+      reportLayout: {
+        ...layoutWithoutStamp,
+        config: { ...layoutWithoutStamp.config, page: { size: "A4", orientation: "portrait" } },
+      },
+      isLoading: false,
+      isError: undefined,
+    });
+    view.rerender(
+      <SaveTemplateDialog source={layoutSource} defaultName="My Layout" onClose={noop} onSaved={noop} />
+    );
+
+    await waitFor(() => expect(renderLayoutSnapshotMock).toHaveBeenCalledTimes(2));
+    expect(renderLayoutSnapshotMock.mock.calls[1][0]).toEqual(
+      expect.objectContaining({ orientation: "portrait", page: { width: 210, height: 297 } })
+    );
+  });
+
+  it("shows a Custom layout's millimetres under the draft's picture", async () => {
+    useReportLayoutMock.mockReturnValue({
+      reportLayout: {
+        ...layoutWithOneElement,
+        config: {
+          ...layoutWithOneElement.config,
+          page: { size: "Custom", orientation: "portrait", width: 500, height: 300 },
+        },
+      },
+      isLoading: false,
+      isError: undefined,
+    });
+
+    render(
+      <SaveTemplateDialog source={layoutSource} defaultName="My Layout" onClose={noop} onSaved={noop} />
+    );
+    await waitFor(() => expect(previewTemplateMock).toHaveBeenCalled());
+
+    await waitFor(() =>
+      expect(screen.getByTestId("template-preview-page-size").textContent).toMatch(/"width":500,"height":300/)
+    );
+  });
+
   it("holds the layout's thumbnail box with a skeleton while its wireframe is being drawn", async () => {
     let resolveSnapshot: (blob: Blob) => void = () => undefined;
     renderLayoutSnapshotMock.mockReturnValue(
@@ -1506,7 +1561,9 @@ describe("SaveTemplateDialog — templates from the same source", () => {
       ],
       isLoading: false,
     });
-    render(<SaveTemplateDialog source={workflowSource} defaultName="My Workflow" onClose={noop} onSaved={noop} />);
+    render(
+      <SaveTemplateDialog source={workflowSource} defaultName="My Workflow" onClose={noop} onSaved={noop} />
+    );
     await screen.findByRole("radio", { name: /Newest/ });
     await expect(screen.getByRole("radio", { name: /Newest/ })).toBeChecked();
     await waitFor(() => expect(screen.getByLabelText("name")).toHaveValue("Newest"));
@@ -1520,7 +1577,14 @@ describe("SaveTemplateDialog — templates from the same source", () => {
     refreshTemplateMock.mockResolvedValue({ ...newest, updated_at: "2026-09-11T10:00:00Z" });
     updateTemplateMock.mockResolvedValue({ ...newest, name: "Renamed" });
     const onSaved = vi.fn();
-    render(<SaveTemplateDialog source={workflowSource} defaultName="My Workflow" onClose={noop} onSaved={onSaved} />);
+    render(
+      <SaveTemplateDialog
+        source={workflowSource}
+        defaultName="My Workflow"
+        onClose={noop}
+        onSaved={onSaved}
+      />
+    );
     await screen.findByRole("radio", { name: /Newest/ });
     await waitFor(() => expect(screen.getByLabelText("name")).toHaveValue("Newest"));
     fireEvent.change(screen.getByLabelText("name"), { target: { value: "Renamed" } });
@@ -1538,7 +1602,9 @@ describe("SaveTemplateDialog — templates from the same source", () => {
       templates: [existing("00000000-0000-0000-0000-0000000000aa", "Newest", "2026-09-09T10:00:00Z")],
       isLoading: false,
     });
-    render(<SaveTemplateDialog source={workflowSource} defaultName="My Workflow" onClose={noop} onSaved={noop} />);
+    render(
+      <SaveTemplateDialog source={workflowSource} defaultName="My Workflow" onClose={noop} onSaved={noop} />
+    );
     await screen.findByRole("button", { name: "save_as_new" });
     fireEvent.click(screen.getByRole("button", { name: "save_as_new" }));
     await waitFor(() => expect(screen.getByLabelText("name")).toHaveValue("My Workflow"));

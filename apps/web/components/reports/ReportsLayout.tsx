@@ -11,6 +11,7 @@ import { Icon } from "@p4b/ui/components/Icon";
 
 import { useProjectInitialViewState } from "@/lib/api/projects";
 import { updateReportLayout, useReportLayouts } from "@/lib/api/reportLayouts";
+import { snapScalebarWidths } from "@/lib/print/scalebar";
 import type { Project, ProjectLayer } from "@/lib/validations/project";
 import type {
   ReportElement,
@@ -114,7 +115,14 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
   // Handle report selection - deselect element when switching layouts
   const handleSelectReport = useCallback((report: ReportLayout | null) => {
     setSelectedElementId(null);
-    setSelectedReport(report);
+    if (!report) {
+      setSelectedReport(null);
+      return;
+    }
+    // Refit scalebar rectangles saved before the snap existed, or by an older
+    // map view. Shown only; persisted with the next edit.
+    const elements = snapScalebarWidths(report.config.elements ?? []);
+    setSelectedReport(elements === report.config.elements ? report : { ...report, config: { ...report.config, elements } });
   }, []);
 
   // Persist report changes: sync SWR cache and save to API
@@ -249,7 +257,7 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
 
             const updatedConfig: ReportLayoutConfig = {
               ...prev.config,
-              elements: [...(prev.config.elements ?? []), newElement],
+              elements: snapScalebarWidths([...(prev.config.elements ?? []), newElement]),
             };
 
             const updatedReport = {
@@ -288,9 +296,11 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
           el.id === elementId ? { ...el, ...updates } : el
         );
 
+        // A map move or a scalebar setting changes the bar, so refit the
+        // scalebar rectangles in the same update.
         const updatedConfig: ReportLayoutConfig = {
           ...prev.config,
-          elements: updatedElements ?? [],
+          elements: snapScalebarWidths(updatedElements ?? []),
         };
 
         const updatedReport = {

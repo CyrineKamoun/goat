@@ -224,6 +224,10 @@ export const templateReadSchema = z.object({
    * fields existed. */
   page_size: z.string().nullable().optional(),
   page_orientation: z.enum(["portrait", "landscape"]).nullable().optional(),
+  /** The sheet in millimetres, turned the way it prints, read off the frozen
+   * config by the backend — so a Custom page has a size on its card too. */
+  page_width_mm: z.number().nullable().optional(),
+  page_height_mm: z.number().nullable().optional(),
   space_id: z.string().uuid(),
   folder_id: z.string().uuid(),
   created_by: contentCreatorSchema.nullable().optional(),

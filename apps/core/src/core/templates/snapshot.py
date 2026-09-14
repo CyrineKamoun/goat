@@ -300,3 +300,55 @@ def bind_workflow_config(
             replacements.append((old_project_layer_id, project_layer_id))
     _rewrite_tool_configs(nodes, replacements)
     return result, unresolved
+
+
+# The named pages a layout can print on, portrait, in millimetres. Mirrors
+# the web client's page table; an orientation turns the sheet.
+PAGE_SIZES_MM: dict[str, tuple[float, float]] = {
+    "A4": (210.0, 297.0),
+    "A3": (297.0, 420.0),
+    "A2": (420.0, 594.0),
+    "A1": (594.0, 841.0),
+    "Letter": (215.9, 279.4),
+    "Legal": (215.9, 355.6),
+    "Tabloid": (279.4, 431.8),
+}
+
+# One side of a Custom page, in millimetres, as the layout editor bounds it.
+MIN_PAGE_SIDE_MM = 50.0
+MAX_PAGE_SIDE_MM = 1500.0
+
+
+def _page_side(value: Any) -> float | None:
+    """One Custom side as a float within the editor's bounds, else None."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    side = float(value)
+    if not MIN_PAGE_SIDE_MM <= side <= MAX_PAGE_SIDE_MM:
+        return None
+    return side
+
+
+def layout_page_mm(config: dict[str, Any] | None) -> tuple[float, float] | None:
+    """The sheet a frozen layout config prints on, as (width, height) in
+    millimetres and turned the way it prints, for a card that never sees the
+    config itself. A named size is turned by its orientation; a Custom page
+    is its own stored sides; anything else is unknown and gives None."""
+    if not isinstance(config, dict):
+        return None
+    page = config.get("page")
+    if not isinstance(page, dict):
+        return None
+    size = page.get("size")
+    if size == "Custom":
+        width = _page_side(page.get("width"))
+        height = _page_side(page.get("height"))
+        if width is None or height is None:
+            return None
+        return (width, height)
+    if not isinstance(size, str) or size not in PAGE_SIZES_MM:
+        return None
+    short, long_ = PAGE_SIZES_MM[size]
+    if page.get("orientation") == "landscape":
+        return (long_, short)
+    return (short, long_)

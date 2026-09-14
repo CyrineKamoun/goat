@@ -19,16 +19,16 @@ import { Rnd } from "react-rnd";
 import ThemeProvider from "@p4b/ui/theme/ThemeProvider";
 
 import type { AtlasPage } from "@/lib/print/atlas-utils";
-import { PAGE_SIZES, mmToPx, pxToMm } from "@/lib/print/units";
+import { resolveElementFrame } from "@/lib/print/elementFrame";
+import { mmToPx, pxToMm, resolvePageMm } from "@/lib/print/units";
+import { setReportCanvasZoom } from "@/lib/store/map/slice";
 import type { Project, ProjectLayer } from "@/lib/validations/project";
 import type { ReportElement, ReportLayoutConfig } from "@/lib/validations/reportLayout";
 
-import { setReportCanvasZoom } from "@/lib/store/map/slice";
-
-import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import { useBasemap } from "@/hooks/map/MapHooks";
 import { useAtlasFeatures } from "@/hooks/reports/useAtlasFeatures";
 import { usePrintConfig } from "@/hooks/reports/usePrintConfig";
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { FixedRulerWrapper, RULER_SIZE } from "@/components/reports/canvas/Ruler";
 import { ElementContentRenderer } from "@/components/reports/elements/renderers/ElementRenderers";
@@ -611,10 +611,26 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
           width: newWidthMm,
           height: newHeightMm,
         },
+        // A scalebar's rectangle is refit to its bar after the update; the
+        // dragged width is the maximum the bar may grow to.
+        ...(element.type === "scalebar" && {
+          config: { ...element.config, maxWidthMm: newWidthMm },
+        }),
       });
       onInteractionEnd?.();
     },
-    [element.id, element.position, onUpdate, onInteractionEnd, zoom, snapPoints, onSnapGuidesChange, isSnappingEnabled]
+    [
+      element.id,
+      element.type,
+      element.config,
+      element.position,
+      onUpdate,
+      onInteractionEnd,
+      zoom,
+      snapPoints,
+      onSnapGuidesChange,
+      isSnappingEnabled,
+    ]
   );
 
   // Custom resize handle styles
@@ -639,25 +655,7 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
       }
     : undefined;
 
-  // Extract border and background styles from element
-  const elementStyle = (element.style ?? {}) as Record<string, unknown>;
-  const borderStyle = (elementStyle.border ?? {}) as { enabled?: boolean; color?: string; width?: number };
-  const backgroundStyle = (elementStyle.background ?? {}) as {
-    enabled?: boolean;
-    color?: string;
-    opacity?: number;
-  };
-
-  // Calculate element border (convert mm to px)
-  const elementBorderEnabled = borderStyle.enabled ?? false;
-  const elementBorderColor = borderStyle.color ?? "#000000";
-  const elementBorderWidthMm = borderStyle.width ?? 0.5;
-  const elementBorderWidthPx = mmToPx(elementBorderWidthMm, SCREEN_DPI) * zoom;
-
-  // Calculate element background
-  const elementBackgroundEnabled = backgroundStyle.enabled ?? false;
-  const elementBackgroundColor = backgroundStyle.color ?? "#ffffff";
-  const elementBackgroundOpacity = backgroundStyle.opacity ?? 1;
+  const frame = resolveElementFrame(element.style, zoom);
 
   return (
     <Rnd
@@ -683,18 +681,10 @@ const ReportElementRenderer: React.FC<ReportElementRendererProps> = ({
         sx={{
           width: "100%",
           height: "100%",
-          // Apply element background (if enabled)
-          backgroundColor: elementBackgroundEnabled
-            ? `rgba(${parseInt(elementBackgroundColor.slice(1, 3), 16)}, ${parseInt(elementBackgroundColor.slice(3, 5), 16)}, ${parseInt(elementBackgroundColor.slice(5, 7), 16)}, ${elementBackgroundOpacity})`
-            : "transparent",
-          // Apply element border (if enabled)
-          border: elementBorderEnabled
-            ? `${elementBorderWidthPx}px solid ${elementBorderColor}`
-            : "none",
+          backgroundColor: frame.backgroundColor,
+          border: frame.border,
           // Selection indicator uses outline (doesn't affect layout/content position)
-          outline: isSelected
-            ? `2px solid ${theme.palette.primary.main}`
-            : "none",
+          outline: isSelected ? `2px solid ${theme.palette.primary.main}` : "none",
           outlineOffset: 0,
           borderRadius: 0,
           overflow: "hidden",
@@ -885,12 +875,7 @@ const ReportsCanvas: React.FC<ReportsCanvasProps> = ({
 
   // Get paper dimensions in pixels based on size, orientation, and DPI
   const paperDimensions = useMemo(() => {
-    const sizeKey = pageConfig.size === "Custom" ? "A4" : pageConfig.size;
-    const size = PAGE_SIZES[sizeKey] || PAGE_SIZES.A4;
-
-    // Get dimensions in mm based on orientation
-    const widthMm = pageConfig.orientation === "landscape" ? size.height : size.width;
-    const heightMm = pageConfig.orientation === "landscape" ? size.width : size.height;
+    const { width: widthMm, height: heightMm } = resolvePageMm(pageConfig);
 
     // Convert mm to pixels at screen DPI for preview
     const widthPx = mmToPx(widthMm, SCREEN_DPI);
@@ -902,7 +887,7 @@ const ReportsCanvas: React.FC<ReportsCanvasProps> = ({
       widthPx,
       heightPx,
     };
-  }, [pageConfig.size, pageConfig.orientation]);
+  }, [pageConfig]);
 
   // Droppable area for the paper
   const { setNodeRef, isOver } = useDroppable({
@@ -1255,7 +1240,9 @@ const ReportsCanvas: React.FC<ReportsCanvasProps> = ({
                         onSelect={(id) => onElementSelect?.(id)}
                         onDelete={(id) => onElementDelete?.(id)}
                         onUpdate={(id, updates) => onElementUpdate?.(id, updates)}
-                        onInteractionEnd={() => { lastInteractionRef.current = Date.now(); }}
+                        onInteractionEnd={() => {
+                          lastInteractionRef.current = Date.now();
+                        }}
                       />
                     ))}
                   </ThemeProvider>

@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 
-import { getPageDimensions, inchesToMm, mmToInches, mmToPx, pxToMm } from "../units";
+import {
+  CUSTOM_PAGE_MAX_MM,
+  CUSTOM_PAGE_MIN_MM,
+  PAGE_SIZES,
+  clampDpi,
+  getPageDimensions,
+  inchesToMm,
+  isCustomSideValid,
+  isDpiAllowed,
+  mmToInches,
+  mmToPx,
+  outputPixels,
+  pxToMm,
+  resolvePageMm,
+} from "../units";
 
 describe("Print Unit Conversions", () => {
   describe("mmToPx", () => {
@@ -81,5 +95,79 @@ describe("Print Unit Conversions", () => {
         expect(dims.height).toBeGreaterThan(dims.width);
       });
     });
+  });
+});
+
+describe("Page sizes beyond A3", () => {
+  it("knows A2 and A1 in portrait millimetres", () => {
+    expect(PAGE_SIZES.A2).toEqual({ width: 420, height: 594 });
+    expect(PAGE_SIZES.A1).toEqual({ width: 594, height: 841 });
+  });
+});
+
+describe("resolvePageMm", () => {
+  it("turns a named size plus orientation into width and height", () => {
+    expect(resolvePageMm({ size: "A3", orientation: "landscape" })).toEqual({ width: 420, height: 297 });
+    expect(resolvePageMm({ size: "A1", orientation: "portrait" })).toEqual({ width: 594, height: 841 });
+  });
+
+  it("uses the stored width and height for a Custom page, ignoring orientation", () => {
+    expect(resolvePageMm({ size: "Custom", orientation: "portrait", width: 300, height: 200 })).toEqual({
+      width: 300,
+      height: 200,
+    });
+  });
+
+  it("falls back to A4 when a Custom page has no dimensions", () => {
+    expect(resolvePageMm({ size: "Custom", orientation: "landscape" })).toEqual({ width: 297, height: 210 });
+  });
+
+  it("falls back to A4 for an unknown size name", () => {
+    expect(resolvePageMm({ size: "B5" as never, orientation: "portrait" })).toEqual({
+      width: 210,
+      height: 297,
+    });
+  });
+});
+
+describe("resolvePageMm and inherited names", () => {
+  it("falls back to A4 for a size named after an inherited object member", () => {
+    expect(resolvePageMm({ size: "toString" as never, orientation: "portrait" })).toEqual({
+      width: 210,
+      height: 297,
+    });
+  });
+});
+
+describe("custom page bounds", () => {
+  it("accepts sides between 50 and 1500 mm", () => {
+    expect(CUSTOM_PAGE_MIN_MM).toBe(50);
+    expect(CUSTOM_PAGE_MAX_MM).toBe(1500);
+    expect(isCustomSideValid(50)).toBe(true);
+    expect(isCustomSideValid(1500)).toBe(true);
+    expect(isCustomSideValid(49.9)).toBe(false);
+    expect(isCustomSideValid(1500.1)).toBe(false);
+    expect(isCustomSideValid(Number.NaN)).toBe(false);
+  });
+});
+
+describe("render size cap", () => {
+  it("reports the output pixel size of a page at a DPI", () => {
+    expect(outputPixels({ width: 210, height: 297 }, 300)).toEqual({ width: 2480, height: 3508 });
+  });
+
+  it("allows a DPI only while the longest side stays under the render cap", () => {
+    const a1 = { width: 594, height: 841 };
+    expect(isDpiAllowed(a1, 300)).toBe(true);
+    expect(isDpiAllowed(a1, 600)).toBe(false);
+    const a3 = { width: 297, height: 420 };
+    expect(isDpiAllowed(a3, 600)).toBe(true);
+  });
+
+  it("picks the highest allowed DPI at or below the requested one", () => {
+    const a1 = { width: 594, height: 841 };
+    expect(clampDpi(a1, 600)).toBe(300);
+    expect(clampDpi(a1, 300)).toBe(300);
+    expect(clampDpi({ width: 1500, height: 1500 }, 600)).toBe(150);
   });
 });

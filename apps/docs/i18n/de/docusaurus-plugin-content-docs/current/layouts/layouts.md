@@ -27,7 +27,7 @@ Der Einstellungsbereich ermöglicht es Ihnen, ein neues Layout zu erstellen, die
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Konfigurieren Sie die Layout-Einstellungen, indem Sie Ihre bevorzugte <code>Seitengröße</code> (A4, A3, Letter), <code>Ausrichtung</code> (Hochformat oder Querformat), <code>Auflösung</code> und <code>Exportformat</code> (PDF, PNG oder JPEG) auswählen.</div>
+  <div class="content">Konfigurieren Sie die Layout-Einstellungen, indem Sie Ihre bevorzugte <code>Seitengröße</code> (A4, A3, A2, A1, Letter, Legal, Tabloid oder Benutzerdefiniert mit eigener Breite und Höhe von 50 bis 1500 mm). Wenn Sie die Seite eines Layouts ändern, das bereits Elemente enthält, fragt GOAT, ob die Elemente an die neue Seite angepasst werden sollen (<b>Elemente skalieren</b>) oder ihre Größe behalten (<b>Größen behalten</b>), <code>Ausrichtung</code> (Hochformat oder Querformat), <code>Auflösung</code> und <code>Exportformat</code> (PDF, PNG oder JPEG) auswählen.</div>
 </div>
 
 <div class="step">

@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from goatlib.config.settings import settings
 from goatlib.tools.base import SimpleToolRunner
@@ -156,6 +156,44 @@ class PrintReportParams(ToolInputBase):
         description="Refresh token for renewing expired access tokens during long jobs",
         json_schema_extra={"x-ui": {"hidden": True}},
     )
+
+    @model_validator(mode="after")
+    def _page_renders(self: Self) -> Self:
+        """The page must be one the browser can render at the requested DPI."""
+        for name, side in (
+            ("paper_width_mm", self.paper_width_mm),
+            ("paper_height_mm", self.paper_height_mm),
+        ):
+            if not MIN_PAGE_SIDE_MM <= side <= MAX_PAGE_SIDE_MM:
+                raise ValueError(
+                    f"{name} must be between {MIN_PAGE_SIDE_MM:g} and {MAX_PAGE_SIDE_MM:g} mm, got {side:g}"
+                )
+        longest = max(self.paper_width_mm, self.paper_height_mm)
+        longest_px = output_side_px(longest, self.dpi)
+        if longest_px > MAX_RENDER_SIDE_PX:
+            raise ValueError(
+                f"{longest:g} mm at {self.dpi} DPI is {longest_px} px on its longest side; "
+                f"the renderer allows at most {MAX_RENDER_SIDE_PX} px. Lower the DPI."
+            )
+        return self
+
+
+# One side of a page, in millimetres, as the layout editor bounds a custom page.
+MIN_PAGE_SIDE_MM = 50.0
+MAX_PAGE_SIDE_MM = 1500.0
+
+# The longest side an export may have in output pixels. Chromium and WebGL
+# refuse canvases past 16384 px and the map frame is such a canvas; this
+# leaves headroom under that. The web client hides DPI options by the same number.
+MAX_RENDER_SIDE_PX = 14000
+
+_BASE_DPI = 96
+_MM_PER_INCH = 25.4
+
+
+def output_side_px(mm: float, dpi: int) -> int:
+    """The output pixels a side of ``mm`` millimetres comes out at, at ``dpi``."""
+    return int(mm / _MM_PER_INCH * dpi)
 
 
 class PrintReportOutput(BaseModel):

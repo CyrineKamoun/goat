@@ -73,6 +73,7 @@ from core.templates.snapshot import (
     detect_workflow_inputs,
     freeze_workflow_config,
     kinds_for,
+    layout_page_mm,
     strip_layout_bindings,
 )
 
@@ -203,6 +204,7 @@ class CRUDTemplate:
             i.mode == "ship" and (i.from_catalog or i.public_read) for i in inputs
         )
         assert row.id is not None
+        page_mm = layout_page_mm(row.config) if row.payload_kind == "layout" else None
         return TemplateRead(
             id=row.id,
             name=row.name,
@@ -211,6 +213,8 @@ class CRUDTemplate:
             thumbnail_url=row.thumbnail_url,
             page_size=row.page_size,
             page_orientation=row.page_orientation,  # type: ignore[arg-type]
+            page_width_mm=page_mm[0] if page_mm else None,
+            page_height_mm=page_mm[1] if page_mm else None,
             space_id=row.space_id,
             folder_id=row.folder_id,
             created_by=creator,

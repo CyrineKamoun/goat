@@ -25,6 +25,9 @@ interface ToolPillProps {
   /** Drops the visible label, leaving an icon-only pill; the `label` still
    * reaches assistive tech through `aria-label`. */
   iconOnly?: boolean;
+  /** Sits in a row of outlined filter chips rather than a toolbar: no paper
+   * fill, chip height and weight, so it does not read as a raised panel. */
+  flat?: boolean;
   onClick?: () => void;
 }
 
@@ -32,7 +35,7 @@ interface ToolPillProps {
  * button of the Content selection action bar — so both pages' rows read as one
  * set. Ref-forwarding, so a popover or a menu can anchor to it. */
 const ToolPill = forwardRef<HTMLButtonElement, ToolPillProps>(function ToolPill(
-  { icon, label, chevron, active, badge, danger, disabled, iconOnly, onClick },
+  { icon, label, chevron, active, badge, danger, disabled, iconOnly, flat, onClick },
   ref
 ) {
   const theme = useTheme();
@@ -58,18 +61,20 @@ const ToolPill = forwardRef<HTMLButtonElement, ToolPillProps>(function ToolPill(
         alignItems: "center",
         justifyContent: "center",
         gap: "7px",
-        height: 38,
+        height: flat ? 34 : 38,
         px: iconOnly ? 0 : "14px",
-        width: iconOnly ? 38 : "auto",
+        width: iconOnly ? (flat ? 34 : 38) : "auto",
         borderRadius: "999px",
         whiteSpace: "nowrap",
         border: `1px solid ${active ? theme.palette.primary.main : theme.palette.divider}`,
         backgroundColor: active
           ? alpha(theme.palette.primary.main, 0.12)
-          : theme.palette.background.paper,
+          : flat
+            ? "transparent"
+            : theme.palette.background.paper,
         color: accent,
         fontSize: 13,
-        fontWeight: 700,
+        fontWeight: flat ? 600 : 700,
         flexShrink: 0,
         opacity: disabled ? 0.45 : 1,
         transition: theme.transitions.create(["background-color", "border-color"], {

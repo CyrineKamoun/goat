@@ -1,8 +1,10 @@
 import * as z from "zod";
 
+import { CUSTOM_PAGE_MAX_MM, CUSTOM_PAGE_MIN_MM } from "@/lib/print/units";
+
 // Page configuration
 export const pageConfigSchema = z.object({
-  size: z.enum(["A4", "A3", "Letter", "Legal", "Tabloid", "Custom"]).default("A4"),
+  size: z.enum(["A4", "A3", "A2", "A1", "Letter", "Legal", "Tabloid", "Custom"]).default("A4"),
   orientation: z.enum(["portrait", "landscape"]).default("portrait"),
   margins: z
     .object({
@@ -12,8 +14,9 @@ export const pageConfigSchema = z.object({
       left: z.number().default(10),
     })
     .default({ top: 10, right: 10, bottom: 10, left: 10 }),
-  width: z.number().optional(),
-  height: z.number().optional(),
+  // A Custom page's own sides in millimetres; unused for a named size.
+  width: z.number().min(CUSTOM_PAGE_MIN_MM).max(CUSTOM_PAGE_MAX_MM).optional(),
+  height: z.number().min(CUSTOM_PAGE_MIN_MM).max(CUSTOM_PAGE_MAX_MM).optional(),
   snapToGuides: z.boolean().default(false), // Enable/disable snapping to guides
   showRulers: z.boolean().default(false), // Show rulers on canvas
   dpi: z.number().optional(),
