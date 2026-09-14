@@ -27,7 +27,7 @@ import HomeSection from "@/components/dashboard/home/HomeSection";
 import TemplateBrowser from "@/components/templates/TemplateBrowser";
 import TemplateKindFilter from "@/components/templates/TemplateKindFilter";
 import TemplatePreviewDialog from "@/components/templates/TemplatePreviewDialog";
-import TemplateSourceSegments from "@/components/templates/TemplateSourceSegments";
+import TemplateSourceMenu from "@/components/templates/TemplateSourceMenu";
 import UseTemplateFlow from "@/components/templates/UseTemplateFlow";
 
 const GRID_SIZE = 12;
@@ -136,13 +136,13 @@ const TemplateBand = () => {
             <Box
               sx={{
                 display: "flex",
-                flexDirection: mobile ? "column" : "row",
+                flexDirection: "row",
                 justifyContent: "space-between",
-                alignItems: mobile ? "flex-start" : "center",
+                alignItems: "center",
                 gap: "10px",
               }}>
               <TemplateKindFilter kind={kind} onChange={setKind} />
-              <TemplateSourceSegments source={source} onChange={setSource} spaces={spaces} />
+              <TemplateSourceMenu source={source} onChange={setSource} spaces={spaces} compact={mobile} />
             </Box>
           )}
 
