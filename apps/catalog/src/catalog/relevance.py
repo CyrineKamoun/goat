@@ -11,8 +11,4 @@ UNGRADED_RELEVANCE = 1
 
 RELEVANCE_RANK_SQL = f'COALESCE("{TOPIC_SCORE_FIELD}", {UNGRADED_RELEVANCE})'
 
-BBOX_AREA_SQL = (
-    "COALESCE(CASE WHEN"
-    " GREATEST(bbox_xmax - bbox_xmin, bbox_ymax - bbox_ymin) > 100 THEN 0"
-    " ELSE (bbox_xmax - bbox_xmin) * (bbox_ymax - bbox_ymin) END, 0)"
-)
+BBOX_AREA_SQL = "COALESCE((bbox_xmax - bbox_xmin) * (bbox_ymax - bbox_ymin), 0)"
