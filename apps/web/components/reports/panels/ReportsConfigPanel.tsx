@@ -1104,14 +1104,17 @@ const ReportsConfigPanel: React.FC<ReportsConfigPanelProps> = ({
                             }}
                           />
                           <Tooltip title={t("swap_width_height")}>
-                            <IconButton
-                              size="small"
-                              aria-label={t("swap_width_height")}
-                              onClick={swapCustomSides}
-                              disabled={!selectedReport || isSaving}
-                              sx={{ width: 40, height: 40, flexShrink: 0 }}>
-                              <Icon iconName={ICON_NAME.REVERSE} style={{ fontSize: 15 }} />
-                            </IconButton>
+                            {/* A disabled button fires no events, so the tooltip listens on the span */}
+                            <Box component="span" sx={{ display: "inline-flex", flexShrink: 0 }}>
+                              <IconButton
+                                size="small"
+                                aria-label={t("swap_width_height")}
+                                onClick={swapCustomSides}
+                                disabled={!selectedReport || isSaving}
+                                sx={{ width: 40, height: 40 }}>
+                                <Icon iconName={ICON_NAME.REVERSE} style={{ fontSize: 15 }} />
+                              </IconButton>
+                            </Box>
                           </Tooltip>
                         </Stack>
                         <Typography variant="caption" color={customSidesValid ? "text.secondary" : "error"}>
