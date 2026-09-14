@@ -7,3 +7,5 @@
 **/.tmp
 **/.cache
 **/.turbo
+# local data mounts (root-owned database volumes break glob expansion)
+data

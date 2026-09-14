@@ -8,7 +8,7 @@ module.exports = {
   printWidth: 110,
   arrowParens: "always",
   importOrder: ["<THIRD_PARTY_MODULES>", "^@p4b/ui/(.*)$", "@p4b/(.*)$", "^@/i18n/(.*)$", "^@/lib/(.*)$", "^@/types(.*)$", "^@/hooks/(.*)$", "^@/components/(.*)$", "^@/(.*)$", "^[./]"],
-  plugins: ["@trivago/prettier-plugin-sort-imports"],
+  plugins: [require.resolve("@trivago/prettier-plugin-sort-imports")],
   importOrderSeparation: true,
   importOrderSortSpecifiers: true,
 };
