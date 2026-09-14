@@ -79,5 +79,5 @@ Now that you have created your first project in GOAT, it's time to share it with
 
 <div class="step">
   <div class="step-number">11</div>
-  <div class="content">Click <code>Copy URL</code> to share a direct link, or <code>Copy iframe Code</code> to embed the map in a website. For more detail, see <a href="../workspace/projects">Projects</a>.</div>
+  <div class="content">Click <code>Copy URL</code> to share a direct link, or <code>Copy iframe Code</code> to embed the map in a website. For more detail, see <a href="../workspace/content">Content</a>.</div>
 </div>
