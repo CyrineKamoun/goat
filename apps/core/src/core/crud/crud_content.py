@@ -383,6 +383,7 @@ WITH items AS (
            f.user_id AS created_by_id
       FROM {schema}.folder f
      WHERE f.deleted_at IS NULL AND f.space_id IS NOT NULL
+       AND f.parent_id IS NOT NULL
        AND (f.space_id = ANY(:my_space_ids) OR f.id = ANY(:folder_ids))
     UNION ALL
     SELECT 'project', p.id, p.name, p.space_id, p.folder_id, p.updated_at, p.created_at, NULL, NULL, p.thumbnail_url,
