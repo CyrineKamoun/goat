@@ -851,6 +851,30 @@ class ToolDatabaseService:
         )
         logger.info(f"Linked layer {layer_id} to bundle {bundle_id} as role={role}")
 
+    async def _make_room_at_top(
+        self: Self, conn: Any, project_id: uuid_module.UUID, room: int
+    ) -> None:
+        """Push a project's tree down by ``room`` positions.
+
+        Groups and layers share one tree-wide "order" sequence — the layer panel
+        writes it by flattening the whole tree — so both tables have to move, or
+        the new rows land in among the old ones instead of above them.
+
+        Without this a new row is written at 0 while something is already there,
+        and two rows sharing a position are ordered by whatever the query happens
+        to return: a tool's output would appear under a bundle that had been
+        sitting at 0 since it was added.
+        """
+        if room <= 0:
+            return
+        for table in ("layer_project", "layer_project_group"):
+            await conn.execute(
+                f"UPDATE {self.schema}.{table} "
+                f'SET "order" = "order" + $2 WHERE project_id = $1',
+                project_id,
+                room,
+            )
+
     async def add_to_project(
         self: Self,
         layer_id: str,
@@ -894,26 +918,6 @@ class ToolDatabaseService:
         properties_json = json.dumps(properties) if properties else None
         other_props_json = json.dumps(other_properties) if other_properties else None
 
-        # Create the layer_project link ("order" is non-nullable)
-        row = await self.pool.fetchrow(
-            f"""
-            INSERT INTO {self.schema}.layer_project (
-                layer_id, project_id, name, "order", properties, other_properties,
-                layer_project_group_id, created_at, updated_at
-            )
-            VALUES ($1, $2, $3, $7, $4::jsonb, $5::jsonb, $6, NOW(), NOW())
-            RETURNING id
-            """,
-            record.layer_id,
-            record.project_id,
-            record.name,
-            properties_json,
-            other_props_json,
-            group_id,
-            order if order is not None else 0,
-        )
-        layer_project_id = row["id"]
-
         # An explicitly ordered layer belongs at the bottom (it is placing itself
         # below what is already there); otherwise the newest layer goes on top.
         placement = (
@@ -921,16 +925,46 @@ class ToolDatabaseService:
             if order is not None
             else "array_prepend($1, COALESCE(layer_order, ARRAY[]::int[]))"
         )
-        await self.pool.execute(
-            f"""
-            UPDATE {self.schema}.project
-            SET layer_order = {placement},
-                updated_at = NOW()
-            WHERE id = $2
-            """,
-            layer_project_id,
-            uuid_module.UUID(project_id),
-        )
+
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                # Going to the top means making room for itself first, exactly as
+                # a bundle group does. Writing 0 without shifting would leave two
+                # rows at the same position.
+                if order is None:
+                    await self._make_room_at_top(conn, record.project_id, 1)
+
+                # Create the layer_project link ("order" is non-nullable)
+                row = await conn.fetchrow(
+                    f"""
+                    INSERT INTO {self.schema}.layer_project (
+                        layer_id, project_id, name, "order", properties,
+                        other_properties, layer_project_group_id,
+                        created_at, updated_at
+                    )
+                    VALUES ($1, $2, $3, $7, $4::jsonb, $5::jsonb, $6, NOW(), NOW())
+                    RETURNING id
+                    """,
+                    record.layer_id,
+                    record.project_id,
+                    record.name,
+                    properties_json,
+                    other_props_json,
+                    group_id,
+                    order if order is not None else 0,
+                )
+                layer_project_id = row["id"]
+
+                await conn.execute(
+                    f"""
+                    UPDATE {self.schema}.project
+                    SET layer_order = {placement},
+                        updated_at = NOW()
+                    WHERE id = $2
+                    """,
+                    layer_project_id,
+                    record.project_id,
+                )
 
         logger.info(
             f"Added layer {layer_id} to project {project_id} "
@@ -959,13 +993,7 @@ class ToolDatabaseService:
         room = 1 + max(member_count, 0)
         async with self.pool.acquire() as conn:
             async with conn.transaction():
-                for table in ("layer_project", "layer_project_group"):
-                    await conn.execute(
-                        f"UPDATE {self.schema}.{table} "
-                        f'SET "order" = "order" + $2 WHERE project_id = $1',
-                        uuid_module.UUID(project_id),
-                        room,
-                    )
+                await self._make_room_at_top(conn, uuid_module.UUID(project_id), room)
                 row = await conn.fetchrow(
                     f"""
                     INSERT INTO {self.schema}.layer_project_group (
