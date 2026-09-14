@@ -112,12 +112,12 @@ Die Institutionalisierung des Indikators im deutschsprachigen Raum sowie die nac
 
 In der Schweizer Version des Indikators wird die Berechnung der Güteklassen üblicherweise für Abfahrten an Werktagen zwischen 6 Uhr und 20 Uhr durchgeführt. Für die Nutzung in GOAT wurde der **Berechnungszeitraum** flexibler gestaltet, sodass der Indikator **für jeden Wochentag und jede Tageszeit** berechnet werden kann.
 
-Die Berechnungen werden basierend auf **GTFS-Daten** durchgeführt (siehe [Eingebaute Datensätze](../../data/builtin_datasets)):
+Die Berechnungen werden basierend auf **GTFS-Daten** durchgeführt (siehe [Netz-Datensätze](../../data/builtin_datasets)):
 Zunächst wird die Anzahl der Abfahrten pro öffentlichem Verkehrsmittel (Zug, U-Bahn, Straßenbahn und Bus) für jede Station dynamisch berechnet. Die Summe der Abfahrten wird durch zwei geteilt, um die Frequenz zu berechnen und die Hin- und Rückrichtungen zu eliminieren. Im nächsten Schritt wird die **durchschnittliche Frequenz** für das ausgewählte Zeitintervall berechnet. Das höherwertige Verkehrsmittel wird als **Stationstyp** ausgewählt, falls mehrere Verkehrsmittel die Station bedienen. Zum Beispiel ist bei Bus und Zug der Zug das höherwertige Verkehrsmittel. Mit Hilfe der unten stehenden Tabelle sowie dem Stationstyp und der Frequenz kann nun die Stationskategorie bestimmt werden.
 
 ### Berechnungsschritte
 
-1. **Abfahrten pro Station**: Berechnung der Anzahl der Abfahrten pro Verkehrsmittel (Zug, U-Bahn, Straßenbahn, Bus) für jede Station mit **GTFS-Daten** (siehe [Eingebaute Datensätze](../../data/builtin_datasets)).
+1. **Abfahrten pro Station**: Berechnung der Anzahl der Abfahrten pro Verkehrsmittel (Zug, U-Bahn, Straßenbahn, Bus) für jede Station mit **GTFS-Daten** (siehe [Netz-Datensätze](../../data/builtin_datasets)).
 2. **Frequenz**: Die Summe der Abfahrten wird durch zwei geteilt, um die Hin- und Rückrichtungen zu eliminieren.
 3. **Stationstyp**: Für jede Station wird das höchstrangige Verkehrsmittel bestimmt (z.B. wenn sowohl Bus als auch Zug verfügbar sind, wird die Station als Bahnstation klassifiziert).
 4. **Kategorienzuweisung**: Verwendung des Stationstyps und der Frequenz zur Bestimmung der Kategorie (siehe Tabelle unten).

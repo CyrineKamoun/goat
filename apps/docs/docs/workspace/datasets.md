@@ -22,7 +22,7 @@ You can add datasets to GOAT by:
 
 ### Upload data
 
-GOAT supports multiple file formats for upload: **GeoPackage**, **GeoJSON**, **Shapefile**, **KML**, **CSV**, **XLSX**, **ZIP**, **Parquet**, and **COG** files.
+GOAT supports multiple file formats for upload: **GeoPackage**, **GeoJSON**, **Shapefile**, **KML**, **CSV**, **XLSX**, **ZIP**, **Parquet**, and **COG** files, as well as **GTFS** (`gtfs.zip`) archives for [Public Transport Networks](../data/dataset_types.md#public-transport-networks) and **Overture** (`overture.zip`) archives for [Street Networks](../data/dataset_types.md#street-networks).
 
 <div class="step">
   <div class="step-number">1</div>
@@ -123,6 +123,7 @@ Easily filter your datasets by [dataset type](../data/dataset_types "What are th
 - **Tables** - Non-spatial tabular data
 - **External Imagery** - Raster data from external sources  
 - **External Vector Tiles** - Vector tiles from external services
+- **Bundles** - Datasets made of several layers, such as [Street Networks and Public Transport Networks](../data/dataset_types.md#datasets-made-of-several-layers)
 
 Click the filter icon <img src={require('/img/icons/filter.png').default} alt="Filter Icon" style={{ maxHeight: "20px", maxWidth: "20px"}}/> to select your desired dataset type.
 

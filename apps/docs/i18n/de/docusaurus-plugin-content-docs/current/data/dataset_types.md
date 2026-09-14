@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Datensatz-Typen
 
-Auf GOAT können Sie mit Datensätzen aus Plan4Betters Katalog arbeiten oder Ihre eigenen von Ihrem Computer hochladen. Es akzeptiert verschiedene Formate für sowohl **Feature-Datensätze** als auch **Raster-Datensätze**. Hier erklären wir die verschiedenen Typen von Datensätzen, die Sie in GOAT verwenden können.
+Auf GOAT können Sie mit Datensätzen aus Plan4Betters Katalog arbeiten, Ihre eigenen hochladen oder einen externen Dienst per URL einbinden (**WFS**, **WMS**, **WMTS**, **XYZ-Kacheln** oder **COG**). Es akzeptiert verschiedene Formate für sowohl **Feature-Datensätze** als auch **Raster-Datensätze** sowie [**Straßennetze**](#straßennetze) und [**ÖPNV-Netze**](#öpnv-netze). Hier erklären wir die verschiedenen Typen von Datensätzen, die Sie in GOAT verwenden können.
 
 ## Feature-Datensätze
 
@@ -21,7 +21,7 @@ Feature-Datensätze speichern **räumliche Features wie Punkte, Linien oder Poly
 
 GOAT erkennt zwei Typen von Feature-Datensätzen basierend auf ihrer Quelle:
 
-- **Feature-Datensatz Standard**: Dies sind die Datensätze, die Sie selbst hochladen (wie GeoJSON, GeoPackage, KML und ZIP-Dateien). Betrachten Sie diese als Ihre "Rohmaterialien" – die ursprünglichen Daten, die Sie in GOAT einbringen, um damit zu arbeiten.
+- **Feature-Datensatz Standard**: Dies sind die Datensätze, die Sie selbst hochladen (wie GeoJSON, GeoPackage, KML und ZIP-Dateien), einschließlich der Layer, die mit einem [Straßennetz](#straßennetze) oder einem [ÖPNV-Netz](#öpnv-netze) importiert werden. Betrachten Sie diese als Ihre "Rohmaterialien" – die ursprünglichen Daten, die Sie in GOAT einbringen, um damit zu arbeiten.
 
 - **Feature-Datensatz Werkzeug**: Dies sind Datensätze, die von GOATs Analyse-Werkzeugen erstellt werden. Wenn Sie eine Analyse durchführen (wie die Erstellung von Einzugsgebieten oder Heatmaps), werden die Ergebnisse zu diesem Typ von Datensatz.
 
@@ -33,6 +33,39 @@ GOAT erkennt zwei Typen von Feature-Datensätzen basierend auf ihrer Quelle:
   <img src={require('/img/data/table.png').default} alt="Nicht-räumliche Datensätze in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
   <p style={{ textAlign: 'center', fontStyle: 'italic', marginTop: '8px', color: '#666' }}> Beispiel einer in GOAT angezeigten Tabelle</p>
 </div>
+
+## Straßennetze
+
+Ein **Straßennetz** ist eine routingfähige Abbildung von Straßen, Wegen und Radwegen. GOAT stellt ein integriertes Netz bereit, und Sie können Ihr eigenes importieren, wenn das Routing auf Daten laufen soll, die Sie selbst verwalten — ein Netz, das Sie selbst pflegen, oder ein geplantes Netz, das Sie testen möchten, bevor es gebaut wird.
+
+Ihre Daten müssen dem **Overture**-Format entsprechen — Segments und Connectors als Parquet-Dateien — verpackt in einer `.zip`-Datei, deren Name `overture` enthält, zum Beispiel `overture.zip` oder `berlin_overture.zip`. Andere Straßendaten, einschließlich OpenStreetMap, werden derzeit nicht unterstützt.
+
+Ein Straßennetz besteht aus zwei Layern, die GOAT zusammenhält:
+
+- **Edges** — die routingfähigen Segmente. Dies ist der Layer, den Sie bearbeiten, wenn Sie das Netz ändern.
+- **Nodes** — die Punkte, an denen Edges zusammentreffen. GOAT pflegt sie für Sie, sobald Sie eine Edge speichern, damit das Netz routingfähig bleibt.
+
+Straßennetze sind die Grundlage für das Routing zu [Fuß](../routing/walking), mit dem [Fahrrad](../routing/bicycle), dem [E-Bike](../routing/bicycle) und dem [Auto](../routing/car) in GOAT. Zum Importieren siehe [Datensätze hinzufügen](../workspace/datasets.md#datensätze-hinzufügen); was das integrierte Netz von GOAT enthält und wie Sie eigene importieren, finden Sie unter [Netz-Datensätze](./builtin_datasets.md#eigene-netze-importieren).
+
+## ÖPNV-Netze
+
+Ein **ÖPNV-Netz** beschreibt die Haltestellen, Linien und Fahrpläne eines Verkehrssystems. GOAT stellt ein integriertes Netz bereit, und Sie können Ihr eigenes importieren, wenn Sie ein Angebot analysieren möchten, das Sie selbst verwalten — Ihren eigenen Feed oder einen Fahrplan, den Sie planen.
+
+Ihre Daten müssen dem **GTFS**-Format entsprechen, verpackt in einer `.zip`-Datei, deren Name `gtfs` enthält, zum Beispiel `gtfs.zip` oder `vbb_gtfs.zip`.
+
+Die enthaltenen Layer entsprechen dem GTFS-Feed selbst: **Stops**, **Routes**, **Trips** und **Stop times** sind immer vorhanden, **Agency**, **Calendar** und **Shapes** kommen hinzu, sofern der Feed sie bereitstellt.
+
+:::info Ein ÖPNV-Netz benötigt ein Straßennetz
+GOAT verbindet Haltestellen mit Straßen, um den Weg zur und von der Haltestelle routen zu können. Deshalb wählen Sie beim Hochladen der GTFS-Datei ein Straßennetz aus — entweder eines Ihrer eigenen oder das integrierte Netz `Standard (Europa)`. Das Straßennetz muss also bereits vorhanden sein.
+:::
+
+ÖPNV-Netze sind die Grundlage für das [ÖPNV](../routing/public_transport)-Routing in GOAT. Zum Importieren siehe [Datensätze hinzufügen](../workspace/datasets.md#datensätze-hinzufügen); was das integrierte Netz von GOAT enthält und wie Sie eigene importieren, finden Sie unter [Netz-Datensätze](./builtin_datasets.md#eigene-netze-importieren).
+
+## Datensätze aus mehreren Layern
+
+Straßennetze und ÖPNV-Netze bestehen beide aus **mehreren Layern, die nur gemeinsam sinnvoll sind**. GOAT nennt einen solchen Datensatz **Datenpaket** und verwaltet ihn als Einheit: Seine Layer werden gemeinsam geteilt, sie erscheinen gemeinsam in einem Projekt, und beim Löschen des Datensatzes werden alle entfernt.
+
+Der Begriff begegnet Ihnen bei der Arbeit: Der Upload-Dialog bestätigt, dass eine erkannte Datei *als Datenpaket importiert* wird, der [Katalog](../workspace/catalog.md) kennzeichnet einen Eintrag mit mehreren Layern als `Datenpaket`, und Teilen oder Löschen betrifft immer den gesamten Satz.
 
 ## Raster-Datensätze
 

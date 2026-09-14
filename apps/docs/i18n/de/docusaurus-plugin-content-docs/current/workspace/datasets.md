@@ -20,7 +20,7 @@ Sie können Datensätze auf zwei Arten zu GOAT hinzufügen: durch Hochladen von 
 
 ### Daten hochladen
 
-GOAT unterstützt mehrere Dateiformate zum Hochladen: **GeoPackage**, **GeoJSON**, **Shapefile**, **KML**, **CSV**, **XLSX**, **ZIP**, **Parquet** und **COG**-Dateien.
+GOAT unterstützt mehrere Dateiformate zum Hochladen: **GeoPackage**, **GeoJSON**, **Shapefile**, **KML**, **CSV**, **XLSX**, **ZIP**, **Parquet** und **COG**-Dateien sowie **GTFS**-Archive (`gtfs.zip`) für [ÖPNV-Netze](../data/dataset_types.md#öpnv-netze) und **Overture**-Archive (`overture.zip`) für [Straßennetze](../data/dataset_types.md#straßennetze).
 
 <div class="step">
   <div class="step-number">1</div>
@@ -121,6 +121,7 @@ Filtern Sie Ihre Datensätze einfach nach [Datensatz-Typ](../data/dataset_types 
 - **Tabellen** - Nicht-räumliche tabellarische Daten
 - **Externe Bilder** - Rasterdaten aus externen Quellen
 - **Externe Vektor-Kacheln** - Vektor-Kacheln aus externen Diensten
+- **Datenpakete** - Datensätze aus mehreren Layern, etwa [Straßennetze und ÖPNV-Netze](../data/dataset_types.md#datensätze-aus-mehreren-layern)
 
 Klicken Sie auf das Filter-Symbol <img src={require('/img/icons/filter.png').default} alt="Filter-Symbol" style={{ maxHeight: "20px", maxWidth: "20px"}}/>, um Ihren gewünschten Datensatz-Typ auszuwählen.
 

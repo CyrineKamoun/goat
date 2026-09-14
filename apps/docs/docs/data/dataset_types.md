@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Dataset Types
 
-On GOAT, you can work with datasets from Plan4Better’s catalog or upload your own from your computer. It accepts various formats for both **Feature Datasets** and **Raster Datasets**. Here we explain the different types of datasets you can use in GOAT.
+On GOAT, you can work with datasets from Plan4Better’s catalog, upload your own, or connect to an external service by URL (**WFS**, **WMS**, **WMTS**, **XYZ Tiles** or **COG**). It accepts various formats for both **Feature Datasets** and **Raster Datasets**, as well as [**Street Networks**](#street-networks) and [**Public Transport Networks**](#public-transport-networks). Here we explain the different types of datasets you can use in GOAT.
 
 ## Feature Datasets
 
@@ -21,7 +21,7 @@ Feature datasets store **spatial features like points, lines, or polygons**. On 
 
 GOAT recognizes two types of feature datasets based on their source:
 
-- **Feature Dataset Standard**: These are the datasets you upload yourself (like GeoJSON, GPKG, KML, and ZIP files). Think of these as your "raw materials" - the original data you bring into GOAT to work with.
+- **Feature Dataset Standard**: These are the datasets you upload yourself (like GeoJSON, GPKG, KML, and ZIP files), including the layers that arrive with a [Street Network](#street-networks) or a [Public Transport Network](#public-transport-networks). Think of these as your "raw materials" - the original data you bring into GOAT to work with.
 
 - **Feature Dataset Tool**: These are datasets created by GOAT's analysis tools. When you run an analysis (like creating catchment areas or heatmaps), the results become this type of dataset.
 
@@ -33,6 +33,39 @@ GOAT recognizes two types of feature datasets based on their source:
   <img src={require('/img/data/table.png').default} alt="Non-spatial datasets in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
   <p style={{ textAlign: 'center', fontStyle: 'italic', marginTop: '8px', color: '#666' }}> Example of a table displayed in GOAT</p>
 </div>
+
+## Street Networks
+
+A **Street Network** is a routable representation of roads, paths and cycleways. GOAT provides a built-in network, and you can import your own whenever you want routing to run on data you control — a network you maintain yourself, or a planned one you want to test before it is built.
+
+Your data must follow the **Overture** format — segments and connectors as Parquet files — packed into a `.zip` whose name contains `overture`, for example `overture.zip` or `berlin_overture.zip`. Other street data, including OpenStreetMap, is not supported at the moment.
+
+A street network is made up of two layers that GOAT keeps together:
+
+- **Edges** — the routable segments. This is the layer you edit when you change the network.
+- **Nodes** — the points where edges meet. GOAT maintains these for you whenever you save an edge, so the network stays routable.
+
+Street networks power GOAT's [Walking](../routing/walking), [Cycling](../routing/bicycle), [E-bike](../routing/bicycle), and [Car](../routing/car) routing. To import one, see [Adding datasets](../workspace/datasets.md#adding-datasets); for what GOAT's built-in network contains and how to bring your own, see [Network Datasets](./builtin_datasets.md#bringing-your-own-networks).
+
+## Public Transport Networks
+
+A **Public Transport Network** describes the stops, lines and timetables of a transit system. GOAT provides a built-in network, and you can import your own whenever you want to analyse a service you control — your own feed, or a timetable you are planning.
+
+Your data must follow the **GTFS** format, packed into a `.zip` whose name contains `gtfs`, for example `gtfs.zip` or `vbb_gtfs.zip`.
+
+The member layers follow the GTFS feed itself: **Stops**, **Routes**, **Trips** and **Stop times** are always present, and **Agency**, **Calendar** and **Shapes** are added when the feed provides them.
+
+:::info A Public Transport Network needs a Street Network
+GOAT connects stops to streets so that it can route the walk to and from a stop. You therefore choose a Street Network while uploading the GTFS file — either one of your own or GOAT's built-in `Default (Europe)` network — which means the street network has to exist first.
+:::
+
+Public transport networks power GOAT's [Public Transport](../routing/public_transport) routing. To import one, see [Adding datasets](../workspace/datasets.md#adding-datasets); for what GOAT's built-in network contains and how to bring your own, see [Network Datasets](./builtin_datasets.md#bringing-your-own-networks).
+
+## Datasets made of several layers
+
+Street Networks and Public Transport Networks are both made up of **several layers that only make sense together**. GOAT calls such a dataset a **bundle** and manages it as a unit: its layers are shared together, they appear together in a project, and deleting the dataset removes all of them.
+
+You will meet the term while working: the upload dialog confirms that a recognized file *will be imported as a bundle*, the [Catalog](../workspace/catalog.md) labels an entry holding several layers `Bundle`, and sharing or deleting one always applies to the whole set.
 
 ## Rasters Datasets
 
