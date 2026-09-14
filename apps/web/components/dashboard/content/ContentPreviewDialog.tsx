@@ -19,6 +19,9 @@ import { useDataset } from "@/lib/api/layers";
 import DatasetDetail from "@/components/dashboard/dataset/DatasetDetail";
 import { contentDialogPaperSx } from "@/components/modals/content/ContentDialogChrome";
 
+/** The template browser's height, so the two browsing dialogs match. */
+const DIALOG_HEIGHT = 800;
+
 interface ContentPreviewDialogProps {
   layerId: string;
   onClose: () => void;
@@ -49,19 +52,24 @@ const ContentPreviewDialog = ({ layerId, onClose, onShare, onMove }: ContentPrev
       fullScreen={fullScreen}
       // On the paper, which carries `role="dialog"`; the modal root would take
       // the label otherwise and leave the dialog itself unnamed.
-      PaperProps={{ "aria-label": dataset?.name, sx: contentDialogPaperSx(1200, fullScreen) }}>
+      // A fixed height: the Summary and Data tabs measure differently, and the
+      // Data tab's rows arrive after it opens, so a paper sized to its content
+      // would shrink and grow with every switch.
+      PaperProps={{
+        "aria-label": dataset?.name,
+        sx: contentDialogPaperSx(1200, fullScreen, { height: DIALOG_HEIGHT }),
+      }}>
       {isLoading && (
-        <DialogContent sx={{ p: { xs: 4, md: 6 } }}>
-          <>
-            {/* The header carries the close control once the dataset is there;
-             * until then this is the only one. */}
-            <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
-              <IconButton size="small" onClick={onClose} aria-label={t("close")}>
-                <Icon iconName={ICON_NAME.CLOSE} fontSize="small" />
-              </IconButton>
-            </Stack>
-            <Skeleton variant="rectangular" width="100%" height={400} />
-          </>
+        <DialogContent sx={{ p: { xs: 4, md: 6 }, display: "flex", flexDirection: "column" }}>
+          {/* The header carries the close control once the dataset is there;
+           * until then this is the only one. */}
+          <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
+            <IconButton size="small" onClick={onClose} aria-label={t("close")}>
+              <Icon iconName={ICON_NAME.CLOSE} fontSize="small" />
+            </IconButton>
+          </Stack>
+          {/* Fills the body, so the paper does not resize once the dataset is in. */}
+          <Skeleton variant="rectangular" width="100%" sx={{ flex: "1 1 auto", height: "auto" }} />
         </DialogContent>
       )}
       {!isLoading && dataset && (
