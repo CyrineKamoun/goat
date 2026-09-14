@@ -9,7 +9,7 @@ a ``bundle_type`` reference table, and it drifted the moment a spec changed.
 
 import logging
 from enum import Enum
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from pydantic import BaseModel, model_validator
 
@@ -199,6 +199,11 @@ class RoleSpec(BaseModel):
     geometry: Optional[GeometryKind] = None
     # Columns the member layer must expose for downstream tools (native names).
     required_columns: Tuple[str, ...] = ()
+    # "Conditionally required": roles sharing a group must supply at least one
+    # between them. GTFS states service days in `calendar`, in `calendar_dates`,
+    # or in both — each is optional alone, but a feed with neither declares no
+    # service at all.
+    required_group: Optional[str] = None
     # Whether a user may edit this member layer's features. False until someone
     # has decided what saving it means for the bundle's derived artifacts.
     editable: bool = False
@@ -360,6 +365,14 @@ class BundleTypeSpec(BaseModel):
     def required_role_keys(self) -> Tuple[str, ...]:
         return tuple(r.key for r in self.roles if r.required)
 
+    def required_role_groups(self) -> Dict[str, Tuple[str, ...]]:
+        """Groups of roles of which at least one must be present, by group name."""
+        groups: Dict[str, List[str]] = {}
+        for role in self.roles:
+            if role.required_group:
+                groups.setdefault(role.required_group, []).append(role.key)
+        return {name: tuple(keys) for name, keys in groups.items()}
+
     def dependency(self, kind: str) -> Optional[DependencySpec]:
         return next((d for d in self.dependencies if d.kind == kind), None)
 
@@ -440,16 +453,70 @@ SPECS: Dict[BundleTypeName, BundleTypeSpec] = {
             "A public-transport network imported from a GTFS feed. Member layers "
             "correspond to the GTFS files."
         ),
+        # The published GTFS file set, at the requirement level the specification
+        # states. A feed brings what it brings: everything optional here is
+        # imported when present and skipped when not, so a tool that wants
+        # frequencies or fares finds them for the feeds that declare them.
         roles=(
-            RoleSpec(key="agency", label="Agency", geometry="none"),
+            # Required
+            RoleSpec(key="agency", label="Agency", required=True, geometry="none"),
             RoleSpec(key="stops", label="Stops", required=True, geometry="point"),
             RoleSpec(key="routes", label="Routes", required=True, geometry="none"),
             RoleSpec(key="trips", label="Trips", required=True, geometry="none"),
             RoleSpec(
                 key="stop_times", label="Stop times", required=True, geometry="none"
             ),
-            RoleSpec(key="calendar", label="Calendar", geometry="none"),
+            # Conditionally required: service days are stated in one, the other,
+            # or both — but a feed must state them somewhere.
+            RoleSpec(
+                key="calendar",
+                label="Calendar",
+                geometry="none",
+                required_group="service",
+            ),
+            RoleSpec(
+                key="calendar_dates",
+                label="Calendar dates",
+                geometry="none",
+                required_group="service",
+            ),
+            # Optional
             RoleSpec(key="shapes", label="Shapes", geometry="line"),
+            RoleSpec(key="frequencies", label="Frequencies", geometry="none"),
+            RoleSpec(key="transfers", label="Transfers", geometry="none"),
+            RoleSpec(key="pathways", label="Pathways", geometry="none"),
+            RoleSpec(key="levels", label="Levels", geometry="none"),
+            RoleSpec(key="feed_info", label="Feed info", geometry="none"),
+            RoleSpec(key="attributions", label="Attributions", geometry="none"),
+            RoleSpec(key="translations", label="Translations", geometry="none"),
+            RoleSpec(key="areas", label="Areas", geometry="none"),
+            RoleSpec(key="stop_areas", label="Stop areas", geometry="none"),
+            RoleSpec(key="networks", label="Networks", geometry="none"),
+            RoleSpec(key="route_networks", label="Route networks", geometry="none"),
+            RoleSpec(key="timeframes", label="Timeframes", geometry="none"),
+            RoleSpec(key="fare_attributes", label="Fare attributes", geometry="none"),
+            RoleSpec(key="fare_rules", label="Fare rules", geometry="none"),
+            RoleSpec(key="fare_media", label="Fare media", geometry="none"),
+            RoleSpec(key="fare_products", label="Fare products", geometry="none"),
+            RoleSpec(key="fare_leg_rules", label="Fare leg rules", geometry="none"),
+            RoleSpec(
+                key="fare_leg_join_rules",
+                label="Fare leg join rules",
+                geometry="none",
+            ),
+            RoleSpec(
+                key="fare_transfer_rules",
+                label="Fare transfer rules",
+                geometry="none",
+            ),
+            RoleSpec(key="rider_categories", label="Rider categories", geometry="none"),
+            RoleSpec(key="booking_rules", label="Booking rules", geometry="none"),
+            RoleSpec(key="location_groups", label="Location groups", geometry="none"),
+            RoleSpec(
+                key="location_group_stops",
+                label="Location group stops",
+                geometry="none",
+            ),
         ),
         # Stops, not shapes: a feed's stops show where it serves at a glance,
         # while its shapes render as a tangle at thumbnail size.

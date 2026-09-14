@@ -49,7 +49,7 @@ from goatlib.bundles.artifacts.street_network import (
 )
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.catchment_area import CatchmentAreaToolRunner
-from goatlib.tools.pt_network import pt_date_field
+from goatlib.tools.pt_network import ensure_pt_date, pt_date_field
 from goatlib.tools.schemas import ToolInputBase, get_default_layer_name
 
 logger = logging.getLogger(__name__)
@@ -1036,6 +1036,7 @@ class CatchmentAreaV2ToolRunner(CatchmentAreaToolRunner):
             params.routing_mode == CatchmentAreaRoutingMode.pt
             and params.pt_network_bundle_id
         ):
+            ensure_pt_date(params.pt_network_bundle_id, params.pt_date)
             analysis_params.timetable_path = fetch_pt_timetable(
                 self, params.pt_network_bundle_id
             )

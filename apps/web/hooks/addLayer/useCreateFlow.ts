@@ -120,7 +120,16 @@ export const useCreateFlow = ({
           // against a caller seeding something computed.
           fields: data.fields
             .filter((field) => isCreatableKind(field.kind))
-            .map((field) => ({ name: field.name, kind: field.kind as "string" | "number" | "datetime" | "boolean" })),
+            .map((field) => ({
+              name: field.name,
+              kind: field.kind as "string" | "number" | "datetime" | "boolean",
+              // The vocabulary travels with the field: it is the one part of a
+              // column the create dialog can ask for that storage type does not
+              // carry, so dropping it here loses it silently.
+              ...(field.allowed_values?.length
+                ? { allowed_values: field.allowed_values, allow_other: !!field.allow_other }
+                : {}),
+            })),
         },
         projectId
       );

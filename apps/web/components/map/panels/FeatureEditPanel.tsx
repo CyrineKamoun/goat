@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import TemporalPicker from "@p4b/ui/components/TemporalPicker";
 
+import { useDayjsLocale } from "@/i18n/utils";
+
 import { useDraw } from "@/lib/providers/DrawProvider";
 import {
   commitFeature,
@@ -29,6 +31,7 @@ import SelectorFreeSolo from "@/components/map/panels/common/SelectorFreeSolo";
 import TextFieldInput from "@/components/map/panels/common/TextFieldInput";
 
 const FeatureEditPanel: React.FC = () => {
+  const dayjsLocale = useDayjsLocale();
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const { drawControl } = useDraw();
@@ -234,6 +237,7 @@ const FeatureEditPanel: React.FC = () => {
             if (!isReadOnly && field.type === "date") {
               return (
                 <TemporalPicker
+                  locale={dayjsLocale}
                   key={field.name}
                   kind="datetime"
                   label={field.name}

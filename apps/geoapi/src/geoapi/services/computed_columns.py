@@ -116,28 +116,6 @@ def allowed_value_columns(
     return constrained
 
 
-def coerce_allowed_values(kind: str | None, values: list[Any]) -> list[Any]:
-    """The vocabulary as the column's own type, or a ValueError naming the culprit.
-
-    A number column holding the string "30" would never match the 30 a write
-    sends, so the dropdown would offer a value that then fails validation. The
-    list is coerced once, here, rather than compared loosely everywhere.
-    """
-    if kind not in ("number", "integer"):
-        return [str(v) for v in values]
-    coerced: list[Any] = []
-    for value in values:
-        try:
-            number = float(value)
-        except (TypeError, ValueError):
-            raise ValueError(
-                f"'{value}' is not a number, so it cannot be an allowed value "
-                "for a number column."
-            ) from None
-        coerced.append(int(number) if number.is_integer() else number)
-    return coerced
-
-
 def column_defaults(field_config: dict[str, Any] | None) -> dict[str, Any]:
     """Columns that supply a value when a new feature leaves them blank."""
     return {

@@ -72,12 +72,34 @@ class OevGueteklasseTool(PTToolBase):
         )
         ref_geom = ref_meta.geometry_column
 
-        # Step 2: Import GTFS data
-        logger.info("Importing GTFS stops...")
-        self._import_gtfs_stops(str(params.stops_path))
+        # Step 2: Import GTFS data. A bundle brings the feed as published, so
+        # its tables are joined for the chosen date; the shipped feed arrives
+        # pre-digested and is read as it is.
+        if params.bundle_stops_path and params.service_date:
+            logger.info("Importing GTFS stops from bundle...")
+            self._import_bundle_gtfs_stops(str(params.bundle_stops_path))
 
-        logger.info("Importing GTFS stop_times...")
-        self._import_gtfs_stop_times(str(params.stop_times_path))
+            logger.info(
+                "Importing GTFS stop_times from bundle for %s...", params.service_date
+            )
+            self._import_bundle_gtfs_stop_times(
+                str(params.bundle_stop_times_path),
+                str(params.bundle_trips_path),
+                str(params.bundle_routes_path),
+                params.service_date,
+                str(params.bundle_calendar_path)
+                if params.bundle_calendar_path
+                else None,
+                str(params.bundle_calendar_dates_path)
+                if params.bundle_calendar_dates_path
+                else None,
+            )
+        else:
+            logger.info("Importing GTFS stops...")
+            self._import_gtfs_stops(str(params.stops_path))
+
+            logger.info("Importing GTFS stop_times...")
+            self._import_gtfs_stop_times(str(params.stop_times_path))
 
         # Step 3: Get stations within reference area
         logger.info("Finding stations within reference area...")

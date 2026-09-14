@@ -47,7 +47,9 @@ def _year(date: Optional[str]) -> Optional[int]:
     return None
 
 
-# role -> GTFS file
+# role -> GTFS file. Every role is `<key>.txt`, which is the specification's own
+# naming; spelled out rather than derived so a role whose file is named
+# differently has somewhere to say so.
 _GTFS_FILE: Dict[str, str] = {
     "agency": "agency.txt",
     "stops": "stops.txt",
@@ -55,18 +57,92 @@ _GTFS_FILE: Dict[str, str] = {
     "trips": "trips.txt",
     "stop_times": "stop_times.txt",
     "calendar": "calendar.txt",
+    "calendar_dates": "calendar_dates.txt",
     "shapes": "shapes.txt",
+    "frequencies": "frequencies.txt",
+    "transfers": "transfers.txt",
+    "pathways": "pathways.txt",
+    "levels": "levels.txt",
+    "feed_info": "feed_info.txt",
+    "attributions": "attributions.txt",
+    "translations": "translations.txt",
+    "areas": "areas.txt",
+    "stop_areas": "stop_areas.txt",
+    "networks": "networks.txt",
+    "route_networks": "route_networks.txt",
+    "timeframes": "timeframes.txt",
+    "fare_attributes": "fare_attributes.txt",
+    "fare_rules": "fare_rules.txt",
+    "fare_media": "fare_media.txt",
+    "fare_products": "fare_products.txt",
+    "fare_leg_rules": "fare_leg_rules.txt",
+    "fare_leg_join_rules": "fare_leg_join_rules.txt",
+    "fare_transfer_rules": "fare_transfer_rules.txt",
+    "rider_categories": "rider_categories.txt",
+    "booking_rules": "booking_rules.txt",
+    "location_groups": "location_groups.txt",
+    "location_group_stops": "location_group_stops.txt",
 }
 
-# columns each role's file must expose (GTFS spec essentials)
+# Columns each role's file must expose: the specification's required fields for
+# that file, and only those — an optional field a feed omits is not an error.
+# Checked for every file present, so a malformed optional table is caught at
+# upload rather than by whatever reads it later.
 _REQUIRED_COLUMNS: Dict[str, Set[str]] = {
-    "agency": {"agency_name"},
-    "stops": {"stop_id", "stop_lat", "stop_lon"},
-    "routes": {"route_id"},
-    "trips": {"route_id", "trip_id"},
+    "agency": {"agency_name", "agency_url", "agency_timezone"},
+    "stops": {"stop_id"},
+    "routes": {"route_id", "route_type"},
+    "trips": {"route_id", "service_id", "trip_id"},
     "stop_times": {"trip_id", "stop_id", "stop_sequence"},
-    "calendar": {"service_id"},
+    "calendar": {
+        "service_id",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+        "start_date",
+        "end_date",
+    },
+    "calendar_dates": {"service_id", "date", "exception_type"},
     "shapes": {"shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"},
+    "frequencies": {"trip_id", "start_time", "end_time", "headway_secs"},
+    "transfers": {"transfer_type"},
+    "pathways": {
+        "pathway_id",
+        "from_stop_id",
+        "to_stop_id",
+        "pathway_mode",
+        "is_bidirectional",
+    },
+    "levels": {"level_id", "level_index"},
+    "feed_info": {"feed_publisher_name", "feed_publisher_url", "feed_lang"},
+    "attributions": {"organization_name"},
+    "translations": {"table_name", "field_name", "language", "translation"},
+    "areas": {"area_id"},
+    "stop_areas": {"area_id", "stop_id"},
+    "networks": {"network_id"},
+    "route_networks": {"network_id", "route_id"},
+    "timeframes": {"timeframe_group_id"},
+    "fare_attributes": {
+        "fare_id",
+        "price",
+        "currency_type",
+        "payment_method",
+        "transfers",
+    },
+    "fare_rules": {"fare_id"},
+    "fare_media": {"fare_media_id", "fare_media_type"},
+    "fare_products": {"fare_product_id", "amount", "currency"},
+    "fare_leg_rules": {"fare_product_id"},
+    "fare_leg_join_rules": {"from_network_id", "to_network_id"},
+    "fare_transfer_rules": {"fare_transfer_type"},
+    "rider_categories": {"rider_category_id", "rider_category_name"},
+    "booking_rules": {"booking_rule_id", "booking_type"},
+    "location_groups": {"location_group_id"},
+    "location_group_stops": {"location_group_id", "stop_id"},
 }
 
 
@@ -109,6 +185,19 @@ class GtfsImporter(BundleImporter):
 
         for role in missing:
             errors.append(f"Required GTFS file '{_GTFS_FILE[role]}' is missing")
+
+        # Conditionally required: a feed states its service days in calendar.txt,
+        # in calendar_dates.txt, or in both. Either alone is valid; neither is a
+        # feed that runs no service.
+        for keys in self.spec.required_role_groups().values():
+            if any(_GTFS_FILE[key] in names for key in keys):
+                continue
+            missing.extend(keys)
+            errors.append(
+                "One of "
+                + " or ".join(f"'{_GTFS_FILE[key]}'" for key in keys)
+                + " is required"
+            )
 
         return ValidationResult(
             valid=not missing and not errors,

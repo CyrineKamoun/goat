@@ -51,7 +51,7 @@ def pt_anchor_unix_minutes(
 
     ``weekday`` takes the enum member or its value; the callers hold both.
     """
-    day = _as_date(on_date) or DEFAULT_NETWORK_ANCHORS.get(
+    day = parse_pt_date(on_date) or DEFAULT_NETWORK_ANCHORS.get(
         str(getattr(weekday, "value", weekday)), DEFAULT_NETWORK_ANCHORS["weekday"]
     )
     moment = datetime.combine(day, time.min, tzinfo=timezone.utc) + timedelta(
@@ -60,7 +60,7 @@ def pt_anchor_unix_minutes(
     return int(moment.timestamp() // 60)
 
 
-def _as_date(value: Any) -> "date_type | None":
+def parse_pt_date(value: Any) -> "date_type | None":
     """A `date` from what a request carried, or None if it carried nothing
     usable — the field is a free-text date in transit."""
     if isinstance(value, date_type) and not isinstance(value, datetime):

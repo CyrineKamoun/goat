@@ -60,6 +60,7 @@ from goatlib.tools.heatmap_v2 import (
 )
 from goatlib.tools.pt_network import (
     apply_pt_bundle_override,
+    ensure_pt_date,
     pt_date_field,
     pt_network_bundle_field,
 )
@@ -726,6 +727,7 @@ class HuffModelV2ToolRunner(BaseToolRunner[HuffModelV2ToolParams]):
         # An uploaded PT bundle replaces the global network: its timetable and
         # its stop-to-street linkage, in the analysis layer's mode spelling.
         if params.routing_mode == HeatmapRoutingMode.pt and params.pt_network_bundle_id:
+            ensure_pt_date(params.pt_network_bundle_id, params.pt_date)
             apply_pt_bundle_override(
                 self,
                 analysis_params,

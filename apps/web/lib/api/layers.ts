@@ -236,10 +236,18 @@ export type CreateEmptyLayerPayload = {
   /**
    * Sent as `kind`, the same vocabulary `addColumn` uses on an existing layer, so
    * a datetime is stored as a timestamp rather than as text. Computed kinds are
-   * absent by construction: their values come from `field_config`, which is only
-   * written once the layer exists.
+   * absent by construction: they need the compute SQL that geoapi's add-column
+   * path builds, which creation does not run.
    */
-  fields: Array<{ name: string; kind: CreatableFieldKind }>;
+  fields: Array<{
+    name: string;
+    kind: CreatableFieldKind;
+    /** The column's vocabulary, carried through to the layer's `field_config`
+     * so a constraint declared at creation means what the same constraint
+     * means when a column is added to a layer that already exists. */
+    allowed_values?: (string | number)[];
+    allow_other?: boolean;
+  }>;
 };
 
 export const createEmptyLayer = async (payload: CreateEmptyLayerPayload, projectId: string): Promise<Job> => {

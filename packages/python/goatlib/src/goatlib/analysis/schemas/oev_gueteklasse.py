@@ -342,6 +342,17 @@ class OevGueteklasseParams(BaseModel):
         ...,
         description="Path to GTFS stop_times parquet file.",
     )
+    # -- GTFS from an uploaded bundle -------------------------------------
+    # Set together or not at all; see the trip-count schema for why.
+    bundle_stops_path: str | Path | None = None
+    bundle_stop_times_path: str | Path | None = None
+    bundle_trips_path: str | Path | None = None
+    bundle_routes_path: str | Path | None = None
+    bundle_calendar_path: str | Path | None = None
+    bundle_calendar_dates_path: str | Path | None = None
+    #: ``YYYY-MM-DD``. Required with the bundle paths above.
+    service_date: str | None = None
+
     time_window: PTTimeWindow = Field(
         ...,
         description="Time window for the analysis.",

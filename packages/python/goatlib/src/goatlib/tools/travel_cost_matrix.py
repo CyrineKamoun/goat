@@ -67,7 +67,7 @@ from goatlib.tools.catchment_area_v2 import (
 from goatlib.tools.catchment_area_v2 import (
     ROUTING_MODE_LABELS as _CATCHMENT_ROUTING_MODE_LABELS,
 )
-from goatlib.tools.pt_network import pt_date_field
+from goatlib.tools.pt_network import ensure_pt_date, pt_date_field
 from goatlib.tools.schemas import ToolInputBase, ToolOutputBase, get_default_layer_name
 
 logger = logging.getLogger(__name__)
@@ -1063,6 +1063,7 @@ class TravelCostMatrixToolRunner(BaseToolRunner[TravelCostMatrixWindmillParams])
 
             # A selected PT bundle's timetable replaces the global network.
             if params.routing_mode == RoutingMode.pt and params.pt_network_bundle_id:
+                ensure_pt_date(params.pt_network_bundle_id, params.pt_date)
                 analysis_params.timetable_path = fetch_pt_timetable(
                     self, params.pt_network_bundle_id
                 )

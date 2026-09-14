@@ -16,6 +16,8 @@ import { useEffect, useMemo } from "react";
 
 import TemporalPicker from "@p4b/ui/components/TemporalPicker";
 
+import { useDayjsLocale } from "@/i18n/utils";
+
 import { useBundle } from "@/lib/api/bundles";
 
 import type { ProcessedInput } from "@/types/map/ogc-processes";
@@ -43,6 +45,7 @@ const isoToday = (): string => {
 };
 
 export default function DateInput({ input, value, onChange, disabled, formValues }: DateInputProps) {
+  const dayjsLocale = useDayjsLocale();
   const options = input.uiMeta?.widget_options ?? {};
   const boundsFrom = options.bounds_from as string | undefined;
   const boundsArtifact = options.bounds_artifact as string | undefined;
@@ -101,6 +104,7 @@ export default function DateInput({ input, value, onChange, disabled, formValues
     <Stack>
       <FormLabelHelper label={input.title} tooltip={input.description} color="inherit" />
       <TemporalPicker
+        locale={dayjsLocale}
         kind="date"
         bold
         value={value ?? (input.defaultValue as string) ?? ""}

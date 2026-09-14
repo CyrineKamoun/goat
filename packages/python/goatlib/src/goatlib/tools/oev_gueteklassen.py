@@ -26,6 +26,7 @@ from goatlib.analysis.schemas.ui import (
 )
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
+from goatlib.tools.pt_network import ensure_pt_date, fetch_gtfs_tables
 from goatlib.tools.schemas import (
     ToolInputBase,
     get_default_layer_name,
@@ -42,6 +43,7 @@ GTFS_DATA_PATH = os.environ.get("GTFS_DATA_PATH", "/app/data/gtfs")
 
 # Section definitions for this tool
 # Order: calculation_time (1), configuration (2), result (7)
+SECTION_PT_NETWORK = UISection(id="pt_network", order=0, icon="route")
 SECTION_CALCULATION_TIME = UISection(id="calculation_time", order=1, icon="clock")
 SECTION_OEV_CONFIGURATION = UISection(id="configuration", order=2, icon="settings")
 SECTION_RESULT_OEV = UISection(
@@ -69,11 +71,30 @@ class OevGueteklassenToolParams(ToolInputBase):
 
     model_config = {
         "json_schema_extra": ui_sections(
+            SECTION_PT_NETWORK,
             SECTION_CALCULATION_TIME,
             SECTION_OEV_CONFIGURATION,
             SECTION_RESULT_OEV,
         )
     }
+
+    pt_network_bundle_id: str | None = Field(
+        default=None,
+        description=(
+            "The public transport network classified: the default network, or a "
+            "public transport bundle added to this project."
+        ),
+        json_schema_extra=ui_field(
+            section="pt_network",
+            field_order=1,
+            label_key="pt_network_bundle_id",
+            widget="bundle-selector",
+            # No artifact: the classes are computed from the feed's own tables,
+            # so a bundle is usable the moment it has been imported.
+            widget_options={"bundle_type": "pt_network_gtfs"},
+            visible_when={"_project_has_pt_network_bundle": True},
+        ),
+    )
 
     # Time window section
     weekday: Weekday = Field(
@@ -84,6 +105,27 @@ class OevGueteklassenToolParams(ToolInputBase):
             field_order=1,
             label_key="weekday",
             enum_labels=WEEKDAY_LABELS,
+            # The default network's schedule is an average of three kinds of
+            # day; a bundle is classified on a real date instead.
+            visible_when={"_pt_network_bundle_id_is_custom": False},
+        ),
+    )
+    pt_date: str | None = Field(
+        default=None,
+        description=(
+            "Date to classify on (YYYY-MM-DD). A feed states its service per "
+            "date, so a holiday timetable is counted as the feed declares it."
+        ),
+        json_schema_extra=ui_field(
+            section="calculation_time",
+            field_order=1,
+            label_key="pt_date",
+            widget="date-picker",
+            visible_when={"_pt_network_bundle_id_is_custom": True},
+            widget_options={
+                "bounds_from": "pt_network_bundle_id",
+                "bounds_artifact": "pt_network_graph",
+            },
         ),
     )
     from_time: int = Field(
@@ -260,6 +302,14 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
             params.stop_times_path or f"{GTFS_DATA_PATH}/stop_times_optimized.parquet"
         )
 
+        # An uploaded bundle is classified from its own tables, on the date chosen.
+        bundle_tables: dict[str, str] = {}
+        if params.pt_network_bundle_id:
+            ensure_pt_date(params.pt_network_bundle_id, params.pt_date)
+            bundle_tables = fetch_gtfs_tables(
+                self, params.pt_network_bundle_id, params.user_id
+            )
+
         # Build time window (weekday is StrEnum, use .value)
         time_window = PTTimeWindow(
             weekday=params.weekday.value
@@ -276,6 +326,13 @@ class OevGueteklassenToolRunner(BaseToolRunner[OevGueteklassenToolParams]):
             stop_times_path=stop_times_path,
             time_window=time_window,
             output_path=str(output_path),
+            bundle_stops_path=bundle_tables.get("stops"),
+            bundle_stop_times_path=bundle_tables.get("stop_times"),
+            bundle_trips_path=bundle_tables.get("trips"),
+            bundle_routes_path=bundle_tables.get("routes"),
+            bundle_calendar_path=bundle_tables.get("calendar"),
+            bundle_calendar_dates_path=bundle_tables.get("calendar_dates"),
+            service_date=params.pt_date if bundle_tables else None,
             station_config=params.station_config or STATION_CONFIG_DEFAULT,
             stations_output_path=str(stations_output_path),
         )

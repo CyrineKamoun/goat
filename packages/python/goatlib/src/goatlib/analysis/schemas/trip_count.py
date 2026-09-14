@@ -42,6 +42,20 @@ class TripCountStationParams(BaseModel):
         ...,
         description="Path to GTFS stop_times parquet file.",
     )
+    # -- GTFS from an uploaded bundle -------------------------------------
+    # Set together or not at all. With them, the feed's own tables are read for
+    # `service_date` rather than the shipped `stop_times_optimized`, whose
+    # weekday/Saturday/Sunday columns are averages and cannot express a holiday
+    # timetable.
+    bundle_stops_path: str | Path | None = None
+    bundle_stop_times_path: str | Path | None = None
+    bundle_trips_path: str | Path | None = None
+    bundle_routes_path: str | Path | None = None
+    bundle_calendar_path: str | Path | None = None
+    bundle_calendar_dates_path: str | Path | None = None
+    #: ``YYYY-MM-DD``. Required with the bundle paths above.
+    service_date: str | None = None
+
     time_window: PTTimeWindow = Field(
         ...,
         description="Time window for the analysis.",

@@ -10,6 +10,8 @@ import { useMap } from "react-map-gl/maplibre";
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import TemporalPicker from "@p4b/ui/components/TemporalPicker";
 
+import { useDayjsLocale } from "@/i18n/utils";
+
 import {
   type Expression as ExpressionType,
   FilterType,
@@ -42,6 +44,7 @@ type ExpressionProps = {
 };
 
 const Expression: React.FC<ExpressionProps> = (props) => {
+  const dayjsLocale = useDayjsLocale();
   const theme = useTheme();
   const { map } = useMap();
 
@@ -333,6 +336,7 @@ const Expression: React.FC<ExpressionProps> = (props) => {
                       selectedExpressionOperation.value as string
                     ) && (
                       <TemporalPicker
+                        locale={dayjsLocale}
                         kind="datetime"
                         label={t("select_date")}
                         value={expression.value as string}
@@ -350,6 +354,7 @@ const Expression: React.FC<ExpressionProps> = (props) => {
                       <Stack direction="column" spacing={2}>
                         {[0, 1].map((index) => (
                           <TemporalPicker
+                            locale={dayjsLocale}
                             key={index}
                             kind="datetime"
                             label={index === 0 ? t("from") : t("to")}

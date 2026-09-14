@@ -1100,6 +1100,20 @@ class BaseToolRunner(SimpleToolRunner, ABC, Generic[TParams]):
             self.db_service.get_bundle_dependency(bundle_id, kind)
         )
 
+    def resolve_bundle_layers(self: Self, bundle_id: str) -> "dict[str, str]":
+        """The bundle's member layers, by spec role.
+
+        For a tool that reads the data a bundle holds rather than something
+        derived from it: a GTFS feed's own tables are what a departure count is
+        counted from, and no artifact stands between them.
+        """
+        if self.db_service is None:
+            return {}
+        rows = _get_or_create_event_loop().run_until_complete(
+            self.db_service.list_bundle_layers(bundle_id)
+        )
+        return {row["role"]: str(row["layer_id"]) for row in rows if row.get("role")}
+
     def resolve_bundle_artifact(
         self: Self, bundle_id: str, kind: str
     ) -> "tuple[str | None, BundleArtifactState | None]":
