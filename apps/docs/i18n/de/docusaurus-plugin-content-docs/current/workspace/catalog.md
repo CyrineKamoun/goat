@@ -7,90 +7,126 @@ sidebar_position: 5
 Der **Daten-Katalog** ist Ihr Zugang zur Erkundung von Plan4Betters umfassender Sammlung hochwertiger [Geodaten](../further_reading/glossary#geospatial-data). **Diese kuratierte Bibliothek bietet zuverlässige, sofort einsatzfähige Daten von offiziellen Open-Data-Anbietern und anderen vertrauenswürdigen Quellen**, die es Ihnen ermöglichen, sofort mit der Analyse und Visualisierung in Ihren GOAT-**Projekten** zu beginnen. Aus dem **Katalog** können Sie:
 
 - **Unsere Datensatz-Sammlung erkunden**, die mehrere thematische Bereiche und geografische Regionen umfasst
-- **Durchsuchen und filtern** nach Schlüsselwort, räumlicher Ausdehnung und **Datensatz**-Attributen
+- **Durchsuchen und filtern** nach Stichwort, Ort, Kategorie, Anbieter, Lizenz und mehr
+- **Häufig genutzte Datensätze speichern** und direkt zu einem Projekt hinzufügen
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/workspace/catalog/catalog_general_de.webp').default} alt="Daten-Katalog" style={{ maxHeight: "auto", maxWidth: "100%"}}/>
 </div>
 
-## Den Katalog erkunden
+## Einen Datensatz finden
 
-Greifen Sie auf den Daten-**Katalog** vom [Workspace](../category/workspace) oder direkt über die <code>+ Layer hinzufügen</code>-Schaltfläche in Ihren GOAT-**Projekten** zu. Der **Katalog** bietet leistungsstarke Entdeckungs-**Werkzeuge**, einschließlich:
+Öffnen Sie den **Katalog** über die Seitenleiste oder aus einem Projekt heraus über `+ Layer hinzufügen`. Die Seite listet alle Datensätze des Katalogs auf. Suche, Filter und Sortierung schränken diese Liste ein, und wenn Sie den Link der Seite kopieren, teilen Sie das Ergebnis — wer ihn öffnet, sieht dieselben Datensätze wie Sie.
 
-- **Schlüsselwort-Suche** zum Finden spezifischer **Datensätze** oder Themen
-- **Filter** zum Durchsuchen von **Datensätzen** nach Typ, [Datenkategorie](#datenkategorie), Region, Sprache, Anbieter-Name und Lizenz
-- **Interaktive Vorschau** zur Bewertung der Datenqualität und des Inhalts vor der Verwendung
+### Suche
 
-### Datensatz-Kategorie {#datenkategorie}
+Tippen Sie in das Suchfeld, um Titel, Beschreibung und Schlagwörter eines Datensatzes zu durchsuchen.
 
-Eine Möglichkeit, den **Katalog** zu filtern, ist über **Datenkategorie**, die **Datensätze** in klare thematische Kategorien für einfache Navigation organisiert:
+Gesucht wird nach ganzen oder Teilwörtern, Groß- und Kleinschreibung spielt keine Rolle: `grünfläche` findet *Grünflächen*. Umgekehrt gilt das nicht — ein längeres Wort als das in den Daten findet nichts. Wählen Sie daher den kürzeren Wortstamm, wenn eine Suche leer bleibt.
 
-- **Grenzen** - Administrative, politische und geografische Grenzen einschließlich Grenzen und Bezirke
-- **Landnutzung** - Klassifizierungen von Landgebieten nach Nutzungstyp (Wohn-, Gewerbe-, Industrie- usw.)
-- **Menschen** - Demografische **Daten** einschließlich Bevölkerungsdichte, Altersgruppen und sozioökonomische Eigenschaften
-- **Orte** - Points of Interest wie Schulen, Krankenhäuser, Touristenattraktionen und Dienstleistungen
-- **Verkehr** - Straßennetze, Eisenbahnen, Flughäfen, Häfen und öffentliche Verkehrsinfrastruktur
+### Filter
 
-### Datensatz-Metadaten
+Die Seitenleiste schränkt die Liste ein nach:
 
-Jeder **Datensatz** enthält umfassende Metadaten, die durch Klicken auf den **Datensatz**-Namen zugänglich sind. Die Metadaten-Ansicht bietet:
+- **Datenart** — Feature, Tabelle, Raster oder Datenpaket
+- **Geometrie** — Punkt, Linie oder Polygon
+- **Kategorie** — das Thema des Datensatzes: Environment, Landuse, Places, Transportation, People, Boundary, Basemap oder Sonstige
+- **Anbieter** — wer den Datensatz bereitstellt
+- **Lizenz** — zu welchen Bedingungen er veröffentlicht ist
+- **Sprache** — die Sprache der Metadaten
+- **Zeitraum** — ein `Von`- und `Bis`-Datum, um Daten zu einem bestimmten Zeitraum zu finden
 
-- **Detaillierte Beschreibungen**, die Inhalt und Umfang des **Datensatzes** erklären
-- **Datensatz**-Typ-Klassifizierung und technische Spezifikationen
-- **Geografische Abdeckung** mit **ISO 3166-1 alpha-2** Ländercodes
-- **Quellinformationen** einschließlich Anbieter-Name und Kontaktdaten
-- **Lizenz-Details**, die Nutzungsrechte und Beschränkungen spezifizieren
-- **Interaktive Karten-Vorschau** für visuelle Datenerkundung
-- **Attribut-Informationen**, die verfügbare Datenfelder und Eigenschaften zeigen
+Jede Option zeigt, wie viele Datensätze sie führen, und die Zahlen passen sich an, während Sie einschränken. Gesetzte Filter erscheinen als Chips über den Ergebnissen, sodass Sie einzelne entfernen können, ohne die Seitenleiste zu öffnen. `Zurücksetzen` entfernt alle.
 
-### Verfügbare Datensatz-Typen
+### Nach Ort filtern {#raeumlicher-filter}
 
-Der **Katalog** umfasst vielfältige **Datensätze**, die als Feature-Layer verwaltet werden, die räumliche Features (Punkte, Linien, Polygone) oder nicht-räumliche tabellarische **Daten** enthalten. Diese **Datensätze** können direkt zu Ihren **Projekten** für Analyse und Visualisierung hinzugefügt werden.
+`Räumlichen Filter setzen` schränkt den Katalog auf Datensätze ein, die ein bestimmtes Gebiet abdecken. Dafür gibt es drei Wege:
 
-#### Points of Interest (POIs)
-Strategische Standorte von Annehmlichkeiten, Einrichtungen und Attraktionen, die für Erreichbarkeitsplanung und Stadtanalyse wesentlich sind, wie öffentliche Verkehrshaltestellen und -stationen, Einkaufszentren und Einzelhandelsstandorte, Tourismus- und Freizeiteinrichtungen, Lebensmittel- und Getränkebetriebe, Gesundheitseinrichtungen und Krankenhäuser, Bildungseinrichtungen und Schulen.
+- **Region** — nach Land, Bundesland oder Bezirk suchen
+- **Punkt + Umkreis** — auf die Karte klicken, um einen Punkt zu setzen, dann einen Radius festlegen
+- **Polygon** — auf die Karte klicken, um die Eckpunkte eines Gebiets zu zeichnen
 
-*Datenquellen:* [Overture Maps Foundation](https://overturemaps.org/), [OpenStreetMap (OSM)](https://wiki.openstreetmap.org/), Regierungsabteilungen, Krankenversicherungsanbieter und Einzelhandelsunternehmen. Zusätzliche Felderhebungen werden bei Bedarf durchgeführt.
+Die Ergebnisse werden danach sortiert, wie viel eines Datensatzes in Ihrem Gebiet liegt. Datensätze, die es am besten abdecken, stehen oben.
 
-#### Bevölkerung und Gebäude
-Detaillierte demografische **Daten**, die auf Gebäude- und lokale Ebenen disaggregiert sind, erweitert mit Landnutzungsinformationen für verbesserte Genauigkeit. Wir bieten Gebäudeebenen-Bevölkerungs**daten** für deutsche Bezirke und Gemeinden, lokale Bevölkerungs**daten** aus dem deutschen Zensus 2022 und europäische NUTS-3-Ebenen-Bevölkerungsstatistiken (Nomenklatur der territorialen Einheiten für die Statistik).
+### Sortierung und Ansichten
 
-*Datenquellen:* [Deutscher Zensus 2022](https://ergebnisse.zensus2022.de/datenbank/online/), einzelne Gemeinden und Bezirke, und 3D-Stadtmodelle deutscher Bundesländer.
+Sortieren Sie nach **Relevanz**, **Zuletzt aktualisiert** oder Titel **A–Z** / **Z–A**, und wechseln Sie zwischen **Liste** und **Kacheln**. Die Relevanz berücksichtigt Ihre Anzeigesprache: Bei deutscher Oberfläche stehen deutschsprachige Datensätze weiter oben.
 
-#### Administrative Grenzen
-Umfassende Grenzen-**Datensätze**, die Regierungs- und Verwaltungshoheitsgebiete auf mehreren Maßstäben definieren, wie Gemeindegrenzen, Bezirksgrenzen, Bundeslandgrenzen und Postleitzahl-Regionen.
+### Häufig genutzte Datensätze speichern
 
-*Datenquellen:* [Bundesamt für Kartographie und Geodäsie (BKG)](https://www.bkg.bund.de/) und [OpenStreetMap (OSM)](https://wiki.openstreetmap.org/).
+Mit dem Stern auf einer Datensatz-Karte speichern Sie ihn. `Meine Favoriten anzeigen` schränkt den Katalog dann auf Ihre gespeicherten Datensätze ein. Diese bleiben über Sitzungen hinweg erhalten und stehen auch in der `+ Layer hinzufügen`-Auswahl im Projekt zur Verfügung.
 
-## Katalog-Daten zu Ihren Projekten hinzufügen
+## Was eine Datensatz-Seite zeigt
 
-Folgen Sie diesen Schritten, um **Datensätze** aus dem **Katalog** zu Ihren GOAT-**Projekten** hinzuzufügen:
+Klicken Sie auf einen Datensatz, um ihn zu öffnen. Der Reiter **Zusammenfassung** zeigt:
+
+- **Beschreibung** von Inhalt und Umfang des Datensatzes
+- **Typ**, **Geometrietyp**, **Kategorie**, **Sprache** und **Region**
+- **Lizenz**, mit `Lizenz bei der Quelle ansehen`, sofern der Datengeber die Bedingungen verlinkt
+- **Referenzjahr** und wann der Datensatz **Zuletzt aktualisiert** wurde
+- **Schlagwörter**, mit denen der Datengeber ihn versehen hat
+- **Datengeber**, mit Kontaktdaten, sofern vorhanden
+
+Wenn ein Datensatz Daten zum Anzeigen hat, enthält der Reiter **Daten** **Beispieldaten** seiner Zeilen sowie eine Liste der **Spalten** mit Name und Typ. Die Beispieldaten sind begrenzt — sie sind ein Blick in die Daten, nicht der vollständige Datensatz.
+
+Ein Datensatz aus mehreren Layern ist als `Datenpaket` gekennzeichnet und listet die **Layer in diesem Datenpaket**. Öffnen Sie einen davon, sehen Sie, zu welchem Datenpaket er gehört. Siehe [Datensatz-Typen](../data/dataset_types.md#datensätze-aus-mehreren-layern).
+
+## Katalog-Daten zu einem Projekt hinzufügen
+
+Datensätze werden aus einem Projekt heraus hinzugefügt — der Dialog `+ Layer hinzufügen` ist also der Ort dafür. Die Katalog-Seite für sich dient dem Finden und Speichern von Datensätzen; ihre Schaltfläche `Zum Projekt hinzufügen` ist noch nicht aktiv.
+
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Navigieren Sie in Ihrem **Projekt** zum <strong>Layer</strong>-Tab und klicken Sie auf <code>+ Layer hinzufügen</code></div>
+  <div class="content">Öffnen Sie in Ihrem Projekt den Reiter <strong>Layer</strong> und klicken Sie auf <code>+ Layer hinzufügen</code>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Wählen Sie <code>Katalog-Explorer</code>, um den Daten-**Katalog** zu durchsuchen</div>
+  <div class="content">Wählen Sie den Reiter <code>Katalog</code>, um dieselben Datensätze mit derselben Suche und denselben Filtern zu durchsuchen.</div>
 </div>
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Durchsuchen oder suchen Sie nach Ihrem gewünschten **Datensatz**, dann klicken Sie auf <code>Layer hinzufügen</code>, um ihn in Ihr **Projekt** einzuschließen</div>
+  <div class="content">Wählen Sie einen oder mehrere Datensätze aus und klicken Sie auf <code>Zum Projekt hinzufügen</code>.</div>
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/catalog/catalog_add-layer.gif').default} alt="Katalog-Explorer" style={{ maxHeight: "700px", maxWidth: "800px"}}/>
+  <img src={require('/img/workspace/catalog/catalog_add-layer.gif').default} alt="Katalog-Datensatz zu einem Projekt hinzufügen" style={{ maxHeight: "700px", maxWidth: "800px"}}/>
 </div>
 
 <p></p>
 
-:::tip Hinweis
-Nach dem Hinzufügen des Layers können Sie [Filter](../map/filter.md "Datensatz filtern") anwenden, um große **Datensätze** auf spezifische geografische Ausdehnungen oder Attribute zu beschränken, die für Ihre Analyse benötigt werden
+Wird ein Katalog-Datensatz zum ersten Mal hinzugefügt, bereitet GOAT eine Kopie davon für Ihr Projekt vor. Der Layer zeigt währenddessen `Daten werden vorbereitet …` und steht zur Verfügung, sobald das abgeschlossen ist.
+
+:::info Katalog-Layer sind schreibgeschützt
+Ein aus dem Katalog hinzugefügter Layer ist mit `Katalog · schreibgeschützt` gekennzeichnet. Sie können ihn wie jeden anderen Layer gestalten, filtern und analysieren, seine Zeilen und Spalten lassen sich jedoch nicht bearbeiten, und er kann nicht direkt heruntergeladen werden — Lizenz und Quelle bleiben beim Anbieter.
 :::
 
+Sobald eine neuere Fassung eines Datensatzes veröffentlicht ist, zeigt ein Layer in Ihrem Projekt `Aktualisierung im Katalog verfügbar`. So entscheiden Sie selbst, wann Sie die neuen Daten übernehmen.
+
+:::tip Hinweis
+Nach dem Hinzufügen des Layers können Sie [Filter](../map/filter.md "Datensatz filtern") anwenden, um große Datensätze auf die für Ihre Analyse benötigten Gebiete oder Attribute einzuschränken.
+:::
+
+## Was der Katalog enthält
+
+Der Katalog deckt mehrere Themenbereiche ab. Dies sind einige der wichtigsten.
+
+### Points of Interest (POIs)
+Strategische Standorte von Annehmlichkeiten, Einrichtungen und Attraktionen, die für Erreichbarkeitsplanung und Stadtanalyse wesentlich sind, wie öffentliche Verkehrshaltestellen und -stationen, Einkaufszentren und Einzelhandelsstandorte, Tourismus- und Freizeiteinrichtungen, Lebensmittel- und Getränkebetriebe, Gesundheitseinrichtungen und Krankenhäuser, Bildungseinrichtungen und Schulen.
+
+*Datenquellen:* [Overture Maps Foundation](https://overturemaps.org/), [OpenStreetMap (OSM)](https://wiki.openstreetmap.org/), Regierungsabteilungen, Krankenversicherungsanbieter und Einzelhandelsunternehmen. Zusätzliche Felderhebungen werden bei Bedarf durchgeführt.
+
+### Bevölkerung und Gebäude
+Detaillierte demografische **Daten**, die auf Gebäude- und lokale Ebenen disaggregiert sind, erweitert mit Landnutzungsinformationen für verbesserte Genauigkeit. Wir bieten Gebäudeebenen-Bevölkerungs**daten** für deutsche Bezirke und Gemeinden, lokale Bevölkerungs**daten** aus dem deutschen Zensus 2022 und europäische NUTS-3-Ebenen-Bevölkerungsstatistiken (Nomenklatur der territorialen Einheiten für die Statistik).
+
+*Datenquellen:* [Deutscher Zensus 2022](https://ergebnisse.zensus2022.de/datenbank/online/), einzelne Gemeinden und Bezirke, und 3D-Stadtmodelle deutscher Bundesländer.
+
+### Administrative Grenzen
+Umfassende Grenzen-**Datensätze**, die Regierungs- und Verwaltungshoheitsgebiete auf mehreren Maßstäben definieren, wie Gemeindegrenzen, Bezirksgrenzen, Bundeslandgrenzen und Postleitzahl-Regionen.
+
+*Datenquellen:* [Bundesamt für Kartographie und Geodäsie (BKG)](https://www.bkg.bund.de/) und [OpenStreetMap (OSM)](https://wiki.openstreetmap.org/).
 
 ## Datenqualität und Wartung
 
