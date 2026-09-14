@@ -6,6 +6,9 @@ import {
   parseBareVideoParagraph,
   parseVideoEmbed,
   stripMediaUrls,
+  youtubeEmbedUrl,
+  youtubePosterUrl,
+  youtubeVideoId,
 } from "@/lib/utils/mediaEmbed";
 
 /** The real source from the BBSR Stadtklimadashboard page. */
@@ -105,5 +108,29 @@ describe("stripMediaUrls", () => {
 
   it("collapses the whitespace it leaves behind", () => {
     expect(stripMediaUrls(`vor ${BBSR_MP4} nach`)).toBe("vor nach");
+  });
+});
+
+describe("youtubeVideoId", () => {
+  it("reads the id out of every YouTube URL shape", () => {
+    expect(youtubeVideoId("https://www.youtube.com/watch?v=_clsR386b9w")).toBe("_clsR386b9w");
+    expect(youtubeVideoId("https://youtu.be/GA_6PbhAA6k?t=12")).toBe("GA_6PbhAA6k");
+    expect(youtubeVideoId("https://www.youtube-nocookie.com/embed/GA_6PbhAA6k")).toBe("GA_6PbhAA6k");
+    expect(youtubeVideoId("https://youtube.com/shorts/GA_6PbhAA6k")).toBe("GA_6PbhAA6k");
+  });
+
+  it("returns null for other hosts, http, and malformed input", () => {
+    expect(youtubeVideoId("https://vimeo.com/12345")).toBeNull();
+    expect(youtubeVideoId("http://www.youtube.com/watch?v=_clsR386b9w")).toBeNull();
+    expect(youtubeVideoId("https://www.youtube.com/watch")).toBeNull();
+    expect(youtubeVideoId("not a url")).toBeNull();
+  });
+
+  it("builds the muted no-cookie embed and the poster from the id", () => {
+    expect(youtubeEmbedUrl("abc123")).toBe(
+      "https://www.youtube-nocookie.com/embed/abc123?autoplay=1&mute=1&rel=0&modestbranding=1"
+    );
+    expect(youtubeEmbedUrl("abc123", { muted: false })).toContain("mute=0");
+    expect(youtubePosterUrl("abc123")).toBe("https://img.youtube.com/vi/abc123/maxresdefault.jpg");
   });
 });

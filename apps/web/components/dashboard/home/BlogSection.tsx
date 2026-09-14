@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Box,
   Button,
@@ -14,81 +16,30 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
+import { type BlogPost, GOAT_CATEGORY, useBlogPosts } from "@/lib/api/blog";
+import { FEEDS_ENABLED, blogIndexUrl, formatFeedDate } from "@/lib/api/feeds";
+
 import HomeSection from "@/components/dashboard/home/HomeSection";
 
-type BlogPost = {
-  title: string;
-  date: string;
-  thumbnail: string;
-  url: string;
-};
+/** How many posts the grid holds at its widest (lg shows three, sm/md four). */
+const POST_COUNT = 4;
 
-const blogPostsEnglish: BlogPost[] = [
-  {
-    title: 'GOAT 2.4.0 "Toggenburg" is here',
-    date: "March 9, 2026",
-    thumbnail:
-      "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/69a80eca7103ae1f77222324_workflows_cover.webp",
-    url: "https://www.plan4better.de/en/post/goat-2-4-0-toggenburg-is-here",
-  },
-  {
-    title: 'GOAT 2.3.0 "Tarn" is here',
-    date: "January 13, 2026",
-    thumbnail:
-      "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/6964f6ab66d9b7fec644a6b5_blogpost_cover-p-1600.webp",
-    url: "https://www.plan4better.de/en/post/goat-2-3-0-tarn-is-here",
-  },
-  {
-    title: 'GOAT 2.2.0 "Cashmere" is here',
-    date: "December 16, 2025",
-    thumbnail:
-      "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/693fb15bef07eb7497624d4d_GOAT_new-version_cover-p-1600.webp",
-    url: "https://www.plan4better.de/en/post/goat-2-2-0-cashmere-is-here",
-  },
-  {
-    title: 'GOAT 2.1.0 "Ibex" is here',
-    date: "October 21, 2025",
-    thumbnail:
-      "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/68ef733d034dbecbd08cc8f3_dashboard-builder-p-1600.webp",
-    url: "https://www.plan4better.de/en/post/goat-2-1-0-ibex-is-here",
-  },
-];
-
-const blogPostsGerman: BlogPost[] = [
-  {
-    title: 'GOAT 2.4.0 „Toggenburg" ist da',
-    date: "9. März 2026",
-    thumbnail:
-      "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/69a80eca7103ae1f77222324_workflows_cover.webp",
-    url: "https://www.plan4better.de/de/post/goat-2-4-0-toggenburg-is-here",
-  },
-  {
-    title: 'GOAT 2.3.0 „Tarn" ist da',
-    date: "13. Januar 2026",
-    thumbnail:
-      "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/6964f6ab66d9b7fec644a6b5_blogpost_cover-p-1600.webp",
-    url: "https://www.plan4better.de/de/post/goat-2-3-0-tarn-ist-da",
-  },
-  {
-    title: 'GOAT 2.2.0 „Cashmere" ist da',
-    date: "16. Dezember 2025",
-    thumbnail:
-      "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/693fb15bef07eb7497624d4d_GOAT_new-version_cover-p-1600.webp",
-    url: "https://www.plan4better.de/de/post/goat-2-2-0-cashmere-ist-da",
-  },
-  {
-    title: 'GOAT 2.1.0 "Ibex" ist da',
-    date: "21. Oktober 2025",
-    thumbnail:
-      "https://cdn.prod.website-files.com/6554ce5f672475c1f40445af/68ef733d034dbecbd08cc8f3_dashboard-builder-p-1600.webp",
-    url: "https://www.plan4better.de/de/post/goat-2-1-0-ibex-is-here",
-  },
-];
-
+/**
+ * H13: the newest GOAT-tagged posts of the website's blog, from its RSS feed.
+ * Returns null when no website URL is configured, the feed fails, or no post
+ * carries the GOAT category — a strip with nothing in it is worse than none.
+ */
 const BlogSection = () => {
-  const isLoading = false;
   const theme = useTheme();
   const { t, i18n } = useTranslation("common");
+  const locale = i18n.language === "de" ? "de" : "en";
+
+  const { posts, isLoading, isError } = useBlogPosts(locale, { category: GOAT_CATEGORY, limit: POST_COUNT });
+
+  if (!FEEDS_ENABLED || isError) return null;
+  if (!isLoading && posts.length === 0) return null;
+
+  const items: (BlogPost | undefined)[] = isLoading ? Array.from({ length: POST_COUNT }) : posts;
 
   return (
     <Box sx={{ pt: "32px", borderTop: `1px solid ${theme.palette.divider}` }}>
@@ -98,31 +49,20 @@ const BlogSection = () => {
           <Button
             variant="text"
             size="small"
+            component="a"
+            href={blogIndexUrl(locale)}
+            target="_blank"
+            rel="noopener noreferrer"
             endIcon={<Icon iconName={ICON_NAME.EXTERNAL_LINK} style={{ fontSize: 12 }} />}
-            onClick={() =>
-              window.open(
-                i18n.language === "de"
-                  ? "https://www.plan4better.de/de/blog"
-                  : "https://www.plan4better.de/blog",
-                "_blank"
-              )
-            }
-            sx={{
-              borderRadius: 0,
-            }}>
+            sx={{ borderRadius: 0 }}>
             {t("visit_blog")}
           </Button>
         }>
         <Grid container spacing={5}>
-          {(isLoading
-            ? Array.from(new Array(3))
-            : i18n.language === "de"
-              ? blogPostsGerman
-              : (blogPostsEnglish ?? [])
-          ).map((item: BlogPost, index: number) => (
+          {items.map((item, index) => (
             <Grid
               item
-              key={item?.title ?? index}
+              key={item?.id ?? index}
               xs={12}
               sm={6}
               md={6}
@@ -133,51 +73,53 @@ const BlogSection = () => {
                 lg: index > 2 ? "none" : "block",
               }}>
               {!item ? (
-                <Skeleton variant="rectangular" height={220} />
+                <Stack spacing={2}>
+                  <Skeleton variant="rectangular" height={220} />
+                  <Skeleton width="40%" />
+                  <Skeleton width="80%" />
+                </Stack>
               ) : (
                 <Card
-                  style={{
+                  component="a"
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="outlined"
+                  sx={{
                     backgroundColor: "transparent",
                     border: "none",
                     boxShadow: "none",
-                  }}
-                  variant="outlined"
-                  onClick={() => window.open(item.url, "_blank")}
-                  sx={{
+                    textDecoration: "none",
+                    color: "inherit",
                     height: "100%",
                     display: "flex",
                     flexDirection: "column",
                     "&:hover": {
                       cursor: "pointer",
-                      "& img": {
-                        boxShadow: theme.shadows[4],
-                      },
-                      "& p": {
-                        color: theme.palette.primary.main,
-                      },
+                      "& img": { boxShadow: theme.shadows[4] },
+                      "& .blog-title": { color: theme.palette.primary.main },
                     },
                   }}>
-                  {item.thumbnail && (
-                    <CardMedia
-                      component="img"
-                      sx={{
-                        height: 220,
-                        objectFit: "cover",
-                        backgroundSize: "cover",
-                        transition: theme.transitions.create(["box-shadow", "transform"], {
-                          duration: theme.transitions.duration.standard,
-                        }),
-                      }}
-                      image={item.thumbnail}
-                    />
-                  )}
+                  <CardMedia
+                    component="img"
+                    image={item.thumbnail ?? undefined}
+                    alt=""
+                    sx={{
+                      height: 220,
+                      objectFit: "cover",
+                      backgroundColor: theme.palette.action.hover,
+                      transition: theme.transitions.create(["box-shadow", "transform"], {
+                        duration: theme.transitions.duration.standard,
+                      }),
+                    }}
+                  />
                   <CardContent sx={{ flexGrow: 1, px: 0 }}>
                     <Stack spacing={2}>
                       <Typography gutterBottom variant="caption">
-                        {item.date}
+                        {formatFeedDate(item.date, locale)}
                       </Typography>
-
                       <Typography
+                        className="blog-title"
                         sx={{
                           transition: theme.transitions.create(["color", "transform"], {
                             duration: theme.transitions.duration.standard,

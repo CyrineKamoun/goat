@@ -55,8 +55,7 @@ vi.mock("@/hooks/dashboard/home/useHomeStage", async () => {
 });
 vi.mock("@/hooks/dashboard/home/useHomeCreate", () => ({ useHomeCreate: useHomeCreateMock }));
 vi.mock("@/components/dashboard/home/BlogSection", () => ({ default: () => null }));
-vi.mock("@/components/dashboard/home/WhatsNewCard", () => ({ default: () => null }));
-vi.mock("@/components/dashboard/home/HomeSpotlight", () => ({ default: () => null }));
+vi.mock("@/components/dashboard/home/HomeAnnouncements", () => ({ default: () => null }));
 vi.mock("@/components/dashboard/home/JumpBackIn", () => ({ default: () => null }));
 vi.mock("@/components/dashboard/home/RecentDatasets", () => ({ default: () => null }));
 vi.mock("@/components/dashboard/home/TeamsCard", () => ({ default: () => null }));
@@ -125,7 +124,7 @@ describe("HomePage", () => {
 
     render(<HomePage />);
 
-    expect(screen.getByText("welcome_back")).toBeInTheDocument();
+    expect(screen.getByText("welcome_to_goat")).toBeInTheDocument();
     // Both the hero's quick action and the checklist's first-step CTA share
     // this label — assert at least one rendered rather than picking one.
     expect(screen.getAllByRole("button", { name: "new_project" }).length).toBeGreaterThan(0);
