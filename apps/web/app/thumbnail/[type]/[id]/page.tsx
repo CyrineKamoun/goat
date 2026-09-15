@@ -49,6 +49,20 @@ interface ThumbnailData {
 }
 
 /**
+ * The renderer hands the payload over on `window`, set by an init script that
+ * runs before any of this page's own code. It used to arrive in the `?data=`
+ * query param, but the payload carries the whole layer list and the request
+ * line counts against the web server's header budget: past Node's 16 KB
+ * default the navigation came back 431 and this page never ran at all.
+ * The query param still works, so a thumbnail URL stays pasteable by hand.
+ */
+function readInjectedThumbnailData(): string | null {
+  if (typeof window === "undefined") return null;
+  const injected = (window as { __THUMBNAIL_DATA__?: unknown }).__THUMBNAIL_DATA__;
+  return typeof injected === "string" ? injected : null;
+}
+
+/**
  * Parse and decode thumbnail data from URL query param
  */
 function parseThumbnailData(dataParam: string | null): ThumbnailData | null {
@@ -103,10 +117,12 @@ export default function ThumbnailPage() {
     setMounted(true);
   }, []);
 
-  // Parse thumbnail data from URL param
+  // Parse thumbnail data from the URL param, or from what the renderer
+  // injected on `window`. Recomputed once `mounted` flips, because `window`
+  // is not readable during the server render that precedes it.
   const thumbnailData = useMemo(() => {
-    return parseThumbnailData(dataParam);
-  }, [dataParam]);
+    return parseThumbnailData(dataParam ?? readInjectedThumbnailData());
+  }, [dataParam, mounted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Extract data from thumbnailData or use defaults
   const viewState = useMemo(() => {
