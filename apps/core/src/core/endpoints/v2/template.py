@@ -4,7 +4,7 @@ delete, refresh."""
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query, Request
 from pydantic import UUID4
 
 from core.crud.crud_template import template as crud_template
@@ -245,6 +245,7 @@ async def delete_template(
     dependencies=[Depends(auth_z)],
 )
 async def use_template(
+    request: Request,
     *,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
@@ -254,8 +255,8 @@ async def use_template(
     """Use a template (T7). A project payload copies its frozen source
     into `target_folder_id` (any space, via `copy_project`). A
     workflow/layout payload is created into `project_id` if given, else
-    into a new project created in `target_folder_id` with the same
-    default view state `useHomeCreate` seeds a fresh project with; for a
+    into a new project created in `target_folder_id`, whose starting view
+    is chosen the same way a directly created project's is; for a
     workflow, every shipped dataset the caller may read is linked into
     that project (an existing link is reused, a new one is grouped under
     the template's name) and `bindings` overrides or fills the rest.
@@ -263,7 +264,12 @@ async def use_template(
     target (`project_id` or `target_folder_id`).
     """
     return await crud_template.use(
-        async_session, template_id=template_id, user_id=user_id, req=req
+        async_session,
+        template_id=template_id,
+        user_id=user_id,
+        req=req,
+        headers=request.headers,
+        peer=request.client.host if request.client else None,
     )
 
 

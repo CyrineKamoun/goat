@@ -194,3 +194,93 @@ async def test_initial_view_state_404s_on_a_trashed_project_via_the_fallback(
         f"{settings.API_V2_STR}/project/{project_id}/initial-view-state"
     )
     assert response.status_code == 404, response.text
+
+
+@pytest.mark.asyncio
+async def test_create_without_a_view_state_is_accepted_and_seeded(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_create_folder: dict[str, Any],
+) -> None:
+    """The field is optional: a caller that sends none still gets a project
+    with a usable starting view, chosen by the server."""
+    response = await client.post(
+        f"{settings.API_V2_STR}/project",
+        json={"folder_id": fixture_create_folder["id"], "name": "no-view-state"},
+    )
+    assert response.status_code in (200, 201), response.text
+    project_id = response.json()["id"]
+
+    read = await client.get(
+        f"{settings.API_V2_STR}/project/{project_id}/initial-view-state"
+    )
+    assert read.status_code == 200, read.text
+    view_state = read.json()
+    assert isinstance(view_state["latitude"], (int, float))
+    assert isinstance(view_state["longitude"], (int, float))
+
+
+@pytest.mark.asyncio
+async def test_a_second_project_inherits_the_last_opened_view(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_create_folder: dict[str, Any],
+) -> None:
+    """The history rung: someone who cannot be placed by address — every
+    caller here, and every caller through a load balancer that does not forward
+    one — keeps landing where they last worked."""
+    first = await _create_project(client, fixture_create_folder["id"], "first")
+    # Opening a project is what stamps `last_opened_at`.
+    assert (
+        await client.get(f"{settings.API_V2_STR}/project/{first['id']}")
+    ).status_code == 200
+
+    moved = {**_CREATE_PAYLOAD_VIEW_STATE, "latitude": 52.52, "longitude": 13.405}
+    updated = await client.put(
+        f"{settings.API_V2_STR}/project/{first['id']}/initial-view-state", json=moved
+    )
+    assert updated.status_code == 200, updated.text
+
+    response = await client.post(
+        f"{settings.API_V2_STR}/project",
+        json={"folder_id": fixture_create_folder["id"], "name": "second"},
+    )
+    assert response.status_code in (200, 201), response.text
+    inherited = await client.get(
+        f"{settings.API_V2_STR}/project/{response.json()['id']}/initial-view-state"
+    )
+    assert inherited.status_code == 200, inherited.text
+    assert inherited.json()["latitude"] == pytest.approx(52.52)
+    assert inherited.json()["longitude"] == pytest.approx(13.405)
+
+
+@pytest.mark.asyncio
+async def test_an_explicit_view_state_still_wins(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_create_folder: dict[str, Any],
+) -> None:
+    """An API client that states a view gets that view, whatever the caller's
+    location or history would otherwise suggest."""
+    first = await _create_project(client, fixture_create_folder["id"], "history")
+    assert (
+        await client.get(f"{settings.API_V2_STR}/project/{first['id']}")
+    ).status_code == 200
+
+    asked = {**_CREATE_PAYLOAD_VIEW_STATE, "latitude": 41.3275, "longitude": 19.8187}
+    response = await client.post(
+        f"{settings.API_V2_STR}/project",
+        json={
+            "folder_id": fixture_create_folder["id"],
+            "name": "explicit",
+            "initial_view_state": asked,
+        },
+    )
+    assert response.status_code in (200, 201), response.text
+    read = await client.get(
+        f"{settings.API_V2_STR}/project/{response.json()['id']}/initial-view-state"
+    )
+    assert read.json()["latitude"] == pytest.approx(41.3275)

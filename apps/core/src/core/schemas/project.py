@@ -92,8 +92,14 @@ initial_view_state_example = {
 
 
 class IProjectCreate(ContentBaseAttributes):
-    initial_view_state: InitialViewState = Field(
-        ..., description="Initial view state of the project"
+    initial_view_state: InitialViewState | None = Field(
+        None,
+        description=(
+            "Initial view state of the project. Omit it to have the server "
+            "choose one, in order: the caller's approximate location, the "
+            "deployment's configured default, the project they most recently "
+            "opened, and failing all of those a wide default view."
+        ),
     )
     tags: List[str] | None = Field(
         default=None,
