@@ -26,7 +26,7 @@ interface SearchInputProps {
   size?: SearchInputSize;
   /** The mark left of the input. */
   startIcon?: ICON_NAME;
-  /** Rendered right of the clear slot — Home's ⌘K hint. */
+  /** Rendered right of the clear slot — Home's `ShortcutHint` key badge. */
   endAdornment?: ReactNode;
   inputProps?: InputBaseProps["inputProps"];
   /** Names the field for assistive tech; the placeholder when unset. */

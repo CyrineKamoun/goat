@@ -16,6 +16,7 @@ import {
 
 import HighlightedText from "@/components/dashboard/common/HighlightedText";
 import SearchInput from "@/components/dashboard/common/SearchInput";
+import ShortcutHint from "@/components/common/ShortcutHint";
 
 /** The layer preview drags the map stack along with it, so Home loads it
  * only once a layer is actually picked. */
@@ -62,7 +63,7 @@ const isSelectable = (row: DisplayRow): row is SelectableRow => row.kind === "it
  * The hero search (H3): one field the user just types into, fanning out to the
  * content feed and the catalog through `useHomeSearch` and showing what each
  * store answered as its own group. A leading `project:` / `dataset:` /
- * `catalog:` narrows the fan-out to one store. ⌘K/Ctrl+K focuses the field
+ * `catalog:` narrows the fan-out to one store. Ctrl/Cmd+K focuses the field
  * from anywhere on the page; ↑/↓ walk the selectable rows (wrapping), Enter
  * runs the highlighted row, Esc clears the query and blurs.
  */
@@ -174,21 +175,7 @@ const HomeSearch = () => {
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         fullWidth
-        endAdornment={
-          <Box
-            component="kbd"
-            sx={{
-              fontFamily: "inherit",
-              fontSize: 11.5,
-              color: theme.palette.text.secondary,
-              border: `1px solid ${theme.palette.divider}`,
-              borderRadius: "5px",
-              px: "6px",
-              py: "1px",
-            }}>
-            ⌘K
-          </Box>
-        }
+        endAdornment={<ShortcutHint letter="K" />}
       />
 
       {focused && (
