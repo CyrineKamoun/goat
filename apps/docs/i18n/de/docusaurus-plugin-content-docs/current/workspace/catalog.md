@@ -91,10 +91,6 @@ Datensätze werden aus einem Projekt heraus hinzugefügt — der Dialog `+ Layer
   <div class="content">Wählen Sie einen oder mehrere Datensätze aus und klicken Sie auf <code>Zum Projekt hinzufügen</code>.</div>
 </div>
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/catalog/catalog_add-layer.gif').default} alt="Katalog-Datensatz zu einem Projekt hinzufügen" style={{ maxHeight: "700px", maxWidth: "800px"}}/>
-</div>
-
 <p></p>
 
 Wird ein Katalog-Datensatz zum ersten Mal hinzugefügt, bereitet GOAT eine Kopie davon für Ihr Projekt vor. Der Layer zeigt währenddessen `Daten werden vorbereitet …` und steht zur Verfügung, sobald das abgeschlossen ist.
