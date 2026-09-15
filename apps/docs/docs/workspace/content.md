@@ -90,20 +90,10 @@ Follow these simple steps to create a new project:
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">
-  <p>Fill in the required information:</p>
-    <ul>
-      <li><strong>Project Title</strong> - Give your project a descriptive name</li>
-      <li><strong>Project Folder</strong> - Choose or create a folder to organize your project</li>
-      <li><strong>Description</strong> (optional) - Add details about your project's purpose</li>
-    </ul>
-  </div>
+  <div class="content">Enter a name and click <code>Create project</code>. The project is created in the folder you are currently in.</div>
 </div>
 
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Review your information and click the <code>Create</code> button to finalize your new project.</div>
-</div>
+To add a **description** or **tags**, or to rename the project later, open its more options menu and choose `Edit metadata`. To put it in a different folder, use `Move` from the same menu.
 
 ### Importing a project
 
@@ -111,21 +101,12 @@ You can import a previously exported GOAT project file:
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Click <code>Add new</code> and choose a project option.</div>
+  <div class="content">Click <code>Add new</code> and choose <code>Import project</code> option.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Select <code>Import</code> to upload an existing project file.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">3</div>
   <div class="content">Choose a <strong>Project Folder</strong> and click <code>Import</code> to finish.</div>
-</div>
-
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/projects/project_import.webp').default} alt="Import a project in GOAT" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
 </div>
 
 ### Uploading a dataset
@@ -144,35 +125,19 @@ GOAT supports multiple file formats for upload: **GeoPackage**, **GeoJSON**, **S
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">In the <strong>Select File</strong> step, choose the file from your local device. Supported formats are listed at the bottom of the dialog. Click <code>Next</code>.</div>
+  <div class="content">In the <strong>Select File</strong> step, choose the file from your local device or drag & drop it. Supported formats are listed at the bottom of the dialog. Click <code>Next</code>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content"><strong>CSV and XLSX files only — Preview &amp; Configure step:</strong> GOAT shows a preview of your tabular data so you can verify it before import.
-    <ul>
-      <li><code>Worksheet</code> — For XLSX files with multiple sheets, select which sheet to import.</li>
-      <li><code>First row is header</code> — Toggle on (default) if your file's first row contains column names. Toggle off if the first row is data — column names will be auto-generated and you can rename them later in the layer settings.</li>
-    </ul>
-    The preview table shows the first rows of your file. Click <code>Next</code> when ready.
-  </div>
-</div>
-
-<div class="step">
-  <div class="step-number">5</div>
   <div class="content">In the <strong>Destination &amp; Metadata</strong> step, configure your dataset:
     <ul>
+     <li><strong>Name</strong> — You can change the default name</li>
       <li><strong>Destination Folder</strong> — Choose where to organize your dataset</li>
-      <li><strong>Name</strong> — Give your dataset a descriptive name</li>
       <li><strong>Description</strong> (optional) — Add details about your dataset's content and purpose</li>
     </ul>
-    Click <code>Next</code>.
+    Click <code>Upload</code>.
   </div>
-</div>
-
-<div class="step">
-  <div class="step-number">6</div>
-  <div class="content">Review your configuration in the <strong>Confirmation</strong> step and click <code>Upload</code> to add the dataset to your workspace.</div>
 </div>
 
 ### Connecting to an external source
@@ -220,32 +185,24 @@ Connect to external data services including **Web Feature Service (WFS)**, **Web
 You can also upload datasets directly while working in the [Map](../map/layers) interface for immediate use in your projects.
 :::
 
-
-
 ## Working with a dataset
 
+### Dataset preview and metadata
+
+View detailed information about your datasets to better understand their content and structure. 
+
+- Access the preview of the dataset by clicking on it. There you can see:
+  - <code>Name</code> 
+  - <code>Description</code> 
+  - <code>Data</code> - Detailed view of all data fields and values  
+  - <code>Map</code> - Spatial visualization with interactive legend
+
+- Access metadata by clicking on the <code> More options </code> menu next to the dataset name and see and edit the Name, Description or add Tags.
+
+  
 ### Downloading a dataset
 
 When downloading a spatial dataset, a dialog lets you choose:
 
 - **Download Type** — the export file format (e.g. GeoPackage, GeoJSON, Shapefile).
 - **Coordinate Reference System (CRS)** — the CRS to reproject the data into before download. GOAT automatically suggests CRS options based on the dataset's geographic extent: global options (WGS 84, Web Mercator) are always available, plus the matching UTM zone and any relevant national or regional CRS. The default is **WGS 84 (EPSG:4326)**.
-
-
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/datasets/managing_datasets.png').default} alt="Dataset management options" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
-</div>
-
-### Dataset metadata and preview
-
-View detailed information about your datasets to better understand their content and structure. Access metadata by clicking directly on the dataset name.
-
-The metadata view provides:
-
-- <code>Summary</code> - Overview of dataset properties and statistics
-- <code>Data</code> - Detailed view of all data fields and values  
-- <code>Map</code> - Spatial visualization with interactive legend
-
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/workspace/datasets/metadata.gif').default} alt="Metadata of the datasets in Workspace of GOAT" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
-</div> 
