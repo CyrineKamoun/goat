@@ -11,6 +11,7 @@ authors = [{ name = "Plan4Better GmbH", email = "dev@plan4better.de" }]
 dependencies = [
   "requests>=2.32.0",
   "python-jose[cryptography]>=3.4.0",
+  "maxminddb==3.2.0",
 ]
 
 [project.optional-dependencies]
