@@ -7,18 +7,36 @@
 -- on `layer.thumbnail_url`, and every write it made aborted with
 -- "permission denied for table organization" raised by this trigger. Book-
 -- keeping a row the caller cannot see is the definer's job, not the caller's.
--- `search_path` is pinned because a definer function inherits the caller's
--- otherwise.
+--
+-- The pinned `search_path` deliberately does NOT name the data schema:
+-- init_triggers.py rewrites the literal `customer.` in this file to the
+-- configured schema and would not reach a bare word here, leaving a stale
+-- name behind on any deployment that renames it. Every reference in the body
+-- is qualified, so the path does not need it.
 CREATE OR REPLACE FUNCTION customer.log_storage_usage()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, customer
+SET search_path = pg_catalog, pg_temp
 AS $$
 DECLARE
     organization_id_input UUID;
     size_difference float := 0;  -- Default size difference
 BEGIN
+    -- An update that leaves `size` alone moves nothing: the difference below
+    -- is zero, and writing that zero still costs a lock on the organization
+    -- row and an UPDATE privilege the caller may not hold. Renames, restyles,
+    -- moves and thumbnail writes all land here.
+    --
+    -- This guard lives in the body rather than in a WHEN clause on a second
+    -- trigger so that the table only ever carries one trigger name. A rollback
+    -- to an image whose copy of this file predates the guard would not know to
+    -- drop a second trigger, and the two would then count the same delta
+    -- twice.
+    IF TG_OP = 'UPDATE' AND NEW.size IS NOT DISTINCT FROM OLD.size THEN
+        RETURN NEW;
+    END IF;
+
     -- Get the organization_id of the user
     SELECT organization_id
     INTO organization_id_input
@@ -48,23 +66,16 @@ END;
 $$;
 
 
+-- A second trigger briefly carried the size guard; drop it so an install that
+-- already saw that shape does not keep counting the same delta twice.
+DROP TRIGGER IF EXISTS log_storage_usage_update_trigger ON customer.layer;
+
 -- Drop the existing update trigger
 DROP TRIGGER IF EXISTS log_storage_usage_trigger ON customer.layer;
 
--- Insert and delete always move the total.
+-- Create a single trigger for INSERT, UPDATE, and DELETE
 CREATE OR REPLACE TRIGGER log_storage_usage_trigger
-AFTER INSERT OR DELETE
+AFTER INSERT OR UPDATE OR DELETE
 ON customer.layer
 FOR EACH ROW
-EXECUTE FUNCTION customer.log_storage_usage();
-
--- An update only does when `size` actually changed. Most updates touch
--- something else entirely (a thumbnail URL, a name, a style), and firing on
--- those wrote `used_storage = used_storage + 0` to the same organization row
--- on every one of them.
-CREATE OR REPLACE TRIGGER log_storage_usage_update_trigger
-AFTER UPDATE OF size
-ON customer.layer
-FOR EACH ROW
-WHEN (OLD.size IS DISTINCT FROM NEW.size)
 EXECUTE FUNCTION customer.log_storage_usage();
