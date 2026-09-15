@@ -74,7 +74,15 @@ def _layout_config() -> dict:
                 "id": "el1",
                 "type": "map",
                 "position": {"x": 0, "y": 0, "w": 1, "h": 1},
-                "config": {},
+                "config": {
+                    "viewState": {"latitude": 48.1, "longitude": 11.5, "zoom": 12},
+                    "lock_layers": True,
+                    "lock_styles": True,
+                    "locked_layer_ids": [3, 4],
+                    "locked_layer_styles": {"3": {"color": "#f00"}},
+                    "locked_basemap_url": "https://tiles.example/streets.json",
+                    "show_labels": True,
+                },
                 "style": {},
                 "map_config": {
                     "layers": [3, 4],
@@ -217,6 +225,26 @@ def test_strip_layout_bindings_removes_every_binding() -> None:
 
     # Input is untouched (pure function, deep copy).
     assert config == original
+
+
+def test_strip_layout_bindings_drops_the_map_view_and_lock_snapshot() -> None:
+    """The author's viewport and locked-layer snapshot are that project's data:
+    the ids are layer_project ids of the source project, and the view is where
+    the author happened to be. Using the template elsewhere must start from
+    the target project's own map; only the lock *intent* travels."""
+    stripped = strip_layout_bindings(_layout_config())
+    map_el = next(e for e in stripped["elements"] if e["id"] == "el1")
+
+    for key in (
+        "viewState",
+        "locked_layer_ids",
+        "locked_layer_styles",
+        "locked_basemap_url",
+    ):
+        assert key not in map_el["config"], key
+    assert map_el["config"]["lock_layers"] is True
+    assert map_el["config"]["lock_styles"] is True
+    assert map_el["config"]["show_labels"] is True
 
 
 def test_strip_layout_bindings_keeps_everything_else_identical() -> None:
