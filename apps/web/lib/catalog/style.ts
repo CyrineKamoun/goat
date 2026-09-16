@@ -29,7 +29,10 @@ export const catalogPaint = (
     // The transformer reads only `properties` and `feature_layer_geometry_type`,
     // so a catalog style needs no layer — hence the cast rather than a fake one.
     return transformToMapboxLayerStyleSpec({
-      properties: style,
+      // `visibility` is a project's layer toggle, and it rides along into the
+      // published style. A preview has no toggle to switch back on, so the
+      // caller's decision to draw the layer is the only visibility there is.
+      properties: { ...style, visibility: true },
       feature_layer_geometry_type: geometryType,
     } as unknown as Layer) as CatalogPaint;
   } catch {

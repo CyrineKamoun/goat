@@ -64,6 +64,14 @@ describe("catalogPaint", () => {
     expect(JSON.stringify(paint?.paint["fill-color"])).toContain("measure");
   });
 
+  it("draws a dataset that was published while switched off", () => {
+    // `visibility` is a project's own layer toggle, captured into the published
+    // style by whoever happened to have the layer hidden. The preview has no
+    // toggle of its own, so honouring it leaves a blank map under a legend.
+    const paint = catalogPaint(style({ visibility: false }), "polygon");
+    expect(paint?.layout?.visibility).toBe("visible");
+  });
+
   it("has nothing to draw without a style or a geometry type", () => {
     expect(catalogPaint(undefined, "point")).toBeUndefined();
     expect(catalogPaint(style(), undefined)).toBeUndefined();
