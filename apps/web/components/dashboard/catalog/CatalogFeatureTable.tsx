@@ -1,10 +1,6 @@
 "use client";
 
-import { Box, Typography, useTheme } from "@mui/material";
 import { useMemo } from "react";
-import { useTranslation } from "react-i18next";
-
-import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import type { CatalogColumn } from "@/lib/validations/catalog";
 import type { DatasetCollectionItems } from "@/lib/validations/layer";
@@ -17,27 +13,34 @@ import FeatureTableFrame from "@/components/dashboard/common/FeatureTableFrame";
 /** Columns that are the feature's shape rather than its attributes. */
 const STRUCTURAL = new Set(["geometry", "geom", "bbox"]);
 
+/** Rows this table puts in the DOM.
+ *
+ * The sample the map draws is far larger than the sample worth tabulating:
+ * every row here becomes a `<TableRow>` of one cell per column, and the table
+ * does not virtualise, so the whole preview would be tens of thousands of
+ * cells laid out at once. Nobody scrolls a preview that far — the question a
+ * data tab answers is "what does a record look like", which the first screenful
+ * answers as well as the last. */
+export const TABLE_ROWS = 100;
+
 const CatalogFeatureTable = ({
   features,
   columns,
-  truncated,
 }: {
   /** A geometry-less dataset's rows arrive as Features with a `null` geometry;
    * this table reads attributes either way. */
   features: GeoJSON.Feature<GeoJSON.Geometry | null>[];
   columns: CatalogColumn[];
-  /** Whether the dataset holds more features than these — the preview's `goat:truncated`. */
-  truncated?: boolean;
 }) => {
-  const { t } = useTranslation("common");
-  const theme = useTheme();
+
+  const shown = useMemo(() => features.slice(0, TABLE_ROWS), [features]);
 
   /** Declared columns first, then anything the data carries beyond them. */
   const fields = useMemo<FeatureTableField[]>(() => {
     const declared = columns.filter((column) => !!column.name && !STRUCTURAL.has(column.name));
     const seen = new Set(declared.map((column) => column.name));
     const extra: FeatureTableField[] = [];
-    for (const feature of features) {
+    for (const feature of shown) {
       for (const key of Object.keys(feature.properties ?? {})) {
         if (!seen.has(key)) {
           seen.add(key);
@@ -47,7 +50,7 @@ const CatalogFeatureTable = ({
       }
     }
     return [...declared.map((column) => ({ name: column.name, type: column.type ?? "string" })), ...extra];
-  }, [columns, features]);
+  }, [columns, shown]);
 
   /** The sample as the table's own page shape. */
   const data = useMemo<DatasetCollectionItems>(
@@ -55,9 +58,9 @@ const CatalogFeatureTable = ({
       type: "FeatureCollection",
       title: "",
       links: [],
-      numberMatched: features.length,
-      numberReturned: features.length,
-      features: features.map((feature, index) => ({
+      numberMatched: shown.length,
+      numberReturned: shown.length,
+      features: shown.map((feature, index) => ({
         type: "Feature",
         // Positional: preview features carry no id, and the table only needs a
         // stable key per row.
@@ -65,34 +68,16 @@ const CatalogFeatureTable = ({
         properties: (feature.properties ?? {}) as Record<string, unknown>,
       })),
     }),
-    [features]
+    [shown]
   );
 
-  if (!fields.length || !features.length) return null;
+  if (!fields.length || !shown.length) return null;
 
   return (
-    <FeatureTableFrame
-      fields={fields}
-      data={data}
-      /* Why the table stops where it does, in the footer of the frame it applies to rather than as a sentence underneath it. */
-      footer={
-        truncated ? (
-          <Box sx={{ px: 3, py: 2 }}>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-              <Icon
-                iconName={ICON_NAME.TABLE}
-                style={{ fontSize: 11 }}
-                htmlColor={theme.palette.text.secondary}
-              />
-              {t("catalog_preview_limited", { count: features.length })}
-            </Typography>
-          </Box>
-        ) : undefined
-      }
-    />
+    /* How much of the dataset this is stands in the card's heading, where the
+       dataset's own size already is — the reader compares the two numbers in
+       one place rather than finding one above the table and one below it. */
+    <FeatureTableFrame fields={fields} data={data} />
   );
 };
 

@@ -13,7 +13,7 @@ import type { CatalogCollection, CatalogItem } from "@/lib/validations/catalog";
 
 import { describedBy, linkHref, useCatalogLabels } from "@/hooks/catalog/useCatalogLabels";
 
-import CatalogFeatureTable from "@/components/dashboard/catalog/CatalogFeatureTable";
+import CatalogFeatureTable, { TABLE_ROWS } from "@/components/dashboard/catalog/CatalogFeatureTable";
 import CatalogFootprintMap from "@/components/dashboard/catalog/CatalogFootprintMap";
 import CatalogProviderCard from "@/components/dashboard/catalog/CatalogProviderCard";
 import {
@@ -76,11 +76,20 @@ const CatalogLayerDetail = ({
     linkHref(collection?.links, "via");
   const periodField = labels.periodField(inBundle ? itemPeriod(item) : datasetPeriod(collection, [item]));
 
-  /** How big the dataset is, beside the sample that shows a slice of it — the two numbers a reader needs to judge what the rows below them represent. */
+  /** How big the dataset is and how much of it the table shows, as one phrase.
+   * Two separate numbers — the dataset's size above the table and the sample's
+   * below it — read as a contradiction rather than as a ratio. */
+  const shownRows = Math.min(TABLE_ROWS, preview?.features?.length ?? 0);
   const datasetSize = useMemo(() => {
     const parts: string[] = [];
     const rows = props["table:row_count"];
-    if (typeof rows === "number") parts.push(t("catalog_row_count_short", { count: rows }));
+    if (typeof rows === "number") {
+      parts.push(
+        shownRows && shownRows < rows
+          ? t("catalog_row_count_sampled", { shown: shownRows, total: rows })
+          : t("catalog_row_count_short", { count: rows })
+      );
+    }
     if (columns.length) parts.push(t("catalog_schema_column_count", { count: columns.length }));
     if (!parts.length) return undefined;
     return (
@@ -88,7 +97,7 @@ const CatalogLayerDetail = ({
         {parts.join(" · ")}
       </Typography>
     );
-  }, [props, columns.length, t]);
+  }, [props, columns.length, shownRows, t]);
 
   const tabs = useMemo(() => {
     const list: { id: TabId; label: string }[] = [{ id: "summary", label: t("summary") }];
@@ -249,11 +258,7 @@ const CatalogLayerDetail = ({
               {/* The sample first: "what does a record look like" is the question a data tab is opened with, and the dictionary answers a narrower one. */}
               {!!preview?.features?.length && (
                 <SectionCard title={t("catalog_feature_table")} right={datasetSize}>
-                  <CatalogFeatureTable
-                    features={preview.features}
-                    columns={columns}
-                    truncated={!!preview["goat:truncated"]}
-                  />
+                  <CatalogFeatureTable features={preview.features} columns={columns} />
                 </SectionCard>
               )}
               {/* No subtitle: the heading and the column headers underneath it already say what this is. */}
