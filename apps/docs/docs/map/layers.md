@@ -144,7 +144,7 @@ You can add layers from [different sources](../data/dataset_types) to your map. 
 
 :::tip tip
 
-You can manage all your datasets on the [Datasets page](../workspace/datasets). 
+You can manage all your datasets on the [Content page](../workspace/content). 
 
 :::
 

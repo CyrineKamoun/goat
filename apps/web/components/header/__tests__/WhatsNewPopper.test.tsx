@@ -15,13 +15,17 @@ const { useReleasesMock, usePreferencesMock, patchPreferencesMock, mutateMock } 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
-vi.mock("@/lib/api/releases", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/api/releases")>("@/lib/api/releases");
+vi.mock("@/lib/api/feeds", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/feeds")>("@/lib/api/feeds");
   return {
     ...actual,
-    RELEASES_FEED_URL: "https://docs.plan4better.de/releases.json",
-    useReleases: useReleasesMock,
+    FEEDS_ENABLED: true,
+    changelogUrl: () => "https://www.plan4better.de/en/goat/changelog",
   };
+});
+vi.mock("@/lib/api/releases", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/releases")>("@/lib/api/releases");
+  return { ...actual, useReleases: useReleasesMock };
 });
 vi.mock("@/lib/api/preferences", () => ({
   usePreferences: usePreferencesMock,
@@ -34,7 +38,7 @@ const entry = (overrides: Partial<ReleaseEntry> = {}): ReleaseEntry => ({
   tag: "new",
   title: "Content Spaces",
   summary: "Spaces now own content.",
-  url: "https://docs.plan4better.de/releases/2026-09-content-spaces",
+  url: "https://www.plan4better.de/en/goat/changelog/2026-09#content-spaces",
   ...overrides,
 });
 
@@ -65,6 +69,19 @@ describe("WhatsNewPopper", () => {
     render(<WhatsNewPopper />);
 
     expect(screen.getByText("1")).toBeInTheDocument();
+  });
+
+  it("shows no badge while the preferences are still loading", () => {
+    useReleasesMock.mockReturnValue({
+      entries: [entry(), entry({ id: "e2" })],
+      isLoading: false,
+      isError: undefined,
+    });
+    usePreferencesMock.mockReturnValue({ preferences: undefined, isLoading: true, mutate: mutateMock });
+
+    render(<WhatsNewPopper />);
+
+    expect(screen.queryByText("2")).toBeNull();
   });
 
   it("patches releases_seen_at to now and refreshes preferences when opened", () => {

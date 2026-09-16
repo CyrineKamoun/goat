@@ -1,10 +1,17 @@
-"""Resolve a public dashboard's searchable-layers config from the published snapshot."""
+"""Resolve what a public dashboard may ask for from its published snapshot.
+
+Two readers share one cached fetch of `customer.project_public.config`: the
+searchable-layers config for layer-search, and the SQL scope for preview-sql —
+the queries the dashboard's author saved in its widgets, and the layers the
+published project contains.
+"""
 
 import json
 import logging
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from typing import Any, TypedDict
 
 import duckdb
@@ -25,6 +32,13 @@ class SearchLayerSpec(TypedDict):
     columns: list[str]
     label_column: str | None
     limit: int
+
+
+class PublicSqlScope(TypedDict):
+    """What an anonymous preview-sql may run against a published project."""
+
+    queries: set[str]
+    layer_ids: set[str]
 
 
 def parse_search_config(config: dict[str, Any]) -> list[SearchLayerSpec]:
@@ -62,9 +76,39 @@ def parse_search_config(config: dict[str, Any]) -> list[SearchLayerSpec]:
     return specs
 
 
+def _stored_sql_queries(node: Any, out: set[str]) -> None:
+    """Collect every `sql_query` string anywhere under `node`.
+
+    Widgets sit at varying depths of the builder config (pages, panels,
+    nested widgets); the key is the contract, not the path.
+    """
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "sql_query" and isinstance(value, str):
+                out.add(value)
+            else:
+                _stored_sql_queries(value, out)
+    elif isinstance(node, list):
+        for item in node:
+            _stored_sql_queries(item, out)
+
+
+def parse_sql_scope(config: dict[str, Any]) -> PublicSqlScope:
+    """The saved widget queries and layer ids of a project_public.config snapshot."""
+    queries: set[str] = set()
+    _stored_sql_queries(config.get("project", {}).get("builder_config") or {}, queries)
+    layer_ids = {
+        str(layer["layer_id"])
+        for layer in config.get("layers") or []
+        if isinstance(layer, dict) and layer.get("layer_id")
+    }
+    return PublicSqlScope(queries=queries, layer_ids=layer_ids)
+
+
 _lock = threading.Lock()
 _fetch_lock = threading.Lock()
-_cache: dict[str, tuple[float, list[SearchLayerSpec]]] = {}
+# Keyed by "<kind>:<project uuid>", one entry per reader of the snapshot.
+_cache: dict[str, tuple[float, Any]] = {}
 _con: duckdb.DuckDBPyConnection | None = None
 
 
@@ -108,7 +152,7 @@ def _fetch_config(project_id: uuid.UUID) -> dict[str, Any] | None:
     return json.loads(row[0]) if row else None
 
 
-def _cache_get(key: str, now: float) -> list[SearchLayerSpec] | None:
+def _cache_get(key: str, now: float) -> Any | None:
     with _lock:
         cached = _cache.get(key)
         if cached and now - cached[0] < CONFIG_TTL_SECONDS:
@@ -126,28 +170,28 @@ def _evict_for_insert(now: float) -> None:
         del _cache[oldest_key]
 
 
-def _cache_put(
-    key: str, now: float, specs: list[SearchLayerSpec]
-) -> list[SearchLayerSpec]:
+def _cache_put(key: str, now: float, value: Any) -> Any:
     with _lock:
         cached = _cache.get(key)
         if cached and now - cached[0] < CONFIG_TTL_SECONDS:
             return cached[1]
         if key not in _cache and len(_cache) >= CACHE_MAX:
             _evict_for_insert(now)
-        _cache[key] = (now, specs)
-        return specs
+        _cache[key] = (now, value)
+        return value
 
 
-def get_public_search_layers(project_id: str) -> list[SearchLayerSpec]:
-    """Searchable-layer specs for a published project, TTL-cached per process.
+def _cached_snapshot_read(
+    kind: str, project_id: str, parse: Callable[[dict[str, Any] | None], Any]
+) -> Any:
+    """`parse(snapshot)` for a published project, TTL-cached per process.
 
     Cache reads take a short lock so one slow fetch never blocks lookups for
     other keys; the Postgres fetch itself is serialized on `_fetch_lock`
     since the underlying DuckDB connection is not thread-safe.
     """
     pid = uuid.UUID(project_id)
-    key = str(pid)
+    key = f"{kind}:{pid}"
 
     cached = _cache_get(key, time.monotonic())
     if cached is not None:
@@ -159,6 +203,33 @@ def get_public_search_layers(project_id: str) -> list[SearchLayerSpec]:
         except duckdb.Error:
             _reset_connection()  # reconnect on next call (e.g. stale PG connection)
             raise
-        specs = parse_search_config(config) if config else []
+        value = parse(config)
 
-    return _cache_put(key, time.monotonic(), specs)
+    return _cache_put(key, time.monotonic(), value)
+
+
+def get_public_search_layers(project_id: str) -> list[SearchLayerSpec]:
+    """Searchable-layer specs for a published project."""
+    specs: list[SearchLayerSpec] = _cached_snapshot_read(
+        "search",
+        project_id,
+        lambda config: parse_search_config(config) if config else [],
+    )
+    return specs
+
+
+_UNPUBLISHED = object()
+
+
+def get_public_sql_scope(project_id: str) -> PublicSqlScope | None:
+    """The stored queries and layers of a published project; None if unpublished.
+
+    Unpublished is cached too (as a sentinel), so a scan of random ids costs
+    one Postgres round trip per id per TTL, not one per request.
+    """
+    value = _cached_snapshot_read(
+        "sql",
+        project_id,
+        lambda config: parse_sql_scope(config) if config else _UNPUBLISHED,
+    )
+    return None if value is _UNPUBLISHED else value

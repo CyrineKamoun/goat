@@ -7,6 +7,7 @@ from fastapi import (
     HTTPException,
     Path,
     Query,
+    Request,
 )
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
@@ -43,6 +44,7 @@ from core.schemas.project import (
 from core.schemas.project import (
     request_examples as project_request_examples,
 )
+from core.services.initial_view_state import resolve_initial_view_state
 
 router = APIRouter()
 
@@ -57,6 +59,7 @@ router = APIRouter()
     dependencies=[Depends(auth_z)],
 )
 async def create_project(
+    request: Request,
     async_session: AsyncSession = Depends(get_db),
     user_id: UUID4 = Depends(get_user_id),
     *,
@@ -66,7 +69,11 @@ async def create_project(
         description="Project to create",
     ),
 ) -> IProjectRead:
-    """This will create an empty project with a default initial view state. The project does not contains layers."""
+    """This will create an empty project. The project does not contain layers.
+
+    A caller that sends no `initial_view_state` gets one chosen for them — see
+    `core.services.initial_view_state` for which signals are tried.
+    """
 
     # A target folder must exist, be live, and be writable by the caller —
     # the new project then takes THAT folder's own space (personal, or a
@@ -95,6 +102,14 @@ async def create_project(
     else:
         space_id = (await crud_space.ensure_personal(async_session, user_id)).id
 
+    initial_view_state = await resolve_initial_view_state(
+        async_session,
+        user_id=user_id,
+        requested=project_in.initial_view_state,
+        headers=request.headers,
+        peer=request.client.host if request.client else None,
+    )
+
     # Create project
     project = await crud_project.create(
         async_session=async_session,
@@ -103,7 +118,7 @@ async def create_project(
             user_id=user_id,
             space_id=space_id,
         ),
-        initial_view_state=project_in.initial_view_state,
+        initial_view_state=initial_view_state,
     )
 
     await async_session.commit()

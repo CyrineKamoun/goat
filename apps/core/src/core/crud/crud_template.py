@@ -40,7 +40,6 @@ from core.db.models.user import User
 from core.db.models.workflow import Workflow
 from core.schemas.content import ContentCreator
 from core.schemas.error import FolderNotFoundError
-from core.schemas.project import InitialViewState
 from core.schemas.report_layout import ReportLayoutCreate
 from core.schemas.share import (
     LayerShareRoleEnum,
@@ -68,6 +67,7 @@ from core.schemas.template import (
     TemplateUseResult,
 )
 from core.schemas.workflow import WorkflowCreate
+from core.services.initial_view_state import resolve_initial_view_state
 from core.templates.snapshot import (
     bind_workflow_config,
     detect_workflow_inputs,
@@ -1252,11 +1252,18 @@ class CRUDTemplate:
     # ------------------------------------------------------------------
 
     async def _new_project_for_use(
-        self, db: AsyncSession, *, folder_id: UUID, user_id: UUID, name: str
+        self,
+        db: AsyncSession,
+        *,
+        folder_id: UUID,
+        user_id: UUID,
+        name: str,
+        headers: Any = None,
+        peer: str | None = None,
     ) -> UUID:
         """Create the project a workflow/layout template's "Use" lands in
-        when no existing `project_id` was given: the same defaults
-        `useHomeCreate` seeds a brand-new project with. Requires `write`
+        when no existing `project_id` was given: the same defaults a directly
+        created project gets, starting view included. Requires `write`
         on `folder_id`."""
         await authz.require(db, "folder", folder_id, user_id, "write")
         folder = await db.get(Folder, folder_id)
@@ -1272,14 +1279,8 @@ class CRUDTemplate:
                 space_id=folder.space_id,
                 user_id=user_id,
             ),
-            initial_view_state=InitialViewState(
-                latitude=48.1502132,
-                longitude=11.5696284,
-                zoom=12,
-                min_zoom=0,
-                max_zoom=20,
-                bearing=0,
-                pitch=0,
+            initial_view_state=await resolve_initial_view_state(
+                db, user_id=user_id, headers=headers, peer=peer
             ),
         )
         assert project.id is not None
@@ -1382,6 +1383,8 @@ class CRUDTemplate:
         template_id: UUID,
         user_id: UUID,
         req: TemplateUseRequest,
+        headers: Any = None,
+        peer: str | None = None,
     ) -> TemplateUseResult:
         """Use a template (T7): create/insert its payload into a target,
         linking whatever shipped datasets the caller may read. Nothing is
@@ -1449,7 +1452,12 @@ class CRUDTemplate:
         else:
             assert req.target_folder_id is not None
             target_project_id = await self._new_project_for_use(
-                db, folder_id=req.target_folder_id, user_id=user_id, name=name
+                db,
+                folder_id=req.target_folder_id,
+                user_id=user_id,
+                name=name,
+                headers=headers,
+                peer=peer,
             )
 
         if row.payload_kind == "workflow":

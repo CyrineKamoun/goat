@@ -67,11 +67,25 @@ class Settings(BaseSettings):
     DEFAULT_USER_LASTNAME: str = "Admin"
     DEFAULT_ORGANIZATION_NAME: str = "GOAT"
     # The catalog mirror directory (mirror_items.parquet, written by goatlib
-    # sync_catalog) — the ONLY thing core reads from the shared volume, and
-    # only ever reads. Deployments should mount just this subtree, read-only;
-    # user data on that volume is not core's business. The default derives
-    # from DATA_DIR so a whole-volume mount keeps working unconfigured.
+    # sync_catalog) — one of two subtrees core reads from the shared volume,
+    # and it only ever reads. Deployments should mount just these subtrees,
+    # read-only; user data on that volume is not core's business. The default
+    # derives from DATA_DIR so a whole-volume mount keeps working unconfigured.
     CATALOG_DATA_DIR: str = os.path.join(os.getenv("DATA_DIR", "/app/data"), "catalog")
+    # The geo database directory (a .mmdb written by goatlib sync_geoip), used
+    # to open a new project near whoever created it. Read-only, like the
+    # catalog mirror, and entirely optional: with no file here the lookup is
+    # skipped and project creation falls back to the rungs below. A deployment
+    # supplying its own database mounts it in here rather than configuring a
+    # second path — any .mmdb in this directory is read.
+    GEOIP_DATA_DIR: str = os.path.join(os.getenv("DATA_DIR", "/app/data"), "geoip")
+    # The starting view for new projects, as a JSON object with the keys of
+    # InitialViewState. Set it to pin a deployment to its own region — an
+    # on-prem install serving one city. It is consulted after the creator's
+    # own location, which in such a deployment answers nothing anyway: users
+    # arrive from private addresses, and those are never geolocated. Unset on
+    # hosted GOAT, where callers come from everywhere.
+    DEFAULT_PROJECT_VIEW_STATE: str | None = None
     # Plan and quotas applied to organizations when no billing system is
     # configured (self-hosted deployments). With billing enabled these come
     # from the billing provider instead.

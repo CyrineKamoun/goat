@@ -13,32 +13,35 @@ import { previewSql } from "@/lib/api/expressions";
 import { apiRequestAuth } from "@/lib/api/fetcher";
 import { useDatasetCollectionItems } from "@/lib/api/layers";
 import { PROCESSES_API_BASE_URL } from "@/lib/api/processes";
+import { usePublicProjectId } from "@/lib/providers/PublicProjectProvider";
+import { filterColumnType, filterValueLabel } from "@/lib/utils/columnFilterOperators";
 import { appendUniqueFeatures } from "@/lib/utils/features";
-import { formatFieldValue } from "@/lib/utils/formatFieldValue";
 import { formatNumber } from "@/lib/utils/format-number";
+import { formatFieldValue } from "@/lib/utils/formatFieldValue";
 import { resolveProjectLayer } from "@/lib/utils/map/layer";
 import type { FieldKind } from "@/lib/validations/layer";
 import { resolveDisplayKind } from "@/lib/validations/layer";
 import type { DatasetCollectionItems, GetCollectionItemsQueryParams } from "@/lib/validations/layer";
 import type { AggregationStatsQueryParams, ProjectLayer } from "@/lib/validations/project";
 import { aggregationStatsQueryParams } from "@/lib/validations/project";
-import { tableDataConfigSchema, tableModeTypes, tableQueryModeTypes, type TableDataSchema } from "@/lib/validations/widget";
+import {
+  type TableDataSchema,
+  tableDataConfigSchema,
+  tableModeTypes,
+  tableQueryModeTypes,
+} from "@/lib/validations/widget";
 import type { FormatNumberTypes } from "@/lib/validations/widget";
 
 import useLayerFields from "@/hooks/map/CommonHooks";
 import { useChartWidget } from "@/hooks/map/DashboardBuilderHooks";
-import {
-  combineCqlFilters,
-  useTableViewFilterController,
-} from "@/hooks/useTableViewFilterController";
+import { combineCqlFilters, useTableViewFilterController } from "@/hooks/useTableViewFilterController";
 
-import WidgetAggregateTable from "@/components/builder/widgets/data/WidgetAggregateTable";
-import ColumnFilterPopover from "@/components/map/panels/ColumnFilterPopover";
-import FeatureTable from "@/components/common/FeatureTable";
 import { NumberFormatSelector } from "@/components/builder/widgets/common/WidgetCommonConfigs";
 import { WidgetStatusContainer } from "@/components/builder/widgets/common/WidgetStatusContainer";
-import { filterColumnType, filterValueLabel } from "@/lib/utils/columnFilterOperators";
+import WidgetAggregateTable from "@/components/builder/widgets/data/WidgetAggregateTable";
+import FeatureTable from "@/components/common/FeatureTable";
 import { fieldIndicatorKind } from "@/components/common/FieldKindIcon";
+import ColumnFilterPopover from "@/components/map/panels/ColumnFilterPopover";
 
 interface TableDataWidgetProps {
   widgetId: string;
@@ -68,7 +71,11 @@ export const TableDataWidget = ({
   onConfigChange,
 }: TableDataWidgetProps) => {
   const { t, i18n } = useTranslation("common");
-  const { config, queryParams, cqlFilter, layerId, isLayerLocked } = useChartWidget(rawConfig, tableDataConfigSchema, aggregationStatsQueryParams);
+  const { config, queryParams, cqlFilter, layerId, isLayerLocked } = useChartWidget(
+    rawConfig,
+    tableDataConfigSchema,
+    aggregationStatsQueryParams
+  );
   const rowsShownSetting = Math.max(1, Math.min(20, Number(config?.options?.page_size ?? 10)));
 
   const queryMode = config?.setup?.query_mode ?? tableQueryModeTypes.Values.builder;
@@ -90,7 +97,9 @@ export const TableDataWidget = ({
 
   const [recordsPage, setRecordsPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(rowsShownSetting);
-  const [recordsAccumulatedData, setRecordsAccumulatedData] = useState<DatasetCollectionItems | undefined>(undefined);
+  const [recordsAccumulatedData, setRecordsAccumulatedData] = useState<DatasetCollectionItems | undefined>(
+    undefined
+  );
   const [recordsHasMore, setRecordsHasMore] = useState(true);
   const [groupedVisibleCount, setGroupedVisibleCount] = useState(rowsShownSetting);
   const [groupedRows, setGroupedRows] = useState<GroupedRow[]>([]);
@@ -117,7 +126,10 @@ export const TableDataWidget = ({
   const [columnEditFormat, setColumnEditFormat] = useState<FormatNumberTypes | undefined>(undefined);
   const [columnEditIsNumeric, setColumnEditIsNumeric] = useState(false);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
-  const [interactiveSort, setInteractiveSort] = useState<{ column: string; direction: "asc" | "desc" } | null>(null);
+  const [interactiveSort, setInteractiveSort] = useState<{
+    column: string;
+    direction: "asc" | "desc";
+  } | null>(null);
 
   const recordsScrollRef = useRef<HTMLDivElement | null>(null);
   const groupedScrollRef = useRef<HTMLDivElement | null>(null);
@@ -145,7 +157,6 @@ export const TableDataWidget = ({
     []
   );
 
-
   useEffect(() => {
     setRowsPerPage(rowsShownSetting);
   }, [rowsShownSetting]);
@@ -171,6 +182,10 @@ export const TableDataWidget = ({
   // This avoids SQL mode becoming "not configured" when projectLayers is temporarily stale.
   const recordsLayerId = selectedLayerId || layerId;
 
+  // In a public view the viewer is anonymous; preview-sql runs for them only
+  // as this published project's own saved query, so the request names it.
+  const publicProjectId = usePublicProjectId();
+
   const tableMetrics = useMemo(() => {
     if (!isGroupedMode || isSqlMode) return [] as GroupedMetricConfig[];
 
@@ -194,7 +209,13 @@ export const TableDataWidget = ({
     });
 
     return metrics;
-  }, [config?.setup?.additional_metrics, config?.setup?.operation_type, config?.setup?.operation_value, isGroupedMode, isSqlMode]);
+  }, [
+    config?.setup?.additional_metrics,
+    config?.setup?.operation_type,
+    config?.setup?.operation_value,
+    isGroupedMode,
+    isSqlMode,
+  ]);
 
   const groupedMetricLabels = useMemo(() => {
     return tableMetrics.map((metric, index) => {
@@ -212,7 +233,13 @@ export const TableDataWidget = ({
       if (metric.operation_type === "expression") return t("expression", { defaultValue: "Expression" });
       return metric.operation_type.toUpperCase();
     });
-  }, [config?.setup?.operation_type, config?.setup?.operation_value, config?.setup?.primary_metric_label, t, tableMetrics]);
+  }, [
+    config?.setup?.operation_type,
+    config?.setup?.operation_value,
+    config?.setup?.primary_metric_label,
+    t,
+    tableMetrics,
+  ]);
 
   const { layerFields, isLoading: areFieldsLoading } = useLayerFields(recordsLayerId || "");
 
@@ -231,13 +258,7 @@ export const TableDataWidget = ({
   // disappear and the viewer cannot undo what they applied.
   useEffect(() => {
     clearViewFilters();
-  }, [
-    config?.setup?.layer_project_id,
-    config?.setup?.query_mode,
-    mode,
-    filteringEnabled,
-    clearViewFilters,
-  ]);
+  }, [config?.setup?.layer_project_id, config?.setup?.query_mode, mode, filteringEnabled, clearViewFilters]);
 
   const visibleFields = useMemo(() => {
     const selectedVisibleColumns = config?.setup?.visible_columns;
@@ -295,7 +316,8 @@ export const TableDataWidget = ({
       (configuredSortBy === "grouped_value" || configuredSortBy.startsWith("metric_"));
 
     const activeSortColumn =
-      interactiveSort?.column ?? (!isGroupedOnlySortKey && configuredSortBy ? configuredSortBy : visibleFields[0]?.name);
+      interactiveSort?.column ??
+      (!isGroupedOnlySortKey && configuredSortBy ? configuredSortBy : visibleFields[0]?.name);
     const activeSortDirection = interactiveSort?.direction ?? config?.options?.sorting ?? "desc";
 
     if (activeSortColumn) {
@@ -328,7 +350,17 @@ export const TableDataWidget = ({
     const sortBy = interactiveSort?.column ?? config?.options?.sort_by ?? "";
     const sorting = interactiveSort?.direction ?? config?.options?.sorting ?? "desc";
     return `${recordsLayerId || ""}|${rowsPerPage}|${sortBy}|${sorting}|${isGroupedMode}|${isSqlMode}|${cqlFilter || ""}|${viewCqlFilter || ""}`;
-  }, [config?.options?.sort_by, config?.options?.sorting, interactiveSort, isGroupedMode, isSqlMode, cqlFilter, viewCqlFilter, recordsLayerId, rowsPerPage]);
+  }, [
+    config?.options?.sort_by,
+    config?.options?.sorting,
+    interactiveSort,
+    isGroupedMode,
+    isSqlMode,
+    cqlFilter,
+    viewCqlFilter,
+    recordsLayerId,
+    rowsPerPage,
+  ]);
 
   useEffect(() => {
     setRecordsPage(0);
@@ -463,7 +495,9 @@ export const TableDataWidget = ({
             });
           });
 
-          setGroupedRows(Array.from(groupedMap.entries()).map(([grouped_value, metrics]) => ({ grouped_value, metrics })));
+          setGroupedRows(
+            Array.from(groupedMap.entries()).map(([grouped_value, metrics]) => ({ grouped_value, metrics }))
+          );
         }
       } catch (error) {
         if (!isCancelled) {
@@ -540,11 +574,14 @@ export const TableDataWidget = ({
           limit: rowsPerPage,
           offset: pageOffset,
           filter_expr: cqlFilter ?? null,
+          project_id: publicProjectId ?? undefined,
         });
 
         if (isCancelled) return;
 
-        setSqlColumns((previous) => (sqlPage === 0 || previous.length === 0 ? result.columns || [] : previous));
+        setSqlColumns((previous) =>
+          sqlPage === 0 || previous.length === 0 ? result.columns || [] : previous
+        );
 
         const incomingRows = (result.rows || []).map((row) => row.values || {});
         setSqlRows((previous) => (sqlPage === 0 ? incomingRows : [...previous, ...incomingRows]));
@@ -572,6 +609,7 @@ export const TableDataWidget = ({
     };
   }, [
     config?.setup?.sql_query,
+    publicProjectId,
     isSqlMode,
     recordsLayerId,
     rowsPerPage,
@@ -590,7 +628,9 @@ export const TableDataWidget = ({
           : tableType === "grouped"
             ? groupedColumnWidths
             : sqlColumnWidths;
-      const currentRenderedWidth = (event.currentTarget.parentElement as HTMLElement | null)?.getBoundingClientRect().width;
+      const currentRenderedWidth = (
+        event.currentTarget.parentElement as HTMLElement | null
+      )?.getBoundingClientRect().width;
       activeResizeRef.current = {
         tableType,
         columnKey,
@@ -607,7 +647,10 @@ export const TableDataWidget = ({
       const activeResize = activeResizeRef.current;
       if (!activeResize) return;
 
-      const nextWidth = Math.max(0, Math.min(900, activeResize.startWidth + (event.clientX - activeResize.startX)));
+      const nextWidth = Math.max(
+        0,
+        Math.min(900, activeResize.startWidth + (event.clientX - activeResize.startX))
+      );
       if (activeResize.tableType === "records") {
         setRecordsColumnWidths((previous) => ({
           ...previous,
@@ -685,44 +728,48 @@ export const TableDataWidget = ({
     (fieldName: string) => {
       const isSorted = interactiveSort?.column === fieldName;
       return [
-        ...(!sortingEnabled ? [] : [
-        {
-          key: "sort-asc",
-          label: t("sort_asc"),
-          icon: <ArrowUpwardIcon />,
-          onSelect: () => setInteractiveSort({ column: fieldName, direction: "asc" }),
-        },
-        {
-          key: "sort-desc",
-          label: t("sort_desc"),
-          icon: <ArrowDownwardIcon />,
-          onSelect: () => setInteractiveSort({ column: fieldName, direction: "desc" }),
-        },
-        ...(isSorted
-          ? [
+        ...(!sortingEnabled
+          ? []
+          : [
               {
-                key: "sort-clear",
-                label: t("clear_sorting", { defaultValue: "Clear sorting" }),
-                icon: <ClearIcon />,
-                onSelect: () => setInteractiveSort(null),
+                key: "sort-asc",
+                label: t("sort_asc"),
+                icon: <ArrowUpwardIcon />,
+                onSelect: () => setInteractiveSort({ column: fieldName, direction: "asc" }),
               },
-            ]
-          : []),
-        ]),
-        ...(!filteringEnabled ? [] : [
-        {
-          key: "filter",
-          label: viewFilterController.expressions.some((e) => e.attribute === fieldName)
-            ? t("edit_filter", { defaultValue: "Edit filter" })
-            : t("add_filter", { defaultValue: "Add filter" }),
-          icon: <FilterAltIcon />,
-          dividerBefore: sortingEnabled,
-          onSelect: (anchorEl: HTMLElement) => {
-            setFilterAnchorEl(anchorEl);
-            setFilterColumn(fieldName);
-          },
-        },
-        ]),
+              {
+                key: "sort-desc",
+                label: t("sort_desc"),
+                icon: <ArrowDownwardIcon />,
+                onSelect: () => setInteractiveSort({ column: fieldName, direction: "desc" }),
+              },
+              ...(isSorted
+                ? [
+                    {
+                      key: "sort-clear",
+                      label: t("clear_sorting", { defaultValue: "Clear sorting" }),
+                      icon: <ClearIcon />,
+                      onSelect: () => setInteractiveSort(null),
+                    },
+                  ]
+                : []),
+            ]),
+        ...(!filteringEnabled
+          ? []
+          : [
+              {
+                key: "filter",
+                label: viewFilterController.expressions.some((e) => e.attribute === fieldName)
+                  ? t("edit_filter", { defaultValue: "Edit filter" })
+                  : t("add_filter", { defaultValue: "Add filter" }),
+                icon: <FilterAltIcon />,
+                dividerBefore: sortingEnabled,
+                onSelect: (anchorEl: HTMLElement) => {
+                  setFilterAnchorEl(anchorEl);
+                  setFilterColumn(fieldName);
+                },
+              },
+            ]),
       ];
     },
     [interactiveSort, t, viewFilterController.expressions, sortingEnabled, filteringEnabled]
@@ -830,15 +877,20 @@ export const TableDataWidget = ({
         const allParents = new Set(sortedGroupedRows.map((row) => row.grouped_value));
         setExpandedParents(allParents);
       } else if (isSqlCollapsibleMode && sqlGroupPrimaryColumn) {
-        const allParents = new Set(
-          sqlRows.map((row) => String(row[sqlGroupPrimaryColumn] ?? "-"))
-        );
+        const allParents = new Set(sqlRows.map((row) => String(row[sqlGroupPrimaryColumn] ?? "-")));
         setExpandedParents(allParents);
       }
     } else {
       setExpandedParents(new Set());
     }
-  }, [collapseInitial, isCollapsibleMode, isSqlCollapsibleMode, sortedGroupedRows, sqlRows, sqlGroupPrimaryColumn]);
+  }, [
+    collapseInitial,
+    isCollapsibleMode,
+    isSqlCollapsibleMode,
+    sortedGroupedRows,
+    sqlRows,
+    sqlGroupPrimaryColumn,
+  ]);
 
   const sqlColumnLabelMap = useMemo(() => {
     return config?.setup?.sql_column_labels || {};
@@ -876,7 +928,9 @@ export const TableDataWidget = ({
       if (aNull) return 1;
       if (bNull) return -1;
       if (typeof aVal === "number" && typeof bVal === "number") return (aVal - bVal) * dirMul;
-      return String(aVal).localeCompare(String(bVal), undefined, { numeric: true, sensitivity: "base" }) * dirMul;
+      return (
+        String(aVal).localeCompare(String(bVal), undefined, { numeric: true, sensitivity: "base" }) * dirMul
+      );
     });
   }, [sqlRows, interactiveSort, isSqlCollapsibleMode]);
 
@@ -906,44 +960,54 @@ export const TableDataWidget = ({
 
   const hasMoreGroupedRows = groupedVisibleCount < sortedGroupedRows.length;
 
-  const groupedTableColumns = useMemo(
-    () => {
-      const baseColumns = [
-        {
-          key: "grouped_value",
-          label: config?.setup?.group_by_label || config?.setup?.group_by_column_name || t("group", { defaultValue: "Group" }),
-          align: "left" as const,
-        },
-        ...(!isCollapsibleMode && hasSecondaryGroup
-          ? [
-              {
-                key: "grouped_secondary_value",
-                label:
-                  config?.setup?.group_by_secondary_label ||
-                  config?.setup?.group_by_secondary_column_name ||
-                  t("secondary_group", { defaultValue: "Secondary group" }),
-                align: "left" as const,
-              },
-            ]
-          : []),
-        ...groupedMetricLabels.map((label, index) => ({
-          key: `metric_${index}`,
-          label,
-          align: "right" as const,
-        })),
-      ];
+  const groupedTableColumns = useMemo(() => {
+    const baseColumns = [
+      {
+        key: "grouped_value",
+        label:
+          config?.setup?.group_by_label ||
+          config?.setup?.group_by_column_name ||
+          t("group", { defaultValue: "Group" }),
+        align: "left" as const,
+      },
+      ...(!isCollapsibleMode && hasSecondaryGroup
+        ? [
+            {
+              key: "grouped_secondary_value",
+              label:
+                config?.setup?.group_by_secondary_label ||
+                config?.setup?.group_by_secondary_column_name ||
+                t("secondary_group", { defaultValue: "Secondary group" }),
+              align: "left" as const,
+            },
+          ]
+        : []),
+      ...groupedMetricLabels.map((label, index) => ({
+        key: `metric_${index}`,
+        label,
+        align: "right" as const,
+      })),
+    ];
 
-      const configuredOrder = config?.setup?.grouped_column_order || [];
-      if (!configuredOrder.length) return baseColumns;
+    const configuredOrder = config?.setup?.grouped_column_order || [];
+    if (!configuredOrder.length) return baseColumns;
 
-      const byKey = new Map(baseColumns.map((column) => [column.key, column]));
-      const ordered = configuredOrder.map((key) => byKey.get(key)).filter(Boolean) as typeof baseColumns;
-      const missing = baseColumns.filter((column) => !configuredOrder.includes(column.key));
+    const byKey = new Map(baseColumns.map((column) => [column.key, column]));
+    const ordered = configuredOrder.map((key) => byKey.get(key)).filter(Boolean) as typeof baseColumns;
+    const missing = baseColumns.filter((column) => !configuredOrder.includes(column.key));
 
-      return [...ordered, ...missing];
-    },
-    [config?.setup?.group_by_column_name, config?.setup?.group_by_label, config?.setup?.group_by_secondary_column_name, config?.setup?.group_by_secondary_label, config?.setup?.grouped_column_order, groupedMetricLabels, hasSecondaryGroup, isCollapsibleMode, t]
-  );
+    return [...ordered, ...missing];
+  }, [
+    config?.setup?.group_by_column_name,
+    config?.setup?.group_by_label,
+    config?.setup?.group_by_secondary_column_name,
+    config?.setup?.group_by_secondary_label,
+    config?.setup?.grouped_column_order,
+    groupedMetricLabels,
+    hasSecondaryGroup,
+    isCollapsibleMode,
+    t,
+  ]);
 
   const groupedTableRows = useMemo(() => {
     if (!isCollapsibleMode) {
@@ -999,7 +1063,10 @@ export const TableDataWidget = ({
       if (isExpanded) {
         // Sub-header row showing the secondary column name
         const subHeaderRow: Record<string, unknown> = {
-          grouped_value: config?.setup?.group_by_secondary_label || config?.setup?.group_by_secondary_column_name || t("secondary_group", { defaultValue: "Secondary group" }),
+          grouped_value:
+            config?.setup?.group_by_secondary_label ||
+            config?.setup?.group_by_secondary_column_name ||
+            t("secondary_group", { defaultValue: "Secondary group" }),
           _isSubHeader: true,
         };
         groupedMetricLabels.forEach((label, metricIndex) => {
@@ -1021,7 +1088,17 @@ export const TableDataWidget = ({
     });
 
     return rows;
-  }, [config?.setup?.group_by_secondary_column_name, config?.setup?.group_by_secondary_label, expandedParents, groupedMetricLabels, hasSecondaryGroup, isCollapsibleMode, showSubtotals, t, visibleGroupedRows]);
+  }, [
+    config?.setup?.group_by_secondary_column_name,
+    config?.setup?.group_by_secondary_label,
+    expandedParents,
+    groupedMetricLabels,
+    hasSecondaryGroup,
+    isCollapsibleMode,
+    showSubtotals,
+    t,
+    visibleGroupedRows,
+  ]);
 
   const groupedTotalsRow = useMemo(() => {
     if (!totalGroupedMetrics.some((value) => value !== null)) return undefined;
@@ -1035,7 +1112,10 @@ export const TableDataWidget = ({
   const formatRecordCell = useCallback(
     (columnKey: string, value: unknown) => {
       if (value === null || value === undefined) return "";
-      if (recordNumericFieldNames.has(columnKey) && (typeof value === "number" || typeof value === "string")) {
+      if (
+        recordNumericFieldNames.has(columnKey) &&
+        (typeof value === "number" || typeof value === "string")
+      ) {
         const parsed = typeof value === "number" ? value : Number(value);
         if (Number.isFinite(parsed)) {
           return formatNumber(parsed, getColumnFormat(columnKey), i18n.language);
@@ -1068,7 +1148,9 @@ export const TableDataWidget = ({
           return (
             <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
               <ArrowIcon sx={{ fontSize: 18, color: "text.secondary", flexShrink: 0 }} />
-              <Box component="span" sx={{ fontWeight: 600 }}>{groupLabel(value, primaryColumn)}</Box>
+              <Box component="span" sx={{ fontWeight: 600 }}>
+                {groupLabel(value, primaryColumn)}
+              </Box>
               <Box component="span" sx={{ color: "text.disabled", fontSize: "0.75rem", ml: 0.25 }}>
                 ({childCount})
               </Box>
@@ -1077,7 +1159,9 @@ export const TableDataWidget = ({
         }
         if (isCollapsibleMode && row?._isSubHeader) {
           return (
-            <Box component="span" sx={{ pl: 3.5, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+            <Box
+              component="span"
+              sx={{ pl: 3.5, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
               {groupLabel(value, secondaryColumn ?? primaryColumn)}
             </Box>
           );
@@ -1119,44 +1203,38 @@ export const TableDataWidget = ({
     ]
   );
 
-  const sqlTableColumns = useMemo(
-    () => {
-      const baseColumns = sqlColumns.map((column, index) => {
-        const align: "left" | "right" =
-          index === 0 || !sqlNumericColumnNames.includes(column.name) ? "left" : "right";
+  const sqlTableColumns = useMemo(() => {
+    const baseColumns = sqlColumns.map((column, index) => {
+      const align: "left" | "right" =
+        index === 0 || !sqlNumericColumnNames.includes(column.name) ? "left" : "right";
 
-        return {
-          key: column.name,
-          label: sqlColumnLabelMap[column.name] || column.name,
-          align,
-        };
-      });
+      return {
+        key: column.name,
+        label: sqlColumnLabelMap[column.name] || column.name,
+        align,
+      };
+    });
 
-      const configuredOrder = config?.setup?.sql_column_order || [];
-      if (!configuredOrder.length) return baseColumns;
+    const configuredOrder = config?.setup?.sql_column_order || [];
+    if (!configuredOrder.length) return baseColumns;
 
-      const byKey = new Map(baseColumns.map((column) => [column.key, column]));
-      const ordered = configuredOrder.map((key) => byKey.get(key)).filter(Boolean) as typeof baseColumns;
-      const missing = baseColumns.filter((column) => !configuredOrder.includes(column.key));
+    const byKey = new Map(baseColumns.map((column) => [column.key, column]));
+    const ordered = configuredOrder.map((key) => byKey.get(key)).filter(Boolean) as typeof baseColumns;
+    const missing = baseColumns.filter((column) => !configuredOrder.includes(column.key));
 
-      return [...ordered, ...missing];
-    },
-    [config?.setup?.sql_column_order, sqlColumnLabelMap, sqlColumns, sqlNumericColumnNames]
-  );
+    return [...ordered, ...missing];
+  }, [config?.setup?.sql_column_order, sqlColumnLabelMap, sqlColumns, sqlNumericColumnNames]);
 
-  const reorderKeys = useCallback(
-    (keys: string[], fromColumnKey: string, toColumnKey: string) => {
-      const fromIndex = keys.indexOf(fromColumnKey);
-      const toIndex = keys.indexOf(toColumnKey);
-      if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return keys;
+  const reorderKeys = useCallback((keys: string[], fromColumnKey: string, toColumnKey: string) => {
+    const fromIndex = keys.indexOf(fromColumnKey);
+    const toIndex = keys.indexOf(toColumnKey);
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return keys;
 
-      const next = [...keys];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    },
-    []
-  );
+    const next = [...keys];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    return next;
+  }, []);
 
   const handleReorderColumn = useCallback(
     (tableType: "records" | "grouped" | "sql", fromColumnKey: string, toColumnKey: string) => {
@@ -1165,10 +1243,9 @@ export const TableDataWidget = ({
       const currentSetup = { ...(config?.setup || {}) } as TableDataSchema["setup"];
 
       if (tableType === "records") {
-        const current =
-          currentSetup.visible_columns?.length
-            ? [...currentSetup.visible_columns]
-            : visibleFields.map((field) => field.name);
+        const current = currentSetup.visible_columns?.length
+          ? [...currentSetup.visible_columns]
+          : visibleFields.map((field) => field.name);
         const nextColumns = reorderKeys(current, fromColumnKey, toColumnKey);
         currentSetup.visible_columns = nextColumns;
       }
@@ -1212,7 +1289,10 @@ export const TableDataWidget = ({
     (columnKey: string, value: unknown) => {
       if (value === null || value === undefined) return "-";
       if (typeof value === "string" && value === "-") return value;
-      if (sqlNumericColumnNames.includes(columnKey) && (typeof value === "number" || typeof value === "string")) {
+      if (
+        sqlNumericColumnNames.includes(columnKey) &&
+        (typeof value === "number" || typeof value === "string")
+      ) {
         const parsed = typeof value === "number" ? value : Number(value);
         if (Number.isFinite(parsed)) {
           return formatNumber(parsed, getColumnFormat(columnKey), i18n.language);
@@ -1263,7 +1343,7 @@ export const TableDataWidget = ({
         sqlNumericColumnNames.forEach((numCol) => {
           if (numCol === sqlGroupPrimaryColumn || numCol === sqlGroupSecondaryColumn) return;
           parentRow[numCol] = children.reduce((sum, child) => {
-            const val = typeof child[numCol] === "number" ? child[numCol] as number : Number(child[numCol]);
+            const val = typeof child[numCol] === "number" ? (child[numCol] as number) : Number(child[numCol]);
             return sum + (Number.isFinite(val) ? val : 0);
           }, 0);
         });
@@ -1274,7 +1354,8 @@ export const TableDataWidget = ({
       if (isExpanded) {
         // Sub-header row showing secondary column name + metric column names
         const subHeaderRow: Record<string, unknown> = {
-          [sqlGroupPrimaryColumn]: sqlTableColumns.find((c) => c.key === sqlGroupSecondaryColumn)?.label || sqlGroupSecondaryColumn,
+          [sqlGroupPrimaryColumn]:
+            sqlTableColumns.find((c) => c.key === sqlGroupSecondaryColumn)?.label || sqlGroupSecondaryColumn,
           _isSubHeader: true,
         };
         sqlTableColumns.forEach((col) => {
@@ -1297,7 +1378,16 @@ export const TableDataWidget = ({
     });
 
     return rows;
-  }, [expandedParents, isSqlCollapsibleMode, showSubtotals, sqlGroupPrimaryColumn, sqlGroupSecondaryColumn, sqlNumericColumnNames, sqlRows, sqlTableColumns]);
+  }, [
+    expandedParents,
+    isSqlCollapsibleMode,
+    showSubtotals,
+    sqlGroupPrimaryColumn,
+    sqlGroupSecondaryColumn,
+    sqlNumericColumnNames,
+    sqlRows,
+    sqlTableColumns,
+  ]);
 
   const formatSqlCellCollapsible = useCallback(
     (columnKey: string, value: unknown, row?: Record<string, unknown>) => {
@@ -1309,7 +1399,9 @@ export const TableDataWidget = ({
           return (
             <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>
               <ArrowIcon sx={{ fontSize: 18, color: "text.secondary", flexShrink: 0 }} />
-              <Box component="span" sx={{ fontWeight: 600 }}>{String(value ?? "-")}</Box>
+              <Box component="span" sx={{ fontWeight: 600 }}>
+                {String(value ?? "-")}
+              </Box>
               <Box component="span" sx={{ color: "text.disabled", fontSize: "0.75rem", ml: 0.25 }}>
                 ({childCount})
               </Box>
@@ -1318,7 +1410,9 @@ export const TableDataWidget = ({
         }
         if (row?._isSubHeader) {
           return (
-            <Box component="span" sx={{ pl: 3.5, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
+            <Box
+              component="span"
+              sx={{ pl: 3.5, fontWeight: 600, fontSize: "0.75rem", color: "text.secondary" }}>
               {String(value ?? "-")}
             </Box>
           );
@@ -1350,7 +1444,11 @@ export const TableDataWidget = ({
   const hasMoreSqlRows = sqlHasMore;
 
   useEffect(() => {
-    const container = isSqlMode ? sqlScrollRef.current : isGroupedMode ? groupedScrollRef.current : recordsScrollRef.current;
+    const container = isSqlMode
+      ? sqlScrollRef.current
+      : isGroupedMode
+        ? groupedScrollRef.current
+        : recordsScrollRef.current;
     if (!container) return;
 
     const measureHeights = () => {
@@ -1451,8 +1549,8 @@ export const TableDataWidget = ({
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  // Re-create when data changes (sentinel position moves) or loading finishes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Re-create when data changes (sentinel position moves) or loading finishes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displayRecordsData, hasMoreRecords, isRecordsLoading, isGroupedMode, isSqlMode]);
 
   useEffect(() => {
@@ -1525,7 +1623,7 @@ export const TableDataWidget = ({
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMoreSqlRows, isSqlLoading, isSqlNextPagePending, isGroupedMode, isSqlMode]);
 
   const handleSqlWheel = useCallback(
@@ -1622,10 +1720,23 @@ export const TableDataWidget = ({
     return () => {
       window.clearTimeout(persistTimer);
     };
-  }, [areWidthsHydrated, groupedColumnWidths, isResizingColumns, recordsColumnWidths, sqlColumnWidths, widthStorageKey]);
+  }, [
+    areWidthsHydrated,
+    groupedColumnWidths,
+    isResizingColumns,
+    recordsColumnWidths,
+    sqlColumnWidths,
+    widthStorageKey,
+  ]);
 
-  const recordsColWidth = useCallback((columnKey: string) => recordsColumnWidths[columnKey], [recordsColumnWidths]);
-  const groupedColWidth = useCallback((columnKey: string) => groupedColumnWidths[columnKey], [groupedColumnWidths]);
+  const recordsColWidth = useCallback(
+    (columnKey: string) => recordsColumnWidths[columnKey],
+    [recordsColumnWidths]
+  );
+  const groupedColWidth = useCallback(
+    (columnKey: string) => groupedColumnWidths[columnKey],
+    [groupedColumnWidths]
+  );
 
   const sqlColWidth = useCallback((columnKey: string) => sqlColumnWidths[columnKey], [sqlColumnWidths]);
 
@@ -1786,7 +1897,9 @@ export const TableDataWidget = ({
               ? isGroupedLoading && groupedRows.length === 0
               : isRecordsLoading && !displayRecordsData
         }
-        isNotConfigured={isSqlMode ? !isSqlConfigured : isGroupedMode ? !isGroupedConfigured : !isRecordsConfigured}
+        isNotConfigured={
+          isSqlMode ? !isSqlConfigured : isGroupedMode ? !isGroupedConfigured : !isRecordsConfigured
+        }
         isNotConfiguredMessage={isLayerLocked ? t("layer_locked_hint") : undefined}
         isError={isSqlMode ? !!sqlError : isGroupedMode ? !!groupedError : !!isRecordsError}
         height={140}
@@ -1797,8 +1910,7 @@ export const TableDataWidget = ({
           {filteringEnabled && viewFilterController.expressions.length > 0 && (
             <Stack direction="row" flexWrap="wrap" gap={1} sx={{ pb: 2 }}>
               {viewFilterController.expressions.map((expression) => {
-                const columnLabel =
-                  recordColumnLabelMap[expression.attribute] || expression.attribute;
+                const columnLabel = recordColumnLabelMap[expression.attribute] || expression.attribute;
                 const operatorLabel = t(`filter_expressions.${expression.expression}`);
                 const valueLabel = filterValueLabel(
                   filterColumnType(
@@ -1810,9 +1922,7 @@ export const TableDataWidget = ({
                 );
                 // A chip has to stay narrow enough that several fit on one row, so
                 // long values still truncate — the tooltip is how you read them.
-                const fullLabel = [columnLabel, operatorLabel, valueLabel]
-                  .filter(Boolean)
-                  .join(" ");
+                const fullLabel = [columnLabel, operatorLabel, valueLabel].filter(Boolean).join(" ");
                 return (
                   <Tooltip key={expression.id} title={fullLabel} placement="top">
                     <Chip
@@ -1831,10 +1941,7 @@ export const TableDataWidget = ({
               })}
             </Stack>
           )}
-          <Box
-            ref={recordsScrollRef}
-            sx={tableScrollSx}
-            onWheel={trapWheelInTable}>
+          <Box ref={recordsScrollRef} sx={tableScrollSx} onWheel={trapWheelInTable}>
             <FeatureTable
               fields={visibleFields}
               data={displayRecordsData}
@@ -1846,7 +1953,12 @@ export const TableDataWidget = ({
               getColumnWidth={recordsColWidth}
               formatCellValue={formatRecordCell}
               renderHeaderLabel={(fieldName, label) =>
-                renderHeaderLabel(`record:${fieldName}`, label, "left", recordNumericFieldNames.has(fieldName))
+                renderHeaderLabel(
+                  `record:${fieldName}`,
+                  label,
+                  "left",
+                  recordNumericFieldNames.has(fieldName)
+                )
               }
               onReorderColumns={(fromColumnKey, toColumnKey) => {
                 handleReorderColumn("records", fromColumnKey, toColumnKey);
@@ -1856,9 +1968,7 @@ export const TableDataWidget = ({
                   ? undefined
                   : (event, fieldName) => startColumnResize(event, "records", fieldName)
               }
-              columnMenuItems={
-                sortingEnabled || filteringEnabled ? recordColumnMenuItems : undefined
-              }
+              columnMenuItems={sortingEnabled || filteringEnabled ? recordColumnMenuItems : undefined}
               sortColumn={interactiveSort?.column}
               sortDirection={interactiveSort?.direction}
             />
@@ -1892,7 +2002,9 @@ export const TableDataWidget = ({
                 </Typography>
               }
               getColumnWidth={groupedColWidth}
-              renderHeaderLabel={(columnKey, label, align) => renderHeaderLabel(columnKey, label, align || "left", columnKey.startsWith("metric_"))}
+              renderHeaderLabel={(columnKey, label, align) =>
+                renderHeaderLabel(columnKey, label, align || "left", columnKey.startsWith("metric_"))
+              }
               onReorderColumns={(fromColumnKey, toColumnKey) => {
                 handleReorderColumn("grouped", fromColumnKey, toColumnKey);
               }}
@@ -1937,10 +2049,7 @@ export const TableDataWidget = ({
 
       {isSqlMode && isSqlConfigured && (
         <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <Box
-            ref={sqlScrollRef}
-            sx={tableScrollSx}
-            onWheel={handleSqlWheel}>
+          <Box ref={sqlScrollRef} sx={tableScrollSx} onWheel={handleSqlWheel}>
             <WidgetAggregateTable
               stickyHeaderEnabled={stickyHeaderEnabled}
               headerColor={headerColor}
@@ -1953,7 +2062,14 @@ export const TableDataWidget = ({
                 </Typography>
               }
               getColumnWidth={sqlColWidth}
-              renderHeaderLabel={(columnKey, label, align) => renderHeaderLabel(`sql:${columnKey}`, label, align || "left", sqlNumericColumnNames.includes(columnKey))}
+              renderHeaderLabel={(columnKey, label, align) =>
+                renderHeaderLabel(
+                  `sql:${columnKey}`,
+                  label,
+                  align || "left",
+                  sqlNumericColumnNames.includes(columnKey)
+                )
+              }
               onReorderColumns={(fromColumnKey, toColumnKey) => {
                 handleReorderColumn("sql", fromColumnKey, toColumnKey);
               }}

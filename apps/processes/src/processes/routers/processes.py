@@ -56,6 +56,7 @@ from processes.services.analytics_registry import (
 )
 from processes.services.analytics_service import AnalyticsService
 from processes.services.beta_access import get_beta_email_domains, is_beta_user_email
+from processes.services.public_search_config import get_public_sql_scope
 from processes.services.tool_registry import tool_registry
 from processes.services.windmill_client import (
     WindmillClient,
@@ -96,6 +97,9 @@ OGC_EXCEPTION_NOT_AUTHORIZED = (
 OGC_EXCEPTION_TOO_MANY_REQUESTS = (
     "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/too-many-requests"
 )
+OGC_EXCEPTION_JOB_EXECUTION_FAILED = (
+    "http://www.opengis.net/def/exceptions/ogcapi-processes-1/1.0/job-execution-failed"
+)
 
 # Processes that can be executed without authentication (read-only analytics)
 # These are sync processes that only query data and don't modify anything
@@ -112,10 +116,11 @@ PUBLIC_ALLOWED_PROCESSES = frozenset(
         # computed here, gated by a public `project_id`. `layer-search` keeps
         # its own gate (public `project_id`, or auth for an explicit `layers`
         # list). `preview-sql`/`validate-sql` are NOT here: they take arbitrary
-        # SQL and a raw `layers` list, their only callers (the formula builder
-        # and the table widget) are authenticated, and a public seat would be
-        # unauthenticated read of any layer plus local-file/SSRF reach through
-        # DuckDB.
+        # SQL and a raw `layers` list, and an open seat would be unauthenticated
+        # read of any layer plus local-file/SSRF reach through DuckDB. A public
+        # dashboard's table widget still needs preview-sql, so it has its own
+        # narrow gate (`_authorize_public_preview_sql`): a published project's
+        # saved query over that project's own layers, nothing else.
         "layer-search",
     }
 )
@@ -131,6 +136,71 @@ SYNC_ANALYTICS_PROCESSES = PUBLIC_ALLOWED_PROCESSES | {"preview-sql", "validate-
 # unboundedly when the analytics pool is saturated.
 _LAYER_SEARCH_MAX_INFLIGHT = 8
 _layer_search_inflight = 0
+
+
+def _authorize_public_preview_sql(inputs: dict[str, Any]) -> None:
+    """Let an anonymous preview-sql run only as a published project's own widget.
+
+    The request must name a published project, and both the query and every
+    layer it reads must be part of that project's published snapshot: the
+    viewer re-runs what the author saved, nothing else. Raises the HTTP error
+    to return otherwise.
+    """
+    project_id = inputs.get("project_id")
+    if not project_id:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "type": OGC_EXCEPTION_NOT_AUTHORIZED,
+                "title": "Authentication required",
+                "status": 401,
+                "detail": "Authentication required for this process",
+            },
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        scope = get_public_sql_scope(str(project_id))
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "type": OGC_EXCEPTION_INVALID_PARAMETER,
+                "title": "Invalid parameter",
+                "status": 422,
+                "detail": "project_id must be a UUID",
+            },
+        )
+    except Exception as e:
+        # Infra failures (e.g. Postgres unreachable) carry the connection URI,
+        # password included, in their message. This path is unauthenticated.
+        logger.error("get_public_sql_scope failed for project %s: %s", project_id, e)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "type": OGC_EXCEPTION_JOB_EXECUTION_FAILED,
+                "title": "Service unavailable",
+                "status": 503,
+                "detail": "preview temporarily unavailable",
+            },
+        )
+    layers = inputs.get("layers") or {}
+    layer_ids = set(layers.values()) if isinstance(layers, dict) else set()
+    allowed = (
+        scope is not None
+        and inputs.get("sql_query") in scope["queries"]
+        and bool(layer_ids)
+        and layer_ids <= scope["layer_ids"]
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "type": OGC_EXCEPTION_NOT_AUTHORIZED,
+                "title": "Forbidden",
+                "status": 403,
+                "detail": "Query is not part of the published project",
+            },
+        )
 
 
 def is_public_allowed_process(process_id: str) -> bool:
@@ -554,7 +624,12 @@ async def execute_process(
     # preview-sql and validate-sql among them — requires a caller, so an
     # unauthenticated request cannot reach arbitrary SQL over a layer.
     if process_id in SYNC_ANALYTICS_PROCESSES:
-        if not is_public_allowed_process(process_id) and user_id is None:
+        if process_id == "preview-sql":
+            if user_id is None:
+                _authorize_public_preview_sql(execute_request.inputs)
+            # Consumed by the gate above; preview_sql itself takes no project.
+            execute_request.inputs.pop("project_id", None)
+        elif not is_public_allowed_process(process_id) and user_id is None:
             raise HTTPException(
                 status_code=401,
                 detail={

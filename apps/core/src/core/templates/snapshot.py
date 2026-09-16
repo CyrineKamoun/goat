@@ -67,6 +67,15 @@ def detect_workflow_inputs(config: dict[str, Any]) -> list[DetectedInput]:
     return detected
 
 
+# Map-element config that describes the source project rather than the layout.
+_MAP_ELEMENT_PROJECT_STATE = (
+    "viewState",
+    "locked_layer_ids",
+    "locked_layer_styles",
+    "locked_basemap_url",
+)
+
+
 def strip_layout_bindings(config: dict[str, Any]) -> dict[str, Any]:
     """Strip every project-layer binding from a report layout config.
 
@@ -74,8 +83,13 @@ def strip_layout_bindings(config: dict[str, Any]) -> dict[str, Any]:
     each element's ``map_config.layers`` emptied, any
     ``config.setup.layer_project_id`` / ``config.layer_project_id`` on chart
     and table elements removed, and the atlas feature-coverage
-    ``layer_project_id`` removed. Page setup, grid, theme, positions and
-    styles are copied through unchanged.
+    ``layer_project_id`` removed. A map element also loses its ``viewState``
+    and its locked-layer snapshot (``locked_layer_ids`` are layer_project ids
+    of the source project; the styles and basemap were captured from it), so
+    the layout opens on the target project's own view and layers; the
+    ``lock_layers`` / ``lock_styles`` flags stay and the editor re-captures
+    the snapshot there. Page setup, grid, theme, positions and styles are
+    copied through unchanged.
     """
     result = copy.deepcopy(config)
     for element in result.get("elements", []):
@@ -84,6 +98,9 @@ def strip_layout_bindings(config: dict[str, Any]) -> dict[str, Any]:
             map_config["layers"] = []
         element_config = element.get("config")
         if isinstance(element_config, dict):
+            if element.get("type") == "map":
+                for key in _MAP_ELEMENT_PROJECT_STATE:
+                    element_config.pop(key, None)
             setup = element_config.get("setup")
             if isinstance(setup, dict):
                 setup.pop("layer_project_id", None)

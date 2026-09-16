@@ -99,7 +99,7 @@ class ProjectExportRunner(SimpleToolRunner):
             # 1. Project record
             project_row = await conn.fetchrow(
                 f"""
-                SELECT id, name, description, basemap, custom_basemaps,
+                SELECT id, user_id, name, description, basemap, custom_basemaps,
                        max_extent, builder_config, tags, thumbnail_url
                 FROM {schema}.project
                 WHERE id = $1
@@ -126,20 +126,32 @@ class ProjectExportRunner(SimpleToolRunner):
             if thumb_url and not thumb_url.startswith("http"):
                 thumbnail_s3_key = thumb_url
 
-            # 3. UserProjectLink — initial_view_state
-            user_project_row = await conn.fetchrow(
+            # 3. UserProjectLink — initial_view_state. The exporter's own row
+            # when they have one; otherwise the owner's, which is the view the
+            # project actually opens to. Someone exporting a shared project they
+            # never opened has no row at all, and the key is left out so the
+            # importer applies its default rather than inserting NULL.
+            owner_uuid: uuid.UUID | None = project_row["user_id"]
+            view_candidates = [
+                uid for uid in dict.fromkeys((user_uuid, owner_uuid)) if uid
+            ]
+            view_rows = await conn.fetch(
                 f"""
-                SELECT initial_view_state
+                SELECT user_id, initial_view_state
                 FROM {schema}.user_project
-                WHERE project_id = $1 AND user_id = $2
+                WHERE project_id = $1 AND user_id = ANY($2::uuid[])
                 """,
                 project_uuid,
-                user_uuid,
+                view_candidates,
             )
-            if user_project_row is not None:
-                project_metadata["initial_view_state"] = user_project_row[
-                    "initial_view_state"
-                ]
+            view_by_user = {
+                row["user_id"]: row["initial_view_state"] for row in view_rows
+            }
+            initial_view_state = view_by_user.get(user_uuid) or view_by_user.get(
+                owner_uuid
+            )
+            if initial_view_state:
+                project_metadata["initial_view_state"] = initial_view_state
 
             # 4. LayerProjectLinks + Layer records
             lp_rows = await conn.fetch(
@@ -156,6 +168,7 @@ class ProjectExportRunner(SimpleToolRunner):
 
             # Fetch layers in batch
             layers_by_id: dict[str, dict[str, Any]] = {}
+            layer_rows: list[Any] = []
             if layer_ids:
                 layer_rows = await conn.fetch(
                     f"""
@@ -299,15 +312,25 @@ class ProjectExportRunner(SimpleToolRunner):
                 for row in rpt_rows
             ]
 
-            # 8. UploadedAssets — scan layer properties for S3 key references
+            # 8. UploadedAssets — scan layer properties for S3 key references.
+            # Icons and images are owned by whoever uploaded them: the exporter,
+            # the project owner, or the owner of a layer in the project. All of
+            # those are candidates; the reference scan below decides.
+            asset_owner_ids = [
+                uid
+                for uid in dict.fromkeys(
+                    (user_uuid, owner_uuid, *(row["user_id"] for row in layer_rows))
+                )
+                if uid
+            ]
             asset_rows = await conn.fetch(
                 f"""
                 SELECT id, s3_key, file_name, display_name, category,
                        mime_type, file_size, asset_type, content_hash
                 FROM {schema}.uploaded_asset
-                WHERE user_id = $1
+                WHERE user_id = ANY($1::uuid[])
                 """,
-                user_uuid,
+                asset_owner_ids,
             )
 
             # Build a combined string from layer JSONB fields for searching

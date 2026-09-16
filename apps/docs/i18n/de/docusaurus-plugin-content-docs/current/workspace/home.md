@@ -4,41 +4,34 @@ sidebar_position: 2
 
 # Startseite
 
-Wenn Sie sich bei GOAT anmelden, gelangen Sie zur **Startseite** - Ihr zentrales Dashboard für den Zugriff auf **Projekte**, **Datensätze** und um mit den neuesten Inhalten auf dem Laufenden zu bleiben. Die Startseite bietet:
-- Zugriff auf Ihre [Neuesten Projekte](#neueste-projekte)
-- Zugriff auf Ihre [Neuesten Datensätze](#neueste-datensätze)
-- Zugriff auf den [Entdecken](#entdecken)-Bereich mit Blog-Posts und anderen wertvollen Ressourcen.
+Nach der Anmeldung bei GOAT landen Sie auf der Startseite — **dem Ausgangspunkt, um zu Ihrer Arbeit zurückzufinden oder etwas Neues zu beginnen**.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/home/home_de.webp').default} alt="Startseite Oberfläche Übersicht in GOAT" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/workspace/home/home_general_de.webp').default} alt="Die Startseite in GOAT" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
 </div>
 
-## Neueste Projekte
+## Suche
 
-Dieser Bereich zeigt Ihre zuletzt aufgerufenen **Projekte** zusammen mit ihren letzten Aktualisierungszeitpunkten. Sie können schnell mit der Arbeit beginnen, indem Sie:
+Die Suche findet Projekte, Datensätze und Vorlagen in allen Bereichen, auf die Sie zugreifen können. Mit `⌘K` (oder `Strg+K`) öffnen Sie sie von überall aus, ohne zur Maus zu greifen.
 
-- Ein neues **Projekt** mit dem **+ Symbol** erstellen
-- Auf alle Ihre **Projekte** zugreifen, indem Sie auf **Alle anzeigen** klicken, um die [Projekte](../workspace/projects) Seite zu besuchen
+## Etwas Neues beginnen
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/home/recent_projects_de.webp').default} alt="Neueste Projekte" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
-</div>
+Unter dem Suchfeld stehen drei Schaltflächen:
 
-## Neueste Datensätze
+- `Neues Projekt` — ein Projekt anlegen, wahlweise aus einer Vorlage
+- `Datensatz hinzufügen` — einen Datensatz hochladen oder eine externe Quelle verbinden
+- `Katalog durchsuchen` — den [Katalog](../workspace/catalog.md) öffnen, um fertige Daten zu finden
 
-Dieser Bereich zeigt Ihre zuletzt aufgerufenen **Datensätze** mit ihren letzten Aktualisierungsinformationen. Sie können Ihre **Daten** verwalten, indem Sie:
+## Weitermachen
 
-- Einen neuen **Datensatz** mit dem **+ Symbol** hinzufügen
-- Alle Ihre **Datensätze** anzeigen, indem Sie auf **Alle anzeigen** klicken, um die [Datensätze](../workspace/datasets) Seite zu besuchen
+Ihre zuletzt geöffneten Projekte, die neuesten zuerst. Jedes zeigt, wann Sie zuletzt daran gearbeitet haben und ob es geteilt ist. Über `Alle Projekte` sehen Sie sämtliche Projekte auf der Seite [Inhalt](../workspace/content.md).
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/home/recent_datasets_de.webp').default} alt="Neueste Datensätze" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
-</div>
+## Mit einer Vorlage starten
 
-## Entdecken
+Mit Vorlagen beginnen Sie mit einem bereits eingerichteten Projekt, Workflow, Dashboard oder Layout. Filtern Sie die Reihe nach Art — `Workflow`, `Dashboard` oder `Layout` — und danach, woher die Vorlage stammt: `Alle`, `GOAT`, `Meine`, `Team` oder `Organisation`. Über `Alle Vorlagen` gelangen Sie zur vollständigen Übersicht.
 
-Der Entdecken-Bereich hält Sie mit den neuesten Blog-Posts und wertvollen Ressourcen aus der GOAT-Community auf dem Laufenden. Bleiben Sie aktuell, indem Sie auf **Blog besuchen** klicken, um alle [Blog-Posts](https://plan4better.de/en/blog/) aufzurufen und neue Features, Tutorials und Einblicke zu entdecken.
+## Erste Schritte
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/home/explore_de.webp').default} alt="Entdecken" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
-</div>
+Solange Sie neu in GOAT sind, zeigt die Kopfzeile einen **Erste Schritte**-Ring mit Ihrem Fortschritt durch eine kurze Checkliste. Ein Klick darauf zeigt die offenen Schritte, führt direkt zu einem davon oder überspringt die Einführung ganz. Der Ring verschwindet, sobald Sie fertig sind oder die Einführung übersprungen haben.
+
+Über den Projektreihen finden Sie außerdem Verweise, die einen ersten Blick lohnen: eine schriftliche Einführung in GOAT, diese Dokumentationsseiten und ein kurzes Video.

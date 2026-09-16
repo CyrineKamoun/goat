@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import type { ProjectLayer } from "@/lib/validations/project";
+import { lockSnapshot, visibleProjectLayers } from "@/lib/print/mapElements";
 import type { ReportElement } from "@/lib/validations/reportLayout";
 
 import type { SelectorItem } from "@/types/map/common";
@@ -184,36 +185,13 @@ const MapElementConfig: React.FC<MapElementConfigProps> = ({ element, projectLay
 
   // Layer lock handlers
   const captureLayerSnapshot = (layers: boolean, styles: boolean) => {
-    const visibleLayers = projectLayers.filter((layer) => {
-      const props = layer.properties as Record<string, unknown>;
-      return props.visibility !== false;
+    onChange({
+      config: lockSnapshot(
+        { ...element.config, lock_layers: layers, lock_styles: styles },
+        visibleProjectLayers(projectLayers),
+        basemapUrl
+      ),
     });
-
-    const updates: Record<string, unknown> = {
-      ...element.config,
-      lock_layers: layers,
-      lock_styles: styles,
-    };
-
-    if (layers) {
-      updates.locked_layer_ids = visibleLayers.map((l) => l.id);
-      updates.locked_basemap_url = basemapUrl;
-      if (styles) {
-        const stylesMap: Record<number, Record<string, unknown>> = {};
-        visibleLayers.forEach((l) => {
-          stylesMap[l.id] = JSON.parse(JSON.stringify(l.properties));
-        });
-        updates.locked_layer_styles = stylesMap;
-      } else {
-        updates.locked_layer_styles = undefined;
-      }
-    } else {
-      updates.locked_layer_ids = undefined;
-      updates.locked_layer_styles = undefined;
-      updates.locked_basemap_url = undefined;
-    }
-
-    onChange({ config: updates });
   };
 
   const handleLockLayersChange = (_event: React.ChangeEvent<HTMLInputElement>, checked: boolean) => {

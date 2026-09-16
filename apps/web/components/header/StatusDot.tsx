@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Tooltip, Typography, alpha, useTheme } from "@mui/material";
+import { Box, Typography, alpha, useTheme } from "@mui/material";
 import { useTranslation } from "react-i18next";
 
 import { useStatusFeed } from "@/lib/api/status";
@@ -23,10 +23,10 @@ const LEVEL_PALETTE: Record<NonOperationalLevel, "info" | "warning" | "error"> =
 };
 
 /**
- * H8's header indicator for `useStatusFeed()`: a quiet grey dot while
- * `overall` is operational, otherwise a coloured pill with the level label
- * linking to the status page. Renders nothing while no feed URL is
- * configured (`useStatusFeed` then returns `status: undefined`).
+ * H8's header indicator for `useStatusFeed()`: nothing while `overall` is
+ * operational, otherwise a coloured pill with the level label linking to the
+ * status page. Renders nothing while no feed URL is configured either
+ * (`useStatusFeed` then returns `status: undefined`).
  */
 const StatusDot = () => {
   const { t } = useTranslation("common");
@@ -35,17 +35,9 @@ const StatusDot = () => {
 
   if (!status) return null;
 
-  if (status.overall === "operational") {
-    const label = t("status_operational");
-    return (
-      <Tooltip title={label}>
-        <Box
-          aria-label={label}
-          sx={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: theme.palette.grey[400] }}
-        />
-      </Tooltip>
-    );
-  }
+  // Nothing to say while everything is operational: a permanent grey dot is
+  // noise, and the status page is one click away in Help for the curious.
+  if (status.overall === "operational") return null;
 
   const level = status.overall;
   const color = theme.palette[LEVEL_PALETTE[level]].main;

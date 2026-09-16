@@ -29,6 +29,10 @@ class TaskDefinition:
         params_class_name: Name of the Params class in the module
         windmill_path: Windmill script path (e.g., "f/goat/tasks/sync_pmtiles")
         schedule: Optional cron schedule (e.g., "0 */6 * * *" for every 6 hours)
+        enabled: Whether the schedule starts switched on. Only applied when the
+            schedule is first created — a later sync leaves whatever state the
+            Windmill UI is in, so turning one on there is not undone by the
+            next sync.
         worker_tag: Windmill worker tag for job routing
     """
 
@@ -39,6 +43,7 @@ class TaskDefinition:
     params_class_name: str
     windmill_path: str
     schedule: str | None = None
+    enabled: bool = True
     worker_tag: str = "tools"
 
     def get_params_class(self: Self) -> type["BaseModel"]:
@@ -143,6 +148,32 @@ TASK_REGISTRY: tuple[TaskDefinition, ...] = (
         module_path="goatlib.tasks.sync_nuts",
         params_class_name="SyncNutsParams",
         windmill_path="f/goat/tasks/sync_nuts",
+        worker_tag="tools",
+    ),
+    TaskDefinition(
+        name="sync_geoip",
+        display_name="Sync GeoIP Database",
+        description=(
+            "Refresh the DB-IP City Lite database in the shared data volume, "
+            "which apps/core reads to open a new project near whoever created "
+            "it. Checked often though DB-IP publishes monthly: a run that "
+            "finds the current release already present downloads nothing, so "
+            "the extra runs cost nothing."
+        ),
+        module_path="goatlib.tasks.sync_geoip",
+        params_class_name="SyncGeoipParams",
+        windmill_path="f/goat/tasks/sync_geoip",
+        # 04:00 UTC on the 1st-3rd, then roughly weekly. DB-IP publishes on the
+        # 1st, so the first three days catch a release within a day of it
+        # landing; the rest are the net for a release that arrives late. Days
+        # of the month rather than a weekday: Windmill's cron counts
+        # day-of-week from 1=Sunday, so `0` is rejected and `7` quietly means
+        # Saturday.
+        schedule="0 0 4 1-3,8,15,22 * *",
+        # Created switched off: the schedule is only useful where core actually
+        # mounts the geo database, so switching it on is a deliberate act per
+        # deployment rather than something a sync turns on everywhere.
+        enabled=False,
         worker_tag="tools",
     ),
     TaskDefinition(

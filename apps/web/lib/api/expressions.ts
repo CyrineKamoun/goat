@@ -236,6 +236,9 @@ export interface PreviewSqlRequest {
   limit?: number;
   offset?: number;
   filter_expr?: string | null;
+  /** Set inside a public view: the published project whose saved query this
+   * is, which lets the processes service run it for an anonymous viewer. */
+  project_id?: string;
 }
 
 export interface PreviewSqlRow {
@@ -290,6 +293,7 @@ export async function previewSql(request: PreviewSqlRequest): Promise<PreviewSql
         limit: request.limit ?? 10,
         offset: request.offset ?? 0,
         ...(request.filter_expr != null && { filter_expr: request.filter_expr }),
+        ...(request.project_id && { project_id: request.project_id }),
       },
     }),
   });

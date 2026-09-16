@@ -27,6 +27,7 @@ from uuid import uuid4
 import asyncpg
 from pydantic import BaseModel, Field
 
+from goatlib.models.project import DEFAULT_INITIAL_VIEW_STATE
 from goatlib.tools.base import SimpleToolRunner
 from goatlib.tools.project_schemas import (
     EXTERNAL_DATA_TYPES,
@@ -554,7 +555,9 @@ class ProjectImportRunner(SimpleToolRunner):
                     project_data.tags,
                 )
 
-                # 2. Insert user_project
+                # 2. Insert user_project. The column is NOT NULL; an archive
+                # exported by someone with no view-state row of their own
+                # carries none, and gets the same default a new project does.
                 await conn.execute(
                     f"""
                     INSERT INTO {schema}.user_project
@@ -565,7 +568,7 @@ class ProjectImportRunner(SimpleToolRunner):
                     """,
                     uuid.UUID(new_user_id),
                     uuid.UUID(new_project_id),
-                    project_data.initial_view_state,
+                    project_data.initial_view_state or dict(DEFAULT_INITIAL_VIEW_STATE),
                 )
 
                 # 3. Insert layer_project_groups (topological order: parents first)

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+     xmlns:atom="http://www.w3.org/2005/Atom"
+     xmlns:media="http://search.yahoo.com/mrss/"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/"
+     xmlns:goat="https://www.plan4better.de/ns/goat-changelog">
+  <channel>
+    <title>GOAT Changelog</title>
+    <link>https://website.plan4better.de/en/goat/changelog</link>
+    <description>What changed in GOAT, and what it means for your work. New features and improvements, in plain language.</description>
+    <language>en</language>
+    <atom:link href="https://website.plan4better.de/en/goat/changelog/rss.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Run accessibility analyses on a network you bring yourself</title>
+      <link>https://website.plan4better.de/en/goat/changelog/2026-09#custom-routing-networks</link>
+      <guid isPermaLink="false">custom-routing-networks</guid>
+      <pubDate>Mon, 14 Sep 2026 00:00:00 GMT</pubDate>
+      <category>new</category>
+      <description>Until now, accessibility analyses ran on the routing networks we provide, which also set the limits of where GOAT could be used. In v3 you upload your own network and the analyses run on that. Take Fukushima: we provide no network there, so the indicators had nothing to run on. Upload the street network and a Catchment Area works the way it does in Munich, and bringing the GTFS data does the same for public transport. That covers most of the world, and local cases too: a planned cycle network, or a campus network missing from OpenStreetMap.</description>
+      <content:encoded><![CDATA[<p>Until now, accessibility analyses ran on the routing networks we provide, and that also
+set the limits of where GOAT could be used. In v3 you upload your own network and the
+analyses run on that.</p>
+<p>Take Fukushima. We do not provide a routing network there, so the accessibility indicators
+had nothing to run on. Upload the street network and a Catchment Area works the way it
+does in Munich. The same holds for public transport: bring the GTFS data for the region
+and the transit indicators run on it.</p>
+<p>That covers two different situations. One is geographic, everywhere we do not already
+cover, which is most of the world. The other is local: a planned cycle network that does
+not exist yet, a campus network that is not in OpenStreetMap, or a national dataset a
+planning office trusts more than the open one. The network arrives in the Overture format,
+a .zip containing <code>segments.geoparquet</code> and <code>connectors.geoparquet</code>.</p>]]></content:encoded>
+      <media:content url="https://website.plan4better.de/_astro/04-catchment-uploaded-network.CHs9KgkB_hOdq0.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://website.plan4better.de/_astro/04-catchment-uploaded-network.CHs9KgkB_hOdq0.webp" />
+    </item>
+    <item>
+      <title>A Home screen that picks up where you left off</title>
+      <link>https://website.plan4better.de/en/goat/changelog/2026-09#home</link>
+      <guid isPermaLink="false">home</guid>
+      <pubDate>Mon, 14 Sep 2026 00:00:00 GMT</pubDate>
+      <category>new</category>
+      <description>Opening GOAT now starts on a Home screen instead of dropping you straight into an empty map. One box searches the whole workspace, and a new project, a dataset and the Catalog are all within reach. Underneath, Jump back in lists the projects you had open most recently, and Start from a template offers the workflow, dashboard and layout templates.</description>
+      <content:encoded><![CDATA[<p>Opening GOAT now starts on a Home screen instead of dropping you straight into an empty
+map.</p>
+<p>It searches the whole workspace from one box, and puts the three things you are most
+likely to want next in reach: a new project, a dataset, or the Catalog. Underneath, Jump
+back in lists the projects you had open most recently, and Start from a template offers
+the workflow, dashboard and layout templates.</p>
+<p>Links to the getting-started guide, the documentation and a short isochrones video sit on
+the same screen, so the first hour with GOAT does not depend on knowing where to look.</p>]]></content:encoded>
+      <media:content url="https://website.plan4better.de/_astro/hero-welcome.CBUEJHn6_Z20pN7F.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://website.plan4better.de/_astro/hero-welcome.CBUEJHn6_Z20pN7F.webp" />
+    </item>
+    <item>
+      <title>Start from a template instead of an empty map</title>
+      <link>https://website.plan4better.de/en/goat/changelog/2026-09#templates</link>
+      <guid isPermaLink="false">templates</guid>
+      <pubDate>Mon, 14 Sep 2026 00:00:00 GMT</pubDate>
+      <category>new</category>
+      <description>An empty map is a bad place to start. v3 adds templates at three levels: a project template opens a prepared project with styled layers, finished analyses and a built Dashboard; a workflow template is a prepared analysis where the only thing missing is your data; and a layout template is a print-ready map you do not have to design from scratch. Workflows and Layouts can now be added from inside a project.</description>
+      <content:encoded><![CDATA[<p>An empty map is a bad place to start, especially in your first hour with a new tool.
+v3 adds templates at three levels.</p>
+<p>A project template opens a prepared project: the layers are styled, the analyses have
+been run and the Dashboard is built, so you can see how results are meant to be read as
+well as how they were produced. A workflow template is a prepared analysis where the only
+thing missing is your data, so ÖV-Güteklassen for your region does not mean building the
+chain of steps yourself. A layout template is a print-ready map you do not have to design
+from scratch.</p>
+<p>Workflows and Layouts can now be added from inside a project, rather than being separate
+places you go to.</p>]]></content:encoded>
+      <media:content url="https://website.plan4better.de/_astro/02-workflow-template.CHkjfeVR_ZfNi3X.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://website.plan4better.de/_astro/02-workflow-template.CHkjfeVR_ZfNi3X.webp" />
+    </item>
+    <item>
+      <title>Search more than 30,000 datasets in the Catalog</title>
+      <link>https://website.plan4better.de/en/goat/changelog/2026-09#catalog</link>
+      <guid isPermaLink="false">catalog</guid>
+      <pubDate>Mon, 14 Sep 2026 00:00:00 GMT</pubDate>
+      <category>enhancement</category>
+      <description>Until v3 the Catalog held around 60 datasets, each one found and added by hand. It now holds more than 30,000, collected from national, regional and municipal open data portals across Europe, plus Overture Maps and OpenStreetMap. Search it, filter by area, topic and data type, and add a dataset to your project without downloading or reprojecting anything.</description>
+      <content:encoded><![CDATA[<p>Until v3 the Catalog held around 60 datasets, each one found, checked and added by
+hand. It now holds more than 30,000.</p>
+<p>They are no longer added one at a time. GOAT collects from public geodata catalogs
+instead: national open data portals across Europe, regional and municipal portals,
+Overture Maps and OpenStreetMap. Everything lands in one index, so a dataset from a
+German state portal and a layer from Overture are described the same way and can be
+found the same way.</p>
+<p>What changes is the first step of a project. Search the Catalog, filter by area, by
+topic and by data type, and add the dataset to your project. No download, no
+reprojection, no cleaning.</p>]]></content:encoded>
+      <media:content url="https://website.plan4better.de/_astro/05-catalog.D-p5vvYM_Zp55a8.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://website.plan4better.de/_astro/05-catalog.D-p5vvYM_Zp55a8.webp" />
+      <goat:spotlight>
+        <goat:headline>More than 30,000 datasets</goat:headline>
+        <goat:image>https://website.plan4better.de/_astro/05-catalog.D-p5vvYM_Zp55a8.webp</goat:image>
+        <goat:url>https://website.plan4better.de/en/post/goat-v3-data-catalog-templates-custom-routing-networks</goat:url>
+      </goat:spotlight>
+    </item>
+    <item>
+      <title>Projects, templates and datasets in one place</title>
+      <link>https://website.plan4better.de/en/goat/changelog/2026-09#content-management</link>
+      <guid isPermaLink="false">content-management</guid>
+      <pubDate>Mon, 14 Sep 2026 00:00:00 GMT</pubDate>
+      <category>enhancement</category>
+      <description>Layers, datasets and projects are organised differently now, and the point of the rebuild was to make moving through them easy. Drag and drop to move things, put folders inside folders, and select several items at once. More importantly, everything is in one view: Projects, Templates, Datasets, Bundles and Folders sit together and you filter by type. Sharing works across all of it, and ownership of an item can be transferred.</description>
+      <content:encoded><![CDATA[<p>Layers, datasets and projects are organised differently now, and the point of the
+rebuild was to make moving through them easy. Drag and drop to move things, put folders
+inside folders, and select several items at once to move or delete them together.</p>
+<p>More importantly, everything is in one view. Projects, Templates, Datasets, Bundles and
+Folders sit together and you filter by type to see only what you want. That makes one
+question much easier to answer than it used to be: which data is connected to which
+project.</p>
+<p>Sharing works across all of it now, not only on projects, and ownership of an item can be
+transferred to someone else. Useful when a colleague leaves, or when a project moves from
+the person who built it to the team that runs it.</p>]]></content:encoded>
+      <media:content url="https://website.plan4better.de/_astro/03-content-space.B-g2pG3A_jzhdB.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://website.plan4better.de/_astro/03-content-space.B-g2pG3A_jzhdB.webp" />
+    </item>
+  </channel>
+</rss>

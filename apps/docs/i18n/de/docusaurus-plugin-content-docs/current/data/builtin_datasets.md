@@ -1,24 +1,25 @@
 ---
 sidebar_position: 3
+sidebar_label: Netz-Datensätze
 ---
 
-# Integrierte Datensätze
+# Netz-Datensätze
 
 ## Die Grundlage hinter GOATs Indikatoren
 
 
-GOATs mächtige Erreichbarkeitsindikatoren und Analysetools basieren auf hochwertigen integrierten Datensätzen, die im Hintergrund arbeiten. **Diese Datensätze sind für Benutzer nicht direkt zugänglich, aber sie ermöglichen alle Routing-Berechnungen und Erreichbarkeitsanalysen in GOAT.**
+GOATs Erreichbarkeitsindikatoren und Analysetools basieren auf hochwertigen Netz-Datensätzen, die im Hintergrund arbeiten. **GOAT bringt integrierte Netze für ÖPNV und Straßen mit, und Sie können [eigene Netze importieren](#eigene-netze-importieren), wenn eine Analyse auf Daten laufen soll, die Sie selbst verwalten.**
 
 Das Verständnis dieser zugrundeliegenden Datensätze hilft Ihnen:
 - **Die Datenqualität zu kennen**, die Sie von GOATs Indikatoren erwarten können
 - **Die geografische Abdeckung** verschiedener Analyse-Werkzeuge zu verstehen
 - **Ergebnisse zu interpretieren** mit Kenntnis der Datenquellen
 
-:::info Benutzerdaten vs. integrierte Daten
-**Integrierte Datensätze** (auf dieser Seite beschrieben) ermöglichen GOATs interne Berechnungen und Indikatoren. Für Datensätze, die Sie hochladen können, oder bestehende Datensätze aus unserem [Katalog](../workspace/catalog.md).
+:::info Netze vs. eigene Datensätze
+Auf dieser Seite geht es um die **Netz-Datensätze**, die hinter GOATs Routing- und Erreichbarkeitsanalysen stehen. Wie Sie eigene Datensätze hochladen oder fertige verwenden, erfahren Sie unter [Inhalt](../workspace/content.md) und im [Katalog](../workspace/catalog.md).
 :::
 
-## Netzwerk-Datensätze für Routing
+## Die integrierten Netze von GOAT
 
 GOAT umfasst umfassende Netzwerk-Datensätze, die alle routing-basierten Erreichbarkeitsindikatoren und Analyse-Werkzeuge antreiben.
 
@@ -72,6 +73,18 @@ Unser Straßennetzwerk repräsentiert reale Verkehrsinfrastruktur einschließlic
 5. **Attributanalyse**: Straßenklassifizierungen, Geschwindigkeitsbegrenzungen, Abbiegebeschränkungen und Einbahnstraßenbezeichnungen werden identifiziert und standardisiert
 6. **Geschwindigkeitsbegrenzungs-Interpolation**: Fehlende Geschwindigkeitsbegrenzungen werden basierend auf Straßentyp und modalen Geschwindigkeiten geschätzt
 
-:::info Demnächst
-Während GOAT derzeit integrierte Netzwerke für öffentliche Verkehrsmittel und Straßen-**Routing** verwendet, arbeiten wir daran, Benutzern zu ermöglichen, ihre eigenen benutzerdefinierten Netzwerke **hochzuladen**. Interessiert an diesem Feature? [Kontaktieren Sie uns](https://plan4better.de/en/contact/ "Support kontaktieren"), um mehr zu erfahren.
-:::
+## Eigene Netze importieren
+
+Die oben beschriebenen Netze sind die integrierten Netze von GOAT und werden standardmäßig verwendet. Sie können auch **eigene Netze importieren** — ein Netz, das Sie selbst pflegen, eine Region, die Sie mit Ihren eigenen Daten analysieren möchten, oder ein geplantes Netz, das Sie testen möchten, bevor es gebaut wird.
+
+Nach dem Import wird Ihr Netz genauso verwendet wie das integrierte: Die Routing- und Erreichbarkeitswerkzeuge bieten es neben `Standard (Europa)` an, und Sie wählen aus, auf welchem Netz eine Analyse laufen soll.
+
+### Eigenes Straßennetz
+
+Ein importiertes Straßennetz lässt sich **auf der Karte bearbeiten**: Zeichnen Sie eine Straße, und GOAT teilt und verbindet die Topologie, pflegt die Nodes und erstellt die Routing-Daten aus Ihren Änderungen neu. So können Sie eine geplante Verbindung testen — eine neue Brücke, eine gesperrte Straße, einen Radweg — und eine Analyse darauf erneut ausführen.
+
+### Eigenes ÖPNV-Netz
+
+Da GOAT den Weg zu und von jeder Haltestelle routet, muss ein ÖPNV-Netz mit einem **Straßennetz verknüpft** sein. Sie wählen dieses Netz beim Hochladen aus, entweder eines Ihrer eigenen oder das integrierte `Standard (Europa)`. Das Straßennetz muss also bereits vorhanden sein. Durch die Verknüpfung mit Ihrem eigenen Straßennetz berücksichtigt eine Fahrplananalyse auch die Straßen, die Sie geändert haben.
+
+Aus welchen Dateiformaten diese Netze importiert werden und aus welchen Layern sie bestehen, erfahren Sie unter [Datensatz-Typen](./dataset_types.md#straßennetze). Die Importschritte finden Sie unter [Inhalte hinzufügen](../workspace/content.md#inhalte-hinzufügen).

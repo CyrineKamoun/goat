@@ -4,41 +4,34 @@ sidebar_position: 2
 
 # Home
 
-When you log in to GOAT, you'll arrive at the Home page - **your central dashboard for accessing projects, datasets, and staying updated with the latest content**. The Home page provides:
-- Access to your [Recent Projects](#recent-projects)
-- Access to your [Recent Datasets](#recent-datasets)
-- Access to the [Explore](#explore) section featuring blog posts and other valuable resources.
+When you log in to GOAT you arrive at the Home page — **the starting point for finding your way back into your work, or beginning something new**.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/home/home.webp').default} alt="Home Interface Overview in GOAT" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/workspace/home/home_general.webp').default} alt="The Home page in GOAT" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
 </div>
 
-## Recent Projects
+## Search
 
-This section **displays your most recently accessed projects** along with their last update timestamps. You can quickly start working by:
+The search box finds projects, datasets and templates across every space you can reach. Press `⌘K` (or `Ctrl+K`) to open it from anywhere without reaching for the mouse.
 
-- **Creating a new project** using the <code> + button </code> 
-- **Accessing all your projects** by clicking <code>See All</code> to visit the [Projects](../workspace/projects) page
+## Starting something new
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/home/recent_projects.webp').default} alt="Recent Projects" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
-</div>
+Three buttons sit under the search box:
 
-## Recent Datasets
+- `New Project` — create a project, optionally from a template
+- `Add Dataset` — upload a dataset or connect an external source
+- `Browse catalog` — open the [Catalog](../workspace/catalog.md) to find ready-made data
 
-This section shows your most recently accessed datasets with their last update information. You can manage your data by:
+## Jump back in
 
-- **Adding a new dataset** using the <code> + button </code> 
-- **Viewing all your datasets** by clicking <code> See All </code> to visit the [Datasets](../workspace/datasets) page
+Your most recently opened projects, newest first, each showing when you last worked on it and whether it is shared. Click `All projects` to see everything on the [Content](../workspace/content.md) page.
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/home/recent_datasets.webp').default} alt="Recent Datasets" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
-</div>
+## Start from a template
 
-## Explore
+Templates let you begin with a project, workflow, dashboard or layout that is already set up. Filter the row by kind — `Workflow`, `Dashboard` or `Layout` — and by who the template came from: `Everyone`, `GOAT`, `Mine`, `Team` or `Organization`. Click `All templates` to browse the full shelf.
 
-The Explore section **keeps you informed with the latest blog posts and valuable resources from the GOAT community**. Stay updated by clicking <code>Visit Blog</code> to access all [blog posts](https://plan4better.de/en/blog/) and discover new features, tutorials, and insights.
+## Getting started
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workspace/home/explore.webp').default} alt="Explore" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
-</div>
+While you are new to GOAT, the header shows a **Getting started** ring with your progress through a short setup checklist. Click it to see which steps remain, jump straight to one, or skip the onboarding entirely. It disappears once you have finished or skipped it.
+
+Above the project rows you will also find links worth a first visit: a written introduction to GOAT, these documentation pages, and a short video.

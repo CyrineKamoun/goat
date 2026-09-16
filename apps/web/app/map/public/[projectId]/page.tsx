@@ -130,7 +130,7 @@ export default function MapPage(props: { params: Promise<{ projectId: string }> 
       ?.tracking_require_consent ?? true;
 
   return (
-    <PublicProjectProvider>
+    <PublicProjectProvider projectId={projectId}>
       {/* One theme for the whole page — the loading screen renders before the
           project (and its branding) is known, and must not fall back to the
           viewer's own dark/light preference either. */}

@@ -5,14 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { DOCS_URL } from "@/lib/constants";
-
-/** The catchment-area walkthrough on the product's own channel, one cut per
- * UI language; the same videos are embedded on the docs' catchment page. */
-const HELP_VIDEO_URL: Record<"en" | "de", string> = {
-  en: "https://www.youtube.com/watch?v=_clsR386b9w",
-  de: "https://www.youtube.com/watch?v=GA_6PbhAA6k",
-};
+import { DOCS_URL, HELP_VIDEO_URL } from "@/lib/constants";
 
 interface HelpStripProps {
   /** Below `md`, the three tiles stack one to a row instead of three across. */

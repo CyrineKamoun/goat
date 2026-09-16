@@ -13,13 +13,16 @@ Tests the project import functionality including:
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import tempfile
 import zipfile
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from goatlib.models.project import DEFAULT_INITIAL_VIEW_STATE
 from goatlib.tools.project_import import (
     ImportCleanupTracker,
     ProjectImportParams,
@@ -1222,3 +1225,115 @@ class TestProjectImportRunner:
             f"Expected 2 layer_project inserts, got {layer_project_inserts}. "
             f"Queries: {execute_log}"
         )
+
+
+def _archive_with_project(project_data: dict[str, Any]) -> bytes:
+    """A minimal valid archive: project.json plus a manifest with its checksum."""
+    project_bytes = json.dumps(project_data, indent=2).encode()
+    manifest = {
+        "format_version": "1.0",
+        "exported_at": "2025-06-01T00:00:00Z",
+        "project_name": project_data["name"],
+        "checksums": {
+            "project.json": f"sha256:{hashlib.sha256(project_bytes).hexdigest()}"
+        },
+    }
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("project.json", project_bytes)
+        zf.writestr("manifest.json", json.dumps(manifest, indent=2).encode())
+    return buf.getvalue()
+
+
+def _run_import_capturing_inserts(
+    runner: ProjectImportRunner, zip_bytes: bytes
+) -> list[tuple[str, tuple[object, ...]]]:
+    """Run a full import against a mocked database; return every INSERT with its args."""
+
+    def mock_download_file(**kwargs: object) -> None:
+        Path(str(kwargs["Filename"])).write_bytes(zip_bytes)
+
+    runner._s3_client.download_file.side_effect = mock_download_file
+
+    inserts: list[tuple[str, tuple[object, ...]]] = []
+
+    async def tracking_execute(query: str, *args: object) -> None:
+        if "INSERT" in query:
+            inserts.append((query, args))
+
+    conn = AsyncMock()
+    conn.set_type_codec = AsyncMock()
+    txn = MagicMock()
+    txn.__aenter__ = AsyncMock(return_value=txn)
+    txn.__aexit__ = AsyncMock(return_value=False)
+    conn.transaction = MagicMock(return_value=txn)
+    conn.execute = AsyncMock(side_effect=tracking_execute)
+    conn.fetchval = AsyncMock(return_value=None)
+
+    with patch("goatlib.tools.project_import.asyncpg") as mock_asyncpg:
+        mock_asyncpg.connect = AsyncMock(return_value=conn)
+        runner.run(
+            ProjectImportParams(
+                user_id="00000000-0000-0000-0000-000000000001",
+                s3_key="imports/test-export.zip",
+                target_folder_id="00000000-0000-0000-0000-ffffffffffff",
+            )
+        )
+    return inserts
+
+
+def _user_project_view_state(
+    inserts: list[tuple[str, tuple[object, ...]]],
+) -> object:
+    query, args = next(i for i in inserts if ".user_project" in i[0])
+    return args[2]
+
+
+class TestImportInitialViewState:
+    """`user_project.initial_view_state` is NOT NULL; the archive may lack it.
+
+    Regression: a project exported by someone without their own view-state
+    row arrived with `initial_view_state: null` and the insert was refused.
+    """
+
+    @pytest.fixture()
+    def runner(self) -> ProjectImportRunner:
+        runner = ProjectImportRunner()
+        settings = MagicMock()
+        settings.customer_schema = "customer"
+        settings.s3_bucket_name = "test-bucket"
+        settings.max_upload_dataset_file_size = 5 * 1024 * 1024 * 1024
+        runner.settings = settings
+        runner._duckdb_con = MagicMock()
+        runner._s3_client = MagicMock()
+        runner._s3_client.head_object.return_value = {"ContentLength": 1}
+        return runner
+
+    def test_missing_view_state_gets_the_default(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        inserts = _run_import_capturing_inserts(
+            runner, _archive_with_project({"name": "Shared Project"})
+        )
+        assert _user_project_view_state(inserts) == DEFAULT_INITIAL_VIEW_STATE
+
+    def test_null_view_state_gets_the_default(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        inserts = _run_import_capturing_inserts(
+            runner,
+            _archive_with_project(
+                {"name": "Shared Project", "initial_view_state": None}
+            ),
+        )
+        assert _user_project_view_state(inserts) == DEFAULT_INITIAL_VIEW_STATE
+
+    def test_present_view_state_is_kept(self, runner: ProjectImportRunner) -> None:
+        view = {"zoom": 12, "latitude": 52.5, "longitude": 13.4}
+        inserts = _run_import_capturing_inserts(
+            runner,
+            _archive_with_project(
+                {"name": "Shared Project", "initial_view_state": view}
+            ),
+        )
+        assert _user_project_view_state(inserts) == view

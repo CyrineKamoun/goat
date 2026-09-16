@@ -11,6 +11,7 @@ import { Icon } from "@p4b/ui/components/Icon";
 
 import { useProjectInitialViewState } from "@/lib/api/projects";
 import { updateReportLayout, useReportLayouts } from "@/lib/api/reportLayouts";
+import { materializeMapElements } from "@/lib/print/mapElements";
 import { snapScalebarWidths } from "@/lib/print/scalebar";
 import type { Project, ProjectLayer } from "@/lib/validations/project";
 import type {
@@ -19,6 +20,8 @@ import type {
   ReportLayout,
   ReportLayoutConfig,
 } from "@/lib/validations/reportLayout";
+
+import { useBasemap } from "@/hooks/map/MapHooks";
 
 import ReportsCanvas from "./canvas/ReportsCanvas";
 import { reportElementIconMap } from "./elements/ReportElementIconMap";
@@ -104,6 +107,7 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
 
   // Get project's initial view state for creating map element snapshots
   const { initialView } = useProjectInitialViewState(project?.id ?? "");
+  const { mapStyle: basemapUrl } = useBasemap(project);
 
   // SWR cache for report layouts — used to keep cache in sync with local changes
   const { mutate: mutateLayouts } = useReportLayouts(project?.id);
@@ -111,19 +115,6 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
   // Ref to track the latest selectedReport for API calls (avoids stale closures)
   const selectedReportRef = useRef(selectedReport);
   selectedReportRef.current = selectedReport;
-
-  // Handle report selection - deselect element when switching layouts
-  const handleSelectReport = useCallback((report: ReportLayout | null) => {
-    setSelectedElementId(null);
-    if (!report) {
-      setSelectedReport(null);
-      return;
-    }
-    // Refit scalebar rectangles saved before the snap existed, or by an older
-    // map view. Shown only; persisted with the next edit.
-    const elements = snapScalebarWidths(report.config.elements ?? []);
-    setSelectedReport(elements === report.config.elements ? report : { ...report, config: { ...report.config, elements } });
-  }, []);
 
   // Persist report changes: sync SWR cache and save to API
   const persistReport = useCallback(
@@ -136,6 +127,40 @@ const ReportsLayout: React.FC<ReportsLayoutProps> = ({
       });
     },
     [mutateLayouts]
+  );
+
+  // What a map element is filled in from when a layout is opened. Read through
+  // a ref so the selection handler keeps one identity: the config panel
+  // re-runs its selection effect whenever that identity changes.
+  const mapElementContextRef = useRef({ initialView, projectLayers, basemapUrl });
+  mapElementContextRef.current = { initialView, projectLayers, basemapUrl };
+
+  // Handle report selection - deselect element when switching layouts
+  const handleSelectReport = useCallback(
+    (report: ReportLayout | null) => {
+      setSelectedElementId(null);
+      if (!report) {
+        setSelectedReport(null);
+        return;
+      }
+      const saved = report.config.elements ?? [];
+      // A layout that came from a template, or from a project with other
+      // layer ids, has map elements without a view or with a lock snapshot
+      // that names no layer here. Fill those in from this project and save,
+      // so the lock freezes what the user first sees.
+      const materialized = materializeMapElements(saved, mapElementContextRef.current);
+      // Refit scalebar rectangles saved before the snap existed, or by an older
+      // map view. Shown only; persisted with the next edit.
+      const elements = snapScalebarWidths(materialized);
+      if (elements === saved) {
+        setSelectedReport(report);
+        return;
+      }
+      const updatedReport: ReportLayout = { ...report, config: { ...report.config, elements } };
+      setSelectedReport(updatedReport);
+      if (materialized !== saved) persistReport(updatedReport);
+    },
+    [persistReport]
   );
 
   // Handle drag start

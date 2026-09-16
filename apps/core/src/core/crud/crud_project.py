@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
+from goatlib.models.project import DEFAULT_INITIAL_VIEW_STATE
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import and_, not_, or_
@@ -37,19 +38,6 @@ from core.schemas.project import (
     ProjectPublicProjectConfig,
     ProjectPublicRead,
 )
-
-# Default initial view state for a project with no per-user or owner
-# `UserProjectLink` row yet (a brand-new project, or one whose owner's row
-# was lost to `ON DELETE CASCADE` on user removal).
-DEFAULT_INITIAL_VIEW_STATE: dict[str, Any] = {
-    "zoom": 5,
-    "pitch": 0,
-    "bearing": 0,
-    "latitude": 51.01364693631891,
-    "max_zoom": 20,
-    "min_zoom": 0,
-    "longitude": 9.576740589534126,
-}
 
 
 class CRUDProject(CRUDBase[Project, Any, Any]):

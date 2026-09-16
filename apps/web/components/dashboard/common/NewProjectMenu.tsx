@@ -17,18 +17,11 @@ import type { Project } from "@/lib/validations/project";
 import NameDialog from "@/components/dashboard/common/NameDialog";
 import ProjectImportModal from "@/components/modals/ProjectImport";
 
-/** What a project starts life with, until the builder saves its own: the
- * default artwork every new project carries, and a Munich-centred view. */
+/** The default artwork every new project carries until the builder saves its
+ * own. The starting *view* is deliberately not sent: the server picks it from
+ * the creator's approximate location, the deployment's configured default, or
+ * the project they last opened. */
 const NEW_PROJECT_THUMBNAIL = "https://assets.plan4better.de/img/goat_new_project_artwork.png";
-const NEW_PROJECT_VIEW_STATE = {
-  latitude: 48.1502132,
-  longitude: 11.5696284,
-  zoom: 12,
-  min_zoom: 0,
-  max_zoom: 20,
-  bearing: 0,
-  pitch: 0,
-};
 
 /** Same SWR key `useOnboardingFacts` (lib/api/onboarding.ts) reads, revalidated
  * here so the checklist and the header tray reflect a project that has just
@@ -112,7 +105,6 @@ export const NewProjectFlows = ({ intent, onClose, location, onCreated }: NewPro
                 description: "",
                 folder_id: location.folderId,
                 thumbnail_url: NEW_PROJECT_THUMBNAIL,
-                initial_view_state: NEW_PROJECT_VIEW_STATE,
               });
             } catch {
               throw new Error(t("error_creating_project"));

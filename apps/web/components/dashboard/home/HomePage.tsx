@@ -15,15 +15,14 @@ import { templateResultHref } from "@/hooks/templates/useUseTemplate";
 
 import BlogSection from "@/components/dashboard/home/BlogSection";
 import DataWays from "@/components/dashboard/home/DataWays";
+import HomeAnnouncements from "@/components/dashboard/home/HomeAnnouncements";
 import HomeHero from "@/components/dashboard/home/HomeHero";
 import HomeSearch from "@/components/dashboard/home/HomeSearch";
-import HomeSpotlight from "@/components/dashboard/home/HomeSpotlight";
 import JumpBackIn from "@/components/dashboard/home/JumpBackIn";
 import RecentDatasets from "@/components/dashboard/home/RecentDatasets";
 import SetupChecklist from "@/components/dashboard/home/SetupChecklist";
 import TeamsCard from "@/components/dashboard/home/TeamsCard";
 import TemplateBand from "@/components/dashboard/home/TemplateBand";
-import WhatsNewCard from "@/components/dashboard/home/WhatsNewCard";
 import TemplateBrowser from "@/components/templates/TemplateBrowser";
 import UseTemplateFlow from "@/components/templates/UseTemplateFlow";
 
@@ -31,9 +30,11 @@ import UseTemplateFlow from "@/components/templates/UseTemplateFlow";
  * The launchpad (H1): greeting, hero search + quick actions, and the help
  * strip all live in `HomeHero`, gated by the caller's stage (H2). Below it,
  * per §3: the onboarding checklist (New, Getting started) and "get some
- * data in" (New, while no dataset exists yet), "jump back in", a template
- * band still to come, recent datasets + what's new, and teams;
- * `BlogSection` (H13) stays last either way.
+ * data in" (New, while no dataset exists yet), "jump back in", the template
+ * band, recent datasets with the teams card beside them, and `BlogSection`
+ * (H13) last. Release notes live in the header popper; `HomeAnnouncements`
+ * opens the first-run Welcome (H7a) and the spotlight (H7) over all of it,
+ * one at a time.
  */
 const HomePage = () => {
   const theme = useTheme();
@@ -91,6 +92,10 @@ const HomePage = () => {
   return (
     <Box
       sx={{
+        // `main` is a flex column, where `mx: auto` alone would shrink this
+        // band to its widest child; the explicit width keeps it at 1180px
+        // whatever is loading.
+        width: "100%",
         maxWidth: 1180,
         mx: "auto",
         px: mobile ? "14px" : "28px",
@@ -163,12 +168,9 @@ const HomePage = () => {
       <TemplateBand />
 
       {stage === "new" ? (
-        /* Day one: nothing sits beside the datasets yet, so What's new takes
-         * the full width instead of a side column with an empty neighbour. */
-        <>
-          <RecentDatasets />
-          <WhatsNewCard />
-        </>
+        /* Day one: no team to show beside the datasets yet, so they take the
+         * full width instead of a side column with an empty neighbour. */
+        <RecentDatasets />
       ) : (
         <Box
           sx={{
@@ -188,14 +190,13 @@ const HomePage = () => {
               flexDirection: "column",
               gap: "24px",
             }}>
-            <WhatsNewCard />
             <TeamsCard />
           </Box>
         </Box>
       )}
 
       <BlogSection />
-      <HomeSpotlight />
+      <HomeAnnouncements />
     </Box>
   );
 };

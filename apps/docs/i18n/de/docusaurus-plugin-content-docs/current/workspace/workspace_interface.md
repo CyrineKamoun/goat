@@ -16,8 +16,7 @@ Hier können Sie Ihre **Datensätze** und **Projekte** erkunden, neue erstellen 
 Die Liste unten erklärt die Navigations-Symbolleiste im **Workspace**.
 
 - <img src={require('/img/icons/home.png').default} alt="Home" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Home</code>: Die Startseite, wenn Sie sich anmelden
-- <img src={require('/img/icons/projects.png').default} alt="Projekte" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Projekte</code>: Hier können Sie Ihre **Projekte** verwalten
-- <img src={require('/img/icons/datasets.png').default} alt="Datensätze" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Datensätze</code>: Hier können Sie Ihre **Datensätze** verwalten
+- <img src={require('/img/icons/projects.png').default} alt="Inhalt" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Inhalt</code>: Ihre Projekte, Datensätze und Vorlagen, gegliedert in [Bereiche](../workspace/content)
 - <img src={require('/img/icons/catalog.png').default} alt="Katalog" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Katalog</code>: Hier können Sie alle verfügbaren **Datensätze** in GOAT durchsuchen
 - <img src={require('/img/icons/settings.png').default} alt="Einstellungen" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Einstellungen</code>: Die Seite, auf der Sie Ihr Profil und Ihre Einstellungen bearbeiten können
 

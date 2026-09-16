@@ -288,15 +288,17 @@ describe("HomeSearch", () => {
     expect(useHomeSearchMock).toHaveBeenLastCalledWith("project: bus");
   });
 
-  it("shows the ⌘K hint with no query and swaps it for a clear button once typing", () => {
-    render(<HomeSearch />);
+  it("shows the shortcut hint with no query and swaps it for a clear button once typing", () => {
+    const { container } = render(<HomeSearch />);
     const input = screen.getByPlaceholderText(placeholder);
 
-    expect(screen.getByText("⌘K")).toBeInTheDocument();
+    // The label itself is per-platform (ShortcutHint); what matters here is
+    // that a key badge is shown, and only while the field is empty.
+    expect(container.querySelector("kbd")).not.toBeNull();
 
     fireEvent.change(input, { target: { value: "bus" } });
 
-    expect(screen.queryByText("⌘K")).not.toBeInTheDocument();
+    expect(container.querySelector("kbd")).toBeNull();
     expect(screen.getByRole("button", { name: "clear" })).toBeInTheDocument();
   });
 

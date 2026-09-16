@@ -6,27 +6,17 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
+import { FEEDS_ENABLED, changelogUrl } from "@/lib/api/feeds";
 import { patchPreferences, usePreferences } from "@/lib/api/preferences";
-import { RELEASES_FEED_URL, releasesIndexUrl, unreadCount, useReleases } from "@/lib/api/releases";
-import type { ReleaseEntry, ReleaseTag } from "@/lib/validations/home";
+import { unreadCount, useReleases } from "@/lib/api/releases";
 
 import { ArrowPopper } from "@/components/ArrowPoper";
+import ReleaseItem from "@/components/dashboard/home/ReleaseItem";
 import HeaderPopoverPaper, { HEADER_POPOVER_PLACEMENT } from "@/components/header/HeaderPopoverPaper";
 
-const TAG_LABEL_KEY: Record<ReleaseTag, string> = {
-  new: "release_new",
-  improved: "release_improved",
-  fixed: "release_fixed",
-};
-
-const TAG_COLOR: Record<ReleaseTag, "primary" | "info" | "success"> = {
-  new: "primary",
-  improved: "info",
-  fixed: "success",
-};
-
-/** H7's header surface for release notes: replaces the old hardcoded card
- * with the real feed. Renders nothing when no feed URL is configured. */
+/** H7's header surface for release notes: the changelog feed as a scrollable
+ * list behind the rocket, badged with the unread count. Renders nothing when
+ * no website URL is configured or the feed has no entries. */
 export default function WhatsNewPopper() {
   const { t, i18n } = useTranslation("common");
   const theme = useTheme();
@@ -36,9 +26,12 @@ export default function WhatsNewPopper() {
   const { entries } = useReleases(locale);
   const { preferences, mutate } = usePreferences();
 
-  if (!RELEASES_FEED_URL) return null;
+  // No feed, or nothing in it yet (or the website unreachable): no rocket rather than an empty panel.
+  if (!FEEDS_ENABLED || entries.length === 0) return null;
 
-  const unread = unreadCount(entries, preferences?.releases_seen_at ?? null);
+  // No badge until the preferences are in: the feed usually arrives first,
+  // and a missing watermark would flash the full count for a moment.
+  const unread = preferences ? unreadCount(entries, preferences.releases_seen_at) : 0;
 
   const handleToggle = () => {
     const next = !open;
@@ -55,7 +48,7 @@ export default function WhatsNewPopper() {
       placement={HEADER_POPOVER_PLACEMENT}
       arrow={false}
       content={
-        <HeaderPopoverPaper sx={{ maxHeight: 420 }}>
+        <HeaderPopoverPaper sx={{ maxHeight: 480, width: 360 }}>
           <Box sx={{ p: 2 }}>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1, pb: 1.5 }}>
               <Icon
@@ -67,9 +60,9 @@ export default function WhatsNewPopper() {
                 {t("whats_new")}
               </Typography>
             </Stack>
-            <Stack spacing={0.5} sx={{ maxHeight: 300, overflowY: "auto" }}>
+            <Stack spacing={0.25} sx={{ maxHeight: 340, overflowY: "auto" }}>
               {entries.map((entry) => (
-                <ReleaseListItem key={entry.id} entry={entry} />
+                <ReleaseItem key={entry.id} entry={entry} />
               ))}
             </Stack>
             <Button
@@ -77,7 +70,7 @@ export default function WhatsNewPopper() {
               variant="text"
               size="small"
               component="a"
-              href={releasesIndexUrl(RELEASES_FEED_URL)}
+              href={changelogUrl(locale)}
               target="_blank"
               rel="noopener noreferrer"
               sx={{ mt: 1.5 }}
@@ -97,53 +90,3 @@ export default function WhatsNewPopper() {
     </ArrowPopper>
   );
 }
-
-const ReleaseListItem = ({ entry }: { entry: ReleaseEntry }) => {
-  const { t } = useTranslation("common");
-  const theme = useTheme();
-
-  return (
-    <Box
-      component="a"
-      href={entry.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      sx={{
-        display: "block",
-        p: "8px 10px",
-        borderRadius: "8px",
-        textDecoration: "none",
-        color: "inherit",
-        "&:hover": { backgroundColor: theme.palette.action.hover },
-      }}>
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-        <Typography
-          component="span"
-          sx={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: `${theme.palette[TAG_COLOR[entry.tag]].main}`,
-          }}>
-          {t(TAG_LABEL_KEY[entry.tag])}
-        </Typography>
-        <Typography component="span" variant="caption" color="text.secondary">
-          {entry.date}
-        </Typography>
-      </Stack>
-      <Typography variant="body2" fontWeight="bold" gutterBottom>
-        {entry.title}
-      </Typography>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{
-          display: "-webkit-box",
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
-        }}>
-        {entry.summary}
-      </Typography>
-    </Box>
-  );
-};
