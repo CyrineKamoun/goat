@@ -43,7 +43,6 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Self
-from urllib.parse import quote
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -1146,10 +1145,15 @@ class ThumbnailGeneratorTask:
         """Render a thumbnail for a project or layer using Playwright."""
         browser = await self._get_browser()
 
-        # Build URL with data parameter
+        # The render payload goes in through an init script, NOT the query
+        # string: it carries the item's whole layer list, the request line
+        # counts against the web server's header budget, and past Node's 16 KB
+        # default such a navigation came back 431 — the page never ran, so the
+        # container this method waits for never existed. The page still reads
+        # `?data=` when it is there, which keeps a URL pasteable by hand.
         base_url = os.environ.get("PRINT_BASE_URL", "http://goat-web:3000")
         data_param = self._build_thumbnail_data(item)
-        url = f"{base_url}/thumbnail/{item.type}/{item.id}?data={quote(data_param)}"
+        url = f"{base_url}/thumbnail/{item.type}/{item.id}"
 
         logger.info(f"Rendering thumbnail for {item.type}/{item.id}")
         logger.debug(f"URL: {url[:200]}...")  # Log truncated URL
@@ -1159,6 +1163,11 @@ class ThumbnailGeneratorTask:
             device_scale_factor=1,
         )
         page = await context.new_page()
+
+        # Runs before any of the page's own scripts, on every document it loads.
+        await page.add_init_script(
+            f"window.__THUMBNAIL_DATA__ = {json.dumps(data_param)};"
+        )
 
         # Capture console logs for debugging
         page.on(

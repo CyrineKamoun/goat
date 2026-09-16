@@ -1,23 +1,24 @@
 ---
 sidebar_position: 3
+sidebar_label: Network Datasets
 ---
 
-# Built-in Datasets
+# Network Datasets
 
 ## The foundation behind GOAT's Indicators
 
-GOAT's powerful accessibility indicators and analysis tools rely on high-quality built-in datasets that work behind the scenes. **These datasets are not directly accessible to users, but they power all routing calculations and accessibility analyses within GOAT.**
+GOAT's accessibility indicators and analysis tools rely on high-quality network datasets that work behind the scenes. **GOAT ships with built-in networks covering public transport and streets, and you can [import your own](#bringing-your-own-networks) when you want an analysis to run on data you control.**
 
 Understanding these underlying datasets helps you:
 - **Know what data quality** to expect from GOAT's indicators
 - **Understand the geographic coverage** of different analysis tools
 - **Interpret results** with knowledge of the data sources
 
-:::info User Data vs Built-in Data
-**Built-in datasets** (described on this page) power GOAT's internal calculations and indicators. For datasets you can upload your own data or use existing datasets from our [Catalog](../workspace/catalog.md).
+:::info Networks vs. your own datasets
+This page is about the **network datasets** behind GOAT's routing and accessibility analyses. To upload ordinary datasets of your own, or to use ready-made ones, see [Content](../workspace/content.md) and the [Catalog](../workspace/catalog.md).
 :::
 
-## Network Datasets for Routing
+## GOAT's built-in networks
 
 GOAT includes comprehensive network datasets that power all routing-based accessibility indicators and analysis tools.
 
@@ -71,6 +72,18 @@ Our street network represents real-world transportation infrastructure including
 5. **Attribute Parsing**: Street classifications, speed limits, turning restrictions, and one-way designations are identified and standardized
 6. **Speed Limit Interpolation**: Missing speed limits are estimated based on street type and modal speeds
 
-:::info Coming Soon
-While GOAT currently uses built-in networks for public transport and street routing, we're working on allowing users to upload their own custom networks. Interested in this feature? [Contact us](https://plan4better.de/en/contact/ "Contact Support") to learn more.
-:::
+## Bringing your own networks
+
+The networks described above are GOAT's built-in ones, and they are used by default. You can also **import your own** — a network you maintain yourself, a region you want to analyse with your own data, or a planned network you want to test before it is built.
+
+Once imported, your network is used exactly like the built-in one: the routing and accessibility tools offer it alongside `Default (Europe)`, and you pick which one an analysis should run on.
+
+### Your own street network
+
+A street network you imported can be **edited on the map**: draw a street and GOAT splits and joins the topology, maintains the nodes, and rebuilds the routing data from what you changed. That makes it possible to test a planned connection — a new bridge, a closed street, a cycleway — and re-run an analysis on the result.
+
+### Your own public transport network
+
+Because GOAT routes the walk to and from each stop, a public transport network has to be **linked to a street network**. You choose that network while uploading, either one of your own or the built-in `Default (Europe)`, so the street network has to exist first. Linking to your own street network is what lets a timetable analysis account for streets you changed.
+
+For the file formats these networks are imported from and the layers they are made of, see [Dataset Types](./dataset_types.md#street-networks). For the import steps, see [Adding content](../workspace/content.md#adding-content).

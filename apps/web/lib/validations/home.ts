@@ -29,23 +29,25 @@ export const releaseEntrySchema = z.object({
   title: z.string(),
   summary: z.string(),
   url: z.string().url(),
+  /** The entry's screenshot, when the changelog carries one. */
+  thumbnail: z.string().url().optional(),
   spotlight: z
     .object({
       headline: z.string(),
-      media: z.string().url().optional(),
-      cta: z.object({ label: z.string(), url: z.string().url() }).optional(),
+      /** A screenshot chosen for the announcement; the entry's thumbnail otherwise. */
+      image: z.string().url().optional(),
+      /** An mp4 or YouTube URL; when present it leads, the image is its poster. */
+      video: z.string().url().optional(),
+      /** Bullet points under the body, for release announcements. */
+      highlights: z.array(z.string()).default([]),
+      /** `label` falls back to a generic "Learn more" in the UI. */
+      cta: z.object({ label: z.string().optional(), url: z.string().url() }).optional(),
     })
     .optional(),
-});
-/** The feed carries both locales; the app picks its own. */
-export const releasesFeedSchema = z.object({
-  generatedAt: z.string(),
-  entries: z.record(z.enum(["en", "de"]), z.array(releaseEntrySchema)),
 });
 
 export type ReleaseTag = z.infer<typeof releaseTag>;
 export type ReleaseEntry = z.infer<typeof releaseEntrySchema>;
-export type ReleasesFeed = z.infer<typeof releasesFeedSchema>;
 
 export const statusLevel = z.enum(["operational", "notice", "maintenance", "disrupted", "outage"]);
 

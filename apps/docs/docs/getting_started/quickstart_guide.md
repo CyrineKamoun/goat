@@ -6,7 +6,7 @@ sidebar_position: 3
 Welcome to GOAT! This quickstart guide will help you get up and running in no time. Follow these steps to explore the workspace, run your first analysis, build a dashboard, and share your work.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<iframe width="674" height="378" src="https://www.youtube.com/embed/_wAEhPTT3jA?si=mJv_duAm_rXz4Jze&amp;start=46" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+<iframe width="674" height="367" src="https://player.mediadelivery.net/play/753320/31ad707d-c1f2-4f21-8c47-1c610141f9d2" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 </div>
 
 ## Create a new project
@@ -14,16 +14,16 @@ Welcome to GOAT! This quickstart guide will help you get up and running in no ti
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">After signing in, you will land on the <code>Workspace</code> page. Click on the <code>+</code> button to create a new project.</div>
+  <div class="content">After signing in, you will land on the <code>Workspace</code> page. Click on the <code>+ New Project</code> button and select <code>Blank Project</code> to create a new project. You have the option also to scroll down and choose a Project template from the section "Start from a Template" </div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Choose a <b>Folder location</b>, fill the <b>project name</b> field and <b>description</b>, and click on the <code>Create</code> button.</div>
+  <div class="content">Fill the <b>project name</b> and click on the <code>Create</code> button.</div>
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/getting_started/new_project.gif').default} alt="Workspace at GOAT" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
+  <img src={require('/img/getting_started/new-project.gif').default} alt="Workspace at GOAT" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
 </div>
 
 ## Add data to your project
@@ -31,7 +31,7 @@ You've landed in the map view of your new project. Now it's time to add some dat
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Click <code>+ Add Layer</code> on the left panel. You can add data from your <b>personal datasets</b>, <b>upload a file</b>, browse the <b>catalog</b>, or connect an <b>external URL</b> (WMS, WMTS, WFS, XYZ). For full details on each option, see <a href="../map/layers">Layers</a>.</div>
+  <div class="content">Click <code>+ Add Layer</code> on the left panel. You can add data from your <b>personal datasets</b>, <b>upload a file</b>, <b>create a layer</b> from scratch, browse the <b>catalog</b>, or connect an <b>external URL</b> (WMS, WMTS, WFS, XYZ). For full details on each option, see <a href="../map/layers">Layers</a>.</div>
 </div>
 
 ## Explore the analysis tools
@@ -79,5 +79,5 @@ Now that you have created your first project in GOAT, it's time to share it with
 
 <div class="step">
   <div class="step-number">11</div>
-  <div class="content">Click <code>Copy URL</code> to share a direct link, or <code>Copy iframe Code</code> to embed the map in a website. For more detail, see <a href="../workspace/projects">Projects</a>.</div>
+  <div class="content">Click <code>Copy URL</code> to share a direct link, or <code>Copy iframe Code</code> to embed the map in a website. For more detail, see <a href="../workspace/content">Content</a>.</div>
 </div>

@@ -49,10 +49,11 @@ describe("HomeHero", () => {
     expect(screen.queryByRole("button", { name: "browse_catalog" })).not.toBeInTheDocument();
   });
 
-  it("welcomes a returning caller back, with the search slot and quick actions", () => {
+  it("still welcomes a caller who is getting started to GOAT, with the search slot and quick actions", () => {
     renderHero({ stage: "getting_started" });
 
-    expect(screen.getByText("welcome_back")).toBeInTheDocument();
+    expect(screen.getByText("welcome_to_goat")).toBeInTheDocument();
+    expect(screen.queryByText("welcome_back")).not.toBeInTheDocument();
     expect(screen.getByTestId("search-slot")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "new_project" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "add_dataset" })).toBeInTheDocument();
@@ -76,9 +77,10 @@ describe("HomeHero", () => {
     expect(screen.getByRole("button", { name: "new_project" })).toBeInTheDocument();
   });
 
-  it("keeps the search slot and quick actions once established", () => {
+  it("welcomes an established caller back, keeping the search slot and quick actions", () => {
     renderHero({ stage: "established" });
 
+    expect(screen.getByText("welcome_back")).toBeInTheDocument();
     expect(screen.getByTestId("search-slot")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "new_project" })).toBeInTheDocument();
   });

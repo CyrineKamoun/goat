@@ -92,9 +92,12 @@ describe("ContentAddMenu", () => {
         expect.objectContaining({ name: "Bus stops", folder_id: "folder-a" })
       )
     );
-    // Defaults the old create dialog carried, now supplied without a form.
+    // The one default the old create dialog carried, still supplied here.
     const payload = createProjectMock.mock.calls[0][0];
-    expect(payload.initial_view_state).toEqual(expect.objectContaining({ zoom: 12 }));
+    // No starting view is sent: the server picks one from the creator's last
+    // project, the deployment's configured default, or their approximate
+    // location, so the client must not pin it to a hardcoded city.
+    expect(payload.initial_view_state).toBeUndefined();
     expect(payload.thumbnail_url).toContain("goat_new_project_artwork");
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/map/p-1"));
   });

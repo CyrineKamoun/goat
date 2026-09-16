@@ -31,7 +31,7 @@ const spotlightEntry = (overrides: Partial<Parameters<typeof useSpotlight>[0][nu
   title: "Content Spaces",
   summary: "Spaces now own content.",
   url: "https://docs.plan4better.de/releases/2026-09-content-spaces",
-  spotlight: { headline: "Content Spaces is here" },
+  spotlight: { headline: "Content Spaces is here", highlights: [] },
   ...overrides,
 });
 
@@ -40,11 +40,6 @@ beforeEach(() => {
   usePreferencesMock.mockReset().mockReturnValue({ mutate: mutateMock });
   patchPreferencesMock.mockReset().mockResolvedValue({});
   mutateMock.mockReset();
-  try {
-    sessionStorage.clear();
-  } catch {
-    // sessionStorage not available in this environment; nothing to clear.
-  }
 });
 
 afterEach(() => {
@@ -94,11 +89,11 @@ describe("useSpotlight", () => {
     expect(result.current.entry?.id).toBe("e1");
   });
 
-  it("shows at most one entry per session: a second hook instance in the same session sees nothing", () => {
+  it("comes back on the next load until acted on: a second mount sees the same entry", () => {
     renderHook(() => useSpotlight([spotlightEntry()], preferences(), "getting_started"));
     const { result } = renderHook(() => useSpotlight([spotlightEntry()], preferences(), "getting_started"));
 
-    expect(result.current.entry).toBeUndefined();
+    expect(result.current.entry?.id).toBe("e1");
   });
 
   it("dismiss patches spotlight_seen with the entry appended, then refreshes preferences", async () => {
@@ -113,6 +108,43 @@ describe("useSpotlight", () => {
 
     expect(patchPreferencesMock).toHaveBeenCalledWith({ spotlight_seen: ["old-id", "e1"] });
     expect(mutateMock).toHaveBeenCalledTimes(1);
+    expect(result.current.entry).toBeUndefined();
+  });
+
+  it("preview reopens the newest spotlight regardless of stage, jobs and history, recording nothing", async () => {
+    useAppSelectorMock.mockReturnValue(["job-1"]);
+    const entries = [
+      spotlightEntry({ id: "old", date: "2026-09-01" }),
+      spotlightEntry({ id: "newest", date: "2026-09-14" }),
+    ];
+    const { result } = renderHook(() =>
+      useSpotlight(entries, preferences(["newest", "old"]), "new", { preview: "*" })
+    );
+
+    expect(result.current.entry?.id).toBe("newest");
+
+    await act(async () => {
+      await result.current.dismiss();
+    });
+
+    expect(result.current.entry).toBeUndefined();
+    expect(patchPreferencesMock).not.toHaveBeenCalled();
+  });
+
+  it("preview by id opens that entry even without a spotlight flag", () => {
+    const entries = [spotlightEntry({ id: "a" }), { ...spotlightEntry({ id: "b" }), spotlight: undefined }];
+    const { result } = renderHook(() =>
+      useSpotlight(entries, preferences(), "established", { preview: "b" })
+    );
+
+    expect(result.current.entry?.id).toBe("b");
+  });
+
+  it("stays closed while suppressed, even in preview", () => {
+    const { result } = renderHook(() =>
+      useSpotlight([spotlightEntry()], preferences(), "established", { preview: "*", suppress: true })
+    );
+
     expect(result.current.entry).toBeUndefined();
   });
 });

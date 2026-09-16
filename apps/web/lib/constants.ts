@@ -1,4 +1,5 @@
 import { isAuthDisabled } from "@/lib/utils/auth-flag";
+import { publicEnv } from "@/lib/utils/public-env";
 
 export const KEYCLOAK_CLIENT_ID = process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID;
 export const KEYCLOAK_ISSUER = process.env.NEXT_PUBLIC_KEYCLOAK_ISSUER;
@@ -20,7 +21,29 @@ export const AUTH_DISABLED = isAuthDisabled(process.env.NEXT_PUBLIC_AUTH);
 
 export const DOCS_URL = "https://goat.plan4better.de/docs";
 export const CONTACT_US_URL = "https://plan4better.de/contact";
-export const WEBSITE_URL = "https://plan4better.de";
+/**
+ * The public website. `NEXT_PUBLIC_WEBSITE_URL` names the deployment whose
+ * blog and GOAT changelog RSS feeds fill Home's "From our blog" and "What's
+ * new"; when it is unset (or still the Docker placeholder) those surfaces
+ * stay hidden and only the plain links fall back to production.
+ */
+const configuredWebsiteUrl = publicEnv(process.env.NEXT_PUBLIC_WEBSITE_URL)?.replace(/\/+$/, "");
+export const WEBSITE_URL = configuredWebsiteUrl ?? "https://www.plan4better.de";
+export const WEBSITE_FEEDS_ENABLED = Boolean(configuredWebsiteUrl);
+
+/** The catchment-area walkthrough the help strip links to, one cut per UI language. */
+export const HELP_VIDEO_URL: Record<"en" | "de", string> = {
+  en: "https://www.youtube.com/watch?v=_clsR386b9w",
+  de: "https://www.youtube.com/watch?v=GA_6PbhAA6k",
+};
+/**
+ * The product intro the first-run Welcome plays: a Bunny Stream video on the
+ * product's video CDN, which generates the poster and the MP4 renditions
+ * beside the HLS playlist. The 720p MP4 plays in a `<video>` everywhere.
+ */
+const WELCOME_VIDEO_BASE = "https://videos.plan4better.de/31ad707d-c1f2-4f21-8c47-1c610141f9d2";
+export const WELCOME_VIDEO_URL = `${WELCOME_VIDEO_BASE}/play_720p.mp4`;
+export const WELCOME_VIDEO_POSTER = `${WELCOME_VIDEO_BASE}/thumbnail.jpg`;
 export const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
 
 export const MAPTILER_KEY = "tffQ1wAu9TKyVMHrc3o3";

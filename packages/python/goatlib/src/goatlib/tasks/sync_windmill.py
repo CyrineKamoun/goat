@@ -119,7 +119,7 @@ class WindmillTaskSyncer:
             "script_path": task_def.windmill_path,
             "is_flow": False,
             "args": {},  # Default args (empty = use defaults)
-            "enabled": True,
+            "enabled": task_def.enabled,
             "timezone": "UTC",
         }
 
@@ -130,7 +130,10 @@ class WindmillTaskSyncer:
             )
 
             if check_response.status_code == 200:
-                # Schedule exists, update it
+                # Schedule exists, update it. `enabled` is deliberately not
+                # sent: whether a schedule runs is decided in the Windmill UI,
+                # and a sync must not switch one back on — or off — behind
+                # whoever set it.
                 response = self.client.post(
                     f"{self.base_url}/api/w/{self.workspace}/schedules/update/{schedule_path}",
                     json={

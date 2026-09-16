@@ -132,7 +132,7 @@ def test_call_after_ttl_expiry_refetches(monkeypatch: pytest.MonkeyPatch) -> Non
     get_public_search_layers(pid)
     assert calls == 1
 
-    key = str(uuid.UUID(pid))
+    key = f"search:{uuid.UUID(pid)}"
     stale_ts, specs = psc._cache[key]
     psc._cache[key] = (stale_ts - psc.CONFIG_TTL_SECONDS - 1.0, specs)
 

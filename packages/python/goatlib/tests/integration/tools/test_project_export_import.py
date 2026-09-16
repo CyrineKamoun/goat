@@ -54,7 +54,7 @@ async def extended_test_schemas(postgres_pool: Any, test_schemas: None) -> None:
                 user_id UUID NOT NULL,
                 project_id UUID NOT NULL
                     REFERENCES {TEST_CUSTOMER_SCHEMA}.project(id) ON DELETE CASCADE,
-                initial_view_state JSONB,
+                initial_view_state JSONB NOT NULL,
                 UNIQUE(user_id, project_id)
             )
         """)

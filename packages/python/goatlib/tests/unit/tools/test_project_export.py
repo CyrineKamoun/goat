@@ -307,6 +307,7 @@ class TestProjectExportRunner:
             if "FROM customer.project" in query:
                 return {
                     "id": project_id,
+                    "user_id": user_id,
                     "name": "Test Project",
                     "description": None,
                     "basemap": None,
@@ -474,3 +475,107 @@ class TestProjectExportRunner:
             layer_index = json.loads(zf.read("layers/index.json"))
             assert len(layer_index["layers"]) == 1
             assert layer_index["layers"][0]["id"] == layer_id
+
+
+def _project_row(project_id: uuid.UUID, owner_id: uuid.UUID) -> dict[str, Any]:
+    return {
+        "id": project_id,
+        "user_id": owner_id,
+        "name": "Shared Project",
+        "description": None,
+        "basemap": None,
+        "custom_basemaps": None,
+        "max_extent": None,
+        "builder_config": None,
+        "tags": None,
+        "thumbnail_url": None,
+    }
+
+
+async def _gather_with_view_rows(
+    runner: ProjectExportRunner,
+    project_id: uuid.UUID,
+    owner_id: uuid.UUID,
+    exporter_id: uuid.UUID,
+    view_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Run `_gather_metadata` against a project with the given user_project rows."""
+
+    async def fake_fetchrow(query: str, *args: object) -> dict[str, Any] | None:
+        if "FROM customer.project" in query:
+            return _project_row(project_id, owner_id)
+        return None
+
+    async def fake_fetch(query: str, *args: object) -> list[dict[str, Any]]:
+        if "FROM customer.user_project" in query:
+            wanted = set(args[1])  # type: ignore[arg-type]
+            return [r for r in view_rows if r["user_id"] in wanted]
+        return []
+
+    conn = AsyncMock()
+    conn.fetchrow = AsyncMock(side_effect=fake_fetchrow)
+    conn.fetch = AsyncMock(side_effect=fake_fetch)
+    conn.set_type_codec = AsyncMock()
+    conn.close = AsyncMock()
+
+    with patch("goatlib.tools.project_export.asyncpg") as mock_asyncpg:
+        mock_asyncpg.connect = AsyncMock(return_value=conn)
+        return await runner._gather_metadata(str(project_id), str(exporter_id))
+
+
+class TestExportInitialViewState:
+    """Which `user_project` row the archive's `initial_view_state` comes from.
+
+    Regression: exporting a project the exporter did not own and had never
+    opened wrote `initial_view_state: null`; the importer then inserted that
+    into a NOT NULL column and the whole import rolled back.
+    """
+
+    project_id = uuid.UUID("00000000-0000-0000-0000-000000000099")
+    owner_id = uuid.UUID("00000000-0000-0000-0000-000000000011")
+    exporter_id = uuid.UUID("00000000-0000-0000-0000-000000000022")
+    owner_view = {"zoom": 12, "latitude": 52.5, "longitude": 13.4}
+    exporter_view = {"zoom": 9, "latitude": 48.1, "longitude": 11.6}
+
+    @pytest.fixture()
+    def runner(self) -> ProjectExportRunner:
+        runner = ProjectExportRunner()
+        settings = MagicMock()
+        settings.customer_schema = "customer"
+        runner.settings = settings
+        return runner
+
+    @pytest.mark.asyncio
+    async def test_exporter_own_row_wins(self, runner: ProjectExportRunner) -> None:
+        metadata = await _gather_with_view_rows(
+            runner,
+            self.project_id,
+            self.owner_id,
+            self.exporter_id,
+            [
+                {"user_id": self.owner_id, "initial_view_state": self.owner_view},
+                {"user_id": self.exporter_id, "initial_view_state": self.exporter_view},
+            ],
+        )
+        assert metadata["project_metadata"]["initial_view_state"] == self.exporter_view
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_owner_row(self, runner: ProjectExportRunner) -> None:
+        metadata = await _gather_with_view_rows(
+            runner,
+            self.project_id,
+            self.owner_id,
+            self.exporter_id,
+            [{"user_id": self.owner_id, "initial_view_state": self.owner_view}],
+        )
+        assert metadata["project_metadata"]["initial_view_state"] == self.owner_view
+
+    @pytest.mark.asyncio
+    async def test_no_row_at_all_omits_the_key(
+        self, runner: ProjectExportRunner
+    ) -> None:
+        """No row anywhere: leave the key out so the importer applies its default."""
+        metadata = await _gather_with_view_rows(
+            runner, self.project_id, self.owner_id, self.exporter_id, []
+        )
+        assert "initial_view_state" not in metadata["project_metadata"]

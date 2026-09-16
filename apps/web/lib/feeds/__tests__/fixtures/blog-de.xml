@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Plan4Better Blog</title>
+    <link>https://www.plan4better.de/de/blog</link>
+    <description>Neuigkeiten und Einblicke: Unsere neuesten Projekte und Entwicklungen in GIS, Stadtplanung, Verkehr und Umwelt</description>
+    <language>de-DE</language>
+    <atom:link href="https://www.plan4better.de/de/blog/rss.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>GOAT v3.0: über 30.000 Datensätze, Vorlagen und eigene Netzwerke</title>
+      <link>https://www.plan4better.de/de/post/goat-v3-datenkatalog-vorlagen-eigene-routing-netzwerke</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/goat-v3-datenkatalog-vorlagen-eigene-routing-netzwerke</guid>
+      <pubDate>Sun, 13 Sep 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Der Katalog ist von 60 auf über 30.000 Datensätze gewachsen, Projekte starten aus einer Vorlage statt aus einer leeren Karte, das Content-Management wurde neu gebaut, und Erreichbarkeitsanalysen laufen jetzt auch auf einem eigenen Netzwerk.</description>
+      <category>goat</category>
+      <category>development</category>
+      <category>news</category>
+      <media:content url="https://www.plan4better.de/_astro/hero-welcome.CBUEJHn6_Z20pN7F.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/hero-welcome.CBUEJHn6_Z20pN7F.webp" />
+    </item>
+    <item>
+      <title>Details auf Abruf: Pop-ups für deine Karten gestalten und bauen</title>
+      <link>https://www.plan4better.de/de/post/details-auf-abruf-pop-ups-fuer-deine-karten-gestalten-und-bauen</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/details-auf-abruf-pop-ups-fuer-deine-karten-gestalten-und-bauen</guid>
+      <pubDate>Wed, 05 Aug 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Pop-ups in Karten gestalten und bauen: wann sie sinnvoll sind, was hineingehört und wie du eigene Pop-ups mit Bausteinen, HTML und KI erstellst.</description>
+      <category>insights</category>
+      <category>goat</category>
+      <media:content url="https://www.plan4better.de/_astro/blogpost-cover.B29s_4N0_Z1WPQTa.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/blogpost-cover.B29s_4N0_Z1WPQTa.webp" />
+    </item>
+    <item>
+      <title>GIS-Workflows: einmal aufbauen, überall ausführen</title>
+      <link>https://www.plan4better.de/de/post/gis-workflows-einmal-aufbauen-ueberall-ausfuehren</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/gis-workflows-einmal-aufbauen-ueberall-ausfuehren</guid>
+      <pubDate>Tue, 14 Jul 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Cyrine Kamoun</dc:creator>
+      <description>Ein GIS-Workflow verbindet Analysewerkzeuge zu einer wiederverwendbaren Pipeline. So sparen Sie mit GOAT Zeit, vermeiden Fehler und reproduzieren Ergebnisse.</description>
+      <category>goat</category>
+      <category>insights</category>
+      <media:content url="https://www.plan4better.de/_astro/gis-workflow-example.h46LC72u_ZvDgHG.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/gis-workflow-example.h46LC72u_ZvDgHG.webp" />
+    </item>
+    <item>
+      <title>Park-Stark: eine quelloffene App für barrierefreies Parken und Navigieren in Mannheim</title>
+      <link>https://www.plan4better.de/de/post/park-stark-quelloffene-app-barrierefreies-parken-mannheim</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/park-stark-quelloffene-app-barrierefreies-parken-mannheim</guid>
+      <pubDate>Tue, 30 Jun 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Nihar Thakkar</dc:creator>
+      <description>Die meisten Navigations-Apps sind für eine imaginäre „durchschnittliche“ Person gebaut, Barrierefreiheit wird erst nachträglich draufgesetzt. Wir wollten es umdrehen. Park-Stark ist eine quelloffene, plattformübergreifende App für Mannheim und weitere Regionen in Baden-Württemberg, von Grund auf um Menschen mit Mobilitäts- und Seheinschränkungen herum entwickelt – sie findet rollstuhlgerechte Parkplätze, bezieht die Echtzeit-Verfügbarkeit aus offenen Daten ein und führt dich mit einer detaillierten Schritt-für-Schritt-Navigation dorthin.</description>
+      <category>development</category>
+      <category>projects</category>
+      <media:content url="https://www.plan4better.de/_astro/blogpost-cover-1.B74O17YL_13EJx6.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/blogpost-cover-1.B74O17YL_13EJx6.webp" />
+    </item>
+    <item>
+      <title>322 Hektar bebaubares Ackerland rund um Schwabach – gefunden mit offenen Daten</title>
+      <link>https://www.plan4better.de/de/post/322-hektar-bebaubares-ackerland-um-schwabach</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/322-hektar-bebaubares-ackerland-um-schwabach</guid>
+      <pubDate>Tue, 16 Jun 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Gokul Gopan</dc:creator>
+      <description>Bayern braucht mehr Wohnraum, ohne weiter Ackerland zu verlieren – und beides gerät ständig aneinander. Als Experiment habt Gokul Gopan (GIS-Analyst bei Plan4Better) nur mit offenen Daten kartiert, welche Flächen rund um Schwabach auf dem Papier reif für Wohnungsbau wären: nah am ÖV, direkt an bestehender Bebauung, in der richtigen Größe und Form. Das Ergebnis – 322 Hektar nahe der Bahn, 842 nahe dem Bus – und ein Workflow, den jede deutsche Kommune übernehmen kann.</description>
+      <category>goat</category>
+      <category>use-cases</category>
+      <media:content url="https://www.plan4better.de/_astro/cover.CrRf_U82_ZIC451.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/cover.CrRf_U82_ZIC451.webp" />
+    </item>
+    <item>
+      <title>Die stille Ebene: Basiskarten finden, gestalten und hosten</title>
+      <link>https://www.plan4better.de/de/post/wo-man-basiskarten-findet</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/wo-man-basiskarten-findet</guid>
+      <pubDate>Tue, 09 Jun 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Kostenlose Basiskarten für MapLibre, QGIS und Tools wie GOAT finden, gestalten und hosten – offene Editoren (Maputnik, MapTiler, Mapbox) und fertige Styles (OpenFreeMap, Protomaps, Stamen).</description>
+      <category>insights</category>
+      <category>goat</category>
+      <media:content url="https://www.plan4better.de/_astro/where-to-find-basemaps-main.CtrNXlCP_Z1h1xFX.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/where-to-find-basemaps-main.CtrNXlCP_Z1h1xFX.webp" />
+    </item>
+    <item>
+      <title>Von Daten zur Botschaft: So gestaltet man ein kartenbasiertes Dashboard für die Raumplanung</title>
+      <link>https://www.plan4better.de/de/post/gestaltung-kartenbasiertes-dashboard-fuer-die-raumplanung</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/gestaltung-kartenbasiertes-dashboard-fuer-die-raumplanung</guid>
+      <pubDate>Tue, 05 May 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Bevor man ein kartenbasiertes Dashboard baut, prägen vier Fragen alles: Was ist die Botschaft, wer ist die Zielgruppe, wozu dient es, und wie soll sich der Nutzer hindurchbewegen? Ein praxisnaher Leitfaden für Raumplaner und Analysten.</description>
+      <category>insights</category>
+      <category>goat</category>
+      <media:content url="https://www.plan4better.de/_astro/clean-dashboard.VnYAqo_i_Z2wShQv.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/clean-dashboard.VnYAqo_i_Z2wShQv.webp" />
+    </item>
+    <item>
+      <title>Kartenbasierte Dashboards: Das räumliche Werkzeug für bessere Entscheidungen</title>
+      <link>https://www.plan4better.de/de/post/kartenbasierte-dashboards-das-raeumliche-werkzeug-fuer-bessere-entscheidungen</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/kartenbasierte-dashboards-das-raeumliche-werkzeug-fuer-bessere-entscheidungen</guid>
+      <pubDate>Wed, 08 Apr 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Nicht jedes Dashboard mit einer Karte ist ein kartenbasiertes Dashboard. Erfahre, was den Unterschied wirklich ausmacht — und warum die Raumplanung genau das braucht.</description>
+      <category>insights</category>
+      <category>goat</category>
+      <media:content url="https://www.plan4better.de/_astro/blogpost-20cover-20-1.C9jQaOeB_EBDnq.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/blogpost-20cover-20-1.C9jQaOeB_EBDnq.webp" />
+    </item>
+    <item>
+      <title>Erreichbarkeitsanalyse: Ein praktischer Leitfaden zu den 8 Methoden in GOAT</title>
+      <link>https://www.plan4better.de/de/post/erreichbarkeitsanalyse-methoden-goat</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/erreichbarkeitsanalyse-methoden-goat</guid>
+      <pubDate>Thu, 02 Apr 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Cyrine Kamoun</dc:creator>
+      <description>Du weißt nicht, welche Methode zur Erreichbarkeitsanalyse für dein nächstes Stadtplanungsprojekt am besten geeignet ist? Dieser Leitfaden stellt die 8 Werkzeuge von GOAT vor – von Einzugsgebieten und Isochrone über die 2SFCA bis hin zum Huff-Modell – mit praxisnahen Beispielen, die dir helfen, die richtige Methode zu wählen.</description>
+      <category>goat</category>
+      <category>insights</category>
+      <media:content url="https://www.plan4better.de/_astro/blogpost-cover-2.B9xGwAU-_1Q472N.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/blogpost-cover-2.B9xGwAU-_1Q472N.webp" />
+    </item>
+    <item>
+      <title>GOAT 2.4.0 „Toggenburg“</title>
+      <link>https://www.plan4better.de/de/post/goat-2-4-0-toggenburg-ist-da</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/goat-2-4-0-toggenburg-ist-da</guid>
+      <pubDate>Mon, 09 Mar 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Workflows, Erweiterte Analyse &amp; Performance-Upgrades</description>
+      <category>goat</category>
+      <category>development</category>
+      <category>news</category>
+      <media:content url="https://www.plan4better.de/_astro/workflows-cover.nnM6Qc0S_ZkQCou.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/workflows-cover.nnM6Qc0S_ZkQCou.webp" />
+    </item>
+    <item>
+      <title>On-Demand-Verkehr: Eine fehlende Ebene in der Planung des öffentlichen Verkehrs</title>
+      <link>https://www.plan4better.de/de/post/on-demand-verkehr-fehlende-ebene</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/on-demand-verkehr-fehlende-ebene</guid>
+      <pubDate>Tue, 10 Feb 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Cyrine Kamoun</dc:creator>
+      <description>On-Demand-Verkehre werden zunehmend zu einem zentralen Bestandteil des öffentlichen Verkehrs, insbesondere dort, wo feste Linienangebote an ihre Grenzen stoßen. Der Beitrag zeigt, wie flexible Angebote Versorgungslücken in unterversorgten Räumen schließen und warum sie integraler Bestandteil der ÖPNV-Planung sein müssen.</description>
+      <category>use-cases</category>
+      <category>insights</category>
+      <media:content url="https://www.plan4better.de/_astro/on-demand-dorfen.qbFZXTe5_LTj1W.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/on-demand-dorfen.qbFZXTe5_LTj1W.webp" />
+    </item>
+    <item>
+      <title>GOAT 2.3.0 „Tarn“ ist da</title>
+      <link>https://www.plan4better.de/de/post/goat-2-3-0-tarn-ist-da</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/goat-2-3-0-tarn-ist-da</guid>
+      <pubDate>Tue, 13 Jan 2026 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Ein neues Jahr, eine neue GOAT-Version. Mit GOAT 2.3.0 stellen wir eine grundlegende Weiterentwicklung der Backend-Architektur von GOAT, eine neue Funktion zum Drucken von Karten und Berichten sowie zahlreiche neue Werkzeuge für die räumliche Analyse vor.</description>
+      <category>goat</category>
+      <category>development</category>
+      <category>news</category>
+      <media:content url="https://www.plan4better.de/_astro/blogpost-cover-e8416baf.Dhk7X_IG_1NMIkX.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/blogpost-cover-e8416baf.Dhk7X_IG_1NMIkX.webp" />
+    </item>
+    <item>
+      <title>Vier natürliche Elemente, ein WebGIS-Werkzeug: Kartierung von Klimawandel und Extremereignissen in Tunesien mit GOAT</title>
+      <link>https://www.plan4better.de/de/post/vier-elemente-ein-webgis-werkzeug-tunesien</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/vier-elemente-ein-webgis-werkzeug-tunesien</guid>
+      <pubDate>Thu, 18 Dec 2025 00:00:00 GMT</pubDate>
+      <dc:creator>Cyrine Kamoun</dc:creator>
+      <description>Eine explorative räumliche Analyse von Klimawandel und Extremereignissen in Tunesien auf Basis von Satelliten- und Sensordaten. Die Studie zeigt, wie ein WebGIS-Werkzeug wie GOAT Umwelttrends in den Bereichen Wasser, Feuer, Erde und Luft sichtbar macht.</description>
+      <category>use-cases</category>
+      <category>goat</category>
+      <media:content url="https://www.plan4better.de/_astro/climate-change-tunisia-cover.B7hTB9Hr_NGXhB.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/climate-change-tunisia-cover.B7hTB9Hr_NGXhB.webp" />
+    </item>
+    <item>
+      <title>GOAT 2.2.0 „Cashmere“ ist da</title>
+      <link>https://www.plan4better.de/de/post/goat-2-2-0-cashmere-ist-da</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/goat-2-2-0-cashmere-ist-da</guid>
+      <pubDate>Tue, 16 Dec 2025 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Wir verbessern GOAT kontinuierlich. Mit Version 2.2.0 führen wir eine neu strukturierte Benutzeroberfläche, Layer-Gruppierungen und Verbesserungen an den Dashboards ein – damit Sie komplexe Daten einfach in klare Entscheidungen übersetzen können.</description>
+      <category>goat</category>
+      <category>development</category>
+      <category>news</category>
+      <media:content url="https://www.plan4better.de/_astro/goat-new-version-cover.mW3Vgb5o_Z1GAooK.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/goat-new-version-cover.mW3Vgb5o_Z1GAooK.webp" />
+    </item>
+    <item>
+      <title>Warum Europa eigene Geosoftware braucht – und warum Open Source ein zentraler Teil der Lösung ist</title>
+      <link>https://www.plan4better.de/de/post/warum-europa-eigene-geosoftware-braucht</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/warum-europa-eigene-geosoftware-braucht</guid>
+      <pubDate>Thu, 11 Dec 2025 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Die Planung in Europa stützt sich stark auf ausländische, proprietäre Geowerkzeuge — mit Risiken für Transparenz, Kontrolle und langfristige digitale Souveränität. Europäische Open-Source-Plattformen wie GOAT bieten einen neuen Weg. Die Entscheidungen, die Planer*innen heute treffen, prägen Europas digitale Grundlagen für die kommenden Jahrzehnte.</description>
+      <category>insights</category>
+      <media:content url="https://www.plan4better.de/_astro/blogpost-cover-4.Biuyzrpk_Z48V1K.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/blogpost-cover-4.Biuyzrpk_Z48V1K.webp" />
+    </item>
+    <item>
+      <title>30 Tage, (fast) 30 Karten, ein Team</title>
+      <link>https://www.plan4better.de/de/post/30-tage-30-karten-ein-team</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/30-tage-30-karten-ein-team</guid>
+      <pubDate>Thu, 04 Dec 2025 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Dieser November stand für das Plan4Better-Team ganz im Zeichen der #30DayMapChallenge – als gemeinsames Abenteuer. Hier können Sie sich die Karten ansehen, die wir erstellt haben!</description>
+      <category>insights</category>
+      <category>goat</category>
+      <media:content url="https://www.plan4better.de/_astro/blogpost-cover-82d134f7.CqFktfnw_1EyATG.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/blogpost-cover-82d134f7.CqFktfnw_1EyATG.webp" />
+    </item>
+    <item>
+      <title>GOAT 2.1.0 &quot;Ibex&quot; ist da</title>
+      <link>https://www.plan4better.de/de/post/goat-2-1-0-ibex-ist-da</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/goat-2-1-0-ibex-ist-da</guid>
+      <pubDate>Tue, 21 Oct 2025 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Jeder Planer kennt die Frustration: wertvolle Daten, gefangen in starren Visualisierungen. Heute ändert sich das. GOAT 2.1.0 'Ibex' gibt Ihnen die Kontrolle mit benutzerdefinierten Dashboards, personalisiertem Styling und hoher Performance, die genau so funktioniert, wie Sie es wollen.</description>
+      <category>goat</category>
+      <category>development</category>
+      <category>news</category>
+      <media:content url="https://www.plan4better.de/_astro/dashboard-builder.DbarAAVs_Z1yKnIY.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/dashboard-builder.DbarAAVs_Z1yKnIY.webp" />
+    </item>
+    <item>
+      <title>Wie wir bei Plan4Better mit QGIS für Datenanalyse und Visualisierung arbeiten</title>
+      <link>https://www.plan4better.de/de/post/wie-wir-mit-qgis-arbeiten</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/wie-wir-mit-qgis-arbeiten</guid>
+      <pubDate>Thu, 02 Oct 2025 00:00:00 GMT</pubDate>
+      <dc:creator>Camila Narbaitz</dc:creator>
+      <description>Open Source ist für uns nicht nur eine Philosophie – es ist unsere Arbeitsweise. QGIS und GOAT bilden zusammen unser Kraftpaket für räumliche Analysen. In diesem Blogpost teilen wir den Workflow, den wir in QGIS aufgebaut haben (ja, inklusive der unschönen Teile).</description>
+      <category>process</category>
+      <category>insights</category>
+      <media:content url="https://www.plan4better.de/_astro/how-we-work-with-qgis-for-data-analysis-and-visualization.ClR2Cz0L_ZMC95E.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/how-we-work-with-qgis-for-data-analysis-and-visualization.ClR2Cz0L_ZMC95E.webp" />
+    </item>
+    <item>
+      <title>Bewertung der ÖV-Güteklassen in Deutschland: Wichtige Erkenntnisse aus unserem White Paper (2025)</title>
+      <link>https://www.plan4better.de/de/post/bewertung-oev-gueteklassen-deutschland-white-paper-2025</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/bewertung-oev-gueteklassen-deutschland-white-paper-2025</guid>
+      <pubDate>Wed, 20 Aug 2025 00:00:00 GMT</pubDate>
+      <dc:creator>Noémi Nagy</dc:creator>
+      <description>Die Qualität des öffentlichen Verkehrs wird durch mehrere Indikatoren bestimmt. Mit diesen Indikatoren haben wir in GOAT eine Analyse durchgeführt, um zu bewerten, wie gut die Gemeinden in Deutschland bedient werden.</description>
+      <category>projects</category>
+      <category>goat</category>
+      <media:content url="https://www.plan4better.de/_astro/cover-landkreise.D236Kxtf_in1dM.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/cover-landkreise.D236Kxtf_in1dM.webp" />
+    </item>
+    <item>
+      <title>Erfolgreicher Abschluss des Projekts GOAT 3.0</title>
+      <link>https://www.plan4better.de/de/post/erfolgreicher-abschluss-des-projekts-goat-3-0</link>
+      <guid isPermaLink="true">https://www.plan4better.de/de/post/erfolgreicher-abschluss-des-projekts-goat-3-0</guid>
+      <pubDate>Wed, 30 Apr 2025 00:00:00 GMT</pubDate>
+      <dc:creator>Elias Pajares</dc:creator>
+      <description>Entwicklung eines digitalen Erreichbarkeitstool für eine ausgeglichene Raum- und Verkehrsplanung</description>
+      <category>goat</category>
+      <category>development</category>
+      <media:content url="https://www.plan4better.de/_astro/v-qualitaet-dresden.CiugL8UW_29Womq.webp" medium="image" type="image/webp" />
+      <media:thumbnail url="https://www.plan4better.de/_astro/v-qualitaet-dresden.CiugL8UW_29Womq.webp" />
+    </item>
+  </channel>
+</rss>

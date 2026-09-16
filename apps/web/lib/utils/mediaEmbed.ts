@@ -76,3 +76,35 @@ export const stripMediaUrls = (input: string): string =>
     .join("")
     .replace(/\s+/g, " ")
     .trim();
+
+/**
+ * The video id of a YouTube URL in any of its shapes — `watch?v=`, `youtu.be/`,
+ * `/embed/`, `/shorts/` — or null for anything else. Only https, as above.
+ */
+export const youtubeVideoId = (raw: string): string | null => {
+  const url = isHttpsUrl(raw);
+  if (!url) return null;
+  const host = url.hostname.replace(/^www\./, "").replace(/^m\./, "");
+  let id: string | null = null;
+  if (host === "youtu.be") {
+    id = url.pathname.slice(1).split("/")[0] || null;
+  } else if (host === "youtube.com" || host === "youtube-nocookie.com") {
+    if (url.pathname === "/watch") id = url.searchParams.get("v");
+    else {
+      const match = /^\/(?:embed|shorts|v)\/([^/?]+)/.exec(url.pathname);
+      id = match?.[1] ?? null;
+    }
+  }
+  return id && /^[\w-]{6,}$/.test(id) ? id : null;
+};
+
+/**
+ * The privacy-enhanced embed for a YouTube id. It autoplays, so callers only
+ * navigate to it after a click; muted by default, unmuted where that click
+ * was explicitly "watch this video".
+ */
+export const youtubeEmbedUrl = (id: string, { muted = true }: { muted?: boolean } = {}): string =>
+  `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&mute=${muted ? 1 : 0}&rel=0&modestbranding=1`;
+
+/** YouTube's own poster frame for an id. */
+export const youtubePosterUrl = (id: string): string => `https://img.youtube.com/vi/${id}/maxresdefault.jpg`;

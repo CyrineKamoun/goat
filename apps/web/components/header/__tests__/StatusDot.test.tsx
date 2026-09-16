@@ -34,13 +34,12 @@ describe("StatusDot", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows a quiet dot with no label while operational", () => {
+  it("renders nothing while everything is operational", () => {
     useStatusFeedMock.mockReturnValue({ status: feed() });
 
-    render(<StatusDot />);
+    const { container } = render(<StatusDot />);
 
-    expect(screen.queryByText("status_operational")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("status_operational")).toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("shows the outage label linking to the status page otherwise", () => {
