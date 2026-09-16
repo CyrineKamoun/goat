@@ -16,23 +16,25 @@ assumed:
 
 **A fixed sample, not a viewport.** No ``bbox`` parameter, no refetch on pan or
 zoom. That keeps the response a pure function of (item, mirror generation), so
-it is cached and computed at most once per item per harvest -- which is also
-what makes reading on demand strictly better than publishing 10,793 preview
-files, most of which nobody would ever open.
+a client can cache it and a deployment may cache it server-side as well.
+
+**The read is bounded, not scanned.** The sample is the first rows of the
+file -- see `_sample_sql`, which is where the cost of this endpoint is decided
+and what the alternatives were measured to cost.
 
 **The cap is bytes, not features.** Per-feature GeoJSON across the live catalog
 spans 0.07-66.7 KB -- a ~950x range that file size does not predict (the worst
 offender is a 1.4 MB file; a 447 MB one is 9x cheaper per feature). 100 raw
-features of one dataset came to 6.4 MB. So the feature ceiling is a fallback
-and the byte budget is the real limit.
+features of one dataset came to 6.4 MB. So the feature ceiling bounds the work
+and the byte budget is the real limit -- and it bounds the *read* (`_collect`),
+not just the response, so a dataset of enormous geometries cannot be
+materialised in full before anything notices.
 
 **Simplification does the work.** At a tolerance of "one screen pixel" the same
 100 features came to 0.27 MB -- 24x smaller, and faster, with nothing visible
-lost at the zoom the extent is drawn at.
-
-Cost, measured cold with no cache against Hetzner: 0.08 s on a typical file,
-1.3-2.9 s on the largest (447 MB / 496k rows). Only the first viewer of an item
-pays it.
+lost at the zoom the extent is drawn at. It is bounded in both directions:
+coarsened while that still pays, and stopped before it empties the shapes it
+is thinning.
 """
 
 import hashlib
@@ -58,10 +60,8 @@ logger = logging.getLogger(__name__)
 #: Columns that are structural rather than attributes of the feature.
 _NON_PROPERTY_COLUMNS = frozenset({"geometry", "geom", "bbox"})
 
-#: Fixed so a cache miss re-reads the *same* features. An unseeded reservoir
-#: would reshuffle the preview whenever a pod restarts or the mirror rolls,
-#: which reads as unstable data rather than as a sample.
-_SAMPLE_SEED = 42
+#: Rows pulled from DuckDB per step while filling the byte budget.
+_FETCH_BATCH = 256
 
 #: How DuckDB spells a geometry column in ``DESCRIBE``. Matched by prefix, not
 #: equality: a GeoParquet file carries its CRS in the type, so the real
@@ -418,6 +418,99 @@ def _bbox_of(features: list[dict[str, Any]]) -> list[float] | None:
     return [min(xs), min(ys), max(xs), max(ys)]
 
 
+def _sample_sql(projection: str, limit: int) -> str:
+    """SQL reading the first ``limit`` rows of the file.
+
+    A bounded read from the front, which touches only the first row groups.
+    Everything else measured against the real bucket costs an order of
+    magnitude more, because cost here is decided by how much of the object has
+    to be touched:
+
+    * a reservoir sample gives every row an equal chance, so it reads every
+      row -- 34 s on a 740 MB object, 108 s on a 232 MB one, on every request,
+      since the server-side cache (`preview_cache_dir`) is off unless a
+      deployment configures one;
+    * sampling at spaced offsets covers the whole extent but touches a row
+      group per offset, and the published files hold 3-54 of them, so it
+      converges on the same scan: measured 21-104 s;
+    * filtering to a bbox prunes on the GeoParquet covering column, but only
+      as far as the row groups allow -- 42 s on the 740 MB file whatever the
+      window size, because it has three of them.
+
+    What this returns is a patch rather than a survey: the files are
+    Hilbert-ordered (`catalog_materialize` writes them `ORDER BY ST_Hilbert`),
+    so the first rows are neighbours on the map as well as in the file, and the
+    client fits its map to the sample's own bbox. The dataset's full extent
+    travels alongside as ``goat:item_bbox``, so a caller that wants to show
+    where the patch sits within the whole still can.
+    """
+    return f"SELECT {projection} FROM read_parquet($url) LIMIT {int(limit)}"
+
+
+def _drawable_count(features: list[dict[str, Any]]) -> int:
+    """How many features still have a shape to draw."""
+    return sum(
+        1 for feature in features if (feature.get("geometry") or {}).get("coordinates")
+    )
+
+
+def _collect(
+    result: duckdb.DuckDBPyConnection,
+    names: list[str],
+    geometry_column: str | None,
+    limit: int,
+    max_bytes: int,
+) -> tuple[list[dict[str, Any]], bool]:
+    """Build features until the row ceiling or the byte budget, whichever first.
+
+    Streamed, not fetched whole. The budget used to be applied to a list that
+    had already been materialised, which left the *ceiling* deciding peak
+    memory -- and the ceiling counts features, while what costs memory is
+    bytes. Per-feature payload spans ~950x across the catalog, so the same 5000
+    rows is 2.8 MB of points or several hundred MB of line geometry. Measured:
+    reading a 740 MB line dataset that way OOM-killed the pod.
+
+    Stopping mid-read also keeps the prefix a prefix -- the rows are
+    file-ordered, so the ones that fit are the ones nearest the start rather
+    than a scatter with holes in it.
+
+    Returns the features, and whether the budget rather than the data ended the
+    read.
+    """
+    features: list[dict[str, Any]] = []
+    # The enclosing brackets of the array the caller serialises these into.
+    size = 2
+    while len(features) < limit:
+        batch = result.fetchmany(_FETCH_BATCH)
+        if not batch:
+            return features, False
+        for values in batch:
+            feature = _feature(dict(zip(names, values, strict=True)), geometry_column)
+            # Plus the ", " that will join it to the previous one.
+            encoded = len(json.dumps(feature)) + 2
+            if features and size + encoded > max_bytes:
+                return features, True
+            features.append(feature)
+            size += encoded
+            if len(features) >= limit:
+                return features, False
+    return features, False
+
+
+def _read_sample(
+    cursor: duckdb.DuckDBPyConnection,
+    projection: str,
+    url: str,
+    geometry_column: str | None,
+    limit: int,
+    settings: CatalogSettings,
+) -> tuple[list[dict[str, Any]], bool]:
+    """One bounded read, collected under the byte budget."""
+    result = cursor.execute(_sample_sql(projection, limit), {"url": url})
+    names = [d[0] for d in result.description]
+    return _collect(result, names, geometry_column, limit, settings.preview_max_bytes)
+
+
 def _fetch(
     cursor: duckdb.DuckDBPyConnection,
     url: str,
@@ -426,34 +519,26 @@ def _fetch(
     tolerance: float,
     settings: CatalogSettings,
 ) -> tuple[list[dict[str, Any]], bool]:
-    """Read, simplify, and shrink until the payload fits the byte budget.
+    """Read and simplify a bounded sample of the item's features.
 
-    **Reservoir sampling, not ``LIMIT``.** The published files are
-    Hilbert-ordered, so the first N rows are spatial neighbours: on the two
-    largest datasets in the catalog (2.5M and 871k features) the first 100
-    covered *0.000%* of the extent -- one road junction -- which a map cannot
-    even fit to. Row-group (``system``) sampling has the same defect, since a
-    row group is itself one Hilbert run. Reservoir sampling covered 60-76% of
-    the extent instead.
+    The read is bounded rather than scanned -- see `_sample_sql` for why, and
+    for what that costs against the real bucket -- and `_collect` stops it at
+    the byte budget, so neither the response nor the memory behind it depends
+    on how heavy this dataset's geometry happens to be.
 
-    It costs a full scan: measured 0.36 s at 871k rows, 1.9 s at 2.5M, and
-    6.0 s on the largest file in the catalog (447 MB), against 1.3 s for a
-    ``LIMIT`` that returns something unusable. Typical files are milliseconds.
-    Paid once per item per harvest, then cached.
-
-    The seed is fixed so the sample is stable: an unseeded sample would return
-    different features on every cache miss, and a preview that reshuffles when
-    a pod restarts looks like broken data.
-
-    Simplification runs after sampling, so it only ever touches ``limit``
-    geometries. Over budget, coarsening is preferred to dropping features -- a
-    preview with blockier shapes still shows the dataset's shape; one with a
-    quarter of the features shows the wrong extent.
+    Simplification runs in the query, on the rows the read selects. When the
+    budget rather than the ceiling ended the read, coarsening it is tried: more
+    of the dataset fits, and blockier shapes at preview zoom cost nothing
+    visible. That is abandoned as soon as it stops paying -- immediately for
+    point data, where the properties rather than the geometry are the bytes --
+    and before it empties the shapes it is thinning.
     """
     if geometry_column is None:
         return _fetch_rows(cursor, url, limit, settings)
 
     quoted = geometry_column.replace('"', '""')
+    best: list[dict[str, Any]] = []
+    best_drawable = -1
     for attempt in range(3):
         step = tolerance * (4**attempt) if tolerance > 0 else 0.0
         geometry_sql = (
@@ -461,25 +546,37 @@ def _fetch(
             if step <= 0
             else f'ST_AsGeoJSON(ST_Simplify("{quoted}", {step}))'
         )
-        result = cursor.execute(
-            f"SELECT {geometry_sql} AS __geometry, * FROM read_parquet(?) "
-            f"USING SAMPLE {int(limit)} ROWS (reservoir, {_SAMPLE_SEED})",
-            [url],
+        features, over_budget = _read_sample(
+            cursor,
+            f"{geometry_sql} AS __geometry, *",
+            url,
+            geometry_column,
+            limit,
+            settings,
         )
-        names = [d[0] for d in result.description]
-        rows = result.fetchall()
-        features = [
-            _feature(dict(zip(names, values, strict=True)), geometry_column)
-            for values in rows
-        ]
-        if len(json.dumps(features)) <= settings.preview_max_bytes:
-            return features, len(rows) >= limit
+        # Simplifying past a shape's own size empties it: measured, a tolerance
+        # of 16x on a 0.02-radius polygon returns `{"coordinates": []}`. A
+        # preview of nothing is worse than a short one, so coarsening keeps the
+        # last tolerance that still had shapes to draw.
+        drawable = _drawable_count(features)
+        if attempt and drawable < best_drawable:
+            break
+        # Coarsening pays in features admitted under the budget; when it stops
+        # buying them it will not buy any at 4x more.
+        if attempt and len(features) <= len(best) * 1.05:
+            best, best_drawable = (
+                (features, drawable)
+                if len(features) > len(best)
+                else (best, best_drawable)
+            )
+            break
+        best, best_drawable = features, drawable
+        if not over_budget:
+            return features, len(features) >= limit
+        if step <= 0:
+            break
 
-    # Still over budget at 16x the tolerance: drop features rather than serve
-    # a payload the cap exists to prevent.
-    while features and len(json.dumps(features)) > settings.preview_max_bytes:
-        features.pop()
-    return features, True
+    return best, True
 
 
 def _fetch_rows(
@@ -492,27 +589,13 @@ def _fetch_rows(
 
     Its own read rather than a branch inside the loop above: with nothing to
     simplify there is no tolerance to coarsen, so the retry that trades detail
-    for bytes would re-run an identical query three times. Over budget, rows
-    are dropped -- the only lever a table has.
-
-    Reservoir sampling for the same reason as features: the published files are
-    ordered, so the first N rows are not a sample of the dataset.
+    for bytes would re-run an identical query three times. A table's only lever
+    is fewer rows, which `_collect` already stops at.
     """
-    result = cursor.execute(
-        "SELECT NULL AS __geometry, * FROM read_parquet(?) "
-        f"USING SAMPLE {int(limit)} ROWS (reservoir, {_SAMPLE_SEED})",
-        [url],
+    features, over_budget = _read_sample(
+        cursor, "NULL AS __geometry, *", url, None, limit, settings
     )
-    names = [d[0] for d in result.description]
-    rows = result.fetchall()
-    features = [
-        _feature(dict(zip(names, values, strict=True)), None) for values in rows
-    ]
-    truncated = len(rows) >= limit
-    while features and len(json.dumps(features)) > settings.preview_max_bytes:
-        features.pop()
-        truncated = True
-    return features, truncated
+    return features, over_budget or len(features) >= limit
 
 
 def _feature(row: dict[str, Any], geometry_column: str | None) -> dict[str, Any]:

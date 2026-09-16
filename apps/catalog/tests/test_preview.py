@@ -5,6 +5,7 @@ connection, so the SSRF guard, the cache's generation scoping, the byte budget
 and the endpoint's wiring are all exercised without a bucket.
 """
 
+import json as _json_module
 import os
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,7 @@ from catalog.services.preview import (
     PreviewCache,
     PreviewReader,
     _cache_filename,
+    _sample_sql,
     object_key,
 )
 
@@ -270,21 +272,20 @@ class TestPreviewReader:
         # The geometry is not repeated as an attribute.
         assert "geometry" not in feature["properties"]
 
-    def test_the_sample_spans_the_dataset_rather_than_a_corner(
+    def test_the_sample_reports_its_own_extent_not_the_item_s(
         self, reader: PreviewReader
     ) -> None:
-        """The reason this samples instead of taking the first N rows.
+        """A prefix is a patch of the dataset, and the client fits to the patch.
 
-        The fixture is written in increasing x/y, the same way the real
-        published files are Hilbert-ordered -- so `LIMIT n` returns a corner.
-        Measured on the two largest real datasets, the first 100 features
-        covered 0.000% of the extent (one road junction), which a map cannot
-        fit to at all. Reservoir sampling covered 60-76%.
+        Fitting to the item extent instead would draw the sample as a speck in
+        the corner of an otherwise empty map -- so the sample carries its own
+        bbox, and the item's goes alongside it for the client to outline.
         """
         doc = reader.read(_row(), limit=20)
-        width = doc["bbox"][2] - doc["bbox"][0]
-        # The fixture spans 10.0..12.5 in x; a corner sample would be a sliver.
-        assert width > 1.0, f"sample spans only {width:.3f} deg -- a corner"
+        assert doc["goat:item_bbox"] == [10.0, 50.0, 12.5, 52.5]
+        sample_width = doc["bbox"][2] - doc["bbox"][0]
+        item_width = doc["goat:item_bbox"][2] - doc["goat:item_bbox"][0]
+        assert 0 < sample_width < item_width
 
     def test_both_the_sample_and_item_extents_are_reported(
         self, reader: PreviewReader
@@ -350,6 +351,146 @@ class TestPreviewReader:
         doc = reader.read(_row(__local_path=flat.as_posix()), limit=100)
         assert len(_json.dumps(doc["features"])) <= 2000
         assert doc["goat:truncated"] is True
+
+
+class TestBoundedSampling:
+    """Why the sample is the first rows.
+
+    Everything else measured against the real bucket costs an order of
+    magnitude more, because the cost is how much of the object gets touched: a
+    reservoir sample reads every row (34-108 s), spaced offsets touch a row
+    group each and the files hold only 3-54 of them (21-104 s), and a bbox
+    filter prunes no further than those row groups allow (42 s on the 740 MB
+    file, whatever the window). A bounded read from the front touches the first
+    row groups and nothing else.
+    """
+
+    def test_reads_only_a_bounded_prefix(self) -> None:
+        sql = _sample_sql("*", limit=100)
+        assert "USING SAMPLE" not in sql, "a reservoir sample reads every row"
+        assert "OFFSET" not in sql, "an offset reads a row group it lands in"
+        assert "LIMIT 100" in sql
+
+    def test_the_sample_is_stable_across_calls(self, reader: PreviewReader) -> None:
+        """A preview that reshuffles between replicas reads as broken data."""
+        first = reader.read(_row(), limit=20)["features"]
+        second = reader.read(_row(), limit=20)["features"]
+        assert [f["properties"]["name"] for f in first] == [
+            f["properties"]["name"] for f in second
+        ]
+
+    def test_the_sample_is_contiguous(self, reader: PreviewReader) -> None:
+        """Neighbours in a Hilbert-ordered file, so neighbours on the map."""
+        names = [
+            f["properties"]["name"] for f in reader.read(_row(), limit=10)["features"]
+        ]
+        assert names == [f"feature-{i}" for i in range(10)]
+
+    def test_the_sample_carries_its_own_extent_and_the_item_s(
+        self, reader: PreviewReader
+    ) -> None:
+        """The client fits to the patch; the item extent says where it sits.
+
+        Fitting to the item extent instead would draw the sample as a speck in
+        the corner of an otherwise empty map.
+        """
+        doc = reader.read(_row(), limit=20)
+        assert doc["goat:item_bbox"] == [10.0, 50.0, 12.5, 52.5]
+        sample_width = doc["bbox"][2] - doc["bbox"][0]
+        assert 0 < sample_width < doc["goat:item_bbox"][2] - doc["goat:item_bbox"][0]
+
+
+class TestByteBudget:
+    def test_the_budget_bounds_the_read_not_just_the_response(
+        self, reader: PreviewReader, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """What OOM-killed a pod: 5000 rows were built before anything checked.
+
+        The ceiling counts features and the cost is bytes, and the two are only
+        loosely related -- per-feature payload spans ~950x across the catalog.
+        So the budget has to stop the read, not filter its result: no more rows
+        may be turned into features once it is reached.
+        """
+        import catalog.services.preview as preview_module
+
+        built = 0
+        real = preview_module._feature
+
+        def counting(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            nonlocal built
+            built += 1
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(preview_module, "_feature", counting)
+        # Small enough that the fixture spans many batches, so stopping early
+        # is observable rather than hidden inside a single fetch.
+        monkeypatch.setattr(preview_module, "_FETCH_BATCH", 8)
+        reader._settings.preview_max_bytes = 3000  # noqa: SLF001
+        doc = reader.read(_row(), limit=200)
+
+        kept = len(doc["features"])
+        assert len(_json_module.dumps(doc["features"])) <= 3000
+        # The fixture holds 250 rows and the ceiling asked for all of them.
+        # Each coarsening attempt reads its own budget-bounded prefix, so the
+        # bound is per attempt plus the batch each stopped inside -- what must
+        # never happen is the whole sample being built and then filtered.
+        assert built < 200, f"built {built} of 200 rows before the budget applied"
+        assert built <= 3 * (kept + 8 + 64), f"built {built} features to keep {kept}"
+
+    def test_what_fits_is_still_a_prefix(self, reader: PreviewReader) -> None:
+        """Stopping at the budget shortens the patch; it must not perforate it."""
+        reader._settings.preview_max_bytes = 3000  # noqa: SLF001
+        names = [
+            f["properties"]["name"] for f in reader.read(_row(), limit=200)["features"]
+        ]
+        assert names == [f"feature-{i}" for i in range(len(names))]
+
+    def test_the_budget_is_respected(self, reader: PreviewReader) -> None:
+        reader._settings.preview_max_bytes = 2000  # noqa: SLF001
+        doc = reader.read(_row(), limit=100)
+        assert len(_json_module.dumps(doc["features"])) <= 2000
+        assert doc["goat:truncated"] is True
+
+
+class TestCoarsening:
+    def test_coarsening_never_empties_the_shapes(self, reader: PreviewReader) -> None:
+        """Simplifying past a shape's own size deletes it.
+
+        Measured on the test fixture's 0.02-radius polygons: at the third
+        coarsening step (16x tolerance) DuckDB's ST_Simplify returns
+        `{"type":"Polygon","coordinates":[]}` for every row, so an over-budget
+        dataset previewed as an empty map with no extent to fit to. Coarsening
+        has to stop at the last tolerance that still had shapes.
+        """
+        reader._settings.preview_max_bytes = 500  # noqa: SLF001
+        doc = reader.read(_row(), limit=100)
+
+        assert doc["features"], "nothing survived the byte budget"
+        drawable = [f for f in doc["features"] if f["geometry"]["coordinates"]]
+        assert len(drawable) == len(
+            doc["features"]
+        ), "coarsening emptied geometries instead of stopping"
+        assert "bbox" in doc, "no extent: the client has nothing to fit the map to"
+
+
+class TestPreviewDefaults:
+    def test_the_ceiling_is_small_because_the_read_is_what_costs(self) -> None:
+        """The ceiling is a cost control, not a quality dial.
+
+        Measured against the real bucket, denser samples are not a bigger
+        number here: at 5000 features every sampler tried cost 40-143 s and
+        peaked at 3.1 GB. What makes a denser preview affordable is smaller row
+        groups in the published files (`catalog_materialize` writes them with
+        DuckDB's default, which is a row count and so leaves 740 MB in three
+        groups), not a change on this side.
+        """
+        settings = CatalogSettings()
+        assert settings.preview_max_features == 100
+        assert settings.preview_max_bytes == 2 * 1024 * 1024
+        # Post-simplification features measured 200-580 B against the bucket,
+        # so the ceiling fits the budget with room to spare and the budget only
+        # binds on genuinely heavy geometry.
+        assert settings.preview_max_features * 580 < settings.preview_max_bytes
 
 
 # ────────────────────────────────────────────────────────────────────────

@@ -132,13 +132,20 @@ class CatalogSettings(BaseSettings):
     #: paired with the store's ETag: the object cannot change without a harvest,
     #: and a harvest changes the ETag, so a stale copy revalidates into a 304.
     assets_max_age_seconds: int = 86400
-    #: Feature ceiling. A preview is a taste of the data, not a download; the
-    #: cap is what keeps it from becoming one.
+    #: Feature ceiling. Not a size limit -- `preview_max_bytes` below is that.
+    #: A preview is a taste of the data, not a download, and the read is what
+    #: costs: see `_sample_sql` for what larger samples were measured to cost
+    #: against the real bucket.
     preview_max_features: int = 100
     #: Byte ceiling on the rendered GeoJSON, applied after simplification.
     #: Measured on the real catalog: per-feature payload spans 0.07-66.7 KB
     #: (~950x), and file size does not predict it, so a feature count alone
     #: bounds nothing -- 100 raw features of one dataset came to 6.4 MB.
+    #:
+    #: Uncompressed, and it bounds the *read* (`_collect`), not just the
+    #: response: the rows are held as Python objects at ~5x their serialised
+    #: size and the handler is synchronous, so the threadpool can have many in
+    #: flight. The wire cost is ~10-13x less than this.
     preview_max_bytes: int = 2 * 1024 * 1024
     #: Assumed raster width, in pixels, of the map the preview is drawn on.
     #: The simplification tolerance is the item's extent divided by this, i.e.
@@ -158,9 +165,8 @@ class CatalogSettings(BaseSettings):
     #:
     #: Set it to enable caching -- ideally a writable shared volume, so one
     #: render serves every replica. The mirror volume cannot be it (mounted
-    #: read-only, design S8). Cost without it: one render per client per
-    #: generation, measured at 390 ms median and 1.7-6.4 s on the largest
-    #: datasets in the catalog.
+    #: read-only, design S8). No deployment sets it today, so the cost below
+    #: is what every request pays, not what the first one does.
     preview_cache_dir: Path | None = None
     #: Disk budget when a cache directory is set. At ~68 KB median, 1 GB holds
     #: roughly 15,000 items -- more than the current catalog.
