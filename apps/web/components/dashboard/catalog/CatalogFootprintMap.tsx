@@ -1,4 +1,4 @@
-import { Alert, Box, Paper, Skeleton, useTheme } from "@mui/material";
+import { Alert, Box, Paper, Skeleton, Typography, useTheme } from "@mui/material";
 import bboxOf from "@turf/bbox";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -70,11 +70,22 @@ const CatalogFootprintMap = ({
   const shown = sample ?? footprint;
 
   // Only worth fetching a style when there is data to draw with it.
-  const { style } = useCatalogStyle(item.assets?.style?.href, !!sample);
+  const styleHref = item.assets?.style?.href;
+  const { style, isLoading: styleLoading } = useCatalogStyle(styleHref, !!sample);
   const geometryType = item.properties["goat:geometryType"] ?? undefined;
   const styled = catalogPaint(style, geometryType);
   /** The dataset's own rendering, and some of its data to draw with it. */
   const styledSample = !!sample && !!styled && !!geometryType;
+  /** The style is still on its way, so nothing is drawn with the right paint yet.
+   *
+   * Without this the sample renders twice: once in the plain footprint colour
+   * while the style request is in flight, then again in the dataset's own
+   * colours when it lands — a visible flash of the wrong rendering. Holding the
+   * features back until the answer is in costs the few hundred milliseconds
+   * nobody was using anyway. A dataset with no style published (108 of 10,793)
+   * has nothing to wait for, and a style that fails to load or cannot be drawn
+   * falls through to the plain rendering, which is what it is for. */
+  const awaitingStyle = !!sample && !!styleHref && styleLoading;
 
   /** Field definitions for the popup, from what the dataset published. */
   const fields = useMemo<LayerField[]>(
@@ -181,8 +192,43 @@ const CatalogFootprintMap = ({
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
 
+  /** The dataset's whole extent, drawn around the part of it being shown.
+   *
+   * The sample is a slice — measured across the catalog, anywhere from 0.26% to
+   * half of the extent it comes from — so without this the map gives no way to
+   * tell whether the dataset stops where the features do. */
+  const extentOutline = useMemo<GeoJSON.FeatureCollection | null>(() => {
+    const box = item.bbox;
+    if (!sample || !box || box.length < 4) return null;
+    const [west, south, east, north] = box;
+    return {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            type: "Polygon",
+            coordinates: [
+              [
+                [west, south],
+                [east, south],
+                [east, north],
+                [west, north],
+                [west, south],
+              ],
+            ],
+          },
+        },
+      ],
+    };
+  }, [item.bbox, sample]);
+
   const initialViewState = useMemo(() => {
-    const box = item.bbox ?? (shown ? (bboxOf(shown) as number[]) : null);
+    // The sample's own extent, not the item's. A sample can sit in a corner of
+    // its dataset, so framing the dataset draws the preview as a speck in an
+    // empty map; the outline above is what keeps the dataset's size legible.
+    const box = (shown ? (bboxOf(shown) as number[]) : null) ?? item.bbox;
     if (!box || box.length < 4) return { longitude: 10, latitude: 51, zoom: 3 };
     return {
       bounds: [box[0], box[1], box[2], box[3]] as [number, number, number, number],
@@ -229,12 +275,40 @@ const CatalogFootprintMap = ({
             setPicked(null);
             setHovered(null);
           }}>
+          {/* Drawn first so the sample sits on top of it. Two lines, not one: a
+              pale casing under a dark dash, so the outline reads over whatever
+              the basemap puts beneath it — light terrain, dark water, imagery —
+              without having to pick a colour that wins against all of them. */}
+          {extentOutline && (
+            <Source id="catalog-extent" type="geojson" data={extentOutline}>
+              <MapLayer
+                id="catalog-extent-casing"
+                type="line"
+                paint={{
+                  "line-color": theme.palette.background.paper,
+                  "line-width": 4,
+                  "line-opacity": 0.45,
+                }}
+              />
+              <MapLayer
+                id="catalog-extent-outline"
+                type="line"
+                paint={{
+                  "line-color": theme.palette.text.secondary,
+                  "line-width": 1.5,
+                  "line-dasharray": [4, 4],
+                  "line-opacity": 0.5,
+                }}
+              />
+            </Source>
+          )}
+
           {/* `generateId`: the highlight spec targets a feature by id, and preview
               GeoJSON carries none. */}
           <Source id="catalog-geometry" type="geojson" data={shown} generateId>
             {/* Layers stay direct children — `Source` injects its id only into
                 children it can see, and a wrapping fragment hides them. */}
-            {styledSample && (
+            {!awaitingStyle && styledSample && (
               <MapLayer
                 {...({
                   id: STYLED_LAYER,
@@ -245,7 +319,7 @@ const CatalogFootprintMap = ({
                 } as React.ComponentProps<typeof MapLayer>)}
               />
             )}
-            {!styledSample && (
+            {!awaitingStyle && !styledSample && (
               <MapLayer
                 id="catalog-geometry-fill"
                 type="fill"
@@ -253,14 +327,14 @@ const CatalogFootprintMap = ({
                 filter={["==", ["geometry-type"], "Polygon"]}
               />
             )}
-            {!styledSample && (
+            {!awaitingStyle && !styledSample && (
               <MapLayer
                 id="catalog-geometry-line"
                 type="line"
                 paint={{ "line-color": FOOTPRINT_COLOR, "line-width": 1.5 }}
               />
             )}
-            {!styledSample && (
+            {!awaitingStyle && !styledSample && (
               <MapLayer
                 id="catalog-geometry-point"
                 type="circle"
@@ -304,6 +378,36 @@ const CatalogFootprintMap = ({
           {/* Capped: the legend owns the bottom-left of this map. */}
           <DetailMapAttribution maxWidth={styledSample ? "62%" : "100%"} />
         </MapLibre>
+
+        {/* What the map is showing, in the one corner the legend and the credit
+            strip leave free. The dashed outline says the same thing spatially;
+            this puts a number on it. */}
+        {!!sample && !!preview && (
+          <Paper
+            elevation={0}
+            sx={{
+              position: "absolute",
+              left: 8,
+              top: 8,
+              px: 1.25,
+              py: 0.5,
+              borderRadius: 1.5,
+              backgroundColor: theme.palette.background.paper,
+              opacity: 0.96,
+              zIndex: 2,
+              pointerEvents: "none",
+            }}>
+            <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+              {typeof preview["goat:total"] === "number" &&
+              preview["goat:total"] > sample.features.length
+                ? t("catalog_preview_sample_of", {
+                    shown: sample.features.length,
+                    total: preview["goat:total"],
+                  })
+                : t("catalog_preview_sample")}
+            </Typography>
+          </Paper>
+        )}
 
         {/* The dataset's legend, drawn by the Layers panel's own component from the
             same style the features use. */}

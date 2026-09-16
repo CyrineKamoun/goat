@@ -2893,6 +2893,8 @@
   "catalog_no_geometry": "Dieser Datensatz hat keine räumliche Ausdehnung und kann daher nicht auf einer Karte gezeigt werden.",
   "catalog_row_count_short": "{{count, number}} Zeilen",
   "catalog_row_count_sampled": "{{shown, number}} von {{total, number}} Zeilen",
+  "catalog_preview_sample": "Vorschau",
+  "catalog_preview_sample_of": "Vorschau · {{shown, number}} von {{total, number}}",
   "catalog_schema_column_count": "{{count}} Spalten",
   "catalog_subtitle": "Kuratierte, direkt nutzbare Datensätze von offiziellen Open-Data-Anbietern und weiteren vertrauenswürdigen Quellen.",
   "catalog_updated": "Zuletzt aktualisiert",

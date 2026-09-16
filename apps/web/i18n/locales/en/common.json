@@ -2893,6 +2893,8 @@
   "catalog_no_geometry": "This dataset has no spatial extent, so there is nothing to show on a map.",
   "catalog_row_count_short": "{{count, number}} rows",
   "catalog_row_count_sampled": "{{shown, number}} of {{total, number}} rows",
+  "catalog_preview_sample": "Preview",
+  "catalog_preview_sample_of": "Preview · {{shown, number}} of {{total, number}}",
   "catalog_schema_column_count": "{{count}} columns",
   "catalog_subtitle": "Curated, ready-to-use datasets from official open-data providers and other trusted sources.",
   "catalog_updated": "Last updated",
