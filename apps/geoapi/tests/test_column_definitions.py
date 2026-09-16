@@ -76,8 +76,14 @@ async def _column_endpoints(
 
     with (
         patch(
-            "geoapi.routers.features_write._get_authorized_metadata",
+            "geoapi.routers.features_write.get_write_authorized_metadata",
             AsyncMock(return_value=_metadata()),
+        ),
+        # An ordinary layer: no bundle owns its columns, so none is protected
+        # and none carries a provenance mark.
+        patch(
+            "geoapi.routers.features_write.layer_is_bundle_member",
+            AsyncMock(return_value=False),
         ),
         patch("geoapi.routers.features_write.layer_service", layer_service),
         patch(

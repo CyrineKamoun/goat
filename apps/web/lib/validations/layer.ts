@@ -63,6 +63,9 @@ const layerFieldType = z.object({
   kind: z.string().optional(),
   is_computed: z.boolean().optional(),
   is_locked: z.boolean().optional(),
+  // The layer belongs to a bundle and this column came with it: it may be
+  // reformatted, but not renamed or deleted. Decided by the server.
+  is_protected: z.boolean().optional(),
   allowed_values: z.array(z.union([z.string(), z.number()])).optional(),
   allow_other: z.boolean().optional(),
   default_value: z.union([z.string(), z.number(), z.boolean()]).nullish(),
@@ -832,6 +835,9 @@ export const fieldDefinitionSchema = z.object({
   name: z.string().min(1, "Field name is required").max(255, "Field name too long"),
   kind: fieldKindSchema,
   is_computed: z.boolean().default(false),
+  // Only ever set for a bundle member's own columns, so optional rather than
+  // defaulted: nothing constructing a field for an ordinary layer has to say so.
+  is_protected: z.boolean().optional(),
   display_config: z.record(z.string(), z.unknown()).default({}),
   // A fixed vocabulary for the column: editors offer these instead of a free
   // text box, and a write outside the list is refused unless allow_other.

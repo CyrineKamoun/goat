@@ -20,6 +20,7 @@ from geoapi.models import (
     Queryables,
     SpatialExtent,
 )
+from geoapi.routers.features_write import layer_is_bundle_member
 from geoapi.routers.tiles import get_layer_version
 from geoapi.services.computed_columns import fetch_field_config
 from geoapi.services.layer_service import layer_service
@@ -57,12 +58,18 @@ async def _load_field_config(layer_info: LayerInfo) -> dict[str, Any]:
 def _apply_field_config_to_properties(
     properties: dict[str, dict[str, Any]],
     field_config: dict[str, Any],
+    *,
+    in_bundle: bool = False,
 ) -> None:
     """Augment each property entry with kind, is_computed, is_locked,
-    allowed_values and display_config.
+    is_protected, allowed_values and display_config.
 
     Mutates *properties* in-place. Skips geometry entries (those that have
     a ``$ref`` key instead of a ``type`` key).
+
+    ``in_bundle`` says the layer belongs to a bundle, which is the only case
+    where a column can be protected — the server decides which, so an editor
+    renders the answer rather than re-deriving the rule.
     """
     for name, prop in properties.items():
         if "$ref" in prop:
@@ -78,6 +85,10 @@ def _apply_field_config_to_properties(
         # value comes from somewhere the layer cannot express, so there is no
         # formula to show and nothing to recompute on demand.
         prop["is_locked"] = entry.get("is_locked", False)
+        # The bundle brought this column, so it may be reformatted but not
+        # dropped or renamed. Columns the user added carry `user_added` and are
+        # theirs to remove; a layer outside a bundle protects nothing.
+        prop["is_protected"] = in_bundle and not entry.get("user_added", False)
         # A fixed vocabulary for the column, if it has one: an editor offers
         # these rather than a free text box. `allow_other` says whether they are
         # the only accepted values or merely the suggested ones.
@@ -331,7 +342,11 @@ async def get_queryables(
             properties[col_name] = prop
 
     # Augment each property with field-config metadata (kind, is_computed, display_config).
-    _apply_field_config_to_properties(properties, field_config)
+    _apply_field_config_to_properties(
+        properties,
+        field_config,
+        in_bundle=await layer_is_bundle_member(layer_info.layer_id),
+    )
 
     apply_cache_headers(response, etag)
     return Queryables(

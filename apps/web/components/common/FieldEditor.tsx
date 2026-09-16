@@ -176,6 +176,9 @@ const SortableFieldRow = ({
           placeholder={t("field_name")}
           autoFocus={isSelected}
           error={!!error}
+          // A bundle's own column is looked up by name by every tool that
+          // reads the layer, so the name is not the user's to change.
+          readOnly={field.is_protected}
           inputProps={{ maxLength: 128 }}
           sx={{
             flex: 1,
@@ -201,8 +204,12 @@ const SortableFieldRow = ({
               htmlColor={theme.palette.text.secondary}
             />
           </IconButton>
+          {/* Not offered for a column the bundle brought: the server refuses
+              it, so the button could only produce an error. */}
           <IconButton
             size="small"
+            disabled={field.is_protected}
+            sx={{ display: field.is_protected ? "none" : undefined }}
             onClick={(e) => {
               e.stopPropagation();
               onRemove();

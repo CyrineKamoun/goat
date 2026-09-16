@@ -141,6 +141,40 @@ async def _get_authorized_metadata(
     return await get_write_authorized_metadata(layer_info, user_id)
 
 
+#: Marks a column the user added themselves, as opposed to one the import
+#: created. Written by the add-column endpoint; its absence is what protects
+#: everything a bundle brought with it — including bundles imported before this
+#: existed, which carry no marks and are therefore wholly protected.
+USER_ADDED = "user_added"
+
+
+async def refuse_if_protected(layer_info: LayerInfo, column: str, action: str) -> None:
+    """Refuse dropping or renaming a column the bundle owns.
+
+    A bundle's member layers are its contract with the tools that read them —
+    a feed's `stop_lat`, an edge's `source_node` — and renaming one removes it
+    as surely as dropping it does. Columns the user added carry a mark and are
+    theirs to remove; everything else the bundle brought is not.
+
+    Asked per column rather than by listing what is protected, so the answer
+    never depends on a column list being current: an unmarked column is
+    protected whether or not anything else knows it exists. A layer in no
+    bundle protects nothing.
+    """
+    if not await layer_is_bundle_member(layer_info.layer_id):
+        return
+    config = await _load_field_config(layer_info)
+    if (config.get(column) or {}).get(USER_ADDED):
+        return
+    raise HTTPException(
+        status_code=403,
+        detail=(
+            f"'{column}' is part of this bundle's data, so it cannot be "
+            f"{action}. Columns you add yourself can be."
+        ),
+    )
+
+
 def _invalidate_caches(layer_id: str) -> None:
     """Invalidate tile cache and metadata cache for a layer.
 
@@ -594,8 +628,13 @@ async def add_column(
     computed kinds, the column is auto-backfilled from existing geometry
     via ``ST_*_Spheroid`` and the field metadata is persisted under
     ``customer.layer.field_config``.
+
+    Allowed on a bundle member, unlike the per-feature routes: a new column is
+    additive, so nothing a bundle already reads changes. It is marked as the
+    user's, which is what later lets it be dropped again while the bundle's own
+    columns cannot be.
     """
-    metadata = await _get_authorized_metadata(layer_info, user_id)
+    metadata = await get_write_authorized_metadata(layer_info, user_id)
 
     try:
         output_kind: str | None = None
@@ -649,15 +688,34 @@ async def add_column(
             default_value=body.default_value,
         )
 
-        # Persist field_config entry
+        # Persist field_config entry.
+        #
+        # The provenance mark is recorded only for a bundle member, which is
+        # the only place it is read: on an ordinary layer every column is the
+        # user's to drop, so storing it there would be a fact nothing asks.
+        #
+        # Safe to decide once, here, because a layer cannot join a bundle
+        # later: the only two writers of `bundle_layer` create the layer as
+        # they add it (an import, and a filtered copy — which carries the
+        # source layer's marks across with its field_config).
+        #
+        # Written for a legacy `type` too, where there is no kind to record:
+        # the entry carries the mark, and a column created without one could
+        # not be deleted again by the person who created it.
         pool = layer_service._pool
-        if pool and body.kind is not None:
-            entry: dict[str, Any] = {
-                "kind": body.kind,
-                "is_computed": computed,
-                "depends_on": depends_on,
-                "display_config": validated_cfg,
-            }
+        if pool:
+            entry: dict[str, Any] = {}
+            if await layer_is_bundle_member(layer_info.layer_id):
+                entry[USER_ADDED] = True
+            if body.kind is not None:
+                entry.update(
+                    {
+                        "kind": body.kind,
+                        "is_computed": computed,
+                        "depends_on": depends_on,
+                        "display_config": validated_cfg,
+                    }
+                )
             if body.kind == "formula":
                 entry["formula"] = body.formula
                 entry["output_kind"] = output_kind
@@ -675,11 +733,15 @@ async def add_column(
                 # the column and is deliberately not kept in step by
                 # `update_column`, which is why that endpoint touches only this.
                 entry["default_value"] = body.default_value
-            async with pool.acquire() as conn:
-                conn = cast("asyncpg.Connection[asyncpg.Record]", conn)
-                current = await fetch_field_config(conn, UUID(layer_info.layer_id))
-                current[body.name] = entry
-                await write_field_config(conn, layer_info.layer_id, current)
+            # Nothing to record: a legacy `type` column on an ordinary layer
+            # has neither a kind to describe nor a mark to carry, and an empty
+            # entry would say less than no entry while looking like a fact.
+            if entry:
+                async with pool.acquire() as conn:
+                    conn = cast("asyncpg.Connection[asyncpg.Record]", conn)
+                    current = await fetch_field_config(conn, UUID(layer_info.layer_id))
+                    current[body.name] = entry
+                    await write_field_config(conn, layer_info.layer_id, current)
 
         await _invalidate_caches_and_pmtiles(layer_info)
         await _settle_schema_caches(layer_info.layer_id)
@@ -704,8 +766,16 @@ async def update_column(
     body: ColumnUpdate,
     columnName: str = Path(..., description="Current column name"),
 ) -> ColumnResponse:
-    """Rename a column and/or update its display config or formula."""
-    metadata = await _get_authorized_metadata(layer_info, user_id)
+    """Rename a column and/or update its display config or formula.
+
+    A bundle member's column may be reformatted or given a vocabulary — those
+    describe the column without changing what it is called. Renaming one the
+    bundle brought is refused: every tool that reads the layer looks the column
+    up by name.
+    """
+    metadata = await get_write_authorized_metadata(layer_info, user_id)
+    if body.new_name:
+        await refuse_if_protected(layer_info, columnName, "renamed")
 
     try:
         if (
@@ -924,7 +994,8 @@ async def delete_column(
     columnName: str = Path(..., description="Column name to delete"),
 ) -> ColumnResponse:
     """Delete a column from a collection."""
-    await _get_authorized_metadata(layer_info, user_id)
+    await get_write_authorized_metadata(layer_info, user_id)
+    await refuse_if_protected(layer_info, columnName, "deleted")
 
     try:
         # A formula referencing this column would break on every subsequent
