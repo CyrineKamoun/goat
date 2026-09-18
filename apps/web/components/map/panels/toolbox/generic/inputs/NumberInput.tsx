@@ -228,7 +228,12 @@ export default function NumberInput({
   if (useSlider) {
     return (
       <Stack>
-        <FormLabelHelper label={label} tooltip={input.description} color="inherit" />
+        <FormLabelHelper
+          label={label}
+          tooltip={input.description}
+          color="inherit"
+          truncate={!!input.uiMeta?.inline_group}
+        />
         <SliderInput
           value={value ?? (effectiveDefault as number) ?? min ?? 0}
           isRange={false}
@@ -243,7 +248,12 @@ export default function NumberInput({
 
   return (
     <Stack>
-      <FormLabelHelper label={label} tooltip={input.description} color="inherit" />
+      <FormLabelHelper
+        label={label}
+        tooltip={input.description}
+        color="inherit"
+        truncate={!!input.uiMeta?.inline_group}
+      />
       <TextField
         type="text"
         inputMode={isInteger ? "numeric" : "decimal"}

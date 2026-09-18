@@ -32,6 +32,8 @@ type SelectorProps = {
   placeholder?: string;
   enableSearch?: boolean;
   label?: string;
+  /** Clip the label to one line — for a selector sharing a row. */
+  truncateLabel?: boolean;
   allSelectedLabel?: string;
   errorMessage?: string;
   emptyMessage?: string;
@@ -52,6 +54,7 @@ const Selector = (props: SelectorProps) => {
     enableSearch,
     placeholder,
     label,
+    truncateLabel,
     tooltip,
     multiple,
     allSelectedLabel,
@@ -86,7 +89,14 @@ const Selector = (props: SelectorProps) => {
     if (!label && !emptyMessage) return null;
     return (
       <FormControl size="small" fullWidth>
-        {label && <FormLabelHelper label={label} color={theme.palette.text.secondary} tooltip={tooltip} />}
+        {label && (
+          <FormLabelHelper
+            label={label}
+            color={theme.palette.text.secondary}
+            tooltip={tooltip}
+            truncate={truncateLabel}
+          />
+        )}
         {emptyMessage && <NoValuesFound text={emptyMessage} icon={emptyMessageIcon} />}
       </FormControl>
     );
@@ -105,6 +115,7 @@ const Selector = (props: SelectorProps) => {
                 : theme.palette.text.secondary
           }
           tooltip={tooltip}
+          truncate={truncateLabel}
         />
       )}
       <Select
@@ -154,9 +165,15 @@ const Selector = (props: SelectorProps) => {
           // {SINGLE ITEM RENDER}
           if (!multiple && !Array.isArray(selectedItems) && selectedItems)
             return (
-              <div style={{ display: "flex", alignItems: "center" }}>
+              // `minWidth: 0` so the label may shrink: without it the flex row
+              // takes its content's width, and a selector sitting beside
+              // another field widens to whatever the chosen option is called —
+              // "Distance" against "Time", or "Entfernung" against "Zeit" —
+              // pushing its neighbour onto the next line. The multi-item render
+              // below already truncates; this is the same rule for one.
+              <div style={{ display: "flex", alignItems: "center", minWidth: 0 }}>
                 {selectedItems.iconNode ? (
-                  <Box component="span" sx={{ mr: 2, display: "inline-flex" }}>
+                  <Box component="span" sx={{ mr: 2, display: "inline-flex", flexShrink: 0 }}>
                     {selectedItems.iconNode}
                   </Box>
                 ) : (
@@ -167,12 +184,12 @@ const Selector = (props: SelectorProps) => {
                         fontSize: "14px",
                         color: theme.palette.text.secondary,
                       }}
-                      sx={{ mr: 2 }}
+                      sx={{ mr: 2, flexShrink: 0 }}
                       color="inherit"
                     />
                   )
                 )}
-                <Typography variant="body2" fontWeight="bold">
+                <Typography variant="body2" fontWeight="bold" noWrap>
                   {selectedItems.label}
                 </Typography>
               </div>

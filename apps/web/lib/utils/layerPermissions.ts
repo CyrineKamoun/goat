@@ -51,6 +51,10 @@ export type CanEditLayerFeaturesArgs = CanEditLayerFieldsArgs & {
  * A `locked` layer (D7) refuses unconditionally: the row it renders from
  * carries no `properties`/`query`/owner the server didn't already blank, so
  * there is nothing to edit and every write would 403 anyway.
+ *
+ * A bundle member is *not* refused here, unlike its features: columns can be
+ * added to one, and the ones the bundle brought are protected individually
+ * (`is_protected` per field) rather than by withholding the whole action.
  */
 export function canEditLayerFields({
   currentUserId,
@@ -58,10 +62,9 @@ export function canEditLayerFields({
   projectOwnerId,
   isProjectEditor,
   inCatalog,
-  inBundle,
   locked,
 }: CanEditLayerFieldsArgs): boolean {
-  if (!isProjectEditor || inCatalog || inBundle || locked) return false;
+  if (!isProjectEditor || inCatalog || locked) return false;
   if (!currentUserId || !layerOwnerId) return false;
 
   if (layerOwnerId === currentUserId) return true;
@@ -71,16 +74,25 @@ export function canEditLayerFields({
 /**
  * Whether to offer feature editing for a layer in a project.
  *
- * Everything {@link canEditLayerFields} requires, plus a size cap: feature
- * editing loads the features into the browser, so beyond
- * `MAX_EDITABLE_LAYER_SIZE` it is not offered. Column operations run in the
- * database and carry no such limit.
+ * Everything {@link canEditLayerFields} requires, plus two things that apply to
+ * rows but not to columns.
+ *
+ * A bundle member's features are edited through the bundle, so that its derived
+ * artifacts are rebuilt from what changed — the per-feature endpoints refuse a
+ * member outright. Columns are different: adding one is additive, so
+ * {@link canEditLayerFields} allows it and protects the bundle's own columns
+ * individually.
+ *
+ * And a size cap: feature editing loads the features into the browser, so
+ * beyond `MAX_EDITABLE_LAYER_SIZE` it is not offered. Column operations run in
+ * the database and carry no such limit.
  */
 export function canEditLayerFeatures({
   layerSize,
   ...fields
 }: CanEditLayerFeaturesArgs): boolean {
   if (!canEditLayerFields(fields)) return false;
+  if (fields.inBundle) return false;
   if (layerSize && layerSize > MAX_EDITABLE_LAYER_SIZE) return false;
   return true;
 }

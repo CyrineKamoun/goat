@@ -88,6 +88,7 @@ const EditFieldsModal: React.FC<EditFieldsModalProps> = ({
         const s = schema as {
           kind?: FieldKind;
           is_computed?: boolean;
+          is_protected?: boolean;
           display_config?: Record<string, unknown>;
           allowed_values?: (string | number)[];
           allow_other?: boolean;
@@ -100,6 +101,7 @@ const EditFieldsModal: React.FC<EditFieldsModalProps> = ({
           name,
           kind: s.kind ?? (s.type === "number" || s.type === "integer" ? "number" : "string"),
           is_computed: s.is_computed ?? false,
+          is_protected: s.is_protected ?? false,
           display_config: s.display_config ?? {},
           allowed_values: s.allowed_values,
           allow_other: s.allow_other ?? false,

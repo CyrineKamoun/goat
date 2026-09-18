@@ -504,6 +504,12 @@ class HeatmapV2WindmillParams(ToolInputBase):
             enum_labels=COST_TYPE_LABELS,
             enum_icons=COST_TYPE_ICONS,
             inline_group="cost_config",
+            # Share the row rather than claiming the width of whichever option
+            # is selected: both start from a zero basis, so the number beside
+            # this keeps its space whether the label reads "Time (min)" or
+            # "Entfernung (m)". Twice the growth of the number, which needs far
+            # less room than a labelled option does.
+            inline_flex="2 1 0",
             # PT is always time-based (total journey minutes); hide the
             # time/distance selector for PT.
             visible_when={

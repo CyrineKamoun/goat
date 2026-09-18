@@ -145,6 +145,9 @@ export default function EnumInput({ input, value, onChange, disabled, formValues
       items={enumItems}
       label={label}
       tooltip={description}
+      // Sharing a row is what makes a wrapped label a problem: it pushes the
+      // field beside it out of shape. A field on its own row wraps as before.
+      truncateLabel={!!input.uiMeta?.inline_group}
       placeholder={t("select_option")}
       disabled={disabled}
     />
