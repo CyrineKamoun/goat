@@ -152,6 +152,8 @@ export type PostPTCatchmentArea = z.infer<typeof ptCatchmentAreaSchema>;
 
 //**=== OEV-GUETEKLASSEN + TRIP COUNT === */
 export const oevGueteklassenCatchmentType = z.enum(["buffer"]);
+export const MIN_PT_CLASSES = 3;
+export const MAX_PT_CLASSES = 26;
 export const stationConfigSchema = z
   .object({
     groups: z.record(z.enum(["A", "B", "C"])),
@@ -256,6 +258,27 @@ export const stationConfigSchema = z
         code: z.ZodIssueCode.custom,
         path: ["classification"],
         message: `classification is missing station categories used in categories: ${missing.join(", ")}`,
+      });
+    }
+
+    // The tool styles the result from the highest PT class: below 3 it cannot pick a
+    // middle color, above 26 it runs out of single-letter labels.
+    const ptClasses = Object.values(classification).flatMap((distances) =>
+      Object.values(distances).map(Number)
+    );
+    const highestPtClass = ptClasses.length ? Math.max(...ptClasses) : 0;
+    if (highestPtClass > 0 && highestPtClass < MIN_PT_CLASSES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["classification"],
+        message: `classification must reach PT class ${MIN_PT_CLASSES} or higher`,
+      });
+    }
+    if (highestPtClass > MAX_PT_CLASSES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["classification"],
+        message: `classification must not go beyond PT class ${MAX_PT_CLASSES}`,
       });
     }
   });
