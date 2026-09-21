@@ -743,6 +743,14 @@ def _build_order_by(
 
     # Every ranking key below is skipped when the caller sorted explicitly: a
     # sortby makes `q` filter-only (api spec §2.1.6), never a ranking signal.
+    #
+    # What the reader typed ranks ahead of both spatial keys: either one takes a
+    # distinct value for nearly every row, so above the text match it settles
+    # every comparison and leaves the match unable to move anything.
+    q_terms = _parse_q_terms(p.q)
+    if q_terms and not p.sortby:
+        prefix += _q_rank_sql(q_terms, add) + ", "
+
     if not p.sortby:
         containment = _containment_rank_sql(p, add, geom)
         if containment:
@@ -755,20 +763,14 @@ def _build_order_by(
         prefix += _viewport_rank_sql(boost, add) + ", "
 
     # Rows in the reader's language next: behind the viewport, so what is
-    # around here still comes first, and ahead of the text match, so a dataset
-    # described in a language the reader cannot read is never the first hit
-    # over an equally placed one they can. Gated on the column, which a file
-    # without the Language extension does not carry.
+    # around here still comes first. Gated on the column, which a file without
+    # the Language extension does not carry.
     if (
         p.language_boost
         and not p.sortby
         and registry.resolve("language_code") is not None
     ):
         prefix += f"(language_code = {add(p.language_boost.lower())}) DESC, "
-
-    q_terms = _parse_q_terms(p.q)
-    if q_terms and not p.sortby:
-        prefix += _q_rank_sql(q_terms, add) + ", "
 
     # How much a planner needs it, then the wider footprint among rows that tie.
     # Gated on the score column, which only collections carry.
