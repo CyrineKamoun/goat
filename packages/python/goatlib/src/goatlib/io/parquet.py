@@ -121,6 +121,7 @@ def write_optimized_parquet(
         geometry_column,
         add_bbox=add_bbox,
         hilbert_sort=hilbert_sort,
+        replace_bbox=add_bbox and _has_bbox_column(con, source_query),
     )
 
     # Execute COPY with optimization
@@ -179,6 +180,19 @@ def _normalize_source(source: str) -> str:
     return f"SELECT * FROM {source}"
 
 
+def _has_bbox_column(
+    con: "duckdb.DuckDBPyConnection",
+    source_query: str,
+) -> bool:
+    """Check whether the source already carries a bbox column."""
+    try:
+        rows = con.execute(f"DESCRIBE {source_query}").fetchall()
+        return any(r[0] == "bbox" for r in rows)
+    except Exception as e:
+        logger.debug("bbox column check failed: %s", e)
+        return False
+
+
 def _check_geometry_column(
     con: "duckdb.DuckDBPyConnection",
     source_query: str,
@@ -205,6 +219,7 @@ def _build_optimized_query(
     geometry_column: str,
     add_bbox: bool = True,
     hilbert_sort: bool = True,
+    replace_bbox: bool = False,
 ) -> str:
     """Build query with bbox columns and Hilbert sorting.
 
@@ -244,9 +259,13 @@ def _build_optimized_query(
         # ST_Hilbert(geometry) computes Hilbert index for the geometry
         order_by = f"ORDER BY ST_Hilbert({geom_expr})"
 
+    # Replace an inherited bbox rather than appending beside it: DuckDB would
+    # rename the new one to bbox_1, and the next tool run would add bbox_2.
+    star = "* EXCLUDE (bbox)" if replace_bbox else "*"
+
     # Combine into final query
     return f"""
-        SELECT *{bbox_expr}
+        SELECT {star}{bbox_expr}
         FROM ({source_query}) AS _src
         {order_by}
     """
