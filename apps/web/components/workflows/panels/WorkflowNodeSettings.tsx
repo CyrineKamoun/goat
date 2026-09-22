@@ -61,11 +61,13 @@ import type { ProcessedSection } from "@/types/map/ogc-processes";
 
 import { useFilteredProjectLayers } from "@/hooks/map/LayerPanelHooks";
 import { useProcessDescription } from "@/hooks/map/useOgcProcesses";
+import { useProjectBundleKinds } from "@/hooks/map/useProjectBundleKinds";
 
 import Container from "@/components/map/panels/Container";
 import SectionHeader from "@/components/map/panels/common/SectionHeader";
 import SectionOptions from "@/components/map/panels/common/SectionOptions";
 import ToolsHeader from "@/components/map/panels/common/ToolsHeader";
+import { DEFAULT_NETWORK_BUNDLE } from "@/components/map/panels/toolbox/generic/inputs/BundleInput";
 import OevStationConfigInput from "@/components/map/panels/toolbox/generic/inputs/OevStationConfigInput";
 import {
   getObjectDefaults,
@@ -258,6 +260,18 @@ export default function WorkflowNodeSettings({
     return virtualValues;
   }, [process, edges, node.id]);
 
+  const connectedStartingPointValues = useMemo(() => {
+    if (!process?.inputs) return {};
+
+    const nested: Record<string, { layer_id: string }> = {};
+    for (const name of Object.keys(connectedLayerValues)) {
+      if (process.inputs[name]?.schema?.["x-ui"]?.widget === "starting-points") {
+        nested[name] = { layer_id: "__connected__" };
+      }
+    }
+    return nested;
+  }, [process, connectedLayerValues]);
+
   // Form state - initialize with node's saved config or defaults
   // Use node.id as key to ensure state resets when switching nodes
   const [values, setValues] = useState<Record<string, unknown>>(() => {
@@ -329,6 +343,30 @@ export default function WorkflowNodeSettings({
   const allInputs = useMemo(() => {
     return sections.flatMap((section) => section.inputs);
   }, [sections]);
+
+  const bundleSelectors = useMemo(
+    () =>
+      allInputs
+        .filter((input) => input.uiMeta?.widget === "bundle-selector")
+        .map((input) => ({
+          name: input.name,
+          bundleType: input.uiMeta?.widget_options?.bundle_type as string | undefined,
+          artifactKind: input.uiMeta?.widget_options?.artifact_kind as string | undefined,
+        })),
+    [allInputs]
+  );
+  const projectBundleValues = useProjectBundleKinds(projectId as string, bundleSelectors);
+
+  const bundleChoiceValues = useMemo((): Record<string, unknown> => {
+    const merged = { ...defaultValues, ...values };
+    const flags: Record<string, unknown> = {};
+    for (const selector of bundleSelectors) {
+      const chosen = merged[selector.name];
+      flags[`_${selector.name}_is_custom`] =
+        typeof chosen === "string" && chosen !== "" && chosen !== DEFAULT_NETWORK_BUNDLE;
+    }
+    return flags;
+  }, [bundleSelectors, values, defaultValues]);
 
   // Repeatable inputs whose items are layers (e.g. merge) — these are filled by
   // canvas connections, so we don't pad them to min_items in the workflow panel.
@@ -443,7 +481,7 @@ export default function WorkflowNodeSettings({
     const effectiveValues = { ...defaultValues, ...connectedLayerValues, ...values };
 
     for (const input of allInputs) {
-      if (input.inputType === "layer") {
+      if (input.inputType === "layer" || input.inputType === "starting-points") {
         const projectLayerId = effectiveValues[input.name] as string | undefined;
 
         if (projectLayerId === "__connected__") {
@@ -480,6 +518,10 @@ export default function WorkflowNodeSettings({
           }
         }
       }
+    }
+
+    for (const [name, datasetId] of Object.entries({ ...mapping })) {
+      mapping[`${name}.layer_id`] = datasetId;
     }
 
     return mapping;
@@ -1010,7 +1052,15 @@ export default function WorkflowNodeSettings({
 
     // Effective values for visibility
     // Include connectedLayerValues so depends_on conditions for connected inputs are satisfied
-    const effectiveValues = { ...defaultValues, ...connectedLayerValues, ...values, ...layerGeometryValues };
+    const effectiveValues = {
+      ...defaultValues,
+      ...connectedLayerValues,
+      ...values,
+      ...layerGeometryValues,
+      ...connectedStartingPointValues,
+      ...projectBundleValues,
+      ...bundleChoiceValues,
+    };
 
     // Render sections with inputs (matching GenericTool pattern)
     return (
@@ -1060,9 +1110,8 @@ export default function WorkflowNodeSettings({
               {/* Render sections dynamically */}
               {sections.map((section) => {
                 // In workflows, skip sections that are handled by node connections or not applicable
-                // Starting points and opportunities come from connected input nodes
                 // Result sections are not supported in workflows
-                const workflowHiddenSections = ["starting", "result"];
+                const workflowHiddenSections = ["result"];
                 // Tools whose opportunity layers arrive on numbered canvas handles
                 // get the section hidden; ones with non-repeatable opportunity
                 // fields (huff_model) must keep it visible.
