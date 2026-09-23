@@ -1,5 +1,7 @@
 # src/goatlib/io/converter.py
+import json
 import logging
+import re
 import shutil
 import tempfile
 import zipfile
@@ -9,6 +11,8 @@ from typing import TYPE_CHECKING, Iterator, Self
 from urllib.parse import urlparse
 
 import duckdb
+from pyproj import CRS
+from pyproj.exceptions import CRSError
 
 from goatlib.config import settings
 from goatlib.io.formats import ALL_EXTS, FileFormat
@@ -23,6 +27,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 ColumnMapping = dict[str, str]
+
+_GEOJSON_CRS_KEY = re.compile(r'"crs"\s*:\s*')
 
 
 @dataclass
@@ -112,6 +118,22 @@ class IOConverter:
             out = Path(out_path)
             out.parent.mkdir(parents=True, exist_ok=True)
 
+            # GeoJSON whose legacy `crs` member PROJ can't resolve: DuckDB's
+            # ST_Read fails hard on it, so convert a copy without the member.
+            sanitized = self._strip_unresolvable_geojson_crs(src_info)
+            if sanitized:
+                try:
+                    return self.to_parquet(
+                        str(sanitized),
+                        out,
+                        geometry_col=geometry_col,
+                        target_crs=target_crs,
+                        column_mapping=column_mapping,
+                        timeout=timeout,
+                    )
+                finally:
+                    shutil.rmtree(sanitized.parent, ignore_errors=True)
+
             # Handle archive formats
             if self._is_archive_format(src_info):
                 return self._handle_archive_conversion(
@@ -185,6 +207,87 @@ class IOConverter:
             return "<OGRWFSDataSource" in head
         except Exception:
             return False
+
+    def _strip_unresolvable_geojson_crs(
+        self: Self, src_info: SourceInfo
+    ) -> Path | None:
+        """Copy a GeoJSON without its `crs` member when PROJ can't resolve it.
+
+        RFC 7946 dropped `crs` (coordinates are always WGS84 lon/lat), but GDAL
+        still honours it, and DuckDB turns GDAL's "crs not found" into a hard
+        error. A resolvable member is kept, so legacy projected files still
+        reproject. An unresolvable one is dropped, provided the coordinates
+        really are lon/lat; otherwise the file is rejected rather than
+        imported at the wrong place.
+
+        Returns the sanitized copy (in its own temp dir), or None to convert
+        the source as is.
+        """
+        path = src_info.path_obj
+        if (
+            path is None
+            or path.suffix.lower()
+            not in (FileFormat.GEOJSON.value, FileFormat.JSON.value)
+            or not path.is_file()
+        ):
+            return None
+
+        # Writers put `crs` ahead of `features`; only look there, so a property
+        # that happens to be called "crs" is never mistaken for the member.
+        with open(path, "rb") as f:
+            # surrogateescape round-trips any byte, so char offsets map back exactly.
+            head = f.read(64 * 1024).decode("utf-8", errors="surrogateescape")
+        match = _GEOJSON_CRS_KEY.search(head)
+        features_at = head.find('"features"')
+        if not match or (features_at != -1 and match.start() > features_at):
+            return None
+        try:
+            crs_obj, end = json.JSONDecoder().raw_decode(head, match.end())
+        except ValueError:
+            return None
+        props = crs_obj.get("properties") if isinstance(crs_obj, dict) else None
+        name = props.get("name") if isinstance(props, dict) else None
+        if not isinstance(name, str) or not name:
+            return None
+        try:
+            CRS.from_user_input(name)
+            return None
+        except CRSError:
+            pass
+
+        logger.warning(
+            "GeoJSON %s declares an unresolvable CRS %r; reading it as WGS84 (RFC 7946)",
+            path,
+            name,
+        )
+        # Drop `"crs": {...}` plus its trailing comma, then stream the rest.
+        rest = head[end:]
+        if rest.lstrip().startswith(","):
+            end += len(rest) - len(rest.lstrip()) + 1
+        start_b = len(head[: match.start()].encode("utf-8", errors="surrogateescape"))
+        end_b = len(head[:end].encode("utf-8", errors="surrogateescape"))
+        tmp_dir = Path(tempfile.mkdtemp(prefix="goatlib_geojson_"))
+        dest = tmp_dir / path.name
+        with open(path, "rb") as src, open(dest, "wb") as dst:
+            dst.write(src.read(start_b))
+            src.seek(end_b)
+            shutil.copyfileobj(src, dst)
+
+        bbox = self.con.execute(
+            f"SELECT ST_XMin(e), ST_YMin(e), ST_XMax(e), ST_YMax(e) "
+            f"FROM (SELECT ST_Extent_Agg(geom) AS e FROM ST_Read('{dest}'))"
+        ).fetchone()
+        if bbox and all(v is not None for v in bbox):
+            min_x, min_y, max_x, max_y = bbox
+            if min_x < -180 or max_x > 180 or min_y < -90 or max_y > 90:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                raise ValueError(
+                    f"The file declares an unknown coordinate system ({name}) and its "
+                    f"coordinates are not WGS84 longitude/latitude (extent "
+                    f"[{min_x:.2f}, {min_y:.2f}, {max_x:.2f}, {max_y:.2f}]). Fix the "
+                    f'file\'s "crs" entry or export it as WGS84 (EPSG:4326).'
+                )
+        return dest
 
     def _is_archive_format(self: Self, src_info: SourceInfo) -> bool:
         """Check if source is an archive format that needs extraction."""
