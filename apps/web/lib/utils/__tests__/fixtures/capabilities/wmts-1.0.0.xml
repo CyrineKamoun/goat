@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Capabilities version="1.0.0" xmlns="http://www.opengis.net/wmts/1.0" xmlns:ows="http://www.opengis.net/ows/1.1" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <ows:ServiceIdentification><ows:Title>basemap.de WMTS</ows:Title></ows:ServiceIdentification>
+  <ows:ServiceProvider><ows:ProviderName>BKG</ows:ProviderName></ows:ServiceProvider>
+  <Contents>
+    <Layer>
+      <ows:Title>basemap.de colour</ows:Title>
+      <ows:WGS84BoundingBox><ows:LowerCorner>5.5 47.2</ows:LowerCorner><ows:UpperCorner>15.5 55.1</ows:UpperCorner></ows:WGS84BoundingBox>
+      <ows:Identifier>de_basemapde_web_raster_farbe</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier>default</ows:Identifier></Style>
+      <Format>image/png</Format>
+      <TileMatrixSetLink><TileMatrixSet>GLOBAL_WEBMERCATOR</TileMatrixSet></TileMatrixSetLink>
+      <ResourceURL format="image/png" resourceType="tile" template="https://sgx.geodatenzentrum.de/wmts_basemapde/tile/1.0.0/de_basemapde_web_raster_farbe/{Style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.png"/>
+      <ResourceURL format="image/jpeg" resourceType="tile" template="https://sgx.geodatenzentrum.de/wmts_basemapde/tile/1.0.0/de_basemapde_web_raster_farbe/{Style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.jpg"/>
+    </Layer>
+    <Layer>
+      <ows:Title>basemap.de UTM</ows:Title>
+      <ows:Identifier>de_basemapde_utm</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier>default</ows:Identifier></Style>
+      <Format>image/png</Format>
+      <TileMatrixSetLink><TileMatrixSet>DE_EPSG_25832_ADV</TileMatrixSet></TileMatrixSetLink>
+      <ResourceURL format="image/png" resourceType="tile" template="https://sgx.geodatenzentrum.de/wmts_basemapde/tile/1.0.0/de_basemapde_utm/{Style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}.png"/>
+    </Layer>
+    <TileMatrixSet>
+      <ows:Identifier>GLOBAL_WEBMERCATOR</ows:Identifier>
+      <ows:SupportedCRS>urn:ogc:def:crs:EPSG::3857</ows:SupportedCRS>
+      <WellKnownScaleSet>urn:ogc:def:wkss:OGC:1.0:GoogleMapsCompatible</WellKnownScaleSet>
+      <TileMatrix><ows:Identifier>0</ows:Identifier><ScaleDenominator>559082264.0287178</ScaleDenominator><TopLeftCorner>-20037508.3428 20037508.3428</TopLeftCorner><TileWidth>256</TileWidth><TileHeight>256</TileHeight><MatrixWidth>1</MatrixWidth><MatrixHeight>1</MatrixHeight></TileMatrix>
+    </TileMatrixSet>
+    <TileMatrixSet>
+      <ows:Identifier>DE_EPSG_25832_ADV</ows:Identifier>
+      <ows:SupportedCRS>urn:ogc:def:crs:EPSG::25832</ows:SupportedCRS>
+      <TileMatrix><ows:Identifier>0</ows:Identifier><ScaleDenominator>17471320.75</ScaleDenominator><TopLeftCorner>-46133.17 6301219.54</TopLeftCorner><TileWidth>256</TileWidth><TileHeight>256</TileHeight><MatrixWidth>1</MatrixWidth><MatrixHeight>1</MatrixHeight></TileMatrix>
+    </TileMatrixSet>
+  </Contents>
+</Capabilities>

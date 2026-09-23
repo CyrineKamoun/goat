@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WMS_Capabilities version="1.3.0" xmlns="http://www.opengis.net/wms" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <Service>
+    <Name>WMS</Name>
+    <Title>Digitale Orthophotos NRW</Title>
+    <ContactInformation><ContactPersonPrimary><ContactOrganization>Geobasis NRW</ContactOrganization></ContactPersonPrimary></ContactInformation>
+  </Service>
+  <Capability>
+    <Request>
+      <GetMap><Format>image/png</Format><DCPType><HTTP><Get><OnlineResource xlink:href="https://www.wms.nrw.de/geobasis/wms_nw_dop?"/></Get></HTTP></DCPType></GetMap>
+    </Request>
+    <Layer>
+      <Title>Orthophotos NRW</Title>
+      <CRS>EPSG:25832</CRS>
+      <EX_GeographicBoundingBox><westBoundLongitude>5.8</westBoundLongitude><eastBoundLongitude>9.5</eastBoundLongitude><southBoundLatitude>50.3</southBoundLatitude><northBoundLatitude>52.6</northBoundLatitude></EX_GeographicBoundingBox>
+      <Layer>
+        <Title>Orthophotos</Title>
+        <CRS>EPSG:3857</CRS>
+        <Layer queryable="0">
+          <Name>nw_dop_rgb</Name>
+          <Title>DOP colour</Title>
+          <Abstract>True-colour aerial imagery.</Abstract>
+          <Style><Name>default</Name><Title>default</Title><LegendURL><Format>image/png</Format><OnlineResource xlink:href="https://www.wms.nrw.de/legend/dop.png"/></LegendURL></Style>
+        </Layer>
+        <Layer>
+          <Name>nw_dop_cir</Name>
+          <Title>DOP colour infrared</Title>
+        </Layer>
+      </Layer>
+      <Layer>
+        <Name>nw_dop_nir</Name>
+        <Title>DOP near infrared</Title>
+        <Style><Name>default</Name><Title>default</Title></Style>
+      </Layer>
+    </Layer>
+  </Capability>
+</WMS_Capabilities>

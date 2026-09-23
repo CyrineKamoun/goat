@@ -10,7 +10,7 @@ import { ICON_NAME } from "@p4b/ui/components/Icon";
  * nothing else decides which entries exist.
  */
 
-export type AddLayerSourceId = "upload" | "explorer" | "catalog" | "create";
+export type AddLayerSourceId = "upload" | "explorer" | "catalog" | "create" | "connect";
 
 /**
  * The two things a source can be: data that does not exist in GOAT yet, or data that does.
@@ -79,6 +79,16 @@ export const ADD_LAYER_SOURCES: AddLayerSource[] = [
     // `createEmptyLayer` posts to a project; without one there is nothing to add
     // the new layer to, so the datasets page does not offer it.
     needsProject: true,
+  },
+  {
+    id: "connect",
+    labelKey: "connect_service",
+    group: "new",
+    icon: ICON_NAME.LINK,
+    // A layer list beside a preview map, both reaching the frame's edges; a folder is all
+    // it needs, so the datasets page offers it too.
+    wide: true,
+    width: "min(1100px, 94vw)",
   },
 ];
 

@@ -14,6 +14,7 @@ vi.mock("@/hooks/addLayer/useDatasetPickerFlow", () => ({
 }));
 vi.mock("@/hooks/addLayer/useCatalogFlow", () => ({ useCatalogFlow: () => controller }));
 vi.mock("@/hooks/addLayer/useCreateFlow", () => ({ useCreateFlow: () => controller }));
+vi.mock("@/hooks/addLayer/useConnectFlow", () => ({ useConnectFlow: () => controller }));
 vi.mock("@/hooks/addLayer/useUploadFlow", () => ({ useUploadFlow: () => controller }));
 
 /** The shelf as the frame renders it, reduced to the one prop under test. */
@@ -26,6 +27,7 @@ vi.mock("@/components/addLayer/DatasetPickerBody", () => ({
 }));
 vi.mock("@/components/addLayer/CatalogBody", () => ({ default: () => <div /> }));
 vi.mock("@/components/addLayer/CreateBody", () => ({ default: () => <div /> }));
+vi.mock("@/components/addLayer/ConnectBody", () => ({ default: () => <div /> }));
 vi.mock("@/components/addLayer/UploadBody", () => ({ default: () => <div /> }));
 
 /** jsdom has no matchMedia; the frame full-screens below `sm` and the shelf

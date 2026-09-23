@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wfs:WFS_Capabilities version="2.0.0" xmlns:wfs="http://www.opengis.net/wfs/2.0" xmlns:ows="http://www.opengis.net/ows/1.1" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <ows:ServiceIdentification><ows:Title>ALKIS vereinfacht NRW</ows:Title><ows:ServiceType>WFS</ows:ServiceType><ows:ServiceTypeVersion>2.0.0</ows:ServiceTypeVersion></ows:ServiceIdentification>
+  <ows:ServiceProvider><ows:ProviderName>Geobasis NRW</ows:ProviderName></ows:ServiceProvider>
+  <wfs:FeatureTypeList>
+    <wfs:FeatureType><wfs:Name>ave:Flurstueck</wfs:Name><wfs:Title>Flurstück</wfs:Title><wfs:Abstract>Land parcels.</wfs:Abstract><wfs:DefaultCRS>urn:ogc:def:crs:EPSG::25832</wfs:DefaultCRS>
+      <ows:WGS84BoundingBox><ows:LowerCorner>5.8 50.3</ows:LowerCorner><ows:UpperCorner>9.5 52.6</ows:UpperCorner></ows:WGS84BoundingBox></wfs:FeatureType>
+    <wfs:FeatureType><wfs:Name>ave:GebaeudeBauwerk</wfs:Name><wfs:Title>Gebäude / Bauwerk</wfs:Title><wfs:DefaultCRS>urn:ogc:def:crs:EPSG::25832</wfs:DefaultCRS></wfs:FeatureType>
+  </wfs:FeatureTypeList>
+</wfs:WFS_Capabilities>

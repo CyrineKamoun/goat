@@ -10,11 +10,13 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import type { FlowController } from "@/hooks/addLayer/flow";
 import { useCatalogFlow } from "@/hooks/addLayer/useCatalogFlow";
+import { useConnectFlow } from "@/hooks/addLayer/useConnectFlow";
 import { useCreateFlow } from "@/hooks/addLayer/useCreateFlow";
 import { useDatasetPickerFlow } from "@/hooks/addLayer/useDatasetPickerFlow";
 import { useUploadFlow } from "@/hooks/addLayer/useUploadFlow";
 
 import CatalogBody from "@/components/addLayer/CatalogBody";
+import ConnectBody from "@/components/addLayer/ConnectBody";
 import CreateBody from "@/components/addLayer/CreateBody";
 import DatasetPickerBody from "@/components/addLayer/DatasetPickerBody";
 import UploadBody from "@/components/addLayer/UploadBody";
@@ -122,6 +124,23 @@ const CreateDialog = ({ projectId, onClose }: { projectId?: string; onClose: () 
   );
 };
 
+const ConnectDialog = ({
+  projectId,
+  defaultFolderId,
+  onClose,
+}: {
+  projectId?: string;
+  defaultFolderId?: string;
+  onClose: () => void;
+}) => {
+  const controller = useConnectFlow({ projectId, defaultFolderId, onDone: onClose });
+  return (
+    <AddLayerFrame sourceId="connect" controller={controller} onClose={onClose}>
+      <ConnectBody controller={controller} />
+    </AddLayerFrame>
+  );
+};
+
 const CatalogDialog = ({ projectId, onClose }: { projectId?: string; onClose: () => void }) => {
   const { map } = useMap();
   /**
@@ -194,6 +213,8 @@ const AddLayerDialog = ({
     );
   if (source === "create") return <CreateDialog projectId={projectId} onClose={onClose} />;
   if (source === "catalog") return <CatalogDialog projectId={projectId} onClose={onClose} />;
+  if (source === "connect")
+    return <ConnectDialog projectId={projectId} defaultFolderId={defaultFolderId} onClose={onClose} />;
   if (source === "explorer") return <MyDatasetsDialog projectId={projectId} onClose={onClose} />;
   return null;
 };
