@@ -253,7 +253,10 @@ class TestRegistration:
     def test_other_tasks_are_unaffected(self) -> None:
         from goatlib.tasks.registry import TASK_REGISTRY
 
-        assert all(t.enabled for t in TASK_REGISTRY if t.name != "sync_geoip")
+        # sync_base_data is off by design too: its data sets, region and
+        # source are per-deployment choices.
+        off_by_design = {"sync_geoip", "sync_base_data"}
+        assert all(t.enabled for t in TASK_REGISTRY if t.name not in off_by_design)
 
     def test_a_resync_does_not_touch_whether_a_schedule_runs(self) -> None:
         """Turning it on in the UI has to survive the next sync — so the update

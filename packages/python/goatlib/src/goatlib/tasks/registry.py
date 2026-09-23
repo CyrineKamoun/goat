@@ -177,6 +177,26 @@ TASK_REGISTRY: tuple[TaskDefinition, ...] = (
         worker_tag="tools",
     ),
     TaskDefinition(
+        name="sync_base_data",
+        display_name="Sync Base Data",
+        description=(
+            "Install and update the street network, public transport network "
+            "and other base data the routing tools read, from "
+            "goat-base-data.plan4better.de or an internal mirror. Downloads "
+            "only a new version, verifies it, then switches to it in one step."
+        ),
+        module_path="goatlib.tasks.sync_base_data",
+        params_class_name="SyncBaseDataParams",
+        windmill_path="f/goat/tasks/sync_base_data",
+        # 03:00 UTC on Mondays (Windmill counts day-of-week from 1=Sunday). A
+        # run that finds every data set current downloads nothing.
+        schedule="0 0 3 * * 2",
+        # Created switched off: which data sets, which region and which source
+        # are per-deployment choices, and a first run can move tens of GB.
+        enabled=False,
+        worker_tag="tools",
+    ),
+    TaskDefinition(
         name="ducklake_compact",
         display_name="DuckLake Compaction",
         description=(
