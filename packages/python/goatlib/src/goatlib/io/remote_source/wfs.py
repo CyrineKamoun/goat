@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Tuple, Union
 
 from goatlib.io.ingest import convert_any
+from goatlib.io.remote_source.url_guard import assert_public_http_url
 from goatlib.io.remote_source.wfs_reader import WFSReader
 from goatlib.models.io import DatasetMetadata
 
@@ -32,6 +33,10 @@ def from_wfs(
     """
     Read or inspect a WFS service and convert layers to Parquet/GeoParquet.
     """
+    # The URL is user input fetched from our network: refuse internal targets
+    # before anything touches it.
+    assert_public_http_url(url)
+
     reader = WFSReader()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
