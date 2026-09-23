@@ -852,7 +852,7 @@ export default function WorkflowNodeSettings({
         };
 
         for (const input of allInputs) {
-          if (input.inputType !== "layer") continue;
+          if (input.inputType !== "layer" && input.inputType !== "starting-points") continue;
 
           const projectLayerId = effectiveValues[input.name] as string | undefined;
 
@@ -882,6 +882,10 @@ export default function WorkflowNodeSettings({
               newPredicted[input.name] = cols;
             }
           }
+        }
+
+        for (const [name, cols] of Object.entries({ ...newPredicted })) {
+          newPredicted[`${name}.layer_id`] = cols;
         }
 
         setPredictedColumns(newPredicted);
