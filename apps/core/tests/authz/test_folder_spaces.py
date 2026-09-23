@@ -203,3 +203,44 @@ async def test_a_folder_without_space_id_still_lands_in_the_personal_space(
     r = await client.post(f"{settings.API_V2_STR}/folder", json={"name": "Drafts"})
     assert r.status_code == 201, r.text
     assert r.json()["space_id"] == str(personal)
+
+
+@pytest.mark.asyncio
+async def test_raster_layer_created_in_a_team_folder_lands_in_that_space(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_get_home_folder: dict[str, object],
+    roles: dict[str, UUID],
+) -> None:
+    """An external-service layer takes its folder's space, like a project does:
+    pinning it to the caller's personal space refused every team folder."""
+    _, space_id = await _team_with_space(client, db_session, "Imagery")
+    home_id = (
+        await db_session.execute(
+            text(
+                f"SELECT id FROM {S}.folder "
+                "WHERE space_id = :s AND name = 'home' AND deleted_at IS NULL"
+            ),
+            {"s": space_id},
+        )
+    ).scalar_one()
+
+    r = await client.post(
+        f"{settings.API_V2_STR}/layer/raster",
+        json={
+            "folder_id": str(home_id),
+            "name": "Orthophotos",
+            "type": "raster",
+            "url": "https://example.com/wms",
+            "data_type": "wms",
+        },
+    )
+    assert r.status_code == 201, r.text
+    stored = (
+        await db_session.execute(
+            text(f"SELECT space_id FROM {S}.layer WHERE id = :id"),
+            {"id": UUID(r.json()["id"])},
+        )
+    ).scalar_one()
+    assert UUID(str(stored)) == space_id

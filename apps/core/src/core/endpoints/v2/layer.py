@@ -28,6 +28,7 @@ from core.crud.crud_folder import folder as crud_folder
 from core.crud.crud_layer import layer as crud_layer
 from core.crud.crud_space import space as crud_space
 from core.db.models._link_model import BundleLayerLink
+from core.db.models.folder import Folder
 from core.db.models.layer import Layer
 from core.db.models.user import User
 from core.db.session import AsyncSession
@@ -67,20 +68,28 @@ async def create_layer_raster(
 ) -> BaseModel:
     """Create a new raster layer from a service hosted externally."""
 
-    space_id = (await crud_space.ensure_personal(async_session, user_id)).id
+    # The layer takes its folder's own space, as a new project does: pinning
+    # it to the caller's personal space refused every team folder with a 404.
+    # Outside HTTPErrorHandler below: it would turn these HTTPExceptions into
+    # a 500.
     if layer_in.folder_id is not None:
-        # Outside HTTPErrorHandler below: authz.require raises HTTPException
-        # directly, which HTTPErrorHandler does not know how to map and
-        # would otherwise turn into a 500.
-        try:
-            await crud_folder.assert_same_space(
-                async_session, folder_id=layer_in.folder_id, space_id=space_id
-            )
-        except FolderNotFoundError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-        await authz.require(
+        folder = await async_session.get(Folder, layer_in.folder_id)
+        if folder is None or folder.deleted_at is not None or folder.space_id is None:
+            raise HTTPException(status_code=404, detail="Folder not found")
+        if not await authz.can(
             async_session, "folder", layer_in.folder_id, user_id, "write"
-        )
+        ):
+            # Readable but not writable: 403. Not even readable: as if absent.
+            if await authz.can(
+                async_session, "folder", layer_in.folder_id, user_id, "read"
+            ):
+                raise HTTPException(
+                    status_code=403, detail="Not allowed to write this folder"
+                )
+            raise HTTPException(status_code=404, detail="Folder not found")
+        space_id = folder.space_id
+    else:
+        space_id = (await crud_space.ensure_personal(async_session, user_id)).id
 
     with HTTPErrorHandler():
         layer = IRasterLayerRead(
