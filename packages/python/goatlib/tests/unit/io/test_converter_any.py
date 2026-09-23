@@ -164,6 +164,69 @@ def test_csv_wkt_geometry_epsg3857_fails(
 
 
 # =====================================================================
+#  GEOJSON CRS MEMBER TESTS
+# =====================================================================
+
+
+def _write_geojson(path: Path, crs_name: str | None, coords: list[float]) -> Path:
+    import json
+
+    doc: dict = {"type": "FeatureCollection", "name": path.stem}
+    if crs_name is not None:
+        doc["crs"] = {"type": "name", "properties": {"name": crs_name}}
+    doc["features"] = [
+        {
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": coords},
+            "properties": {"name": "a"},
+        }
+    ]
+    path.write_text(json.dumps(doc))
+    return path
+
+
+def _first_point(out: Path) -> tuple[float, float]:
+    con = duckdb.connect()
+    con.execute("LOAD spatial")
+    x, y = con.execute(
+        f"SELECT ST_X(geometry), ST_Y(geometry) FROM read_parquet('{out}')"
+    ).fetchone()
+    return x, y
+
+
+def test_geojson_unresolvable_crs_falls_back_to_wgs84(tmp_path: Path) -> None:
+    """A malformed `crs` member (typo'd CRS84 URN) is dropped, per RFC 7946."""
+    src = _write_geojson(
+        tmp_path / "typo.geojson", "urn:ogc:def:crs:OGC:1.3/CRS84", [16.34, 48.21]
+    )
+    out, meta = convert_any(str(src), tmp_path / "out", target_crs="EPSG:4326")[0]
+    assert meta.crs == "EPSG:4326"
+    x, y = _first_point(out)
+    assert x == pytest.approx(16.34) and y == pytest.approx(48.21)
+
+
+def test_geojson_resolvable_projected_crs_still_reprojects(tmp_path: Path) -> None:
+    """A valid legacy `crs` member is still honoured (not blindly ignored)."""
+    src = _write_geojson(
+        tmp_path / "mgi.geojson",
+        "urn:ogc:def:crs:EPSG::31256",
+        [-2310.0, 342090.0],  # MGI / Austria GK East, central Vienna
+    )
+    out, _ = convert_any(str(src), tmp_path / "out", target_crs="EPSG:4326")[0]
+    x, y = _first_point(out)
+    assert 16.0 < x < 16.7 and 48.0 < y < 48.4
+
+
+def test_geojson_unresolvable_crs_with_projected_coords_fails(tmp_path: Path) -> None:
+    """Unknown CRS on non-lon/lat coordinates must not import as WGS84."""
+    src = _write_geojson(
+        tmp_path / "bad.geojson", "urn:ogc:def:crs:EPSG::999999", [-2310.0, 342090.0]
+    )
+    with pytest.raises(ValueError, match="unknown coordinate system"):
+        convert_any(str(src), tmp_path / "out", target_crs="EPSG:4326")
+
+
+# =====================================================================
 #  MIXED CONTENT INPUT TESTS
 # =====================================================================
 
