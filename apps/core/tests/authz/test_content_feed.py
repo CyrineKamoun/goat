@@ -1195,3 +1195,96 @@ async def test_rows_tied_on_the_sort_column_page_without_repeating(
     assert len(listed) == len(set(listed)), "no row is listed on two pages"
     assert set(listed) == {str(i) for i in ids}
     assert listed == sorted(str(i) for i in ids), "ties read in id order"
+
+
+@pytest.mark.asyncio
+async def test_feed_tells_linked_layers_from_ones_goat_holds(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+    fixture_get_home_folder: dict[str, object],
+) -> None:
+    """A layer with a stored `url` is drawn from someone else's service: the
+    feed marks it linked and names the host, never the full address (tile URLs
+    can carry keys). A WFS import is a copy GOAT holds, so it is not linked,
+    but still names where it came from."""
+    sid = (
+        await db_session.execute(
+            text(f"SELECT id FROM {S}.space WHERE user_id = :u"),
+            {"u": fixture_create_user},
+        )
+    ).scalar_one()
+    fid = str(fixture_get_home_folder["id"])
+
+    wms = await client.post(
+        f"{settings.API_V2_STR}/layer/raster",
+        json={
+            "folder_id": fid,
+            "name": "Orthophotos",
+            "type": "raster",
+            "url": "https://www.wms.nrw.de/geobasis/wms_nw_dop?bbox={bbox-epsg-3857}&key=secret",
+            "data_type": "wms",
+        },
+    )
+    assert wms.status_code == 201, wms.text
+
+    def insert_feature(name: str) -> Any:
+        return text(
+            f"INSERT INTO {S}.layer (id, name, type, feature_layer_type, "
+            "feature_layer_geometry_type, user_id, folder_id, space_id, updated_at, "
+            "data_type, other_properties) "
+            f"VALUES (gen_random_uuid(), '{name}', 'feature', 'standard', 'polygon', "
+            ":u, :f, :s, now(), CAST(:dt AS text), CAST(:op AS jsonb)) RETURNING id"
+        )
+
+    wfs_id = (
+        await db_session.execute(
+            insert_feature("Flurstücke"),
+            {
+                "u": fixture_create_user,
+                "f": fid,
+                "s": sid,
+                "dt": "wfs",
+                "op": json.dumps(
+                    {"url": "https://www.wfs.nrw.de/geobasis/wfs?SERVICE=WFS"}
+                ),
+            },
+        )
+    ).scalar_one()
+    plain_id = (
+        await db_session.execute(
+            insert_feature("Parks"),
+            {"u": fixture_create_user, "f": fid, "s": sid, "dt": None, "op": None},
+        )
+    ).scalar_one()
+    await db_session.commit()
+
+    rows = {
+        i["id"]: i
+        for i in (await _feed(client, space_id=str(sid), folder_id=fid))["items"]
+    }
+    assert (
+        rows[wms.json()["id"]].items()
+        >= {
+            "is_linked": True,
+            "data_type": "wms",
+            "source_host": "www.wms.nrw.de",
+        }.items()
+    )
+    assert "secret" not in json.dumps(rows[wms.json()["id"]])
+    assert (
+        rows[str(wfs_id)].items()
+        >= {
+            "is_linked": False,
+            "data_type": "wfs",
+            "source_host": "www.wfs.nrw.de",
+        }.items()
+    )
+    assert (
+        rows[str(plain_id)].items()
+        >= {
+            "is_linked": False,
+            "data_type": None,
+            "source_host": None,
+        }.items()
+    )

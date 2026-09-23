@@ -140,7 +140,11 @@ const ContentCard = ({
             alignItems: "center",
             gap: "6px",
           }}>
-          <TypeTag label={t(typeLabelKey(item))} locked={item.restricted || item.restricted_inherited} />
+          <TypeTag
+            label={t(typeLabelKey(item))}
+            locked={item.restricted || item.restricted_inherited}
+            linkedLabel={item.is_linked ? t("layer_linked") : undefined}
+          />
           {item.type === "template" && (item.template_kinds ?? []).length > 0 && (
             <KindBadges kinds={item.template_kinds ?? []} size={20} />
           )}

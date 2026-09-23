@@ -53,6 +53,12 @@ export const contentItemSchema = z.object({
   is_public: z.boolean().default(false),
   layer_type: z.string().nullable().optional(),
   feature_layer_geometry_type: z.string().nullable().optional(),
+  /** Layers only: the source format (wms, wmts, xyz, cog, wfs); null for data made in GOAT. */
+  data_type: z.string().nullable().optional(),
+  /** Layers only: drawn live from someone else's service rather than held by GOAT. */
+  is_linked: z.boolean().optional(),
+  /** Layers only: the host a linked layer is drawn from, or a WFS import was copied from. */
+  source_host: z.string().nullable().optional(),
   is_shortcut: z.boolean().default(false),
   restricted: z.boolean().default(false),
   restricted_inherited: z.boolean().default(false),

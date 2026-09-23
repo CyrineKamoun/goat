@@ -1,6 +1,7 @@
 "use client";
 
 import { Box, alpha, useTheme } from "@mui/material";
+import { visuallyHidden } from "@mui/utils";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
@@ -8,13 +9,16 @@ interface TypeTagProps {
   label: string;
   /** The item narrows who in its space can see it — a padlock leads the tag. */
   locked?: boolean;
+  /** Drawn live from someone else's service — a link icon closes the tag. Given as the
+   * word screen readers announce for it, since the icon alone says nothing to them. */
+  linkedLabel?: string;
 }
 
 /** The kind, overlaid on a card's top-left corner. It sits on imagery — a map
  * thumbnail or a drawn stand-in — so it is a scrim over whatever is behind it
  * rather than a themed surface: a dark wash of `common.black` carrying
  * `common.white` text, which holds in both themes. */
-const TypeTag = ({ label, locked }: TypeTagProps) => {
+const TypeTag = ({ label, locked, linkedLabel }: TypeTagProps) => {
   const theme = useTheme();
 
   return (
@@ -35,13 +39,22 @@ const TypeTag = ({ label, locked }: TypeTagProps) => {
         whiteSpace: "nowrap",
       }}>
       {locked && (
-        <Icon
-          iconName={ICON_NAME.LOCK}
-          style={{ fontSize: 10 }}
-          htmlColor={theme.palette.common.white}
-        />
+        <Icon iconName={ICON_NAME.LOCK} style={{ fontSize: 10 }} htmlColor={theme.palette.common.white} />
       )}
       {label}
+      {linkedLabel && (
+        <>
+          <Icon
+            iconName={ICON_NAME.LINK}
+            style={{ fontSize: 10 }}
+            htmlColor={theme.palette.common.white}
+            aria-hidden
+          />
+          <Box component="span" sx={visuallyHidden}>
+            {linkedLabel}
+          </Box>
+        </>
+      )}
     </Box>
   );
 };

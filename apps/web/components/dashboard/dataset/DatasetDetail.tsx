@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
-import { layerTypeLabelKey } from "@/lib/utils/content";
+import { layerSourceLine, layerSourceOf, layerTypeLabelKey } from "@/lib/utils/content";
 import { DEFAULT_ROWS_PER_PAGE_OPTIONS } from "@/lib/utils/pagination";
 import type { Layer } from "@/lib/validations/layer";
 
@@ -142,12 +142,15 @@ const DatasetDetail = ({ dataset, actions }: DatasetDetailProps) => {
   const stringOf = (value: string | number | null | undefined) =>
     value === null || value === undefined || value === "" ? undefined : String(value);
 
+  const sourceLine = layerSourceLine(layerSourceOf(dataset), t);
+
   const fields: (MetaField | false | undefined)[] = [
     {
       icon: ICON_NAME.LAYERS,
       label: t("metadata.headings.type"),
       value: t(typeLabelKey),
     },
+    !!sourceLine && { icon: ICON_NAME.LINK, label: t("source"), value: sourceLine },
     {
       icon: ICON_NAME.MAP,
       label: t("metadata.headings.geometry_type"),

@@ -109,6 +109,23 @@ class ContentItem(BaseModel):
     )
     layer_type: str | None = None
     feature_layer_geometry_type: str | None = None
+    data_type: str | None = Field(
+        default=None,
+        description="Layers only: the source format (wms, wmts, xyz, cog, wfs); "
+        "None for data uploaded or created in GOAT.",
+    )
+    is_linked: bool = Field(
+        default=False,
+        description="Layers only: drawn live from someone else's service (a "
+        "stored `url`), rather than held by GOAT. A WFS import is a copy, so "
+        "it is not linked.",
+    )
+    source_host: str | None = Field(
+        default=None,
+        description="Layers only: the host a linked layer is drawn from, or a "
+        "WFS import was copied from. The host alone: a full tile URL can carry "
+        "an API key.",
+    )
     is_shortcut: bool = Field(
         default=False,
         description="True for a `content_shortcut` row left behind after a "

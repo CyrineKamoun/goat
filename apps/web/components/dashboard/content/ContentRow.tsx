@@ -5,6 +5,8 @@ import { formatDistance } from "date-fns";
 import type { DragEvent } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
+
 import { useDateFnsLocale } from "@/i18n/utils";
 
 import { audienceOf, markKindOf, spaceDisplayName, spaceIconFor, typeLabelKey } from "@/lib/utils/content";
@@ -127,6 +129,18 @@ const ContentRow = ({
         </Typography>
         <Typography component="div" noWrap sx={{ fontSize: 11.5, color: theme.palette.text.secondary }}>
           {t(typeLabelKey(item))}
+          {item.is_linked && (
+            <Tooltip title={t("layer_linked_tip")} placement="top" disableInteractive>
+              <Box component="span" sx={{ display: "inline-flex", verticalAlign: "-1px", ml: 1 }}>
+                <Icon
+                  iconName={ICON_NAME.LINK}
+                  style={{ fontSize: 10 }}
+                  htmlColor={theme.palette.text.secondary}
+                  titleAccess={t("layer_linked")}
+                />
+              </Box>
+            </Tooltip>
+          )}
           {location && ` · ${location}`}
         </Typography>
       </Box>

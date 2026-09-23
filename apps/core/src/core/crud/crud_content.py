@@ -11,6 +11,7 @@ listed (e.g. `content_shortcut`) — add a branch there, not a second query.
 """
 
 from typing import Any, List, Sequence
+from urllib.parse import urlparse
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -90,6 +91,16 @@ _DEFAULT_THUMBNAILS: dict[str, str | None] = {
     "folder": None,
     "template": settings.DEFAULT_PROJECT_THUMBNAIL,
 }
+
+
+def _host_of(url: str | None) -> str | None:
+    """The host of a stored service address, or None; never the rest of it."""
+    if not url:
+        return None
+    try:
+        return urlparse(url).hostname
+    except ValueError:
+        return None
 
 
 def _thumbnail_url(resource_type: str, stored: str | None) -> str | None:
@@ -873,6 +884,7 @@ class CRUDContent:
             db, {row.created_by_id for row in rows if row.created_by_id is not None}
         )
         template_details = await self._template_details(db, ids_by_type["template"])
+        layer_sources = await self._layer_sources(db, ids_by_type["layer"])
 
         items = [
             ContentItem(
@@ -901,10 +913,45 @@ class CRUDContent:
                 restricted=bool(row.restricted),
                 restricted_inherited=bool(row.restricted_inherited),
                 **template_details.get(row.id, {}),
+                **layer_sources.get(row.id, {}),
             )
             for row in rows
         ]
         return ContentPage(items=items, total=total, page=page, size=size)
+
+    async def _layer_sources(
+        self, db: AsyncSession, layer_ids: List[UUID]
+    ) -> dict[UUID, dict[str, Any]]:
+        """Where the page's layers come from: `data_type`, `is_linked` and
+        `source_host` for each (empty for pages without layers).
+
+        Linked means a stored `url`: a WMS/WMTS/XYZ/COG layer is drawn from
+        that address, while data GOAT holds — uploads, tool outputs, WFS
+        imports — never stores one. A hosted raster must keep it that way (its
+        tile URL built from the layer id, not stored), or it would read as
+        linked. A WFS import keeps the service address in
+        `other_properties.url`, which names where the copy came from.
+        """
+        if not layer_ids:
+            return {}
+        rows = (
+            await db.execute(
+                text(
+                    f"SELECT id, data_type::text AS data_type, url, "
+                    f"other_properties->>'url' AS source_url "
+                    f"FROM {settings.SCHEMA}.layer WHERE id = ANY(:ids)"
+                ),
+                {"ids": layer_ids},
+            )
+        ).all()
+        return {
+            r.id: {
+                "data_type": r.data_type,
+                "is_linked": r.url is not None,
+                "source_host": _host_of(r.url or r.source_url),
+            }
+            for r in rows
+        }
 
     async def _template_details(
         self, db: AsyncSession, template_ids: List[UUID]

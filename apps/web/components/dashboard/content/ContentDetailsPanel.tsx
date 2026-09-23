@@ -13,6 +13,7 @@ import {
   folderPath,
   iconFor,
   lastRoleSegment,
+  layerSourceLine,
   markKindOf,
   restrictedAncestorName,
   spaceDisplayName,
@@ -116,9 +117,13 @@ const ContentDetailsPanel = ({
   // The labelled metadata rows, in the same treatment the catalog's own
   // detail sidebar uses. "Owner" stays a sentence below them, since it names
   // its own subject rather than being a value in a column.
+  const sourceLine = item
+    ? layerSourceLine({ dataType: item.data_type, isLinked: item.is_linked, host: item.source_host }, t)
+    : null;
   const metaRows: { icon: ICON_NAME; label: string; value: string }[] = item
     ? [
         { icon: iconFor(item), label: t("type"), value: t(typeLabelKey(item)) },
+        ...(sourceLine ? [{ icon: ICON_NAME.LINK, label: t("source"), value: sourceLine }] : []),
         {
           icon: ICON_NAME.FOLDER,
           label: t("location"),
@@ -363,107 +368,109 @@ const ContentDetailsPanel = ({
 
               {(itemSpace || grants.length > 0 || item.is_public) && (
                 <>
-              <Box sx={{ height: "1px", backgroundColor: theme.palette.divider, margin: "14px 0 10px" }} />
-
-              <Typography
-                component="div"
-                sx={{
-                  fontSize: 11,
-                  fontWeight: 800,
-                  letterSpacing: "0.7px",
-                  textTransform: "uppercase",
-                  color: "text.secondary",
-                  marginBottom: "8px",
-                }}>
-                {t("who_has_access")}
-              </Typography>
-              {item.restricted && (
-                <Typography sx={{ fontSize: 12, marginBottom: "8px", lineHeight: 1.5 }}>
-                  {t("restricted_note")}
-                </Typography>
-              )}
-              {!item.restricted && item.restricted_inherited && (
-                <Typography sx={{ fontSize: 12, marginBottom: "8px", lineHeight: 1.5 }}>
-                  <Trans
-                    i18nKey="common:restricted_inherited_note"
-                    values={{ folder: restrictedAncestorName(folders, item.folder_id) }}
-                    components={{ b: <b /> }}
+                  <Box
+                    sx={{ height: "1px", backgroundColor: theme.palette.divider, margin: "14px 0 10px" }}
                   />
-                </Typography>
-              )}
-              <Stack>
-                {/* The widest audience first: a published item is open to
+
+                  <Typography
+                    component="div"
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      letterSpacing: "0.7px",
+                      textTransform: "uppercase",
+                      color: "text.secondary",
+                      marginBottom: "8px",
+                    }}>
+                    {t("who_has_access")}
+                  </Typography>
+                  {item.restricted && (
+                    <Typography sx={{ fontSize: 12, marginBottom: "8px", lineHeight: 1.5 }}>
+                      {t("restricted_note")}
+                    </Typography>
+                  )}
+                  {!item.restricted && item.restricted_inherited && (
+                    <Typography sx={{ fontSize: 12, marginBottom: "8px", lineHeight: 1.5 }}>
+                      <Trans
+                        i18nKey="common:restricted_inherited_note"
+                        values={{ folder: restrictedAncestorName(folders, item.folder_id) }}
+                        components={{ b: <b /> }}
+                      />
+                    </Typography>
+                  )}
+                  <Stack>
+                    {/* The widest audience first: a published item is open to
                 anyone with the link, GOAT account or not — the same warning
                 colour the card chip uses for it. */}
-                {item.is_public && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: "9px", padding: "4px 0" }}>
-                    <Box sx={accessCircleSx}>
-                      <Icon
-                        iconName={ICON_NAME.GLOBE}
-                        style={{ fontSize: 11, color: theme.palette.warning.main }}
-                      />
-                    </Box>
-                    <Typography
-                      component="span"
-                      noWrap
-                      sx={{
-                        flex: 1,
-                        minWidth: 0,
-                        fontSize: 12.5,
-                        fontWeight: 600,
-                        color: theme.palette.warning.main,
-                      }}>
-                      {t("public")}
-                    </Typography>
-                    <Chip
-                      label={t(item.type === "layer" ? "every_goat_user" : "anyone_with_link")}
-                      size="small"
-                      sx={roleChipSx}
-                    />
-                  </Box>
-                )}
-                {/* A restricted item withholds the space default (D9), so the
+                    {item.is_public && (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: "9px", padding: "4px 0" }}>
+                        <Box sx={accessCircleSx}>
+                          <Icon
+                            iconName={ICON_NAME.GLOBE}
+                            style={{ fontSize: 11, color: theme.palette.warning.main }}
+                          />
+                        </Box>
+                        <Typography
+                          component="span"
+                          noWrap
+                          sx={{
+                            flex: 1,
+                            minWidth: 0,
+                            fontSize: 12.5,
+                            fontWeight: 600,
+                            color: theme.palette.warning.main,
+                          }}>
+                          {t("public")}
+                        </Typography>
+                        <Chip
+                          label={t(item.type === "layer" ? "every_goat_user" : "anyone_with_link")}
+                          size="small"
+                          sx={roleChipSx}
+                        />
+                      </Box>
+                    )}
+                    {/* A restricted item withholds the space default (D9), so the
                 space is not one of its audiences — only the grants below are.
                 A personal space has no members for the flag to narrow. */}
-                {itemSpace && (!isRestricted || itemSpace.kind === "personal") && (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: "9px", padding: "4px 0" }}>
-                    <Box sx={accessCircleSx}>
-                      <Icon
-                        iconName={spaceIconFor(itemSpace)}
-                        style={{ fontSize: 11, color: theme.palette.text.secondary }}
-                      />
-                    </Box>
-                    <Typography
-                      component="span"
-                      noWrap
-                      sx={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600 }}>
-                      {itemSpace.kind === "personal" ? t("only_you") : spaceDisplayName(itemSpace, t)}
-                    </Typography>
-                    {itemSpace.kind !== "personal" && (
-                      <Chip label={t("space_members")} size="small" sx={roleChipSx} />
+                    {itemSpace && (!isRestricted || itemSpace.kind === "personal") && (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: "9px", padding: "4px 0" }}>
+                        <Box sx={accessCircleSx}>
+                          <Icon
+                            iconName={spaceIconFor(itemSpace)}
+                            style={{ fontSize: 11, color: theme.palette.text.secondary }}
+                          />
+                        </Box>
+                        <Typography
+                          component="span"
+                          noWrap
+                          sx={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600 }}>
+                          {itemSpace.kind === "personal" ? t("only_you") : spaceDisplayName(itemSpace, t)}
+                        </Typography>
+                        {itemSpace.kind !== "personal" && (
+                          <Chip label={t("space_members")} size="small" sx={roleChipSx} />
+                        )}
+                      </Box>
                     )}
-                  </Box>
-                )}
-                {grants.map((entry) => (
-                  <Box
-                    key={entry.id}
-                    sx={{ display: "flex", alignItems: "center", gap: "9px", padding: "4px 0" }}>
-                    <Box sx={accessCircleSx}>
-                      <Icon
-                        iconName={ICON_NAME.USERS}
-                        style={{ fontSize: 11, color: theme.palette.text.secondary }}
-                      />
-                    </Box>
-                    <Typography
-                      component="span"
-                      noWrap
-                      sx={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600 }}>
-                      {entry.name ?? entry.id}
-                    </Typography>
-                    <Chip label={t(lastRoleSegment(entry.role))} size="small" sx={roleChipSx} />
-                  </Box>
-                ))}
-              </Stack>
+                    {grants.map((entry) => (
+                      <Box
+                        key={entry.id}
+                        sx={{ display: "flex", alignItems: "center", gap: "9px", padding: "4px 0" }}>
+                        <Box sx={accessCircleSx}>
+                          <Icon
+                            iconName={ICON_NAME.USERS}
+                            style={{ fontSize: 11, color: theme.palette.text.secondary }}
+                          />
+                        </Box>
+                        <Typography
+                          component="span"
+                          noWrap
+                          sx={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600 }}>
+                          {entry.name ?? entry.id}
+                        </Typography>
+                        <Chip label={t(lastRoleSegment(entry.role))} size="small" sx={roleChipSx} />
+                      </Box>
+                    ))}
+                  </Stack>
                 </>
               )}
 
