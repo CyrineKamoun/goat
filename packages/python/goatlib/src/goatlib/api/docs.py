@@ -14,7 +14,7 @@ app's source tree would not exist).
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -53,19 +53,23 @@ def mount_api_docs(
     app.mount(static_url, StaticFiles(directory=STATIC_DIR), name="static")
     favicon_url = f"{static_url.rstrip('/')}/{FAVICON_FILENAME}"
 
+    # Both pages are loaded by the browser, so the URLs they reference must
+    # carry the service's root path when it sits behind a path prefix.
     @app.get(docs_url, include_in_schema=False)
-    async def swagger_ui_html() -> HTMLResponse:
+    async def swagger_ui_html(request: Request) -> HTMLResponse:
+        root = request.scope.get("root_path", "")
         return get_swagger_ui_html(
-            openapi_url=openapi_url,
+            openapi_url=root + openapi_url,
             title=app.title,
-            swagger_favicon_url=favicon_url,
+            swagger_favicon_url=root + favicon_url,
             swagger_ui_parameters=swagger_ui_parameters,
         )
 
     @app.get(redoc_url, include_in_schema=False)
-    async def redoc_html() -> HTMLResponse:
+    async def redoc_html(request: Request) -> HTMLResponse:
+        root = request.scope.get("root_path", "")
         return get_redoc_html(
-            openapi_url=openapi_url,
+            openapi_url=root + openapi_url,
             title=app.title,
-            redoc_favicon_url=favicon_url,
+            redoc_favicon_url=root + favicon_url,
         )

@@ -352,7 +352,9 @@ def get_base_url(request: Request) -> str:
     host = request.headers.get("x-forwarded-host") or request.headers.get(
         "host", "localhost"
     )
-    return f"{proto}://{host}"
+    # Path prefix when served behind a path-routing gateway (ROOT_PATH).
+    root_path = request.scope.get("root_path", "")
+    return f"{proto}://{host}{root_path}"
 
 
 # === Landing Page and Conformance ===

@@ -3,6 +3,8 @@
 import os
 from typing import Optional
 
+from goatlib.api.root_path import normalize_root_path
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -39,6 +41,15 @@ class Settings(BaseSettings):
 
     # API Settings
     APP_NAME: str = "GOAT Processes API"
+    # Path prefix when served behind a path-routing gateway (e.g. "/geoapi").
+    # Empty = served from "/" of its own host. See goatlib.api.root_path.
+    ROOT_PATH: str = normalize_root_path(os.getenv("ROOT_PATH"))
+
+    @field_validator("ROOT_PATH", mode="before")
+    @classmethod
+    def _normalize_root_path(cls, value: str | None) -> str:
+        return normalize_root_path(value)
+
     DEBUG: bool = False
 
     # Authentication settings

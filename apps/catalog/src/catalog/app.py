@@ -95,6 +95,7 @@ def create_app(settings: CatalogSettings | None = None) -> FastAPI:
         version="1.0.0",
         description="STAC API for the GOAT data catalog",
         openapi_url="/api/openapi.json",
+        root_path=settings.root_path,
         # The docs pages are served by the routes below instead of FastAPI's
         # built-ins, so they can carry the shared GOAT API favicon (as core
         # does). Disabling them here avoids two handlers on one path.

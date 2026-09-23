@@ -79,6 +79,7 @@ app = FastAPI(
     version="1.0.0",
     description="OGC API Processes for GOAT geospatial analysis tools",
     openapi_url="/api/openapi.json",
+    root_path=settings.ROOT_PATH,
     # Both docs pages are served by goatlib.api.mount_api_docs below;
     # FastAPI's built-ins cannot carry a favicon.
     docs_url=None,

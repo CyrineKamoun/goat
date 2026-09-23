@@ -14,9 +14,11 @@ from goatlib.api.docs import (
     STATIC_DIR,
     mount_api_docs,
 )
+from goatlib.api.root_path import normalize_root_path
 
 __all__ = [
     "mount_api_docs",
+    "normalize_root_path",
     "STATIC_DIR",
     "FAVICON_URL_PATH",
     "DEFAULT_OPENAPI_URL",

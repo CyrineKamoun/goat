@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
 
-from pydantic import AliasChoices, Field, model_validator
+from goatlib.api.root_path import normalize_root_path
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +18,13 @@ class CatalogSettings(BaseSettings):
     nuts_file: str = "nuts.parquet"
     version_file: str = "VERSION"
     enable_mcp: bool = True
+    # Path prefix when served behind a path-routing gateway (e.g. "/catalog").
+    # Empty = served from "/" of its own host. Reads the repo-wide ROOT_PATH,
+    # with a catalog-only override. See goatlib.api.root_path.
+    root_path: str = Field(
+        default="",
+        validation_alias=AliasChoices("CATALOG_ROOT_PATH", "ROOT_PATH"),
+    )
     # Host headers the /mcp Streamable HTTP transport accepts (DNS-rebinding
     # protection -- see catalog.routers.mcp.build_transport_security).
     # ["*"] (the default) disables the check entirely, since a fresh
@@ -189,6 +197,11 @@ class CatalogSettings(BaseSettings):
             and self.s3_access_key_id
             and self.s3_secret_access_key
         )
+
+    @field_validator("root_path", mode="before")
+    @classmethod
+    def _normalize_root_path(cls, value: str | None) -> str:
+        return normalize_root_path(value)
 
     @model_validator(mode="after")
     def _default_cors_to_goat_ui(self) -> "CatalogSettings":
