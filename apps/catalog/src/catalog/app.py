@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from goatlib.api import mount_api_docs
+from goatlib.api import RootPathMiddleware, mount_api_docs
 from goatobs import setup_observability
 from starlette.middleware.gzip import GZipMiddleware
 
@@ -107,6 +107,8 @@ def create_app(settings: CatalogSettings | None = None) -> FastAPI:
 
     # Docs pages + shared GOAT favicon, one implementation for all services.
     mount_api_docs(app)
+    # Stripped-prefix requests look like unstripped ones (see ROOT_PATH).
+    app.add_middleware(RootPathMiddleware)
 
     # OTel auto-instrumentation + structlog, mirroring geoapi's
     # main.py (I2): a complete no-op unless OTEL_ENABLED=true, so this is

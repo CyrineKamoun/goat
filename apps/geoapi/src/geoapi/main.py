@@ -11,7 +11,7 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from goatlib.api import mount_api_docs
+from goatlib.api import RootPathMiddleware, mount_api_docs
 from goatlib.auth import JOSEError
 from goatobs import build_auth_context_middleware, setup_observability
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -131,6 +131,8 @@ app = FastAPI(
 
 # Docs pages + shared GOAT favicon, one implementation for all services.
 mount_api_docs(app)
+# Stripped-prefix requests look like unstripped ones (see ROOT_PATH).
+app.add_middleware(RootPathMiddleware)
 
 # OTel auto-instrumentation + structlog. Module-top so middleware is
 # installed before the first request arrives. Env-var-gated — no-op
