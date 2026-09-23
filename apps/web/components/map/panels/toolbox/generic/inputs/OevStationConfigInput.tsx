@@ -26,9 +26,10 @@ import Selector from "@/components/map/panels/common/Selector";
 import {
   classLabelToNumber,
   classNumberToLabel,
+  clearClassificationCell,
   getCategoryIds,
   getDistanceKeys,
-  getIntervalLabels,
+  getIntervalBounds,
   updateCategoryCell,
   updateClassificationCell,
   withFrequencies,
@@ -41,10 +42,10 @@ interface OevStationConfigInputProps {
   disabled?: boolean;
 }
 
-const PRESETS: { value: OevConfigPresetKey; label: string }[] = [
-  { value: "compact_60", label: "Takt bis 60 Minuten" },
-  { value: "standard_120", label: "Takt bis 120 Minuten" },
-  { value: "extended_210", label: "Takt bis 210 Minuten" },
+const PRESETS: { value: OevConfigPresetKey; labelKey: string }[] = [
+  { value: "compact_60", labelKey: "oev_station_config_preset_compact_60" },
+  { value: "standard_120", labelKey: "oev_station_config_preset_standard_120" },
+  { value: "extended_210", labelKey: "oev_station_config_preset_extended_210" },
 ];
 
 const DEFAULT_PRESET: OevConfigPresetKey = "standard_120";
@@ -55,14 +56,14 @@ type GroupKey = (typeof GROUP_OPTIONS)[number];
 
 interface ModeGroupOption {
   id: string;
-  label: string;
+  labelKey: string;
   routeTypes: string[];
 }
 
 const MODE_GROUP_OPTIONS: ModeGroupOption[] = [
   {
     id: "2",
-    label: "Bahn",
+    labelKey: "routing_modes.rail",
     routeTypes: [
       "2",
       "100",
@@ -86,17 +87,19 @@ const MODE_GROUP_OPTIONS: ModeGroupOption[] = [
       "405",
     ],
   },
-  { id: "1", label: "U-Bahn / Metro", routeTypes: ["1", "401", "402"] },
-  { id: "0", label: "Tram", routeTypes: ["0", "900", "901", "902", "903", "904", "905", "906"] },
+  { id: "1", labelKey: "routing_modes.subway", routeTypes: ["1", "401", "402"] },
+  {
+    id: "0",
+    labelKey: "routing_modes.tram",
+    routeTypes: ["0", "900", "901", "902", "903", "904", "905", "906"],
+  },
   {
     id: "3",
-    label: "Bus",
+    labelKey: "routing_modes.bus",
     routeTypes: ["3", "200", "201", "202", "204", "700", "701", "702", "704", "705", "712", "715", "800"],
   },
-  { id: "4", label: "Fähre", routeTypes: ["4", "1000"] },
-  { id: "5", label: "Seilbahn", routeTypes: ["5", "1300"] },
-  { id: "6", label: "Gondel", routeTypes: ["6"] },
-  { id: "7", label: "Standseilbahn", routeTypes: ["7", "1400"] },
+  { id: "6", labelKey: "routing_modes.gondola", routeTypes: ["6"] },
+  { id: "7", labelKey: "routing_modes.funicular", routeTypes: ["7", "1400"] },
 ];
 
 const sortObject = (value: unknown): unknown => {
@@ -157,18 +160,23 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
 
   const presetItems = useMemo<SelectorItem[]>(() => {
     return [
-      ...PRESETS.map((preset) => ({ value: preset.value, label: preset.label })),
-      { value: "custom", label: "Benutzerdefiniert" },
+      ...PRESETS.map((preset) => ({ value: preset.value, label: t(preset.labelKey) })),
+      { value: "custom", label: t("custom") },
     ];
-  }, []);
+  }, [t]);
 
   const selectedDraftPresetItem = useMemo<SelectorItem | undefined>(() => {
     return presetItems.find((item) => item.value === selectedDraftPresetValue);
   }, [presetItems, selectedDraftPresetValue]);
 
   const intervalLabels = useMemo(
-    () => getIntervalLabels(draftConfig.time_frequency),
-    [draftConfig.time_frequency]
+    () =>
+      getIntervalBounds(draftConfig.time_frequency).map(({ min, max }) =>
+        min === undefined
+          ? t("oev_station_config_interval_first", { max })
+          : t("oev_station_config_interval_range", { min, max })
+      ),
+    [draftConfig.time_frequency, t]
   );
   const categoryIds = useMemo(() => getCategoryIds(draftConfig), [draftConfig]);
   const distanceKeys = useMemo(() => getDistanceKeys(draftConfig), [draftConfig]);
@@ -316,6 +324,11 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
       [cellKey]: normalizedValue,
     }));
 
+    if (!normalizedValue.trim()) {
+      setDraftConfig((current) => clearClassificationCell(current, categoryId, distance));
+      return;
+    }
+
     const stationClass = classLabelToNumber(normalizedValue);
     if (!stationClass) {
       return;
@@ -338,6 +351,8 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
       setDraftConfig((current) =>
         updateClassificationCell(current, categoryId, distance, String(stationClass))
       );
+    } else if (!rawValue.trim()) {
+      setDraftConfig((current) => clearClassificationCell(current, categoryId, distance));
     }
 
     setClassificationInputDrafts((current) => {
@@ -356,14 +371,14 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
           gap: 1,
         }}>
         <Button variant="outlined" onClick={handleOpenDialog} disabled={disabled}>
-          Haltestellenkonfiguration
+          {t("oev_station_config")}
         </Button>
 
         <AppDialog
           open={dialogOpen}
           onClose={handleCloseDialog}
           icon={ICON_NAME.SETTINGS}
-          title="Haltestellenkonfiguration"
+          title={t("oev_station_config")}
           maxWidth={1200}
           bodySx={{ mb: 2 }}
           footer={
@@ -379,13 +394,16 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
               selectedItems={selectedDraftPresetItem}
               setSelectedItems={handleDialogPresetChange}
               items={presetItems}
-              label="Konfigurationsprofil"
-              placeholder="Profil auswählen"
+              label={t("oev_station_config_profile")}
+              placeholder={t("oev_station_config_profile_placeholder")}
               disabled={disabled}
             />
 
             <FormControl size="small" fullWidth>
-              <FormLabelHelper label="Taktgrenzen (Minuten)" color={theme.palette.text.secondary} />
+              <FormLabelHelper
+                label={t("oev_station_config_frequency_thresholds")}
+                color={theme.palette.text.secondary}
+              />
               <Autocomplete
                 multiple
                 freeSolo
@@ -410,7 +428,7 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
                     <Chip
                       {...getTagProps({ index })}
                       key={`${option}-${index}`}
-                      label={`${option} Min.`}
+                      label={t("oev_station_config_frequency_chip", { value: option })}
                       size="small"
                     />
                   ))
@@ -418,7 +436,7 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    placeholder="Wert in Minuten eingeben + Enter"
+                    placeholder={t("oev_station_config_frequency_placeholder")}
                     onBlur={() => {
                       if (!draftFrequencyInput.trim()) {
                         return;
@@ -447,7 +465,7 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
               }}>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                 <Typography variant="subtitle2" sx={sectionHeadingSx}>
-                  Verkehrsmittelgruppen
+                  {t("oev_station_config_transport_groups")}
                 </Typography>
                 <Box
                   sx={{
@@ -466,7 +484,7 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
                     </colgroup>
                     <thead>
                       <tr>
-                        <th style={tableHeaderCellStyle}>Verkehrsmittel</th>
+                        <th style={tableHeaderCellStyle}>{t("oev_station_config_transport_mode")}</th>
                         {groupKeys.map((groupKey) => (
                           <th key={`mode-group-header-${groupKey}`} style={tableHeaderCellStyle}>
                             {groupKey}
@@ -479,7 +497,7 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
                         const selectedGroup = getModeGroupValue(draftConfig, option);
                         return (
                           <tr key={option.id}>
-                            <td style={{ ...tableCellStyle, padding: "2px 4px" }}>{option.label}</td>
+                            <td style={{ ...tableCellStyle, padding: "2px 4px" }}>{t(option.labelKey)}</td>
                             {groupKeys.map((groupKey) => (
                               <td
                                 key={`${option.id}-${groupKey}`}
@@ -503,7 +521,7 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
 
               <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                 <Typography variant="subtitle2" sx={sectionHeadingSx}>
-                  Haltestellenkategorien
+                  {t("oev_station_config_station_categories")}
                 </Typography>
                 <Box
                   sx={{
@@ -522,7 +540,7 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
                     </colgroup>
                     <thead>
                       <tr>
-                        <th style={tableHeaderCellStyle}>Taktintervall</th>
+                        <th style={tableHeaderCellStyle}>{t("oev_station_config_frequency")}</th>
                         <th style={tableHeaderCellStyle}>A</th>
                         <th style={tableHeaderCellStyle}>B</th>
                         <th style={tableHeaderCellStyle}>C</th>
@@ -562,7 +580,7 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
             </Box>
 
             <Typography variant="subtitle2" sx={sectionHeadingSx}>
-              Distanzklassen
+              {t("oev_station_config_distance_classes")}
             </Typography>
             <Box
               sx={{
@@ -581,7 +599,7 @@ export default function OevStationConfigInput({ value, onChange, disabled }: Oev
                 </colgroup>
                 <thead>
                   <tr>
-                    <th style={tableHeaderCellStyle}>Kategorie</th>
+                    <th style={tableHeaderCellStyle}>{t("category")}</th>
                     {distanceKeys.map((distance) => (
                       <th key={`distance-${distance}`} style={tableHeaderCellStyle}>
                         {distance} m

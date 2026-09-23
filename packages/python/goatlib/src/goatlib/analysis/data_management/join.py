@@ -393,7 +393,7 @@ class JoinTool(AnalysisTool):
         )
         SELECT * EXCLUDE (rn)
         FROM joined_data
-        WHERE rn = 1 OR rn IS NULL  -- Keep first match or unmatched targets (for LEFT JOIN)
+        WHERE rn = 1
         """)
 
         write_optimized_parquet(

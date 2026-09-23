@@ -66,14 +66,10 @@ export const computeDefaultClassForCell = (categoryId: string, distanceIndex: nu
   return String(Math.max(1, category + distanceIndex - 1));
 };
 
-export const getIntervalLabels = (frequencies: number[]): string[] => {
-  return frequencies.map((threshold, index) => {
-    if (index === 0) {
-      return `<= ${threshold} Minuten`;
-    }
-    const previous = frequencies[index - 1];
-    return `> ${previous} bis <= ${threshold} Minuten`;
-  });
+export const getIntervalBounds = (frequencies: number[]): { min?: number; max: number }[] => {
+  return frequencies.map((threshold, index) =>
+    index === 0 ? { max: threshold } : { min: frequencies[index - 1], max: threshold }
+  );
 };
 
 const nextCategoryRow = (lastRow: { A?: number; B?: number; C?: number } | undefined) => {
@@ -213,5 +209,27 @@ export const ensureClassificationCoverage = (config: OevStationConfig): OevStati
   return {
     ...config,
     classification,
+  };
+};
+
+export const clearClassificationCell = (
+  config: OevStationConfig,
+  categoryId: string,
+  distance: number
+): OevStationConfig => {
+  const existingRow = config.classification[categoryId];
+  if (!existingRow || existingRow[distance] === undefined) {
+    return config;
+  }
+
+  const nextRow = { ...existingRow };
+  delete nextRow[distance];
+
+  return {
+    ...config,
+    classification: {
+      ...config.classification,
+      [categoryId]: nextRow,
+    },
   };
 };

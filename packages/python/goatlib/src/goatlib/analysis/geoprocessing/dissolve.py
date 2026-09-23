@@ -168,7 +168,7 @@ class DissolveTool(AnalysisTool):
         sql = f"""
             CREATE OR REPLACE TABLE dissolve_result AS
             SELECT
-                ST_Union_Agg({input_geom}) AS geom
+                ST_Union_Agg({input_geom}) AS geometry
                 {"," + select_dissolve_cols.rstrip(",") if select_dissolve_cols else ""}
                 {stats_select}
             FROM {input_table}
