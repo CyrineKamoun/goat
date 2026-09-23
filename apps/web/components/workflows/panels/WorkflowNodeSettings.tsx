@@ -695,7 +695,7 @@ export default function WorkflowNodeSettings({
     const connectedInputs: string[] = [];
 
     for (const input of allInputs) {
-      if (input.inputType !== "layer") continue;
+      if (input.inputType !== "layer" && input.inputType !== "starting-points") continue;
 
       // Check if this input has a connection
       const edge = edges.find(
