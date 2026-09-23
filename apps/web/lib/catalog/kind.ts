@@ -57,7 +57,7 @@ export const markFor = ({ kind, geometryType }: MarkSubject): ICON_NAME => {
   if (kind === "project") return ICON_NAME.MAP;
   if (kind === "template") return ICON_NAME.CLONE;
   if (kind === "table") return ICON_NAME.TABLE;
-  if (kind === "raster") return ICON_NAME.IMAGE;
+  if (kind === "raster") return ICON_NAME.RASTER;
   switch (geometryType) {
     case "point":
       return ICON_NAME.POINT_FEATURE;

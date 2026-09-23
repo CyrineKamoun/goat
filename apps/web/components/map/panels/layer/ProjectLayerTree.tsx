@@ -1216,7 +1216,7 @@ export const ProjectLayerTree = ({
       else if (node.layer_type === "raster") {
         iconNode = (
           <Icon
-            iconName={ICON_NAME.IMAGE}
+            iconName={ICON_NAME.RASTER}
             fontSize="small"
             style={{ fontSize: "1rem", color: theme.palette.action.active }}
           />

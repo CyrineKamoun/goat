@@ -121,7 +121,7 @@ describe("iconFor", () => {
 
   it("uses a table/raster icon for those layer types", () => {
     expect(iconFor(item({ type: "layer", layer_type: "table" }))).toBe(ICON_NAME.TABLE);
-    expect(iconFor(item({ type: "layer", layer_type: "raster" }))).toBe(ICON_NAME.IMAGE);
+    expect(iconFor(item({ type: "layer", layer_type: "raster" }))).toBe(ICON_NAME.RASTER);
   });
 
   it("uses a geometry-specific icon for feature layers", () => {
@@ -369,7 +369,7 @@ describe("markFor, through iconFor and iconForType", () => {
 
   it("prefers the layer's kind over its geometry", () => {
     expect(iconFor(item({ type: "layer", layer_type: "table" }))).toBe(ICON_NAME.TABLE);
-    expect(iconFor(item({ type: "layer", layer_type: "raster" }))).toBe(ICON_NAME.IMAGE);
+    expect(iconFor(item({ type: "layer", layer_type: "raster" }))).toBe(ICON_NAME.RASTER);
   });
 
   it("marks a vector layer by its geometry", () => {

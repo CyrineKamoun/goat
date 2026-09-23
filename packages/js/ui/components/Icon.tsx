@@ -183,6 +183,7 @@ import {
   number,
   pointIcon,
   polygonIcon,
+  rasterIcon,
   streetNetworkIcon,
   text,
   variableIcon,
@@ -266,6 +267,8 @@ export enum ICON_NAME {
   DOWNLOAD = "download",
   UPLOAD = "upload",
   TABLE = "table",
+  /** Raster data of any source — a pixel grid, the GIS convention; not a photo. */
+  RASTER = "raster",
   BARS_PROGRESS = "bar-progress",
   CREDIT_CARD = "credit-card",
   RULES_COMBINED = "rules-combined",
@@ -459,6 +462,7 @@ const nameToIcon: { [k in ICON_NAME]: IconDefinition } = {
   [ICON_NAME.DOWNLOAD]: faDownload,
   [ICON_NAME.UPLOAD]: faUpload,
   [ICON_NAME.TABLE]: faTable,
+  [ICON_NAME.RASTER]: rasterIcon,
   [ICON_NAME.BARS_PROGRESS]: faBarsProgress,
   [ICON_NAME.EXTERNAL_LINK]: faExternalLinkAlt,
   [ICON_NAME.CREDIT_CARD]: faCreditCard,
@@ -595,6 +599,12 @@ export const brandColors: BrandColors = {
 
 library.add(...Object.values(nameToIcon));
 
+/** Per-path opacities for the few icons drawn in more than one strength; every other icon's
+ * paths are drawn solid. */
+const PATH_OPACITIES: Partial<Record<ICON_NAME, number[]>> = {
+  [ICON_NAME.RASTER]: [1, 0.55, 0.3],
+};
+
 /** An icon's raw geometry: its own viewBox size and the path data behind it.
  * `null` for a name the map has no icon for. */
 function iconGeometry(iconName: ICON_NAME): { width: number; height: number; paths: string[] } | null {
@@ -611,7 +621,7 @@ export function Icon({ iconName, ...rest }: SvgIconProps & { iconName: ICON_NAME
   return (
     <SvgIcon viewBox={`0 0 ${geometry.width} ${geometry.height}`} {...rest}>
       {geometry.paths.map((d, i) => (
-        <path key={i} d={d} fill="currentColor" />
+        <path key={i} d={d} fill="currentColor" fillOpacity={PATH_OPACITIES[iconName]?.[i]} />
       ))}
     </SvgIcon>
   );

@@ -1,11 +1,12 @@
-import ImageIcon from "@mui/icons-material/Image";
-import { Box } from "@mui/material";
+import { Box, useTheme } from "@mui/material";
 import React from "react";
 
-import type { Layer } from "@/lib/validations/layer";
-import type { ProjectLayer } from "@/lib/validations/project";
+import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
+
 import { rgbToHex } from "@/lib/utils/helpers";
 import { getLegendColorMap, resolveFeatureMarker } from "@/lib/utils/map/legend";
+import type { Layer } from "@/lib/validations/layer";
+import type { ProjectLayer } from "@/lib/validations/project";
 
 import { MaskedImageIcon } from "@/components/map/panels/style/other/MaskedImageIcon";
 
@@ -18,6 +19,17 @@ interface LayerIconProps {
   iconSource?: "custom" | "library"; // To determine if we should apply mask
 }
 
+/** The same raster glyph the layer tree and the content pages use, in the theme's icon
+ * colour rather than a fixed grey that disappeared on the dark theme. */
+const RasterIcon = () => {
+  const theme = useTheme();
+  return (
+    <Box sx={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Icon iconName={ICON_NAME.RASTER} style={{ fontSize: "1rem", color: theme.palette.action.active }} />
+    </Box>
+  );
+};
+
 export const LayerIcon = ({
   type,
   color,
@@ -26,9 +38,7 @@ export const LayerIcon = ({
   iconUrl,
   iconSource = "library",
 }: LayerIconProps) => {
-  if (type === "raster") {
-    return <ImageIcon fontSize="small" sx={{ color: "#888" }} />;
-  }
+  if (type === "raster") return <RasterIcon />;
 
   // Custom Marker Image
   if (type === "point" && iconUrl) {
@@ -131,16 +141,14 @@ function LegendSwatch({ colors }: { colors: string[] }) {
  */
 export function buildLayerIcon(
   layer: ProjectLayer | Layer | undefined,
-  featureProperties?: Record<string, unknown>,
+  featureProperties?: Record<string, unknown>
 ): React.ReactNode | undefined {
   if (!layer) return undefined;
 
   const layerType = (layer as { layer_type?: string }).layer_type;
   if (layerType === "raster") return <LayerIcon type="raster" />;
 
-  const geomType = (
-    layer as { feature_layer_geometry_type?: string }
-  ).feature_layer_geometry_type;
+  const geomType = (layer as { feature_layer_geometry_type?: string }).feature_layer_geometry_type;
   if (!geomType) return undefined;
 
   const props = (layer.properties as Record<string, unknown>) ?? {};
@@ -182,9 +190,7 @@ export function buildLayerIcon(
   // as a multi-color swatch. Mirrors what the Layers panel does at
   // ProjectLayerTree.tsx around L1071-L1085 (LegendPanel for the full
   // breakdown; we just need a compact preview).
-  const hasComplexLegend = Boolean(
-    props.color_field || props.stroke_color_field || props.marker_field,
-  );
+  const hasComplexLegend = Boolean(props.color_field || props.stroke_color_field || props.marker_field);
   if (hasComplexLegend) {
     const fillStops = getLegendColorMap(props, "color").map((s) => s.color);
     const strokeStops = getLegendColorMap(props, "stroke_color").map((s) => s.color);
