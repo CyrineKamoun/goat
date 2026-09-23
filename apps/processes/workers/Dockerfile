@@ -9,11 +9,23 @@
 
 ARG WINDMILL_IMAGE_TAG='1.607.0'
 ARG PYTHON_VERSION=3.11
+# Python versions Windmill itself asks uv for on top of PYTHON_VERSION. Any it
+# can't find in /tmp/windmill/cache/py_runtime it downloads from GitHub at
+# runtime, which breaks air-gapped installs. For Windmill 1.607.0 that is
+# 3.12: its "latest stable" default (PyVAlias::default), preinstalled at every
+# worker start and used by the dependency job's cache prefill. Re-check when
+# bumping WINDMILL_IMAGE_TAG (ls /tmp/windmill/cache/py_runtime in the official
+# image shows what that release expects).
+ARG WINDMILL_EXTRA_PYTHON_VERSIONS="3.12"
 
 # =============================================================================
-# Stage: Server - API, UI, scheduler (official image, no changes)
+# Stage: Server - API, UI, scheduler (official image)
 # =============================================================================
 FROM ghcr.io/windmill-labs/windmill:${WINDMILL_IMAGE_TAG} AS server
+# Don't pull Windmill Hub script/resource-type embeddings (bucket.windmillhub.com,
+# re-pulled periodically). They only feed Windmill's own AI/Hub search in its UI;
+# GOAT doesn't use them, and the fetch is a runtime download.
+ENV DISABLE_EMBEDDING=true
 
 # =============================================================================
 # Stage: Worker Default - minimal for cron jobs, system tasks (official image)
@@ -79,6 +91,12 @@ COPY pyproject.toml uv.lock /app/
 WORKDIR /app
 RUN uv sync --all-extras --frozen --no-dev --no-editable --package=goatlib
 
+# Python versions Windmill asks for besides the venv's (see
+# WINDMILL_EXTRA_PYTHON_VERSIONS), installed next to it in the same uv-managed
+# directory.
+ARG WINDMILL_EXTRA_PYTHON_VERSIONS
+RUN uv python install ${WINDMILL_EXTRA_PYTHON_VERSIONS}
+
 # Bake DuckDB extensions (spatial/httpfs/postgres/ducklake + community h3) into the
 # image so the runtime never fetches them from the DuckDB repositories — removes
 # the egress/TLS dependency and speeds cold start. (linux-base already carries
@@ -104,6 +122,18 @@ COPY --from=python-build $UV_PYTHON_INSTALL_DIR $UV_PYTHON_INSTALL_DIR
 COPY --from=python-build $UV_PROJECT_ENVIRONMENT $UV_PROJECT_ENVIRONMENT
 COPY --from=python-build /app /app
 
+# Point Windmill's uv-managed Python directory at ours. Windmill ignores
+# PYTHON_PATH when it resolves a Python version: at every worker start and in
+# every dependency job and every deployed-script run it calls
+# `uv python find <v>` with UV_PYTHON_INSTALL_DIR hardcoded to
+# /tmp/windmill/cache/py_runtime and runs `uv python install <v>` (a GitHub
+# download) on a miss. With this link it finds the Pythons baked in /python, so
+# nothing is downloaded. (A symlinked directory works; symlinked version
+# subdirectories are ignored by uv.) Jobs still execute with PYTHON_PATH.
+RUN mkdir -p /tmp/windmill/cache \
+    && ln -s $UV_PYTHON_INSTALL_DIR /tmp/windmill/cache/py_runtime \
+    && chmod 777 /tmp/windmill /tmp/windmill/cache
+
 # DuckDB extensions baked at build time into DuckDB's default extension
 # directory ($HOME/.duckdb/extensions). Windmill job subprocesses inherit HOME,
 # so every connection they open finds the extensions without configuration.
@@ -112,7 +142,22 @@ ENV HOME=/root
 COPY --from=python-build /opt/duckdb-extensions /root/.duckdb/extensions
 RUN chmod -R a+rX /root/.duckdb && chmod a+x /root
 
+# Windmill runs uv (`uv python find` above, lockfile resolution) with its
+# environment cleared down to HOME and PATH, so uv's cache is always
+# $HOME/.cache/uv, and the worker keeps its own script cache in
+# $HOME/.cache/windmill. Make both creatable under a non-root UID too (sticky,
+# like /tmp); otherwise `uv python find` fails and Windmill falls back to
+# `uv python install`.
+RUN mkdir -p /root/.cache/uv && chmod 1777 /root/.cache /root/.cache/uv
+
 WORKDIR ${APP}
+
+# Windmill's `uv python list` (the "latest stable" lookup for scripts without a
+# `# py311`-style annotation) runs with NO environment at all. For a UID
+# without a passwd entry uv then has no home and caches in ./.uv_cache, i.e.
+# ${APP}/.uv_cache, which is root-owned; the list fails and Windmill falls back
+# to installing 3.10 from GitHub. Pre-create it writable.
+RUN mkdir -p ${APP}/.uv_cache && chmod 1777 ${APP}/.uv_cache
 
 ENV DISABLE_SERVER=true \
     PYTHON_PATH="$UV_PROJECT_ENVIRONMENT/bin/python"
@@ -175,6 +220,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Playwright Python package and browsers
-RUN uv pip install playwright && playwright install chromium && playwright install-deps chromium
+# --no-cache: keep root-owned wheels out of the shared /root/.cache/uv (and ~140 MB out of the image)
+RUN uv pip install --no-cache playwright && playwright install chromium && playwright install-deps chromium
 
 ENV WORKER_TAGS=print
