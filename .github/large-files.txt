@@ -1,0 +1,7 @@
+# Files allowed past the limits in scripts/check-file-sizes.sh. One glob per
+# line; keep the list short, and say why each entry has to be this large.
+
+# goatlib I/O fixtures: real-world files the readers are tested against.
+packages/python/goatlib/tests/data/io/mixed/mixed_content.zip
+packages/python/goatlib/tests/data/io/vector/valid/gpkg/multiple_layers.gpkg
+packages/python/goatlib/tests/data/io/raster/imagery.tif
