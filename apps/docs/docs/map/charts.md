@@ -7,7 +7,7 @@ sidebar_position: 6
 The Charts feature allows you to **quickly visualize aggregated data**, result  from the tools **aggregate polygon** and **aggregate point**, without complex configuration showing the relationship between your source and target layers.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/map/charts/charts.gif').default} alt="Filter tool in GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
+  <Video src={require('/img/map/charts/charts.mp4').default} alt="Filter tool in GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
 </div> 
 
 ## How to use charts

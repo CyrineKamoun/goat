@@ -127,7 +127,7 @@ Sobald die Berechnung abgeschlossen ist, werden **zwei Ergebnis-Layer** zur Kart
 
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/geoanalysis/spatial_clustering/clustering.png').default} alt="Spatial Clustering Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<img src={require('/img/toolbox/geoanalysis/spatial_clustering/clustering.webp').default} alt="Spatial Clustering Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 
 :::tip Tipp

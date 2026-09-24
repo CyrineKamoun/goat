@@ -43,7 +43,7 @@ All layers are visible across zoom levels 1-22 unless configured otherwise.
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/styling/zoom_adjust.gif').default} alt="Adjusting zoom visibility settings" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/zoom_adjust.mp4').default} alt="Adjusting zoom visibility settings" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "cover"}}/>
 </div>
 
 ## Best practices
@@ -57,7 +57,7 @@ All layers are visible across zoom levels 1-22 unless configured otherwise.
 **Summary data** (Heat maps, Aggregated): Use lower levels (1-14) for overview.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/map/styling/zooming_out.gif').default} alt="Zoom visibility demonstration" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/zooming_out.mp4').default} alt="Zoom visibility demonstration" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div>
 
 <p></p>

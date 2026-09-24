@@ -20,5 +20,5 @@ In the final step of our tutorial, we'll show you how to share your completed an
   
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/tutorials/01_erste_schritte/teilen.gif').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
+<Video src={require('/img/tutorials/01_erste_schritte/teilen.mp4').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
 </div>

@@ -23,7 +23,7 @@ Welcome to GOAT! This quickstart guide will help you get up and running in no ti
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/getting_started/new-project.gif').default} alt="Workspace at GOAT" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
+  <Video src={require('/img/getting_started/new-project.mp4').default} alt="Workspace at GOAT" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
 </div>
 
 ## Add data to your project

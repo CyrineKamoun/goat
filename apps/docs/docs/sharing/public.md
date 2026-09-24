@@ -13,7 +13,7 @@ Public sharing is view-only. If you want others to **edit the map**, use the **T
 ## How to Share a Map Publicly? 
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/sharing/sharing_public.gif').default} alt="Public Sharing on GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
+  <Video src={require('/img/sharing/sharing_public.mp4').default} alt="Public Sharing on GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
 </div>
 <p></p>
 
@@ -43,7 +43,7 @@ Now you can:
 To control how far users can zoom out, you can lock the map extent.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/sharing/sharing_lock_extent.gif').default} alt="Public Sharing on GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
+  <Video src={require('/img/sharing/sharing_lock_extent.mp4').default} alt="Public Sharing on GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
 </div>
 <p> </p>
 

@@ -40,7 +40,7 @@ The `Join Type` controls which features appear in the output:
 When each target feature matches at most one feature in the Join Layer, the result has the same number of rows as the Target Layer.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_one.png').default} alt="One-to-One Join: Inner Join vs Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_one.webp').default} alt="One-to-One Join: Inner Join vs Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
 </div>
 
 ### One-to-Many
@@ -48,7 +48,7 @@ When each target feature matches at most one feature in the Join Layer, the resu
 When one target feature matches multiple features in the Join Layer, the result contains one row per match — the target geometry is repeated for each matching record.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_many.png').default} alt="One-to-Many Join: Inner Join vs Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_many.webp').default} alt="One-to-Many Join: Inner Join vs Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
 </div>
 
 </TabItem>
@@ -58,7 +58,7 @@ When one target feature matches multiple features in the Join Layer, the result 
 A Spatial Join links features based on their geometric relationship — no shared field is needed. Each feature in the Target Layer is matched to features in the Join Layer that satisfy the selected spatial relationship.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: "32px", marginBottom: "32px" }}>
-  <img src={require('/img/toolbox/data_management/join/spatial_relationships.png').default} alt="Spatial Relationship Types" style={{ maxHeight: "auto", maxWidth: "70%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/data_management/join/spatial_relationships.webp').default} alt="Spatial Relationship Types" style={{ maxHeight: "auto", maxWidth: "70%", objectFit: "cover"}}/>
 </div>
 
 **Available spatial relationships:**

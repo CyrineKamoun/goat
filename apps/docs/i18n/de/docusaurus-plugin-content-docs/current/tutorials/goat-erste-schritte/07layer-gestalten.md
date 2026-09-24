@@ -16,7 +16,7 @@ Jetzt passen wir das Erscheinungsbild beider Layer an, um eine klare Karte zu er
 4. **Wählen Sie Orange als Füllfarbe**
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/tutorials/01_erste_schritte/layer-gestalten.gif').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
+<Video src={require('/img/tutorials/01_erste_schritte/layer-gestalten.mp4').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
 </div>
 
 ## Den "Mannheim" Grenz-Layer gestalten

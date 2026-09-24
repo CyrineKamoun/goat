@@ -39,7 +39,7 @@ Sharing **does not duplicate** your data, only grants access to it.
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/sharing/manage_team_members.gif').default} alt="Teams in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <Video src={require('/img/sharing/manage_team_members.mp4').default} alt="Teams in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
 </div>
 <p> </p>
 
@@ -65,7 +65,7 @@ When you share a dataset/project with a Team/Organization, all members will have
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/sharing/share_project.gif').default} alt="Sharing Access in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <Video src={require('/img/sharing/share_project.mp4').default} alt="Sharing Access in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
 </div>
 <p> </p>
 

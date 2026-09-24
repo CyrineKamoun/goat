@@ -12,7 +12,7 @@ Kombiniert **Features aus zwei Polygon-Layern** zu einem einzigen Layer. Die Aus
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
-  <img src={require('/img/toolbox/geoprocessing/union.png').default} alt="Buffer Types" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/geoprocessing/union.webp').default} alt="Buffer Types" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "cover"}}/>
 
 </div> 
 

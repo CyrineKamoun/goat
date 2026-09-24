@@ -43,7 +43,7 @@ Panels sind die Hauptbereiche, in denen Sie Ihre Widgets organisieren. Sie könn
 
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/builder/new_panel.gif').default} alt="Panel options and appearance" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
+  <Video src={require('/img/builder/new_panel.mp4').default} alt="Panel options and appearance" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
 </div>
 
 <p></p>
@@ -106,7 +106,7 @@ Um ein Panel zu löschen, klicken Sie unten in den Einstellungen auf `Panel lös
 Weitere Details finden Sie unter [Widgets](../category/widgets).
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/builder/widget_drag.gif').default} alt="recent datasets" style={{ maxHeight: "400px", maxWidth: "auto", objectFit: "cover"}}/>
+  <Video src={require('/img/builder/widget_drag.mp4').default} alt="recent datasets" style={{ maxHeight: "400px", maxWidth: "auto", objectFit: "cover"}}/>
 </div>
 
 ## Einstellungen

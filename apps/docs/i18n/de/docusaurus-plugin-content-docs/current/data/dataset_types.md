@@ -30,7 +30,7 @@ GOAT erkennt zwei Typen von Feature-Datensätzen basierend auf ihrer Quelle:
 **Tabellen** sind **nicht-räumliche Datensätze** ohne geografische Referenzpunkte, daher können sie nicht auf der Karte visualisiert werden. Importieren Sie sie in **CSV**- oder **XLSX**-Formaten für Analyse und Datenmanagement.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/data/table.png').default} alt="Nicht-räumliche Datensätze in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <img src={require('/img/data/table.webp').default} alt="Nicht-räumliche Datensätze in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
   <p style={{ textAlign: 'center', fontStyle: 'italic', marginTop: '8px', color: '#666' }}> Beispiel einer in GOAT angezeigten Tabelle</p>
 </div>
 

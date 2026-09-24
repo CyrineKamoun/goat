@@ -48,7 +48,7 @@ import TabItem from '@theme/TabItem';
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/attribute-based-fill-color.gif').default} alt="Fill Color Styling" style={{ maxHeight: "auto", maxWidth: "20%", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/attribute-based-fill-color.mp4').default} alt="Fill Color Styling" style={{ maxHeight: "auto", maxWidth: "20%", objectFit: "cover"}}/>
 
 </div>
 
@@ -82,7 +82,7 @@ import TabItem from '@theme/TabItem';
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/attribute-based-stroke-color.gif').default} alt="Stroke Color Styling" style={{ maxHeight: "auto", maxWidth: "20%", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/attribute-based-stroke-color.mp4').default} alt="Stroke Color Styling" style={{ maxHeight: "auto", maxWidth: "20%", objectFit: "cover"}}/>
 
 </div>
 
@@ -121,7 +121,7 @@ import TabItem from '@theme/TabItem';
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/attribute-based-custom-marker.gif').default} alt="Custom Marker Styling" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/attribute-based-custom-marker.mp4').default} alt="Custom Marker Styling" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
 
 </div>
 
@@ -192,7 +192,7 @@ GOAT offers four predefined palette types:
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-<img src={require('/img/map/styling/attribute-based-color-palettes.gif').default} alt="Quantile" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
+<Video src={require('/img/map/styling/attribute-based-color-palettes.mp4').default} alt="Quantile" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
 
 </div>  
 
@@ -206,7 +206,7 @@ The <code>Color Scale</code> determines how data values map to colors. GOAT offe
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-<img src={require('/img/map/styling/quantile.png').default} alt="Quantile" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
+<img src={require('/img/map/styling/quantile.webp').default} alt="Quantile" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
 
 </div>  
 
@@ -215,7 +215,7 @@ The <code>Color Scale</code> determines how data values map to colors. GOAT offe
 **Classifies data by deviation from the average**. Shows **relative dispersion, distribution, and outliers** statistically, but requires normally distributed data.
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/standard_deviation.png').default} alt="Standard Deviation" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
+  <img src={require('/img/map/styling/standard_deviation.webp').default} alt="Standard Deviation" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
 
 </div> 
 
@@ -224,7 +224,7 @@ The <code>Color Scale</code> determines how data values map to colors. GOAT offe
 **Divides data into equal-sized value ranges**. Works well for **evenly distributed data but can be misleading with skewed data** (some classes may be empty). 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/equal_interval.png').default} alt="Equal Interval" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
+  <img src={require('/img/map/styling/equal_interval.webp').default} alt="Equal Interval" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
 
 </div> 
 
@@ -234,7 +234,7 @@ The <code>Color Scale</code> determines how data values map to colors. GOAT offe
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/heads_tails.png').default} alt="Heads and Tails" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
+  <img src={require('/img/map/styling/heads_tails.webp').default} alt="Heads and Tails" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
 
 </div> 
 
@@ -244,7 +244,7 @@ The <code>Color Scale</code> determines how data values map to colors. GOAT offe
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/ordinal.png').default} alt="Custom Ordinal for strings" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
+  <img src={require('/img/map/styling/ordinal.webp').default} alt="Custom Ordinal for strings" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
 
 </div>
 
@@ -254,7 +254,7 @@ You can add more steps and select multiple string values per group from the <cod
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/custom_ordinal.gif').default} alt="Custom Ordinal for strings" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/custom_ordinal.mp4').default} alt="Custom Ordinal for strings" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
 
 </div> 
 

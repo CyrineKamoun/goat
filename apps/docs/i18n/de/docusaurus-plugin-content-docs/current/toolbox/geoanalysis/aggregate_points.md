@@ -18,7 +18,7 @@ Das Werkzeug "Punkte Aggregieren" kann verwendet werden, um **die Eigenschaften 
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/toolbox/geoanalysis/aggregate_points/point_aggregation.png').default} alt="Punkt-Aggregation" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/geoanalysis/aggregate_points/point_aggregation.webp').default} alt="Punkt-Aggregation" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
 
 </div> 
 
@@ -108,7 +108,7 @@ Die verfügbaren **Statistische Methoden** sind in der folgenden Tabelle aufgef�
 
 Sobald der Berechnungsprozess abgeschlossen ist, wird der resultierende Layer **"Aggregation Punkt"** zur Karte hinzugefügt. Dieser Layer besteht aus den Informationen des Quell-Layers und einer **zusätzlichen Spalte**, die die Ergebnisse der **statistischen Operation** zeigt. Sie können die Tabelle sehen, indem Sie auf das Polygon auf der Karte klicken.
 
-<img src={require('/img/toolbox/geoanalysis/aggregate_points/aggregate_points_result.png').default} alt="Punkt-Aggregation Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "auto"}}/>
+<img src={require('/img/toolbox/geoanalysis/aggregate_points/aggregate_points_result.webp').default} alt="Punkt-Aggregation Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "auto"}}/>
 
 
 :::tip Tipp

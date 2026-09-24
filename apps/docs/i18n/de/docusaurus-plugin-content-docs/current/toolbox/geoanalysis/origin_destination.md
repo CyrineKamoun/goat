@@ -18,7 +18,7 @@ Das Quelle-Ziel-Werkzeug erstellt **gerade Linien, die Startpunkte (Quellen) mit
 Das folgende Beispiel zeigt eine *Eingabetabelle (Matrix-Layer)* und die resultierenden *Quelle-Ziel-Linien* basierend auf den *Postleitzahlengebieten (Geometrie-Layer)*.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/toolbox/geoanalysis/origin_destination/od_example.png').default} alt="Quelle-Ziel Werkzeug in GOAT" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/geoanalysis/origin_destination/od_example.webp').default} alt="Quelle-Ziel Werkzeug in GOAT" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
 </div> 
 
 
@@ -87,7 +87,7 @@ Sobald der Berechnungsprozess abgeschlossen ist, werden die resultierenden Layer
 
 Wenn Sie auf ein "Q-Z Relation"-Element auf der Karte klicken, können Sie die Attributdetails anzeigen, wie die **Quelle**, das **Ziel** und die **Gewichtung** dieser Relation.
 
-<img src={require('/img/toolbox/geoanalysis/origin_destination/result.png').default} alt="Quelle-Ziel Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
+<img src={require('/img/toolbox/geoanalysis/origin_destination/result.webp').default} alt="Quelle-Ziel Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
 
 :::tip Tipp
 Möchten Sie Ihren Ergebnis-Layer stylen und schön aussehende Karten erstellen? Siehe [Styling](../../map/layer_style/style/styling).

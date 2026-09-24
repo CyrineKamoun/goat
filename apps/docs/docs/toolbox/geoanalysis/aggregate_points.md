@@ -18,7 +18,7 @@ The Aggregate Points tool can be used to **analyze the characteristics of points
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/toolbox/geoanalysis/aggregate_points/point_aggregation.png').default} alt="Point Aggregation" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/geoanalysis/aggregate_points/point_aggregation.webp').default} alt="Point Aggregation" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
 
 </div> 
 
@@ -109,7 +109,7 @@ Available **Statistics Methods** are listed in the following. The available meth
 
 As soon as the calculation process is finished, the resulting layer **"Aggregation Point"** will be added to the map. This layer consists of the information of the source layer and an **additional column** showing the results from the **statistical operation**. You can see the table by clicking on the polygon on the map.
 
-<img src={require('/img/toolbox/geoanalysis/aggregate_points/aggregate_points_result.png').default} alt="Point Aggregation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "auto"}}/>
+<img src={require('/img/toolbox/geoanalysis/aggregate_points/aggregate_points_result.webp').default} alt="Point Aggregation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "auto"}}/>
 
 <p></p>
 

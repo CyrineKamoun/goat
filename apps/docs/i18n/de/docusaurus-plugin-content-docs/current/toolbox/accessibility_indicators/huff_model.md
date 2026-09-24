@@ -188,7 +188,7 @@ Sobald die Berechnung abgeschlossen ist, wird ein Ergebnis-Layer zur Karte hinzu
 - **Niedrigere Wahrscheinlichkeitswerte** zeigen an, dass eine Einrichtung weniger Nachfrage erfasst, entweder weil sie weniger attraktiv ist, weiter entfernt liegt oder starker Konkurrenz durch nahegelegene Alternativen ausgesetzt ist.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/huff_model/huff_model.png').default} alt="Huff-model Heatmap Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/huff_model/huff_model.webp').default} alt="Huff-model Heatmap Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 <p></p>
 

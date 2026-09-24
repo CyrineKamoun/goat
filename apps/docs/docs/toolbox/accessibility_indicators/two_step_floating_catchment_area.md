@@ -286,14 +286,14 @@ The following example illustrates how the 2SFCA method works for each step.
 - **Step 1** computes a capacity ratio for each destination. A destination with 100 beds serving 100 people has a ratio of 1.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/two_step_floating_catchment_area/step1_2sfca.png').default} alt="Heatmap 2SFCA Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/two_step_floating_catchment_area/step1_2sfca.webp').default} alt="Heatmap 2SFCA Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 <p></p>
 
 - **Step 2** sums up the ratios of all destinations reachable from each cell. A cell that can reach two destinations (ratios 1 and 0.4) gets an accessibility of 1.4.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/two_step_floating_catchment_area/step2_2sfca.png').default} alt="Heatmap 2SFCA Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/two_step_floating_catchment_area/step2_2sfca.webp').default} alt="Heatmap 2SFCA Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 <p></p>
 
@@ -303,7 +303,7 @@ The following example illustrates how the 2SFCA method works for each step.
 ### Cell costs
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.png').default} alt="gravity-no-destination-potential" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.webp').default} alt="gravity-no-destination-potential" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
 </div>
 
 <p></p>

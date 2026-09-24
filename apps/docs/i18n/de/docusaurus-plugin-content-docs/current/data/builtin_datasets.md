@@ -28,7 +28,7 @@ GOAT umfasst umfassende Netzwerk-Datensätze, die alle routing-basierten Erreich
 Unser öffentliches Verkehrsnetz deckt mehrere Verkehrsmittel ab, einschließlich Bus, Tram, U-Bahn, Bahn und Fähre. Dieses Netzwerk ermöglicht GOATs [Öffentlicher Verkehr](../routing/public_transport) Routing-Funktionen.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/data/data_basis/pt_network_banner.png').default} alt="Öffentliches Verkehrsnetz" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/data/data_basis/pt_network_banner.webp').default} alt="Öffentliches Verkehrsnetz" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div>
 
 **Was enthalten ist:**

@@ -141,7 +141,7 @@ Zunächst wird die Anzahl der Abfahrten pro öffentlichem Verkehrsmittel (Zug, U
 Die erstellten Puffer-Einzugsgebiete werden um die Haltestellen in den entsprechenden Farben visualisiert, um die **Güteklasse** (<span style={{color: "#199741"}}>A</span>-<span style={{color: "#E4696A"}}>F</span>) hervorzuheben.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/accessibility_indicators/gueteklassen/visualization.png').default} alt="Visualisierung der ÖV-Güteklassen" style={{ maxHeight: "400px", maxWidth: "100%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/accessibility_indicators/gueteklassen/visualization.webp').default} alt="Visualisierung der ÖV-Güteklassen" style={{ maxHeight: "400px", maxWidth: "100%", objectFit: "cover"}}/>
 </div>
 
 ## 5. Weitere Lektüre

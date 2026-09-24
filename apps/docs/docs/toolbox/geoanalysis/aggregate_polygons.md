@@ -17,7 +17,7 @@ The Aggregate Polygons tool can be used to **analyze the characteristics of poly
 The example below shows the geometry of the *Source Layer* remains unchanged, while its attributes are enriched by aggregating information from the *Area of Aggregation*.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/toolbox/geoanalysis/aggregate_polygons/polygon_aggregation.png').default} alt="Polygon Aggregation" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/geoanalysis/aggregate_polygons/polygon_aggregation.webp').default} alt="Polygon Aggregation" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
 </div> 
 
 
@@ -111,7 +111,7 @@ Available **Statistics Methods** are listed in the following. The available meth
 ### Results
 As soon as the calculation process is finished, the resulting layer <b>Aggregation Polygon</b> will be added to the map. The result layer will consist of the information of the source layer and an <b>additional column</b> showing the results from the <b>statistical operation</b>. You can see the table by clicking on the polygon on the map.
 
-<img src={require('/img/toolbox/geoanalysis/aggregate_polygons/aggregate_polygons_result.png').default} alt="Polygon Aggregation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "auto"}}/>
+<img src={require('/img/toolbox/geoanalysis/aggregate_polygons/aggregate_polygons_result.webp').default} alt="Polygon Aggregation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "auto"}}/>
 
 <p></p>
 

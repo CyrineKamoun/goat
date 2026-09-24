@@ -27,7 +27,7 @@ GOAT includes comprehensive network datasets that power all routing-based access
 Our public transport network covers multiple modes including buses, trams, subways, trains, and ferries. This network enables GOAT's [Public Transport](../routing/public_transport) routing capabilities.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/data/data_basis/pt_network_banner.png').default} alt="Public Transport Network" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/data/data_basis/pt_network_banner.webp').default} alt="Public Transport Network" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div>
 
 **What's Included:**

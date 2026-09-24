@@ -217,7 +217,7 @@ For a visual explanation of how sensitivity affects the calculation, see the **[
 Once the calculation is complete, a result layer will be added to the map. This <i>Heatmap Gravity</i> layer will contain your color-coded heatmap. Clicking on any of the heatmap's hexagonal cells will reveal the computed accessibility value for this cell.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/gravity_based/gravity_calculation.gif').default} alt="Heatmap Gravity-Based Calculation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<Video src={require('/img/toolbox/accessibility_indicators/heatmaps/gravity_based/gravity_calculation.mp4').default} alt="Heatmap Gravity-Based Calculation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 
 <p></p>
@@ -233,7 +233,7 @@ Want to create visually compelling maps that tell a clear story? Learn how to cu
 The example below shows how the changes in the opportunity settings can affect the gravity heatmap. Its destination potential is based on the total number of hourly public transport departures from a stop.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/gravity_based/gravity_calculation_comparison.png').default} alt="gravity-no-destination-potential" style={{ maxHeight: "500px", maxWidth: "auto"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/gravity_based/gravity_calculation_comparison.webp').default} alt="gravity-no-destination-potential" style={{ maxHeight: "500px", maxWidth: "auto"}}/>
 </div>
 
 <p></p>
@@ -245,7 +245,7 @@ The map on the back is calculated without destination potential. The second map 
 ### Cell costs
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.png').default} alt="gravity-no-destination-potential" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.webp').default} alt="gravity-no-destination-potential" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
 </div>
 
 <p></p>

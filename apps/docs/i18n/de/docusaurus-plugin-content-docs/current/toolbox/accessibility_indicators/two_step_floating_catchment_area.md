@@ -287,14 +287,14 @@ Das folgende Beispiel veranschaulicht, wie die 2SFCA-Methode für jeden Schritt 
 - **Schritt 1** berechnet ein Kapazitätsverhältnis für jedes Ziel: `R_j = S_j / Σ D_k` – die Kapazität des Ziels geteilt durch die Gesamtbevölkerung in seinem Einzugsgebiet. Ein Ziel mit 100 Betten, das 100 Personen versorgt, hat ein Verhältnis von 1.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/two_step_floating_catchment_area/step1_2sfca.png').default} alt="Heatmap 2SFCA Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/two_step_floating_catchment_area/step1_2sfca.webp').default} alt="Heatmap 2SFCA Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 <p></p>
 
 - **Schritt 2** summiert die Verhältnisse aller Ziele, die von jeder Zelle aus erreichbar sind. Eine Zelle, die zwei Ziele erreichen kann (Verhältnisse 1 und 0,4), erhält eine Erreichbarkeit von 1,4.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/two_step_floating_catchment_area/step2_2sfca.png').default} alt="Heatmap 2SFCA Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/two_step_floating_catchment_area/step2_2sfca.webp').default} alt="Heatmap 2SFCA Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 <p></p>
 
@@ -304,7 +304,7 @@ Das folgende Beispiel veranschaulicht, wie die 2SFCA-Methode für jeden Schritt 
 ### Zellkosten
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.png').default} alt="Zuordnung der Zellkosten" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.webp').default} alt="Zuordnung der Zellkosten" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
 </div>
 
 <p></p>

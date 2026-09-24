@@ -216,7 +216,7 @@ Eine visuelle Erklärung, wie die Sensitivität die Berechnung beeinflusst, find
 Nach Abschluss der Berechnung wird ein Ergebnis-Layer zur Karte hinzugefügt. Dieser <i>Heatmap Gravity</i>-Layer enthält Ihre farbcodierte Heatmap. Ein Klick auf eine der hexagonalen Zellen zeigt den berechneten Erreichbarkeitswert für diese Zelle an.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/gravity_based/gravity_calculation.gif').default} alt="Heatmap Gravity-basierte Berechnung in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/> </div>
+<Video src={require('/img/toolbox/accessibility_indicators/heatmaps/gravity_based/gravity_calculation.mp4').default} alt="Heatmap Gravity-basierte Berechnung in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/> </div>
 
 <p></p>
 
@@ -231,7 +231,7 @@ Möchten Sie visuell ansprechende Karten erstellen, die eine klare Geschichte er
 Das folgende Beispiel zeigt, wie sich Änderungen in den Ziel-Einstellungen auf die Gravity-Heatmap auswirken. Das Destinationspotenzial basiert auf der Gesamtzahl der stündlichen ÖPNV-Abfahrten von einer Haltestelle.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/gravity_based/gravity_calculation_comparison.png').default} alt="gravity-no-destination-potential" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/gravity_based/gravity_calculation_comparison.webp').default} alt="gravity-no-destination-potential" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 
 <p></p>
@@ -243,7 +243,7 @@ Die hintere Karte ist ohne Destinationspotenzial berechnet. Die zweite Karte ver
 ### Zellkosten
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.png').default} alt="Zuordnung der Zellkosten" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.webp').default} alt="Zuordnung der Zellkosten" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
 </div>
 
 <p></p>

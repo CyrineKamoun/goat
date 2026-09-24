@@ -43,7 +43,7 @@ Alle Layer sind über die Zoom-Stufen 1-22 sichtbar, sofern nicht anders konfigu
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/styling/zoom_adjust.gif').default} alt="Zoom-Sichtbarkeitseinstellungen anpassen" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/zoom_adjust.mp4').default} alt="Zoom-Sichtbarkeitseinstellungen anpassen" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "cover"}}/>
 </div>
 
 
@@ -58,7 +58,7 @@ Alle Layer sind über die Zoom-Stufen 1-22 sichtbar, sofern nicht anders konfigu
 <b>Zusammenfassende Daten</b> (Heatmaps, Aggregiert): Verwenden Sie niedrigere Stufen (1-14) für Überblick.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/map/styling/zooming_out.gif').default} alt="Zoom-Sichtbarkeits-Demonstration" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/zooming_out.mp4').default} alt="Zoom-Sichtbarkeits-Demonstration" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div>
 
 <p></p>

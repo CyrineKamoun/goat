@@ -19,7 +19,7 @@ Um unsere Analyse speziell auf Mannheim zu fokussieren, filtern wir beide Layer.
    - **Wert:** "mannheim" (suchen Sie nach diesem Wert)
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/tutorials/01_erste_schritte/filtern.gif').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
+<Video src={require('/img/tutorials/01_erste_schritte/filtern.mp4').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
 </div>
 
 ### Den Layer "POI Einkaufen" filtern & auschneiden

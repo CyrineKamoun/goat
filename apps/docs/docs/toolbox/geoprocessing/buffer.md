@@ -79,7 +79,7 @@ A buffer is a tool used to **delineate the catchment area around a specific poin
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/geoprocessing/buffer/polygon_union_difference.png').default} alt="Polygon Union+ Polygon Difference Result in GOAT" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/geoprocessing/buffer/polygon_union_difference.webp').default} alt="Polygon Union+ Polygon Difference Result in GOAT" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
 </div> 
 
 <p></p>

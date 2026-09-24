@@ -18,7 +18,7 @@ sidebar_position: 2
 ## Wie teile ich eine Karte öffentlich?
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/sharing/sharing_public.gif').default} alt="Öffentliches Teilen in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <Video src={require('/img/sharing/sharing_public.mp4').default} alt="Öffentliches Teilen in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
 </div>
 <p> </p>
 
@@ -47,7 +47,7 @@ Nun können Sie:
 Um zu steuern, wie weit Nutzer herauszoomen können, können Sie den Kartenausschnitt sperren.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/sharing/sharing_lock_extent.gif').default} alt="Öffentliches Teilen in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <Video src={require('/img/sharing/sharing_lock_extent.mp4').default} alt="Öffentliches Teilen in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
 </div>
 <p> </p>
 

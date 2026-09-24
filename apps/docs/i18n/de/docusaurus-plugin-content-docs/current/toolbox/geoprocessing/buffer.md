@@ -81,7 +81,7 @@ Ein Puffer ist ein Werkzeug, das verwendet wird, um **das Einzugsgebiet um einen
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
-  <img src={require('/img/toolbox/geoprocessing/buffer/polygon_union_difference.png').default} alt="Polygon-Vereinigung + Polygon-Differenz Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/geoprocessing/buffer/polygon_union_difference.webp').default} alt="Polygon-Vereinigung + Polygon-Differenz Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "60%", objectFit: "cover"}}/>
 </div> 
 
 <div class="step">

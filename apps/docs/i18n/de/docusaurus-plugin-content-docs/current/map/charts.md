@@ -7,7 +7,7 @@ sidebar_position: 6
 Die Diagramm-Funktion ermöglicht es Ihnen, **aggregierte Daten schnell zu visualisieren**, die aus den Werkzeugen **Polygone aggregieren** und **Punkte aggregieren** stammen, ohne komplexe Konfiguration und zeigt die Beziehung zwischen Ihren Quell- und Ziel-Layern.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/map/charts/charts.gif').default} alt="Diagramm-Werkzeug in GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
+  <Video src={require('/img/map/charts/charts.mp4').default} alt="Diagramm-Werkzeug in GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
 </div> 
 
 ## Wie man Diagramme verwendet

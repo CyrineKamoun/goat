@@ -127,7 +127,7 @@ Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Ein
 
 Sobald die Berechnung abgeschlossen ist, wird ein Ergebnislayer zur Karte hinzugefügt. Dieser Heatmap Konnektivität Layer enthält Ihre farbkodierte Heatmap. **Durch Klicken auf eine der sechseckigen Zellen der Heatmap wird der berechnete Konnektivitätswert für diese Zelle angezeigt.**
 
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/connectivity_based/connectivity_calculation.gif').default} alt="Connectivity-basierte Heatmap Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<Video src={require('/img/toolbox/accessibility_indicators/heatmaps/connectivity_based/connectivity_calculation.mp4').default} alt="Connectivity-basierte Heatmap Ergebnis in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 
 
 :::tip Tipp
@@ -143,7 +143,7 @@ Möchten Sie Ihre Heatmaps gestalten und schöne Karten erstellen? Siehe [Stylin
 Für jedes Sechseck im Raster innerhalb des Interessengebiets (AOI) identifiziert das Tool alle umgebenden Sechsecke, die es erreichen können. Diese umgebenden Sechsecke können sich außerhalb der AOI befinden, müssen aber innerhalb der angegebenen **Reisezeit** und mit der gewählten **Reisemethode** erreichbar sein.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/accessibility_indicators/heatmaps/connectivity_based/heatmap_connectivity_infographic.png').default} alt="Extent of cells from where destination cell within AOI is accessible." style={{ maxHeight: "400px", maxWidth: "500px", alignItems:'center'}}/>
+  <img src={require('/img/toolbox/accessibility_indicators/heatmaps/connectivity_based/heatmap_connectivity_infographic.webp').default} alt="Extent of cells from where destination cell within AOI is accessible." style={{ maxHeight: "400px", maxWidth: "500px", alignItems:'center'}}/>
 </div>
 
 Konnektivitäts-Formel:

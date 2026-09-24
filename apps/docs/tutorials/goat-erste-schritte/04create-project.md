@@ -15,5 +15,5 @@ After logging in, you will arrive at the Workspace page. To create a new project
 3. **Click `Create`**
    
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/tutorials/01_erste_schritte/neues-projekt.gif').default} alt="Create New Project in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
+<Video src={require('/img/tutorials/01_erste_schritte/neues-projekt.mp4').default} alt="Create New Project in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
 </div>

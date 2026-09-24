@@ -18,7 +18,7 @@ The Origin-Destination tool creates **straight lines connecting starting points 
 The example below shows an *Input Table (Matrix Layer)* and the resulting *Origin-Destination Lines* based on the *Zipcode Areas (Geometry Layer)*.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/toolbox/geoanalysis/origin_destination/od_example.png').default} alt="Origin Destination Tool in GOAT" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/geoanalysis/origin_destination/od_example.webp').default} alt="Origin Destination Tool in GOAT" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
 </div> 
 
 
@@ -88,7 +88,7 @@ As soon as the calculation process is finished, the resulting layers will be add
 If you click on an "O-D Relation" item on the map, you can view the attribute details, such as the **origin**, **destination** and **weight** of this relation.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/geoanalysis/origin_destination/result.png').default} alt="Origin Destination Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
+<img src={require('/img/toolbox/geoanalysis/origin_destination/result.webp').default} alt="Origin Destination Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
 </div>
 
 <p></p>

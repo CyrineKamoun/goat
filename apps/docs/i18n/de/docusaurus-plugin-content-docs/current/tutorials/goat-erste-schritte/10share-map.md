@@ -20,5 +20,5 @@ Im letzten Schritt unseres Tutorials zeigen wir Ihnen, wie Sie Ihre fertige Anal
   
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/tutorials/01_erste_schritte/teilen.gif').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
+<Video src={require('/img/tutorials/01_erste_schritte/teilen.mp4').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
 </div>

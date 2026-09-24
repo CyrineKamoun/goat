@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 **Filter limits data visibility on your map** using logical expressions (e.g., supermarkets with specific names) or spatial expressions (e.g., points within a bounding box). **The filter allows you to focus on relevant information without altering original data.** It works with **point layers** and **polygon layers** containing `number`, `string`, `datetime`, and `boolean` data types. 
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/map/filter/filter_clicking.gif').default} alt="Filter tool in GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
+  <Video src={require('/img/map/filter/filter_clicking.mp4').default} alt="Filter tool in GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
 </div> 
 
 ## How to use the filter
@@ -118,7 +118,7 @@ For the expressions **"includes"** and **"excludes"**, multiple values can be se
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/filter/Map_extend.gif').default} alt="Attribute Selection" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <Video src={require('/img/map/filter/Map_extend.mp4').default} alt="Attribute Selection" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 
 </div> 
 </TabItem>

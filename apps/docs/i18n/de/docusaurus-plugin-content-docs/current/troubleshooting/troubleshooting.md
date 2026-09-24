@@ -27,7 +27,7 @@ Wenn Sie eine Analyse in einem Projekt ausführen, wird die Aufgabe in der Softw
   </span>
 </div>
 
-  ![Filtern zur Berechnung größerer Flächen](/img/troubleshooting/filtering.jpg "Filtern zur Berechnung größerer Flächen")
+  ![Filtern zur Berechnung größerer Flächen](/img/troubleshooting/filtering.webp "Filtern zur Berechnung größerer Flächen")
   
 
  * Wenn Sie einen Indikator berechnen, das Ergebnis jedoch leer ist, wird kein Output generiert und ein Job-Fehler tritt auf. Beispiel: Wenn Sie den Indikator Abfahrten ÖPNV in einem Gebiet und einem Zeitraum verwenden, in dem keine Fahrten stattfinden, schlägt der Job mit dem Fehler fehl: **The Layer is None**.
@@ -71,7 +71,7 @@ Wenn Sie eine Analyse in einem Projekt ausführen, wird die Aufgabe in der Softw
 </div>
   
 
-![Startpunkt der Streckenführung](/img/troubleshooting/routing_start.jpeg "Startpunkt der Streckenführung")
+![Startpunkt der Streckenführung](/img/troubleshooting/routing_start.webp "Startpunkt der Streckenführung")
 
 
 

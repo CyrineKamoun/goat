@@ -25,7 +25,7 @@ You can find below common job failure and suggestions to solve them.
   </span>
 </div>
 
- ![Filtering to compute larger areas](/img/troubleshooting/filtering.jpg "Filtering to compute larger areas")
+ ![Filtering to compute larger areas](/img/troubleshooting/filtering.webp "Filtering to compute larger areas")
 
 For example, if you use the public transport trip count indicator in an area and a time period where no trip is performed; the job fails with the error: **The Layer is None**
 <div style={{ display: "flex", alignItems: "center" }}>
@@ -67,7 +67,7 @@ For example, if you use the public transport trip count indicator in an area and
   </span>
 </div>
 
- ![Routing start point](/img/troubleshooting/routing_start.jpeg "Routing start point")
+ ![Routing start point](/img/troubleshooting/routing_start.webp "Routing start point")
 
 
 ## Uploading datasets

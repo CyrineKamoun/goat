@@ -37,7 +37,7 @@ Das Teilen **dupliziert nicht** Ihre Daten, sondern gewährt nur Zugriff darauf.
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/sharing/manage_team_members.gif').default} alt="Teams in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <Video src={require('/img/sharing/manage_team_members.mp4').default} alt="Teams in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
 </div>
 <p> </p>
 
@@ -63,7 +63,7 @@ Wenn Sie einen Datensatz/ein Projekt mit einem Team oder einer Organisation teil
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/sharing/share_project.gif').default} alt="Teilen-Zugriff in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <Video src={require('/img/sharing/share_project.mp4').default} alt="Teilen-Zugriff in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
 </div>
 <p> </p>
 

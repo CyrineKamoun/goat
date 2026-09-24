@@ -19,7 +19,7 @@ To focus our analysis specifically on Mannheim, we will filter both layers.
    - **Value:** "mannheim" (search for this value)
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/tutorials/01_erste_schritte/filtern.gif').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
+<Video src={require('/img/tutorials/01_erste_schritte/filtern.mp4').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
 </div>
 
 ### Filter & Clip the "POI Shopping" Layer

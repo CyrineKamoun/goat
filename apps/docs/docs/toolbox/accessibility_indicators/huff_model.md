@@ -189,7 +189,7 @@ Once the calculation is complete, a result layer will be added to the map. Each 
 - **Lower probability** values indicate that a facility captures less demand, either because it is less attractive, farther away, or faces strong competition from nearby alternatives.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/huff_model/huff_model.png').default} alt="Huff Model Calculation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/huff_model/huff_model.webp').default} alt="Huff Model Calculation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 <p></p>
 

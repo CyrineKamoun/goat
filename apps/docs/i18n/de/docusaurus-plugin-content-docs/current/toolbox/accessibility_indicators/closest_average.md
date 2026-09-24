@@ -152,7 +152,7 @@ Sobald die Berechnung abgeschlossen ist, wird ein Ergebnislayer zur Karte hinzug
 
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/accessibility_indicators/heatmaps/closest_average_based/clst-avg-calculation.gif').default} alt="Heatmap Durchschnitt Reisezeit Berechnung" style={{width: "auto", height: "400px", objectFit: "cover"}}/>
+  <Video src={require('/img/toolbox/accessibility_indicators/heatmaps/closest_average_based/clst-avg-calculation.mp4').default} alt="Heatmap Durchschnitt Reisezeit Berechnung" style={{width: "auto", height: "400px", objectFit: "cover"}}/>
 </div>
 
 ## 4. Technische Details
@@ -160,7 +160,7 @@ Sobald die Berechnung abgeschlossen ist, wird ein Ergebnislayer zur Karte hinzug
 ### Zellkosten
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.png').default} alt="Zuordnung der Zellkosten" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.webp').default} alt="Zuordnung der Zellkosten" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
 </div>
 
 <p></p>
@@ -211,7 +211,7 @@ Für weitere Einblicke in den Routing-Algorithmus besuchen Sie [Routing](../../c
 Die folgenden Beispiele illustrieren die Berechnung einer Heatmap Durchschnitt Reisezeit für die gleichen Gelegenheiten, mit einem variierenden Wert für die `Anzahl der Ziele`.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/closest_average_based/cls-avg-destinations.png').default} alt="Heatmap Durchschnitt Reisezeit für verschiedene Ziele" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/closest_average_based/cls-avg-destinations.webp').default} alt="Heatmap Durchschnitt Reisezeit für verschiedene Ziele" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 
 <p></p>

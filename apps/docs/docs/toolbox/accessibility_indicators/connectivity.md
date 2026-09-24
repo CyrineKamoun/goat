@@ -127,7 +127,7 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
 Once the calculation is complete, a result layer will be added to the map. This Heatmap Connectivity layer will contain your color-coded heatmap. **Clicking on any of the heatmap's hexagonal cells will reveal the computed connectivity value for this cell.**
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/connectivity_based/connectivity_calculation.gif').default} alt="Connectivity Heatmap Calculation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<Video src={require('/img/toolbox/accessibility_indicators/heatmaps/connectivity_based/connectivity_calculation.mp4').default} alt="Connectivity Heatmap Calculation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 <p></p>
 
@@ -144,7 +144,7 @@ Want to style your heatmaps and create nice-looking maps? See [Styling](../../ma
 For each hexagon in the grid within the Area of Interest (AOI), the tool identifies all surrounding hexagons that can reach it. These surrounding hexagons can be outside the AOI but must be within the specified **travel time** and using the chosen **travel method**.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/accessibility_indicators/heatmaps/connectivity_based/heatmap_connectivity_infographic.png').default} alt="Extent of cells from where destination cell within AOI is accessible." style={{ maxHeight: "400px", maxWidth: "500px", alignItems:'center'}}/>
+  <img src={require('/img/toolbox/accessibility_indicators/heatmaps/connectivity_based/heatmap_connectivity_infographic.webp').default} alt="Extent of cells from where destination cell within AOI is accessible." style={{ maxHeight: "400px", maxWidth: "500px", alignItems:'center'}}/>
 </div>
 
 Connectivity formula:

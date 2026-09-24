@@ -31,7 +31,7 @@ import TabItem from '@theme/TabItem';
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/styling/label_by.gif').default} alt="Auswahl des Beschriftungsattributfelds" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/label_by.mp4').default} alt="Auswahl des Beschriftungsattributfelds" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
 </div>
 
 
@@ -79,7 +79,7 @@ import TabItem from '@theme/TabItem';
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/styling/labels_overlap.gif').default} alt="Beschriftungsüberlappung und Halo-Effekte" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/labels_overlap.mp4').default} alt="Beschriftungsüberlappung und Halo-Effekte" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
 </div>
 
 

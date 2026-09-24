@@ -16,7 +16,7 @@ Now let's customize the appearance of both layers to create a clear map.
 4. **Choose Orange as fill color**
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/tutorials/01_erste_schritte/layer-gestalten.gif').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
+<Video src={require('/img/tutorials/01_erste_schritte/layer-gestalten.mp4').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
 </div>
 
 ## Style the "Mannheim" Boundary Layer

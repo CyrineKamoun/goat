@@ -218,7 +218,7 @@ Der verwendete Algorithmus zur Ableitung der Einzugsgebietsform hängt vom Routi
 - **Auto** — die Form wird mithilfe der DuckDB-Funktion [`ST_ConcaveHull`](https://duckdb.org/docs/current/core_extensions/spatial/functions#st_concavehull) abgeleitet, die sich eng um die erreichbaren Punkte legt, um das Einzugsgebiets-Polygon zu erzeugen. Es wird ein dynamisches Konkavitätsverhältnis basierend auf der Anzahl erreichter Knoten verwendet: `0,5` bei weniger als 10.000 Knoten, `0,3` bei weniger als 50.000 und `0,2` andernfalls — niedrigere Werte erzeugen engere, stärker konkave Formen bei großen Einzugsgebieten, höhere Werte glattere Konturen bei kleinen.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/accessibility_indicators/catchments/wiki.png').default} alt="Marching-Squares-Illustration" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "contain"}}/>
+  <img src={require('/img/toolbox/accessibility_indicators/catchments/wiki.webp').default} alt="Marching-Squares-Illustration" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "contain"}}/>
 </div>
 
 ### Wissenschaftlicher Hintergrund

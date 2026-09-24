@@ -28,7 +28,7 @@ import TabItem from '@theme/TabItem';
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/styling/label_by.gif').default} alt="Selecting label attribute field" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/label_by.mp4').default} alt="Selecting label attribute field" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
 </div>
 
 <div class="step">
@@ -74,7 +74,7 @@ import TabItem from '@theme/TabItem';
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/styling/labels_overlap.gif').default} alt="Label overlap and halo effects" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/labels_overlap.mp4').default} alt="Label overlap and halo effects" style={{ maxHeight: "auto", maxWidth: "500px", objectFit: "cover"}}/>
 </div>
 
 ## Best practices

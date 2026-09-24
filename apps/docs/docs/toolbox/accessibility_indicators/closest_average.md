@@ -149,7 +149,7 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 Once the calculation is complete, a result layer will be added to the map. Clicking on any of the **heatmap's hexagonal cells will reveal the computed average travel cost value for that cell.**
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/closest_average_based/clst-avg-calculation.gif').default} alt="Closest Average Heatmap Calculation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<Video src={require('/img/toolbox/accessibility_indicators/heatmaps/closest_average_based/clst-avg-calculation.mp4').default} alt="Closest Average Heatmap Calculation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 
 ## 4. Technical details
@@ -157,7 +157,7 @@ Once the calculation is complete, a result layer will be added to the map. Click
 ### Cell costs
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.png').default} alt="gravity-no-destination-potential" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/shared/cell_cost_assignment.webp').default} alt="gravity-no-destination-potential" style={{ maxHeight: "400px", maxWidth: "auto"}}/>
 </div>
 
 <p></p>
@@ -210,7 +210,7 @@ For further insights into the Routing algorithm, visit [Routing](../../category/
 The following examples illustrate the computation of a closest-average-based heatmap for the same opportunities, with a varying `Number of destinations` value.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/accessibility_indicators/heatmaps/closest_average_based/cls-avg-destinations.png').default} alt="Closest Average Heatmaps for different destinations" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<img src={require('/img/toolbox/accessibility_indicators/heatmaps/closest_average_based/cls-avg-destinations.webp').default} alt="Closest Average Heatmaps for different destinations" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 
 <p></p>

@@ -30,7 +30,7 @@ GOAT recognizes two types of feature datasets based on their source:
 **Tables** are **non-spatial datasets** without geographic reference points, so they can't be visualized on the map. Import them in **CSV** or **XLSX** formats for analysis and data management.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/data/table.png').default} alt="Non-spatial datasets in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <img src={require('/img/data/table.webp').default} alt="Non-spatial datasets in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
   <p style={{ textAlign: 'center', fontStyle: 'italic', marginTop: '8px', color: '#666' }}> Example of a table displayed in GOAT</p>
 </div>
 

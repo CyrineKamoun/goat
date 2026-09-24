@@ -219,7 +219,7 @@ The algorithm used to derive the catchment shape depends on the routing mode:
 - **Car** — the shape is derived using DuckDB's [`ST_ConcaveHull`](https://duckdb.org/docs/current/core_extensions/spatial/functions#st_concavehull) function, which wraps tightly around the set of reachable points to produce the catchment polygon. A dynamic concavity ratio is applied based on the number of reached nodes: `0.5` for fewer than 10,000 nodes, `0.3` for fewer than 50,000, and `0.2` otherwise — lower values produce tighter, more concave shapes for large catchments, while higher values yield smoother outlines for small ones.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/accessibility_indicators/catchments/wiki.png').default} alt="Marching Squares illustration" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "contain"}}/>
+  <img src={require('/img/toolbox/accessibility_indicators/catchments/wiki.webp').default} alt="Marching Squares illustration" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "contain"}}/>
 </div>
 
 ### Scientific background

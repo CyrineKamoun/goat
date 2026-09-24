@@ -22,7 +22,7 @@ Willkommen bei GOAT! Diese Schnellstartanleitung hilft Ihnen dabei, schnell losz
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/getting_started/new-project.gif').default} alt="Workspace bei GOAT" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
+  <Video src={require('/img/getting_started/new-project.mp4').default} alt="Workspace bei GOAT" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
 </div>
 
 ## Daten zu Ihrem Projekt hinzufügen

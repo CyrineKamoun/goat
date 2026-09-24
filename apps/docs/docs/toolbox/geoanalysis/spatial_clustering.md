@@ -127,7 +127,7 @@ Once the calculation is complete, **two result layers** will be added to the map
 
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/toolbox/geoanalysis/spatial_clustering/clustering.png').default} alt="Closest Average Heatmap Calculation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
+<img src={require('/img/toolbox/geoanalysis/spatial_clustering/clustering.webp').default} alt="Closest Average Heatmap Calculation Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
 </div>
 
 :::tip Tip

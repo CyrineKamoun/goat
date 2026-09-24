@@ -47,7 +47,7 @@ import TabItem from '@theme/TabItem';
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/styling/attribute-based-fill-color.gif').default} alt="Füllfarbe Styling" style={{ maxHeight: "auto", maxWidth: "20%", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/attribute-based-fill-color.mp4').default} alt="Füllfarbe Styling" style={{ maxHeight: "auto", maxWidth: "20%", objectFit: "cover"}}/>
 </div>
 
 </TabItem>
@@ -79,7 +79,7 @@ import TabItem from '@theme/TabItem';
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/styling/attribute-based-stroke-color.gif').default} alt="Strichfarbe Styling" style={{ maxHeight: "auto", maxWidth: "20%", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/attribute-based-stroke-color.mp4').default} alt="Strichfarbe Styling" style={{ maxHeight: "auto", maxWidth: "20%", objectFit: "cover"}}/>
 </div>
 
 </TabItem>
@@ -116,7 +116,7 @@ import TabItem from '@theme/TabItem';
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/styling/attribute-based-custom-marker.gif').default} alt="Benutzerdefinierte Marker Styling" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/attribute-based-custom-marker.mp4').default} alt="Benutzerdefinierte Marker Styling" style={{ maxHeight: "auto", maxWidth: "40%", objectFit: "cover"}}/>
 </div>
 
 </TabItem>
@@ -193,7 +193,7 @@ Die <code>Farbskala</code> bestimmt, wie Datenwerte auf Farben abgebildet werden
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/quantile.png').default} alt="Quantil" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
+  <img src={require('/img/map/styling/quantile.webp').default} alt="Quantil" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
 
 </div>  
 
@@ -202,7 +202,7 @@ Die <code>Farbskala</code> bestimmt, wie Datenwerte auf Farben abgebildet werden
 **Klassifiziert Daten nach Abweichung vom Durchschnitt**. Zeigt **relative Streuung, Verteilung und Ausreißer statistisch**, benötigt aber normalverteilte Daten.
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/standard_deviation.png').default} alt="Standardabweichung" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
+  <img src={require('/img/map/styling/standard_deviation.webp').default} alt="Standardabweichung" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
 
 </div> 
 
@@ -211,7 +211,7 @@ Die <code>Farbskala</code> bestimmt, wie Datenwerte auf Farben abgebildet werden
 **Teilt Daten in gleich große Wertebereiche auf**. Funktioniert gut bei **gleichmäßig verteilten Daten, kann aber bei schiefen Daten irreführend sein** (einige Klassen können leer sein).
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/equal_interval.png').default} alt="Gleiches Intervall" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
+  <img src={require('/img/map/styling/equal_interval.webp').default} alt="Gleiches Intervall" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
 
 </div> 
 
@@ -221,7 +221,7 @@ Die <code>Farbskala</code> bestimmt, wie Datenwerte auf Farben abgebildet werden
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/heads_tails.png').default} alt="Heads and Tails" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
+  <img src={require('/img/map/styling/heads_tails.webp').default} alt="Heads and Tails" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
 
 </div> 
 
@@ -231,7 +231,7 @@ Die <code>Farbskala</code> bestimmt, wie Datenwerte auf Farben abgebildet werden
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/ordinal.png').default} alt="Benutzerdefiniert Ordinal für Strings" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
+  <img src={require('/img/map/styling/ordinal.webp').default} alt="Benutzerdefiniert Ordinal für Strings" style={{ maxHeight: "auto", maxWidth: "75%", objectFit: "cover"}}/>
 
 </div>
 
@@ -241,7 +241,7 @@ Sie können mehr Schritte hinzufügen und mehrere String-Werte pro Gruppe aus de
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
-  <img src={require('/img/map/styling/custom_ordinal.gif').default} alt="Benutzerdefiniert Ordinal für Strings" style={{ maxHeight: "300px", maxWidth: "300px", objectFit: "cover"}}/>
+  <Video src={require('/img/map/styling/custom_ordinal.mp4').default} alt="Benutzerdefiniert Ordinal für Strings" style={{ maxHeight: "300px", maxWidth: "300px", objectFit: "cover"}}/>
 
 </div> 
 

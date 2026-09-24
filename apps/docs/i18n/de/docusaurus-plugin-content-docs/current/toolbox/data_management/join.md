@@ -40,7 +40,7 @@ Der `Verbindungstyp` bestimmt, welche Features in der Ausgabe erscheinen:
 Wenn jedes Ziel-Feature höchstens einem Feature im Join-Layer entspricht, enthält das Ergebnis die gleiche Anzahl von Zeilen wie der Ziel-Layer.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_one_de.png').default} alt="Eins-zu-Eins-Verknüpfung: Inner Join vs. Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_one_de.webp').default} alt="Eins-zu-Eins-Verknüpfung: Inner Join vs. Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
 </div>
 
 ### Eins zu Viele
@@ -48,7 +48,7 @@ Wenn jedes Ziel-Feature höchstens einem Feature im Join-Layer entspricht, enth�
 Wenn ein Ziel-Feature mehreren Features im Join-Layer entspricht, enthält das Ergebnis eine Zeile pro Übereinstimmung — die Ziel-Geometrie wird für jeden passenden Datensatz wiederholt.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_many_de.png').default} alt="Eins-zu-Viele-Verknüpfung: Inner Join vs. Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_many_de.webp').default} alt="Eins-zu-Viele-Verknüpfung: Inner Join vs. Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
 </div>
 
 </TabItem>
@@ -58,7 +58,7 @@ Wenn ein Ziel-Feature mehreren Features im Join-Layer entspricht, enthält das E
 Eine räumliche Verknüpfung verbindet Features basierend auf ihrer geometrischen Beziehung — kein gemeinsames Feld ist erforderlich. Jedes Feature im Ziel-Layer wird mit Features im Join-Layer abgeglichen, die die ausgewählte räumliche Beziehung erfüllen.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: "32px", marginBottom: "32px" }}>
-  <img src={require('/img/toolbox/data_management/join/spatial_relationships_de.png').default} alt="Arten räumlicher Beziehungen" style={{ maxHeight: "auto", maxWidth: "70%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/data_management/join/spatial_relationships_de.webp').default} alt="Arten räumlicher Beziehungen" style={{ maxHeight: "auto", maxWidth: "70%", objectFit: "cover"}}/>
 </div>
 
 **Verfügbare räumliche Beziehungen:**

@@ -22,7 +22,7 @@ Für unsere Supermarkt-Erreichbarkeitsanalyse benötigen wir zwei wichtige Daten
 3. **Klicken Sie auf `Layer hinzufügen`**, um die Grenzen zu Ihrem Projekt hinzuzufügen
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/tutorials/01_erste_schritte/daten-hinzufugen.gif').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
+<Video src={require('/img/tutorials/01_erste_schritte/daten-hinzufugen.mp4').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
 </div>
 
 <p></p>

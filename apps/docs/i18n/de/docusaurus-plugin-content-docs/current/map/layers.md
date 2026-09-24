@@ -148,7 +148,7 @@ Bei der Visualisierung mehrerer Datensätze gleichzeitig ist die Layer-Reihenfol
 Fahren Sie mit der Maus über den <strong>linken Rand</strong> des Layers in der Layer-Liste, bis ein Pfeilsymbol erscheint, dann <strong>ziehen und lassen Sie los, um</strong> den Layer an die gewünschte Position zu verschieben.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/layers/layer_order.gif').default} alt="Layer-Reihenfolge" style={{ maxHeight: "flex", maxWidth: "flex", objectFit: "cover"}}/>
+  <Video src={require('/img/map/layers/layer_order.mp4').default} alt="Layer-Reihenfolge" style={{ maxHeight: "flex", maxWidth: "flex", objectFit: "cover"}}/>
 </div> 
 
 
@@ -157,7 +157,7 @@ Fahren Sie mit der Maus über den <strong>linken Rand</strong> des Layers in der
 Klicken Sie auf das <img src={require('/img/icons/eye.png').default} alt="Layer anzeigen in GOAT" style={{ maxHeight: "flex", maxWidth: "flex", objectFit: "cover"}}/> Symbol neben dem Layer-Namen, um einen Layer vorübergehend aus der Kartenansicht <strong>auszublenden</strong>. Ein erneuter Klick auf das Auge macht den Layer <strong>wieder sichtbar</strong>.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/layers/hide_layers.gif').default} alt="Layer ausblenden" style={{ maxHeight: "flex", maxWidth: "flex", objectFit: "cover"}}/>
+  <Video src={require('/img/map/layers/hide_layers.mp4').default} alt="Layer ausblenden" style={{ maxHeight: "flex", maxWidth: "flex", objectFit: "cover"}}/>
 </div> 
 
 #### Layer gruppieren

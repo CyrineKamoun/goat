@@ -22,7 +22,7 @@ For our supermarket accessibility analysis, we need two important datasets: supe
 3. **Click `Add Layer`** to add the boundaries to your project
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/tutorials/01_erste_schritte/daten-hinzufugen.gif').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
+<Video src={require('/img/tutorials/01_erste_schritte/daten-hinzufugen.mp4').default} alt="Catchment Area Calculation Result in GOAT" style={{ maxHeight: "100%", maxWidth: "auto"}}/>
 </div>
 
 <p></p>
