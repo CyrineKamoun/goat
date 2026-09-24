@@ -216,6 +216,38 @@ describe("parseCapabilities — WMTS from GeoWebCache", () => {
   });
 });
 
+describe("parseCapabilities — WMTS from QGIS Server, which offers KVP only", () => {
+  const url =
+    "https://example.org/cgi-bin/qgis_mapserv.fcgi?MAP=/srv/projects/area.qgs&SERVICE=WMTS&REQUEST=GetCapabilities";
+  const text = fixture("wmts-qgis-server.xml");
+
+  it("draws a layer without a resource URL through GetTile requests", () => {
+    const [layer] = parseCapabilities(url, text).groups[0].layers;
+    expect(layer.unsupported).toBeUndefined();
+    const tile = new URL(layer.tileUrl!.replace("{z}", "5").replace("{y}", "10").replace("{x}", "16"));
+    expect(Object.fromEntries(tile.searchParams)).toEqual({
+      MAP: "/srv/projects/area.qgs",
+      SERVICE: "WMTS",
+      REQUEST: "GetTile",
+      VERSION: "1.0.0",
+      LAYER: "area",
+      STYLE: "default",
+      FORMAT: "image/png",
+      TILEMATRIXSET: "EPSG:3857",
+      TILEMATRIX: "5",
+      TILEROW: "10",
+      TILECOL: "16",
+    });
+    expect(tile.pathname).toBe("/cgi-bin/qgis_mapserv.fcgi");
+  });
+
+  it("does not request by KVP from a service that does not allow it", () => {
+    const restOnly = text.replaceAll("<ows:Value>KVP</ows:Value>", "<ows:Value>RESTful</ows:Value>");
+    const [layer] = parseCapabilities(url, restOnly).groups[0].layers;
+    expect(layer.unsupported).toEqual({ reason: "no_tiles" });
+  });
+});
+
 describe("parseCapabilities — WFS", () => {
   it("reads WFS 2.0 feature types as a single choice, copied into GOAT", () => {
     const service = parseCapabilities(WFS_URL, fixture("wfs-2.0.0.xml"));

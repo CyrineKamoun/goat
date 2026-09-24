@@ -1,0 +1,142 @@
+<Capabilities xmlns:ows="http://www.opengis.net/ows/1.1" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.0.0" xmlns="http://www.opengis.net/wmts/1.0" xsi:schemaLocation="http://www.opengis.net/wmts/1.0 http://schemas.opengis.net/wmts/1.0/wmtsGetCapabilities_response.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:gml="http://www.opengis.net/gml">
+ <ows:ServiceIdentification>
+  <ows:ServiceType>OGC WMTS</ows:ServiceType>
+  <ows:ServiceTypeVersion>1.0.0</ows:ServiceTypeVersion>
+  <ows:Title>Untitled</ows:Title>
+  <ows:Fees>None</ows:Fees>
+  <ows:AccessConstraints>None</ows:AccessConstraints>
+ </ows:ServiceIdentification>
+ <ows:ServiceProvider/>
+ <ows:OperationsMetadata>
+  <ows:Operation name="GetCapabilities">
+   <ows:DCP>
+    <ows:HTTP>
+     <ows:Get xlink:href="https://example.org/cgi-bin/qgis_mapserv.fcgi?MAP=/srv/projects/area.qgs&amp;">
+      <ows:Constraint name="GetEncoding">
+       <ows:AllowedValues>
+        <ows:Value>KVP</ows:Value>
+       </ows:AllowedValues>
+      </ows:Constraint>
+     </ows:Get>
+    </ows:HTTP>
+   </ows:DCP>
+  </ows:Operation>
+  <ows:Operation name="GetTile">
+   <ows:DCP>
+    <ows:HTTP>
+     <ows:Get xlink:href="https://example.org/cgi-bin/qgis_mapserv.fcgi?MAP=/srv/projects/area.qgs&amp;">
+      <ows:Constraint name="GetEncoding">
+       <ows:AllowedValues>
+        <ows:Value>KVP</ows:Value>
+       </ows:AllowedValues>
+      </ows:Constraint>
+     </ows:Get>
+    </ows:HTTP>
+   </ows:DCP>
+  </ows:Operation>
+  <ows:Operation name="GetFeatureInfo">
+   <ows:DCP>
+    <ows:HTTP>
+     <ows:Get xlink:href="https://example.org/cgi-bin/qgis_mapserv.fcgi?MAP=/srv/projects/area.qgs&amp;">
+      <ows:Constraint name="GetEncoding">
+       <ows:AllowedValues>
+        <ows:Value>KVP</ows:Value>
+       </ows:AllowedValues>
+      </ows:Constraint>
+     </ows:Get>
+    </ows:HTTP>
+   </ows:DCP>
+  </ows:Operation>
+ </ows:OperationsMetadata>
+ <Contents>
+  <Layer>
+   <ows:Identifier>area</ows:Identifier>
+   <ows:WGS84BoundingBox>
+    <ows:LowerCorner>6 47</ows:LowerCorner>
+    <ows:UpperCorner>15 55</ows:UpperCorner>
+   </ows:WGS84BoundingBox>
+   <ows:BoundingBox crs="EPSG:3857">
+    <ows:LowerCorner>667916.944 5942074.072</ows:LowerCorner>
+    <ows:UpperCorner>1669792.362 7361866.114</ows:UpperCorner>
+   </ows:BoundingBox>
+   <Style isDefault="true">
+    <ows:Identifier>default</ows:Identifier>
+    <ows:Title>default</ows:Title>
+   </Style>
+   <Format>image/png</Format>
+   <InfoFormat>text/plain</InfoFormat>
+   <InfoFormat>text/html</InfoFormat>
+   <InfoFormat>text/xml</InfoFormat>
+   <InfoFormat>application/vnd.ogc.gml</InfoFormat>
+   <InfoFormat>application/vnd.ogc.gml/3.1.1</InfoFormat>
+   <TileMatrixSetLink>
+    <TileMatrixSet>EPSG:3857</TileMatrixSet>
+   </TileMatrixSetLink>
+   <TileMatrixSetLink>
+    <TileMatrixSet>EPSG:4326</TileMatrixSet>
+   </TileMatrixSetLink>
+  </Layer>
+  <TileMatrixSet>
+   <ows:Identifier>EPSG:3857</ows:Identifier>
+   <ows:SupportedCRS>EPSG:3857</ows:SupportedCRS>
+   <TileMatrix>
+    <ows:Identifier>0</ows:Identifier>
+    <ScaleDenominator>559082264.028718</ScaleDenominator>
+    <TopLeftCorner>-20037508.343 20037508.343</TopLeftCorner>
+    <TileWidth>256</TileWidth>
+    <TileHeight>256</TileHeight>
+    <MatrixWidth>1</MatrixWidth>
+    <MatrixHeight>1</MatrixHeight>
+   </TileMatrix>
+   <TileMatrix>
+    <ows:Identifier>1</ows:Identifier>
+    <ScaleDenominator>279541132.014359</ScaleDenominator>
+    <TopLeftCorner>-20037508.343 20037508.343</TopLeftCorner>
+    <TileWidth>256</TileWidth>
+    <TileHeight>256</TileHeight>
+    <MatrixWidth>2</MatrixWidth>
+    <MatrixHeight>2</MatrixHeight>
+   </TileMatrix>
+   <TileMatrix>
+    <ows:Identifier>2</ows:Identifier>
+    <ScaleDenominator>139770566.007179</ScaleDenominator>
+    <TopLeftCorner>-20037508.343 20037508.343</TopLeftCorner>
+    <TileWidth>256</TileWidth>
+    <TileHeight>256</TileHeight>
+    <MatrixWidth>4</MatrixWidth>
+    <MatrixHeight>4</MatrixHeight>
+   </TileMatrix>
+  </TileMatrixSet>
+  <TileMatrixSet>
+   <ows:Identifier>EPSG:4326</ows:Identifier>
+   <ows:SupportedCRS>EPSG:4326</ows:SupportedCRS>
+   <TileMatrix>
+    <ows:Identifier>0</ows:Identifier>
+    <ScaleDenominator>279541132.014359</ScaleDenominator>
+    <TopLeftCorner>90 -180</TopLeftCorner>
+    <TileWidth>256</TileWidth>
+    <TileHeight>256</TileHeight>
+    <MatrixWidth>2</MatrixWidth>
+    <MatrixHeight>1</MatrixHeight>
+   </TileMatrix>
+   <TileMatrix>
+    <ows:Identifier>1</ows:Identifier>
+    <ScaleDenominator>139770566.007179</ScaleDenominator>
+    <TopLeftCorner>90 -180</TopLeftCorner>
+    <TileWidth>256</TileWidth>
+    <TileHeight>256</TileHeight>
+    <MatrixWidth>4</MatrixWidth>
+    <MatrixHeight>2</MatrixHeight>
+   </TileMatrix>
+   <TileMatrix>
+    <ows:Identifier>2</ows:Identifier>
+    <ScaleDenominator>69885283.00359</ScaleDenominator>
+    <TopLeftCorner>90 -180</TopLeftCorner>
+    <TileWidth>256</TileWidth>
+    <TileHeight>256</TileHeight>
+    <MatrixWidth>8</MatrixWidth>
+    <MatrixHeight>4</MatrixHeight>
+   </TileMatrix>
+  </TileMatrixSet>
+ </Contents>
+</Capabilities>

@@ -546,7 +546,7 @@
   "connect_service_only_crs": "{{crs}} only",
   "connect_service_only_crs_tip": "GOAT draws imagery in Web Mercator (EPSG:3857); this layer is only offered in {{crs}}.",
   "connect_service_no_tiles": "No tiles",
-  "connect_service_no_tiles_tip": "The service offers this layer only through KVP requests, which GOAT can’t draw.",
+  "connect_service_no_tiles_tip": "The service doesn’t say where this layer’s tiles can be requested.",
   "connect_service_other_format": "Other format",
   "connect_service_other_format_tip": "The service offers this layer only in formats GOAT can’t draw as imagery, such as vector tiles.",
   "connect_service_other_grid": "Other tile grid",

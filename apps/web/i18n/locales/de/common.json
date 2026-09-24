@@ -556,7 +556,7 @@
   "connect_service_only_crs": "nur {{crs}}",
   "connect_service_only_crs_tip": "GOAT zeichnet Bilddaten in Web Mercator (EPSG:3857); dieser Layer wird nur in {{crs}} angeboten.",
   "connect_service_no_tiles": "Keine Kacheln",
-  "connect_service_no_tiles_tip": "Der Dienst bietet diesen Layer nur über KVP-Anfragen an, die GOAT nicht zeichnen kann.",
+  "connect_service_no_tiles_tip": "Der Dienst gibt nicht an, wo die Kacheln dieses Layers abgerufen werden können.",
   "connect_service_other_format": "Anderes Format",
   "connect_service_other_format_tip": "Der Dienst bietet diesen Layer nur in Formaten an, die GOAT nicht als Bilddaten zeichnen kann, etwa Vektorkacheln.",
   "connect_service_other_grid": "Anderes Kachelraster",

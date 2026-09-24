@@ -26,7 +26,7 @@ export type LngLatBounds = [number, number, number, number];
 export type UnsupportedReason =
   /** Imagery is drawn in Web Mercator; the layer is offered only in these. */
   | { reason: "projection"; crs: string[] }
-  /** A WMTS that serves tiles only by KVP request, with no REST template to draw. */
+  /** A WMTS layer with no resource URL, from a service that names no GetTile endpoint for KVP. */
   | { reason: "no_tiles" }
   /** A WMTS whose tiles come only in formats the map cannot draw as imagery, such as vector tiles. */
   | { reason: "format" }
@@ -279,15 +279,57 @@ const zoomMatrixPrefix = (set: any): string | null => {
 /** Tile formats the map can draw, in order of preference. */
 const WMTS_TILE_FORMATS = ["image/png", "image/jpeg", "image/tiff", "image/png8"];
 
-/** A WMTS layer's resource URL templates for tiles, leaving out feature info. */
-const wmtsTileResources = (layer: any): any[] =>
-  (layer.ResourceURL ?? []).filter((resource: any) => resource.resourceType !== "FeatureInfo");
+/** The first of the formats that the map draws as imagery, in order of preference. */
+const drawableFormat = (formats: string[]): string | undefined =>
+  WMTS_TILE_FORMATS.map((format) => formats.find((candidate) => candidate.includes(format))).find(Boolean);
 
-/** The template in the first format the map draws as imagery. */
-const wmtsTemplate = (resources: any[]): string | undefined =>
-  WMTS_TILE_FORMATS.map((format) =>
-    resources.find((candidate) => String(candidate.format).includes(format))
-  ).find(Boolean)?.template;
+/**
+ * The GetTile endpoint for KVP requests, less the OGC parameters GOAT sets itself, or
+ * `undefined` for a service that does not take them. A service that names no encoding is
+ * assumed to take KVP.
+ */
+const wmtsKvpBase = (doc: any): string | undefined => {
+  const endpoints: any[] = doc?.OperationsMetadata?.GetTile?.DCP?.HTTP?.Get ?? [];
+  const kvp = endpoints.find((endpoint) => {
+    const encoding = (endpoint.Constraint ?? []).find((constraint: any) => constraint.name === "GetEncoding");
+    return endpoint.href && (!encoding || (encoding.AllowedValues?.Value ?? []).includes("KVP"));
+  });
+  return kvp ? getMapBaseOf(kvp.href) : undefined;
+};
+
+/** A GetTile request by KVP, written as a resource URL template so it is filled in the same way. */
+const kvpTemplate = (base: string, layer: string, format: string) => {
+  const fixed = new URLSearchParams({
+    SERVICE: "WMTS",
+    REQUEST: "GetTile",
+    VERSION: "1.0.0",
+    LAYER: layer,
+    FORMAT: format,
+  });
+  const placeholders =
+    "STYLE={Style}&TILEMATRIXSET={TileMatrixSet}&TILEMATRIX={TileMatrix}&TILEROW={TileRow}&TILECOL={TileCol}";
+  return `${base}${base.includes("?") ? "&" : "?"}${fixed}&${placeholders}`;
+};
+
+/**
+ * Where a WMTS layer's tiles are requested, in the first format the map draws: its resource
+ * URL template, or a GetTile request by KVP for a layer without one, as QGIS Server serves.
+ * `requestable` is false when the tiles cannot be asked for at all, which is told apart
+ * from tiles that come in no format the map draws.
+ */
+const wmtsTemplate = (layer: any, kvpBase?: string): { template?: string; requestable: boolean } => {
+  const resources: any[] = (layer.ResourceURL ?? []).filter(
+    (resource: any) => resource.resourceType !== "FeatureInfo"
+  );
+  if (resources.length) {
+    const format = drawableFormat(resources.map((resource) => String(resource.format)));
+    const resource = resources.find((candidate) => String(candidate.format) === format);
+    return { template: resource?.template, requestable: true };
+  }
+  if (!kvpBase) return { requestable: false };
+  const format = drawableFormat(layer.Format ?? []);
+  return { template: format ? kvpTemplate(kvpBase, layer.Identifier, format) : undefined, requestable: true };
+};
 
 /** The first grid a WMTS layer links that the map draws as z/x/y, with its matrix prefix. */
 const wmtsZoomGrid = (layer: any, matrixSets: any[]): { id: string; prefix: string } | undefined => {
@@ -302,9 +344,9 @@ const wmtsZoomGrid = (layer: any, matrixSets: any[]): { id: string; prefix: stri
  * Why a WMTS layer cannot be drawn, the most fundamental reason first: without Web Mercator,
  * how the tiles are requested does not matter.
  */
-const wmtsRefusal = (crs: string[], resources: any[], template?: string): UnsupportedReason => {
+const wmtsRefusal = (crs: string[], requestable: boolean, template?: string): UnsupportedReason => {
   if (!crs.some(isWebMercator)) return { reason: "projection", crs };
-  if (!resources.length) return { reason: "no_tiles" };
+  if (!requestable) return { reason: "no_tiles" };
   if (!template) return { reason: "format" };
   return { reason: "grid" };
 };
@@ -313,10 +355,10 @@ const parseWmts = (address: string, text: string): ConnectedService => {
   const doc = new WMTSCapabilities().read(text) as any;
   const layers: any[] = doc?.Contents?.Layer ?? [];
   const matrixSets: any[] = doc?.Contents?.TileMatrixSet ?? [];
+  const kvpBase = wmtsKvpBase(doc);
 
   const entries: ServiceLayer[] = layers.map((layer) => {
-    const resources = wmtsTileResources(layer);
-    const template = wmtsTemplate(resources);
+    const { template, requestable } = wmtsTemplate(layer, kvpBase);
     const grid = wmtsZoomGrid(layer, matrixSets);
     // Drawn in its first style.
     const tileUrl =
@@ -339,7 +381,7 @@ const parseWmts = (address: string, text: string): ConnectedService => {
       abstract: layer.Abstract || undefined,
       crs,
       bounds,
-      unsupported: tileUrl ? undefined : wmtsRefusal(crs, resources, template),
+      unsupported: tileUrl ? undefined : wmtsRefusal(crs, requestable, template),
       tileUrl,
     };
   });
