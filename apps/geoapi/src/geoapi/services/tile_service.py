@@ -73,6 +73,23 @@ _PATH_CACHE_MAX_SIZE = 2000  # ~400KB max
 _EXISTS_CACHE_MAX_SIZE = 5000  # ~250KB max
 
 
+def _tiles_version(pmtiles_path: Path, label: bool) -> str | None:
+    """What the cached tiles of this file are keyed on: its mtime, plus the
+    anchor file's for label tiles (regenerated on its own). None when the
+    file is gone."""
+    try:
+        version = str(pmtiles_path.stat().st_mtime_ns)
+    except FileNotFoundError:
+        return None
+    if label:
+        anchor = pmtiles_path.with_name(pmtiles_path.stem + "_anchor.pmtiles")
+        try:
+            version += f".{anchor.stat().st_mtime_ns}"
+        except FileNotFoundError:
+            version += ".none"
+    return version
+
+
 class CachedPMTilesReader:
     """Optimized PMTiles reader that caches header and root directory.
 
@@ -616,7 +633,8 @@ class TileService:
         """Get tile directly from PMTiles using only layer_id (no schema lookup).
 
         Ultra-fast path that completely bypasses DuckDB.
-        Uses Redis cache for distributed deployments.
+        Uses Redis cache for distributed deployments, keyed on the PMTiles
+        file's mtime so a regenerated file is never answered from the cache.
 
         Args:
             layer_id: Layer UUID (with or without hyphens)
@@ -633,8 +651,26 @@ class TileService:
         # Anchor tiles are cached under a separate key to avoid collision
         cache_layer_id = layer_id + "_anchor" if label else layer_id
 
-        # Check Redis cache first (fast path for distributed deployments)
-        cached = get_cached_tile(cache_layer_id, z, x, y)
+        # Step 1: Find PMTiles path. Its mtime versions the cached tiles: a
+        # workflow re-run or a layer refresh rewrites the file under the same
+        # layer id, and must not be answered with tiles of the old one.
+        pmtiles_path = self._find_pmtiles_by_layer_id(layer_id)
+        if pmtiles_path is None:
+            return None
+        version = _tiles_version(pmtiles_path, label)
+        if version is None:
+            # The cached path is gone: rewritten elsewhere (legacy nested path
+            # replaced by the flat one) or deleted for regeneration. Look again.
+            self._pmtiles_path_cache.pop(layer_id.replace("-", ""), None)
+            pmtiles_path = self._find_pmtiles_by_layer_id(layer_id)
+            if pmtiles_path is None:
+                return None
+            version = _tiles_version(pmtiles_path, label)
+            if version is None:
+                return None
+
+        # Check Redis cache (fast path for distributed deployments)
+        cached = get_cached_tile(cache_layer_id, z, x, y, version=version)
         if cached is not None:
             tile_data, is_gzip = cached
             elapsed_ms = (time.monotonic() - start_time) * 1000
@@ -648,11 +684,6 @@ class TileService:
                 elapsed_ms,
             )
             return (tile_data, is_gzip, "pmtiles-cached")
-
-        # Step 1: Find PMTiles path
-        pmtiles_path = self._find_pmtiles_by_layer_id(layer_id)
-        if pmtiles_path is None:
-            return None
 
         # Step 2: Read tile from PMTiles
         result = await self._get_tile_from_pmtiles_path(pmtiles_path, z, x, y)
@@ -679,7 +710,7 @@ class TileService:
 
         # Cache in Redis for other pods
         if tile_data:
-            cache_tile(cache_layer_id, z, x, y, tile_data, is_gzip)
+            cache_tile(cache_layer_id, z, x, y, tile_data, is_gzip, version=version)
 
         logger.debug(
             "PMTiles %s tile %d/%d/%d: %d bytes (%.1fms)",

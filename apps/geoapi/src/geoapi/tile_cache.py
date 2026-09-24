@@ -89,24 +89,31 @@ def get_redis_client() -> Optional[redis.Redis]:
         return None
 
 
-def _cache_key(layer_id: str, z: int, x: int, y: int) -> str:
+def _cache_key(
+    layer_id: str, z: int, x: int, y: int, version: str | None = None
+) -> str:
     """Generate cache key for a tile.
 
-    Format: tile:{layer_id}:{z}/{x}/{y}
+    Format: tile:{layer_id}:{z}/{x}/{y}, or tile:{layer_id}:v{version}:{z}/{x}/{y}
+    when the tiles have a version (the PMTiles file's mtime), so a regenerated
+    file never hits tiles cached from the one it replaced.
     """
     # Normalize layer_id (remove hyphens for consistency)
     layer_id_normalized = layer_id.replace("-", "")
+    if version is not None:
+        return f"tile:{layer_id_normalized}:v{version}:{z}/{x}/{y}"
     return f"tile:{layer_id_normalized}:{z}/{x}/{y}"
 
 
 def get_cached_tile(
-    layer_id: str, z: int, x: int, y: int
+    layer_id: str, z: int, x: int, y: int, version: str | None = None
 ) -> Optional[tuple[bytes, bool]]:
     """Get tile from Redis cache.
 
     Args:
         layer_id: Layer UUID
         z, x, y: Tile coordinates
+        version: Version of the tiles' source (see ``_cache_key``)
 
     Returns:
         Tuple of (tile_data, is_gzip) or None if not cached
@@ -116,7 +123,7 @@ def get_cached_tile(
         return None
 
     try:
-        key = _cache_key(layer_id, z, x, y)
+        key = _cache_key(layer_id, z, x, y, version)
         # Use pipeline for atomic read of data + metadata
         pipe = client.pipeline()
         pipe.get(key)
@@ -145,6 +152,7 @@ def cache_tile(
     tile_data: bytes,
     is_gzip: bool,
     ttl: Optional[int] = None,
+    version: str | None = None,
 ) -> bool:
     """Store tile in Redis cache.
 
@@ -154,6 +162,7 @@ def cache_tile(
         tile_data: Tile bytes
         is_gzip: Whether tile is gzip compressed
         ttl: Optional TTL override (uses settings.TILE_CACHE_TTL by default)
+        version: Version of the tiles' source (see ``_cache_key``)
 
     Returns:
         True if cached successfully, False otherwise
@@ -167,7 +176,7 @@ def cache_tile(
         return False
 
     try:
-        key = _cache_key(layer_id, z, x, y)
+        key = _cache_key(layer_id, z, x, y, version)
         cache_ttl = ttl if ttl is not None else settings.TILE_CACHE_TTL
 
         # Use pipeline for atomic write
