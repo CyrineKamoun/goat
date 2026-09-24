@@ -239,6 +239,25 @@ class TestProjectImportRunner:
         # Original not mutated
         assert config["nodes"][0]["data"]["layerId"] == "old-layer-id"
 
+    def test_remap_workflow_config_drops_entry_ids_the_archive_did_not_carry(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        """A project entry id is a serial of the exporting database. One the
+        import did not recreate names nothing here, or an unrelated entry that
+        happens to share the number, which the runner would then read."""
+        config = {
+            "nodes": [
+                {"id": "n1", "data": {"type": "dataset", "projectLayerId": 101}},
+                {"id": "n2", "data": {"type": "dataset", "projectLayerId": 4711}},
+            ],
+            "edges": [],
+        }
+
+        result = runner._remap_workflow_config(config, {}, {101: 5001})
+
+        assert result["nodes"][0]["data"]["projectLayerId"] == 5001
+        assert "projectLayerId" not in result["nodes"][1]["data"]
+
     def test_remap_layer_other_properties_workflow_export(
         self, runner: ProjectImportRunner
     ) -> None:
@@ -1337,3 +1356,160 @@ class TestImportInitialViewState:
             ),
         )
         assert _user_project_view_state(inserts) == view
+
+
+class TestImportWorkflowExportLinks:
+    """An imported workflow keeps overwriting its imported result, and a
+    dataset node reading that result follows the imported project entry.
+
+    The project entry carries a ``workflow_export`` stamp naming the workflow
+    whose export node it shows (see ``workflow_export_target``); workflow ids
+    and entry ids are both regenerated on import.
+    """
+
+    LAYER = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+    @pytest.fixture()
+    def runner(self) -> ProjectImportRunner:
+        runner = ProjectImportRunner()
+        settings = MagicMock()
+        settings.customer_schema = "customer"
+        settings.s3_bucket_name = "test-bucket"
+        settings.max_upload_dataset_file_size = 5 * 1024 * 1024 * 1024
+        runner.settings = settings
+        runner._duckdb_con = MagicMock()
+        runner._duckdb_con.execute.return_value.fetchall.return_value = [
+            ("id", "INTEGER"),
+            ("geometry", "GEOMETRY"),
+        ]
+        runner._s3_client = MagicMock()
+        runner._s3_client.head_object.return_value = {"ContentLength": 1}
+        return runner
+
+    def _archive(self) -> bytes:
+        stamp = {"workflow_id": "wf-1", "export_node_id": "export-1"}
+        files: dict[str, bytes] = {
+            "project.json": json.dumps({"name": "Chained"}).encode(),
+            "layers/index.json": json.dumps(
+                {"layers": [{"id": self.LAYER, "name": "Result", "type": "feature"}]}
+            ).encode(),
+            f"layers/{self.LAYER}/metadata.json": json.dumps(
+                {
+                    "id": self.LAYER,
+                    "name": "Result",
+                    "type": "feature",
+                    "other_properties": {"workflow_export": stamp},
+                }
+            ).encode(),
+            "layer_project_links.json": json.dumps(
+                {
+                    "links": [
+                        {
+                            "id": 101,
+                            "layer_id": self.LAYER,
+                            "name": "Result",
+                            "order": 0,
+                            "other_properties": {
+                                "table_config": {"hidden": []},
+                                "workflow_export": stamp,
+                            },
+                        }
+                    ]
+                }
+            ).encode(),
+            "workflows/wf-1.json": json.dumps(
+                {
+                    "id": "wf-1",
+                    "name": "Chained",
+                    "config": {
+                        "nodes": [
+                            {
+                                "id": "dataset-1",
+                                "data": {
+                                    "type": "dataset",
+                                    "layerId": self.LAYER,
+                                    "projectLayerId": 101,
+                                },
+                            },
+                            {"id": "export-1", "data": {"type": "export"}},
+                        ],
+                        "edges": [],
+                    },
+                }
+            ).encode(),
+        }
+        manifest = {
+            "format_version": "1.1",
+            "exported_at": "2025-06-01T00:00:00Z",
+            "project_name": "Chained",
+            "checksums": {
+                name: f"sha256:{hashlib.sha256(data).hexdigest()}"
+                for name, data in files.items()
+            },
+            "layer_count": 1,
+            "internal_layer_count": 1,
+            "external_layer_count": 0,
+            "workflow_count": 1,
+            "report_count": 0,
+        }
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for name, data in files.items():
+                zf.writestr(name, data)
+            zf.writestr(f"layers/{self.LAYER}/data.parquet", b"FAKE_PARQUET")
+            zf.writestr("manifest.json", json.dumps(manifest).encode())
+        return buf.getvalue()
+
+    def test_entry_stamp_and_dataset_node_follow_the_imported_ids(
+        self, runner: ProjectImportRunner
+    ) -> None:
+        zip_bytes = self._archive()
+        runner._s3_client.download_file.side_effect = lambda **kw: Path(
+            str(kw["Filename"])
+        ).write_bytes(zip_bytes)
+
+        link_inserts: list[tuple[object, ...]] = []
+        workflow_inserts: list[tuple[object, ...]] = []
+
+        async def execute(query: str, *args: object) -> None:
+            if "INSERT INTO customer.workflow" in query:
+                workflow_inserts.append(args)
+
+        async def fetchval(query: str, *args: object) -> int:
+            if "INSERT INTO customer.layer_project\n" in query:
+                link_inserts.append(args)
+                return 5001
+            return 1
+
+        conn = AsyncMock()
+        conn.set_type_codec = AsyncMock()
+        txn = MagicMock()
+        txn.__aenter__ = AsyncMock(return_value=txn)
+        txn.__aexit__ = AsyncMock(return_value=False)
+        conn.transaction = MagicMock(return_value=txn)
+        conn.execute = AsyncMock(side_effect=execute)
+        conn.fetchval = AsyncMock(side_effect=fetchval)
+
+        with patch("goatlib.tools.project_import.asyncpg") as mock_asyncpg:
+            mock_asyncpg.connect = AsyncMock(return_value=conn)
+            runner.run(
+                ProjectImportParams(
+                    user_id="00000000-0000-0000-0000-000000000001",
+                    s3_key="imports/chained.zip",
+                    target_folder_id="00000000-0000-0000-0000-ffffffffffff",
+                )
+            )
+
+        (workflow_args,) = workflow_inserts
+        new_workflow_id = str(workflow_args[0])
+        assert new_workflow_id != "wf-1"
+        (link_args,) = link_inserts
+        assert link_args[5] == {
+            "table_config": {"hidden": []},
+            "workflow_export": {
+                "workflow_id": new_workflow_id,
+                "export_node_id": "export-1",
+            },
+        }
+        dataset_node = workflow_args[5]["nodes"][0]  # type: ignore[index]
+        assert dataset_node["data"]["projectLayerId"] == 5001

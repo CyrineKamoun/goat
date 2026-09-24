@@ -8,12 +8,17 @@ It takes a temp layer (stored in /data/temporary/) and:
 4. Cleans up the temp files
 
 **Overwrite on re-run**: if ``overwrite_previous`` is set and ``export_node_id``
-is provided, the backend looks up the most recent layer that this
-``(workflow_id, export_node_id)`` pair previously produced (via the
-``other_properties.workflow_export`` stamp written at creation) and replaces
-its data in place, preserving the layer_id, project attachments, and any
-user-customized style/tags. Identity is tracked entirely backend-side so
-workflows can run without the browser (long runs, remote triggers).
+is provided, ``goatlib.tools.workflow_export_target`` finds the project entry
+that shows this export node's previous result. The workflow's own result is
+replaced in place, whoever runs it, preserving the layer_id, project entries,
+and any user-customized style/tags. A layer shared with a project copy or
+template (inherited from it, or still shown by it) gets a new layer behind the
+same entry instead, so copies and their source never change each other's
+results. Identity is tracked entirely backend-side so workflows can run
+without the browser (long runs, remote triggers).
+
+Every run is authorized first: the runner must be able to write the project,
+and the workflow must belong to it.
 
 This runs as a Windmill job like other tools.
 """
@@ -25,17 +30,28 @@ import uuid
 from pathlib import Path
 from typing import Any, Literal
 
+import asyncpg
 from pydantic import BaseModel, Field
 
-from goatlib.tools.base import BaseToolRunner
+from goatlib.tools.authz import authorize_workflow_export
+from goatlib.tools.base import BaseToolRunner, _get_or_create_event_loop
 from goatlib.tools.layer_replace import LayerReplaceMixin
 from goatlib.tools.schemas import ToolInputBase
+from goatlib.tools.workflow_dataset_nodes import retarget_dataset_nodes
+from goatlib.tools.workflow_export_target import (
+    ExportTarget,
+    claim_link,
+    export_lock,
+    resolve_export_target,
+    restamp_layer,
+)
 from goatlib.utils.layer import (
     layer_schema_name,
     table_path_parts,
 )
 
 logger = logging.getLogger(__name__)
+
 
 # Temp data root
 TEMP_DATA_ROOT = Path("/app/data/temporary")
@@ -64,10 +80,11 @@ class FinalizeLayerParams(ToolInputBase):
     )
     overwrite_previous: bool = Field(
         default=False,
-        description="If True, find a layer previously produced by this "
-        "(workflow_id, export_node_id) pair and replace its data in place "
-        "instead of creating a new layer. Falls back to creating a new "
-        "layer when no prior export is found or the user no longer owns it.",
+        description="If True, replace the result a previous run of this "
+        "export node left in the project, whoever ran it: in place when this "
+        "workflow produced it, or with a new layer behind the same project "
+        "entry when the layer is shared with a project copy or template. "
+        "Creates a new layer when the project shows no previous result.",
     )
     export_node_id: str | None = Field(
         default=None,
@@ -141,161 +158,180 @@ class FinalizeLayerRunner(LayerReplaceMixin, BaseToolRunner[FinalizeLayerParams]
 
         return base_path, parquet_path, metadata
 
-    def _try_overwrite_existing(
+    async def _authorize(self, params: FinalizeLayerParams) -> None:
+        """Refuse unless the runner may write the project and the workflow is
+        that project's (see ``authorize_workflow_export``)."""
+        if self.settings is None:
+            raise RuntimeError("Settings not initialized")
+        from goatlib.tools.db import ToolDatabaseService
+
+        pool = await self.get_postgres_pool()
+        try:
+            await authorize_workflow_export(
+                ToolDatabaseService(pool, schema=self.settings.customer_schema),
+                user_id=str(params.user_id),
+                project_id=params.project_id,
+                workflow_id=params.workflow_id,
+            )
+        finally:
+            await pool.close()
+
+    async def _resolve_target(self, params: FinalizeLayerParams) -> ExportTarget | None:
+        """Where this export node's result goes. Read on its own connection:
+        the lock's transaction lasts the whole export, and reads inside it
+        would hold their table locks that long."""
+        if self.settings is None:
+            raise RuntimeError("Settings not initialized")
+        assert params.user_id is not None and params.export_node_id is not None
+        pool = await self.get_postgres_pool()
+        try:
+            target: ExportTarget | None = await resolve_export_target(
+                pool,
+                self.settings.customer_schema,
+                user_id=params.user_id,
+                project_id=params.project_id,
+                workflow_id=params.workflow_id,
+                export_node_id=params.export_node_id,
+            )
+            return target
+        finally:
+            await pool.close()
+
+    async def _connect(self) -> asyncpg.Connection:
+        """A dedicated connection for the export lock held across the write.
+        Its transaction takes nothing but the advisory lock."""
+        if self.settings is None:
+            raise RuntimeError("Settings not initialized")
+        return await asyncpg.connect(
+            host=self.settings.postgres_server,
+            port=self.settings.postgres_port,
+            user=self.settings.postgres_user,
+            password=self.settings.postgres_password,
+            database=self.settings.postgres_db,
+        )
+
+    async def _claim(
+        self, params: FinalizeLayerParams, *, link_id: int, layer_id: str
+    ) -> None:
+        """Point the project entry at the layer and stamp it as this export
+        node's result."""
+        if self.settings is None:
+            raise RuntimeError("Settings not initialized")
+        assert params.export_node_id is not None
+        pool = await self.get_postgres_pool()
+        try:
+            await claim_link(
+                pool,
+                self.settings.customer_schema,
+                project_id=params.project_id,
+                link_id=link_id,
+                layer_id=layer_id,
+                workflow_id=params.workflow_id,
+                export_node_id=params.export_node_id,
+            )
+        finally:
+            await pool.close()
+
+    async def _restamp(self, params: FinalizeLayerParams, layer_id: str) -> None:
+        if self.settings is None:
+            raise RuntimeError("Settings not initialized")
+        assert params.export_node_id is not None
+        pool = await self.get_postgres_pool()
+        try:
+            await restamp_layer(
+                pool,
+                self.settings.customer_schema,
+                layer_id=layer_id,
+                workflow_id=params.workflow_id,
+                export_node_id=params.export_node_id,
+            )
+        finally:
+            await pool.close()
+
+    def _overwrite_in_place(
         self,
         params: FinalizeLayerParams,
         parquet_path: Path,
-        metadata: dict,
-    ) -> FinalizeLayerOutput | None:
-        """Attempt to replace an existing layer in place.
+        target: ExportTarget,
+    ) -> str:
+        """Replace the target layer's data, keeping its id, style, tags and
+        project entries.
 
-        Looks up the layer previously produced by this
-        ``(workflow_id, export_node_id)`` pair (stamped in
-        ``other_properties.workflow_export`` at creation). Returns a populated
-        output on success, or None when no prior export is found — the caller
-        then falls back to creating a new layer.
+        No ownership check: the target is this workflow's result (or one it
+        took over), and the runner was authorized to write the project — a
+        workflow's result belongs to the workflow, not to whoever ran it last.
         """
-        import asyncio
-
-        if (
-            params.user_id is None
-            or not params.overwrite_previous
-            or not params.export_node_id
-        ):
-            return None
-
+        assert params.user_id is not None
         user_id = params.user_id
-        workflow_id = params.workflow_id
-        export_node_id = params.export_node_id
+        layer_id: str = target.layer_id
+        loop = _get_or_create_event_loop()
 
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        existing_id = loop.run_until_complete(
-            self._find_previous_export(
-                user_id=user_id,
-                workflow_id=workflow_id,
-                export_node_id=export_node_id,
-            )
+        layer_info = loop.run_until_complete(
+            self._get_layer_full_info(layer_id, user_id, require_owner=False)
         )
-        if existing_id is None:
-            logger.info(
-                "Overwrite: no prior export found for workflow=%s node=%s",
-                workflow_id,
-                export_node_id,
-            )
-            return None
-
-        async def lookup() -> dict[str, Any] | None:
-            try:
-                return await self._get_layer_full_info(existing_id, user_id)
-            except (ValueError, PermissionError) as e:
-                logger.info(
-                    "Overwrite fallback: cannot reuse layer %s (%s)",
-                    existing_id,
-                    e,
-                )
-                return None
-
-        layer_info = loop.run_until_complete(lookup())
-        if layer_info is None:
-            return None
 
         table_info = self._replace_ducklake_table(
-            layer_id=existing_id,
+            layer_id=layer_id,
             owner_id=user_id,
             parquet_path=parquet_path,
         )
 
-        self._delete_old_pmtiles(user_id=user_id, layer_id=existing_id)
+        self._delete_old_pmtiles(user_id=user_id, layer_id=layer_id)
 
-        existing_table = self.resolve_layer_table_path(existing_id)
+        existing_table = self.resolve_layer_table_path(layer_id)
         snapshot_id = self._get_ducklake_snapshot_id(*table_path_parts(existing_table))
 
         self._regenerate_pmtiles(
             user_id=user_id,
-            layer_id=existing_id,
+            layer_id=layer_id,
             table_info=table_info,
             snapshot_id=snapshot_id,
         )
 
         loop.run_until_complete(
             self._update_layer_metadata(
-                layer_id=existing_id,
+                layer_id=layer_id,
                 feature_count=table_info.get("feature_count", 0),
                 extent_wkt=table_info.get("extent_wkt"),
                 size=table_info.get("size", 0),
                 geometry_type=table_info.get("geometry_type"),
             )
         )
+        if target.mode == "adopt":
+            loop.run_until_complete(self._restamp(params, layer_id))
 
         loop.run_until_complete(
             self._sync_name_and_get_link(
-                layer_id=existing_id,
+                layer_id=layer_id,
                 project_id=params.project_id,
                 new_name=params.layer_name,
             )
         )
 
-        link_id = loop.run_until_complete(
-            self._get_or_create_project_link(
-                layer_id=existing_id,
-                project_id=params.project_id,
-                name=params.layer_name or layer_info["name"],
+        name = params.layer_name or layer_info["name"]
+        link_id = target.link_id
+        if link_id is None:
+            link_id = loop.run_until_complete(
+                self._get_or_create_project_link(
+                    layer_id=layer_id,
+                    project_id=params.project_id,
+                    name=name,
+                )
             )
-        )
+        loop.run_until_complete(self._claim(params, link_id=link_id, layer_id=layer_id))
 
         from goatlib.tools.db import normalize_geometry_type
 
-        return FinalizeLayerOutput(
-            layer_id=existing_id,
-            layer_name=params.layer_name or layer_info["name"],
+        self._output_info = FinalizeLayerOutput(
+            layer_id=layer_id,
+            layer_name=name,
             project_id=params.project_id,
             layer_project_id=link_id,
             feature_count=table_info.get("feature_count", 0),
             geometry_type=normalize_geometry_type(table_info.get("geometry_type")),
             overwritten=True,
         )
-
-    async def _find_previous_export(
-        self,
-        user_id: str,
-        workflow_id: str,
-        export_node_id: str,
-    ) -> str | None:
-        """Return the layer_id of the most recent prior export for this
-        ``(workflow_id, export_node_id)`` pair owned by the user, if any.
-
-        Matches are identified by the ``other_properties.workflow_export``
-        stamp written by ``_create_new_layer``.
-        """
-        if self.settings is None:
-            raise RuntimeError("Settings not initialized")
-
-        import uuid as uuid_module
-
-        schema = self.settings.customer_schema
-        pool = await self.get_postgres_pool()
-        try:
-            row = await pool.fetchrow(
-                f"""
-                SELECT id FROM {schema}.layer
-                WHERE user_id = $1
-                  AND other_properties -> 'workflow_export' ->> 'workflow_id' = $2
-                  AND other_properties -> 'workflow_export' ->> 'export_node_id' = $3
-                ORDER BY created_at DESC
-                LIMIT 1
-                """,
-                uuid_module.UUID(user_id),
-                workflow_id,
-                export_node_id,
-            )
-            return str(row["id"]) if row else None
-        finally:
-            await pool.close()
+        return layer_id
 
     async def _sync_name_and_get_link(
         self,
@@ -412,37 +448,76 @@ class FinalizeLayerRunner(LayerReplaceMixin, BaseToolRunner[FinalizeLayerParams]
         if params.user_id is None:
             raise ValueError("user_id is required for finalize_layer")
 
-        user_id = params.user_id
-        workflow_id = params.workflow_id
-        node_id = params.node_id
-
         base_path, parquet_path, metadata = self._resolve_temp_parquet(
-            user_id, workflow_id, node_id
+            params.user_id, params.workflow_id, params.node_id
         )
 
+        loop = _get_or_create_event_loop()
+        loop.run_until_complete(self._authorize(params))
+
         if params.overwrite_previous and params.export_node_id:
-            overwrite_output = self._try_overwrite_existing(
+            layer_id = self._export_with_overwrite(params, parquet_path, metadata)
+        else:
+            layer_id = self._create_new_layer(
                 params=params,
                 parquet_path=parquet_path,
                 metadata=metadata,
             )
-            if overwrite_output is not None:
-                self._output_info = overwrite_output
-                if params.delete_temp:
-                    self._delete_temp(base_path)
-                return overwrite_output.layer_id
-
-        # Fall through to the create-new-layer path
-        new_layer_id = self._create_new_layer(
-            params=params,
-            parquet_path=parquet_path,
-            metadata=metadata,
-        )
 
         if params.delete_temp:
             self._delete_temp(base_path)
 
-        return new_layer_id
+        return layer_id
+
+    def _export_with_overwrite(
+        self,
+        params: FinalizeLayerParams,
+        parquet_path: Path,
+        metadata: dict,
+    ) -> str:
+        """Resolve the export node's target and write it, holding the export
+        lock so a concurrent run of the same node waits instead of racing."""
+        if self.settings is None:
+            raise RuntimeError("Settings not initialized")
+        assert params.user_id is not None and params.export_node_id is not None
+
+        loop = _get_or_create_event_loop()
+        conn = loop.run_until_complete(self._connect())
+        try:
+            lock = export_lock(
+                conn,
+                workflow_id=params.workflow_id,
+                export_node_id=params.export_node_id,
+            )
+            loop.run_until_complete(lock.__aenter__())
+            try:
+                target = loop.run_until_complete(self._resolve_target(params))
+                logger.info(
+                    "Export node %s of workflow %s writes to %s",
+                    params.export_node_id,
+                    params.workflow_id,
+                    target or "a new layer",
+                )
+                if target is None:
+                    layer_id = self._create_new_layer(params, parquet_path, metadata)
+                elif target.mode == "copy_on_write":
+                    layer_id = self._create_new_layer(
+                        params,
+                        parquet_path,
+                        metadata,
+                        claim_link_id=target.link_id,
+                    )
+                else:
+                    layer_id = self._overwrite_in_place(params, parquet_path, target)
+            except BaseException as exc:
+                loop.run_until_complete(
+                    lock.__aexit__(type(exc), exc, exc.__traceback__)
+                )
+                raise
+            loop.run_until_complete(lock.__aexit__(None, None, None))
+            return layer_id
+        finally:
+            loop.run_until_complete(conn.close())
 
     def _delete_temp(self, base_path: Path) -> None:
         try:
@@ -456,8 +531,15 @@ class FinalizeLayerRunner(LayerReplaceMixin, BaseToolRunner[FinalizeLayerParams]
         params: FinalizeLayerParams,
         parquet_path: Path,
         metadata: dict,
+        claim_link_id: int | None = None,
     ) -> str:
-        """Original finalize path: create a brand-new layer record."""
+        """Create a brand-new layer record.
+
+        With ``claim_link_id`` the layer replaces the one behind that project
+        entry (copy-on-write for an output the workflow inherited): the entry
+        keeps its id and settings and the old layer is left to whoever else
+        uses it. Otherwise the layer is added to the project.
+        """
         user_id = params.user_id  # type: ignore[assignment]
         assert user_id is not None  # guarded by caller
 
@@ -536,67 +618,96 @@ class FinalizeLayerRunner(LayerReplaceMixin, BaseToolRunner[FinalizeLayerParams]
             except Exception as e:
                 logger.warning(f"PMTiles generation failed (non-fatal): {e}")
 
-        import asyncio
+        assert self.settings is not None
+        schema = self.settings.customer_schema
+        # The workflow + export node that produced the data; the project entry
+        # showing it carries the same stamp (see workflow_export_target).
+        stamp: dict[str, Any] | None = None
+        if params.export_node_id:
+            stamp = {
+                "workflow_export": {
+                    "workflow_id": params.workflow_id,
+                    "export_node_id": params.export_node_id,
+                }
+            }
 
-        async def create_db_records() -> int:
-            from goatlib.tools.db import ToolDatabaseService
-
-            pool = await self.get_postgres_pool()
-            db_service = ToolDatabaseService(pool, schema="customer")
-
+        async def create_layer_record(db_service: Any) -> dict[str, Any] | None:
             folder_id = await db_service.get_project_folder_id(params.project_id)
             if not folder_id:
                 raise ValueError(
                     f"Could not find folder for project {params.project_id}"
                 )
-
             is_feature = bool(geometry_type)
-            layer_type = "feature" if is_feature else "table"
-
-            layer_style = params.properties or metadata.get("properties")
-
-            # Stamp the originating workflow + export node so future re-runs
-            # with overwrite_previous=True can find this layer backend-side.
-            other_properties: dict[str, Any] | None = None
-            if params.export_node_id:
-                other_properties = {
-                    "workflow_export": {
-                        "workflow_id": params.workflow_id,
-                        "export_node_id": params.export_node_id,
-                    }
-                }
-
-            layer_properties = await db_service.create_layer(
+            properties: dict[str, Any] | None = await db_service.create_layer(
                 layer_id=new_layer_id,
                 user_id=user_id,
                 folder_id=folder_id,
                 name=layer_name,
-                layer_type=layer_type,
+                layer_type="feature" if is_feature else "table",
                 feature_layer_type="tool" if is_feature else None,
                 geometry_type=geometry_type,
                 extent_wkt=extent_wkt,
                 feature_count=feature_count,
                 size=parquet_path.stat().st_size,
-                properties=layer_style,
-                other_properties=other_properties,
+                properties=params.properties or metadata.get("properties"),
+                other_properties=stamp,
                 tool_type=metadata.get("process_id"),
                 job_id=None,
             )
+            return properties
 
-            return await db_service.add_to_project(
-                layer_id=new_layer_id,
-                project_id=params.project_id,
-                name=layer_name,
-                properties=layer_properties,
-            )
+        async def create_db_records() -> int:
+            from goatlib.tools.db import ToolDatabaseService
 
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            pool = await self.get_postgres_pool()
+            try:
+                if claim_link_id is None:
+                    db_service = ToolDatabaseService(pool, schema=schema)
+                    layer_properties = await create_layer_record(db_service)
+                    link_id: int = await db_service.add_to_project(
+                        layer_id=new_layer_id,
+                        project_id=params.project_id,
+                        name=layer_name,
+                        properties=layer_properties,
+                        other_properties=stamp,
+                    )
+                    return link_id
+                # Copy-on-write: the new layer, the entry pointing at it and
+                # the dataset nodes reading that entry commit together, so a
+                # failure cannot leave a layer that no project shows.
+                assert params.export_node_id is not None
+                async with pool.acquire() as conn, conn.transaction():
+                    await create_layer_record(ToolDatabaseService(conn, schema=schema))
+                    await claim_link(
+                        conn,
+                        schema,
+                        project_id=params.project_id,
+                        link_id=claim_link_id,
+                        layer_id=new_layer_id,
+                        workflow_id=params.workflow_id,
+                        export_node_id=params.export_node_id,
+                    )
+                    await retarget_dataset_nodes(
+                        conn,
+                        schema,
+                        project_id=params.project_id,
+                        link_id=claim_link_id,
+                        layer_id=new_layer_id,
+                    )
+                return claim_link_id
+            finally:
+                await pool.close()
 
+        loop = _get_or_create_event_loop()
         layer_project_id = loop.run_until_complete(create_db_records())
+        if claim_link_id is not None:
+            loop.run_until_complete(
+                self._sync_name_and_get_link(
+                    layer_id=new_layer_id,
+                    project_id=params.project_id,
+                    new_name=layer_name,
+                )
+            )
 
         logger.info(
             f"Created layer record: {new_layer_id}, layer_project_id={layer_project_id}"

@@ -47,9 +47,15 @@ class LayerReplaceMixin:
     """
 
     async def _get_layer_full_info(
-        self: _HasReplaceDeps, layer_id: str, user_id: str
+        self: _HasReplaceDeps,
+        layer_id: str,
+        user_id: str,
+        *,
+        require_owner: bool = True,
     ) -> dict[str, Any]:
-        """Get full layer info and verify ownership.
+        """Get full layer info and, unless ``require_owner`` is False, verify
+        the user owns the layer. A workflow export passes False: its result
+        belongs to the workflow, and the caller authorized the project.
 
         Raises:
             PermissionError: If user doesn't own the layer.
@@ -74,7 +80,7 @@ class LayerReplaceMixin:
 
             # NULL owner = a catalog layer, which is nobody's to change.
             owner_id = str(row["user_id"]) if row["user_id"] else None
-            if owner_id != user_id:
+            if require_owner and owner_id != user_id:
                 raise PermissionError(
                     f"User {user_id} cannot update layer {layer_id} owned by {owner_id}"
                 )
@@ -110,38 +116,50 @@ class LayerReplaceMixin:
 
         con = self.duckdb_con
 
-        logger.info("Dropping existing DuckLake table: %s", full_table)
-        con.execute(f"DROP TABLE IF EXISTS {full_table}")
+        # One transaction: a failure after the DROP (unreadable file, killed
+        # worker) must leave the old table, not a layer without data.
+        con.execute("BEGIN TRANSACTION")
+        try:
+            logger.info("Replacing DuckLake table: %s", full_table)
+            con.execute(f"DROP TABLE IF EXISTS {full_table}")
 
-        # Ensure user schema exists (first export into this schema otherwise fails)
-        con.execute(f"CREATE SCHEMA IF NOT EXISTS lake.{schema}")
+            # Ensure user schema exists (first export into this schema otherwise fails)
+            con.execute(f"CREATE SCHEMA IF NOT EXISTS lake.{schema}")
 
-        cols = con.execute(
-            f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}')"
-        ).fetchall()
-        geom_col = None
-        for col_name, col_type, *_ in cols:
-            if "GEOMETRY" in col_type.upper():
-                geom_col = col_name
-                break
+            cols = con.execute(
+                f"DESCRIBE SELECT * FROM read_parquet('{parquet_path}')"
+            ).fetchall()
+            geom_col = None
+            for col_name, col_type, *_ in cols:
+                if "GEOMETRY" in col_type.upper():
+                    geom_col = col_name
+                    break
 
-        if geom_col:
-            con.execute(f"""
-                CREATE TABLE {full_table} AS
-                SELECT * FROM read_parquet('{parquet_path}')
-                ORDER BY ST_Hilbert({geom_col})
-            """)
-            logger.info(
-                "Created DuckLake table: %s (Hilbert-sorted by %s)",
-                full_table,
-                geom_col,
-            )
-        else:
-            con.execute(f"""
-                CREATE TABLE {full_table} AS
-                SELECT * FROM read_parquet('{parquet_path}')
-            """)
-            logger.info("Created DuckLake table: %s", full_table)
+            if geom_col:
+                con.execute(f"""
+                    CREATE TABLE {full_table} AS
+                    SELECT * FROM read_parquet('{parquet_path}')
+                    ORDER BY ST_Hilbert({geom_col})
+                """)
+            else:
+                con.execute(f"""
+                    CREATE TABLE {full_table} AS
+                    SELECT * FROM read_parquet('{parquet_path}')
+                """)
+            con.execute("COMMIT")
+        except BaseException:
+            # A failed COMMIT has already ended the transaction; the ROLLBACK
+            # then fails too, and must not replace the error that matters.
+            try:
+                con.execute("ROLLBACK")
+            except duckdb.Error:
+                pass
+            raise
+        logger.info(
+            "Created DuckLake table: %s%s",
+            full_table,
+            f" (Hilbert-sorted by {geom_col})" if geom_col else "",
+        )
 
         table_info = self._get_table_info(con, full_table)
         table_info["table_name"] = full_table

@@ -46,6 +46,8 @@ class Authorizer(Protocol):
 
     async def bundle_exists(self, bundle_id: str) -> bool: ...
 
+    async def workflow_in_project(self, workflow_id: str, project_id: str) -> bool: ...
+
 
 async def require_can(
     db: Any,
@@ -196,4 +198,28 @@ async def authorize_artifact_cleanup(
         raise ValueError(
             "These bundles still exist and are not yours to change, so their "
             f"artifacts cannot be removed: {', '.join(sorted(refused))}."
+        )
+
+
+async def authorize_workflow_export(
+    db: Any, *, user_id: str, project_id: str, workflow_id: str
+) -> None:
+    """Saving a workflow result: write on the project, and the workflow is
+    that project's.
+
+    Write, because the result becomes a layer in the project, or replaces the
+    one a previous run left there, whoever ran it: a workflow's result is the
+    workflow's, not its runner's. The pairing, because the layer a re-run
+    replaces is looked up in the named project for the named workflow; a
+    workflow from elsewhere would let one project's run claim another's
+    results. One refusal for both, so the job cannot be used to probe ids.
+    """
+    if not (
+        await db.workflow_in_project(workflow_id, project_id)
+        and await db.user_can("project", project_id, user_id, "write")
+    ):
+        raise ValueError(
+            f"Project {project_id} does not exist, is not yours to change, or "
+            f"has no workflow {workflow_id}, so the workflow result cannot be "
+            "saved there."
         )

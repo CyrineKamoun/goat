@@ -198,9 +198,17 @@ class ProjectImportRunner(SimpleToolRunner):
         return legacy_links
 
     def _remap_workflow_config(
-        self: Self, config: dict[str, Any], id_map: dict[str, str]
+        self: Self,
+        config: dict[str, Any],
+        id_map: dict[str, str],
+        layer_project_id_map: dict[int, int] | None = None,
     ) -> dict[str, Any]:
-        """Remap layer IDs in workflow config nodes, clear export state fields."""
+        """Remap layer IDs and project entry IDs in workflow config nodes,
+        clear export state fields.
+
+        A dataset node reads the layer its project entry (``projectLayerId``)
+        shows, so that id follows the imported entry too.
+        """
         config_copy = json.loads(json.dumps(config))
         nodes = config_copy.get("nodes", [])
         for node in nodes:
@@ -212,6 +220,18 @@ class ProjectImportRunner(SimpleToolRunner):
                 old_layer_id = node_data.get("layerId")
                 if old_layer_id and old_layer_id in id_map:
                     node_data["layerId"] = id_map[old_layer_id]
+
+            # An entry id is a serial of the exporting database: one this
+            # import did not recreate names nothing here, or an unrelated
+            # entry sharing the number, so it is dropped.
+            if node_type == "dataset" and "projectLayerId" in node_data:
+                new_link_id = (layer_project_id_map or {}).get(
+                    node_data["projectLayerId"]
+                )
+                if new_link_id is None:
+                    del node_data["projectLayerId"]
+                else:
+                    node_data["projectLayerId"] = new_link_id
 
             # Clear export state fields
             for state_field in ("exportedLayerId", "jobId", "status"):
@@ -227,12 +247,12 @@ class ProjectImportRunner(SimpleToolRunner):
     ) -> dict[str, Any] | None:
         """Remap the workflow_export stamp's workflow_id via id_map.
 
-        Layers persisted by a 'Save as Dataset' node carry an
-        ``other_properties.workflow_export`` stamp that finalize_layer's
-        overwrite-on-rerun lookup matches against. The workflow row itself
-        gets a new UUID on import, so without remapping the stamp the
-        first post-import run misses and creates a duplicate layer
-        instead of replacing the imported one.
+        Layers persisted by a 'Save as Dataset' node, and the project entries
+        showing them, carry an ``other_properties.workflow_export`` stamp that
+        finalize_layer's overwrite-on-rerun lookup matches against. The
+        workflow row itself gets a new UUID on import, so without remapping
+        the stamp the first post-import run misses and creates a duplicate
+        layer instead of replacing the imported one.
         """
         if not other_properties:
             return other_properties
@@ -720,7 +740,9 @@ class ProjectImportRunner(SimpleToolRunner):
                         link_data.get("name"),
                         link_data.get("order", 0),
                         link_data.get("properties"),
-                        link_data.get("other_properties"),
+                        self._remap_layer_other_properties(
+                            link_data.get("other_properties"), id_map
+                        ),
                         link_data.get("query"),
                         link_data.get("charts"),
                         group_serial,
@@ -765,7 +787,9 @@ class ProjectImportRunner(SimpleToolRunner):
                 # 5. Insert workflows
                 for wf in workflows:
                     new_wf_id = id_map.get(wf.id, str(uuid4()))
-                    remapped_config = self._remap_workflow_config(wf.config, id_map)
+                    remapped_config = self._remap_workflow_config(
+                        wf.config, id_map, layer_project_id_map
+                    )
                     await conn.execute(
                         f"""
                         INSERT INTO {schema}.workflow

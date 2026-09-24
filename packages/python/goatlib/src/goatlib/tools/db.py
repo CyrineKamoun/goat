@@ -199,6 +199,17 @@ class ToolDatabaseService:
         )
         return bool(row and row["ok"])
 
+    async def workflow_in_project(
+        self: Self, workflow_id: str, project_id: str
+    ) -> bool:
+        """Whether the workflow row belongs to the project."""
+        row = await self.pool.fetchrow(
+            f"SELECT 1 AS ok FROM {self.schema}.workflow WHERE id = $1 AND project_id = $2",
+            uuid_module.UUID(workflow_id),
+            uuid_module.UUID(project_id),
+        )
+        return row is not None
+
     async def bundle_exists(self: Self, bundle_id: str) -> bool:
         """Whether the bundle row is still there.
 

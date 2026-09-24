@@ -1,422 +1,497 @@
-"""Tests for the overwrite-on-rerun branch of finalize_layer.
+"""finalize_layer's side of "Overwrite on re-run".
 
-Identity of "the layer to overwrite" is resolved purely backend-side: on
-creation, the layer is stamped with ``other_properties.workflow_export =
-{workflow_id, export_node_id}``; on re-run, the backend queries for that
-stamp. This is deliberately independent of the browser — workflows can run
-long or be triggered remotely.
+Which layer a re-run writes into is decided by
+``goatlib.tools.workflow_export_target`` against the real schema (see
+``apps/core/tests/authz/test_workflow_export_target.py``). These tests cover
+what finalize does with that answer: authorize first, hold the export lock
+around resolve + write, then
 
-Covers:
-- Param schema accepts overwrite_previous + export_node_id
-- Runner takes the overwrite branch when a prior export exists
-- Runner falls back to create when no prior export matches the stamp
-- Runner falls back to create when the matched layer is no longer owned
-- main() forwards the new fields
-- _create_new_layer stamps the layer with workflow_export
+- no target        → create a layer and add it to the project,
+- ``in_place``     → replace the layer's data, whoever owns it,
+- ``adopt``        → the same, and record this workflow as its producer,
+- ``copy_on_write``→ create a layer and point the existing entry at it,
+
+stamping every project entry it writes. DuckLake, PMTiles and Postgres are
+replaced at the level below finalize's own logic.
 """
 
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any, AsyncIterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from goatlib.tools import finalize_layer as finalize_module
 from goatlib.tools.finalize_layer import (
     FinalizeLayerOutput,
     FinalizeLayerParams,
     FinalizeLayerRunner,
 )
+from goatlib.tools.workflow_export_target import ExportTarget
 
 USER = "00000000-0000-0000-0000-000000000001"
+OTHER_USER = "00000000-0000-0000-0000-000000000002"
 WORKFLOW = "00000000-0000-0000-0000-000000000010"
-NODE = "00000000-0000-0000-0000-000000000020"
+NODE = "tool-00000000-0000-0000-0000-000000000020"
 EXPORT_NODE = "export-node-abc"
 PROJECT = "00000000-0000-0000-0000-000000000030"
 FOLDER = "00000000-0000-0000-0000-000000000040"
 PRIOR_LAYER = "00000000-0000-0000-0000-000000000abc"
+LINK = 77
 
 
-def _base_params(**overrides):
-    kwargs = dict(
+def _params(**overrides: Any) -> FinalizeLayerParams:
+    kwargs: dict[str, Any] = dict(
         user_id=USER,
         workflow_id=WORKFLOW,
         node_id=NODE,
         project_id=PROJECT,
         folder_id=FOLDER,
         layer_name="My Report",
+        overwrite_previous=True,
+        export_node_id=EXPORT_NODE,
     )
     kwargs.update(overrides)
     return FinalizeLayerParams(**kwargs)
 
 
-class TestFinalizeLayerParamsOverwrite:
-    def test_defaults(self):
-        p = _base_params()
+def _runner() -> FinalizeLayerRunner:
+    r = FinalizeLayerRunner()
+    settings = MagicMock()
+    settings.customer_schema = "customer"
+    settings.tiles_data_dir = "/tmp/tiles"
+    settings.pmtiles_enabled = False
+    r.settings = settings
+    return r
+
+
+def _temp(tmp_path: Path) -> tuple[Path, Path, dict]:
+    base = tmp_path / "base"
+    base.mkdir()
+    parquet = base / "t_x.parquet"
+    parquet.write_bytes(b"data")
+    return base, parquet, {}
+
+
+class TestParams:
+    def test_defaults(self) -> None:
+        p = FinalizeLayerParams(
+            user_id=USER,
+            workflow_id=WORKFLOW,
+            node_id=NODE,
+            project_id=PROJECT,
+            folder_id=FOLDER,
+        )
         assert p.overwrite_previous is False
         assert p.export_node_id is None
 
-    def test_accepts_overwrite_fields(self):
-        p = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
-        assert p.overwrite_previous is True
-        assert p.export_node_id == EXPORT_NODE
 
+class TestProcess:
+    """process(): authorize, then resolve and write under the export lock."""
 
-class TestFinalizeLayerOverwriteBranch:
-    """Test the _try_overwrite_existing path end to end with mocks."""
+    def _run(
+        self,
+        tmp_path: Path,
+        params: FinalizeLayerParams,
+        target: ExportTarget | None,
+        events: list[str] | None = None,
+    ) -> tuple[str, MagicMock, MagicMock]:
+        r = _runner()
+        events = events if events is not None else []
 
-    def _runner(self):
-        r = FinalizeLayerRunner()
-        settings = MagicMock()
-        settings.customer_schema = "customer"
-        settings.tiles_data_dir = "/tmp/tiles"
-        settings.pmtiles_enabled = False
-        r.settings = settings
-        return r
+        @asynccontextmanager
+        async def lock(conn: Any, **kwargs: Any) -> AsyncIterator[None]:
+            events.append(f"lock {kwargs['workflow_id']} {kwargs['export_node_id']}")
+            yield
+            events.append("unlock")
 
-    def test_skipped_when_flag_off(self, tmp_path: Path):
-        r = self._runner()
-        params = _base_params(export_node_id=EXPORT_NODE)  # flag defaults False
-        parquet = tmp_path / "t_x.parquet"
-        parquet.write_bytes(b"")
+        async def resolve(conn: Any, *args: Any, **kwargs: Any) -> ExportTarget | None:
+            events.append("resolve")
+            resolved_on.append(conn)
+            return target
 
-        result = r._try_overwrite_existing(params, parquet, metadata={})
-        assert result is None
+        def create(*args: Any, **kwargs: Any) -> str:
+            events.append("create")
+            return "new-layer-id"
 
-    def test_skipped_when_no_export_node_id(self, tmp_path: Path):
-        r = self._runner()
-        params = _base_params(overwrite_previous=True)  # no export_node_id
-        parquet = tmp_path / "t_x.parquet"
-        parquet.write_bytes(b"")
+        def overwrite(*args: Any, **kwargs: Any) -> str:
+            events.append("overwrite")
+            return PRIOR_LAYER
 
-        result = r._try_overwrite_existing(params, parquet, metadata={})
-        assert result is None
-
-    def test_falls_back_when_no_prior_export_found(self, tmp_path: Path):
-        r = self._runner()
-        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
-        parquet = tmp_path / "t_x.parquet"
-        parquet.write_bytes(b"")
-
-        with patch.object(r, "_find_previous_export", new=AsyncMock(return_value=None)):
-            result = r._try_overwrite_existing(params, parquet, metadata={})
-        assert result is None
-
-    def test_falls_back_when_matched_layer_gone(self, tmp_path: Path):
-        """Stamp points at a layer that was since deleted or reassigned."""
-        r = self._runner()
-        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
-        parquet = tmp_path / "t_x.parquet"
-        parquet.write_bytes(b"")
-
+        conn = MagicMock()
+        conn.close = AsyncMock()
+        connect = AsyncMock(return_value=conn)
+        pool = _pool()
+        resolved_on: list[Any] = []
+        self.resolved_on = resolved_on
+        self.lock_conn = conn
         with (
+            patch.object(r, "_resolve_temp_parquet", return_value=_temp(tmp_path)),
+            patch.object(r, "_authorize", new=AsyncMock()),
+            patch.object(r, "_connect", new=connect),
+            patch.object(r, "get_postgres_pool", new=AsyncMock(return_value=pool)),
+            patch.object(finalize_module, "export_lock", lock),
+            patch.object(finalize_module, "resolve_export_target", resolve),
+            patch.object(r, "_create_new_layer", side_effect=create) as mock_create,
             patch.object(
-                r,
-                "_find_previous_export",
-                new=AsyncMock(return_value=PRIOR_LAYER),
-            ),
-            patch.object(
-                r,
-                "_get_layer_full_info",
-                new=AsyncMock(side_effect=ValueError("Layer not found: ...")),
-            ),
+                r, "_overwrite_in_place", side_effect=overwrite
+            ) as mock_overwrite,
         ):
-            result = r._try_overwrite_existing(params, parquet, metadata={})
-        assert result is None
+            layer_id = r.process(params)
+        # The lock's connection, when one was opened, is always closed.
+        assert conn.close.await_count == connect.await_count
+        return layer_id, mock_create, mock_overwrite
 
-    def test_falls_back_when_permission_denied(self, tmp_path: Path):
-        r = self._runner()
-        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
-        parquet = tmp_path / "t_x.parquet"
-        parquet.write_bytes(b"")
-
+    def test_refused_run_writes_nothing(self, tmp_path: Path) -> None:
+        r = _runner()
         with (
+            patch.object(r, "_resolve_temp_parquet", return_value=_temp(tmp_path)),
             patch.object(
                 r,
-                "_find_previous_export",
-                new=AsyncMock(return_value=PRIOR_LAYER),
+                "_authorize",
+                new=AsyncMock(side_effect=ValueError("cannot be saved there")),
             ),
-            patch.object(
-                r,
-                "_get_layer_full_info",
-                new=AsyncMock(
-                    side_effect=PermissionError(
-                        f"User {USER} cannot update layer {PRIOR_LAYER}"
-                    )
-                ),
-            ),
+            patch.object(r, "_create_new_layer") as mock_create,
+            patch.object(r, "_overwrite_in_place") as mock_overwrite,
         ):
-            result = r._try_overwrite_existing(params, parquet, metadata={})
-        assert result is None
+            with pytest.raises(ValueError, match="cannot be saved there"):
+                r.process(_params())
+        mock_create.assert_not_called()
+        mock_overwrite.assert_not_called()
 
-    def test_happy_path_replaces_in_place(self, tmp_path: Path):
-        r = self._runner()
-        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
+    def test_manual_save_is_authorized_too(self, tmp_path: Path) -> None:
+        """The plain "Save" (no export node) also adds a layer to the project."""
+        r = _runner()
+        with (
+            patch.object(r, "_resolve_temp_parquet", return_value=_temp(tmp_path)),
+            patch.object(
+                r, "_authorize", new=AsyncMock(side_effect=ValueError("refused"))
+            ),
+            patch.object(r, "_create_new_layer") as mock_create,
+        ):
+            with pytest.raises(ValueError):
+                r.process(_params(overwrite_previous=False, export_node_id=None))
+        mock_create.assert_not_called()
+
+    def test_no_target_creates_a_layer(self, tmp_path: Path) -> None:
+        layer_id, mock_create, mock_overwrite = self._run(tmp_path, _params(), None)
+        assert layer_id == "new-layer-id"
+        assert mock_create.call_args.kwargs.get("claim_link_id") is None
+        mock_overwrite.assert_not_called()
+
+    @pytest.mark.parametrize("mode", ["in_place", "adopt"])
+    def test_own_or_adoptable_layer_is_overwritten(
+        self, tmp_path: Path, mode: str
+    ) -> None:
+        target = ExportTarget(layer_id=PRIOR_LAYER, link_id=LINK, mode=mode)  # type: ignore[arg-type]
+        layer_id, mock_create, mock_overwrite = self._run(tmp_path, _params(), target)
+        assert layer_id == PRIOR_LAYER
+        assert mock_overwrite.call_args.args[-1] == target
+        mock_create.assert_not_called()
+
+    def test_inherited_layer_gets_a_new_layer_behind_the_same_entry(
+        self, tmp_path: Path
+    ) -> None:
+        target = ExportTarget(layer_id=PRIOR_LAYER, link_id=LINK, mode="copy_on_write")
+        layer_id, mock_create, mock_overwrite = self._run(tmp_path, _params(), target)
+        assert layer_id == "new-layer-id"
+        assert mock_create.call_args.kwargs["claim_link_id"] == LINK
+        mock_overwrite.assert_not_called()
+
+    def test_resolve_and_write_happen_under_the_export_lock(
+        self, tmp_path: Path
+    ) -> None:
+        events: list[str] = []
+        target = ExportTarget(layer_id=PRIOR_LAYER, link_id=LINK, mode="in_place")
+        self._run(tmp_path, _params(), target, events)
+        assert events == [
+            f"lock {WORKFLOW} {EXPORT_NODE}",
+            "resolve",
+            "overwrite",
+            "unlock",
+        ]
+
+    def test_target_is_resolved_outside_the_lock_transaction(
+        self, tmp_path: Path
+    ) -> None:
+        """Reads in the lock's transaction would hold their table locks for the
+        whole export (DuckLake write + tippecanoe), so a migration's ALTER on
+        customer.layer would queue behind it and every query behind that."""
+        self._run(tmp_path, _params(), None)
+        assert self.resolved_on and self.resolved_on[0] is not self.lock_conn
+
+    def test_without_overwrite_nothing_is_looked_up(self, tmp_path: Path) -> None:
+        events: list[str] = []
+        layer_id, mock_create, _ = self._run(
+            tmp_path, _params(overwrite_previous=False), None, events
+        )
+        assert layer_id == "new-layer-id"
+        assert events == ["create"]
+
+
+def _layer_row(owner: str) -> dict[str, Any]:
+    return {
+        "id": PRIOR_LAYER,
+        "user_id": owner,
+        "folder_id": FOLDER,
+        "name": "Old Name",
+        "type": "feature",
+        "data_type": None,
+        "feature_layer_type": "tool",
+        "feature_layer_geometry_type": "point",
+        "other_properties": {},
+    }
+
+
+def _pool(fetchrow_result: Any = None) -> MagicMock:
+    pool = MagicMock()
+    pool.fetchrow = AsyncMock(return_value=fetchrow_result)
+    pool.execute = AsyncMock()
+    pool.close = AsyncMock()
+    return pool
+
+
+class TestOverwriteInPlace:
+    TABLE_INFO = {
+        "table_name": "lake.layers.t_abc",
+        "feature_count": 42,
+        "size": 1024,
+        "geometry_type": "POINT",
+        "extent_wkt": "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))",
+        "columns": {"id": "VARCHAR", "geometry": "GEOMETRY"},
+        "geometry_column": "geometry",
+    }
+
+    def _overwrite(
+        self,
+        tmp_path: Path,
+        target: ExportTarget,
+        *,
+        owner: str = USER,
+    ) -> tuple[FinalizeLayerRunner, str, AsyncMock, AsyncMock, AsyncMock]:
+        r = _runner()
         parquet = tmp_path / "t_x.parquet"
         parquet.write_bytes(b"parquet")
-
-        table_info = {
-            "table_name": f"lake.user_x.t_{PRIOR_LAYER.replace('-', '')}",
-            "feature_count": 42,
-            "size": 1024,
-            "geometry_type": "POINT",
-            "extent_wkt": "POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))",
-            "columns": {"id": "VARCHAR", "geometry": "GEOMETRY"},
-            "geometry_column": "geometry",
-        }
-
-        layer_info = {
-            "id": PRIOR_LAYER,
-            "user_id": USER,
-            "folder_id": FOLDER,
-            "name": "Old Name",
-            "type": "feature",
-            "data_type": None,
-            "feature_layer_type": "tool",
-            "geometry_type": "point",
-            "other_properties": {
-                "workflow_export": {
-                    "workflow_id": WORKFLOW,
-                    "export_node_id": EXPORT_NODE,
-                }
-            },
-        }
-
+        claim = AsyncMock()
+        restamp = AsyncMock()
+        attach = AsyncMock(return_value=88)
         with (
             patch.object(
                 r,
-                "_find_previous_export",
-                new=AsyncMock(return_value=PRIOR_LAYER),
+                "get_postgres_pool",
+                new=AsyncMock(side_effect=lambda: _pool(_layer_row(owner))),
             ),
-            patch.object(
-                r, "_get_layer_full_info", new=AsyncMock(return_value=layer_info)
-            ),
-            patch.object(r, "_replace_ducklake_table", return_value=table_info),
+            patch.object(r, "_replace_ducklake_table", return_value=self.TABLE_INFO),
             patch.object(r, "_delete_old_pmtiles", return_value=True),
             patch.object(r, "_regenerate_pmtiles"),
+            patch.object(
+                r, "resolve_layer_table_path", return_value="lake.layers.t_abc"
+            ),
             patch.object(r, "_get_ducklake_snapshot_id", return_value=None),
             patch.object(r, "_update_layer_metadata", new=AsyncMock()),
             patch.object(r, "_sync_name_and_get_link", new=AsyncMock()),
-            patch.object(
-                r, "_get_or_create_project_link", new=AsyncMock(return_value=77)
-            ),
+            patch.object(r, "_get_or_create_project_link", new=attach),
+            patch.object(finalize_module, "claim_link", claim),
+            patch.object(finalize_module, "restamp_layer", restamp),
         ):
-            result = r._try_overwrite_existing(params, parquet, metadata={})
+            layer_id = r._overwrite_in_place(_params(), parquet, target)
+        return r, layer_id, claim, restamp, attach
 
-        assert isinstance(result, FinalizeLayerOutput)
-        assert result.overwritten is True
-        assert result.layer_id == PRIOR_LAYER  # preserved
-        assert result.layer_project_id == 77
-        assert result.feature_count == 42
-        assert result.layer_name == "My Report"  # synced to current dataset_name
-
-
-class TestFinalizeLayerProcessDispatch:
-    """process() should delegate to the overwrite branch when applicable, and
-    fall through to _create_new_layer otherwise."""
-
-    def _runner(self):
-        r = FinalizeLayerRunner()
-        settings = MagicMock()
-        settings.customer_schema = "customer"
-        settings.tiles_data_dir = "/tmp/tiles"
-        settings.pmtiles_enabled = False
-        r.settings = settings
-        return r
-
-    def test_overwrite_branch_used_when_returns_output(self, tmp_path: Path):
-        r = self._runner()
-        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
-        base_path = tmp_path / "base"
-        parquet = base_path / "t_x.parquet"
-        base_path.mkdir()
-        parquet.write_bytes(b"data")
-
-        fake_output = FinalizeLayerOutput(
+    def test_layer_of_another_member_is_overwritten(self, tmp_path: Path) -> None:
+        """Case 3: the workflow is the unit; ownership is not the gate."""
+        target = ExportTarget(layer_id=PRIOR_LAYER, link_id=LINK, mode="in_place")
+        r, layer_id, claim, restamp, _ = self._overwrite(
+            tmp_path, target, owner=OTHER_USER
+        )
+        assert layer_id == PRIOR_LAYER
+        assert r._output_info == FinalizeLayerOutput(
             layer_id=PRIOR_LAYER,
-            layer_name="x",
+            layer_name="My Report",
             project_id=PROJECT,
-            layer_project_id=1,
-            feature_count=0,
-            geometry_type=None,
+            layer_project_id=LINK,
+            feature_count=42,
+            geometry_type="point",
             overwritten=True,
         )
+        claim.assert_awaited_once()
+        assert claim.call_args.kwargs == {
+            "project_id": PROJECT,
+            "link_id": LINK,
+            "layer_id": PRIOR_LAYER,
+            "workflow_id": WORKFLOW,
+            "export_node_id": EXPORT_NODE,
+        }
+        restamp.assert_not_awaited()
 
-        with (
-            patch.object(
-                r,
-                "_resolve_temp_parquet",
-                return_value=(base_path, parquet, {}),
-            ),
-            patch.object(
-                r, "_try_overwrite_existing", return_value=fake_output
-            ) as mock_try,
-            patch.object(r, "_create_new_layer") as mock_create,
-        ):
-            layer_id = r.process(params)
-
-        assert layer_id == PRIOR_LAYER
-        assert r._output_info.overwritten is True
-        mock_try.assert_called_once()
-        mock_create.assert_not_called()
-
-    def test_falls_back_to_create_when_overwrite_branch_returns_none(
-        self, tmp_path: Path
-    ):
-        r = self._runner()
-        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
-        base_path = tmp_path / "base"
-        parquet = base_path / "t_x.parquet"
-        base_path.mkdir()
-        parquet.write_bytes(b"data")
-
-        with (
-            patch.object(
-                r,
-                "_resolve_temp_parquet",
-                return_value=(base_path, parquet, {}),
-            ),
-            patch.object(r, "_try_overwrite_existing", return_value=None),
-            patch.object(
-                r, "_create_new_layer", return_value="new-layer-id"
-            ) as mock_create,
-        ):
-            layer_id = r.process(params)
-
-        assert layer_id == "new-layer-id"
-        mock_create.assert_called_once()
-
-    def test_create_path_when_overwrite_disabled(self, tmp_path: Path):
-        r = self._runner()
-        params = _base_params()  # overwrite_previous=False by default
-        base_path = tmp_path / "base"
-        parquet = base_path / "t_x.parquet"
-        base_path.mkdir()
-        parquet.write_bytes(b"data")
-
-        with (
-            patch.object(
-                r,
-                "_resolve_temp_parquet",
-                return_value=(base_path, parquet, {}),
-            ),
-            patch.object(r, "_try_overwrite_existing") as mock_try,
-            patch.object(
-                r, "_create_new_layer", return_value="new-layer-id"
-            ) as mock_create,
-        ):
-            layer_id = r.process(params)
-
-        assert layer_id == "new-layer-id"
-        mock_try.assert_not_called()
-        mock_create.assert_called_once()
-
-
-class TestCreateNewLayerStamp:
-    """_create_new_layer must stamp workflow_export so future re-runs find it."""
-
-    def test_stamp_is_written_into_other_properties(self, tmp_path: Path):
-        """Patch out all the heavy work and assert db_service.create_layer got
-        other_properties containing the workflow_export stamp."""
-        from goatlib.tools.finalize_layer import FinalizeLayerRunner
-
-        r = FinalizeLayerRunner()
-        settings = MagicMock()
-        settings.customer_schema = "customer"
-        settings.tiles_data_dir = "/tmp/tiles"
-        settings.pmtiles_enabled = False
-        r.settings = settings
-
-        # Stand up a parquet file so stat().st_size works
-        parquet = tmp_path / "t_x.parquet"
-        parquet.write_bytes(b"x")
-
-        # Mock duckdb_con
-        mock_con = MagicMock()
-        mock_con.execute.return_value.fetchall.return_value = [
-            ("id", "VARCHAR"),
-            ("geometry", "GEOMETRY"),
-        ]
-        mock_con.execute.return_value.fetchone.return_value = (1,)
-        r._duckdb_con = mock_con
-
-        # Mock the async db_service so we can inspect what got passed
-        fake_db_service = MagicMock()
-        fake_db_service.get_project_folder_id = AsyncMock(return_value=FOLDER)
-        fake_db_service.create_layer = AsyncMock(return_value={"style": "x"})
-        fake_db_service.add_to_project = AsyncMock(return_value=99)
-
-        params = _base_params(overwrite_previous=True, export_node_id=EXPORT_NODE)
-
-        with (
-            patch(
-                "goatlib.tools.db.ToolDatabaseService",
-                return_value=fake_db_service,
-            ),
-            patch.object(r, "get_postgres_pool", new=AsyncMock()),
-            patch.object(r, "_get_ducklake_snapshot_id", return_value=None),
-        ):
-            r._create_new_layer(params, parquet, metadata={"geometry_type": "POINT"})
-
-        fake_db_service.create_layer.assert_called_once()
-        kwargs = fake_db_service.create_layer.call_args.kwargs
-        assert kwargs["other_properties"] == {
-            "workflow_export": {
-                "workflow_id": WORKFLOW,
-                "export_node_id": EXPORT_NODE,
-            }
+    def test_adopted_layer_records_this_workflow(self, tmp_path: Path) -> None:
+        target = ExportTarget(layer_id=PRIOR_LAYER, link_id=LINK, mode="adopt")
+        _, _, _, restamp, _ = self._overwrite(tmp_path, target)
+        restamp.assert_awaited_once()
+        assert restamp.call_args.kwargs == {
+            "layer_id": PRIOR_LAYER,
+            "workflow_id": WORKFLOW,
+            "export_node_id": EXPORT_NODE,
         }
 
-    def test_no_stamp_when_no_export_node_id(self, tmp_path: Path):
-        """Manual Save path (no export_node_id) must not stamp."""
-        r = FinalizeLayerRunner()
-        settings = MagicMock()
-        settings.customer_schema = "customer"
-        settings.tiles_data_dir = "/tmp/tiles"
-        settings.pmtiles_enabled = False
-        r.settings = settings
+    def test_layer_not_in_the_project_is_attached_and_stamped(
+        self, tmp_path: Path
+    ) -> None:
+        target = ExportTarget(layer_id=PRIOR_LAYER, link_id=None, mode="in_place")
+        r, _, claim, _, attach = self._overwrite(tmp_path, target)
+        attach.assert_awaited_once()
+        assert claim.call_args.kwargs["link_id"] == 88
+        assert r._output_info.layer_project_id == 88
 
+
+class TestCreateNewLayer:
+    STAMP = {
+        "workflow_export": {"workflow_id": WORKFLOW, "export_node_id": EXPORT_NODE}
+    }
+
+    def _create(
+        self,
+        tmp_path: Path,
+        params: FinalizeLayerParams,
+        claim_link_id: int | None,
+        *,
+        claim_error: Exception | None = None,
+    ) -> dict[str, Any]:
+        r = _runner()
         parquet = tmp_path / "t_x.parquet"
         parquet.write_bytes(b"x")
-
-        mock_con = MagicMock()
-        mock_con.execute.return_value.fetchall.return_value = [
+        con = MagicMock()
+        con.execute.return_value.fetchall.return_value = [
             ("id", "VARCHAR"),
             ("geometry", "GEOMETRY"),
         ]
-        mock_con.execute.return_value.fetchone.return_value = (1,)
-        r._duckdb_con = mock_con
+        con.execute.return_value.fetchone.return_value = (1,)
+        r._duckdb_con = con
 
-        fake_db_service = MagicMock()
-        fake_db_service.get_project_folder_id = AsyncMock(return_value=FOLDER)
-        fake_db_service.create_layer = AsyncMock(return_value={})
-        fake_db_service.add_to_project = AsyncMock(return_value=99)
+        db = MagicMock()
+        db.get_project_folder_id = AsyncMock(return_value=FOLDER)
+        db.create_layer = AsyncMock(return_value={"style": "x"})
+        db.add_to_project = AsyncMock(return_value=99)
+        services: list[Any] = []
 
-        params = _base_params()  # no export_node_id
+        def service(pool_or_conn: Any, schema: str) -> MagicMock:
+            services.append(pool_or_conn)
+            return db
 
+        # The pool hands out one connection; its transaction records how it
+        # ended, which is what makes create + claim all or nothing.
+        tx_exits: list[Any] = []
+        conn = MagicMock(name="conn")
+
+        @asynccontextmanager
+        async def transaction() -> AsyncIterator[None]:
+            try:
+                yield
+            except BaseException as exc:
+                tx_exits.append(exc)
+                raise
+            tx_exits.append(None)
+
+        conn.transaction = transaction
+
+        @asynccontextmanager
+        async def acquire() -> AsyncIterator[Any]:
+            yield conn
+
+        pool = _pool()
+        pool.acquire = acquire
+        claim = AsyncMock(side_effect=claim_error)
+        retarget = AsyncMock()
+        outcome: dict[str, Any] = {}
         with (
-            patch(
-                "goatlib.tools.db.ToolDatabaseService",
-                return_value=fake_db_service,
-            ),
-            patch.object(r, "get_postgres_pool", new=AsyncMock()),
+            patch("goatlib.tools.db.ToolDatabaseService", side_effect=service),
+            patch.object(r, "get_postgres_pool", new=AsyncMock(return_value=pool)),
             patch.object(r, "_get_ducklake_snapshot_id", return_value=None),
+            patch.object(r, "_sync_name_and_get_link", new=AsyncMock()),
+            patch.object(finalize_module, "claim_link", claim),
+            patch.object(finalize_module, "retarget_dataset_nodes", retarget),
         ):
-            r._create_new_layer(params, parquet, metadata={"geometry_type": "POINT"})
+            try:
+                outcome["layer_id"] = r._create_new_layer(
+                    params,
+                    parquet,
+                    metadata={"geometry_type": "POINT"},
+                    claim_link_id=claim_link_id,
+                )
+            except Exception as exc:
+                outcome["error"] = exc
+        outcome.update(
+            db=db,
+            claim=claim,
+            retarget=retarget,
+            conn=conn,
+            pool=pool,
+            services=services,
+            tx_exits=tx_exits,
+        )
+        return outcome
 
-        kwargs = fake_db_service.create_layer.call_args.kwargs
-        assert kwargs["other_properties"] is None
+    def test_new_layer_and_its_stamped_entry_are_created(self, tmp_path: Path) -> None:
+        out = self._create(tmp_path, _params(), None)
+        assert out["db"].create_layer.call_args.kwargs["other_properties"] == self.STAMP
+        assert (
+            out["db"].add_to_project.call_args.kwargs["other_properties"] == self.STAMP
+        )
+        out["claim"].assert_not_awaited()
+        out["pool"].close.assert_awaited()
+
+    def test_copy_on_write_points_the_existing_entry_at_the_new_layer(
+        self, tmp_path: Path
+    ) -> None:
+        out = self._create(tmp_path, _params(), LINK)
+        layer_id = out["layer_id"]
+        out["db"].add_to_project.assert_not_awaited()
+        assert out["claim"].call_args.args[0] is out["conn"]
+        assert out["claim"].call_args.kwargs == {
+            "project_id": PROJECT,
+            "link_id": LINK,
+            "layer_id": layer_id,
+            "workflow_id": WORKFLOW,
+            "export_node_id": EXPORT_NODE,
+        }
+        assert out["retarget"].call_args.args[0] is out["conn"]
+        assert out["retarget"].call_args.kwargs == {
+            "project_id": PROJECT,
+            "link_id": LINK,
+            "layer_id": layer_id,
+        }
+        assert out["services"] == [
+            out["conn"]
+        ], "layer row written on the same connection"
+        assert out["tx_exits"] == [None]
+
+    def test_copy_on_write_failing_to_claim_the_entry_keeps_no_layer(
+        self, tmp_path: Path
+    ) -> None:
+        """Creating the layer and repointing the entry commit together, so a
+        failure in between cannot leave a layer no project shows."""
+        boom = OSError("connection lost")
+        out = self._create(tmp_path, _params(), LINK, claim_error=boom)
+        assert out["error"] is boom
+        out["db"].create_layer.assert_awaited_once()
+        assert out["tx_exits"] == [boom]
+
+    def test_manual_save_is_not_stamped(self, tmp_path: Path) -> None:
+        out = self._create(
+            tmp_path, _params(overwrite_previous=False, export_node_id=None), None
+        )
+        assert out["db"].create_layer.call_args.kwargs["other_properties"] is None
+        assert out["db"].add_to_project.call_args.kwargs["other_properties"] is None
+        out["claim"].assert_not_awaited()
 
 
-class TestFinalizeLayerMainSignature:
-    """main() must accept the new fields so Windmill can pass them."""
+class TestMainSignature:
+    """main() is what Windmill calls; the runner passes these by name."""
 
-    def test_main_accepts_overwrite_fields(self):
+    def test_main_accepts_overwrite_fields(self) -> None:
         import inspect
 
         from goatlib.tools.finalize_layer import main
 
         sig = inspect.signature(main)
-        assert "overwrite_previous" in sig.parameters
-        assert "export_node_id" in sig.parameters
         assert sig.parameters["overwrite_previous"].default is False
         assert sig.parameters["export_node_id"].default is None
-        # existing_layer_id should no longer be a parameter — identity is
-        # backend-resolved.
-        assert "existing_layer_id" not in sig.parameters

@@ -10,14 +10,21 @@ Usage:
     Called from frontend via Windmill API when user clicks "Run Workflow"
 """
 
+import asyncio
 import logging
 import re
 from typing import Any
 
+import asyncpg
 import wmill
 from pydantic import BaseModel, Field
 
 from goatlib.tools.if_node import IF_FALSE_HANDLE, execute_if_node
+from goatlib.tools.workflow_dataset_nodes import (
+    current_layer_ids,
+    project_layer_ids,
+    with_current_layer_ids,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -771,6 +778,61 @@ def run_tool_node(
     }
 
 
+async def _connect() -> tuple[asyncpg.Connection, str]:
+    """A connection to the GOAT database, and its customer schema."""
+    from goatlib.tools.base import ToolSettings
+
+    settings = ToolSettings.from_env()
+    conn = await asyncpg.connect(
+        host=settings.postgres_server,
+        port=settings.postgres_port,
+        user=settings.postgres_user,
+        password=settings.postgres_password,
+        database=settings.postgres_db,
+    )
+    return conn, settings.customer_schema
+
+
+def resolve_dataset_layers(params: WorkflowRunnerParams) -> list[dict[str, Any]]:
+    """The workflow's nodes with each dataset node reading the layer its
+    project entry shows now (see ``workflow_dataset_nodes``)."""
+    link_ids = project_layer_ids(params.nodes)
+    if not link_ids:
+        return params.nodes
+
+    async def lookup() -> dict[int, str]:
+        conn, schema = await _connect()
+        try:
+            current: dict[int, str] = await current_layer_ids(
+                conn,
+                schema,
+                user_id=params.user_id,
+                project_id=params.project_id,
+                link_ids=link_ids,
+            )
+            return current
+        finally:
+            await conn.close()
+
+    try:
+        current = asyncio.run(lookup())
+    except Exception as e:
+        # The layer ids as saved are right unless a re-run moved an entry to
+        # a new layer since (finalize also rewrites the saved ids then), so a
+        # lookup failure must not take the whole run down with it. Only the
+        # error type is logged: job output is shown to the user, and a
+        # connection error can carry the database address and credentials.
+        message = (
+            "Could not look up dataset nodes' project layers "
+            f"({type(e).__name__}); using the layer ids as saved"
+        )
+        logger.warning(message)
+        print(f"[workflow_runner] {message}")
+        return params.nodes
+    nodes: list[dict[str, Any]] = with_current_layer_ids(params.nodes, current)
+    return nodes
+
+
 def cleanup_previous_results(params: WorkflowRunnerParams) -> None:
     """Clean up temp files from previous workflow run."""
     from goatlib.tools.cleanup_temp import cleanup_workflow_temp
@@ -818,6 +880,11 @@ def main(
         edges=edges,
         variables=variables or [],
     )
+
+    # Dataset nodes read what their project entry shows now: a re-run may
+    # have put a new layer behind an entry the node still names by old id.
+    nodes = resolve_dataset_layers(params)
+    params.nodes = nodes
 
     # Clean up previous temp results for this workflow
     print("[workflow_runner] Cleaning up previous results...")

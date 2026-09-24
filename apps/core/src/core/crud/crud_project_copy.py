@@ -20,10 +20,12 @@ from core.db.models._link_model import (
     UserProjectLink,
 )
 from core.db.models.folder import Folder
+from core.db.models.layer import Layer
 from core.db.models.project import Project
 from core.db.models.report_layout import ReportLayout
 from core.db.models.workflow import Workflow
 from core.schemas.error import FolderNotFoundError
+from core.templates.snapshot import _rewrite_tool_configs
 
 logger = logging.getLogger(__name__)
 
@@ -250,9 +252,46 @@ async def copy_project(
         old_to_new_group_id[source_group.id] = new_group.id
 
     # ------------------------------------------------------------------
-    # 7. Create new LayerProjectLinks (same layer_ids — no data duplication)
+    # 7. Create new Workflows (deep copy config; layer refs stay valid since
+    #    layers are shared). Before the links: a link showing a workflow's
+    #    export result names that workflow, so it needs the copy's id.
+    # ------------------------------------------------------------------
+    old_to_new_workflow_id: dict[str, str] = {}
+    new_workflows: list[Workflow] = []
+    for source_workflow in source_workflows:
+        new_workflow = Workflow(
+            project_id=new_project.id,
+            name=source_workflow.name,
+            description=source_workflow.description,
+            is_default=source_workflow.is_default,
+            config=copy.deepcopy(source_workflow.config),
+            thumbnail_url=source_workflow.thumbnail_url,
+        )
+        async_session.add(new_workflow)
+        new_workflows.append(new_workflow)
+    await async_session.flush()  # populate the new workflow ids
+    for source_workflow, new_workflow in zip(source_workflows, new_workflows):
+        old_to_new_workflow_id[str(source_workflow.id)] = str(new_workflow.id)
+
+    # ------------------------------------------------------------------
+    # 8. Create new LayerProjectLinks (same layer_ids — no data duplication)
     # ------------------------------------------------------------------
     old_to_new_link_id: dict[int, int] = {}
+    # Layer stamps only matter for mapping entries to copied workflows.
+    layer_other_properties: dict[UUID, dict[str, Any] | None] = (
+        {
+            row.id: row.other_properties
+            for row in (
+                await async_session.execute(
+                    select(Layer.id, Layer.other_properties).where(
+                        Layer.id.in_([link.layer_id for link in source_links])
+                    )
+                )
+            ).all()
+        }
+        if old_to_new_workflow_id and source_links
+        else {}
+    )
 
     # `shareable` records that whoever put the layer into the project held
     # `share` on it (D7). On a copy that person is the copier, who may reach the
@@ -279,9 +318,11 @@ async def copy_project(
             properties=copy.deepcopy(source_link.properties)
             if source_link.properties
             else None,
-            other_properties=copy.deepcopy(source_link.other_properties)
-            if source_link.other_properties
-            else None,
+            other_properties=_copy_export_stamp(
+                source_link.other_properties,
+                layer_other_properties.get(source_link.layer_id),
+                old_to_new_workflow_id,
+            ),
             query=copy.deepcopy(source_link.query) if source_link.query else None,
             charts=copy.deepcopy(source_link.charts) if source_link.charts else None,
             # Never wider than the source link, never wider than what the
@@ -299,7 +340,17 @@ async def copy_project(
         old_to_new_link_id[source_link.id] = new_link.id
 
     # ------------------------------------------------------------------
-    # 7b. Remap builder_config layer_project_id references
+    # 8a. Point the copied workflows' dataset nodes at the copy's links
+    # ------------------------------------------------------------------
+    if old_to_new_link_id:
+        for new_workflow in new_workflows:
+            new_workflow.config = _remap_dataset_node_links(
+                new_workflow.config, old_to_new_link_id
+            )
+            async_session.add(new_workflow)
+
+    # ------------------------------------------------------------------
+    # 8b. Remap builder_config layer_project_id references
     # ------------------------------------------------------------------
     if new_project.builder_config and (old_to_new_link_id or old_to_new_group_id):
         new_project.builder_config = _remap_builder_config(
@@ -311,21 +362,6 @@ async def copy_project(
         new_project.custom_basemaps = _remap_basemap_layer_config(
             new_project.custom_basemaps, old_to_new_link_id
         )
-
-    # ------------------------------------------------------------------
-    # 8. Create new Workflows (deep copy config; layer refs stay valid since
-    #    layers are shared)
-    # ------------------------------------------------------------------
-    for source_workflow in source_workflows:
-        new_workflow = Workflow(
-            project_id=new_project.id,
-            name=source_workflow.name,
-            description=source_workflow.description,
-            is_default=source_workflow.is_default,
-            config=copy.deepcopy(source_workflow.config),
-            thumbnail_url=source_workflow.thumbnail_url,
-        )
-        async_session.add(new_workflow)
 
     # ------------------------------------------------------------------
     # 9. Create new ReportLayouts
@@ -364,6 +400,71 @@ async def copy_project(
         "Copied project %s -> %s (user=%s)", project_id, new_project.id, user_id
     )
     return new_project
+
+
+def _remap_dataset_node_links(
+    config: dict[str, Any] | None, old_to_new_link_id: dict[int, int]
+) -> dict[str, Any] | None:
+    """Point dataset nodes' `projectLayerId` at the copy's links, and the
+    copies of those ids that tool configs keep.
+
+    The workflow runner reads a dataset node through that link, so a copied
+    node still naming the source project's link would miss the layer the
+    copy's link shows. A link the copy does not have is left as is; the runner
+    then falls back to the node's `layerId`. Tool configs are rewritten for
+    the node's own link ids only — the same rewrite template binding and the
+    editor's "Replace datasets" apply — so unrelated numbers stay.
+    """
+    if not isinstance(config, dict):
+        return config
+    remapped = copy.deepcopy(config)
+    nodes = remapped.get("nodes") or []
+    replacements: list[tuple[int | str, int | str | None]] = []
+    for node in nodes:
+        data = node.get("data") if isinstance(node, dict) else None
+        if not isinstance(data, dict) or data.get("type") != "dataset":
+            continue
+        link_id = data.get("projectLayerId")
+        if isinstance(link_id, int) and link_id in old_to_new_link_id:
+            data["projectLayerId"] = old_to_new_link_id[link_id]
+            replacements.append((link_id, old_to_new_link_id[link_id]))
+    _rewrite_tool_configs(nodes, replacements)
+    return remapped
+
+
+def _copy_export_stamp(
+    link_other_properties: dict[str, Any] | None,
+    layer_other_properties: dict[str, Any] | None,
+    old_to_new_workflow_id: dict[str, str],
+) -> dict[str, Any] | None:
+    """`other_properties` for the copy of a project entry, its
+    `workflow_export` stamp naming the copied workflow.
+
+    The stamp marks the entry as the result of a workflow's export node, which
+    a re-run overwrites (`goatlib.tools.workflow_export_target`). It comes from
+    the source entry's own stamp, or, for an entry written before entries
+    carried one, from the layer's stamp when that names a workflow of the
+    source project. A stamp naming no copied workflow is dropped: it names
+    nothing in the copy.
+    """
+    copied = (
+        copy.deepcopy(link_other_properties)
+        if isinstance(link_other_properties, dict)
+        else {}
+    )
+    source_stamp = copied.pop("workflow_export", None)
+    if not isinstance(source_stamp, dict) and isinstance(layer_other_properties, dict):
+        source_stamp = layer_other_properties.get("workflow_export")
+    if isinstance(source_stamp, dict):
+        new_workflow_id = old_to_new_workflow_id.get(
+            str(source_stamp.get("workflow_id"))
+        )
+        if new_workflow_id is not None:
+            copied["workflow_export"] = {
+                **source_stamp,
+                "workflow_id": new_workflow_id,
+            }
+    return copied or None
 
 
 def _remap_basemap_layer_config(
