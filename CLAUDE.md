@@ -130,6 +130,7 @@ Copy `.env.example` to `.env`. Key variables:
 - **MUST: Grep both i18n files for every UI label before writing it.** Never assume, translate, or copy a label from existing docs. Always run `grep` on `apps/web/i18n/locales/en/common.json` and `apps/web/i18n/locales/de/common.json` to get the exact string the UI renders.
 - **Always check the German glossary before writing German docs.** The glossary is at `apps/docs/docs/nerdy_content/GOAT_ui_glossary.md`. Use the exact German UI terms listed there for all UI element names, buttons, and section headings. Never translate UI terms from English without verifying in the glossary first.
 - For Docusaurus docs, also check existing DE pages (e.g. `i18n/de/...`) to confirm which terms are already in use and to maintain consistency.
+- **Screen recordings are MP4, screenshots are WebP — never GIF.** Embed a recording with `<Video src={require('/img/….mp4').default} alt="…" />` (registered globally, no import); it plays muted and looped like a GIF. Convert with `ffmpeg -i in.gif -movflags +faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -crf 26 out.mp4` and `ffmpeg -i in.png -c:v libwebp -quality 85 out.webp`. The PR `file-size` check rejects images over 1 MB, videos over 4 MB and other files over 2 MB (`scripts/check-file-sizes.sh`; exceptions go in `.github/large-files.txt`). Don't commit source files (`original_files/`, `.pptx`) next to the published images.
 
 ## Docs Diagram Exports (Figma API)
 

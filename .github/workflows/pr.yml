@@ -70,8 +70,25 @@ jobs:
     uses: ./.github/workflows/nextjs-bundle-analysis.yml
     secrets: inherit
 
+  file-size:
+    name: file-size
+    if: ${{ github.event_name != 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The PR's merge commit and its parents, trees only: the check fetches
+      # just the blobs of the files the PR adds or modifies.
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout: scripts
+      - name: 📏 Keep large files out of the repository
+        run: scripts/check-file-sizes.sh HEAD^1 HEAD
+
   required:
-    needs: [lint, test, build, analyze]
+    needs: [lint, test, build, analyze, file-size]
     if: always()
     runs-on: ubuntu-latest
     steps:
