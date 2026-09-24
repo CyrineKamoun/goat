@@ -53,7 +53,7 @@ The tools are located on the right side of the Layers Panel:
 
 When selecting a layer from the Layers Panel, the Editing Panel appears on the right side of the map interface. This panel provides access to various options:
 
-- <code>Style</code>: <strong>Customize the visual appearance</strong> of the selected layer by changing colors, opacity, and other styling options. Read more in <a href="/docs/map/layer_style">Layer Styling</a>.
+- <code>Style</code>: <strong>Customize the visual appearance</strong> of the selected layer by changing colors, opacity, and other styling options. Read more in <a href="/docs/category/layer-design">Layer Styling</a>.
 
 - <code>Filter</code>: <strong>Apply filters</strong> to the selected layer to display only specific features based on attribute values. Read more in <a href="/docs/map/filter">Layer Filtering</a>.
 

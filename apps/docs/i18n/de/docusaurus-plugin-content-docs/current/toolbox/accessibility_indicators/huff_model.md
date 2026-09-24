@@ -167,7 +167,7 @@ Idealerweise sammeln Sie Daten zu tatsächlichen Kundenbesuchen oder Marktanteil
 
 <div class="step">
   <div class="step-number">13</div>
-  <div class="content">Optional können Sie verschiedene Routing-Optionen für das gewählte Verkehrsmittel konfigurieren, etwa Reisegeschwindigkeit, maximale Anzahl an Umstiegen, Zu- und Abgangslimits und mehr. Weitere Informationen zu verkehrsmittelspezifischen Optionen finden Sie im Abschnitt <a href="/docs/category/routing">Routing</a>.</div>
+  <div class="content">Optional können Sie verschiedene Routing-Optionen für das gewählte Verkehrsmittel konfigurieren, etwa Reisegeschwindigkeit, maximale Anzahl an Umstiegen, Zu- und Abgangslimits und mehr. Weitere Informationen zu verkehrsmittelspezifischen Optionen finden Sie im Abschnitt <a href="/category/routing">Routing</a>.</div>
 </div>
 
 <div class="step">

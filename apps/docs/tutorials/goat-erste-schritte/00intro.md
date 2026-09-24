@@ -46,11 +46,11 @@ Before you start:
 
 | Step | Topic                           | Duration |
 | ------- | ------------------------------- | ----- |
-| 1       | [Introduction](./01start)             | 10 min |
-| 2       | [Create & Prepare Project](./04create-project)        | 15 min |
-| 3       | [Understand & Create Catchment Areas](./08understand-tools)                    | 15 min |
-| 4      | [Share Map](./10share-map)                    | 3 min |
-| 5      | [Tutorial Completed!](./11congratulations)                    | 2 min |
+| 1       | [Introduction](./01start.md)             | 10 min |
+| 2       | [Create & Prepare Project](./04create-project.md)        | 15 min |
+| 3       | [Understand & Create Catchment Areas](./08understand-tools.md)                    | 15 min |
+| 4      | [Share Map](./10share-map.md)                    | 3 min |
+| 5      | [Tutorial Completed!](./11congratulations.md)                    | 2 min |
 
 ## Who Is This Tutorial For?
 
@@ -66,7 +66,7 @@ The focus is on planning logic, interpretation and application – not on techni
 
 If you want to dive deeper into a tool or need a different explanation:
 
-📚 **[Complete Documentation](/docs/getting_started/)** - Comprehensive guides to all GOAT functions
+📚 **[Complete Documentation](/category/getting-started)** - Comprehensive guides to all GOAT functions
 
 🎥 **[GOAT's Youtube Channel](#)** - Detailed technical videos on every tool
 

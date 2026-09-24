@@ -43,7 +43,7 @@ Je nach den Layern, die Sie hinzugefügt haben, können Sie verschiedene Analyse
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Wählen Sie das Analysewerkzeug aus, das Sie verwenden möchten. Sie können zwischen unseren <b>Accessibility indicators</b>, <b>Data management</b>, <b>Geoanalysis</b> oder <b>Geoprocessing</b>-Werkzeugen wählen und die Einstellungen vervollständigen. Weitere Details finden Sie unter <a href="/docs/category/toolbox">Werkzeugkiste</a>.</div>
+  <div class="content">Wählen Sie das Analysewerkzeug aus, das Sie verwenden möchten. Sie können zwischen unseren <b>Accessibility indicators</b>, <b>Data management</b>, <b>Geoanalysis</b> oder <b>Geoprocessing</b>-Werkzeugen wählen und die Einstellungen vervollständigen. Weitere Details finden Sie unter <a href="/category/toolbox">Werkzeugkiste</a>.</div>
 </div>
 
 ## Ihre Karte gestalten
