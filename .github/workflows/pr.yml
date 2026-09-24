@@ -62,6 +62,7 @@ jobs:
         ${{ needs.file-changes.outputs.web == 'true'
         || needs.file-changes.outputs.storybook == 'true' }}
       keycloak-theme: ${{ needs.file-changes.outputs.keycloak-theme == 'true' }}
+      docs: ${{ needs.file-changes.outputs.docs == 'true' }}
 
   analyze:
     name: analyze

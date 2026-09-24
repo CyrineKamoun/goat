@@ -12,6 +12,9 @@ on:
       keycloak-theme:
         type: boolean
         default: false
+      docs:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -67,3 +70,28 @@ jobs:
         run: |
           cd ${{ github.workspace }}/packages/js/keycloak-theme
           pnpm run build-keycloak-theme
+
+  # A page that points at a missing image or video fails the webpack build, and
+  # release.yml only builds the docs image on main. Building here catches it on
+  # the PR instead.
+  docs:
+    name: docs
+    if: ${{ inputs.docs }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📥 Checkout PR
+        uses: plan4better/.github/.github/actions/pr-git-checkout@main
+
+      - name: 📥 Monorepo install
+        uses: plan4better/.github/.github/actions/pnpm-install@main
+        with:
+          enable-corepack: true
+          cwd: ${{ github.workspace }}
+          node_version: 22
+
+      - name: 🏗️ Docs build (en + de)
+        run: pnpm --filter @p4b/docs build
