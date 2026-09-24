@@ -24,9 +24,17 @@ jobs:
     needs: file-changes
     uses: ./.github/workflows/lint.yml
     secrets: inherit
+    # Direct pushes to main get no pr.yml run, so this is their only lint.
     with:
-      web: true
-      python: false
+      web: >-
+        ${{ needs.file-changes.outputs.web == 'true'
+        || startsWith(github.ref, 'refs/tags/v') }}
+      python: >-
+        ${{ needs.file-changes.outputs.core == 'true'
+        || needs.file-changes.outputs.geoapi == 'true'
+        || needs.file-changes.outputs.processes == 'true'
+        || needs.file-changes.outputs.catalog == 'true'
+        || startsWith(github.ref, 'refs/tags/v') }}
 
   # Gate releases on the test suites. Change-detection picks the affected
   # suites on branch pushes; tag releases run everything (same override the

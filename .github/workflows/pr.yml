@@ -1,9 +1,9 @@
 name: "PR"
 
+# Not on pushes to main: release.yml lints, tests and builds every push there,
+# and running this too duplicated all of it.
 on:
   pull_request:
-    branches: [main]
-  push:
     branches: [main]
   merge_group:
   workflow_dispatch:
@@ -73,7 +73,6 @@ jobs:
 
   file-size:
     name: file-size
-    if: ${{ github.event_name != 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
