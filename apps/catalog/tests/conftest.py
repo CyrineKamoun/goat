@@ -1,4 +1,5 @@
 import os
+import shutil
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -42,10 +43,27 @@ def _settings_from_kwargs_only() -> Iterator[None]:
     os.environ.update(saved)
 
 
+@pytest.fixture(scope="session")
+def _catalog_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The default fixture catalog, generated once per session.
+
+    Generating it takes ~0.4 s and most tests need one, which made generation
+    most of the suite's run time. The writer is deterministic (see
+    test_fixture_deterministic), so a copy is the same catalog.
+    """
+    template = tmp_path_factory.mktemp("catalog_template")
+    write_catalog(template)
+    write_nuts(template)
+    return template
+
+
 @pytest.fixture()
-def catalog_dir(tmp_path: Path) -> Path:
-    write_catalog(tmp_path)
-    write_nuts(tmp_path)
+def catalog_dir(tmp_path: Path, _catalog_template: Path) -> Path:
+    # A fresh copy per test, so a test that rewrites its catalog changes only
+    # its own. shutil.copy (not copy2) gives new mtimes, as writing would.
+    shutil.copytree(
+        _catalog_template, tmp_path, dirs_exist_ok=True, copy_function=shutil.copy
+    )
     return tmp_path
 
 
