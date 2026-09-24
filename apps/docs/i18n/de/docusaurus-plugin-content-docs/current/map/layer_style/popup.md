@@ -68,7 +68,7 @@ Für vollständige Kontrolle über das Popup-Design wechseln Sie unter `Inhalt` 
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-  <img src={require('/img/map/styling/popup_html_de.webp').default} alt="Benutzerdefiniertes HTML-Popup in GOAT" style={{ maxHeight: "400px", maxWidth: "100%", objectFit: "cover"}}/>
+  <img src={require('/img/map/styling/popup_html_de.webp').default} alt="Benutzerdefiniertes HTML-Popup in GOAT" style={{ maxHeight: "auto", maxWidth: "100%"}}/>
 </div>
 
 ## Bewährte Praktiken

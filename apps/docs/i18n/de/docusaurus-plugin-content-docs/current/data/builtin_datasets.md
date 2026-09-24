@@ -68,23 +68,51 @@ Unser Straßennetzwerk repräsentiert reale Verkehrsinfrastruktur einschließlic
 **Verarbeitungsworkflow:**
 1. **Datenimport**: Straßennetzwerkdaten werden im Geoparquet-Format aus Overture Maps' [Transportation theme](https://docs.overturemaps.org/guides/transportation/) importiert
 2. **Höhenverarbeitung**: Europäische DEM-Kacheln werden verarbeitet, um topografische Informationen zu extrahieren
-3. **Räumliche Indexierung**: Netzwerksegmente werden mit [Ubers H3-Gittersystem](../further_reading/glossary#h3-grid) für effiziente Verarbeitung organisiert
+3. **Räumliche Indexierung**: Netzwerksegmente werden mit [Ubers H3-Gittersystem](../further_reading/glossary#h3-gitter) für effiziente Verarbeitung organisiert
 4. **Steigungsberechnung**: Oberflächengfäle und Steigungswiderstand werden für jedes Straßensegment berechnet
 5. **Attributanalyse**: Straßenklassifizierungen, Geschwindigkeitsbegrenzungen, Abbiegebeschränkungen und Einbahnstraßenbezeichnungen werden identifiziert und standardisiert
 6. **Geschwindigkeitsbegrenzungs-Interpolation**: Fehlende Geschwindigkeitsbegrenzungen werden basierend auf Straßentyp und modalen Geschwindigkeiten geschätzt
 
 ## Eigene Netze importieren
 
-Die oben beschriebenen Netze sind die integrierten Netze von GOAT und werden standardmäßig verwendet. Sie können auch **eigene Netze importieren** — ein Netz, das Sie selbst pflegen, eine Region, die Sie mit Ihren eigenen Daten analysieren möchten, oder ein geplantes Netz, das Sie testen möchten, bevor es gebaut wird.
+Die oben beschriebenen Netze sind die integrierten Netze von GOAT und werden standardmäßig verwendet. Sie können auch **eigene Netze importieren**: ein Netz, das Sie selbst pflegen, eine Region, die Sie mit Ihren eigenen Daten analysieren möchten, oder ein geplantes Netz, das Sie testen möchten, bevor es gebaut wird.
 
-Nach dem Import wird Ihr Netz genauso verwendet wie das integrierte: Die Routing- und Erreichbarkeitswerkzeuge bieten es neben `Standard (Europa)` an, und Sie wählen aus, auf welchem Netz eine Analyse laufen soll.
+Nach dem Import wird Ihr Netz genauso verwendet wie das integrierte: Die Routing- und Erreichbarkeitswerkzeuge bieten es neben dem integrierten an (`Standard (Europa)` bei Straßennetzen, `Standard` bei ÖPNV-Netzen), und Sie wählen aus, auf welchem Netz eine Analyse laufen soll.
 
 ### Eigenes Straßennetz
 
-Ein importiertes Straßennetz lässt sich **auf der Karte bearbeiten**: Zeichnen Sie eine Straße, und GOAT teilt und verbindet die Topologie, pflegt die Nodes und erstellt die Routing-Daten aus Ihren Änderungen neu. So können Sie eine geplante Verbindung testen — eine neue Brücke, eine gesperrte Straße, einen Radweg — und eine Analyse darauf erneut ausführen.
+Ihre Daten müssen dem [Overture-Maps-Schema](https://docs.overturemaps.org/) entsprechen. Dafür gibt es zwei Wege:
+
+**Fragen Sie uns nach einem Export.** Teilen Sie Plan4Better mit, welche Region Sie benötigen, und wir bereiten eine Datei vor, die Sie direkt hochladen können. Dafür müssen Sie nichts installieren. Es ist der schnellste Weg, wenn Sie die Daten nicht selbst aufbereiten möchten.
+
+**Holen Sie die Daten selbst.** Installieren Sie das [Kommandozeilenwerkzeug overturemaps](https://docs.overturemaps.org/getting-data/overturemaps-py/), ermitteln Sie den Begrenzungsrahmen Ihres Gebiets mit einem Werkzeug wie [boundingbox.klokantech.com](https://boundingbox.klokantech.com/) im CSV-Format, laden Sie dann die beiden Layer herunter, die GOAT benötigt, und packen Sie sie zusammen:
+
+```bash
+overturemaps download --bbox=<Ihre Region> -f geoparquet --type=segment -o segment.geoparquet
+overturemaps download --bbox=<Ihre Region> -f geoparquet --type=connector -o connector.geoparquet
+zip -j overture.zip ./segment.geoparquet ./connector.geoparquet
+```
+
+Verwenden Sie für beide Downloads denselben Begrenzungsrahmen. Segments und Connectors müssen dasselbe Gebiet abdecken, sonst fügt sich das Netz nicht zusammen.
+
+Ein importiertes Straßennetz lässt sich **auf der Karte bearbeiten**: Zeichnen Sie eine Straße, und GOAT teilt und verbindet die Topologie, pflegt die Nodes und erstellt die Routing-Daten aus Ihren Änderungen neu. So können Sie eine geplante Verbindung testen, etwa eine neue Brücke, eine gesperrte Straße oder einen Radweg, und eine Analyse darauf erneut ausführen.
 
 ### Eigenes ÖPNV-Netz
 
-Da GOAT den Weg zu und von jeder Haltestelle routet, muss ein ÖPNV-Netz mit einem **Straßennetz verknüpft** sein. Sie wählen dieses Netz beim Hochladen aus, entweder eines Ihrer eigenen oder das integrierte `Standard (Europa)`. Das Straßennetz muss also bereits vorhanden sein. Durch die Verknüpfung mit Ihrem eigenen Straßennetz berücksichtigt eine Fahrplananalyse auch die Straßen, die Sie geändert haben.
+Ihre Daten müssen ein Feed nach der [offiziellen GTFS-Spezifikation](https://gtfs.org/documentation/schedule/reference/) sein. Solche Feeds stammen üblicherweise aus einer von drei Quellen:
+
+**Fragen Sie uns nach einem Export.** Teilen Sie Plan4Better mit, welche Region Sie benötigen, und wir bereiten eine Datei vor, die Sie direkt hochladen können. Der schnellste Weg, wenn Sie nicht selbst nach einem Feed suchen möchten.
+
+**Gehen Sie zur Quelle.** Verkehrsunternehmen veröffentlichen ihre Feeds selbst, und viele Länder sammeln sie zentral. In Deutschland übernimmt das [DELFI](https://www.delfi.de/) bundesweit. So erhalten Sie die aktuellsten Daten und die klarsten Lizenzbedingungen.
+
+**Nutzen Sie einen Aggregator.** Die [Mobility Database](https://mobilitydatabase.org/) und [transit.land](https://www.transit.land/) erfassen Feeds von Betreibern weltweit. Das ist der einfachste Weg, einen Feed zu finden, wenn Sie nicht wissen, wer ihn veröffentlicht.
+
+Da GOAT den Weg zu und von jeder Haltestelle routet, muss ein ÖPNV-Netz mit einem **Straßennetz verknüpft** sein. Sie wählen dieses Netz beim Hochladen aus: das integrierte `Standard (Europa)` oder eines, das Sie vorher importiert haben.
+
+:::info Außerhalb Europas zuerst ein Straßennetz hochladen
+Das integrierte Netz `Standard (Europa)` deckt nur Europa ab. Liegen Ihre Fahrplandaten außerhalb, importieren Sie zuerst ein Straßennetz für diese Region. Sonst gibt es nichts, womit sich die Haltestellen verbinden ließen.
+:::
+
+Die Verknüpfung mit Ihrem eigenen Straßennetz sorgt außerdem dafür, dass eine Fahrplananalyse die Straßen berücksichtigt, die Sie geändert haben.
 
 Aus welchen Dateiformaten diese Netze importiert werden und aus welchen Layern sie bestehen, erfahren Sie unter [Datensatz-Typen](./dataset_types.md#straßennetze). Die Importschritte finden Sie unter [Inhalte hinzufügen](../workspace/content.md#inhalte-hinzufügen).

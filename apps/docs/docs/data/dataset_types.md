@@ -36,27 +36,27 @@ GOAT recognizes two types of feature datasets based on their source:
 
 ## Street Networks
 
-A **Street Network** is a routable representation of roads, paths and cycleways. GOAT provides a built-in network, and you can import your own whenever you want routing to run on data you control — a network you maintain yourself, or a planned one you want to test before it is built.
+A **Street Network** is a routable representation of roads, paths and cycleways. GOAT provides a built-in network, and you can import your own whenever you want routing to run on data you control: a network you maintain yourself, or a planned one you want to test before it is built.
 
-Your data must follow the **Overture** format — segments and connectors as Parquet files — packed into a `.zip` whose name contains `overture`, for example `overture.zip` or `berlin_overture.zip`. Other street data, including OpenStreetMap, is not supported at the moment.
+Your data must follow the **Overture** format, segments and connectors as Parquet files, packed into a `.zip` whose name contains `overture`, for example `overture.zip` or `berlin_overture.zip`. Other street data, including OpenStreetMap, is not supported at the moment.
 
 A street network is made up of two layers that GOAT keeps together:
 
-- **Edges** — the routable segments. This is the layer you edit when you change the network.
-- **Nodes** — the points where edges meet. GOAT maintains these for you whenever you save an edge, so the network stays routable.
+- **Edges**: the routable segments. This is the layer you edit when you change the network.
+- **Nodes**: the points where edges meet. GOAT maintains these for you whenever you save an edge, so the network stays routable.
 
 Street networks power GOAT's [Walking](../routing/walking), [Cycling](../routing/bicycle), [E-bike](../routing/bicycle), and [Car](../routing/car) routing. To import one, see [Adding content](../workspace/content.md#adding-content); for what GOAT's built-in network contains and how to bring your own, see [Network Datasets](./builtin_datasets.md#bringing-your-own-networks).
 
 ## Public Transport Networks
 
-A **Public Transport Network** describes the stops, lines and timetables of a transit system. GOAT provides a built-in network, and you can import your own whenever you want to analyse a service you control — your own feed, or a timetable you are planning.
+A **Public Transport Network** describes the stops, lines and timetables of a transit system. GOAT provides a built-in network, and you can import your own whenever you want to analyse a service you control: your own feed, or a timetable you are planning.
 
 Your data must follow the **GTFS** format, packed into a `.zip` whose name contains `gtfs`, for example `gtfs.zip` or `vbb_gtfs.zip`.
 
 The member layers follow the GTFS feed itself: **Stops**, **Routes**, **Trips** and **Stop times** are always present, and **Agency**, **Calendar** and **Shapes** are added when the feed provides them.
 
 :::info A Public Transport Network needs a Street Network
-GOAT connects stops to streets so that it can route the walk to and from a stop. You therefore choose a Street Network while uploading the GTFS file — either one of your own or GOAT's built-in `Default (Europe)` network — which means the street network has to exist first.
+GOAT connects stops to streets so that it can route the walk to and from a stop. You therefore choose a Street Network while uploading the GTFS file, either GOAT's built-in `Default (Europe)` network or one of your own, which then has to be imported first.
 :::
 
 Public transport networks power GOAT's [Public Transport](../routing/public_transport) routing. To import one, see [Adding content](../workspace/content.md#adding-content); for what GOAT's built-in network contains and how to bring your own, see [Network Datasets](./builtin_datasets.md#bringing-your-own-networks).

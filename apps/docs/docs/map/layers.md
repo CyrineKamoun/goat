@@ -25,119 +25,110 @@ The Layers Panel is your central hub for organizing and controlling all the data
 
 ### Add Layers
 
-You can add layers from [different sources](../data/dataset_types) to your map. You can either:
-- Integrate **datasets from your data explorer or the catalog explorer**
-- Upload new **datasets from your local device** (GeoPackage, GeoJSON, Shapefile, KML, CSV, or XLSX). 
-- Add external layers by inserting the **url of the external source** (WFS, WMS, WMTS, XYZ Tiles, or COG).
-- **Create a new empty layer** directly in your project.
+You can add layers from [different sources](../data/dataset_types) to your map:
 
+**New data**
 
+- **Upload file**: a dataset from your device (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet, and GTFS or Overture archives)
+- **Create layer**: a new empty layer you draw into
+- **Connect service**: a layer served by WFS, WMS, WMTS, XYZ Tiles or COG, added by URL
 
-<p></p>
+**Existing data**
+
+- **My datasets**: anything already in your spaces
+- **Catalog**: ready-made datasets from official providers
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">On the left panel, click on <code>+ Add Layer</code> to <strong>open the layer options</strong>. </div>
+  <div class="content">On the left panel, click <code>+ Add layer</code>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Select if you like to integrate a dataset using the: <code>Dataset Explorer</code>, <code>Dataset Upload</code>, <code>Dataset External</code>, <code>Catalog Explorer</code>, or <code>Create Layer</code> to <strong>choose your data source</strong>.</div>
+  <div class="content">Choose where the layer comes from.</div>
 </div>
 
 <Tabs>
-  <TabItem value="Dataset Explorer" label="Dataset Explorer" default className="tabItemBox">
-
+  <TabItem value="Upload" label="Upload file" default className="tabItemBox">
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Select the file you want to <strong>import</strong>.</div>
+  <div class="content">Drag a file onto the drop zone, or click to choose one. The supported formats are listed above it.</div>
 </div>
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Click on <code>+ Add Layer</code> to <strong>add the selected file</strong>.</div>
-</div>
-
-
-</TabItem>
-<TabItem value="Dataset Upload" label="Dataset Upload" className="tabItemBox">
-
-
-<div class="step">
-  <div class="step-number">3</div>
-  <div class="content">Select the file you want to <strong>import</strong>.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Define the name of the dataset and <strong>add a description</strong>, if you like.</div>
+  <div class="content">Give the dataset a name and, if you like, a description. For a CSV or XLSX you can also open <code>Set up columns</code> to pick the worksheet and say whether the first row holds column names.</div>
 </div>
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Check the information and click on <code>Upload</code> to <strong>upload the dataset</strong>.</div>
+  <div class="content">Click <code>Upload</code>.</div>
 </div>
 
+<div class="content"><strong>Street networks and GTFS feeds:</strong> a GTFS or Overture archive is imported as a <a href="../data/dataset_types#datasets-made-of-several-layers">bundle</a> rather than a single layer, and a public transport feed asks you to link it to a street network. See <a href="../data/builtin_datasets#bringing-your-own-networks">Network Datasets</a> for where to get this data and what happens on import.</div>
 
   </TabItem>
-  <TabItem value="Dataset External" label="Dataset External" className="tabItemBox">
-  
+  <TabItem value="Create" label="Create layer" className="tabItemBox">
+
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Insert your <code>external URL</code> and <strong>follow the steps</strong> depending on the type of dataset you would like to add.</div>
+  <div class="content">Enter a <strong>layer name</strong>, select the <strong>geometry type</strong> (<code>Point</code>, <code>Line</code>, <code>Polygon</code>, or <code>Table</code>), and define your <strong>fields</strong>. For full details, see <a href="./layer_editing">Layer Editing</a>.</div>
+</div>
+
+  </TabItem>
+  <TabItem value="My datasets" label="My datasets" className="tabItemBox">
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Browse or search your spaces for the dataset you want.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Select one or more and click <code>Add layer</code> (<code>Add 3 layers</code> when you have selected three).</div>
+</div>
+
+  </TabItem>
+  <TabItem value="Catalog" label="Catalog" className="tabItemBox">
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Search and filter the <a href="../workspace/catalog">Catalog</a> for the dataset you need. The same filters as the Catalog page are available here.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Select one or more datasets and click <code>Add layer</code>. GOAT prepares a copy for your project; the layer reads <code>Preparing data …</code> while that runs.</div>
+</div>
+
+  </TabItem>
+  <TabItem value="External" label="Connect service" className="tabItemBox">
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Enter the <code>URL</code> of the service, then follow the steps for the kind of source you are adding.</div>
 </div>
 
 <Tabs>
   <TabItem value="WFS" label="WFS" default className="tabItemBox">
-
-  <div class="step">
-      <div class="content"> <p>When you would like to add a WFS layer you need to have a <strong>GetCapabilities</strong> link. </p>
-      In the next step you can choose which layer you would like to add to your dataset. <strong>You can only choose one layer at a time.</strong></div>
-      </div>
-     </TabItem>
+    <div class="step">
+      <div class="content"><p>A WFS layer needs a <strong>GetCapabilities</strong> link.</p>You then choose which layer to add. <strong>Only one layer can be added at a time.</strong></div>
+    </div>
+  </TabItem>
 
   <TabItem value="WMS" label="WMS" className="tabItemBox">
-     
-  <div class="step">
-      <div class="content"> <p>When you would like to add a WMS layer you need to have a <strong>GetCapabilities</strong> link.</p> Here you have the option to select multiple layers, but when added to GOAT it <strong>will be merged onto one layer.</strong> </div>
-      </div>
-      </TabItem>
+    <div class="step">
+      <div class="content"><p>A WMS layer also needs a <strong>GetCapabilities</strong> link.</p>You can select several layers here, but GOAT <strong>merges them into one</strong>.</div>
+    </div>
+  </TabItem>
 
   <TabItem value="WMTS" label="WMTS" className="tabItemBox">
-
-  <div class="step">
-      <div class="content"> <p>You can add a WMTS to your dataset via a <strong>direct URL</strong> or <strong>GetCapabilities</strong> link. You can only choose *one layer* at a time if your URL contains more than one layer.</p>
-      The projection needs to be <strong>WEB Mercator (EPSG:3857) and GoogleMaps compatible</strong>. Because they have different zoom levels, the dataset would not show up in the list of available layers if it doesn't meet both requirements.</div>
-      </div>
-    </TabItem>
-  </Tabs>
-</TabItem>
-  <TabItem value="Catalog Explorer" label="Catalog Explorer" className="tabItemBox">
-
-<div class="step">
-  <div class="step-number">3</div>
-  <div class="content">Browse <code>GOAT Dataset Catalog</code> to <strong>explore available datasets</strong>.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Select the Dataset you want to <strong>import</strong>.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Click on <code>+ Add Layer</code> to <strong>add the selected dataset</strong>.</div>
-</div>
-
-
- </TabItem>
-  <TabItem value="Create Layer" label="Create Layer" className="tabItemBox">
-
-<div class="step">
-  <div class="step-number">3</div>
-  <div class="content">Create a new empty layer directly in your project. Enter a <strong>layer name</strong>, select the <strong>geometry type</strong> (<code>Point</code>, <code>Line</code>, <code>Polygon</code>, or <code>Table</code>), and define your <strong>fields</strong>. For full details, see <a href="./layer_editing">Layer Editing</a>.</div>
-</div>
+    <div class="step">
+      <div class="content"><p>A WMTS can be added by <strong>direct URL</strong> or <strong>GetCapabilities</strong> link. If the URL carries more than one layer, only one can be added at a time.</p>The projection must be <strong>Web Mercator (EPSG:3857)</strong> and GoogleMaps compatible. Zoom levels differ otherwise, so a source that does not meet both will not appear in the list.</div>
+    </div>
+  </TabItem>
+</Tabs>
 
   </TabItem>
 </Tabs>
@@ -192,7 +183,7 @@ Click the <img src={require('/img/icons/layer.png').default} alt="Group layers" 
 By clicking on <img src={require('/img/icons/3dots.png').default} alt="Options" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>more options</code> icon next to each layer you have further options to <strong>manage and organize</strong> the selected layer.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/map/layers/layer_options.webp').default} alt="Layer Options" style={{ maxHeight: "250px", maxWidth: "250px", objectFit: "cover", alignItems: 'center'}}/>
+<img src={require('/img/map/layers/layer_options.webp').default} alt="Layer Options" style={{ maxHeight: "auto", maxWidth: "420px", objectFit: "cover", alignItems: 'center'}}/>
 </div>
 
 <p></p>

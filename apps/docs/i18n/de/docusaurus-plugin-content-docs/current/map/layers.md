@@ -22,129 +22,113 @@ Das Layer Panel ist Ihre zentrale Anlaufstelle für die Organisation und Steueru
 
 ### Layer hinzufügen
 
-Sie können Layer aus [verschiedenen Quellen](../data/dataset_types) zu Ihrer Karte hinzufügen. Sie können entweder:
-- **Datensätze aus Ihrem Datensatz-Explorer oder dem Katalog-Explorer integrieren**
-- Neue **Datensätze von Ihrem lokalen Gerät hochladen** (GeoPackage, GeoJSON, Shapefile, KML, CSV oder XLSX)
-- Externe Layer durch Eingabe der **URL der externen Quelle** hinzufügen (WFS, WMS, WMTS, XYZ Tiles oder COG)
-- Einen **neuen leeren Layer** direkt in Ihrem Projekt erstellen
+Sie können Layer aus [verschiedenen Quellen](../data/dataset_types) zu Ihrer Karte hinzufügen:
 
-<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/map/layers/add_layer_de.webp').default} alt="Layer in GOAT hinzufügen" style={{ maxHeight: "flex", maxWidth: "flex", objectFit: "cover"}}/>
-</div>
+**Neue Daten**
 
-<p></p>
+- **Datei hochladen**: ein Datensatz von Ihrem Gerät (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet sowie GTFS- und Overture-Archive)
+- **Layer erstellen**: ein neuer, leerer Layer, in den Sie zeichnen
+- **Dienst verbinden**: ein Layer, der über WFS, WMS, WMTS, XYZ-Kacheln oder COG bereitgestellt wird, per URL eingebunden
+
+**Vorhandene Daten**
+
+- **Meine Datensätze**: alles, was bereits in Ihren Bereichen liegt
+- **Katalog**: fertige Datensätze von offiziellen Anbietern
+
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Navigieren Sie zum <code>Layer</code>-Menü über die <strong>linke Seitenleiste</strong>.</div>
+  <div class="content">Klicken Sie in der linken Leiste auf <code>+ Layer hinzufügen</code>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Klicken Sie auf <code>+ Layer hinzufügen</code>, um <strong>die Layer-Optionen zu öffnen</strong>.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">3</div>
-  <div class="content">Wählen Sie aus, ob Sie einen Datensatz über folgende Optionen integrieren möchten: <code>Datensatz-Explorer</code>, <code>Datensatz-Upload</code>, <code>Externer Datensatz</code>, <code>Katalog-Explorer</code> oder <code>Layer erstellen</code>, um <strong>Ihre Datenquelle zu wählen</strong>.</div>
+  <div class="content">Wählen Sie, woher der Layer stammt.</div>
 </div>
 
 <Tabs>
-  <TabItem value="Dataset Explorer" label="Datensatz-Explorer" default className="tabItemBox">
+  <TabItem value="Upload" label="Datei hochladen" default className="tabItemBox">
 
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Ziehen Sie eine Datei auf den Ablagebereich oder klicken Sie, um eine auszuwählen. Die unterstützten Formate stehen darüber.</div>
+</div>
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Wählen Sie die Datei aus, die Sie <strong>importieren</strong> möchten.</div>
+  <div class="content">Geben Sie dem Datensatz einen Namen und bei Bedarf eine Beschreibung. Bei CSV- oder XLSX-Dateien können Sie zusätzlich über <code>Spalten einrichten</code> das Arbeitsblatt wählen und angeben, ob die erste Zeile die Spaltennamen enthält.</div>
 </div>
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Klicken Sie auf <code>+ Layer hinzufügen</code>, um <strong>die ausgewählte Datei hinzuzufügen</strong>.</div>
+  <div class="content">Klicken Sie auf <code>Hochladen</code>.</div>
 </div>
 
-
-</TabItem>
-<TabItem value="Dataset Upload" label="Datensatz-Upload" className="tabItemBox">
-
-
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Wählen Sie die Datei aus, die Sie **importieren** möchten.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Definieren Sie den Namen des Datensatzes und <strong>fügen Sie eine Beschreibung hinzu</strong>, wenn Sie möchten.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">6</div>
-  <div class="content">Überprüfen Sie die Informationen und klicken Sie auf <code>Hochladen</code>, um <strong>den Datensatz hochzuladen</strong>.</div>
-</div>
-
+<div class="content"><strong>Straßennetze und GTFS-Feeds:</strong> ein GTFS- oder Overture-Archiv wird als <a href="../data/dataset_types#datensätze-aus-mehreren-layern">Datenpaket</a> importiert, nicht als einzelner Layer. Bei einem ÖPNV-Feed werden Sie außerdem gebeten, ihn mit einem Straßennetz zu verknüpfen. Woher Sie diese Daten bekommen und was beim Import geschieht, steht unter <a href="../data/builtin_datasets#eigene-netze-importieren">Netz-Datensätze</a>.</div>
 
   </TabItem>
-  <TabItem value="Dataset External" label="Externer Datensatz" className="tabItemBox">
-  
+  <TabItem value="Create" label="Layer erstellen" className="tabItemBox">
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Geben Sie einen <strong>Layer-Namen</strong> ein, wählen Sie den <strong>Geometrietyp</strong> (<code>Punkt</code>, <code>Linie</code>, <code>Polygon</code> oder <code>Tabelle</code>) und legen Sie die <strong>Felder</strong> fest. Ausführlich beschrieben in <a href="./layer_editing">Layer bearbeiten</a>.</div>
+</div>
+
+  </TabItem>
+  <TabItem value="My datasets" label="Meine Datensätze" className="tabItemBox">
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Durchsuchen Sie Ihre Bereiche nach dem gewünschten Datensatz.</div>
+</div>
+
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Geben Sie Ihre <code>externe URL</code> ein und <strong>folgen Sie den Schritten</strong> abhängig vom Typ des Datensatzes, den Sie hinzufügen möchten.</div>
+  <div class="content">Wählen Sie einen oder mehrere aus und klicken Sie auf <code>Layer hinzufügen</code> (<code>3 Layer hinzufügen</code>, wenn Sie drei ausgewählt haben).</div>
+</div>
+
+  </TabItem>
+  <TabItem value="Catalog" label="Katalog" className="tabItemBox">
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Durchsuchen und filtern Sie den <a href="../workspace/catalog">Katalog</a> nach dem passenden Datensatz. Es stehen dieselben Filter wie auf der Katalog-Seite zur Verfügung.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Wählen Sie einen oder mehrere Datensätze aus und klicken Sie auf <code>Layer hinzufügen</code>. GOAT bereitet eine Kopie für Ihr Projekt vor; der Layer zeigt währenddessen <code>Daten werden vorbereitet …</code>.</div>
+</div>
+
+  </TabItem>
+  <TabItem value="External" label="Dienst verbinden" className="tabItemBox">
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Geben Sie die <code>URL</code> des Dienstes ein und folgen Sie den Schritten für die Art der Quelle, die Sie einbinden.</div>
 </div>
 
 <Tabs>
   <TabItem value="WFS" label="WFS" default className="tabItemBox">
-
-  <div class="step">
-      <div class="content"> <p>Wenn Sie einen WFS-Layer hinzufügen möchten, benötigen Sie einen <strong>GetCapabilities</strong>-Link. </p>
-      Im nächsten Schritt können Sie wählen, welchen Layer Sie zu Ihrem Datensatz hinzufügen möchten. <strong>Sie können nur einen Layer zur Zeit auswählen.</strong></div>
-      </div>
-     </TabItem>
+    <div class="step">
+      <div class="content"><p>Für einen WFS-Layer benötigen Sie einen <strong>GetCapabilities</strong>-Link.</p>Anschließend wählen Sie den gewünschten Layer. <strong>Es lässt sich jeweils nur ein Layer hinzufügen.</strong></div>
+    </div>
+  </TabItem>
 
   <TabItem value="WMS" label="WMS" className="tabItemBox">
-     
-  <div class="step">
-      <div class="content"> <p>Wenn Sie einen WMS-Layer hinzufügen möchten, benötigen Sie einen <strong>GetCapabilities</strong>-Link.</p> Hier haben Sie die Option, mehrere Layer auszuwählen, aber wenn sie zu GOAT hinzugefügt werden, <strong>werden sie zu einem Layer zusammengeführt.</strong> </div>
-      </div>
-      </TabItem>
+    <div class="step">
+      <div class="content"><p>Auch ein WMS-Layer benötigt einen <strong>GetCapabilities</strong>-Link.</p>Hier können Sie mehrere Layer auswählen, GOAT <strong>führt sie jedoch zu einem zusammen</strong>.</div>
+    </div>
+  </TabItem>
 
   <TabItem value="WMTS" label="WMTS" className="tabItemBox">
-
-  <div class="step">
-      <div class="content"> <p>Sie können einen WMTS zu Ihrem Datensatz über eine <strong>direkte URL</strong> oder einen <strong>GetCapabilities</strong>-Link hinzufügen. Sie können nur <strong>einen Layer</strong> zur Zeit auswählen, wenn Ihre URL mehr als einen Layer enthält.</p>
-      Die Projektion muss <strong>Web Mercator (EPSG:3857) und GoogleMaps-kompatibel</strong> sein. Da sie verschiedene Zoomstufen haben, würde der Datensatz nicht in der Liste der verfügbaren Layer erscheinen, wenn er nicht beide Anforderungen erfüllt.</div>
-      </div>
-    </TabItem>
-  </Tabs>
-</TabItem>
-  <TabItem value="Catalog Explorer" label="Katalog-Explorer" className="tabItemBox">
-
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Durchsuchen Sie den <code>GOAT Datensatz-Katalog</code>, um <strong>verfügbare Datensätze zu erkunden</strong>.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Wählen Sie den Datensatz aus, den Sie <strong>importieren</strong> möchten.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">6</div>
-  <div class="content">Klicken Sie auf <code>+ Layer hinzufügen</code>, um <strong>den ausgewählten Datensatz hinzuzufügen</strong>.</div>
-</div>
-
-
- </TabItem>
-  <TabItem value="Create Layer" label="Layer erstellen" className="tabItemBox">
-
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Erstellen Sie einen neuen leeren Layer direkt in Ihrem Projekt. Geben Sie einen <strong>Layernamen</strong> ein, wählen Sie den <strong>Geometrietyp</strong> (<code>Point</code>, <code>Line</code>, <code>Polygon</code> oder <code>Table</code>) und definieren Sie Ihre <strong>Felder</strong>. Weitere Details finden Sie unter <a href="./layer_editing">Layer-Bearbeitung</a>.</div>
-</div>
-
+    <div class="step">
+      <div class="content"><p>Ein WMTS lässt sich über eine <strong>direkte URL</strong> oder einen <strong>GetCapabilities</strong>-Link einbinden. Enthält die URL mehrere Layer, kann jeweils nur einer hinzugefügt werden.</p>Die Projektion muss <strong>Web Mercator (EPSG:3857)</strong> und GoogleMaps-kompatibel sein. Andernfalls unterscheiden sich die Zoomstufen, und die Quelle erscheint nicht in der Liste.</div>
+    </div>
   </TabItem>
 </Tabs>
 
+  </TabItem>
+</Tabs>
 
 :::tip Tipp
 
@@ -217,7 +201,7 @@ Layer-Gruppen ermöglichen es Ihnen:
 Durch Klicken auf das <code>weitere Optionen</code> <img src={require('/img/icons/3dots.png').default} alt="Optionen" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> Symbol haben Sie weitere Optionen zur <strong>Verwaltung und Organisation</strong> des ausgewählten Layers.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
-<img src={require('/img/map/layers/layer_options_de.webp').default} alt="Layer-Optionen" style={{ maxHeight: "250px", maxWidth: "250px", objectFit: "cover", alignItems: 'center'}}/>
+<img src={require('/img/map/layers/layer_options_de.webp').default} alt="Layer-Optionen" style={{ maxHeight: "auto", maxWidth: "420px", objectFit: "cover", alignItems: 'center'}}/>
 </div>
 
 <p></p>
