@@ -390,15 +390,7 @@ const NumericScalebar: React.FC<{
   scaleDenominator: number;
   labelSx?: Record<string, unknown>;
 }> = ({ scaleDenominator, labelSx }) => {
-  const formatScale = (ratio: number): string => {
-    if (ratio >= 1000000) {
-      return `1:${(ratio / 1000000).toFixed(1)}M`;
-    }
-    if (ratio >= 1000) {
-      return `1:${(ratio / 1000).toFixed(0)}K`;
-    }
-    return `1:${ratio}`;
-  };
+  const formatScale = (ratio: number): string => `1:${Math.round(ratio).toLocaleString()}`;
 
   return (
     <Box
