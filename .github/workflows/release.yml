@@ -31,6 +31,10 @@ jobs:
   # Gate releases on the test suites. Change-detection picks the affected
   # suites on branch pushes; tag releases run everything (same override the
   # release jobs use). Advisory suites report green and never block.
+  # A push that touches none of their paths skips every suite, and a skipped
+  # `test` would skip each release job below that needs it. So those jobs
+  # check `!failure() && !cancelled()` rather than the implicit success():
+  # skipped suites don't block a release, failed ones still do.
   test:
     name: test
     needs: file-changes
@@ -61,7 +65,7 @@ jobs:
 
   release-docker-web:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.web == 'true' || startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.web == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -77,7 +81,7 @@ jobs:
 
   release-docker-core:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.core == 'true' || startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.core == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -93,8 +97,7 @@ jobs:
 
   release-docker-geoapi:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.geoapi == 'true' ||
-      startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.geoapi == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -110,8 +113,7 @@ jobs:
 
   release-docker-catalog:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.catalog == 'true' ||
-      startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.catalog == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -127,8 +129,7 @@ jobs:
 
   release-docker-processes:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.processes == 'true' ||
-      startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.processes == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -144,7 +145,7 @@ jobs:
 
   release-docker-storybook:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.storybook == 'true' || startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.storybook == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -160,7 +161,7 @@ jobs:
 
   release-docker-docs:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.docs == 'true' || startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.docs == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -176,7 +177,7 @@ jobs:
 
   release-docker-keycloak:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.keycloak-theme == 'true' || startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.keycloak-theme == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -193,7 +194,7 @@ jobs:
   # Windmill images - server and workers
   release-docker-windmill-server:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.processes == 'true' || startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.processes == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -210,7 +211,7 @@ jobs:
 
   release-docker-windmill-worker-default:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.processes == 'true' || startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.processes == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -227,7 +228,7 @@ jobs:
 
   release-docker-windmill-worker-tools:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.processes == 'true' || startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.processes == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
@@ -244,7 +245,7 @@ jobs:
 
   release-docker-windmill-worker-print:
     needs: [file-changes, lint, test]
-    if: needs.file-changes.outputs.processes == 'true' || startsWith(github.ref, 'refs/tags/v')
+    if: ${{ !failure() && !cancelled() && (needs.file-changes.outputs.processes == 'true' || startsWith(github.ref, 'refs/tags/v')) }}
     uses: ./.github/workflows/reusable-docker-build.yml
     permissions:
       contents: read
