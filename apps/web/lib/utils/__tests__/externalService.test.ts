@@ -172,6 +172,50 @@ describe("parseCapabilities — WMTS", () => {
   });
 });
 
+describe("parseCapabilities — WMTS from GeoWebCache", () => {
+  const url = "https://example.org/geoserver/gwc/service/wmts?REQUEST=GetCapabilities";
+  const service = parseCapabilities(url, fixture("wmts-geowebcache.xml"));
+  const layer = (id: string) => service.groups[0].layers.find((entry) => entry.id === id);
+  const rest = "https://example.org/geoserver/gwc/service/wmts/rest";
+
+  it("fills the template's placeholders whatever their case, the empty style included", () => {
+    expect(layer("ws:quad")?.tileUrl).toBe(`${rest}/ws:quad//WebMercatorQuad/{z}/{y}/{x}?format=image/png`);
+  });
+
+  it("draws the EPSG:900913 grid, naming each tile matrix as the service does", () => {
+    expect(layer("ws:gridset")?.unsupported).toBeUndefined();
+    expect(layer("ws:gridset")?.tileUrl).toBe(
+      `${rest}/ws:gridset//EPSG:900913/EPSG:900913:{z}/{y}/{x}?format=image/png`
+    );
+  });
+
+  it("draws a grid of 512 px tiles that cover what 256 px tiles do at the same level", () => {
+    expect(layer("ws:hidpi")?.tileUrl).toBe(
+      `${rest}/ws:hidpi//EPSG:900913x2/EPSG:900913x2:{z}/{y}/{x}?format=image/png`
+    );
+  });
+
+  it("marks only the layer without a resource URL as having no tiles", () => {
+    expect(layer("ws:kvp")?.unsupported).toEqual({ reason: "no_tiles" });
+    expect(layer("ws:quad")?.unsupported).toBeUndefined();
+  });
+
+  it("tells a layer offered only in formats the map can't draw as imagery from a KVP-only one", () => {
+    expect(layer("ws:vector")?.unsupported).toEqual({ reason: "format" });
+  });
+
+  it("refuses a Web Mercator grid whose levels are not the map's zoom levels", () => {
+    expect(layer("ws:offset")?.unsupported).toEqual({ reason: "grid" });
+  });
+
+  it("names the projection when no linked grid is Web Mercator, even without a resource URL", () => {
+    expect(layer("ws:national")?.unsupported).toEqual({
+      reason: "projection",
+      crs: ["EPSG:6870", "EPSG:4326"],
+    });
+  });
+});
+
 describe("parseCapabilities — WFS", () => {
   it("reads WFS 2.0 feature types as a single choice, copied into GOAT", () => {
     const service = parseCapabilities(WFS_URL, fixture("wfs-2.0.0.xml"));

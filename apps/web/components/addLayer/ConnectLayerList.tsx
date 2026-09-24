@@ -18,7 +18,7 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import type { ConnectedService, ServiceLayer } from "@/lib/utils/externalService";
+import type { ConnectedService, UnsupportedReason } from "@/lib/utils/externalService";
 import { serviceLayers } from "@/lib/utils/externalService";
 
 const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
@@ -70,13 +70,21 @@ const ConnectLayerList = ({
       return next;
     });
 
-  const unsupportedLabel = (layer: ServiceLayer) =>
-    layer.unsupported?.reason === "projection"
-      ? {
-          short: t("connect_service_only_crs", { crs: layer.unsupported.crs[0] ?? "" }),
-          long: t("connect_service_only_crs_tip", { crs: layer.unsupported.crs.join(", ") }),
-        }
-      : { short: t("connect_service_no_tiles"), long: t("connect_service_no_tiles_tip") };
+  const unsupportedLabel = (unsupported: UnsupportedReason) => {
+    switch (unsupported.reason) {
+      case "projection":
+        return {
+          short: t("connect_service_only_crs", { crs: unsupported.crs[0] ?? "" }),
+          long: t("connect_service_only_crs_tip", { crs: unsupported.crs.join(", ") }),
+        };
+      case "format":
+        return { short: t("connect_service_other_format"), long: t("connect_service_other_format_tip") };
+      case "grid":
+        return { short: t("connect_service_other_grid"), long: t("connect_service_other_grid_tip") };
+      case "no_tiles":
+        return { short: t("connect_service_no_tiles"), long: t("connect_service_no_tiles_tip") };
+    }
+  };
 
   return (
     <Stack sx={{ minHeight: 0, height: "100%" }}>
@@ -137,7 +145,7 @@ const ConnectLayerList = ({
                 group.layers.map((layer) => {
                   const checked = selected.includes(layer.id);
                   const off = !!layer.unsupported;
-                  const label = off ? unsupportedLabel(layer) : null;
+                  const label = layer.unsupported ? unsupportedLabel(layer.unsupported) : null;
                   const Control = service.multiple ? Checkbox : Radio;
                   return (
                     <Tooltip key={layer.id} title={label?.long ?? ""} placement="right" disableInteractive>

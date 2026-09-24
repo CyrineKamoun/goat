@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Capabilities xmlns="http://www.opengis.net/wmts/1.0" xmlns:ows="http://www.opengis.net/ows/1.1" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.0.0">
+  <ows:ServiceIdentification>
+    <ows:Title>Web Map Tile Service - GeoWebCache</ows:Title>
+  </ows:ServiceIdentification>
+  <Contents>
+    <Layer>
+      <ows:Title>Quad</ows:Title>
+      <ows:Identifier>ws:quad</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier/></Style>
+      <Format>image/png</Format>
+      <TileMatrixSetLink><TileMatrixSet>WebMercatorQuad</TileMatrixSet></TileMatrixSetLink>
+      <ResourceURL format="image/png" resourceType="tile" template="https://example.org/geoserver/gwc/service/wmts/rest/ws:quad/{style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}?format=image/png"/>
+    </Layer>
+    <Layer>
+      <ows:Title>Gridset</ows:Title>
+      <ows:Identifier>ws:gridset</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier/></Style>
+      <Format>image/png</Format>
+      <TileMatrixSetLink><TileMatrixSet>EPSG:900913</TileMatrixSet></TileMatrixSetLink>
+      <ResourceURL format="image/png" resourceType="tile" template="https://example.org/geoserver/gwc/service/wmts/rest/ws:gridset/{style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}?format=image/png"/>
+    </Layer>
+    <Layer>
+      <ows:Title>HiDPI</ows:Title>
+      <ows:Identifier>ws:hidpi</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier/></Style>
+      <Format>image/png</Format>
+      <TileMatrixSetLink><TileMatrixSet>EPSG:900913x2</TileMatrixSet></TileMatrixSetLink>
+      <ResourceURL format="image/png" resourceType="tile" template="https://example.org/geoserver/gwc/service/wmts/rest/ws:hidpi/{style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}?format=image/png"/>
+    </Layer>
+    <Layer>
+      <ows:Title>KVP only</ows:Title>
+      <ows:Identifier>ws:kvp</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier/></Style>
+      <Format>image/png</Format>
+      <TileMatrixSetLink><TileMatrixSet>WebMercatorQuad</TileMatrixSet></TileMatrixSetLink>
+    </Layer>
+    <Layer>
+      <ows:Title>Vector</ows:Title>
+      <ows:Identifier>ws:vector</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier/></Style>
+      <Format>application/vnd.mapbox-vector-tile</Format>
+      <TileMatrixSetLink><TileMatrixSet>EPSG:900913</TileMatrixSet></TileMatrixSetLink>
+      <ResourceURL format="application/vnd.mapbox-vector-tile" resourceType="tile" template="https://example.org/geoserver/gwc/service/wmts/rest/ws:vector/{style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}?format=application/vnd.mapbox-vector-tile"/>
+      <ResourceURL format="application/json" resourceType="FeatureInfo" template="https://example.org/geoserver/gwc/service/wmts/rest/ws:vector/{style}/{TileMatrixSet}/{TileMatrix}/{TileRow}/{TileCol}/{J}/{I}?format=application/json"/>
+    </Layer>
+    <Layer>
+      <ows:Title>Offset grid</ows:Title>
+      <ows:Identifier>ws:offset</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier>default</ows:Identifier></Style>
+      <Format>image/png</Format>
+      <TileMatrixSetLink><TileMatrixSet>EPSG_3857_16</TileMatrixSet></TileMatrixSetLink>
+      <ResourceURL format="image/png" resourceType="tile" template="https://example.org/tiles/ws:offset/{TileMatrixSet}/{TileMatrix}/{TileCol}/{TileRow}"/>
+    </Layer>
+    <Layer>
+      <ows:Title>National grid</ows:Title>
+      <ows:Identifier>ws:national</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier/></Style>
+      <Format>image/png</Format>
+      <TileMatrixSetLink><TileMatrixSet>EPSG:6870</TileMatrixSet></TileMatrixSetLink>
+      <TileMatrixSetLink><TileMatrixSet>EPSG:4326</TileMatrixSet></TileMatrixSetLink>
+    </Layer>
+    <TileMatrixSet>
+      <ows:Identifier>WebMercatorQuad</ows:Identifier>
+      <ows:SupportedCRS>urn:ogc:def:crs:EPSG::3857</ows:SupportedCRS>
+      <TileMatrix><ows:Identifier>0</ows:Identifier><ScaleDenominator>5.59082264028717E8</ScaleDenominator><TopLeftCorner>-2.003750834E7 2.003750834E7</TopLeftCorner><TileWidth>256</TileWidth><TileHeight>256</TileHeight><MatrixWidth>1</MatrixWidth><MatrixHeight>1</MatrixHeight></TileMatrix>
+      <TileMatrix><ows:Identifier>1</ows:Identifier><ScaleDenominator>2.79541132014358E8</ScaleDenominator><TopLeftCorner>-2.003750834E7 2.003750834E7</TopLeftCorner><TileWidth>256</TileWidth><TileHeight>256</TileHeight><MatrixWidth>2</MatrixWidth><MatrixHeight>2</MatrixHeight></TileMatrix>
+    </TileMatrixSet>
+    <TileMatrixSet>
+      <ows:Identifier>EPSG:900913</ows:Identifier>
+      <ows:SupportedCRS>urn:ogc:def:crs:EPSG::900913</ows:SupportedCRS>
+      <TileMatrix><ows:Identifier>EPSG:900913:0</ows:Identifier><ScaleDenominator>5.590822639508929E8</ScaleDenominator><TopLeftCorner>-2.003750834E7 2.0037508E7</TopLeftCorner><TileWidth>256</TileWidth><TileHeight>256</TileHeight><MatrixWidth>1</MatrixWidth><MatrixHeight>1</MatrixHeight></TileMatrix>
+      <TileMatrix><ows:Identifier>EPSG:900913:1</ows:Identifier><ScaleDenominator>2.7954113197544646E8</ScaleDenominator><TopLeftCorner>-2.003750834E7 2.0037508E7</TopLeftCorner><TileWidth>256</TileWidth><TileHeight>256</TileHeight><MatrixWidth>2</MatrixWidth><MatrixHeight>2</MatrixHeight></TileMatrix>
+    </TileMatrixSet>
+    <TileMatrixSet>
+      <ows:Identifier>EPSG:900913x2</ows:Identifier>
+      <ows:SupportedCRS>urn:ogc:def:crs:EPSG::900913</ows:SupportedCRS>
+      <TileMatrix><ows:Identifier>EPSG:900913x2:0</ows:Identifier><ScaleDenominator>2.7954113197544646E8</ScaleDenominator><TopLeftCorner>-2.003750834E7 2.0037508E7</TopLeftCorner><TileWidth>512</TileWidth><TileHeight>512</TileHeight><MatrixWidth>1</MatrixWidth><MatrixHeight>1</MatrixHeight></TileMatrix>
+      <TileMatrix><ows:Identifier>EPSG:900913x2:1</ows:Identifier><ScaleDenominator>1.3977056598772323E8</ScaleDenominator><TopLeftCorner>-2.003750834E7 2.0037508E7</TopLeftCorner><TileWidth>512</TileWidth><TileHeight>512</TileHeight><MatrixWidth>2</MatrixWidth><MatrixHeight>2</MatrixHeight></TileMatrix>
+    </TileMatrixSet>
+    <TileMatrixSet>
+      <ows:Identifier>EPSG_3857_16</ows:Identifier>
+      <ows:SupportedCRS>EPSG:3857</ows:SupportedCRS>
+      <TileMatrix><ows:Identifier>00</ows:Identifier><ScaleDenominator>17471320.750897426</ScaleDenominator><TopLeftCorner>-20037508.342787 20037508.342787</TopLeftCorner><TileWidth>256</TileWidth><TileHeight>256</TileHeight><MatrixWidth>32</MatrixWidth><MatrixHeight>32</MatrixHeight></TileMatrix>
+      <TileMatrix><ows:Identifier>01</ows:Identifier><ScaleDenominator>8735660.375448713</ScaleDenominator><TopLeftCorner>-20037508.342787 20037508.342787</TopLeftCorner><TileWidth>256</TileWidth><TileHeight>256</TileHeight><MatrixWidth>64</MatrixWidth><MatrixHeight>64</MatrixHeight></TileMatrix>
+    </TileMatrixSet>
+    <TileMatrixSet>
+      <ows:Identifier>EPSG:6870</ows:Identifier>
+      <ows:SupportedCRS>urn:ogc:def:crs:EPSG::6870</ows:SupportedCRS>
+      <TileMatrix><ows:Identifier>EPSG:6870:0</ows:Identifier><ScaleDenominator>2500000.0</ScaleDenominator><TopLeftCorner>5002500.0 4000.0</TopLeftCorner><TileWidth>256</TileWidth><TileHeight>256</TileHeight><MatrixWidth>2</MatrixWidth><MatrixHeight>3</MatrixHeight></TileMatrix>
+    </TileMatrixSet>
+    <TileMatrixSet>
+      <ows:Identifier>EPSG:4326</ows:Identifier>
+      <ows:SupportedCRS>urn:ogc:def:crs:EPSG::4326</ows:SupportedCRS>
+      <TileMatrix><ows:Identifier>EPSG:4326:0</ows:Identifier><ScaleDenominator>2.795411320143589E8</ScaleDenominator><TopLeftCorner>90.0 -180.0</TopLeftCorner><TileWidth>256</TileWidth><TileHeight>256</TileHeight><MatrixWidth>2</MatrixWidth><MatrixHeight>1</MatrixHeight></TileMatrix>
+    </TileMatrixSet>
+  </Contents>
+</Capabilities>

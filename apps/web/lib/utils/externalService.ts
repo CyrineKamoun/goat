@@ -3,7 +3,7 @@ import WMSCapabilities from "ol/format/WMSCapabilities";
 import WMTSCapabilities from "ol/format/WMTSCapabilities";
 
 import { generateLayerGetLegendGraphicUrl, generateWmsUrl } from "@/lib/transformers/wms";
-import { convertWmtsToXYZUrl, getWmtsFlatLayers } from "@/lib/transformers/wmts";
+import { convertWmtsToXYZUrl } from "@/lib/transformers/wmts";
 import WFSCapabilities from "@/lib/utils/parser/ol/format/WFSCapabilities";
 import type { CreateLayerFromDataset, CreateRasterLayer } from "@/lib/validations/layer";
 import {
@@ -27,7 +27,11 @@ export type UnsupportedReason =
   /** Imagery is drawn in Web Mercator; the layer is offered only in these. */
   | { reason: "projection"; crs: string[] }
   /** A WMTS that serves tiles only by KVP request, with no REST template to draw. */
-  | { reason: "no_tiles" };
+  | { reason: "no_tiles" }
+  /** A WMTS whose tiles come only in formats the map cannot draw as imagery, such as vector tiles. */
+  | { reason: "format" }
+  /** A WMTS whose Web Mercator grid does not match the map's zoom levels, such as one offset by five. */
+  | { reason: "grid" };
 
 export type ServiceLayer = {
   /** The service's own name for it, unique within the service. */
@@ -247,24 +251,78 @@ const parseWms = (address: string, text: string): ConnectedService => {
   };
 };
 
+/** Web Mercator's extent along the equator, and the pixel size OGC scale denominators assume. */
+const WEB_MERCATOR_EXTENT = 2 * Math.PI * 6378137;
+const OGC_PIXEL_SIZE = 0.00028;
+
+/**
+ * What a tile matrix set names its matrices before the zoom level — `EPSG:900913:` for
+ * GeoWebCache's grid, nothing for most — or `null` for a set the map cannot draw as z/x/y:
+ * another projection, or a matrix whose tiles do not span the zoom level its name ends in.
+ * The span decides, not the scale, so 512 px tiles at twice the resolution draw too.
+ */
+const zoomMatrixPrefix = (set: any): string | null => {
+  const matrices: any[] = set?.TileMatrix ?? [];
+  if (!isWebMercator(String(set?.SupportedCRS ?? "")) || !matrices.length) return null;
+  let prefix: string | null = null;
+  for (const matrix of matrices) {
+    const name = String(matrix.Identifier ?? "").match(/^(.*?)(\d+)$/);
+    const span = (matrix.TileWidth ?? 256) * matrix.ScaleDenominator * OGC_PIXEL_SIZE;
+    const zoom = Math.log2(WEB_MERCATOR_EXTENT / span);
+    if (!name || Math.abs(zoom - Number(name[2])) > 0.01) return null;
+    if (prefix !== null && name[1] !== prefix) return null;
+    prefix = name[1];
+  }
+  return prefix;
+};
+
+/** Tile formats the map can draw, in order of preference. */
+const WMTS_TILE_FORMATS = ["image/png", "image/jpeg", "image/tiff", "image/png8"];
+
+/** A WMTS layer's resource URL templates for tiles, leaving out feature info. */
+const wmtsTileResources = (layer: any): any[] =>
+  (layer.ResourceURL ?? []).filter((resource: any) => resource.resourceType !== "FeatureInfo");
+
+/** The template in the first format the map draws as imagery. */
+const wmtsTemplate = (resources: any[]): string | undefined =>
+  WMTS_TILE_FORMATS.map((format) =>
+    resources.find((candidate) => String(candidate.format).includes(format))
+  ).find(Boolean)?.template;
+
+/** The first grid a WMTS layer links that the map draws as z/x/y, with its matrix prefix. */
+const wmtsZoomGrid = (layer: any, matrixSets: any[]): { id: string; prefix: string } | undefined => {
+  for (const link of layer.TileMatrixSetLink ?? []) {
+    const prefix = zoomMatrixPrefix(matrixSets.find((set) => set.Identifier === link.TileMatrixSet));
+    if (prefix !== null) return { id: link.TileMatrixSet, prefix };
+  }
+  return undefined;
+};
+
+/**
+ * Why a WMTS layer cannot be drawn, the most fundamental reason first: without Web Mercator,
+ * how the tiles are requested does not matter.
+ */
+const wmtsRefusal = (crs: string[], resources: any[], template?: string): UnsupportedReason => {
+  if (!crs.some(isWebMercator)) return { reason: "projection", crs };
+  if (!resources.length) return { reason: "no_tiles" };
+  if (!template) return { reason: "format" };
+  return { reason: "grid" };
+};
+
 const parseWmts = (address: string, text: string): ConnectedService => {
   const doc = new WMTSCapabilities().read(text) as any;
   const layers: any[] = doc?.Contents?.Layer ?? [];
   const matrixSets: any[] = doc?.Contents?.TileMatrixSet ?? [];
 
-  // One drawable option per layer: `getWmtsFlatLayers` lists every style × format pair,
-  // first style first and PNG before the other formats, so the first one is the default.
-  let options: any[] = [];
-  let kvpOnly = false;
-  try {
-    options = getWmtsFlatLayers(doc);
-  } catch {
-    // A layer without a ResourceURL: tiles are only served by KVP request.
-    kvpOnly = true;
-  }
-
   const entries: ServiceLayer[] = layers.map((layer) => {
-    const option = options.find((candidate) => candidate.Identifier === layer.Identifier);
+    const resources = wmtsTileResources(layer);
+    const template = wmtsTemplate(resources);
+    const grid = wmtsZoomGrid(layer, matrixSets);
+    // Drawn in its first style.
+    const tileUrl =
+      template && grid
+        ? convertWmtsToXYZUrl(template, layer.Style?.[0]?.Identifier ?? "", grid.id, grid.prefix)
+        : undefined;
     const linked = (layer.TileMatrixSetLink ?? []).map((link: any) => link.TileMatrixSet);
     const crs = unique(
       matrixSets
@@ -281,14 +339,8 @@ const parseWmts = (address: string, text: string): ConnectedService => {
       abstract: layer.Abstract || undefined,
       crs,
       bounds,
-      unsupported: option
-        ? undefined
-        : kvpOnly || !layer.ResourceURL?.length
-          ? { reason: "no_tiles" }
-          : { reason: "projection", crs },
-      tileUrl: option
-        ? convertWmtsToXYZUrl(option.ResourceURL, option.Style, option.TileMatrixSet)
-        : undefined,
+      unsupported: tileUrl ? undefined : wmtsRefusal(crs, resources, template),
+      tileUrl,
     };
   });
 
