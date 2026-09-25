@@ -7,12 +7,6 @@ from goatlib.analysis.schemas.heatmap import (
 )
 from pydantic import ValidationError
 
-_ANALYSIS_DATA = Path(__file__).parent.parent.parent / "data" / "analysis"
-requires_analysis_data = pytest.mark.skipif(
-    not (_ANALYSIS_DATA / "kita_munich.geojson").exists(),
-    reason="kita_munich.geojson / census_munich.geojson not in repo",
-)
-
 
 def test_huffmodel_schema_validation() -> None:
     """Test that HuffmodelParams schema validates correctly"""
@@ -60,18 +54,17 @@ def test_huffmodel_schema_validation() -> None:
     print("Schema validation tests passed")
 
 
-@requires_analysis_data
 def test_huff_model_workflow(data_root: Path, walking_matrix_dir: Path) -> None:
     """Test the Huff model workflow using kindergarten data"""
     result_dir = Path(__file__).parent.parent.parent / "result"
     result_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create opportunity layer using kindergarten data (kita.geojson)
-    opportunity_path = str(data_root / "analysis" / "kita_munich.geojson")
-    attractivity = "capacity"
+    # Opportunity layer: kindergartens in eastern Munich, with their capacity
+    opportunity_path = str(data_root / "analysis" / "kita_part_munich.gpkg")
+    attractivity = "capacity_int"
     max_cost = 30
     # Create demand layer using census data (population needing kindergarten services)
-    demand_path = str(data_root / "analysis" / "census_munich.geojson")
+    demand_path = str(data_root / "analysis" / "census_part_munich.parquet")
     demand_field = "einwohner"  # Population count as demand
 
     reference_area_path = str(data_root / "analysis" / "munich_districts.geojson")

@@ -9,12 +9,6 @@ from goatlib.analysis.schemas.heatmap import (
     TwoSFCAType,
 )
 
-_ANALYSIS_DATA = Path(__file__).parent.parent.parent / "data" / "analysis"
-requires_analysis_data = pytest.mark.skipif(
-    not (_ANALYSIS_DATA / "kita_munich.geojson").exists(),
-    reason="kita_munich.geojson / census_munich.geojson not in repo",
-)
-
 
 def test_2sfca_schema_validation():
     """Test 2SFCA parameter schema validation."""
@@ -198,7 +192,6 @@ def test_2sfca_basic_computation():
     )
 
 
-@requires_analysis_data
 def test_2sfca_workflow(data_root: Path, walking_matrix_dir: Path) -> None:
     """Test the standard 2SFCA workflow"""
     result_dir = Path(__file__).parent.parent.parent / "result"
@@ -207,12 +200,12 @@ def test_2sfca_workflow(data_root: Path, walking_matrix_dir: Path) -> None:
     # Create synthetic opportunity layers
     opportunity1 = Opportunity2SFCA(
         name="kita",
-        input_path=str(data_root / "analysis" / "kita_munich.geojson"),
-        capacity="capacity",
+        input_path=str(data_root / "analysis" / "kita_part_munich.gpkg"),
+        capacity="capacity_int",
         max_cost=30,
     )
     # Create synthetic demand layer
-    demand_path = str(data_root / "analysis" / "census_munich.geojson")
+    demand_path = str(data_root / "analysis" / "census_part_munich.parquet")
     demand_field = "einwohner"
 
     params = Heatmap2SFCAParams(
@@ -234,7 +227,6 @@ def test_2sfca_workflow(data_root: Path, walking_matrix_dir: Path) -> None:
     assert Path(results[0][1].path).exists()
 
 
-@requires_analysis_data
 def test_e2sfca_workflow(data_root: Path, walking_matrix_dir: Path) -> None:
     """Test the Enhanced 2SFCA workflow with impedance weighting"""
     result_dir = Path(__file__).parent.parent.parent / "result"
@@ -243,13 +235,13 @@ def test_e2sfca_workflow(data_root: Path, walking_matrix_dir: Path) -> None:
     # Create synthetic opportunity layers
     opportunity1 = Opportunity2SFCA(
         name="kita",
-        input_path=str(data_root / "analysis" / "kita_munich.geojson"),
-        capacity="capacity",
+        input_path=str(data_root / "analysis" / "kita_part_munich.gpkg"),
+        capacity="capacity_int",
         max_cost=30,
     )
 
     # Create synthetic demand layer
-    demand_path = str(data_root / "analysis" / "census_munich.geojson")
+    demand_path = str(data_root / "analysis" / "census_part_munich.parquet")
     demand_field = "einwohner"
 
     params = Heatmap2SFCAParams(
@@ -272,7 +264,6 @@ def test_e2sfca_workflow(data_root: Path, walking_matrix_dir: Path) -> None:
     assert Path(results[0][1].path).exists()
 
 
-@requires_analysis_data
 def test_m2sfca_workflow(data_root: Path, walking_matrix_dir: Path) -> None:
     """Test the Enhanced 2SFCA workflow with impedance weighting"""
     result_dir = Path(__file__).parent.parent.parent / "result"
@@ -281,13 +272,13 @@ def test_m2sfca_workflow(data_root: Path, walking_matrix_dir: Path) -> None:
     # Create synthetic opportunity layers
     opportunity1 = Opportunity2SFCA(
         name="kita",
-        input_path=str(data_root / "analysis" / "kita_munich.geojson"),
-        capacity="capacity",
+        input_path=str(data_root / "analysis" / "kita_part_munich.gpkg"),
+        capacity="capacity_int",
         max_cost=30,
     )
 
     # Create synthetic demand layer
-    demand_path = str(data_root / "analysis" / "census_munich.geojson")
+    demand_path = str(data_root / "analysis" / "census_part_munich.parquet")
     demand_field = "einwohner"
 
     params = Heatmap2SFCAParams(
