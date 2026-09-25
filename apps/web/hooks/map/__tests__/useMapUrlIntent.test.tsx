@@ -9,7 +9,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import { renderHook, waitFor } from "@testing-library/react";
 import React from "react";
 import { Provider } from "react-redux";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mapReducer } from "@/lib/store/map/slice";
 import { workflowReducer } from "@/lib/store/workflow/slice";
@@ -64,6 +64,13 @@ describe("useMapUrlIntent", () => {
     mockReportLayouts = undefined;
     window.history.replaceState(null, "", "/map/p1");
     replaceStateSpy = vi.spyOn(window.history, "replaceState");
+  });
+
+  // Restored after each test so the next one's setup call above reaches the
+  // real method: since Vitest 4, spying on a method that is already a spy
+  // returns that same spy, so its calls would carry over between tests.
+  afterEach(() => {
+    replaceStateSpy.mockRestore();
   });
 
   it("does nothing when the URL carries none of mode/workflow/layout", () => {

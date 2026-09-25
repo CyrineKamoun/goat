@@ -148,13 +148,13 @@
     "@types/react-dom": "^19.2.0",
     "@types/uuid": "^9.0.2",
     "@vitejs/plugin-react": "^4.2.1",
-    "@vitest/ui": "^1.0.4",
+    "@vitest/ui": "^5.0.2",
     "cross-env": "^7.0.3",
     "es-check": "^7.1.1",
     "eslint-config-p4b": "workspace:*",
     "jsdom": "^29.1.1",
     "react-rnd": "^10.4.1",
     "size-limit": "^8.2.6",
-    "vitest": "^3.2.6"
+    "vitest": "^5.0.2"
   }
 }

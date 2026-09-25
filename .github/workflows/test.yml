@@ -62,13 +62,13 @@ jobs:
       - name: 📥 Install Playwright Chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm --filter web exec playwright install --with-deps chromium
-      # vmForks creates the jsdom window once per worker instead of once per test
-      # file, and still gives each file its own modules and mocks: the suite ran
-      # in about half the time. It costs ~6 GB of memory at four workers, which
-      # a 16 GB runner has but many laptops don't, so it is set here and not in
-      # vitest.config.ts. The memory limit recycles a worker that leaks past 10%.
+      # vmForks builds the jsdom environment once per worker instead of once per
+      # test file, while each file still gets its own modules and mocks, so the
+      # suite runs about three times faster than on the default pool. It holds
+      # more memory, which a CI runner has room for and a laptop may not, so the
+      # pool is chosen here rather than in vitest.config.ts.
       - name: 🧪 Vitest
-        run: pnpm --filter web exec vitest run --pool=vmForks --poolOptions.vmForks.memoryLimit=0.1 --maxWorkers=4
+        run: pnpm --filter web exec vitest run --pool=vmForks --maxWorkers=4
 
   core:
     name: core (pytest)
