@@ -126,8 +126,8 @@ jobs:
           enable-cache: true
       # gdal is sdist-only and needs libgdal to build; only goatlib's WFS/
       # converter paths import it (lazily), so this suite runs without it.
-      # routing is the C++ package: compiling it took ~73 s of every job's
-      # ~80 s install, and only goatlib's bundle code imports it (lazily), so
+      # routing is the C++ package: compiling it was most of every job's
+      # install time, and only goatlib's bundle code imports it (lazily), so
       # every suite but goatlib skips it too.
       - name: 🐍 Install dependencies
         run: uv sync --frozen --all-packages --all-extras --no-install-package gdal --no-install-package routing

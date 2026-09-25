@@ -136,7 +136,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           # Default to the checked-out workspace. With no context,
           # build-push-action falls back to the Git context and BuildKit
-          # re-clones the whole repo (~1.5 GB) inside the builder, discarding
+          # re-clones the whole repository inside the builder, discarding
           # the checkout above.
           context: ${{ inputs.context || '.' }}
           file: ${{ inputs.file }}
@@ -235,7 +235,8 @@ jobs:
       # the highest vX.Y.Z in the repository, so a patch release on a maintenance
       # branch never overtakes a newer major and pre-release tags never qualify.
       # Tags come from ls-remote, not a checkout: a full-history clone of this
-      # repo took 5-27 minutes when every merge job ran one at the same time.
+      # repo is large, and with every merge job cloning at once it took far
+      # longer than the merge itself.
       - name: 🏷️ Decide whether this tag becomes latest
         id: latest
         run: |

@@ -47,9 +47,10 @@ def _settings_from_kwargs_only() -> Iterator[None]:
 def _catalog_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """The default fixture catalog, generated once per session.
 
-    Generating it takes ~0.4 s and most tests need one, which made generation
-    most of the suite's run time. The writer is deterministic (see
-    test_fixture_deterministic), so a copy is the same catalog.
+    Generating it is slow next to a single test, and most tests need one, so
+    generating it per test was most of the suite's run time. The writer is
+    deterministic (see test_fixture_deterministic), so a copy is the same
+    catalog.
     """
     template = tmp_path_factory.mktemp("catalog_template")
     write_catalog(template)
