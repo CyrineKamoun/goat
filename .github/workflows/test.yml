@@ -133,7 +133,9 @@ jobs:
         run: uv sync --frozen --all-packages --all-extras --no-install-package gdal --no-install-package routing
       # --no-sync: a bare `uv run` re-syncs and would pull gdal back in.
       - name: 🧪 pytest
-        run: uv run --no-sync pytest tests/
+        # -n 4: one worker per runner CPU; conftest gives each worker its own
+        # database schema.
+        run: uv run --no-sync pytest tests/ -n 4
         working-directory: apps/core
 
   alembic:
@@ -211,13 +213,33 @@ jobs:
       # reach their assertions without it.
       - name: 🌍 Install libgdal-dev and tippecanoe
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libgdal-dev tippecanoe
+      # routing is the C++ package, and building it is most of this job's
+      # install. uv rebuilds a path dependency after every checkout because its
+      # files look new, so the wheel is cached here instead. The key covers what
+      # the build reads (the package's files, including CMakeLists.txt with the
+      # libduckdb and nigiri versions it pins, plus the lockfile and the Python
+      # version) and the runner image: any change there builds a fresh wheel.
+      - name: 🖥️ Runner image
+        id: image
+        run: echo "os=$ImageOS" >> "$GITHUB_OUTPUT"
+      - name: 📦 Restore routing wheel
+        id: routing-wheel
+        uses: actions/cache@v4
+        with:
+          path: .routing-wheel
+          key: routing-wheel-${{ steps.image.outputs.os }}-${{ runner.arch }}-${{ hashFiles('packages/cpp/routing/**', 'uv.lock', '.python-version') }}
+      - name: 🏗️ Build routing wheel
+        if: steps.routing-wheel.outputs.cache-hit != 'true'
+        run: uv build --wheel packages/cpp/routing --out-dir .routing-wheel
       - name: 🐍 Install dependencies
-        run: uv sync --frozen --all-packages --all-extras
+        run: |
+          uv sync --frozen --all-packages --all-extras --no-install-package routing
+          uv pip install --no-deps .routing-wheel/*.whl
       - name: 🧪 pytest (unit, utils, io)
         # tests/integration is excluded on purpose: it needs a DuckLake catalog
         # and Postgres fixtures this job has no services for. tests/benchmarks
-        # holds manually-run scripts, not tests.
-        run: uv run --no-sync pytest tests/unit tests/utils tests/io
+        # holds manually-run scripts, not tests. -n 4: one worker per runner CPU.
+        run: uv run --no-sync pytest tests/unit tests/utils tests/io -n 4
         working-directory: packages/python/goatlib
 
   goatobs:
@@ -305,5 +327,6 @@ jobs:
       - name: 🐍 Install dependencies
         run: uv sync --frozen --all-packages --all-extras --no-install-package gdal --no-install-package routing
       - name: 🧪 pytest
-        run: uv run --no-sync pytest tests/
+        # -n 4: one worker per runner CPU.
+        run: uv run --no-sync pytest tests/ -n 4
         working-directory: apps/catalog
