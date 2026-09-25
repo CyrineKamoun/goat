@@ -121,8 +121,11 @@ jobs:
           enable-cache: true
       # gdal is sdist-only and needs libgdal to build; only goatlib's WFS/
       # converter paths import it (lazily), so this suite runs without it.
+      # routing is the C++ package: compiling it took ~73 s of every job's
+      # ~80 s install, and only goatlib's bundle code imports it (lazily), so
+      # every suite but goatlib skips it too.
       - name: 🐍 Install dependencies
-        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal --no-install-package routing
       # --no-sync: a bare `uv run` re-syncs and would pull gdal back in.
       - name: 🧪 pytest
         run: uv run --no-sync pytest tests/
@@ -169,7 +172,7 @@ jobs:
           version: "0.9.2"
           enable-cache: true
       - name: 🐍 Install dependencies
-        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal --no-install-package routing
       # `init` creates its own schemas and both extensions, so an empty
       # database is all this needs.
       - name: 🗄️ alembic upgrade head
@@ -230,7 +233,7 @@ jobs:
           version: "0.9.2"
           enable-cache: true
       - name: 🐍 Install dependencies
-        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal --no-install-package routing
       - name: 🧪 pytest
         run: uv run --no-sync pytest tests/
         working-directory: packages/python/goatobs
@@ -251,7 +254,7 @@ jobs:
           version: "0.9.2"
           enable-cache: true
       - name: 🐍 Install dependencies
-        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal --no-install-package routing
       - name: 🧪 pytest
         run: uv run --no-sync pytest tests/
         working-directory: apps/geoapi
@@ -272,7 +275,7 @@ jobs:
           version: "0.9.2"
           enable-cache: true
       - name: 🐍 Install dependencies
-        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal --no-install-package routing
       - name: 🧪 pytest
         run: uv run --no-sync pytest tests/
         working-directory: apps/processes
@@ -295,7 +298,7 @@ jobs:
           version: "0.9.2"
           enable-cache: true
       - name: 🐍 Install dependencies
-        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal --no-install-package routing
       - name: 🧪 pytest
         run: uv run --no-sync pytest tests/
         working-directory: apps/catalog

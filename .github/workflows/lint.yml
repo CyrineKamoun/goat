@@ -71,10 +71,10 @@ jobs:
           version: "0.9.2"
           enable-cache: true
 
-      # gdal is sdist-only and needs libgdal to build; ruff/mypy don't need
-      # it installed.
+      # gdal is sdist-only and needs libgdal to build, and routing is the C++
+      # package that takes ~73 s to compile; ruff/mypy need neither installed.
       - name: 🐍 Install Dependencies
-        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal --no-install-package routing
         working-directory: ${{ github.workspace }}
 
       # REQUIRED: ruff lint on the packages that are clean. Keeps them clean and
