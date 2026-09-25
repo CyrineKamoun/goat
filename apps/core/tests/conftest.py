@@ -31,6 +31,8 @@ from sqlalchemy import select, text
 # name when something outside pytest needs to know it.
 TEST_SCHEMA_PREFIX = "test_schema"
 _WORKER = os.environ.get("PYTEST_XDIST_WORKER")
+# Any fixed number works; it only has to be the same in every worker.
+_SETUP_LOCK = 870_421_117
 TEST_SCHEMA = os.environ.get("GOAT_TEST_SCHEMA") or (
     f"{TEST_SCHEMA_PREFIX}_{_WORKER}_{os.getpid()}"
     if _WORKER
@@ -110,53 +112,70 @@ async def session_fixture(event_loop):
             "customer": settings.SCHEMA,
         }
     )
-    async with session_manager.connect() as connection:
-        await connection.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
-        await _drop_abandoned_test_schemas(connection)
-        for schema in [settings.SCHEMA]:
-            await connection.execute(
-                text(f"""DROP SCHEMA IF EXISTS {schema} CASCADE""")
+    # xdist workers run this setup at the same time, and parts of it touch
+    # objects they share (CREATE EXTENSION, the functions in the `basic`
+    # schema), which Postgres does not allow concurrently even with IF NOT
+    # EXISTS. A session-level advisory lock makes the workers take turns; the
+    # engine runs in AUTOCOMMIT, so a transaction-level lock would be released
+    # at once.
+    async with session_manager.connect() as lock_connection:
+        await lock_connection.execute(text(f"SELECT pg_advisory_lock({_SETUP_LOCK})"))
+        try:
+            async with session_manager.connect() as connection:
+                await connection.execute(
+                    text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
+                )
+                await _drop_abandoned_test_schemas(connection)
+                for schema in [settings.SCHEMA]:
+                    await connection.execute(
+                        text(f"""DROP SCHEMA IF EXISTS {schema} CASCADE""")
+                    )
+                    await connection.execute(
+                        text(f"""CREATE SCHEMA IF NOT EXISTS {schema}""")
+                    )
+                await session_manager.drop_all(connection)
+                await session_manager.create_all(connection)
+                await connection.commit()
+            # `get_my_role` and other listing paths call `effective_role` /
+            # `can` — install the authz SQL functions into the test schema so any
+            # test hitting a project/layer/bundle endpoint has them, not just tests
+            # under tests/authz/ that install them again themselves (add-only, so
+            # re-running this is a no-op there).
+            async with session_manager.session() as function_session:
+                manager = AsyncFunctionManager(
+                    session=function_session,
+                    path="functions",
+                    schema="basic",
+                    schema_mapping={"basic": "basic", "customer": settings.SCHEMA},
+                )
+                await manager.add_functions()
+            # `folder_depth_check` enforces folder nesting depth <= 3 and same-space
+            # parents at the DB level too, and `content_space_default` backfills
+            # space_id from the folder on insert — install both the same way
+            # init_triggers.py does for a real deploy (`customer.` substituted to
+            # the active schema), so any test that inserts/updates folder/layer/
+            # project/bundle rows runs against them, not just the tests that target
+            # them directly.
+            triggers_dir = (
+                Path(__file__).resolve().parent.parent
+                / "src"
+                / "core"
+                / "db"
+                / "sql"
+                / "triggers"
             )
-            await connection.execute(text(f"""CREATE SCHEMA IF NOT EXISTS {schema}"""))
-        await session_manager.drop_all(connection)
-        await session_manager.create_all(connection)
-        await connection.commit()
-    # `get_my_role` and other listing paths call `effective_role` /
-    # `can` — install the authz SQL functions into the test schema so any
-    # test hitting a project/layer/bundle endpoint has them, not just tests
-    # under tests/authz/ that install them again themselves (add-only, so
-    # re-running this is a no-op there).
-    async with session_manager.session() as function_session:
-        manager = AsyncFunctionManager(
-            session=function_session,
-            path="functions",
-            schema="basic",
-            schema_mapping={"basic": "basic", "customer": settings.SCHEMA},
-        )
-        await manager.add_functions()
-    # `folder_depth_check` enforces folder nesting depth <= 3 and same-space
-    # parents at the DB level too, and `content_space_default` backfills
-    # space_id from the folder on insert — install both the same way
-    # init_triggers.py does for a real deploy (`customer.` substituted to
-    # the active schema), so any test that inserts/updates folder/layer/
-    # project/bundle rows runs against them, not just the tests that target
-    # them directly.
-    triggers_dir = (
-        Path(__file__).resolve().parent.parent
-        / "src"
-        / "core"
-        / "db"
-        / "sql"
-        / "triggers"
-    )
-    for trigger_name in ("folder_depth.sql", "content_space_default.sql"):
-        trigger_sql = (
-            (triggers_dir / trigger_name)
-            .read_text()
-            .replace("customer.", f"{settings.SCHEMA}.")
-        )
-        async with session_manager.session() as trigger_session:
-            await trigger_session.execute(text(trigger_sql))
+            for trigger_name in ("folder_depth.sql", "content_space_default.sql"):
+                trigger_sql = (
+                    (triggers_dir / trigger_name)
+                    .read_text()
+                    .replace("customer.", f"{settings.SCHEMA}.")
+                )
+                async with session_manager.session() as trigger_session:
+                    await trigger_session.execute(text(trigger_sql))
+        finally:
+            await lock_connection.execute(
+                text(f"SELECT pg_advisory_unlock({_SETUP_LOCK})")
+            )
     yield
     logging.info("Starting session_fixture finalizer")
     async with session_manager.connect() as connection:
