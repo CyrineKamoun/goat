@@ -607,14 +607,16 @@ def _envelope_match_sql(west: float, south: float, east: float, north: float) ->
 
     Intersection over union: dividing by the row's own area alone asks "is all
     of you inside", which a village answers as well as a nationwide layer, so
-    `?nuts=DE` led with one city's points of interest.
+    `?nuts=DE` led with one city's points of interest. Times the share lying
+    inside, or a box merely the size of the rectangle outranks one within it.
 
     Arithmetic on the bbox columns, no spatial call per row: 144 ms against
     1,323 ms for the `ST_Intersection` form at a million rows.
 
     The bounds are inlined rather than bound: the expression repeats each one,
     and matching that order in a parameter list is a trap this file has fallen
-    into before. A zero-extent row scores 0, the limit of the ratio.
+    into before. A zero-extent row has no ratio to take and counts as matched;
+    rounding ties near-zero scores.
     """
     area = (east - west) * (north - south)
     overlap = (
@@ -625,7 +627,9 @@ def _envelope_match_sql(west: float, south: float, east: float, north: float) ->
     return (
         f"CASE WHEN (bbox_xmax >= {west} AND bbox_xmin <= {east} "
         f"AND bbox_ymax >= {south} AND bbox_ymin <= {north}) "
-        f"THEN ({overlap}) / NULLIF({own} + {area} - ({overlap}), 0) "
+        f"THEN ROUND(CASE WHEN {own} = 0 THEN 1.0 "
+        f"ELSE ({overlap}) * ({overlap}) "
+        f"/ NULLIF(({own} + {area} - ({overlap})) * {own}, 0) END, 3) "
         f"ELSE 0 END DESC"
     )
 
@@ -714,11 +718,13 @@ def _containment_rank_sql(p: SearchParams, add: Any, geom: str) -> str | None:
 
         # Built left to right, in the order the placeholders appear.
         overlap = f"ST_Area(ST_Intersection({geom}, {union()}))"
+        overlap_2 = f"ST_Area(ST_Intersection({geom}, {union()}))"
         region = f"ST_Area({union()})"
-        overlap_again = f"ST_Area(ST_Intersection({geom}, {union()}))"
+        overlap_3 = f"ST_Area(ST_Intersection({geom}, {union()}))"
         return (
-            f"COALESCE({overlap} / "
-            f"NULLIF(ST_Area({geom}) + {region} - {overlap_again}, 0), 0) DESC"
+            f"ROUND(COALESCE({overlap} * {overlap_2} / NULLIF("
+            f"(ST_Area({geom}) + {region} - {overlap_3}) * ST_Area({geom}), 0), "
+            f"0), 3) DESC"
         )
 
     return None
