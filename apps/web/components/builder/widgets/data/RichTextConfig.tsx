@@ -1,4 +1,4 @@
-import { Add } from "@mui/icons-material";
+import Add from "@mui/icons-material/Add";
 import { Button, Checkbox, FormControlLabel, Stack, TextField, Typography } from "@mui/material";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";

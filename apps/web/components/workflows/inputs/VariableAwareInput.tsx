@@ -17,7 +17,7 @@
  * pass-through to GenericInput for ALL input types.
  */
 
-import { DataObject as VariableIcon } from "@mui/icons-material";
+import VariableIcon from "@mui/icons-material/DataObject";
 import {
   Box,
   ClickAwayListener,

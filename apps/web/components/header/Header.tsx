@@ -1,6 +1,6 @@
 "use client";
 
-import { Info } from "@mui/icons-material";
+import Info from "@mui/icons-material/Info";
 import { Box, Button, Chip, IconButton, Link, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import Divider from "@mui/material/Divider";
 import { format, formatDistance, parseISO } from "date-fns";

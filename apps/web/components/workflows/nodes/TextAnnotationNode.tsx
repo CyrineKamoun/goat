@@ -1,6 +1,7 @@
 "use client";
 
-import { Delete as DeleteIcon, ContentCopy as DuplicateIcon } from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
+import DuplicateIcon from "@mui/icons-material/ContentCopy";
 import { Box, Divider, IconButton, Paper, Stack, Tooltip, useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import Subscript from "@tiptap/extension-subscript";

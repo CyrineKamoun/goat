@@ -5,7 +5,8 @@
  * Tools tab: All tools from OGC API Processes, organized by category.
  * Workflows tab: Project workflows that can be run with runtime variables.
  */
-import { Search as SearchIcon, Settings as SettingsIcon } from "@mui/icons-material";
+import SearchIcon from "@mui/icons-material/Search";
+import SettingsIcon from "@mui/icons-material/Settings";
 import {
   Box,
   CircularProgress,

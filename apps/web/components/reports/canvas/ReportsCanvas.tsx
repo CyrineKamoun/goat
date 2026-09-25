@@ -1,14 +1,12 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Fullscreen as FullscreenIcon,
-  NavigateNext as NextIcon,
-  NavigateBefore as PrevIcon,
-  Remove as RemoveIcon,
-} from "@mui/icons-material";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import NextIcon from "@mui/icons-material/NavigateNext";
+import PrevIcon from "@mui/icons-material/NavigateBefore";
+import RemoveIcon from "@mui/icons-material/Remove";
 import { Box, IconButton, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import type { StyleSpecification } from "maplibre-gl";

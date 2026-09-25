@@ -1,12 +1,10 @@
 "use client";
 
-import {
-  CancelOutlined as CancelOutlinedIcon,
-  ExpandLess as ExpandLessIcon,
-  ExpandMore as ExpandMoreIcon,
-  Search as SearchIcon,
-  Settings as SettingsIcon,
-} from "@mui/icons-material";
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import SearchIcon from "@mui/icons-material/Search";
+import SettingsIcon from "@mui/icons-material/Settings";
 import {
   Box,
   Card,

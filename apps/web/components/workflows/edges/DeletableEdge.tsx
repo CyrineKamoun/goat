@@ -1,6 +1,6 @@
 "use client";
 
-import { Delete as DeleteIcon } from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { IconButton, Stack, Tooltip, useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import {

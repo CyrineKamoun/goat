@@ -8,7 +8,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { DragIndicator as DragIndicatorIcon } from "@mui/icons-material";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import {
   Box,
   Button,

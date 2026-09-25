@@ -7,7 +7,8 @@
  * For tool nodes, displays the same inputs as GenericTool.
  * For dataset nodes, delegates to DatasetNodeSettings.
  */
-import { Block as BlockIcon, CheckCircle as CheckCircleIcon } from "@mui/icons-material";
+import BlockIcon from "@mui/icons-material/Block";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import {
   Box,
   Button,

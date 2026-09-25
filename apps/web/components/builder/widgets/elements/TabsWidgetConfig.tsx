@@ -3,14 +3,12 @@ import { DndContext, closestCenter } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  DragIndicator as DragIndicatorIcon,
-  ExpandLess,
-  ExpandMore,
-  MoreVert as MoreVertIcon,
-} from "@mui/icons-material";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import ExpandLess from "@mui/icons-material/ExpandLess";
+import ExpandMore from "@mui/icons-material/ExpandMore";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import {
   Box,
   Checkbox,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Description as ReportIcon } from "@mui/icons-material";
+import ReportIcon from "@mui/icons-material/Description";
 import {
   Alert,
   Box,

@@ -1,15 +1,13 @@
 "use client";
 
-import {
-  CloseFullscreen as CollapseIcon,
-  OpenInFull as ExpandIcon,
-  FitScreen as FitViewIcon,
-  Lock as LockIcon,
-  LockOpen as UnlockIcon,
-  AccountTree as WorkflowIcon,
-  Add as ZoomInIcon,
-  Remove as ZoomOutIcon,
-} from "@mui/icons-material";
+import CollapseIcon from "@mui/icons-material/CloseFullscreen";
+import ExpandIcon from "@mui/icons-material/OpenInFull";
+import FitViewIcon from "@mui/icons-material/FitScreen";
+import LockIcon from "@mui/icons-material/Lock";
+import UnlockIcon from "@mui/icons-material/LockOpen";
+import WorkflowIcon from "@mui/icons-material/AccountTree";
+import ZoomInIcon from "@mui/icons-material/Add";
+import ZoomOutIcon from "@mui/icons-material/Remove";
 import { Box, IconButton, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import {

@@ -1,4 +1,5 @@
-import { Delete as DeleteIcon, MoreVert as MoreVertIcon } from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import {
   Checkbox,
   FormControlLabel,

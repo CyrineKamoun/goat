@@ -1,7 +1,8 @@
 "use client";
 
 import { useDraggable } from "@dnd-kit/core";
-import { CancelOutlined as CancelOutlinedIcon, Download as DownloadIcon } from "@mui/icons-material";
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
+import DownloadIcon from "@mui/icons-material/Download";
 import {
   Box,
   Card,

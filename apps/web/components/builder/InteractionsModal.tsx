@@ -1,4 +1,5 @@
-import { ChevronRight, Close } from "@mui/icons-material";
+import ChevronRight from "@mui/icons-material/ChevronRight";
+import Close from "@mui/icons-material/Close";
 import { Badge, Box, Button, Divider, IconButton, Stack, Switch, Typography } from "@mui/material";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";

@@ -1,7 +1,9 @@
 import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Add, Close, DragIndicator } from "@mui/icons-material";
+import Add from "@mui/icons-material/Add";
+import Close from "@mui/icons-material/Close";
+import DragIndicator from "@mui/icons-material/DragIndicator";
 import { Box, Chip, Divider, IconButton, Menu, MenuItem, Stack, Tooltip, Typography } from "@mui/material";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";

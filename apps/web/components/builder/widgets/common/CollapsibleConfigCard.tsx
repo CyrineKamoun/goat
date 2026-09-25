@@ -1,4 +1,6 @@
-import { KeyboardArrowDown, KeyboardArrowRight, Close } from "@mui/icons-material";
+import KeyboardArrowDown from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowRight from "@mui/icons-material/KeyboardArrowRight";
+import Close from "@mui/icons-material/Close";
 import { Box, Collapse, IconButton, Stack, Typography } from "@mui/material";
 
 interface CollapsibleConfigCardProps {

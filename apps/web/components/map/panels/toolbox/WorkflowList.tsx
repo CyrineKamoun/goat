@@ -1,4 +1,4 @@
-import { AccountTree as WorkflowIcon } from "@mui/icons-material";
+import WorkflowIcon from "@mui/icons-material/AccountTree";
 import {
   Box,
   CircularProgress,

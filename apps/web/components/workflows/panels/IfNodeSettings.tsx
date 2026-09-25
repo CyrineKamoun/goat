@@ -1,10 +1,8 @@
 "use client";
 
-import {
-  Block as BlockIcon,
-  DataObject as VariableIcon,
-  Delete as DeleteIcon,
-} from "@mui/icons-material";
+import BlockIcon from "@mui/icons-material/Block";
+import VariableIcon from "@mui/icons-material/DataObject";
+import DeleteIcon from "@mui/icons-material/Delete";
 import {
   Box,
   Button,

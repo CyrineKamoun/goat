@@ -10,7 +10,8 @@
  *
  * Map tab is disabled if the data doesn't have geometry.
  */
-import { KeyboardArrowDown as CollapseIcon, DragHandle as DragHandleIcon } from "@mui/icons-material";
+import CollapseIcon from "@mui/icons-material/KeyboardArrowDown";
+import DragHandleIcon from "@mui/icons-material/DragHandle";
 import {
   Box,
   IconButton,

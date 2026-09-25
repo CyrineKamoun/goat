@@ -1,4 +1,4 @@
-import { Delete as DeleteIcon } from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { IconButton, Link, Stack, Switch, TextField, Typography, useTheme } from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";

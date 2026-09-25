@@ -1,4 +1,4 @@
-import { Delete } from "@mui/icons-material";
+import Delete from "@mui/icons-material/Delete";
 import { IconButton, Tooltip } from "@mui/material";
 import type { GridColDef, GridRenderCellParams } from "@mui/x-data-grid";
 import { DataGrid } from "@mui/x-data-grid";

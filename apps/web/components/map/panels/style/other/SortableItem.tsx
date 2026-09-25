@@ -1,6 +1,6 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { DragIndicator } from "@mui/icons-material";
+import DragIndicator from "@mui/icons-material/DragIndicator";
 import { MenuItem, Stack, useTheme } from "@mui/material";
 
 import { DragHandle } from "@/components/common/DragHandle";

@@ -1,12 +1,10 @@
 "use client";
 
-import {
-  CallSplit as CallSplitIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Delete as DeleteIcon,
-  ContentCopy as DuplicateIcon,
-} from "@mui/icons-material";
+import CallSplitIcon from "@mui/icons-material/CallSplit";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
+import DeleteIcon from "@mui/icons-material/Delete";
+import DuplicateIcon from "@mui/icons-material/ContentCopy";
 import { Box, Tooltip, Typography } from "@mui/material";
 import { type NodeProps, NodeToolbar, Position } from "@xyflow/react";
 import React, { memo, useCallback } from "react";

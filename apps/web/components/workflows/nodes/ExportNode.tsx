@@ -1,12 +1,10 @@
 "use client";
 
-import {
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Delete as DeleteIcon,
-  ContentCopy as DuplicateIcon,
-  Warning as WarningIcon,
-} from "@mui/icons-material";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
+import DeleteIcon from "@mui/icons-material/Delete";
+import DuplicateIcon from "@mui/icons-material/ContentCopy";
+import WarningIcon from "@mui/icons-material/Warning";
 import { Box, Stack, Tooltip, Typography } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { type NodeProps, NodeToolbar, Position, useEdges } from "@xyflow/react";

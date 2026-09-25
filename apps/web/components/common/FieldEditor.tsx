@@ -3,7 +3,7 @@ import { DndContext, closestCenter } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { DragIndicator as DragIndicatorIcon } from "@mui/icons-material";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import {
   Autocomplete,
   Box,

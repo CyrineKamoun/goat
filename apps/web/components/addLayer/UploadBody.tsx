@@ -1,6 +1,6 @@
 "use client";
 
-import { ErrorOutlineOutlined } from "@mui/icons-material";
+import ErrorOutlineOutlined from "@mui/icons-material/ErrorOutlineOutlined";
 import {
   Box,
   FormControlLabel,

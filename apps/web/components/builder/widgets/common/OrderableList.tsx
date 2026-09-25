@@ -3,12 +3,10 @@ import { DndContext, closestCenter } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  Delete as DeleteIcon,
-  DragIndicator as DragIndicatorIcon,
-  MoreVert as MoreVertIcon,
-  SwapVert as SortIcon,
-} from "@mui/icons-material";
+import DeleteIcon from "@mui/icons-material/Delete";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import SortIcon from "@mui/icons-material/SwapVert";
 import {
   Box,
   Chip,

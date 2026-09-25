@@ -1,14 +1,12 @@
 "use client";
 
-import {
-  Redo as RedoIcon,
-  PlayArrow as RunIcon,
-  NearMe as SelectIcon,
-  Stop as StopIcon,
-  StickyNote2 as TextIcon,
-  Undo as UndoIcon,
-  DataObject as VariablesIcon,
-} from "@mui/icons-material";
+import RedoIcon from "@mui/icons-material/Redo";
+import RunIcon from "@mui/icons-material/PlayArrow";
+import SelectIcon from "@mui/icons-material/NearMe";
+import StopIcon from "@mui/icons-material/Stop";
+import TextIcon from "@mui/icons-material/StickyNote2";
+import UndoIcon from "@mui/icons-material/Undo";
+import VariablesIcon from "@mui/icons-material/DataObject";
 import { Box, Button, IconButton, Tooltip } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import React from "react";
