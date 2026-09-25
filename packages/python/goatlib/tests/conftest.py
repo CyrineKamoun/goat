@@ -261,13 +261,16 @@ def traveltime_matrices_dir() -> Path:
     """
     Directory containing travel time matrices for heatmap tests.
 
-    Downloads the matrices from S3 if not already present locally.
-    The matrices are stored in /app/data/traveltime_matrices/ with hive partitioning.
+    Downloads the matrices if not already present locally, with hive
+    partitioning. They live in a folder of their own under data/test_fixtures:
+    the tools read every partition in the folder they're given, so a developer's
+    real matrices in data/traveltime_matrices (a different schema) made these
+    tests fail locally while they passed in CI.
     """
-    # Use root data folder for shared test data
     matrices_dir = (
         Path(__file__).parent.parent.parent.parent.parent
         / "data"
+        / "test_fixtures"
         / "traveltime_matrices"
     )
 
