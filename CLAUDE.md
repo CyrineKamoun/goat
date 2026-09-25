@@ -29,7 +29,7 @@ GOAT is an open-source WebGIS platform for integrated planning, built as a monor
 ### Frontend (web)
 ```bash
 pnpm web                          # Dev server on port 3000 (uses dotenv + turbo)
-pnpm build --filter=web           # Production build
+pnpm build --filter=@p4b/web      # Production build
 pnpm lint                         # ESLint across all JS packages
 pnpm lint:fix                     # ESLint autofix
 pnpm typecheck                    # TypeScript type checking
