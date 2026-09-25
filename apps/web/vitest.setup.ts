@@ -41,3 +41,37 @@ process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
 process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
 process.env.NEXT_PUBLIC_GEOAPI_URL = "http://localhost:8100";
 process.env.NEXT_PUBLIC_PROCESSES_URL = "http://localhost:8300";
+
+// next/dynamic, as a React.lazy component: the chunk still lands a tick
+// after the first render, as in the app, without Next's runtime (whose CJS
+// build pulls @swc/helpers in a way VM-based pools cannot load).
+vi.mock("next/dynamic", async () => {
+  const React = await import("react");
+  type Loaded =
+    | { default?: React.ComponentType<Record<string, unknown>> }
+    | React.ComponentType<Record<string, unknown>>;
+  return {
+    default: (
+      load: () => Promise<Loaded>,
+      options?: { loading?: React.ComponentType<Record<string, unknown>> }
+    ) => {
+      const Lazy = React.lazy(async () => {
+        const loaded = await load();
+        return {
+          default:
+            typeof loaded === "function"
+              ? loaded
+              : (loaded.default as React.ComponentType<Record<string, unknown>>),
+        };
+      });
+      const Loading = options?.loading;
+      const Dynamic = (props: Record<string, unknown>) =>
+        React.createElement(
+          React.Suspense,
+          { fallback: Loading ? React.createElement(Loading) : null },
+          React.createElement(Lazy, props)
+        );
+      return Dynamic;
+    },
+  };
+});
