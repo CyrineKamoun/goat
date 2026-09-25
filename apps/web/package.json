@@ -100,7 +100,7 @@
     "liquidjs": "^10.27.0",
     "lodash.uniq": "^4.5.0",
     "maplibre-gl": "^5.21.1",
-    "next": "16.2.12",
+    "next": "16.3.3",
     "next-auth": "^4.24.15",
     "nuqs": "^2.8.0",
     "ol": "10.1.0",
@@ -134,7 +134,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@next/bundle-analyzer": "^16.2.12",
+    "@next/bundle-analyzer": "^16.3.3",
     "@p4b/prettier-config": "workspace:*",
     "@p4b/tsconfig": "workspace:*",
     "@playwright/test": "^1.33.0",
