@@ -42,6 +42,6 @@ describe("MetaSidebar", () => {
     render(<MetaSidebar fields={fields} flat />);
 
     const list = screen.getByText("Owner").closest("aside")?.querySelector("aside > div > div");
-    expect(getComputedStyle(list as Element).borderStyle).toBe("");
+    expect(getComputedStyle(list as Element).borderStyle).toBe("none");
   });
 });

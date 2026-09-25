@@ -56,26 +56,14 @@ describe("ContentSpacesPanel", () => {
 
   it("keeps its card chrome by default and drops it when flush", () => {
     const paperOf = (element: HTMLElement) => element.querySelector(".MuiPaper-root") as HTMLElement;
-    // jsdom does not expand the `border` shorthand into computed longhands,
-    // so the rules Emotion wrote for this element are read instead.
-    const cssOf = (element: HTMLElement) => {
-      const classes = element.className.split(" ").filter((name) => name.startsWith("css-"));
-      return Array.from(document.querySelectorAll("style"))
-        .flatMap((style) => Array.from(style.sheet?.cssRules ?? []))
-        .filter((rule): rule is CSSStyleRule => "selectorText" in rule)
-        .filter((rule) => classes.some((name) => rule.selectorText.includes(`.${name}`)))
-        .map((rule) => rule.cssText)
-        .join(" ");
-    };
 
     const { container: page } = render(panel());
-    expect(cssOf(paperOf(page))).toMatch(/border:\s*1px solid/);
+    expect(getComputedStyle(paperOf(page)).borderStyle).toBe("solid");
+    expect(getComputedStyle(paperOf(page)).borderWidth).toBe("1px");
 
     const { container: rail } = render(panel({ flush: true }));
-    const css = cssOf(paperOf(rail));
     // The host draws the single rule beside a flush rail.
-    expect(css).toMatch(/border:\s*none/);
-    expect(css).not.toMatch(/border:\s*1px solid/);
+    expect(getComputedStyle(paperOf(rail)).borderStyle).toBe("none");
     expect(getComputedStyle(paperOf(rail)).boxShadow).toBe("none");
   });
 

@@ -48,7 +48,7 @@ describe("CatalogBundleMembers", () => {
 
     const style = listStyle(container);
     expect(style.overflowY).not.toBe("auto");
-    expect(style.maxHeight).toBe("");
+    expect(style.maxHeight).toBe("none");
   });
 
   it("scrolls as soon as there are more than five", () => {
