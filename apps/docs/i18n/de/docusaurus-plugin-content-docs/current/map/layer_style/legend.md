@@ -41,7 +41,7 @@ Bei der attributbasierten Darstellung mit einer Farbskala (jede Klassifizierungs
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Klicken Sie im Bereich <code>Stil</code> des Tabs <code>Stil</code> neben <code>Füllfarbe</code> oder <code>Strichfarbe</code> auf das Optionen-Symbol <img src={require('/img/icons/options.png').default} alt="Optionen-Symbol" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>. Ist unter <code>Farbe basierend auf</code> ein Feld ausgewählt, klicken Sie auf die Auswahl <code>Farbskala</code>, um das Klassifizierungsfenster zu öffnen. Siehe <a href="./style/attribute_based_styling">Attributbasiertes Styling</a>.</div>
+  <div class="content">Klicken Sie im Bereich <code>Stil</code> des Tabs <code>Stil</code> neben <code>Füllfarbe</code> oder <code>Strichfarbe</code> auf das Optionen-Symbol <img src={require('/img/icons/options.png').default} alt="Optionen-Symbol" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>. Ist unter <code>Farbe basierend auf</code> ein Feld ausgewählt, klicken Sie auf die Auswahl <code>Farbskala</code>, um das Klassifizierungsfenster zu öffnen. Siehe [Attributbasiertes Styling](./style/attribute_based_styling).</div>
 </div>
 
 <div class="step">

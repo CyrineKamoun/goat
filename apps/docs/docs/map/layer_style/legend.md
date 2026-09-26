@@ -38,7 +38,7 @@ When using attribute-based styling with a color scale (any classification method
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">In the <code>Style</code> section of the <code>Style</code> tab, click the options icon <img src={require('/img/icons/options.png').default} alt="Options Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> next to <code>Fill Color</code> or <code>Stroke Color</code>. With a field selected in <code>Color based on</code>, click the <code>Color scale</code> selector to open the classification panel. See <a href="./style/attribute_based_styling">Attribute-based Styling</a>.</div>
+  <div class="content">In the <code>Style</code> section of the <code>Style</code> tab, click the options icon <img src={require('/img/icons/options.png').default} alt="Options Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> next to <code>Fill Color</code> or <code>Stroke Color</code>. With a field selected in <code>Color based on</code>, click the <code>Color scale</code> selector to open the classification panel. See [Attribute-based Styling](./style/attribute_based_styling).</div>
 </div>
 
 <div class="step">

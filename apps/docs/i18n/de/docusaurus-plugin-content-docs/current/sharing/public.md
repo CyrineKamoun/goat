@@ -7,10 +7,10 @@ sidebar_position: 2
 
 **Wenn Sie ein Projekt öffentlich teilen, kann jeder Ihre Karte ansehen, ohne ein GOAT-Konto zu benötigen.** Diese Funktion eignet sich ideal, um räumliche Analysen zu präsentieren, Einblicke zu teilen oder interaktive Karten auf externen Plattformen einzubetten.
 
-Beim Veröffentlichen entsteht eine **Momentaufnahme** des Projekts: Die öffentliche Seite zeigt das Projekt so, wie es zum Zeitpunkt der Veröffentlichung war, während das Projekt selbst an seinem Platz bleibt und seine Zugriffsrechte behält. Besucher sehen das Projekt so, wie es im <a href="../builder/builder_interface">Dashboard</a> angeordnet ist.
+Beim Veröffentlichen entsteht eine **Momentaufnahme** des Projekts: Die öffentliche Seite zeigt das Projekt so, wie es zum Zeitpunkt der Veröffentlichung war, während das Projekt selbst an seinem Platz bleibt und seine Zugriffsrechte behält. Besucher sehen das Projekt so, wie es im [Dashboard](../builder/builder_interface) angeordnet ist.
 
 ::::info
-Öffentliches Teilen ist nur zum Ansehen. Wenn andere die Karte **bearbeiten** sollen, teilen Sie sie in den Tabs <code>Personen</code> und <code>Teams</code> des Dialogs <code>Teilen</code>. Siehe <a href="../sharing">Teams & Mitglieder</a>.
+Öffentliches Teilen ist nur zum Ansehen. Wenn andere die Karte **bearbeiten** sollen, teilen Sie sie in den Tabs <code>Personen</code> und <code>Teams</code> des Dialogs <code>Teilen</code>. Siehe [Teams & Mitglieder](../sharing).
 ::::
 
 ## Wie teile ich eine Karte öffentlich?
@@ -45,7 +45,7 @@ Nun können Sie:
 
 Sobald das Projekt veröffentlicht ist, bietet der Tab <code>Öffentlich</code> außerdem diese Einstellungen:
 
-- <code>Adresse</code> – Wenn Ihre Organisation eine eigene Domain eingerichtet hat, wählen Sie hier, ob die Karte über diese Domain oder über die <code>GOAT-Standarddomain</code> bereitgestellt wird. Ohne eigene Domain zeigt dieser Abschnitt nur den Link. Eigene Domains richten Sie unter <a href="../workspace/settings">Einstellungen</a> ein.
+- <code>Adresse</code> – Wenn Ihre Organisation eine eigene Domain eingerichtet hat, wählen Sie hier, ob die Karte über diese Domain oder über die <code>GOAT-Standarddomain</code> bereitgestellt wird. Ohne eigene Domain zeigt dieser Abschnitt nur den Link. Eigene Domains richten Sie unter [Einstellungen](../workspace/settings) ein.
 
 - <code>Messung</code> – Wählen Sie eine Analytics-Instanz, um Besuche der öffentlichen Seite zu messen, oder <code>Kein Tracking</code>. Hat Ihre Organisation keine Analytics-Instanz konfiguriert, weist der Tab darauf hin. Ist eine Instanz ausgewählt, legt der Schalter <code>Cookie-Einwilligungsbanner</code> fest, ob Besucher gefragt werden, bevor das Tracking startet. Wenn Sie ihn ausschalten, erscheint eine Warnung, da Tracking ohne Einwilligung in Deutschland und den meisten EU-Ländern nicht mit der DSGVO vereinbar ist.
 
@@ -71,7 +71,7 @@ Um zu steuern, wie weit Nutzer die Karte verschieben und herauszoomen können, k
   <div class="content">Klicken Sie auf <code>Kartenausdehnung sperren</code>. Die Karte lässt sich nun nicht mehr über diesen Bereich hinaus verschieben oder herauszoomen. Um die Sperre aufzuheben, klicken Sie im selben Menü auf <code>Kartenansicht entsperren</code>.</div>
 </div>
 
-Um stattdessen die Zoomstufen zu begrenzen, nutzen Sie <code>Zoom-Grenzen</code> in den <a href="../builder/settings">Einstellungen</a> des Dashboards.
+Um stattdessen die Zoomstufen zu begrenzen, nutzen Sie <code>Zoom-Grenzen</code> in den [Einstellungen](../builder/settings) des Dashboards.
 
 ::::info
 Wenn Ihre Karte bereits veröffentlicht ist, **müssen Sie sie erneut veröffentlichen**, damit die Änderungen wirksam werden. Der Link bleibt gleich.

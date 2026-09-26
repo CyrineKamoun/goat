@@ -68,14 +68,14 @@ Sie können Layer aus [verschiedenen Quellen](../data/dataset_types) zu Ihrer Ka
   <div class="content">Klicken Sie auf <code>Hochladen</code>.</div>
 </div>
 
-<div class="content"><strong>Straßennetze und GTFS-Feeds:</strong> ein GTFS- oder Overture-Archiv wird als <a href="../data/dataset_types#datensätze-aus-mehreren-layern">Datenpaket</a> importiert, nicht als einzelner Layer. Bei einem ÖPNV-Feed werden Sie außerdem gebeten, ihn mit einem Straßennetz zu verknüpfen. Woher Sie diese Daten bekommen und was beim Import geschieht, steht unter <a href="../data/builtin_datasets#eigene-netze-importieren">Netz-Datensätze</a>.</div>
+<div class="content"><strong>Straßennetze und GTFS-Feeds:</strong> ein GTFS- oder Overture-Archiv wird als [Datenpaket](../data/dataset_types#datensätze-aus-mehreren-layern) importiert, nicht als einzelner Layer. Bei einem ÖPNV-Feed werden Sie außerdem gebeten, ihn mit einem Straßennetz zu verknüpfen. Woher Sie diese Daten bekommen und was beim Import geschieht, steht unter [Netz-Datensätze](../data/builtin_datasets#eigene-netze-importieren).</div>
 
   </TabItem>
   <TabItem value="Create" label="Layer erstellen" className="tabItemBox">
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Geben Sie einen <strong>Layer-Namen</strong> ein, wählen Sie den <strong>Geometrietyp</strong> (<code>Punkt</code>, <code>Linie</code>, <code>Polygon</code> oder <code>Tabelle</code>) und legen Sie die <strong>Felder</strong> fest. Ausführlich beschrieben in <a href="./layer_editing">Layer bearbeiten</a>.</div>
+  <div class="content">Geben Sie einen <strong>Layer-Namen</strong> ein, wählen Sie den <strong>Geometrietyp</strong> (<code>Punkt</code>, <code>Linie</code>, <code>Polygon</code> oder <code>Tabelle</code>) und legen Sie die <strong>Felder</strong> fest. Ausführlich beschrieben in [Layer bearbeiten](./layer_editing).</div>
 </div>
 
   </TabItem>
@@ -96,7 +96,7 @@ Sie können Layer aus [verschiedenen Quellen](../data/dataset_types) zu Ihrer Ka
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Durchsuchen und filtern Sie den <a href="../workspace/catalog">Katalog</a> nach dem passenden Datensatz. Es stehen dieselben Filter wie auf der Katalog-Seite zur Verfügung.</div>
+  <div class="content">Durchsuchen und filtern Sie den [Katalog](../workspace/catalog) nach dem passenden Datensatz. Es stehen dieselben Filter wie auf der Katalog-Seite zur Verfügung.</div>
 </div>
 
 <div class="step">

@@ -7,10 +7,10 @@ sidebar_position: 2
 
 **Sharing a project publicly allows anyone to view your map without needing a GOAT account.** This feature is ideal for showcasing spatial analysis, sharing insights, or embedding interactive maps on external platforms.
 
-Publishing creates a **snapshot** of the project: the public page shows the project as it was when you published it, while the project itself stays where it is and keeps its access rights. Visitors see the project as it is laid out in the <a href="../builder/builder_interface">Dashboard</a>.
+Publishing creates a **snapshot** of the project: the public page shows the project as it was when you published it, while the project itself stays where it is and keeps its access rights. Visitors see the project as it is laid out in the [Dashboard](../builder/builder_interface).
 
 ::::info
-Public sharing is view-only. If you want others to **edit the map**, share it on the <code>People</code> and <code>Teams</code> tabs of the <code>Share</code> dialog. See <a href="../sharing">Teams & Members</a>.
+Public sharing is view-only. If you want others to **edit the map**, share it on the <code>People</code> and <code>Teams</code> tabs of the <code>Share</code> dialog. See [Teams & Members](../sharing).
 ::::
 
 ## How to Share a Map Publicly? 
@@ -45,7 +45,7 @@ Now you can:
 
 Once the project is published, the <code>Public</code> tab also offers these settings:
 
-- <code>Address</code> – If your organization has set up a custom domain, choose here whether the map is served from it or from the <code>GOAT default domain</code>. Without a custom domain, this section only shows the link. Custom domains are set up under <a href="../workspace/settings">Settings</a>.
+- <code>Address</code> – If your organization has set up a custom domain, choose here whether the map is served from it or from the <code>GOAT default domain</code>. Without a custom domain, this section only shows the link. Custom domains are set up under [Settings](../workspace/settings).
 
 - <code>Measurement</code> – Choose an analytics instance to measure visits to the public page, or <code>No tracking</code>. If your organization has not configured any analytics instance, the tab says so. With an instance selected, the <code>Cookie consent banner</code> switch decides whether visitors are asked before tracking starts. Turning it off shows a warning, because tracking without consent is not compliant with GDPR in Germany and most of the EU.
 
@@ -73,7 +73,7 @@ To control how far users can pan and zoom out, you can lock the map extent.
   <div class="content">Click <code>Lock map extent</code>. The map can no longer be panned or zoomed out beyond this area. To remove the limit, click <code>Unlock map view</code> in the same menu.</div>
 </div>
 
-To limit the zoom levels instead, use <code>Zoom limits</code> in the Dashboard <a href="../builder/settings">Settings</a>.
+To limit the zoom levels instead, use <code>Zoom limits</code> in the Dashboard [Settings](../builder/settings).
 
 ::::info
 If your map is already published, **you’ll need to republish it** for the changes to take effect. The link will remain the same.

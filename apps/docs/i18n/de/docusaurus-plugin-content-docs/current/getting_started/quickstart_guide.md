@@ -31,7 +31,7 @@ Sie sind in der Kartenansicht Ihres neuen Projekts gelandet. Jetzt ist es Zeit, 
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Klicken Sie oben im Panel <code>Layer</code> auf der linken Seite auf <code>Layer hinzufügen</code>. In einem leeren Projekt befindet sich die Schaltfläche in der Mitte des Panels. Wählen Sie unter <code>Neue Daten</code> <code>Datei hochladen</code>, <code>Layer erstellen</code>, um einen leeren Layer anzulegen, oder <code>Dienst verbinden</code> für eine WMS-, WMTS-, WFS-, XYZ- oder COG-Quelle. Wählen Sie unter <code>Vorhandene Daten</code> <code>Meine Datensätze</code> oder <code>Katalog</code>, um einen Datensatz hinzuzufügen, der bereits in GOAT vorhanden ist. Weitere Details zu den einzelnen Optionen finden Sie unter <a href="../map/layers">Layer</a>.</div>
+  <div class="content">Klicken Sie oben im Panel <code>Layer</code> auf der linken Seite auf <code>Layer hinzufügen</code>. In einem leeren Projekt befindet sich die Schaltfläche in der Mitte des Panels. Wählen Sie unter <code>Neue Daten</code> <code>Datei hochladen</code>, <code>Layer erstellen</code>, um einen leeren Layer anzulegen, oder <code>Dienst verbinden</code> für eine WMS-, WMTS-, WFS-, XYZ- oder COG-Quelle. Wählen Sie unter <code>Vorhandene Daten</code> <code>Meine Datensätze</code> oder <code>Katalog</code>, um einen Datensatz hinzuzufügen, der bereits in GOAT vorhanden ist. Weitere Details zu den einzelnen Optionen finden Sie unter [Layer](../map/layers).</div>
 </div>
 
 ## Analysewerkzeuge erkunden
@@ -44,7 +44,7 @@ Je nach den Layern, die Sie hinzugefügt haben, können Sie verschiedene Analyse
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Im Tab <code>Werkzeuge</code> sind die Werkzeuge in <code>Erreichbarkeitsindikatoren</code>, <code>Geoverarbeitung</code>, <code>Geoanalyse</code> und <code>Datenmanagement</code> gruppiert. Klicken Sie auf das Werkzeug, das Sie verwenden möchten, und vervollständigen Sie seine Einstellungen. Weitere Details finden Sie unter <a href="../category/toolbox">Werkzeugkiste</a>.</div>
+  <div class="content">Im Tab <code>Werkzeuge</code> sind die Werkzeuge in <code>Erreichbarkeitsindikatoren</code>, <code>Geoverarbeitung</code>, <code>Geoanalyse</code> und <code>Datenmanagement</code> gruppiert. Klicken Sie auf das Werkzeug, das Sie verwenden möchten, und vervollständigen Sie seine Einstellungen. Weitere Details finden Sie unter [Werkzeugkiste](../category/toolbox).</div>
 </div>
 
 ## Ihre Karte gestalten
@@ -62,7 +62,7 @@ Sobald Sie die Layer zu Ihrer Karte hinzugefügt und die Analyse berechnet haben
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Öffnen Sie in den Abschnitten darunter <code>Beschriftungen</code> und wählen Sie unter <code>Beschriftung nach</code> ein Feld aus, aktivieren Sie das <code>Popup</code> und richten Sie seinen Inhalt ein, und legen Sie unter <code>Legende</code> fest, ob der Layer angezeigt wird, und fügen Sie einen <code>Untertitel</code> hinzu. Weitere Details finden Sie unter <a href="../map/layer_style/style/styling">Layer-Stil</a>.</div>
+  <div class="content">Öffnen Sie in den Abschnitten darunter <code>Beschriftungen</code> und wählen Sie unter <code>Beschriftung nach</code> ein Feld aus, aktivieren Sie das <code>Popup</code> und richten Sie seinen Inhalt ein, und legen Sie unter <code>Legende</code> fest, ob der Layer angezeigt wird, und fügen Sie einen <code>Untertitel</code> hinzu. Weitere Details finden Sie unter [Layer-Stil](../map/layer_style/style/styling).</div>
 </div>
 
 ## Bereit, Ihre Arbeit zu teilen
@@ -80,5 +80,5 @@ Nachdem Sie Ihr erstes Projekt in GOAT erstellt haben, ist es Zeit, es mit ander
 
 <div class="step">
   <div class="step-number">11</div>
-  <div class="content">Klicken Sie unter <code>Adresse</code> auf <code>Link kopieren</code>, um einen direkten Link zu teilen. Klicken Sie unter <code>Einbetten</code> neben <code>Code einbetten</code> auf <code>Kopieren</code>, um den iframe-Code für eine Website zu kopieren. Weitere Details finden Sie unter <a href="../sharing/public">Öffentliches Teilen</a>.</div>
+  <div class="content">Klicken Sie unter <code>Adresse</code> auf <code>Link kopieren</code>, um einen direkten Link zu teilen. Klicken Sie unter <code>Einbetten</code> neben <code>Code einbetten</code> auf <code>Kopieren</code>, um den iframe-Code für eine Website zu kopieren. Weitere Details finden Sie unter [Öffentliches Teilen](../sharing/public).</div>
 </div>

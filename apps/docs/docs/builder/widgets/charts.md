@@ -23,7 +23,7 @@ The categories widget allows you to visualize the distribution of a categorical 
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Choose the <code>statistic method</code> <b>you want to apply</b>. It can be <code>Count</code>, <code>Sum</code>, <code>Min</code>, <code>Max</code>, or add your own <a href="../expressions"><code>Expression</code></a>.</div>
+  <div class="content">Choose the <code>statistic method</code> <b>you want to apply</b>. It can be <code>Count</code>, <code>Sum</code>, <code>Min</code>, <code>Max</code>, or add your own [`Expression`](../expressions).</div>
 </div>
 
 <div class="step">
@@ -138,7 +138,7 @@ Pie chart widget allows you to **visualize the distribution of a field** from a 
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Choose the <code>statistic method</code> <b>you want to apply</b>. It can be <code>Count</code>, <code>Sum</code>, <code>Min</code>, <code>Max</code>, or add your own <a href="../expressions"><code>Expression</code></a>.</div>
+  <div class="content">Choose the <code>statistic method</code> <b>you want to apply</b>. It can be <code>Count</code>, <code>Sum</code>, <code>Min</code>, <code>Max</code>, or add your own [`Expression`](../expressions).</div>
 </div>
 
 <div class="step">

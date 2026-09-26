@@ -167,7 +167,7 @@ Ideally, collect data on actual customer visits or market shares to estimate opt
 
 <div class="step">
   <div class="step-number">13</div>
-  <div class="content">Optionally, configure various routing options for your selected transport mode such as travel speed, max transfers, access/egress limits and more. Further information about mode-specific options can be found under the <a href="../../category/routing">Routing</a> section.</div>
+  <div class="content">Optionally, configure various routing options for your selected transport mode such as travel speed, max transfers, access/egress limits and more. Further information about mode-specific options can be found under the [Routing](../../category/routing) section.</div>
 </div>
 
 ### Result Layer

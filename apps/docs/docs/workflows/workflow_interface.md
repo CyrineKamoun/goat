@@ -62,7 +62,7 @@ The canvas workspace is where you can drag and drop nodes, zoom, pan, and select
 - <img src={require('/img/icons/text-card.png').default} alt="Text Card" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Text Card</code>: <strong>Add text annotations</strong> to document workflow steps
 - <img src={require('/img/icons/redo.png').default} alt="Redo" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Redo</code>: <strong>Restore the last undone action</strong>
 - <img src={require('/img/icons/undo.png').default} alt="Undo" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Undo</code>: <strong>Reverse the last action</strong>
-- <img src={require('/img/icons/variables.png').default} alt="Variables" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Variables</code>: <strong>Create and manage</strong> <a href="variables">workflow variables</a> for reusable parameters
+- <img src={require('/img/icons/variables.png').default} alt="Variables" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> <code>Variables</code>: <strong>Create and manage</strong> [workflow variables](variables) for reusable parameters
 - <img src={require('/img/icons/play.png').default} alt="Run" style={{ maxHeight: "40px", maxWidth: "40px", objectFit: "cover"}}/> <code>Run</code>: <strong>Execute the entire workflow</strong>
 
 **Minimap**: Located in the bottom right corner of the canvas, providing an overview navigator for complex workflows.
@@ -106,7 +106,7 @@ Give each **Save as Dataset** node a descriptive name and enable **Overwrite on 
   - [Custom SQL](custom_sql.md): Advanced data processing with SQL queries
 
 - **Control**
-  - <code>Conditional</code>: Add a branching node that routes the layer to a <strong>True</strong> or <strong>False</strong> path based on defined conditions. See <a href="if_clause">Conditional</a>.
+  - <code>Conditional</code>: Add a branching node that routes the layer to a <strong>True</strong> or <strong>False</strong> path based on defined conditions. See [Conditional](if_clause).
 
 
 **History Tab**

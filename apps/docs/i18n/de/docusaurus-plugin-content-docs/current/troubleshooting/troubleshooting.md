@@ -24,7 +24,7 @@ Wenn Sie eine Analyse in einem Projekt ausführen, wird die Aufgabe in der Softw
     style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover", marginRight: "8px" }} 
   />
   <span>
-    <strong>Sie können den  <a href="map/filter">Filter</a> verwenden, um Ihre Analyse in kleinere Ebenen zu unterteilen.</strong>
+    <strong>Sie können den  [Filter](map/filter) verwenden, um Ihre Analyse in kleinere Ebenen zu unterteilen.</strong>
   </span>
 </div>
 

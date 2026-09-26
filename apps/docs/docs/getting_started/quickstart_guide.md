@@ -32,7 +32,7 @@ You've landed in the map view of your new project. Now it's time to add some dat
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Click <code>Add layer</code> at the top of the <code>Layers</code> panel on the left. In an empty project, the button sits in the middle of the panel. Under <code>New data</code>, choose <code>Upload file</code>, <code>Create layer</code> to start an empty layer, or <code>Connect service</code> for a WMS, WMTS, WFS, XYZ or COG source. Under <code>Existing data</code>, choose <code>My datasets</code> or <code>Catalog</code> to add a dataset that is already in GOAT. For full details on each option, see <a href="../map/layers">Layers</a>.</div>
+  <div class="content">Click <code>Add layer</code> at the top of the <code>Layers</code> panel on the left. In an empty project, the button sits in the middle of the panel. Under <code>New data</code>, choose <code>Upload file</code>, <code>Create layer</code> to start an empty layer, or <code>Connect service</code> for a WMS, WMTS, WFS, XYZ or COG source. Under <code>Existing data</code>, choose <code>My datasets</code> or <code>Catalog</code> to add a dataset that is already in GOAT. For full details on each option, see [Layers](../map/layers).</div>
 </div>
 
 ## Explore the analysis tools
@@ -44,7 +44,7 @@ Depending on the layers you have added, you can run different analyses from the 
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">On the <code>Tools</code> tab, the tools are grouped into <code>Accessibility Indicators</code>, <code>Geoprocessing</code>, <code>Geoanalysis</code> and <code>Data Management</code>. Click the tool you want to use and complete its settings. For more detail, see <a href="../category/toolbox">Toolbox</a>.</div>
+  <div class="content">On the <code>Tools</code> tab, the tools are grouped into <code>Accessibility Indicators</code>, <code>Geoprocessing</code>, <code>Geoanalysis</code> and <code>Data Management</code>. Click the tool you want to use and complete its settings. For more detail, see [Toolbox](../category/toolbox).</div>
 </div>
 
 ## Style your map
@@ -62,7 +62,7 @@ Once you have added the layers to your map and computed the analysis, you can cu
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">In the sections below, open <code>Labels</code> and choose a field in <code>Label by</code>, switch on the <code>Popup</code> and set up its content, and in <code>Legend</code> choose whether the layer is shown and add a <code>Caption</code>. For more detail, see <a href="../map/layer_style/style/styling">Layer Styling</a>.</div>
+  <div class="content">In the sections below, open <code>Labels</code> and choose a field in <code>Label by</code>, switch on the <code>Popup</code> and set up its content, and in <code>Legend</code> choose whether the layer is shown and add a <code>Caption</code>. For more detail, see [Layer Styling](../map/layer_style/style/styling).</div>
 </div>
 
 ## Ready to share your work
@@ -80,5 +80,5 @@ Now that you have created your first project in GOAT, it's time to share it with
 
 <div class="step">
   <div class="step-number">11</div>
-  <div class="content">Under <code>Address</code>, click <code>Copy link</code> to share a direct link. Under <code>Embed</code>, click <code>Copy</code> next to <code>Embed Code</code> to copy the iframe code for a website. For more detail, see <a href="../sharing/public">Public Sharing</a>.</div>
+  <div class="content">Under <code>Address</code>, click <code>Copy link</code> to share a direct link. Under <code>Embed</code>, click <code>Copy</code> next to <code>Embed Code</code> to copy the iframe code for a website. For more detail, see [Public Sharing](../sharing/public).</div>
 </div>
