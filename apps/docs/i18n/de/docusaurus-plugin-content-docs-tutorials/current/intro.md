@@ -15,7 +15,7 @@ Willkommen zum GOAT Tutorials Bereich! Hier finden Sie Schritt-für-Schritt Anle
   <div className="col col--6">
     <DocCard item={{
       type: 'link',
-      href: '/tutorials/goat-erste-schritte/',
+      href: '/tutorials/goat-first-steps',
       label: '🚀 GOAT Erste Schritte',
       description: 'Lernen Sie die Grundlagen von GOAT durch eine umfassende Supermarkt-Erreichbarkeitsanalyse in Mannheim. Perfekt für Einsteiger in die Raumanalyse.',
       customProps: {
@@ -48,7 +48,7 @@ Jedes Tutorial ist in klare Abschnitte unterteilt, die Sie in Ihrem eigenen Temp
 
 ## Benötigen Sie Hilfe?
 
-- 📖 Schauen Sie in unsere [Dokumentation](/docs/intro) für detaillierte Feature-Referenzen
+- 📖 Schauen Sie in unsere [Dokumentation](/) für detaillierte Feature-Referenzen
 - 🎥 Schauen Sie sich unsere [YouTube-Tutorials](https://www.youtube.com/@Plan4Better) für Video-Anleitungen an
 - 💬 Folgen Sie uns auf [LinkedIn](https://www.linkedin.com/company/plan4better) für Updates
 - 📧 Kontaktieren Sie unser Support-Team für technische Unterstützung

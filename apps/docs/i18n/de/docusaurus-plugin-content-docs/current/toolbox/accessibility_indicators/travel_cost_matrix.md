@@ -98,7 +98,7 @@ Die Reisekostenmatrix ist für die **Massenberechnung über viele Ursprünge und
 
 :::tip Hinweis
 
-Die Berechnungszeit skaliert mit der Anzahl der OD-Paare. Den Fortschritt können Sie in der [Statusleiste](../../workspace/home#status-bar) verfolgen.
+Die Berechnungszeit skaliert mit der Anzahl der OD-Paare. Den Fortschritt können Sie in der [Statusleiste](../../workspace/workspace_interface.md#job-status) verfolgen.
 
 :::
 

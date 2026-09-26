@@ -264,5 +264,5 @@ You can add more steps and select multiple string values per group from the <cod
 
 
 :::tip HINT
-To reuse your dataset with the styling settings in other projects, [save your style as default](./styling#default-settings).
+To reuse your dataset with the styling settings in other projects, [save your style as default](./styling.md#copy-and-paste-style).
 :::

@@ -6,17 +6,19 @@ const { sidebarItemsGenerator } = require("./src/sidebar/sections");
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: "GOAT DOCS",
-  tagline: "GOATs are cool",
+  title: "GOAT Docs",
+  tagline: "Guides and reference for GOAT, the open-source WebGIS for integrated planning",
   favicon: "img/favicon.ico",
   url: "https://goat.plan4better.de",
   baseUrl: "/docs/",
   organizationName: "plan4better",
   projectName: "goat",
-  onBrokenLinks: "warn",
+  trailingSlash: false,
+  onBrokenLinks: "throw",
+  onBrokenAnchors: "throw",
   markdown: {
     hooks: {
-      onBrokenMarkdownLinks: "warn",
+      onBrokenMarkdownLinks: "throw",
     },
   },
   i18n: {
@@ -42,20 +44,15 @@ const config = {
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
           sidebarItemsGenerator,
-          editUrl: ({ locale, versionDocsDirPath, docPath }) => {
+          editUrl: ({ locale, docPath }) => {
             const translation = locale || 'en';
             if (translation !== 'en') {
               return `https://github.com/plan4better/goat/edit/main/apps/docs/i18n/${translation}/docusaurus-plugin-content-docs/current/${docPath}`;
             }
             return `https://github.com/plan4better/goat/edit/main/apps/docs/docs/${docPath}`;
           },
-          lastVersion: "current",
-          versions: {
-            current: {
-              path: "",
-            },
-          },
         },
+        blog: false,
         theme: {
           customCss: require.resolve("./src/css/custom.css"),
         },
@@ -89,6 +86,7 @@ const config = {
         blogTitle: "Release notes",
         blogSidebarTitle: "Release notes",
         showReadingTime: false,
+        onUntruncatedBlogPosts: "ignore",
         feedOptions: { type: null },
       },
     ],
@@ -96,8 +94,8 @@ const config = {
       "@docusaurus/plugin-client-redirects",
       {
         createRedirects(existingPath) {
-          // Redirect old /2.0/ versioned URLs to the new unversioned paths
-          return [`/2.0${existingPath}`];
+          // Links to /2.0/<page> land on <page>.
+          return existingPath.endsWith("/404.html") ? [] : [`/2.0${existingPath}`];
         },
       },
     ],
@@ -106,8 +104,7 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
-      // Replace with your project's social card
-      image: "img/GOAT_logo_white_green_crop_b.png",
+      image: "img/social-card.png",
       navbar: {
         logo: {
           alt: "GOAT by Plan4Better",
@@ -135,12 +132,6 @@ const config = {
             type: "localeDropdown",
             position: "right"
           },
-          // Re-enable when multiple doc versions exist:
-          // {
-          //   type: "docsVersionDropdown",
-          //   position: "right",
-          //   dropdownActiveClassDisabled: true,
-          // },
           {
             href: "https://github.com/plan4better/goat",
             label: "GitHub",

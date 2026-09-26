@@ -77,7 +77,7 @@ The example below shows an *Input Table (Matrix Layer)* and the resulting *Origi
 
 :::tip Hint
 
-Depending on the complexity of the OD-matrix, the calculation might take some minutes. The [status bar](../../workspace/home#status-bar) shows the current progress.
+Depending on the complexity of the OD-matrix, the calculation might take some minutes. The [status bar](../../workspace/workspace_interface.md#job-status) shows the current progress.
 
 :::
 

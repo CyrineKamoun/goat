@@ -1,5 +1,5 @@
 ---
-slug: /goat-erste-schritte
+slug: /goat-first-steps
 sidebar_position: 1
 sidebar_label: GOAT Erste Schritte
 ---
@@ -46,11 +46,11 @@ Bevor Sie starten:
 
 | Schritt | Thema                           | Dauer |
 | ------- | ------------------------------- | ----- |
-| 1       | [Einführung](./01start)             | 10 min |
-| 2       | [Projekt erstellen & vorbereiten](./04create-project)        | 15 min |
-| 3       | [Einzugsgebiete verstehen & erstellen](./08understand-tools)                    | 15 min |
-| 4      | [Karte teilen](./10share-map)                    | 3 min |
-| 5      | [Tutorial abgeschlossen!](./11congratulations)                    | 2 min |
+| 1       | [Einführung](./01start.md)             | 10 min |
+| 2       | [Projekt erstellen & vorbereiten](./04create-project.md)        | 15 min |
+| 3       | [Einzugsgebiete verstehen & erstellen](./08understand-tools.md)                    | 15 min |
+| 4      | [Karte teilen](./10share-map.md)                    | 3 min |
+| 5      | [Tutorial abgeschlossen!](./11congratulations.md)                    | 2 min |
 
 ## Für wen ist dieses Tutorial gedacht?
 
@@ -66,7 +66,7 @@ Der Fokus liegt auf Planungslogik, Interpretation und Anwendung – nicht auf te
 
 Falls Sie tiefer in ein Tool eintauchen möchten oder eine andere Erklärung benötigen:
 
-📚 **[Vollständige Dokumentation](/docs/getting_started/)** - Umfassende Leitfäden zu allen GOAT-Funktionen
+📚 **[Vollständige Dokumentation](/category/getting-started)** - Umfassende Leitfäden zu allen GOAT-Funktionen
 
 🎥 **[GOAT's Youtube-Kanal](#)** - Ausführliche technische Videos zu jedem Tool
 

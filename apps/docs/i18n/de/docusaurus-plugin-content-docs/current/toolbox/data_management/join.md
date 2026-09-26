@@ -192,6 +192,6 @@ In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüp
 
 :::tip Hinweis
 
-Die Berechnungszeit variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/home#status-bar) verfolgen.
+Die Berechnungszeit variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/workspace_interface.md#job-status) verfolgen.
 
 :::

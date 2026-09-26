@@ -183,7 +183,7 @@ For each mode, configure the **maximum travel time or distance** and the **trave
 
 :::tip Hint
 
-Calculation time varies by settings. Check the [status bar](../../workspace/home#status-bar) for progress.
+Calculation time varies by settings. Check the [status bar](../../workspace/workspace_interface.md#job-status) for progress.
 
 :::
 

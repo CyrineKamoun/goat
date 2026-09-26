@@ -251,5 +251,5 @@ Sie können mehr Schritte hinzufügen und mehrere String-Werte pro Gruppe aus de
 
 
 :::tip HINWEIS
-Um Ihren Datensatz mit den Styling-Einstellungen in anderen Projekten zu verwenden, [speichern Sie Ihren Stil als Standard](./styling#standard-einstellungen).
+Um Ihren Datensatz mit den Styling-Einstellungen in anderen Projekten zu verwenden, [speichern Sie Ihren Stil als Standard](./styling.md#stil-kopieren-und-einfügen).
 :::

@@ -61,6 +61,6 @@ Merging stacks features from multiple layers into one layer. Unlike a join, no m
 
 :::tip Hint
 
-Calculation time varies by settings. Check the [status bar](../../workspace/home#status-bar) for progress.
+Calculation time varies by settings. Check the [status bar](../../workspace/workspace_interface.md#job-status) for progress.
 
 :::

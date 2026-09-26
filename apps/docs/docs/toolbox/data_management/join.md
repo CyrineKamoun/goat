@@ -192,6 +192,6 @@ In this example, population data is joined to Berlin districts using both condit
 
 :::tip Hint
 
-Calculation time varies by settings. Check the [status bar](../../workspace/home#status-bar) for progress.
+Calculation time varies by settings. Check the [status bar](../../workspace/workspace_interface.md#job-status) for progress.
 
 :::

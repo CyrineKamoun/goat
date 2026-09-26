@@ -61,6 +61,6 @@ Beim Zusammenführen werden Objekte aus mehreren Layern in einem Layer vereint. 
 
 :::tip Hinweis
 
-Die Berechnungsdauer variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/home#status-bar) verfolgen.
+Die Berechnungsdauer variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/workspace_interface.md#job-status) verfolgen.
 
 :::
