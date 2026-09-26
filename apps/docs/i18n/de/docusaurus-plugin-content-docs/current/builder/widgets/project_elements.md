@@ -7,7 +7,7 @@ sidebar_position: 4
 
 # Projektelemente
 
-Dieser Abschnitt bietet zusätzliche Widgets, **um Ihr Dashboard abzurunden**: **Text**, **Trennelement**, **Bild**, **Tabs** und **Links**. Ziehen Sie das Widget per Drag & Drop auf ein Panel.
+Dieser Abschnitt bietet zusätzliche Widgets, **um Ihr Dashboard abzurunden**: **Text**, **Trennlinie**, **Bild**, **Tabs** und **Links**. Ziehen Sie das Widget per Drag & Drop auf ein Panel.
 
 
 ### Text
@@ -22,9 +22,9 @@ Fügen Sie Text zu Ihrem Dashboard hinzu. Sie können ihn mit den erscheinenden 
   <Video src={require('/img/builder/builder_text.mp4').default} alt="recent datasets" style={{ maxHeight: "500px", maxWidth: "auto", objectFit: "cover"}}/>
 </div> 
 
-### Trennelement
+### Trennlinie
 
-Das Trennelement-Widget **fügt eine horizontale Linie zu Ihrem Dashboard hinzu**, die verwendet werden kann, um verschiedene Abschnitte oder Elemente innerhalb des Dashboards visuell zu trennen.
+Das Widget Trennlinie **fügt eine horizontale Linie zu Ihrem Dashboard hinzu**, die verwendet werden kann, um verschiedene Abschnitte oder Elemente innerhalb des Dashboards visuell zu trennen.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <Video src={require('/img/builder/builder_divider.mp4').default} alt="recent datasets" style={{ maxHeight: "500px", maxWidth: "auto", objectFit: "cover"}}/>

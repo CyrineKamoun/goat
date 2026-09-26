@@ -41,7 +41,7 @@ Refers to the process of **extracting a portion of a vector dataset based on the
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Select the <code>Overlay layer</code> you want to use as the clip layer.</div>
+  <div class="content">Select the <code>Overlay Layer</code> you want to use as the clip layer.</div>
 </div>
 
 <div class="step">

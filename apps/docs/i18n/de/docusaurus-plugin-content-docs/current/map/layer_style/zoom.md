@@ -35,12 +35,12 @@ Alle Layer sind über die Zoom-Stufen 1-22 sichtbar, sofern nicht anders konfigu
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Wählen Sie Ihren Layer und navigieren Sie zu <code>Layer Design</code> <img src={require('/img/icons/styling.png').default} alt="Styling Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> und finden Sie den <code>Zoom-Sichtbarkeitsbereich</code></div>
+  <div class="content">Klicken Sie im <code>Layer</code>-Panel auf Ihren Layer. Rechts öffnet sich das Einstellungs-Panel des Layers; der Tab <code>Stil</code> ist ausgewählt. <code>Zoom-Sichtbarkeit</code> finden Sie ganz oben in diesem Tab. Die Markierung über der Skala zeigt die aktuelle Zoom-Stufe der Karte.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Stellen Sie Ihren Bereich ein, indem Sie <strong>die Griffe auf der Skala ziehen oder Werte manuell eingeben.</strong></div>
+  <div class="content">Stellen Sie Ihren Bereich ein, indem Sie <strong>die Griffe auf der Skala ziehen oder den Minimal- und Maximalwert manuell</strong> in die Felder darunter eingeben.</div>
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>

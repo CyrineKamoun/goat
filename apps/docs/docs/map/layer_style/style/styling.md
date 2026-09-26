@@ -13,12 +13,12 @@ sidebar_position: 1
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Select your layer and navigate to <code>Layer design</code> <img src={require('/img/icons/styling.png').default} alt="Styling Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> and find the <code>Style section</code></div>
+  <div class="content">In the <code>Layers</code> panel, click your layer. Its settings panel opens on the right with the tabs <code>Style</code>, <code>Filter</code> and <code>Metadata</code>, and the <code>Style</code> tab selected. The styling options are in the <code>Style</code> section of this tab.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Choose the styling category you want to modify: <code>Fill color</code>, <code>Stroke color</code>, <code>Stroke width</code>, <code>Line style</code> (line layers only), <code>Clustering</code>, <code>Custom Marker</code> and <code>Point settings</code> (point layers only).</div>
+  <div class="content">Choose the styling category you want to modify: <code>Fill Color</code> (point and polygon layers), <code>Stroke Color</code> (labelled <code>Color</code> for line layers), <code>Stroke Width</code>, <code>Line style</code> (line layers only), <code>Clustering</code>, <code>Custom Marker</code> and <code>Point Settings</code> (point layers only).</div>
 </div>
 
 ### Fill color
@@ -28,29 +28,33 @@ Fill color defines the interior appearance of point and polygon features.
   <div class="step-number">3</div>
   <div class="content">
     <p>
-     On <code>Color</code> use the <strong>Color picker to select your color</strong> or the <strong>Preset colors to choose from the predefined color palette</strong>.
+     On <code>Color</code> use the <strong>Color Picker to select your color</strong> or the <strong>Preset Colors to choose from the predefined color palette</strong>.
     </p>
   </div>
 </div>
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content"> Use the <code>opacity slider</code> or enter a value between 0 (transparent) and 1 (opaque) to <strong>control transparency</strong>.</div>
+  <div class="content">Click the options icon <img src={require('/img/icons/options.png').default} alt="Options Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> next to <code>Fill Color</code> to show its advanced options. Under <code>Opacity</code>, move the slider or enter a value between 0 (transparent) and 1 (opaque) to <strong>control transparency</strong>.</div>
 </div>
+
+:::info
+<code>Opacity</code> applies to the fill only. <code>Stroke Color</code> has no opacity setting: outlines of points and polygons are always drawn fully opaque, and line layers have no <code>Opacity</code> control in the <code>Style</code> section.
+:::
 
 ### Stroke color
 Stroke color applies to the outlines and edges of map features. It helps distinguish features and enhance their visibility.
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">  On <code>Color</code> use the <strong>Color picker</strong> or the <strong>Preset colors</strong> to <strong>customize stroke appearance</strong>.</div>
+  <div class="content">  On <code>Color</code> use the <strong>Color Picker</strong> or the <strong>Preset Colors</strong> to <strong>customize stroke appearance</strong>.</div>
 </div>
 
 ### Stroke width
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">  On <code>Stroke width</code> move the slider to <strong>adjust the thickness</strong> of lines and feature outlines.</div>
+  <div class="content">  On <code>Stroke Width</code> move the slider to <strong>adjust the thickness</strong> of lines and feature outlines.</div>
 </div>
 
 ### Line style
@@ -148,32 +152,32 @@ You can only edit the color of icons from the library, not uploaded custom icons
 <div class="step">
   <div class="step-number">14</div>
   <div class="content">
-  Under <code>Point settings</code>, on <code>Size</code> <strong>adjust the radius</strong> using the slider or enter precise values in the text box for exact control.
+  Under <code>Point Settings</code>, on <code>Size</code> <strong>adjust the radius</strong> using the slider or enter precise values in the text box for exact control.
   </div>
 </div>
 
 ## Copy and paste style
 
-The Layer Design panel has three quick-action icons at the top to manage styles across layers: **Copy style**, **Paste style**, and **Set as default**. This lets you apply a consistent look across multiple layers without reconfiguring each one manually.
+The <code>Style</code> tab of a layer's settings panel has three quick-action icons at the top to manage styles across layers: **Copy Style**, **Paste Style**, and **Set as Default**. This lets you apply a consistent look across multiple layers without reconfiguring each one manually.
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Select the layer whose style you want to copy and open <code>Layer design</code> <img src={require('/img/icons/styling.png').default} alt="Styling Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/>.</div>
+  <div class="content">In the <code>Layers</code> panel, click the layer whose style you want to copy. Its settings panel opens with the <code>Style</code> tab selected.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Click the <code>Copy style</code> icon at the top of the panel.</div>
+  <div class="content">Click the <code>Copy Style</code> icon at the top of the tab.</div>
 </div>
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Select the target layer, open its <code>Layer design</code> panel, and click <code>Paste style</code> to apply the copied style.</div>
+  <div class="content">Click the target layer in the <code>Layers</code> panel and click <code>Paste Style</code> at the top of its <code>Style</code> tab to apply the copied style.</div>
 </div>
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Optionally, click <code>Set as default</code> to save the current style as the default for future uses of this dataset.</div>
+  <div class="content">Optionally, click <code>Set as Default</code> to save the current style as the default for future uses of this dataset.</div>
 </div>
 
 :::tip Smart styling

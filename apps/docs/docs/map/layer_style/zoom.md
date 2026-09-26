@@ -35,12 +35,12 @@ All layers are visible across zoom levels 1-22 unless configured otherwise.
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Select your layer and navigate to <code>Layer design</code> <img src={require('/img/icons/styling.png').default} alt="Styling Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> and find the <code>Zoom visibility section</code></div>
+  <div class="content">In the <code>Layers</code> panel, click your layer. Its settings panel opens on the right with the <code>Style</code> tab selected. <code>Zoom Visibility</code> is at the top of this tab. The marker above the scale shows the current zoom level of the map.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Set your range by <strong>dragging the handles on the scale or manually entering values.</strong></div>
+  <div class="content">Set your range by <strong>dragging the handles on the scale or manually entering the minimum and maximum values</strong> in the fields below it.</div>
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>

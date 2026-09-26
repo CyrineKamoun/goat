@@ -22,7 +22,7 @@ You can find below common job failure and suggestions to solve them.
     style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover", marginRight: "8px" }} 
   />
   <span>
-    <strong>To perform analysis on large area, you can use the  <a href="map/filter">Filter</a> to split your analysis into smaller areas.</strong>
+    <strong>To perform analysis on large area, you can use the  [Filter](map/filter) to split your analysis into smaller areas.</strong>
   </span>
 </div>
 

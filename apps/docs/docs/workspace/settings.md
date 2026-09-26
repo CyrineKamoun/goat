@@ -94,7 +94,7 @@ Under **White Label**, you can publish dashboards on your own domain and configu
 
 ### Custom Domains
 
-**Publish your dashboards on your own domain.** Each domain serves one published project. To assign a domain to a project, use the Share dialog in the Dashboard Builder.
+**Publish your dashboards on your own domain.** Each domain serves one published project. To assign a domain to a project, choose it under `Address` on the `Public` tab of the project's `Share` dialog; see [Public Sharing](../sharing/public).
 
 **To add a custom domain:**
 

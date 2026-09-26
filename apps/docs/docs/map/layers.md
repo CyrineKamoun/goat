@@ -67,14 +67,14 @@ You can add layers from [different sources](../data/dataset_types) to your map:
   <div class="content">Click <code>Upload</code>.</div>
 </div>
 
-<div class="content"><strong>Street networks and GTFS feeds:</strong> a GTFS or Overture archive is imported as a <a href="../data/dataset_types#datasets-made-of-several-layers">bundle</a> rather than a single layer, and a public transport feed asks you to link it to a street network. See <a href="../data/builtin_datasets#bringing-your-own-networks">Network Datasets</a> for where to get this data and what happens on import.</div>
+<div class="content"><strong>Street networks and GTFS feeds:</strong> a GTFS or Overture archive is imported as a [bundle](../data/dataset_types#datasets-made-of-several-layers) rather than a single layer, and a public transport feed asks you to link it to a street network. See [Network Datasets](../data/builtin_datasets#bringing-your-own-networks) for where to get this data and what happens on import.</div>
 
   </TabItem>
   <TabItem value="Create" label="Create layer" className="tabItemBox">
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Enter a <strong>layer name</strong>, select the <strong>geometry type</strong> (<code>Point</code>, <code>Line</code>, <code>Polygon</code>, or <code>Table</code>), and define your <strong>fields</strong>. For full details, see <a href="./layer_editing">Layer Editing</a>.</div>
+  <div class="content">Enter a <strong>layer name</strong>, select the <strong>geometry type</strong> (<code>Point</code>, <code>Line</code>, <code>Polygon</code>, or <code>Table</code>), and define your <strong>fields</strong>. For full details, see [Layer Editing](./layer_editing).</div>
 </div>
 
   </TabItem>
@@ -95,7 +95,7 @@ You can add layers from [different sources](../data/dataset_types) to your map:
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Search and filter the <a href="../workspace/catalog">Catalog</a> for the dataset you need. The same filters as the Catalog page are available here.</div>
+  <div class="content">Search and filter the [Catalog](../workspace/catalog) for the dataset you need. The same filters as the Catalog page are available here.</div>
 </div>
 
 <div class="step">

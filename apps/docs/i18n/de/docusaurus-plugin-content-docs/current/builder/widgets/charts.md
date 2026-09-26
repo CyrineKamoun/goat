@@ -24,7 +24,7 @@ Das Kategorien-Widget ermöglicht es Ihnen, die Verteilung eines kategorischen F
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Wählen Sie die <code>statistische Methode</code>, die Sie anwenden möchten. Es kann <code>Anzahl</code>, <code>Summe</code>, <code>Min</code>, <code>Max</code> sein oder Sie fügen Ihren eigenen <a href="../expressions"><code>Ausdruck</code></a> hinzu.</div>
+  <div class="content">Wählen Sie die <code>statistische Methode</code>, die Sie anwenden möchten. Es kann <code>Anzahl</code>, <code>Summe</code>, <code>Min</code>, <code>Max</code> sein oder Sie fügen Ihren eigenen [`Ausdruck`](../expressions) hinzu.</div>
 </div>
 
 <div class="step">
@@ -142,7 +142,7 @@ Das Kreisdiagramm-Widget ermöglicht es Ihnen, **die Verteilung eines Feldes** a
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Wählen Sie die <code>statistische Methode</code>, die Sie anwenden möchten. Es kann <code>Anzahl</code>, <code>Summe</code>, <code>Min</code>, <code>Max</code> sein oder Sie fügen Ihren eigenen <a href="../expressions"><code>Ausdruck</code></a> hinzu.</div>
+  <div class="content">Wählen Sie die <code>statistische Methode</code>, die Sie anwenden möchten. Es kann <code>Anzahl</code>, <code>Summe</code>, <code>Min</code>, <code>Max</code> sein oder Sie fügen Ihren eigenen [`Ausdruck`](../expressions) hinzu.</div>
 </div>
 
 <div class="step">
@@ -190,5 +190,5 @@ Ergebnisse werden in **Prozent** visualisiert.
 
 ::::tip
 
-Wo **statistische Methoden angewendet werden können**, sind *Anzahl, Summe, Min, Max und <a href="../expressions">Ausdruck</a>* die verfügbaren Optionen. Schauen Sie sich unsere **<a href="../expressions">Ausdrücke-Dokumentation</a>** für weitere Informationen an.
+Wo **statistische Methoden angewendet werden können**, sind *Anzahl, Summe, Min, Max und [Ausdruck](../expressions)* die verfügbaren Optionen. Schauen Sie sich unsere **[Ausdrücke-Dokumentation](../expressions)** für weitere Informationen an.
 ::::
