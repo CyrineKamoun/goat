@@ -94,7 +94,7 @@ Unter **White Label** können Sie Dashboards auf Ihrer eigenen Domain veröffent
 
 ### Eigene Domains
 
-**Veröffentlichen Sie Ihre Dashboards unter Ihrer eigenen Domain.** Jede Domain bedient ein veröffentlichtes Projekt. Um eine Domain einem Projekt zuzuweisen, verwenden Sie den Teilen-Dialog im Dashboard-Builder.
+**Veröffentlichen Sie Ihre Dashboards unter Ihrer eigenen Domain.** Jede Domain bedient ein veröffentlichtes Projekt. Um eine Domain einem Projekt zuzuweisen, wählen Sie sie im Dialog `Teilen` des Projekts im Tab `Öffentlich` unter `Adresse`; siehe [Öffentliches Teilen](../sharing/public).
 
 **So fügen Sie eine eigene Domain hinzu:**
 
