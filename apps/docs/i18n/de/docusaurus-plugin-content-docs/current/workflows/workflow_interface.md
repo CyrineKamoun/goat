@@ -103,7 +103,7 @@ Vergeben Sie für jeden **Als Datensatz speichern**-Knoten einen aussagekräftig
   
 - **Datenmanagement**
   - [Verknüpfen](../toolbox/data_management/join.md), [Zusammenführen](../toolbox/data_management/merge.md) und andere Datenmanipulations-Werkzeuge
-  - [Benutzerdefinierte SQL](custom_sql.md): Erweiterte Datenverarbeitung mit SQL-Abfragen
+  - [Benutzerdefiniertes SQL](custom_sql.md): Erweiterte Datenverarbeitung mit SQL-Abfragen
 
 - **Steuerung**
   - <code>Bedingung</code>: Fügt einen Verzweigungsknoten hinzu, der den Layer basierend auf definierten Bedingungen in einen <strong>Wahr</strong>- oder <strong>Falsch</strong>-Pfad weiterleitet. Siehe <a href="if_clause">Bedingung</a>.
