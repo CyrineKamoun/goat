@@ -1,7 +1,8 @@
 name: "Docs links"
-# External links in the docs break without any change on our side, so they are
-# checked on a schedule instead of on every PR. Links between docs pages are
-# checked by every docs build (onBrokenLinks: "throw").
+# External links in the docs break without any change on our side, so all of
+# them are checked on a schedule. Pull requests check only the external links
+# they add (scripts/check-docs-links.sh), and every docs build checks the links
+# between docs pages (onBrokenLinks: "throw").
 #
 # Broken links are listed in one open issue, updated on every run and closed
 # once all links work again.
@@ -31,25 +32,21 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v7
 
+      - name: 🔗 Set up lychee
+        uses: ./.github/actions/setup-lychee
+
+      # Settings in apps/docs/lychee.toml, shared with the pull request check.
       - name: 🔗 Check links
         id: lychee
-        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
-        with:
-          workingDirectory: apps/docs
-          # Only http(s) links: root-relative links resolve to static/ and
-          # are left out with the other file links. Many publishers answer
-          # link checkers with 403, 406 or 429 although the page exists.
-          args: >-
-            --no-progress
-            --root-dir ${{ github.workspace }}/apps/docs/static
-            --scheme https --scheme http
-            --accept 100..=103,200..=299,403,406,429
-            --exclude 'youtube\.com/embed/VIDEO_ID'
-            --max-concurrency 16 --timeout 20 --max-retries 2
-            'docs/**/*.md*' 'tutorials/**/*.md*' 'i18n/**/*.md*'
+        working-directory: apps/docs
+        run: |
+          set +e
+          lychee --config lychee.toml --root-dir "$PWD/static" \
+            --format markdown --output "$RUNNER_TEMP/lychee.md" \
+            'docs/**/*.md*' 'tutorials/**/*.md*' 'i18n/**/*.md*' \
             'src/**/*.js' 'src/**/*.tsx' docusaurus.config.js
-          output: ${{ runner.temp }}/lychee.md
-          fail: false
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/lychee.md" >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: 📝 Report in an issue
         env:

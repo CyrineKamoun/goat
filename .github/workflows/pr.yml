@@ -99,10 +99,37 @@ jobs:
       - name: 📏 Keep large files out of the repository
         run: scripts/check-file-sizes.sh HEAD^1 HEAD
 
+  # External links the PR adds to the docs; links between docs pages fail the
+  # docs build, and links that break later are reported by docs-links.yml.
+  docs-links:
+    name: docs-links
+    needs: file-changes
+    if: ${{ needs.file-changes.outputs.docs == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # As in file-size: the merge commit and its parents, trees only; the
+      # script reads the changed files and lychee.toml from git.
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout: |
+            scripts
+            .github/actions
+      - name: 🔗 Set up lychee
+        uses: ./.github/actions/setup-lychee
+      - name: 🔗 Check the links the PR adds
+        env:
+          # Raises lychee's GitHub rate limit for github.com links
+          GITHUB_TOKEN: ${{ github.token }}
+        run: scripts/check-docs-links.sh HEAD^1 HEAD
+
   required:
     # file-changes too: when it fails, every job after it is skipped, not
     # failed, and would count as passed.
-    needs: [file-changes, lint, test, build, analyze, file-size]
+    needs: [file-changes, lint, test, build, analyze, file-size, docs-links]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
