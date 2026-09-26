@@ -3,6 +3,7 @@
 
 const { themes: prismThemes } = require("prism-react-renderer");
 const { sidebarItemsGenerator } = require("./src/sidebar/sections");
+const { lastUpdatedVcs } = require("./src/vcs/lastUpdated");
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -16,6 +17,9 @@ const config = {
   trailingSlash: false,
   onBrokenLinks: "throw",
   onBrokenAnchors: "throw",
+  future: {
+    experimental_vcs: lastUpdatedVcs(),
+  },
   markdown: {
     hooks: {
       onBrokenMarkdownLinks: "throw",
@@ -44,6 +48,7 @@ const config = {
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
           sidebarItemsGenerator,
+          showLastUpdateTime: true,
           editUrl: ({ locale, docPath }) => {
             const translation = locale || 'en';
             if (translation !== 'en') {
@@ -68,6 +73,7 @@ const config = {
         path: "tutorials",
         routeBasePath: "tutorials",
         sidebarPath: require.resolve("./sidebarsTutorials.js"),
+        showLastUpdateTime: true,
         editUrl: ({ locale, docPath }) => {
           const translation = locale || 'en';
           if (translation !== 'en') {

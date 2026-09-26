@@ -155,7 +155,7 @@
     "description": "Die Worte, mit denen beschrieben wird, von wem die Seite zuletzt aktualisiert wurde"
   },
   "theme.lastUpdated.lastUpdatedAtBy": {
-    "message": "Letztes Update{atDate}{byUser}",
+    "message": "Zuletzt aktualisiert{atDate}{byUser}",
     "description": "Der Satz, mit dem angezeigt wird, wann und von wem eine Seite zuletzt aktualisiert wurde"
   },
   "theme.navbar.mobileVersionsDropdown.label": {
