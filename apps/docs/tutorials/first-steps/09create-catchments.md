@@ -1,4 +1,5 @@
 ---
+description: "Compute walking catchment areas around the Mannheim supermarkets with the GOAT Catchment Area tool and read the result on the map."
 slug: /first-steps/create-catchment-areas
 sidebar_position: 10
 sidebar_label: ✏️ 9. Create Catchment Areas

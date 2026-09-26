@@ -1,6 +1,7 @@
 ---
 sidebar_position: 5
 sidebar_label: Operations
+description: "Run GOAT with Docker Compose day to day: add users through Keycloak, reach Windmill, load routing base data, back up and restore, upgrade, and troubleshoot."
 ---
 
 # Operations

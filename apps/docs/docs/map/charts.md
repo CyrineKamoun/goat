@@ -1,4 +1,5 @@
 ---
+description: "Open View Chart on an Aggregate Points or Aggregate Polygons result layer to plot it as a vertical bar, horizontal bar or line chart, optionally cumulative."
 sidebar_position: 6
 ---
 

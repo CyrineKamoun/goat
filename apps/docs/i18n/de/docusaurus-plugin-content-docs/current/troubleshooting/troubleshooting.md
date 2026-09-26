@@ -1,4 +1,5 @@
 ---
+description: "Lösen Sie häufige Probleme: Jobs über Zeit- oder Feature-Limit, leere Ergebnisse, Heatmap-Sensitivität, Startpunkte von Einzugsgebieten und falsche Formate."
 sidebar_position: 10
 slug: /troubleshooting
 ---

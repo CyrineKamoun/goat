@@ -1,4 +1,5 @@
 ---
+description: "Style the supermarket points and the city boundary in GOAT to make a clear, readable map."
 slug: /first-steps/style-layers
 sidebar_position: 7
 sidebar_label: ✏️ 7. Style Layers

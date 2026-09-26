@@ -1,4 +1,5 @@
 ---
+description: "Fassen Sie Polygonattribute auf Polygonen oder einem H3-Gitter zusammen, etwa als Anzahl, Summe oder Mittelwert, optional nach Verschneidungsfläche gewichtet."
 sidebar_position: 3
 ---
 

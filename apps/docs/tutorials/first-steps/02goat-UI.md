@@ -1,4 +1,5 @@
 ---
+description: "A video tour of the GOAT user interface: the workspace, the map view, the layer panel and the toolbox you will use in this tutorial."
 slug: /first-steps/goat-ui
 sidebar_position: 2
 sidebar_label: 2. GOAT User Interface

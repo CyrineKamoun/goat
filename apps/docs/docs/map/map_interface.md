@@ -1,4 +1,5 @@
 ---
+description: "Find your way around the Map interface: the upper bar, the Layers panel, search, toolbox and measurement tools, the style and filter panel, and map navigation."
 sidebar_position: 1
 ---
 

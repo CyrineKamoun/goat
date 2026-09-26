@@ -1,4 +1,5 @@
 ---
+description: "Create a point, line, polygon or table layer, draw and edit features on the map, edit attributes in the data table and add computed formula fields."
 sidebar_position: 3
 ---
 

@@ -2,6 +2,7 @@
 sidebar_position: 1
 slug: /
 title: Willkommen bei GOAT 👋
+description: "GOAT, die WebGIS-Plattform für integrierte Planung von Plan4Better: Karten gestalten und räumliche Daten analysieren, mit Fokus auf Erreichbarkeit."
 hide_title: true
 ---
 

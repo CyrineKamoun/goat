@@ -1,4 +1,5 @@
 ---
+description: "Erstellen Sie Layouts mit Karten, Texten und Legenden, wählen Sie Seitengröße und Ausrichtung, speichern Sie Vorlagen und exportieren Sie PDF, PNG oder JPEG."
 sidebar_position: 1
 ---
 

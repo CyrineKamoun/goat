@@ -1,4 +1,5 @@
 ---
+description: "Search and filter the GOAT Data Catalog by keyword, location, category, publisher or licence, save favourites and add read-only catalog datasets to a project."
 sidebar_position: 4
 ---
 

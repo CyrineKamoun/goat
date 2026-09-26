@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 sidebar_label: Network Datasets
+description: "The built-in public transport and street networks behind GOAT's routing, their sources and processing, and how to import your own Overture or GTFS network."
 ---
 
 # Network Datasets

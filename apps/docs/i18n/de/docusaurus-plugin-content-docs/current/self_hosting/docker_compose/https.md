@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
 sidebar_label: HTTPS und Adressen
+description: "Wählen Sie die öffentliche URL und einen der vier TLS-Modi (auto, custom, internal, off) und betreiben Sie GOAT hinter eigenem Load Balancer oder mit Firmen-CA."
 ---
 
 # HTTPS und Adressen

@@ -1,4 +1,5 @@
 ---
+description: "Set the zoom range, between 0 and 22, at which a layer appears on the map by dragging the scale handles or typing values, with suggested ranges per data type."
 sidebar_position: 1
 ---
 import Tabs from '@theme/Tabs';

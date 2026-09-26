@@ -1,4 +1,5 @@
 ---
+description: "A video introduction to GOAT, the WebGIS platform for data-driven urban, transport and environmental planning, and what you will build in this tutorial."
 slug: /first-steps/start-here
 sidebar_position: 1
 sidebar_label: 1. Start Here

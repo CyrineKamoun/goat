@@ -1,4 +1,5 @@
 ---
+description: "Publish the finished tutorial map in GOAT, then share its public link or embed it in a website with an iframe."
 slug: /first-steps/share-map
 sidebar_position: 11
 sidebar_label: ✏️ 10. Share Map

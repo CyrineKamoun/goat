@@ -1,4 +1,5 @@
 ---
+description: "Join attributes from a Join Layer to a Target Layer by matching field values, a spatial relationship or both, with inner or left join and optional statistics."
 sidebar_position: 1
 ---
 

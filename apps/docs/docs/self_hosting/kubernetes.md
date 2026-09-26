@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 sidebar_label: Kubernetes (Helm)
+description: "Install GOAT with the Helm chart and set what it leaves to you: public URLs, S3 storage, Keycloak login, the analysis workers and multi-node storage."
 ---
 
 # Kubernetes (Helm)

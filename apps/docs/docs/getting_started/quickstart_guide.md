@@ -1,4 +1,5 @@
 ---
+description: "Create a first project, add layers, run a tool from the Toolbox, style the map with labels, popups and legend, and publish it as a public link or iframe."
 sidebar_position: 3
 ---
 

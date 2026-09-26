@@ -1,4 +1,5 @@
 ---
+description: "Legen Sie das Projekt für das Tutorial in GOAT an: Workspace öffnen, neues Projekt erstellen und Name, Beschreibung und Ordner festlegen."
 slug: /first-steps/create-project
 sidebar_position: 4
 sidebar_label: ✏️ 4. Projekt erstellen

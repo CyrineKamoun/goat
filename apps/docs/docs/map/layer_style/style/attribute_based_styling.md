@@ -1,4 +1,5 @@
 ---
+description: "Style fill, stroke, stroke width, markers or point radius by a data field, using color palettes and classification methods such as quantile or custom breaks."
 sidebar_position: 2
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "The exercise of the GOAT first-steps tutorial: assess how easily residents of Mannheim reach supermarkets on foot, using only data from the GOAT catalog."
 slug: /first-steps/exercise-introduction
 sidebar_position: 3
 sidebar_label: 3. Exercise Introduction

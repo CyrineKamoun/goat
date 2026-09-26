@@ -1,4 +1,5 @@
 ---
+description: "Filter the boundaries and supermarket layers in GOAT so the tutorial analysis covers only Mannheim."
 slug: /first-steps/data-preparation
 sidebar_position: 6
 sidebar_label: ✏️ 6. Prepare Data

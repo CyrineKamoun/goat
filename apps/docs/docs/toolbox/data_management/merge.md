@@ -1,4 +1,5 @@
 ---
+description: "Combine two or more layers into one output layer: same-named fields are merged, unique fields kept, with options for a source column and multi-part geometries."
 sidebar_position: 2
 ---
 

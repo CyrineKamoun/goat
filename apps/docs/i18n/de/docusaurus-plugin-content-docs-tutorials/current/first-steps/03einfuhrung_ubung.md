@@ -1,4 +1,5 @@
 ---
+description: "Die Übung des GOAT-Einstiegstutorials: Bewerten Sie, wie gut Einwohner von Mannheim Supermärkte zu Fuß erreichen, nur mit Daten aus dem GOAT-Katalog."
 slug: /first-steps/exercise-introduction
 sidebar_position: 3
 sidebar_label: 3. Einführung in die Übung

@@ -1,4 +1,5 @@
 ---
+description: "Get started with GOAT: a hands-on tutorial that walks through a supermarket accessibility analysis for Mannheim, from the first project to a shared map."
 slug: /first-steps
 sidebar_position: 1
 sidebar_label: GOAT First Steps

@@ -1,4 +1,5 @@
 ---
+description: "Gestalten Sie Füll- und Strichfarbe, Strichbreite, Marker oder Punktradius nach einem Datenfeld, mit Farbpaletten und Klassifizierungen wie Quantil."
 sidebar_position: 2
 ---
 

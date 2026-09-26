@@ -1,4 +1,5 @@
 ---
+description: "Fügen Sie dem Tutorial-Projekt Supermarkt-Standorte und Stadtgrenzen aus dem GOAT-Datenkatalog hinzu."
 slug: /first-steps/add-data
 sidebar_position: 5
 sidebar_label: ✏️ 5. Daten hinzufügen

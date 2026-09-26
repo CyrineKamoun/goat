@@ -1,4 +1,5 @@
 ---
+description: "Gestalten Sie die Supermarkt-Punkte und die Stadtgrenze in GOAT für eine klare, gut lesbare Karte."
 slug: /first-steps/style-layers
 sidebar_position: 7
 sidebar_label: ✏️ 7. Layer gestalten

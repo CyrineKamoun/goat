@@ -1,4 +1,5 @@
 ---
+description: "Filtern Sie Punkt- und Polygon-Layer nach Attributen oder Kartenausdehnung, verknüpfen Sie Ausdrücke mit UND/ODER und sichern Sie das Ergebnis als Layer."
 sidebar_position: 5
 ---
 import Tabs from '@theme/Tabs';

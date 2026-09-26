@@ -1,4 +1,5 @@
 ---
+description: "Set fill and stroke color, opacity, stroke width, line patterns and arrows, point clustering, custom markers and point size, and copy styles between layers."
 sidebar_position: 1
 ---
 

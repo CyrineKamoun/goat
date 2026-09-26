@@ -1,3 +1,7 @@
+---
+description: "Define String or Number workflow variables with default values, insert them into tool parameter fields, and set their values when running from the Map view."
+---
+
 # Variables
 
 **Workflow Variables** allow you to define reusable values that can be set at run time without editing the workflow. Use them to make your analysis flexible and shareable — collaborators can run the same workflow with different parameters without touching the workflow structure.

@@ -1,4 +1,5 @@
 ---
+description: "Berechnen Sie mit dem GOAT-Werkzeug Einzugsgebiet die Einzugsgebiete zu Fuß um die Mannheimer Supermärkte und lesen Sie das Ergebnis auf der Karte."
 slug: /first-steps/create-catchment-areas
 sidebar_position: 10
 sidebar_label: ✏️ 9. Einzugsgebiete erstellen

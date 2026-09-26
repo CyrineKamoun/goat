@@ -1,4 +1,5 @@
 ---
+description: "Aggregate polygon attributes onto polygons or an H3 grid with count, sum, mean, median, min or max, optionally weighted by the share of intersection area."
 sidebar_position: 3
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "What a catchment area is, how GOAT computes it from travel time or distance, and why it suits a supermarket accessibility analysis."
 slug: /first-steps/catchment-areas
 sidebar_position: 9
 sidebar_label: 8. Understanding Catchment Areas

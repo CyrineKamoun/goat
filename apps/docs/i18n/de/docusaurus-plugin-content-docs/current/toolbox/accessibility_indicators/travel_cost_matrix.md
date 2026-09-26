@@ -1,4 +1,5 @@
 ---
+description: "Berechnen Sie Reisezeit oder Entfernung für jedes Start-Ziel-Paar zweier Punkt-Layer, per Routing oder Luftlinie, und erhalten Sie eine Tabelle der Reisekosten."
 sidebar_position: 10
 ---
 

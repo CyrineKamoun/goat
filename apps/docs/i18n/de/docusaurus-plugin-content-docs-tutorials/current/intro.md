@@ -1,4 +1,5 @@
 ---
+description: "Schritt-für-Schritt-Tutorials für GOAT: Lernen Sie die Planungs- und Erreichbarkeitswerkzeuge an einem echten Beispiel kennen, vom ersten Projekt bis zur geteilten Karte."
 sidebar_position: 1
 slug: /
 ---

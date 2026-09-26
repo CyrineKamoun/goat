@@ -1,4 +1,5 @@
 ---
+description: "Add a custom vector or raster basemap by URL or a single color, with sample URLs from common providers, sub-layer ordering and allowed basemaps in dashboards."
 sidebar_position: 7
 ---
 

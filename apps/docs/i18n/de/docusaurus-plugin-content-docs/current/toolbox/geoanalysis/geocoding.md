@@ -1,4 +1,5 @@
 ---
+description: "Wandeln Sie Adressen eines Layers mit Pelias in Punkte um, aus einer Spalte mit vollständiger Adresse oder aus Feldern für Straße, Postleitzahl, Stadt und Land."
 sidebar_position: 5
 ---
 import Tabs from '@theme/Tabs';

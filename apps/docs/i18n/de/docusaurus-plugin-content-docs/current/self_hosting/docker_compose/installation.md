@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
 sidebar_label: Installation
+description: "Installieren Sie GOAT mit dem Docker-Compose-Paket auf einem Linux-Server: Voraussetzungen, Download, setup.sh, erster Start, Prüfung mit smoke.sh, Anmeldung."
 ---
 
 # Installation

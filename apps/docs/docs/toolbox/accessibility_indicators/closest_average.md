@@ -1,4 +1,5 @@
 ---
+description: "Map the average travel time or distance from each hexagonal cell to the n nearest opportunities, by transport mode, cost limit and number of destinations."
 sidebar_position: 3
 ---
 

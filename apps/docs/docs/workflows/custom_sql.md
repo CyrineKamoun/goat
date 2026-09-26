@@ -1,3 +1,7 @@
+---
+description: "Write SQL queries against up to three connected inputs (input_1 to input_3) in a Custom SQL workflow node, with spatial functions and workflow variables."
+---
+
 # Custom SQL
 
 The **Custom SQL** tool allows you to write custom SQL queries for data analysis directly within your workflows. This powerful feature enables advanced data processing that goes beyond GOAT's built-in tools.

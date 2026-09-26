@@ -1,4 +1,5 @@
 ---
+description: "Was ein Einzugsgebiet ist, wie GOAT es aus Reisezeit oder Entfernung berechnet und warum es sich für eine Supermarkt-Erreichbarkeitsanalyse eignet."
 slug: /first-steps/catchment-areas
 sidebar_position: 9
 sidebar_label: 8. Einzugsgebiete verstehen

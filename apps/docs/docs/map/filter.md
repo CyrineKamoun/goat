@@ -1,4 +1,5 @@
 ---
+description: "Filter a point or polygon layer by attribute with logical expressions or by map extent, combine expressions with AND or OR, and save the result as a new layer."
 sidebar_position: 5
 ---
 import Tabs from '@theme/Tabs';

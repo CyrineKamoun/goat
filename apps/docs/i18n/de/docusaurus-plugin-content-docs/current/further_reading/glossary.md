@@ -1,4 +1,5 @@
 ---
+description: "Definitionen von Planungs- und GIS-Begriffen in GOAT, etwa Erreichbarkeit, aktive Mobilität, Konnektivität, H3-Gitter, Heatmap, Isochrone und Point of Interest."
 sidebar_position: 4
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "Verwalten Sie Profil, Präferenzen, Teams, Organisation und Abrechnung und richten Sie eigene Domains und Matomo-Analytics für veröffentlichte Dashboards ein."
 sidebar_position: 5
 ---
 

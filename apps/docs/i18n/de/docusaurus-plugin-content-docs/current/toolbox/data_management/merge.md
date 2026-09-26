@@ -1,4 +1,5 @@
 ---
+description: "Führen Sie zwei oder mehr Layer zu einem zusammen: gleichnamige Felder werden vereint, übrige bleiben erhalten, optional mit Quellspalte und Multi-Geometrien."
 sidebar_position: 2
 ---
 

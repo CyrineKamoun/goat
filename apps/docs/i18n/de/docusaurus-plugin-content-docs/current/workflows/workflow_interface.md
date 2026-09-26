@@ -1,4 +1,5 @@
 ---
+description: "Erstellen Sie Workflows auf der Leinwand aus verbundenen Datensatz-, Werkzeug- und Bedingung-Knoten, führen Sie sie aus und speichern Sie sie als Vorlage."
 sidebar_position: 1
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "Legen Sie per Schieberegler oder Eingabe fest, in welchem Zoom-Bereich von 0 bis 22 ein Layer auf der Karte erscheint, mit Empfehlungen je nach Datenart."
 sidebar_position: 1
 ---
 import Tabs from '@theme/Tabs';

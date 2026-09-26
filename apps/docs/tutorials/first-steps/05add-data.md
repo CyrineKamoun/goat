@@ -1,4 +1,5 @@
 ---
+description: "Add supermarket locations and city boundaries from the GOAT data catalog to the tutorial project."
 slug: /first-steps/add-data
 sidebar_position: 5
 sidebar_label: ✏️ 5. Add Data

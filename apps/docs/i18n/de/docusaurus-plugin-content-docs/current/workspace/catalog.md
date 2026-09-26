@@ -1,4 +1,5 @@
 ---
+description: "Filtern Sie den Katalog nach Stichwort, Ort, Kategorie, Datengeber oder Lizenz, speichern Sie Favoriten und fügen Sie Katalog-Datensätze einem Projekt hinzu."
 sidebar_position: 4
 ---
 

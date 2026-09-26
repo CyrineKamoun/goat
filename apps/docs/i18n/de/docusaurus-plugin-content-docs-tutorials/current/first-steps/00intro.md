@@ -1,4 +1,5 @@
 ---
+description: "Erste Schritte mit GOAT: ein praktisches Tutorial, das eine Supermarkt-Erreichbarkeitsanalyse für Mannheim vom ersten Projekt bis zur geteilten Karte durchspielt."
 slug: /first-steps
 sidebar_position: 1
 sidebar_label: GOAT Erste Schritte

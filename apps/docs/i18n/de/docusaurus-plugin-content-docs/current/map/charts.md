@@ -1,4 +1,5 @@
 ---
+description: "Zeigen Sie Ergebnisse von Punkte aggregieren oder Polygone aggregieren mit Diagramm anzeigen als Balken- oder Liniendiagramm an, optional als kumulierte Summe."
 sidebar_position: 6
 ---
 

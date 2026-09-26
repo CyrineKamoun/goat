@@ -1,4 +1,5 @@
 ---
+description: "Berechnen Sie, wo sich Eingabe- und Überdeckungs-Layer überschneiden; nur diese Bereiche bleiben, mit Attributen beider Layer, optional mit Feldauswahl."
 sidebar_position: 4
 ---
 

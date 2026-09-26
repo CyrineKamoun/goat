@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
 sidebar_label: Übersicht
+description: "Aus welchen Diensten GOAT besteht, von Web-App und APIs bis Keycloak, Garage und Windmill, und wie sich Docker Compose und Kubernetes mit Helm unterscheiden."
 ---
 
 # Self-Hosting

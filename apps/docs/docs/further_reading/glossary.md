@@ -1,4 +1,5 @@
 ---
+description: "Definitions of planning and GIS terms used across GOAT, such as accessibility, active mobility, connectivity, H3 grid, heatmap, isochrone and point of interest."
 sidebar_position: 4
 ---
 

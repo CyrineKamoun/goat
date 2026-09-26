@@ -1,6 +1,7 @@
 ---
 sidebar_position: 4
 sidebar_label: Configuration reference
+description: "Every setting in the bundle's .env file, grouped by release, address and TLS, authentication, storage, database, jobs, integrations, email and backups."
 ---
 
 # Configuration reference

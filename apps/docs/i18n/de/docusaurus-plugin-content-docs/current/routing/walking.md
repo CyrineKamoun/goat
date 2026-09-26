@@ -1,4 +1,5 @@
 ---
+description: "Wie GOAT Fußwege berechnet: Overture-Maps-Netz, gefiltert auf Straßenklassen für Fußgänger, Kantenkosten als Länge durch Geschwindigkeit und Dijkstra-Suche."
 sidebar_position: 1
  
 ---

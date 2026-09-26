@@ -1,4 +1,5 @@
 ---
+description: "QGIS-ähnliche Funktionen für die Widgets Zahlen, Kategorien, Kreisdiagramm und Rich Text: für Zahlen, Text, Datum, Typumwandlung, Aggregation und Geometrie."
 sidebar_position: 4
 ---
 

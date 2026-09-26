@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 sidebar_label: Externe Dienste
+description: "Ersetzen Sie Garage und Keycloak aus dem Paket durch eigenen S3-Speicher und eigenes Keycloak, binden Sie SMTP an und schalten Sie optionale Integrationen ein."
 ---
 
 # Externe Dienste

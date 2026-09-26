@@ -1,4 +1,5 @@
 ---
+description: "Ein Video-Rundgang durch die Benutzeroberfläche von GOAT: Workspace, Kartenansicht, Layer-Bereich und die Werkzeuge, die Sie in diesem Tutorial verwenden."
 slug: /first-steps/goat-ui
 sidebar_position: 2
 sidebar_label: 2. GOAT-Benutzeroberfläche

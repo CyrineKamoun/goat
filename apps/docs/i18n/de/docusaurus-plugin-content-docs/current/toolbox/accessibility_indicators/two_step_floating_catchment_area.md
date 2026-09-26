@@ -1,4 +1,5 @@
 ---
+description: "Setzen Sie mit der 2SFCA-Methode die Kapazität von Einrichtungen je Sechseckzelle ins Verhältnis zur Nachfrage, als Standard-, Enhanced- oder Modified-Variante."
 sidebar_position: 5
 ---
 

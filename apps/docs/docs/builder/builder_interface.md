@@ -1,4 +1,5 @@
 ---
+description: "Build a dashboard by adding panels on any side of the map, setting their style, appearance, position and width, and dragging widgets into them from the sidebar."
 sidebar_position: 1
 ---
 

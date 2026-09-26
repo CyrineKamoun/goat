@@ -1,4 +1,5 @@
 ---
+description: "Map how well connected each hexagon in an area of interest is: the total area from which it can be reached within a travel time or distance limit."
 sidebar_position: 4
 
 ---

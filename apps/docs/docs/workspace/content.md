@@ -1,4 +1,5 @@
 ---
+description: "Organise projects, datasets and templates in personal, team and organisation spaces: share, move, transfer or restore them, import projects, upload datasets."
 sidebar_position: 3
 ---
 

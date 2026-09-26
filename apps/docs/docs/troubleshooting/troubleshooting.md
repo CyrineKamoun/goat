@@ -1,4 +1,5 @@
 ---
+description: "Fix common GOAT problems: jobs over the time or feature limit, empty results, Heatmap Gravity sensitivity, catchment area start points and unsupported uploads."
 sidebar_position: 10
 slug: /troubleshooting
 ---

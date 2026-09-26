@@ -1,4 +1,5 @@
 ---
+description: "Eine Video-Einführung in GOAT, die WebGIS-Plattform für datenbasierte Stadt-, Verkehrs- und Umweltplanung, und was Sie in diesem Tutorial erstellen."
 slug: /first-steps/start-here
 sidebar_position: 1
 sidebar_label: 1. Starten hier

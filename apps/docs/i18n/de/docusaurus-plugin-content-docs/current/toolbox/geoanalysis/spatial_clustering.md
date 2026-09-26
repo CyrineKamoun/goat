@@ -1,4 +1,5 @@
 ---
+description: "Gruppieren Sie bis zu 2.000 Punkte in eine feste Zahl von Zonen, per K-Means oder als Ausgeglichene Zonen, die nach Anzahl oder Feldwert gleich groß werden."
 sidebar_position: 6
 ---
 

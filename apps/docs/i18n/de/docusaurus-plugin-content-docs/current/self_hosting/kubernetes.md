@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 sidebar_label: Kubernetes (Helm)
+description: "Installieren Sie GOAT mit dem Helm-Chart und legen Sie fest, was es offenlässt: öffentliche URLs, S3-Speicher, Anmeldung, Analyse-Worker und RWX-Speicher."
 ---
 
 # Kubernetes (Helm)

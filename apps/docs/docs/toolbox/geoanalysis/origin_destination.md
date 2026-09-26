@@ -1,4 +1,5 @@
 ---
+description: "Draw straight lines between origins and destinations from a matrix table and a geometry layer, producing a weighted O-D Relation layer and an O-D Point layer."
 sidebar_position: 4
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "Erstellen Sie Puffer in festem Abstand um Punkte, Linien oder Polygone, in mehreren Pufferstufen und optional per Polygon-Vereinigung und -Differenz kombiniert."
 sidebar_position: 1
 ---
 

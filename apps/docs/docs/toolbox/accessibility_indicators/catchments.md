@@ -1,4 +1,5 @@
 ---
+description: "Calculate how far people can travel on foot, by bicycle, pedelec, car or public transport within a time or distance limit, as polygons, networks or grids."
 sidebar_position: 1
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "Create buffer zones at a set distance around points, lines or polygons, split into several buffer steps and optionally combined by polygon union and difference."
 sidebar_position: 1
 ---
 

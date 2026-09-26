@@ -1,4 +1,5 @@
 ---
+description: "How GOAT routes public transport from GTFS data with nigiri and RAPTOR, plus access and egress legs, and its options for modes, day, time window and transfers."
 sidebar_position: 3
 
 ---

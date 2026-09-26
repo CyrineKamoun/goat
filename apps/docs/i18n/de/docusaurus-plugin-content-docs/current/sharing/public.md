@@ -1,4 +1,5 @@
 ---
+description: "Veröffentlichen Sie ein Projekt, damit alle die Karte ohne GOAT-Konto sehen, teilen Sie es per URL oder iframe und sperren Sie den Kartenausschnitt."
 sidebar_position: 2
 ---
 

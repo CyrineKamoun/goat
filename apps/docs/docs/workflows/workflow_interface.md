@@ -1,4 +1,5 @@
 ---
+description: "Build workflows on a canvas by connecting dataset, tool and Conditional nodes, run them, review results as table or map, and save them as templates."
 sidebar_position: 1
 ---
 

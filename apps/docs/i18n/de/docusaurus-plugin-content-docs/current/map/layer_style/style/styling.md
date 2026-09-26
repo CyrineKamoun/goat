@@ -1,4 +1,5 @@
 ---
+description: "Legen Sie Füll- und Strichfarbe, Deckkraft, Strichbreite, Linienstil, Clustering, eigene Marker und Punktgröße fest und kopieren Sie Stile in andere Layer."
 sidebar_position: 1
 ---
 

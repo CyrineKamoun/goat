@@ -1,4 +1,5 @@
 ---
+description: "Browse project, workflow and layout templates on the Home page, filter them by kind and source, preview one and create a new project from it with Use template."
 sidebar_position: 4
 ---
 

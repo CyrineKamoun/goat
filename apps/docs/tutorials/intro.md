@@ -1,4 +1,5 @@
 ---
+description: "Step-by-step GOAT tutorials: learn the planning and accessibility tools on a real example, from your first project to a shared map."
 sidebar_position: 1
 slug: /
 ---

@@ -1,4 +1,5 @@
 ---
+description: "Compare facility capacity with population demand per hexagonal cell using the two-step floating catchment method, in Standard, Enhanced or Modified form."
 sidebar_position: 5
 ---
 

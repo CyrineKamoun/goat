@@ -1,4 +1,5 @@
 ---
+description: "Gestalten Sie ein Dashboard: Panels an jeder Kartenseite hinzufügen, Stil, Aussehen, Position und Breite anpassen und Widgets aus der Seitenleiste hineinziehen."
 sidebar_position: 1
 ---
 

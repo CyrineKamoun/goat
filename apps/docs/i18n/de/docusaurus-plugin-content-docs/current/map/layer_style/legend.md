@@ -1,4 +1,5 @@
 ---
+description: "Blenden Sie die Legende eines Layers ein oder aus, fügen Sie einen Untertitel hinzu und ersetzen Sie Werte der Farbstufen durch eigene Legendenbezeichnungen."
 sidebar_position: 5
 ---
 import Tabs from '@theme/Tabs';

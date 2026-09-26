@@ -1,4 +1,5 @@
 ---
+description: "Zeigen Sie Feature-Informationen bei Klick oder Hover in einem Popup an, aus Blöcken wie Feldliste, Text und Bild oder aus eigenem HTML mit Feldwerten."
 sidebar_position: 4
 ---
 import Tabs from '@theme/Tabs';

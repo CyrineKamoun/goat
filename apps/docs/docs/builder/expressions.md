@@ -1,4 +1,5 @@
 ---
+description: "QGIS-style functions for the Numbers, Categories, Pie chart and Rich Text widgets: numeric, string, date/time, casting, aggregate and geometry functions."
 sidebar_position: 4
 ---
 

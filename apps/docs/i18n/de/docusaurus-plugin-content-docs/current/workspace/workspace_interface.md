@@ -1,4 +1,5 @@
 ---
+description: "Die Navigationsleiste des Workspace mit Startseite, Inhalt, Katalog und Einstellungen sowie das Benutzerprofil und der Job Status für Uploads und Analysen."
 sidebar_position: 1
 ---
 

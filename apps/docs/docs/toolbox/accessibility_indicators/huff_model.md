@@ -1,4 +1,5 @@
 ---
+description: "Estimate the share of demand in a reference area that each competing facility captures, based on its attractiveness, travel time and distance decay."
 sidebar_position: 6
 ---
 

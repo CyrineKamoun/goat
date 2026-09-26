@@ -1,4 +1,5 @@
 ---
+description: "Verwalten Sie Team-Mitglieder in den Einstellungen und teilen Sie Datensätze, Projekte oder Ordner mit einem Team oder der Organisation als Viewer oder Editor."
 sidebar_position: 6
 slug: /sharing
 ---

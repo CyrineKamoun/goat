@@ -1,4 +1,5 @@
 ---
+description: "Sie haben das GOAT-Einstiegstutorial abgeschlossen: eine Zusammenfassung Ihres Ergebnisses und die nächsten Schritte in GOAT."
 slug: /first-steps/congratulations
 sidebar_position: 12
 sidebar_label: 🎉 11. Tutorial abgeschlossen!

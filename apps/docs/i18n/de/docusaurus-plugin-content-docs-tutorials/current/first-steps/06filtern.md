@@ -1,4 +1,5 @@
 ---
+description: "Filtern Sie die Layer mit den Grenzen und den Supermärkten in GOAT, damit die Tutorial-Analyse nur Mannheim umfasst."
 slug: /first-steps/data-preparation
 sidebar_position: 6
 sidebar_label: ✏️ 6. Daten vorbereiten

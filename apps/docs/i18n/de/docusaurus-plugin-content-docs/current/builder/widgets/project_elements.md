@@ -1,4 +1,5 @@
 ---
+description: "Runden Sie Ihr Dashboard mit den Widgets Text, Trennlinie, Bild, Tabs und Links ab: Text formatieren, Abschnitte trennen, Widgets in Tabs gruppieren."
 sidebar_position: 4
 ---
 

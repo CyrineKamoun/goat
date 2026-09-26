@@ -1,4 +1,5 @@
 ---
+description: "You finished the GOAT first-steps tutorial: a summary of what you built and where to go next in GOAT."
 slug: /first-steps/congratulations
 sidebar_position: 12
 sidebar_label: 🎉 11. Tutorial Completed!

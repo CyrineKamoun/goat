@@ -1,4 +1,5 @@
 ---
+description: "Veröffentlichen Sie die fertige Tutorial-Karte in GOAT und teilen Sie den öffentlichen Link oder binden Sie die Karte per iframe in eine Website ein."
 slug: /first-steps/share-map
 sidebar_position: 11
 sidebar_label: ✏️ 10. Karte teilen

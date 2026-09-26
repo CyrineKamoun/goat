@@ -1,4 +1,5 @@
 ---
+description: "Behalten Sie nur die Features oder Teile davon, die im Überdeckungs-Layer liegen; die Attribute des Eingabe-Layers bleiben, die des Ausschnitt-Layers nicht."
 sidebar_position: 2
 ---
 

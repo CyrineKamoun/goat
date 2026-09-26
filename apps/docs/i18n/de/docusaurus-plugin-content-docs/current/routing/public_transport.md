@@ -1,4 +1,5 @@
 ---
+description: "Wie GOAT ÖV-Fahrten aus GTFS-Daten mit nigiri und RAPTOR samt Zugangs- und Abgangsweg berechnet, mit Optionen für Modi, Tag, Zeitfenster und Umstiege."
 sidebar_position: 3
 
 ---
