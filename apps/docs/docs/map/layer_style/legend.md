@@ -14,17 +14,17 @@ import TabItem from '@theme/TabItem';
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Select your layer and navigate to <code>Layer design</code> <img src={require('/img/icons/styling.png').default} alt="Styling Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> and find the <code>Legend section</code></div>
+  <div class="content">In the <code>Layers</code> panel, click your layer. Its settings panel opens on the right with the <code>Style</code> tab selected. Open the <code>Legend</code> section at the bottom of this tab.</div>
 </div>
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Toggle the <code>Show</code> checkbox to <strong>enable or disable the legend display</strong></div>
+  <div class="content">Under <code>Options</code>, toggle the <code>Show</code> checkbox to <strong>enable or disable the legend display</strong></div>
 </div>
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">You can add a <code>Caption</code> field <strong>explaining the layer's content</strong>. The caption will appear below the layer name in the legend list</div>
+  <div class="content">While <code>Show</code> is enabled, you can fill in the <code>Caption</code> field <strong>explaining the layer's content</strong>. The caption will appear below the layer name in the legend list</div>
 </div>
 
 <p></p>
@@ -34,11 +34,11 @@ import TabItem from '@theme/TabItem';
 
 ## Custom legend labels for color steps
 
-When using attribute-based styling with a color scale (numeric or custom classification), you can add a custom label to each color step. These labels replace the raw data values in the map legend with human-readable descriptions.
+When using attribute-based styling with a color scale (any classification method, including <code>Custom Breaks</code> and <code>Custom Ordinal</code>), you can add a custom label to each color step. These labels replace the raw data values in the map legend with human-readable descriptions.
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">Open <code>Layer design</code> <img src={require('/img/icons/styling.png').default} alt="Styling Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> and navigate to the <code>Color scale</code> panel under attribute-based styling.</div>
+  <div class="content">In the <code>Style</code> section of the <code>Style</code> tab, click the options icon <img src={require('/img/icons/options.png').default} alt="Options Icon" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> next to <code>Fill Color</code> or <code>Stroke Color</code>. With a field selected in <code>Color based on</code>, click the <code>Color scale</code> selector to open the classification panel. See <a href="./style/attribute_based_styling">Attribute-based Styling</a>.</div>
 </div>
 
 <div class="step">
@@ -48,7 +48,7 @@ When using attribute-based styling with a color scale (numeric or custom classif
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Leave the field empty to show the default numeric value in the legend.</div>
+  <div class="content">Leave the field empty to show the default value in the legend. Click <code>Apply</code> to save your labels.</div>
 </div>
 
 ## Best practices
