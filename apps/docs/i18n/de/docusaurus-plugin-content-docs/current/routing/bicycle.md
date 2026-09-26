@@ -1,4 +1,5 @@
 ---
+description: "Wie GOAT Fahrrad- und Pedelec-Routen im Overture-Maps-Netz berechnet, mit Kantenkosten nach Oberfläche und beim Fahrrad nach Steigung aus Copernicus-Höhendaten."
 sidebar_position: 2
 
 ---

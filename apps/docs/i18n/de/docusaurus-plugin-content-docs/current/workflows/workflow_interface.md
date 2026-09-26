@@ -1,4 +1,5 @@
 ---
+description: "Erstellen Sie Workflows auf der Leinwand aus verbundenen Datensatz-, Werkzeug- und Bedingung-Knoten, führen Sie sie aus und speichern Sie sie als Vorlage."
 sidebar_position: 1
 ---
 
@@ -6,7 +7,7 @@ sidebar_position: 1
 
 **Workflows** in GOAT bieten ein mächtiges visuelles Automatisierungssystem zur Erstellung anspruchsvoller räumlicher Analysepipelines. Anstatt einzelne Werkzeuge nacheinander auszuführen, können Sie mehrere Analyseschritte mit einer Drag-and-Drop-Leinwand verbinden und dabei eine automatisierte Datenverarbeitung erstellen, die wiederholende manuelle Arbeit eliminiert.
 
-Die Workflows können bei verschiedenen Datensätzen und Szenarien wiederverwendet werden. Jeder Workflow besteht aus verschiedenen Arten von [Knoten](../further_reading/glossary.md#knoten), die durch [Kanten](../further_reading/glossary.md#kanten) verbunden sind, und ermöglicht Ihnen:
+Die Workflows können bei verschiedenen Datensätzen und Szenarien wiederverwendet werden. Jeder Workflow besteht aus verschiedenen Arten von Knoten, die durch Kanten verbunden sind, und ermöglicht Ihnen:
 
 - **Automatisierung komplexer analytischer Pipelines**: Verketten Sie mehrere Werkzeuge, bei denen die Ausgabe einer Analyse automatisch in die nächste eingespeist wird
 - **Erstellen von Multi-Source-Daten-Workflows**: Bauen Sie anspruchsvolle Analyseprozesse auf, die mehrere Datensätze und Verarbeitungsschritte integrieren

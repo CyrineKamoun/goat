@@ -1,4 +1,5 @@
 ---
+description: "Combine two or more layers into one output layer: same-named fields are merged, unique fields kept, with options for a source column and multi-part geometries."
 sidebar_position: 2
 ---
 
@@ -61,6 +62,6 @@ Merging stacks features from multiple layers into one layer. Unlike a join, no m
 
 :::tip Hint
 
-Calculation time varies by settings. Check the [status bar](../../workspace/home#status-bar) for progress.
+Calculation time varies by settings. Check the [status bar](../../workspace/workspace_interface.md#job-status) for progress.
 
 :::

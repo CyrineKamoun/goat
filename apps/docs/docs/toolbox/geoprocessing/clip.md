@@ -1,4 +1,5 @@
 ---
+description: "Keep only the features, or parts of features, of an input layer that fall inside an overlay polygon layer, preserving input attributes but not the clip layer's."
 sidebar_position: 2
 ---
 

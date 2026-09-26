@@ -1,4 +1,5 @@
 ---
+description: "Beschriften Sie Features nach einem Attributfeld und legen Sie Größe, Farbe, Platzierung, Offset und Überlappung sowie Halo-Farbe und Halo-Breite fest."
 sidebar_position: 3
 ---
 import Tabs from '@theme/Tabs';

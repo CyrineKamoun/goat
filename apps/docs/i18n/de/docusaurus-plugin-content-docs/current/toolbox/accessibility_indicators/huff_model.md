@@ -1,4 +1,5 @@
 ---
+description: "Schätzen Sie, welchen Anteil der Nachfrage in einem Referenzgebiet jede konkurrierende Einrichtung erfasst, nach Attraktivität, Reisezeit und Distanzabfall."
 sidebar_position: 6
 ---
 

@@ -53,6 +53,19 @@ on:
         description: Docker build target stage name
         required: false
         type: string
+      fetch-history:
+        description: >-
+          Check out the full commit history (without file contents) instead
+          of only the built commit, for a prepare-command that reads git log
+        required: false
+        type: boolean
+        default: false
+      prepare-command:
+        description: >-
+          Shell commands run in the checkout before the image is built, e.g.
+          to generate files the build needs from git
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -104,6 +117,14 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: false
+          fetch-depth: ${{ inputs.fetch-history && '0' || '1' }}
+          filter: ${{ inputs.fetch-history && 'blob:none' || '' }}
+
+      - name: 🧰 Prepare build context
+        if: inputs.prepare-command != ''
+        env:
+          PREPARE: ${{ inputs.prepare-command }}
+        run: sh -ec "$PREPARE"
 
       - name: 🐳 Set up Docker Buildx
         id: buildx

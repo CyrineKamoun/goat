@@ -1,4 +1,5 @@
 ---
+description: "Chart layer data with the Categories, Histogram and Pie chart widgets: pick a statistic, field and grouping, style the colors and set the click response."
 sidebar_position: 3
 ---
 

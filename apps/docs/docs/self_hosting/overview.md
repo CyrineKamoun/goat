@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
 sidebar_label: Overview
+description: "The services GOAT consists of, from web app and APIs to Keycloak, Garage and Windmill, and how Docker Compose and Kubernetes with Helm deployments compare."
 ---
 
 # Self-hosting

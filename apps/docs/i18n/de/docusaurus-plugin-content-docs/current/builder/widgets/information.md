@@ -1,4 +1,5 @@
 ---
+description: "Richten Sie das Layer-Widget im Dashboard ein: Layer auswählen, Legende und Download erlauben, Baum- oder Tab-Layout, Zoom-Verhalten und Layer-Aktionen wählen."
 sidebar_position: 1
 ---
 

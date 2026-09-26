@@ -1,4 +1,5 @@
 ---
+description: "Erstellen Sie Punkt-, Linien-, Polygon- oder Tabellen-Layer, bearbeiten Sie Features auf der Karte und Attribute in der Tabelle und ergänzen Sie Formelfelder."
 sidebar_position: 3
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "Aggregieren Sie Punkte auf Polygone oder ein H3-Gitter und berechnen Sie je Fläche Anzahl, Summe, Mittelwert, Median, Min oder Max eines Punktattributs."
 sidebar_position: 1
 ---
 import Tabs from '@theme/Tabs';

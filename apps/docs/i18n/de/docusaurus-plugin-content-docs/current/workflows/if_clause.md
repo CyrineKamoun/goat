@@ -1,3 +1,7 @@
+---
+description: "Leiten Sie einen Layer mit dem Bedingung-Knoten in den Wahr- oder Falsch-Zweig eines Workflows, anhand logischer oder statistischer Ausdrücke mit UND oder ODER."
+---
+
 # Bedingung
 
 Der **Bedingung**-Knoten leitet eine Eingabeebene basierend auf einer definierten Bedingung an den **Wahr**- oder **Falsch**-Zweig weiter. Die Ebene wird unverändert weitergegeben — eine Bedingung gilt als wahr, wenn mindestens ein Feature sie erfüllt.

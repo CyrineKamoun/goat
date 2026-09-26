@@ -1,4 +1,5 @@
 ---
+description: "Fügen Sie Layer per Upload, als neuen Layer, über WFS, WMS, WMTS, XYZ oder COG, aus Ihren Datensätzen oder dem Katalog hinzu und ordnen oder gruppieren Sie sie."
 sidebar_position: 2
 ---
 

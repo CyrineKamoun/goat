@@ -1,4 +1,5 @@
 ---
+description: "Erstellen Sie ein erstes Projekt, fügen Sie Layer hinzu, nutzen Sie die Werkzeuge, gestalten Sie die Karte und veröffentlichen Sie sie per Link oder iframe."
 sidebar_position: 3
 ---
 

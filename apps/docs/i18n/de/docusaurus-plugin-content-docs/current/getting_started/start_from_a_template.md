@@ -1,4 +1,5 @@
 ---
+description: "Durchsuchen Sie Projekt-, Workflow- und Layout-Vorlagen auf der Startseite, filtern Sie nach Art und Quelle und erstellen Sie daraus ein neues Projekt."
 sidebar_position: 4
 ---
 

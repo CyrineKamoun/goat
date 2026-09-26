@@ -99,10 +99,6 @@
     "message": "Breadcrumbs",
     "description": "Das ARIA-Label für die Breadcrumbs"
   },
-  "theme.docs.DocCard.categoryDescription": {
-    "message": "{count} Einträge",
-    "description": "Die Standardbeschreibung für eine Kategoriekarte im generierten Index, die angibt, wie viele Elemente diese Kategorie umfasst"
-  },
   "theme.docs.paginator.navAriaLabel": {
     "message": "Dokumentation Seiten Navigation",
     "description": "Das ARIA-Label für die Paginierung der Dokumente"
@@ -159,7 +155,7 @@
     "description": "Die Worte, mit denen beschrieben wird, von wem die Seite zuletzt aktualisiert wurde"
   },
   "theme.lastUpdated.lastUpdatedAtBy": {
-    "message": "Letztes Update{atDate}{byUser}",
+    "message": "Zuletzt aktualisiert{atDate}{byUser}",
     "description": "Der Satz, mit dem angezeigt wird, wann und von wem eine Seite zuletzt aktualisiert wurde"
   },
   "theme.navbar.mobileVersionsDropdown.label": {
@@ -193,10 +189,6 @@
   "theme.CodeBlock.wordWrapToggle": {
     "message": "Toggle word wrap",
     "description": "Das Titelattribut für die Schaltfläche zum Umschalten des Zeilenumbruchs von Codeblöcken"
-  },
-  "theme.DocSidebarItem.toggleCollapsedCategoryAriaLabel": {
-    "message": "Umschalten der Seitenleiste mit einklappbarer Kategorie '{label}'",
-    "description": "Das ARIA-Label zum Umschalten der ausklappbaren Seitenleistenkategorie"
   },
   "theme.NavBar.navAriaLabel": {
     "message": "Haupt",

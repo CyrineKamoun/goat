@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
 sidebar_label: Feldtypen
+description: "Die Feldtypen in GOAT, von Text, Zahl, Boolesch und Datum bis zu berechneter Fläche, Umfang, Länge und Formel, dazu Zahlenformat und zulässige Werte."
 ---
 
 # Feldtypen

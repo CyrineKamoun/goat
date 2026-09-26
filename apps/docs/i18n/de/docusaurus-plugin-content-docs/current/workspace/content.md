@@ -1,4 +1,5 @@
 ---
+description: "Verwalten Sie Projekte, Datensätze und Vorlagen in eigenen, Team- und Organisationsbereichen: teilen, verschieben, übertragen, wiederherstellen, hochladen."
 sidebar_position: 3
 ---
 

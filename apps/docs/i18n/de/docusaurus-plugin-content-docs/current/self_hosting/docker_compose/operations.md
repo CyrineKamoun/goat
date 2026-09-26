@@ -1,6 +1,7 @@
 ---
 sidebar_position: 5
 sidebar_label: Betrieb
+description: "Betreiben Sie GOAT mit Docker Compose im Alltag: Benutzer über Keycloak anlegen, Windmill erreichen, Routing-Basisdaten laden, Backups, Updates und Fehlersuche."
 ---
 
 # Betrieb

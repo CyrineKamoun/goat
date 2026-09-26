@@ -1,4 +1,5 @@
 ---
+description: "Wie GOAT Autofahrten im Overture-Maps-Netz berechnet: mit Tempolimit je Richtung, Einbahnstraßen und Dijkstra-Suche, noch ohne historische Verkehrsmuster."
 sidebar_position: 4
 
 ---

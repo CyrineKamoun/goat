@@ -1,4 +1,5 @@
 ---
+description: "Die Datensatz-Typen in GOAT: Feature-Datensätze, Tabellen, Overture-Straßennetze, GTFS-ÖPNV-Netze, Datenpakete sowie Raster über WMS, WMTS, XYZ oder COG."
 sidebar_position: 1
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "Map accessibility to opportunities on a hexagonal grid with a gravity formula, weighting destinations by travel cost, sensitivity and destination potential."
 sidebar_position: 2
 ---
 import Tabs from '@theme/Tabs';

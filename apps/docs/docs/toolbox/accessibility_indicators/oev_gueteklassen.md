@@ -1,4 +1,5 @@
 ---
+description: "Classify public transport quality from A to F with station buffers based on GTFS departure frequency and station type, for any day and time window."
 sidebar_position: 7
 ---
 

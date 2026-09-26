@@ -1,3 +1,7 @@
+---
+description: "Legen Sie Variablen vom Typ Text oder Zahl mit Standardwert an, fügen Sie sie in Werkzeugparameter ein und setzen Sie Werte beim Start aus der Kartenansicht."
+---
+
 # Variablen
 
 **Workflow-Variablen** ermöglichen es Ihnen, wiederverwendbare Werte zu definieren, die zur Laufzeit gesetzt werden können, ohne den Workflow zu bearbeiten. Nutzen Sie sie, um Ihre Analyse flexibel und teilbar zu machen — Mitarbeitende können denselben Workflow mit anderen Parametern ausführen, ohne die Workflow-Struktur zu ändern.

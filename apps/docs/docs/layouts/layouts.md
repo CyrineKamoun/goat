@@ -1,4 +1,5 @@
 ---
+description: "Create print layouts with maps, text, legends and scale bars, set page size, orientation and resolution, save them as templates and export as PDF, PNG or JPEG."
 sidebar_position: 1
 ---
 

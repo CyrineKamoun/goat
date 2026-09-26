@@ -1,4 +1,5 @@
 ---
+description: "Label map features with an attribute field and set the size, color, placement, offset and overlap of the labels, plus a halo color and width for readability."
 sidebar_position: 3
 ---
 import Tabs from '@theme/Tabs';

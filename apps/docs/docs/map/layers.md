@@ -1,4 +1,5 @@
 ---
+description: "Add layers by file upload, drawing, a WFS, WMS, WMTS, XYZ or COG service, your datasets or the Catalog, then reorder, hide, group and edit them."
 sidebar_position: 2
 ---
 

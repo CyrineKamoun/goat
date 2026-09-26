@@ -1,4 +1,5 @@
 ---
+description: "Fügen Sie eigene Vektor- oder Raster-Grundkarten per URL oder als Volltonfarbe hinzu, mit Beispiel-URLs gängiger Anbieter und Anordnung der Basemap-Layer."
 sidebar_position: 7
 ---
 

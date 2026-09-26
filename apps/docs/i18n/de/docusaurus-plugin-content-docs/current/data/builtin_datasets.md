@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 sidebar_label: Netz-Datensätze
+description: "Die integrierten ÖPNV- und Straßennetze hinter dem Routing in GOAT, ihre Quellen und Aufbereitung, und wie Sie eigene Overture- oder GTFS-Netze importieren."
 ---
 
 # Netz-Datensätze

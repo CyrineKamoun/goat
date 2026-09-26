@@ -1,4 +1,5 @@
 ---
+description: "Zeigen Sie, wie gut jedes Sechseck eines Interessengebiets angebunden ist: die Gesamtfläche, von der es in einem Zeit- oder Entfernungslimit erreichbar ist."
 sidebar_position: 4
 
 ---

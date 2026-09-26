@@ -1,4 +1,5 @@
 ---
+description: "The dataset types in GOAT: feature datasets, tables, Overture street networks, GTFS public transport networks, bundles, and WMS, WMTS, XYZ or COG rasters."
 sidebar_position: 1
 ---
 

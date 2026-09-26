@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
 sidebar_label: HTTPS and addresses
+description: "Choose the public URL and one of the four TLS modes (auto, custom, internal, off) for Caddy, and run GOAT behind your own load balancer or with a company CA."
 ---
 
 # HTTPS and addresses

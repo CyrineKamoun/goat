@@ -1,4 +1,5 @@
 ---
+description: "Convert addresses from a layer into points with the Pelias geocoder, from one full-address column or from separate street, postal code, city and country fields."
 sidebar_position: 5
 ---
 import Tabs from '@theme/Tabs';

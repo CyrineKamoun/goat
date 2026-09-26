@@ -1,4 +1,5 @@
 ---
+description: "Berechnen Sie Reisezeit oder Entfernung für jedes Start-Ziel-Paar zweier Punkt-Layer, per Routing oder Luftlinie, und erhalten Sie eine Tabelle der Reisekosten."
 sidebar_position: 10
 ---
 
@@ -98,7 +99,7 @@ Die Reisekostenmatrix ist für die **Massenberechnung über viele Ursprünge und
 
 :::tip Hinweis
 
-Die Berechnungszeit skaliert mit der Anzahl der OD-Paare. Den Fortschritt können Sie in der [Statusleiste](../../workspace/home#status-bar) verfolgen.
+Die Berechnungszeit skaliert mit der Anzahl der OD-Paare. Den Fortschritt können Sie in der [Statusleiste](../../workspace/workspace_interface.md#job-status) verfolgen.
 
 :::
 

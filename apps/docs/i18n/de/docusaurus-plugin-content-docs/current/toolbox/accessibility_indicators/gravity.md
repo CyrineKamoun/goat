@@ -1,4 +1,5 @@
 ---
+description: "Bilden Sie die Erreichbarkeit von Gelegenheiten im Sechseckraster per Gravitationsformel ab, gewichtet nach Reisekosten, Sensitivität und Destinationspotenzial."
 sidebar_position: 2
 ---
 import Tabs from '@theme/Tabs';

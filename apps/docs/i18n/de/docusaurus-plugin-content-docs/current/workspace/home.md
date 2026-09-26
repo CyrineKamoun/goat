@@ -1,4 +1,5 @@
 ---
+description: "Auf der Startseite durchsuchen Sie alle Bereiche, legen Projekte oder Datensätze an, öffnen zuletzt Genutztes, wählen Vorlagen und folgen der Checkliste."
 sidebar_position: 2
 ---
 

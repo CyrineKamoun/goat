@@ -1,4 +1,5 @@
 ---
+description: "Show feature details in a popup on click or hover, built from field list, text, image, button, badge and divider blocks or custom HTML with field placeholders."
 sidebar_position: 4
 ---
 import Tabs from '@theme/Tabs';

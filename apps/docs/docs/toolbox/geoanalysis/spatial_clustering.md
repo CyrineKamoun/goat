@@ -1,4 +1,5 @@
 ---
+description: "Group up to 2,000 points into a set number of zones with fast K-Means or Balanced Zones, a genetic algorithm that evens out zone size by count or field value."
 sidebar_position: 6
 ---
 

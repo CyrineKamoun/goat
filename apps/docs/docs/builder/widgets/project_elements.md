@@ -1,4 +1,5 @@
 ---
+description: "Round off a dashboard with Text, Divider, Image, Tabs and Links widgets: format text, separate sections, group widgets into tabs and add links or popups."
 sidebar_position: 4
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "Add Filter, Table, Numbers and Rich Text widgets to a dashboard to filter a layer by field, list or group its records, compute statistics and show live values."
 sidebar_position: 2
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "Aggregate point data onto polygons or an H3 grid and calculate the count, sum, mean, median, min or max of a point attribute for each area."
 sidebar_position: 1
 ---
 import Tabs from '@theme/Tabs';

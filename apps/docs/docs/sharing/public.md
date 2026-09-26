@@ -1,4 +1,5 @@
 ---
+description: "Publish a project so anyone can view the map without a GOAT account, share it by URL or iframe, lock the map extent and republish after changes."
 sidebar_position: 2
 ---
 

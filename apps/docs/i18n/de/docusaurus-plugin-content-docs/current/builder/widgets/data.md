@@ -1,4 +1,5 @@
 ---
+description: "Nutzen Sie die Widgets Filter, Tabelle, Zahlen und Rich Text im Dashboard, um Layer nach Feldern zu filtern, Daten zu gruppieren und Statistiken anzuzeigen."
 sidebar_position: 2
 ---
 

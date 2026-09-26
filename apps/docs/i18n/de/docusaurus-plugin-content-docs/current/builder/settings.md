@@ -1,4 +1,5 @@
 ---
+description: "Konfigurieren Sie Kartensteuerung, Steuerungslayout, erlaubte Hintergrundkarten, Zoom-Grenzen, Branding, Social Sharing, Sprache und Interaktionen im Dashboard."
 sidebar_position: 3
 ---
 

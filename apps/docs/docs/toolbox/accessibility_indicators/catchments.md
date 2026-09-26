@@ -1,4 +1,5 @@
 ---
+description: "Calculate how far people can travel on foot, by bicycle, pedelec, car or public transport within a time or distance limit, as polygons, networks or grids."
 sidebar_position: 1
 ---
 
@@ -183,7 +184,7 @@ For each mode, configure the **maximum travel time or distance** and the **trave
 
 :::tip Hint
 
-Calculation time varies by settings. Check the [status bar](../../workspace/home#status-bar) for progress.
+Calculation time varies by settings. Check the [status bar](../../workspace/workspace_interface.md#job-status) for progress.
 
 :::
 

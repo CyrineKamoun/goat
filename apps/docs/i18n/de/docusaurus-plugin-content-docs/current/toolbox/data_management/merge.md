@@ -1,4 +1,5 @@
 ---
+description: "Führen Sie zwei oder mehr Layer zu einem zusammen: gleichnamige Felder werden vereint, übrige bleiben erhalten, optional mit Quellspalte und Multi-Geometrien."
 sidebar_position: 2
 ---
 
@@ -61,6 +62,6 @@ Beim Zusammenführen werden Objekte aus mehreren Layern in einem Layer vereint. 
 
 :::tip Hinweis
 
-Die Berechnungsdauer variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/home#status-bar) verfolgen.
+Die Berechnungsdauer variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/workspace_interface.md#job-status) verfolgen.
 
 :::

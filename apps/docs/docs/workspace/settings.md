@@ -1,4 +1,5 @@
 ---
+description: "Manage your profile and preferences, teams, organization members and billing plan, and set up custom domains and Matomo analytics for published dashboards."
 sidebar_position: 5
 ---
 

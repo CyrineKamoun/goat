@@ -1,3 +1,7 @@
+---
+description: "Route a layer to the True or False branch of a workflow with the Conditional node, using logical or statistic expressions combined with AND or OR."
+---
+
 # Conditional
 
 The **Conditional** node routes an input layer to the **True** or **False** branch based on a condition you define. The layer is passed through unchanged — a condition is true when at least one feature satisfies it.

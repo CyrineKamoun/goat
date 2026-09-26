@@ -1,4 +1,5 @@
 ---
+description: "Berechnen Sie, wie weit man zu Fuß, per Fahrrad, Pedelec, Auto oder ÖV in einer Reisezeit oder Entfernung kommt, als Polygon, Netzwerk oder Gitter."
 sidebar_position: 1
 ---
 
@@ -182,7 +183,7 @@ Für jeden Modus können Sie die **maximale Reisezeit oder Entfernung** sowie di
 
 :::tip Hinweis
 
-Die Berechnungszeit variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/home#status-bar) verfolgen.
+Die Berechnungszeit variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/workspace_interface.md#job-status) verfolgen.
 
 :::
 

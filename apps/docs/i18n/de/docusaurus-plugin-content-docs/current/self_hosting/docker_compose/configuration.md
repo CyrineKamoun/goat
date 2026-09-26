@@ -1,6 +1,7 @@
 ---
 sidebar_position: 4
 sidebar_label: Konfigurationsreferenz
+description: "Alle Einstellungen der Datei .env des Pakets, gruppiert nach Release, Adresse und TLS, Anmeldung, Speicher, Datenbank, Jobs, Integrationen, E-Mail und Backups."
 ---
 
 # Konfigurationsreferenz

@@ -1,6 +1,7 @@
 ---
 sidebar_position: 3
 sidebar_label: External services
+description: "Replace the bundled Garage and Keycloak with your own S3 storage and Keycloak, connect an SMTP server for email, and switch on optional integrations in .env."
 ---
 
 # External services

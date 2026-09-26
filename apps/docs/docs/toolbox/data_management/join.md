@@ -1,4 +1,5 @@
 ---
+description: "Join attributes from a Join Layer to a Target Layer by matching field values, a spatial relationship or both, with inner or left join and optional statistics."
 sidebar_position: 1
 ---
 
@@ -192,6 +193,6 @@ In this example, population data is joined to Berlin districts using both condit
 
 :::tip Hint
 
-Calculation time varies by settings. Check the [status bar](../../workspace/home#status-bar) for progress.
+Calculation time varies by settings. Check the [status bar](../../workspace/workspace_interface.md#job-status) for progress.
 
 :::

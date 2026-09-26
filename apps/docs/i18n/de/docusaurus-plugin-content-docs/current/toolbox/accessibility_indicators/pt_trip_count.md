@@ -1,4 +1,5 @@
 ---
+description: "Ermitteln Sie aus GTFS-Daten die durchschnittlichen ÖV-Abfahrten pro Stunde je Haltepunkt für Tag und Zeitfenster, gesamt und je Verkehrsmittel."
 sidebar_position: 8
 ---
 

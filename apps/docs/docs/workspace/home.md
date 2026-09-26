@@ -1,4 +1,5 @@
 ---
+description: "Use the Home page to search every space with prefixes, start a project or dataset, reopen recent work, pick a template and follow the setup checklist."
 sidebar_position: 2
 ---
 

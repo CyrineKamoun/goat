@@ -1,6 +1,7 @@
 ---
 sidebar_position: 2
 sidebar_label: Field Types
+description: "The field types of a GOAT column, from text, number, boolean and date to computed area, perimeter, length and formula, plus formatting and allowed values."
 ---
 
 # Field Types

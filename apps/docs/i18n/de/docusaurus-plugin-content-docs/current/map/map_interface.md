@@ -1,4 +1,5 @@
 ---
+description: "Orientieren Sie sich auf der Kartenoberfläche: obere Leiste, Layer Panel, Suche, Werkzeuge und Messungen, Stil- und Filterbereich sowie die Kartennavigation."
 sidebar_position: 1
 ---
 

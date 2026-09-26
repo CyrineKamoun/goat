@@ -1,4 +1,5 @@
 ---
+description: "Configure the dashboard Layers widget: choose the layers it lists, allow legends and downloads, pick a tree or tab layout, zoom behavior and layer actions."
 sidebar_position: 1
 ---
 

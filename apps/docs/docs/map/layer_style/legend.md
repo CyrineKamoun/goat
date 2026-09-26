@@ -1,4 +1,5 @@
 ---
+description: "Show or hide a layer's legend, add a caption below the layer name and replace the values of color scale steps with custom legend labels such as Low or High."
 sidebar_position: 5
 ---
 import Tabs from '@theme/Tabs';

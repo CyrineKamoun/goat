@@ -1,4 +1,5 @@
 ---
+description: "Zeigen Sie Layer-Daten in den Widgets Kategorien, Histogramm und Kreisdiagramm: Statistik, Feld und Gruppierung wählen, Farben und Auswahlverhalten festlegen."
 sidebar_position: 3
 ---
 

@@ -1,4 +1,5 @@
 ---
+description: "Calculate the average public transport departures per hour at each platform for a chosen day and time window, in total and per mode, from GTFS data."
 sidebar_position: 8
 ---
 

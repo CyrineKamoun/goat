@@ -1,4 +1,5 @@
 ---
+description: "Hängen Sie Felder eines Join-Layers über Attribute, räumliche Beziehung oder beides an einen Ziel-Layer an, als Inner oder Left Join, optional mit Statistiken."
 sidebar_position: 1
 ---
 
@@ -192,6 +193,6 @@ In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüp
 
 :::tip Hinweis
 
-Die Berechnungszeit variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/home#status-bar) verfolgen.
+Die Berechnungszeit variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/workspace_interface.md#job-status) verfolgen.
 
 :::

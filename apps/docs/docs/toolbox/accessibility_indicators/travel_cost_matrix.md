@@ -1,4 +1,5 @@
 ---
+description: "Compute travel time or distance for every origin-destination pair of two point layers, by routing mode or flight distance, as a table of travel costs."
 sidebar_position: 10
 ---
 
@@ -98,7 +99,7 @@ The Travel Cost Matrix is designed for **batch computation across many origins a
 
 :::tip Hint
 
-Calculation time scales with the number of O-D pairs. Check the [status bar](../../workspace/home#status-bar) for progress.
+Calculation time scales with the number of O-D pairs. Check the [status bar](../../workspace/workspace_interface.md#job-status) for progress.
 
 :::
 

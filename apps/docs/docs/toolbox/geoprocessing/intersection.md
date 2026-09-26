@@ -1,4 +1,5 @@
 ---
+description: "Compute where an input and an overlay layer overlap, keeping only those areas with the attributes of both layers, with optional field selection and prefix."
 sidebar_position: 4
 ---
 

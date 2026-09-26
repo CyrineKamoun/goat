@@ -1,4 +1,5 @@
 ---
+description: "Manage team members in Settings and share datasets, projects or whole folders with a team or organization as viewer or editor, and see what each role can do."
 sidebar_position: 1
 ---
 

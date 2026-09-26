@@ -1,6 +1,7 @@
 ---
 sidebar_position: 1
 sidebar_label: Installation
+description: "Install GOAT on one Linux server with the Docker Compose bundle: requirements, download, setup.sh configuration, first start, smoke.sh checks and first login."
 ---
 
 # Installation

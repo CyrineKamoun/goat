@@ -1,4 +1,5 @@
 ---
+description: "Klassifizieren Sie die ÖV-Qualität von A bis F mit Puffern um Haltestellen, nach GTFS-Abfahrtsfrequenz und Stationstyp, für beliebige Tage und Uhrzeiten."
 sidebar_position: 7
 ---
 

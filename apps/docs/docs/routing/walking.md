@@ -1,4 +1,5 @@
 ---
+description: "How GOAT routes walking trips: an Overture Maps network filtered to pedestrian road classes, edge cost as length divided by speed, and a Dijkstra search."
 sidebar_position: 1
  
 ---

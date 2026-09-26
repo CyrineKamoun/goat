@@ -1,4 +1,5 @@
 ---
+description: "Zeigen Sie je Sechseckzelle die durchschnittliche Reisezeit oder Entfernung zu den n nächsten Gelegenheiten, abhängig von Verkehrsmittel und Reisekostenlimit."
 sidebar_position: 3
 ---
 

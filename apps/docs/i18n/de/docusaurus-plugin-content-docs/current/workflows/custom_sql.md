@@ -1,3 +1,7 @@
+---
+description: "Schreiben Sie im Knoten Benutzerdefiniertes SQL Abfragen auf bis zu drei verbundene Eingaben (input_1 bis input_3), mit räumlichen Funktionen und Variablen."
+---
+
 # Benutzerdefinierte SQL
 
 :::warning Erweiterte Funktion

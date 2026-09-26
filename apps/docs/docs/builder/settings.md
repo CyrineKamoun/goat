@@ -1,4 +1,5 @@
 ---
+description: "Configure a dashboard's map controls and layout, allowed basemaps, zoom limits, branding, social sharing preview, language and interactions between elements."
 sidebar_position: 3
 ---
 

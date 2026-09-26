@@ -1,4 +1,5 @@
 ---
+description: "Zeichnen Sie aus Matrix-Tabelle und Geometrie-Layer gerade Linien zwischen Quellen und Zielen, als gewichteten Layer Q-Z Relation plus Layer Q-Z Punkt."
 sidebar_position: 4
 ---
 
@@ -77,7 +78,7 @@ Das folgende Beispiel zeigt eine *Eingabetabelle (Matrix-Layer)* und die resulti
 
 :::tip Hinweis
 
-Je nach Komplexität der QZ-Matrix kann die Berechnung einige Minuten dauern. Die [Statusleiste](../../workspace/home#status-bar) zeigt den aktuellen Fortschritt an.
+Je nach Komplexität der QZ-Matrix kann die Berechnung einige Minuten dauern. Die [Statusleiste](../../workspace/workspace_interface.md#job-status) zeigt den aktuellen Fortschritt an.
 
 :::
 

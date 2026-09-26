@@ -1,4 +1,5 @@
 ---
+description: "How GOAT routes bicycle and pedelec trips on the Overture Maps network, adjusting edge cost for surface and, for bicycles, slope from Copernicus elevation data."
 sidebar_position: 2
 
 ---
