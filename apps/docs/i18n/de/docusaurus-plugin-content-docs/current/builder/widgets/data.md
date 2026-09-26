@@ -66,7 +66,8 @@ Das Tabellen-Widget **zeigt Daten eines Layers als scrollbare Tabelle**. Sie kö
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Wählen Sie die <code>Datenquelle</code>:
+  <div class="content">
+  Wählen Sie die <code>Datenquelle</code>:
   <ul>
     <li><code>Dashboard-Konfiguration</code> — Spalten und Gruppierung visuell konfigurieren</li>
     <li><code>SQL-Abfrage</code> — eigene SQL-Abfrage gegen den Layer schreiben</li>
@@ -76,7 +77,8 @@ Das Tabellen-Widget **zeigt Daten eines Layers als scrollbare Tabelle**. Sie kö
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Im Modus <b>Dashboard-Konfiguration</b> wählen Sie den <code>Modus</code>:
+  <div class="content">
+  Im Modus <b>Dashboard-Konfiguration</b> wählen Sie den <code>Modus</code>:
   <ul>
     <li><code>Records</code> — zeigt alle Zeilen an. Mit <code>Visible fields</code> wählen Sie, welche Spalten angezeigt werden.</li>
     <li><code>Grouped</code> — aggregiert Daten nach Feld. Definieren Sie eine oder mehrere <code>Wertspalten</code> (jeweils mit einer Statistik: Count, Sum, Mean, Median, Min, Max), ein <code>Gruppierungsfeld</code> und optional ein <code>Secondary group-by field</code>. Klicken Sie auf <code>+ Add column</code>, um weitere Wertspalten hinzuzufügen.</li>
@@ -96,7 +98,8 @@ Das Tabellen-Widget **zeigt Daten eines Layers als scrollbare Tabelle**. Sie kö
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Unter <code>Layout</code> konfigurieren Sie das Erscheinungsbild der Tabelle:
+  <div class="content">
+  Unter <code>Layout</code> konfigurieren Sie das Erscheinungsbild der Tabelle:
   <ul>
     <li><code>Sticky header</code> — Spaltenüberschrift beim Scrollen sichtbar halten</li>
     <li><code>Show totals</code> — Summenzeile am Ende der Tabelle anzeigen</li>
@@ -112,7 +115,8 @@ Das Tabellen-Widget **zeigt Daten eines Layers als scrollbare Tabelle**. Sie kö
 
 <div class="step">
   <div class="step-number">10</div>
-  <div class="content">Unter <code>Optionen</code>:
+  <div class="content">
+  Unter <code>Optionen</code>:
   <ul>
     <li><code>Nach Kartenausschnitt filtern</code> — nur Zeilen innerhalb der aktuellen Kartenansicht berücksichtigen</li>
     <li><code>Angezeigte Zeilen</code> — Anzahl der initial geladenen Zeilen und Nachladegröße beim Scrollen (1–20)</li>
@@ -180,7 +184,8 @@ Das Rich-Text-Widget **zeigt formatierten Text mit optionalen dynamischen Werten
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Unter <code>Optionen</code>:
+  <div class="content">
+  Unter <code>Optionen</code>:
   <ul>
     <li><code>Nach Kartenausschnitt filtern</code> — Variablenwerte aktualisieren sich auf Daten innerhalb der aktuellen Kartenansicht</li>
     <li><code>Ausblenden ohne Filter</code> — blendet das Widget aus, wenn kein Filter aktiv ist. Wenn deaktiviert, legen Sie einen <code>Fallback-Text</code> fest, der stattdessen angezeigt wird.</li>

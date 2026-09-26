@@ -65,7 +65,8 @@ The Table widget **displays data from a layer as a scrollable table**. You can s
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Choose the <code>Data source</code>:
+  <div class="content">
+  Choose the <code>Data source</code>:
   <ul>
     <li><code>Dashboard setup</code> — configure columns and grouping visually</li>
     <li><code>SQL query</code> — write a custom SQL query against the layer</li>
@@ -75,7 +76,8 @@ The Table widget **displays data from a layer as a scrollable table**. You can s
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">In <b>Dashboard setup</b> mode, choose the <code>Mode</code>:
+  <div class="content">
+  In <b>Dashboard setup</b> mode, choose the <code>Mode</code>:
   <ul>
     <li><code>Records</code> — shows all rows. Use <code>Visible fields</code> to select which columns to display.</li>
     <li><code>Grouped</code> — aggregates data by field. Define one or more <code>Value columns</code> (each with a statistic: Count, Sum, Mean, Median, Min, Max), a <code>Group-by field</code>, and optionally a <code>Secondary group-by field</code>. Click <code>+ Add column</code> to add more value columns.</li>
@@ -95,7 +97,8 @@ The Table widget **displays data from a layer as a scrollable table**. You can s
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Under <code>Layout</code>, configure the table appearance:
+  <div class="content">
+  Under <code>Layout</code>, configure the table appearance:
   <ul>
     <li><code>Sticky header</code> — keeps the column header visible while scrolling</li>
     <li><code>Show totals</code> — shows a totals row at the bottom</li>
@@ -111,7 +114,8 @@ The Table widget **displays data from a layer as a scrollable table**. You can s
 
 <div class="step">
   <div class="step-number">10</div>
-  <div class="content">Under <code>Options</code>:
+  <div class="content">
+  Under <code>Options</code>:
   <ul>
     <li><code>Filter viewport</code> — only includes rows within the current map view</li>
     <li><code>Rows shown</code> — number of rows loaded initially and per scroll chunk (1–20)</li>
@@ -178,7 +182,8 @@ The Rich Text widget **displays formatted text with optional dynamic values** fr
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Under <code>Options</code>:
+  <div class="content">
+  Under <code>Options</code>:
   <ul>
     <li><code>Filter viewport</code> — variable values update to reflect only data within the current map view</li>
     <li><code>Hide when no filter</code> — hides the widget when no filter is active. When disabled, set a <code>Fallback text</code> to show instead.</li>

@@ -72,7 +72,7 @@ The example below shows the geometry of the *Source Layer* remains unchanged, wh
 
 :::tip NOTE
 
-To learn more about the H3 grid, you can visit the [Glossary](../../further_reading/glossary#H3-grid).
+To learn more about the H3 grid, you can visit the [Glossary](../../further_reading/glossary#h3-grid).
 
 :::
 

@@ -38,10 +38,12 @@ Das Kategorien-Widget ermöglicht es Ihnen, die Verteilung eines kategorischen F
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Unter <code>Stil</code> konfigurieren Sie das Erscheinungsbild des Diagramms:
+  <div class="content">
+  Unter <code>Stil</code> konfigurieren Sie das Erscheinungsbild des Diagramms:
   <ul>
     <li><code>Grundfarbe</code> — legt die Standard-Balkenfarbe fest</li>
-    <li><code>Wertbasierte Darstellung</code> — wenn aktiviert, werden Balken basierend auf dem ausgewählten Darstellungsfeld eingefärbt. Weitere Optionen erscheinen:
+    <li>
+      <code>Wertbasierte Darstellung</code> — wenn aktiviert, werden Balken basierend auf dem ausgewählten Darstellungsfeld eingefärbt. Weitere Optionen erscheinen:
       <ul>
         <li><code>Darstellungsfeld</code> — wählen Sie <code>Statistikfeld</code> (Farbe nach Wert) oder <code>Gruppierungsfeld</code> (eine Farbe pro Kategorie)</li>
         <li><code>Farbskala</code> — Klassifizierungsmethode (z.B. Quantil); nur sichtbar wenn Darstellungsfeld auf Statistikfeld gesetzt ist</li>
@@ -56,7 +58,8 @@ Das Kategorien-Widget ermöglicht es Ihnen, die Verteilung eines kategorischen F
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Unter <code>Optionen</code>:
+  <div class="content">
+  Unter <code>Optionen</code>:
   <ul>
     <li><code>Auswahlverhalten</code> — wählen Sie <code>Filtern</code>, um alle verbundenen Widgets beim Klick auf einen Balken zu filtern, oder <code>Hervorheben</code>, um den ausgewählten Balken hervorzuheben, ohne zu filtern</li>
     <li><code>Nach Kartenausschnitt filtern</code> — nur Daten innerhalb der aktuellen Kartenansicht anzeigen</li>
@@ -92,7 +95,8 @@ Das Histogramm-Widget ermöglicht es Ihnen, die **Verteilung eines numerischen F
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Unter <code>Stil</code> konfigurieren Sie das Erscheinungsbild des Diagramms:
+  <div class="content">
+  Unter <code>Stil</code> konfigurieren Sie das Erscheinungsbild des Diagramms:
   <ul>
     <li><code>Grundfarbe</code> — legt die Standard-Balkenfarbe fest</li>
     <li><code>Hover-Farbe</code> — Farbe beim Hover über einen Balken</li>
@@ -106,7 +110,8 @@ Das Histogramm-Widget ermöglicht es Ihnen, die **Verteilung eines numerischen F
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Unter <code>Optionen</code>:
+  <div class="content">
+  Unter <code>Optionen</code>:
   <ul>
     <li><code>Auswahlverhalten</code> — wählen Sie <code>Filtern</code>, um alle verbundenen Widgets beim Klick auf einen Balken zu filtern, oder <code>Hervorheben</code>, um den ausgewählten Bereich hervorzuheben, ohne zu filtern</li>
     <li><code>Nach Kartenausschnitt filtern</code> — nur Daten innerhalb der aktuellen Kartenansicht anzeigen</li>
@@ -151,7 +156,8 @@ Das Kreisdiagramm-Widget ermöglicht es Ihnen, **die Verteilung eines Feldes** a
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Unter <code>Stil</code> konfigurieren Sie das Erscheinungsbild des Diagramms:
+  <div class="content">
+  Unter <code>Stil</code> konfigurieren Sie das Erscheinungsbild des Diagramms:
   <ul>
     <li><code>Diagrammtyp</code> — wählen Sie <code>Donut</code>, <code>Kreis</code> oder <code>Halbkreis</code></li>
     <li><code>Beschriftungsgröße</code> — wählen Sie <code>S</code>, <code>M</code> oder <code>L</code></li>
@@ -163,7 +169,8 @@ Das Kreisdiagramm-Widget ermöglicht es Ihnen, **die Verteilung eines Feldes** a
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Unter <code>Optionen</code>:
+  <div class="content">
+  Unter <code>Optionen</code>:
   <ul>
     <li><code>Nach Kartenausschnitt filtern</code> — zeigt nur Daten innerhalb der aktuellen Kartenansicht an</li>
   </ul>

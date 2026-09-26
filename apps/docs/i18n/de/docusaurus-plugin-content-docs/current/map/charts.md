@@ -24,7 +24,8 @@ Die Diagramm-Funktion ermöglicht es Ihnen, **aggregierte Daten schnell zu visua
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Wählen Sie Ihren bevorzugten <code>Diagrammtyp</code> aus den verfügbaren Optionen:
+  <div class="content">
+  Wählen Sie Ihren bevorzugten <code>Diagrammtyp</code> aus den verfügbaren Optionen:
     <ul>
       <li><b>Vertikales Balkendiagramm</b>: Klassisches Säulendiagramm-Format</li>
       <li><b>Horizontales Balkendiagramm</b>: Horizontale Balken für bessere Lesbarkeit der Beschriftungen</li>

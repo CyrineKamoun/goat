@@ -67,7 +67,8 @@ The **Line style** section is available for **line layers only** and controls th
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Under <code>Arrows</code>, choose the arrowhead direction: <code>None</code>, <code>Forward</code>, <code>Backward</code>, or <code>Both</code>. When any direction is selected, additional controls appear:
+  <div class="content">
+  Under <code>Arrows</code>, choose the arrowhead direction: <code>None</code>, <code>Forward</code>, <code>Backward</code>, or <code>Both</code>. When any direction is selected, additional controls appear:
     <ul>
       <li><code>Placement</code> — where the arrows are placed: <code>Repeat along line</code>, <code>Start of line</code>, <code>End of line</code>, <code>Both ends</code>, or <code>Center (one per line)</code>.</li>
       <li><code>Arrow size</code> — slider to control the arrowhead size.</li>
@@ -81,7 +82,8 @@ The **Line style** section is available for **line layers only** and controls th
 
 <div class="step">
   <div class="step-number">9</div>
-  <div class="content">Expand <code>Advanced Options</code> to configure:
+  <div class="content">
+  Expand <code>Advanced Options</code> to configure:
     <ul>
       <li><code>Cap</code> — how line endpoints are rendered: <code>Butt</code>, <code>Round</code>, or <code>Square</code>.</li>
       <li><code>Join</code> — how corners between line segments look: <code>Bevel</code>, <code>Round</code>, or <code>Miter</code>.</li>

@@ -30,7 +30,8 @@ Sharing **does not duplicate** your data, only grants access to it.
 
 <div class="step">
    <div class="step-number">4</div>
-   <div class="content">If you are the <b>Owner</b> of the Organization, you can:
+   <div class="content">
+   If you are the <b>Owner</b> of the Organization, you can:
       <ul>
          <li>Click <code>+ New Member</code> to add a new member.</li>
          <li>Click the <code>More options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px', verticalAlign: 'middle'}}/> menu and then on <code>Delete</code> to remove a member</li>

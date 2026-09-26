@@ -54,7 +54,8 @@ Das Tabs-Widget **gruppiert andere Widgets desselben Panels in Tab-Ansichten**, 
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Unter <code>Tabs & Widgets</code> wird jeder Tab mit seinem Namen und der Widget-Anzahl aufgelistet. Klicken Sie auf einen Tab, um ihn zu erweitern:
+  <div class="content">
+  Unter <code>Tabs & Widgets</code> wird jeder Tab mit seinem Namen und der Widget-Anzahl aufgelistet. Klicken Sie auf einen Tab, um ihn zu erweitern:
   <ul>
     <li>Verwenden Sie das Dropdown <code>Widget zu diesem Tab hinzufügen...</code>, um Widgets aus demselben Panel zuzuweisen. Jedes Widget kann jeweils nur einem Tab zugewiesen werden.</li>
     <li>Ziehen Sie das gepunktete Symbol, um zugewiesene Widgets neu anzuordnen. Verwenden Sie das ⋮-Menü, um ein Widget aus dem Tab zu entfernen.</li>
@@ -89,7 +90,8 @@ Das Links-Widget **zeigt eine Reihe von beschrifteten Links oder Popup-Auslöser
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Unter <code>Links</code> hat jedes Element einen <code>URL</code> / <code>Popup</code>-Schalter:
+  <div class="content">
+  Unter <code>Links</code> hat jedes Element einen <code>URL</code> / <code>Popup</code>-Schalter:
   <ul>
     <li><code>URL</code> — geben Sie eine <code>Bezeichnung</code> und eine Ziel-URL ein.</li>
     <li><code>Popup</code> — geben Sie eine <code>Bezeichnung</code> ein und klicken Sie auf <code>Popup konfigurieren</code>, um <code>Popup-Typ</code> (<code>Tooltip</code>, <code>Popup</code> oder <code>Dialog</code>), <code>Popup-Platzierung</code>, <code>Größe</code> (<code>Klein</code>, <code>Mittel</code> oder <code>Groß</code>) und den Popup-Inhalt (Markdown unterstützt) festzulegen.</li>
@@ -105,7 +107,8 @@ Das Links-Widget **zeigt eine Reihe von beschrifteten Links oder Popup-Auslöser
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Unter <code>Optionen</code>:
+  <div class="content">
+  Unter <code>Optionen</code>:
   <ul>
     <li><code>Trennzeichen</code> — visueller Trenner zwischen Links: <code>Vertikaler Strich</code>, <code>Punkt</code> oder <code>Strich</code>.</li>
     <li><code>Zusatztext</code> — zusätzlicher Text neben den Links (z.B. ein Copyright-Hinweis).</li>

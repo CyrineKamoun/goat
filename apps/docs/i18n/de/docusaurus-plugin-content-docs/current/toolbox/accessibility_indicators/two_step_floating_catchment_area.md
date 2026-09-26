@@ -160,31 +160,31 @@ Erfordert die Auswahl einer **Widerstandsfunktion** und eines **Sensitivitätswe
 
 <TabItem value="gaussian" label="Gauß" default className="tabItemBox">
 
-Berechnet Distanzgewichte unter Verwendung einer Gaußschen (glockenförmigen) Kurve. Die Erreichbarkeit nimmt für kurze Reisezeiten langsam ab und fällt jenseits eines bestimmten Schwellenwerts schnell ab. Dies ist die am häufigsten verwendete Widerstandsfunktion. Details siehe [Technische Details](#calculation).
+Berechnet Distanzgewichte unter Verwendung einer Gaußschen (glockenförmigen) Kurve. Die Erreichbarkeit nimmt für kurze Reisezeiten langsam ab und fällt jenseits eines bestimmten Schwellenwerts schnell ab. Dies ist die am häufigsten verwendete Widerstandsfunktion. Details siehe [Technische Details](#berechnung).
 
 </TabItem>
 
 <TabItem value="linear" label="Linear" className="tabItemBox">
 
-Behält eine direkte lineare Beziehung zwischen Reisezeit und Gewicht bei. Das Gewicht nimmt gleichmäßig von 1 (am Ursprung) bis 0 (bei maximaler Reisezeit) ab. Details siehe [Technische Details](#calculation).
+Behält eine direkte lineare Beziehung zwischen Reisezeit und Gewicht bei. Das Gewicht nimmt gleichmäßig von 1 (am Ursprung) bis 0 (bei maximaler Reisezeit) ab. Details siehe [Technische Details](#berechnung).
 
 </TabItem>
 
 <TabItem value="exponential" label="Exponentiell" className="tabItemBox">
 
-Berechnet Gewichte unter Verwendung einer exponentiellen Abklingkurve, gesteuert durch den Sensitivitätsparameter. Höhere Sensitivitätswerte erzeugen ein langsameres Abklingen. Details siehe [Technische Details](#calculation).
+Berechnet Gewichte unter Verwendung einer exponentiellen Abklingkurve, gesteuert durch den Sensitivitätsparameter. Höhere Sensitivitätswerte erzeugen ein langsameres Abklingen. Details siehe [Technische Details](#berechnung).
 
 </TabItem>
 
 <TabItem value="power" label="Potenz" className="tabItemBox">
 
-Berechnet Gewichte unter Verwendung einer Potenzfunktion. Der Sensitivitätsparameter steuert den Exponenten und bestimmt, wie schnell die Gewichte mit der Reisezeit abnehmen. Details siehe [Technische Details](#calculation).
+Berechnet Gewichte unter Verwendung einer Potenzfunktion. Der Sensitivitätsparameter steuert den Exponenten und bestimmt, wie schnell die Gewichte mit der Reisezeit abnehmen. Details siehe [Technische Details](#berechnung).
 
 </TabItem>
 
 <TabItem value="cumulative" label="Kumulativ" className="tabItemBox">
 
-Wendet innerhalb des Reisezeitlimits ein volles Gewicht von 1 auf jede Einrichtung an und 0 darüber hinaus, ohne Distanzabfall. Anders als die übrigen Funktionen verwendet sie den Sensitivitätsparameter nicht – alle erreichbaren Einrichtungen zählen gleich. Details siehe [Technische Details](#calculation).
+Wendet innerhalb des Reisezeitlimits ein volles Gewicht von 1 auf jede Einrichtung an und 0 darüber hinaus, ohne Distanzabfall. Anders als die übrigen Funktionen verwendet sie den Sensitivitätsparameter nicht – alle erreichbaren Einrichtungen zählen gleich. Details siehe [Technische Details](#berechnung).
 
 </TabItem>
 
@@ -216,7 +216,8 @@ Wendet innerhalb des Reisezeitlimits ein volles Gewicht von 1 auf jede Einrichtu
 
 <div class="step">
   <div class="step-number">13</div>
-  <div class="content">Wählen Sie einen <code>Potenzialtyp</code>, um festzulegen, wie die Kapazität jeder Einrichtung bestimmt wird:
+  <div class="content">
+  Wählen Sie einen <code>Potenzialtyp</code>, um festzulegen, wie die Kapazität jeder Einrichtung bestimmt wird:
     <ul>
       <li><b>Constant</b> — alle Einrichtungen haben die gleiche Kapazität. Geben Sie einen numerischen Wert ein (Standard: 1.0).</li>
       <li><b>Field</b> — verwenden Sie ein numerisches Feld aus dem <i>Eingabe-Layer</i> als Kapazität (z. B. Anzahl der Betten, Sitze oder Quadratmeter).</li>
@@ -453,11 +454,11 @@ Die kumulative Funktion wendet **keinen Distanzabfall** an und verwendet den Par
 ### Klassifizierung
 
 Um die berechneten Erreichbarkeitsniveaus für jede Rasterzelle zu klassifizieren, wird standardmäßig eine Klassifizierung basierend auf Quantilen verwendet. 
-Es können jedoch auch verschiedene andere Klassifizierungsmethoden verwendet werden. Lesen Sie mehr im Abschnitt **[Datenklassifizierungsmethoden](../../map/layer_style/style/attribute_based_styling#data-classification-methods)** auf der Seite *Attributbasiertes Styling*.
+Es können jedoch auch verschiedene andere Klassifizierungsmethoden verwendet werden. Lesen Sie mehr im Abschnitt **[Datenklassifizierungsmethoden](../../map/layer_style/style/attribute_based_styling#datenklassifizierungsmethoden)** auf der Seite *Attributbasiertes Styling*.
 
 ### Visualisierung 
 
-Heatmaps in GOAT nutzen **[Ubers H3-Raster](../../further_reading/glossary#h3-grid)**-Lösung für effiziente Berechnung und leicht verständliche Visualisierung. Im Hintergrund wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jeden *Routing-Modus* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der aktiven Mobilität und das Auto GOATs Dijkstra-Implementierung verwenden.
+Heatmaps in GOAT nutzen **[Ubers H3-Raster](../../further_reading/glossary#h3-gitter)**-Lösung für effiziente Berechnung und leicht verständliche Visualisierung. Im Hintergrund wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jeden *Routing-Modus* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der aktiven Mobilität und das Auto GOATs Dijkstra-Implementierung verwenden.
 
 Die Auflösung und Dimensionen des verwendeten hexagonalen Rasters hängen vom gewählten *Routing-Modus* ab:
 

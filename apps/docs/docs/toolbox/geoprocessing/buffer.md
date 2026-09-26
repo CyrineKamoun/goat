@@ -65,7 +65,8 @@ A buffer is a tool used to **delineate the catchment area around a specific poin
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Configure the <code>Polygon Union</code> setting:
+  <div class="content">
+  Configure the <code>Polygon Union</code> setting:
     <ul>
       <li><b>Disabled</b>: GOAT will generate single buffers around each input geometry</li>
       <li><b>Enabled</b>: GOAT will create a <b>geometric union of all steps of the buffer polygons</b>. The buffer with the biggest extent also includes all buffer areas of the smaller extent. This approach is useful if you want to see the total area covered by all your buffer steps combined.</li>

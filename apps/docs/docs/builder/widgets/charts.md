@@ -37,10 +37,12 @@ The categories widget allows you to visualize the distribution of a categorical 
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Under <code>Style</code>, configure the chart appearance:
+  <div class="content">
+  Under <code>Style</code>, configure the chart appearance:
   <ul>
     <li><code>Base Color</code> — sets the default bar color</li>
-    <li><code>Value-based styling</code> — when enabled, bars are colored based on the selected styling field. Additional options appear:
+    <li>
+      <code>Value-based styling</code> — when enabled, bars are colored based on the selected styling field. Additional options appear:
       <ul>
         <li><code>Styling field</code> — choose <code>Statistics field</code> (color by computed value) or <code>Group-by field</code> (one color per category)</li>
         <li><code>Color scale</code> — classification method (e.g. Quantile); shown when Styling field is set to Statistics field</li>
@@ -55,7 +57,8 @@ The categories widget allows you to visualize the distribution of a categorical 
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Under <code>Options</code>:
+  <div class="content">
+  Under <code>Options</code>:
   <ul>
     <li><code>Selection Response</code> — choose <code>Filter</code> to filter all connected widgets when a bar is clicked, or <code>Highlight</code> to highlight the selected bar without filtering</li>
     <li><code>Filter viewport</code> — makes only the data within the current map view visible</li>
@@ -89,7 +92,8 @@ The histogram widget allows you to visualize the **distribution of a numeric fie
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Under <code>Style</code>, configure the chart appearance:
+  <div class="content">
+  Under <code>Style</code>, configure the chart appearance:
   <ul>
     <li><code>Base Color</code> — sets the default bar color</li>
     <li><code>Hover Color</code> — color shown when hovering over a bar</li>
@@ -103,7 +107,8 @@ The histogram widget allows you to visualize the **distribution of a numeric fie
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Under <code>Options</code>:
+  <div class="content">
+  Under <code>Options</code>:
   <ul>
     <li><code>Selection Response</code> — choose <code>Filter</code> to filter all connected widgets when a bar is clicked, or <code>Highlight</code> to highlight the selected portion without filtering</li>
     <li><code>Filter viewport</code> — makes only the data within the current map view visible</li>
@@ -147,7 +152,8 @@ Pie chart widget allows you to **visualize the distribution of a field** from a 
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Under <code>Style</code>, configure the chart appearance:
+  <div class="content">
+  Under <code>Style</code>, configure the chart appearance:
   <ul>
     <li><code>Chart type</code> — choose <code>Donut</code>, <code>Pie</code>, or <code>Half donut</code></li>
     <li><code>Label size</code> — choose <code>S</code>, <code>M</code>, or <code>L</code></li>
@@ -159,7 +165,8 @@ Pie chart widget allows you to **visualize the distribution of a field** from a 
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Under <code>Options</code>:
+  <div class="content">
+  Under <code>Options</code>:
   <ul>
     <li><code>Filter viewport</code> — shows only data within the current map view</li>
   </ul>

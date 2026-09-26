@@ -44,7 +44,8 @@ Merging stacks features from multiple layers into one layer. Unlike a join, no m
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Expand <code>Merge Options</code> and configure the following toggles:
+  <div class="content">
+  Expand <code>Merge Options</code> and configure the following toggles:
   <ul>
     <li><code>Add Source Column</code> — adds a column to the output indicating which input layer each feature came from.</li>
     <li><code>Validate Geometry Types</code> — checks that all input layers share the same geometry type before merging.</li>

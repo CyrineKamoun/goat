@@ -45,7 +45,8 @@ Berechnet die **geometrische Überschneidung zweier Vektor-Layer.** Die Ausgabe 
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Optional können Sie den Umschalter für <code>Feldauswahl</code> aktivieren, um auszuwählen, welche Attribute in die Ausgabe eingeschlossen werden sollen:
+  <div class="content">
+  Optional können Sie den Umschalter für <code>Feldauswahl</code> aktivieren, um auszuwählen, welche Attribute in die Ausgabe eingeschlossen werden sollen:
     <ul>
       <li>Wählen Sie spezifische Felder aus dem <code>Eingabe-Layer</code>, die im Ergebnis beibehalten werden sollen</li>
       <li>Wählen Sie spezifische Felder aus dem <code>Überdeckungs-Layer</code>, die im Ergebnis beibehalten werden sollen</li>

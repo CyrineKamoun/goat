@@ -24,7 +24,8 @@ The Charts feature allows you to **quickly visualize aggregated data**, result  
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Choose your preferred <code>Chart Type</code> from the available options:
+  <div class="content">
+  Choose your preferred <code>Chart Type</code> from the available options:
     <ul>
       <li><b>Vertical Bar Chart</b>: Classic column chart format</li>
       <li><b>Horizontal Bar Chart</b>: Horizontal bars for better label visibility</li>

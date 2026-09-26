@@ -109,7 +109,8 @@ Under **White Label**, you can publish dashboards on your own domain and configu
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">The <strong>Configure DNS</strong> step opens, showing the exact record to create at your DNS provider. The record depends on your domain type:
+  <div class="content">
+  The <strong>Configure DNS</strong> step opens, showing the exact record to create at your DNS provider. The record depends on your domain type:
     <br/><br/>
     <strong>Subdomain</strong> (e.g. <code>maps.example.com</code>):
     <table><thead><tr><th>Type</th><th>Host</th><th>Target</th><th>TTL</th></tr></thead><tbody><tr><td>CNAME</td><td>maps</td><td>cname.goat.plan4better.de</td><td>3600</td></tr></tbody></table>
@@ -154,7 +155,8 @@ GOAT currently supports **Matomo** as the analytics provider.
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">In the <strong>Add analytics</strong> dialog, fill in:
+  <div class="content">
+  In the <strong>Add analytics</strong> dialog, fill in:
     <ul>
       <li><code>Name</code> — a label to tell instances apart, e.g. <code>Client XY Matomo</code>.</li>
       <li><code>Provider</code> — select <code>Matomo</code>.</li>

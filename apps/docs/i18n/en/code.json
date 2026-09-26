@@ -269,5 +269,145 @@
   "theme.tags.tagsPageTitle": {
     "message": "Tags",
     "description": "The title of the tag list page"
+  },
+  "theme.SearchBar.label": {
+    "message": "Search…",
+    "description": "The ARIA label and placeholder for search button"
+  },
+  "goat.copyPage.label": {
+    "message": "Copy page",
+    "description": "Label of the button that copies a doc page's Markdown"
+  },
+  "goat.copyPage.title": {
+    "message": "Copy this page as Markdown",
+    "description": "Tooltip of the button that copies a doc page's Markdown source"
+  },
+  "goat.copyPage.copied": {
+    "message": "Copied",
+    "description": "Shown after a doc page's Markdown was copied"
+  },
+  "goat.copyPage.failed": {
+    "message": "Copy failed",
+    "description": "Shown when copying a doc page's Markdown failed"
+  },
+  "goat.feedback.question": {
+    "message": "Was this helpful?",
+    "description": "Question of the doc page feedback widget"
+  },
+  "goat.feedback.thanks": {
+    "message": "Thanks for your feedback!",
+    "description": "Shown after a reader rated a doc page"
+  },
+  "goat.feedback.notHelpful": {
+    "message": "Not helpful",
+    "description": "Feedback face"
+  },
+  "goat.feedback.somewhatHelpful": {
+    "message": "Somewhat helpful",
+    "description": "Feedback face"
+  },
+  "goat.feedback.helpful": {
+    "message": "Helpful",
+    "description": "Feedback face"
+  },
+  "goat.home.cards.label": {
+    "message": "Documentation sections",
+    "description": "ARIA label of the section cards on the docs landing page"
+  },
+  "goat.home.card.gettingStarted.title": {
+    "message": "Getting started",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.gettingStarted.description": {
+    "message": "Sign up, take the quickstart tour and start a project from a template.",
+    "description": "Description of a section card on the docs landing page"
+  },
+  "goat.home.card.workspace.title": {
+    "message": "Workspace",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.workspace.description": {
+    "message": "Manage your projects, datasets, teams and settings.",
+    "description": "Description of a section card on the docs landing page"
+  },
+  "goat.home.card.data.title": {
+    "message": "Data",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.data.description": {
+    "message": "Use the built-in datasets or upload and connect your own.",
+    "description": "Description of a section card on the docs landing page"
+  },
+  "goat.home.card.map.title": {
+    "message": "Map",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.map.description": {
+    "message": "Add layers, style them, filter features and measure on the map.",
+    "description": "Description of a section card on the docs landing page"
+  },
+  "goat.home.card.toolbox.title": {
+    "message": "Toolbox",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.toolbox.description": {
+    "message": "Accessibility indicators, geoanalysis, geoprocessing and data management tools.",
+    "description": "Description of a section card on the docs landing page"
+  },
+  "goat.home.card.workflows.title": {
+    "message": "Workflows",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.workflows.description": {
+    "message": "Chain datasets and tools into analysis pipelines you can run again.",
+    "description": "Description of a section card on the docs landing page"
+  },
+  "goat.home.card.layouts.title": {
+    "message": "Layouts",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.layouts.description": {
+    "message": "Design map reports and export them as PDF or PNG.",
+    "description": "Description of a section card on the docs landing page"
+  },
+  "goat.home.card.dashboard.title": {
+    "message": "Dashboard",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.dashboard.description": {
+    "message": "Build interactive dashboards with widgets, charts and maps.",
+    "description": "Description of a section card on the docs landing page"
+  },
+  "goat.home.card.sharing.title": {
+    "message": "Sharing",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.sharing.description": {
+    "message": "Work together in teams or publish public and embedded maps.",
+    "description": "Description of a section card on the docs landing page"
+  },
+  "goat.home.card.routing.title": {
+    "message": "Routing",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.routing.description": {
+    "message": "How GOAT computes travel times for walking, cycling, public transport and car.",
+    "description": "Description of a section card on the docs landing page"
+  },
+  "goat.home.card.tutorials.title": {
+    "message": "Tutorials",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.tutorials.description": {
+    "message": "Step-by-step exercises that walk you through GOAT.",
+    "description": "Description of a section card on the docs landing page"
+  },
+  "goat.home.card.troubleshooting.title": {
+    "message": "Troubleshooting",
+    "description": "Title of a section card on the docs landing page"
+  },
+  "goat.home.card.troubleshooting.description": {
+    "message": "Solutions for failed jobs and other common issues.",
+    "description": "Description of a section card on the docs landing page"
   }
 }

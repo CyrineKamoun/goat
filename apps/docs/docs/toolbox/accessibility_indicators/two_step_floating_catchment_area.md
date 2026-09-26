@@ -215,7 +215,8 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
 
 <div class="step">
   <div class="step-number">13</div>
-  <div class="content">Choose a <code>Potential Type</code> to define how each facility's capacity is determined:
+  <div class="content">
+  Choose a <code>Potential Type</code> to define how each facility's capacity is determined:
     <ul>
       <li><b>Constant</b> — all facilities have the same capacity. Enter a numeric value (default: 1.0).</li>
       <li><b>Field</b> — use a numeric field from the <i>Input Layer</i> as the capacity (e.g., number of beds, seats, or square meters).</li>

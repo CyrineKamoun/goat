@@ -1,9 +1,15 @@
 ---
 sidebar_position: 1
 slug: /
+title: Welcome to GOAT 👋
+hide_title: true
 ---
 
-# Welcome to GOAT 👋
+import { DocsHero, DocsSectionCards } from '@site/src/components/DocsHome';
+
+<DocsHero title="Welcome to GOAT 👋">Guides, tool references and tutorials for GOAT, the WebGIS platform for integrated planning by Plan4Better.</DocsHero>
+
+<DocsSectionCards />
 
 **Imagine a powerful tool that lets you see the hidden patterns and stories behind spatial landscapes. That's GOAT, developed by Plan4Better.** Whether you're a planner, developer, or analyst, GOAT is your compass, guiding you through the complexities of spatial data to make your work more insightful and impactful.
 
