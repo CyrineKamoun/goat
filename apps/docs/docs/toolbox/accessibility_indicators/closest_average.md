@@ -102,7 +102,7 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Configure various routing options for your selected transport mode such as travel speed, max transfers, access/egress limits and more. Further information about mode-specific options can be found under the <a href="/docs/category/routing">Routing</a> section.</div>
+  <div class="content">Configure various routing options for your selected transport mode such as travel speed, max transfers, access/egress limits and more. Further information about mode-specific options can be found under the <a href="../../category/routing">Routing</a> section.</div>
 </div>
 
 ### Opportunities
