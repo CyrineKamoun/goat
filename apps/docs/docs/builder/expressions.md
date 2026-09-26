@@ -164,6 +164,6 @@ The following functions work with any type of field. The input and the output wi
 
 :::tip
 
-Find further information in the [QGIS documentation](https://docs.qgis.org/3.28/en/docs/user_manual/expressions/expressions.html).
+Find further information in the [QGIS documentation](https://docs.qgis.org/latest/en/docs/user_manual/expressions/expression.html).
 
 :::

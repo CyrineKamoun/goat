@@ -161,6 +161,6 @@ Die folgenden Funktionen arbeiten mit jedem Feldtyp. Die Eingabe und die Ausgabe
 
 :::tip
 
-Weitere Informationen finden Sie in der [QGIS-Dokumentation](https://docs.qgis.org/3.28/en/docs/user_manual/expressions/expressions.html).
+Weitere Informationen finden Sie in der [QGIS-Dokumentation](https://docs.qgis.org/latest/en/docs/user_manual/expressions/expression.html).
 
 :::
