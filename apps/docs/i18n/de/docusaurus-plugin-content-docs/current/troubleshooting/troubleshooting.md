@@ -14,7 +14,7 @@ Zögern Sie nicht, uns für Unterstützung oder weitere Fragen [hier](https://pl
 
 ## Job-Fehler
 
-Wenn Sie eine Analyse in einem Projekt ausführen, wird die Aufgabe in der Software als **Job** bezeichnet. Eine Fehlermeldung mit **Job-Fehler** bedeutet, dass die Aufgabe nicht ausgeführt werden konnte. Um mehr über die Ursache des Fehlers zu erfahren, überprüfen Sie bitte die [Statusleiste](../workspace/workspace_interface.md#job-status). Nachfolgend finden Sie häufige Ursachen für Job-Fehler und Vorschläge zu deren Behebung.
+Wenn Sie eine Analyse in einem Projekt ausführen, wird die Aufgabe in der Software als **Job** bezeichnet. Eine Fehlermeldung mit **Job-Fehler** bedeutet, dass die Aufgabe nicht ausgeführt werden konnte. Um mehr über die Ursache des Fehlers zu erfahren, überprüfen Sie bitte den [Job Status](../workspace/workspace_interface.md#job-status). Nachfolgend finden Sie häufige Ursachen für Job-Fehler und Vorschläge zu deren Behebung.
 
 * Jobs dürfen eine Dauer von zwei Minuten nicht überschreiten. Es gibt außerdem eine Begrenzung für die Anzahl der Features, die für jeden Indikator analysiert werden können.
 <div style={{ display: "flex", alignItems: "center" }}>
@@ -45,7 +45,7 @@ Wenn Sie eine Analyse in einem Projekt ausführen, wird die Aufgabe in der Softw
 
 
 ## Erreichbarkeitsindikatoren
-### Heatmap - Durchschnitt Reisezeit
+### Heatmap Gravity
 * Die Sensitivität einer Gaußschen Widerstandsfunktion darf 1.000.000 nicht überschreiten.
 <div style={{ display: "flex", alignItems: "center" }}>
   <img 
