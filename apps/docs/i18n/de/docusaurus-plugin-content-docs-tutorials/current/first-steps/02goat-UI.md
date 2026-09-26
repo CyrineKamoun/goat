@@ -1,5 +1,5 @@
 ---
-slug: /tutorials/goat-erste-schritte/goat-ui
+slug: /first-steps/goat-ui
 sidebar_position: 2
 sidebar_label: 2. GOAT-Benutzeroberfläche
 ---

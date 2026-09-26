@@ -80,6 +80,26 @@ const config = {
     [
       "@docusaurus/plugin-client-redirects",
       {
+        // Earlier addresses of the first-steps tutorial pages.
+        redirects: [
+          { from: "/tutorials/goat-first-steps", to: "/tutorials/first-steps" },
+          ...[
+            "start-here",
+            "goat-ui",
+            "exercise-introduction",
+            "create-project",
+            "add-data",
+            "data-preparation",
+            "style-layers",
+            "catchment-areas",
+            "create-catchment-areas",
+            "share-map",
+            "congratulations",
+          ].map((step) => ({
+            from: `/tutorials/tutorials/goat-erste-schritte/${step}`,
+            to: `/tutorials/first-steps/${step}`,
+          })),
+        ],
         createRedirects(existingPath) {
           // Links to /2.0/<page> land on <page>.
           return existingPath.endsWith("/404.html") ? [] : [`/2.0${existingPath}`];

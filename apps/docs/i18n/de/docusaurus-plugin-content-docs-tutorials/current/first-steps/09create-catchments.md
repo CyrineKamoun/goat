@@ -1,7 +1,7 @@
 ---
-slug: /tutorials/goat-erste-schritte/einzugsgebiete-erstellen
+slug: /first-steps/create-catchment-areas
 sidebar_position: 10
-sidebar_label: ✏️ 10. Einzugsgebiete erstellen
+sidebar_label: ✏️ 9. Einzugsgebiete erstellen
 ---
 
 # Einzugsgebiete erstellen

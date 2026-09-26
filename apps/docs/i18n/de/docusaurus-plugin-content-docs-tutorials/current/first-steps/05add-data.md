@@ -1,5 +1,5 @@
 ---
-slug: /tutorials/goat-erste-schritte/daten-hinzufügen
+slug: /first-steps/add-data
 sidebar_position: 5
 sidebar_label: ✏️ 5. Daten hinzufügen
 ---

@@ -1,7 +1,7 @@
 ---
-slug: /tutorials/goat-erste-schritte/create-catchment-areas
+slug: /first-steps/create-catchment-areas
 sidebar_position: 10
-sidebar_label: ✏️ 10. Create Catchment Areas
+sidebar_label: ✏️ 9. Create Catchment Areas
 ---
 
 # Create Catchment Areas

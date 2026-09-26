@@ -1,7 +1,7 @@
 ---
-slug: /tutorials/goat-erste-schritte/congratulations
+slug: /first-steps/congratulations
 sidebar_position: 12
-sidebar_label: 🎉 12. Tutorial Completed!
+sidebar_label: 🎉 11. Tutorial Completed!
 ---
 
 # 🎉 Tutorial Completed!
@@ -21,7 +21,7 @@ You created a **complete accessibility analysis** from scratch and learned:
 
 ## 🗺️ Your Finished Analysis
 
-You created a **publication-ready supermarket accessibility analysis for Mannheim**. Now you can [🔗 **share your map on LinkedIn**](https://www.linkedin.com/sharing/share-offsite/?url=https%3A//goat.plan4better.de%2Ftutorials%2Fgoat-erste-schritte&text=I%20just%20completed%20the%20GOAT%20Getting%20Started%20tutorial%20and%20created%20a%20complete%20accessibility%20analysis%20for%20supermarket%20access%20in%20Mannheim!%20%F0%9F%97%BA%EF%B8%8F%20%23GOAT%20%23GIS%20%23UrbanPlanning%20%23Accessibility) and showcase your new expertise!
+You created a **publication-ready supermarket accessibility analysis for Mannheim**. Now you can [🔗 **share your map on LinkedIn**](https://www.linkedin.com/sharing/share-offsite/?url=https%3A//goat.plan4better.de%2Fdocs%2Ftutorials%2Ffirst-steps&text=I%20just%20completed%20the%20GOAT%20Getting%20Started%20tutorial%20and%20created%20a%20complete%20accessibility%20analysis%20for%20supermarket%20access%20in%20Mannheim!%20%F0%9F%97%BA%EF%B8%8F%20%23GOAT%20%23GIS%20%23UrbanPlanning%20%23Accessibility) and showcase your new expertise!
 
 ## 🚀 Next Steps
 

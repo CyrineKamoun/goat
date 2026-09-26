@@ -1,5 +1,5 @@
 ---
-slug: /tutorials/goat-erste-schritte/exercise-introduction
+slug: /first-steps/exercise-introduction
 sidebar_position: 3
 sidebar_label: 3. Exercise Introduction
 ---

@@ -1,5 +1,5 @@
 ---
-slug: /tutorials/goat-erste-schritte/data-preparation
+slug: /first-steps/data-preparation
 sidebar_position: 6
 sidebar_label: ✏️ 6. Prepare Data
 ---

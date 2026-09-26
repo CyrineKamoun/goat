@@ -1,5 +1,5 @@
 ---
-slug: /tutorials/goat-erste-schritte/layer-gestalten
+slug: /first-steps/style-layers
 sidebar_position: 7
 sidebar_label: ✏️ 7. Layer gestalten
 ---

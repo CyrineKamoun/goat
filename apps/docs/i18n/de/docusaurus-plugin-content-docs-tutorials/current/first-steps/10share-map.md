@@ -1,7 +1,7 @@
 ---
-slug: /tutorials/goat-erste-schritte/karte-teilen
+slug: /first-steps/share-map
 sidebar_position: 11
-sidebar_label: ✏️ 11. Karte teilen
+sidebar_label: ✏️ 10. Karte teilen
 ---
 
 # Karte teilen

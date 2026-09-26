@@ -1,5 +1,5 @@
 ---
-slug: /tutorials/goat-erste-schritte/start-here
+slug: /first-steps/start-here
 sidebar_position: 1
 sidebar_label: 1. Start Here
 ---

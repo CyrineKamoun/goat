@@ -1,7 +1,7 @@
 ---
-slug: /tutorials/goat-erste-schritte/einzugsgebiete
+slug: /first-steps/catchment-areas
 sidebar_position: 9
-sidebar_label: 9. Einzugsgebiete verstehen
+sidebar_label: 8. Einzugsgebiete verstehen
 ---
 
 # Einzugsgebiete verstehen

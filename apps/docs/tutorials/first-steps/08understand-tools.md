@@ -1,7 +1,7 @@
 ---
-slug: /tutorials/goat-erste-schritte/catchment-areas
+slug: /first-steps/catchment-areas
 sidebar_position: 9
-sidebar_label: 9. Understanding Catchment Areas
+sidebar_label: 8. Understanding Catchment Areas
 ---
 
 # Understanding Catchment Areas

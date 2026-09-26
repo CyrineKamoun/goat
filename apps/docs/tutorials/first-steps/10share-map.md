@@ -1,7 +1,7 @@
 ---
-slug: /tutorials/goat-erste-schritte/share-map
+slug: /first-steps/share-map
 sidebar_position: 11
-sidebar_label: ✏️ 11. Share Map
+sidebar_label: ✏️ 10. Share Map
 ---
 
 # Share Map

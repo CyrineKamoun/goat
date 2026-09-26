@@ -1,5 +1,5 @@
 ---
-slug: /tutorials/goat-erste-schritte/create-project
+slug: /first-steps/create-project
 sidebar_position: 4
 sidebar_label: ✏️ 4. Create Project
 ---

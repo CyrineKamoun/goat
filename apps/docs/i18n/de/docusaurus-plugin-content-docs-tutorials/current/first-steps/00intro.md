@@ -1,5 +1,5 @@
 ---
-slug: /goat-first-steps
+slug: /first-steps
 sidebar_position: 1
 sidebar_label: GOAT Erste Schritte
 ---
