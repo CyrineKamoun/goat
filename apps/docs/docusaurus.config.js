@@ -78,19 +78,6 @@ const config = {
       },
     ],
     [
-      "@docusaurus/plugin-content-blog",
-      {
-        id: "releases",
-        routeBasePath: "releases",
-        path: "./releases",
-        blogTitle: "Release notes",
-        blogSidebarTitle: "Release notes",
-        showReadingTime: false,
-        onUntruncatedBlogPosts: "ignore",
-        feedOptions: { type: null },
-      },
-    ],
-    [
       "@docusaurus/plugin-client-redirects",
       {
         createRedirects(existingPath) {
