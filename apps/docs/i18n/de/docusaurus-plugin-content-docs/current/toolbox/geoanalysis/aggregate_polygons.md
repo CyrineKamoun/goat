@@ -77,7 +77,7 @@ Das folgende Beispiel zeigt, dass die Geometrie des *Quell-Layers* unverändert 
 
 :::tip HINWEIS
 
-Um mehr über das H3-Gitter zu erfahren, können Sie das [Glossar](../../further_reading/glossary#H3-grid) besuchen.
+Um mehr über das H3-Gitter zu erfahren, können Sie das [Glossar](../../further_reading/glossary#h3-gitter) besuchen.
 
 :::
 

@@ -73,7 +73,7 @@ Das Werkzeug "Punkte Aggregieren" kann verwendet werden, um **die Eigenschaften 
 
 :::tip HINWEIS
 
-Um mehr über das H3-Gitter zu erfahren, können Sie das [Glossar](../../further_reading/glossary#H3-grid) besuchen.
+Um mehr über das H3-Gitter zu erfahren, können Sie das [Glossar](../../further_reading/glossary#h3-gitter) besuchen.
 
 :::
 

@@ -50,7 +50,8 @@ The Tabs widget **groups other widgets in the same panel into tabbed views**, le
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Under <code>Tabs & Widgets</code>, each tab is listed with its name and widget count. Click a tab to expand it:
+  <div class="content">
+  Under <code>Tabs & Widgets</code>, each tab is listed with its name and widget count. Click a tab to expand it:
   <ul>
     <li>Use the <code>Add widget to this tab...</code> dropdown to assign widgets from the same panel. Each widget can only be assigned to one tab at a time.</li>
     <li>Drag the dotted icon to reorder assigned widgets. Use the ⋮ menu to remove a widget from the tab.</li>
@@ -85,7 +86,8 @@ The Links widget **displays a row of labelled links or popup triggers**, useful 
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Under <code>Links</code>, each item has a <code>URL</code> / <code>Popup</code> toggle:
+  <div class="content">
+  Under <code>Links</code>, each item has a <code>URL</code> / <code>Popup</code> toggle:
   <ul>
     <li><code>URL</code> — enter a <code>Label</code> and a destination URL.</li>
     <li><code>Popup</code> — enter a <code>Label</code> and click <code>Configure popup</code> to set the <code>Popup type</code> (<code>Tooltip</code>, <code>Popup</code>, or <code>Dialog</code>), <code>Popup placement</code>, <code>Size</code> (<code>Small</code>, <code>Medium</code>, or <code>Large</code>), and the popup content (Markdown supported).</li>
@@ -101,7 +103,8 @@ The Links widget **displays a row of labelled links or popup triggers**, useful 
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Under <code>Options</code>:
+  <div class="content">
+  Under <code>Options</code>:
   <ul>
     <li><code>Separator</code> — visual divider between links: <code>Vertical line</code>, <code>Dot</code>, or <code>Dash</code>.</li>
     <li><code>Secondary text</code> — additional text shown alongside the links (e.g. a copyright notice).</li>

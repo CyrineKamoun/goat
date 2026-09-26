@@ -44,7 +44,8 @@ Beim Zusammenführen werden Objekte aus mehreren Layern in einem Layer vereint. 
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Öffnen Sie <code>Merge-Optionen</code> und konfigurieren Sie die folgenden Schalter:
+  <div class="content">
+  Öffnen Sie <code>Merge-Optionen</code> und konfigurieren Sie die folgenden Schalter:
   <ul>
     <li><code>Add Source Column</code> — fügt dem Ergebnis eine Spalte hinzu, die angibt, aus welchem Eingabe-Layer ein Objekt stammt.</li>
     <li><code>Validate Geometry Types</code> — prüft vor dem Zusammenführen, ob alle Eingabe-Layer denselben Geometrietyp aufweisen.</li>

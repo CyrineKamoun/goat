@@ -24,7 +24,8 @@ The **Conditional** node routes an input layer to the **True** or **False** bran
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Click the Conditional node to open its configuration. Click <strong>Add Expression</strong> and choose a condition type:
+  <div class="content">
+  Click the Conditional node to open its configuration. Click <strong>Add Expression</strong> and choose a condition type:
     <ul>
       <li><strong>Logical Expression</strong> — Select a field from the upstream layer, choose an operator (e.g. greater than, contains), and enter a value.</li>
       <li><strong>Statistic Expression</strong> — Choose an aggregate method (<code>count</code>, <code>sum</code>, <code>mean</code>, <code>median</code>, <code>min</code>, <code>max</code>), optionally select a numeric field, choose a comparison operator, and enter a threshold value.</li>

@@ -155,7 +155,8 @@ GOAT supports multiple file formats for upload: **GeoPackage**, **GeoJSON**, **S
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content"><strong>CSV and XLSX files only:</strong> click <code>Set up columns</code> to check a preview of the first rows.
+  <div class="content">
+  <strong>CSV and XLSX files only:</strong> click <code>Set up columns</code> to check a preview of the first rows.
     <ul>
       <li><code>Worksheet</code>: for XLSX files with several sheets, select which sheet to import.</li>
       <li><code>First row is header</code>: on by default. Turn it off if the first row is data; column names are then generated, and you can rename them later in the layer settings.</li>

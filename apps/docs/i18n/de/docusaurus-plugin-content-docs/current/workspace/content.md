@@ -155,7 +155,8 @@ GOAT unterstützt mehrere Dateiformate zum Hochladen: **GeoPackage**, **GeoJSON*
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content"><strong>Nur für CSV- und XLSX-Dateien:</strong> Klicken Sie auf <code>Spalten einrichten</code>, um eine Vorschau der ersten Zeilen zu prüfen.
+  <div class="content">
+  <strong>Nur für CSV- und XLSX-Dateien:</strong> Klicken Sie auf <code>Spalten einrichten</code>, um eine Vorschau der ersten Zeilen zu prüfen.
     <ul>
       <li><code>Arbeitsblatt</code>: Bei XLSX-Dateien mit mehreren Blättern wählen Sie aus, welches Blatt importiert werden soll.</li>
       <li><code>Erste Zeile ist Kopfzeile</code>: standardmäßig aktiviert. Deaktivieren Sie die Option, wenn die erste Zeile Daten enthält; die Spaltennamen werden dann erzeugt und können später in den Layer-Einstellungen umbenannt werden.</li>

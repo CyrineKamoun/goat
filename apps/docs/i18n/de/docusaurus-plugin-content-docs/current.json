@@ -190,5 +190,29 @@
   "sidebar.tutorialSidebar.category.Workflows.link.generated-index.description": {
     "message": "Erstellen Sie visuelle Analyse-Workflows durch das Verbinden von Datensätzen, Werkzeugen und Export-Knoten. Bauen Sie komplexe räumliche Analysepipelines mit Drag-and-Drop-Einfachheit auf, führen Sie Workflows schrittweise aus und verketten Sie mehrere Werkzeuge für anspruchsvolle räumliche Analysen.",
     "description": "Die generierte Beschreibung der Indexseite für die Kategorie Workflows in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.section-getting-started": {
+    "message": "Erste Schritte",
+    "description": "Die Bezeichnung des Abschnitts Getting started in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.section-getting-started.link.generated-index.description": {
+    "message": "Der Bereich Erste Schritte bietet einen Überblick über die wichtigsten Features und Funktionalitäten der GOAT-Plattform. Er führt Benutzer durch die ersten Schritte zur effektiven Nutzung der Plattform.",
+    "description": "Die generierte Beschreibung der Indexseite für den Abschnitt Getting started in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.section-user-manual": {
+    "message": "Benutzerhandbuch",
+    "description": "Die Bezeichnung des Abschnitts User manual in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.section-self-hosting": {
+    "message": "Self-Hosting",
+    "description": "Die Bezeichnung des Abschnitts Self-hosting in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.Docker Compose": {
+    "message": "Docker Compose",
+    "description": "Die Bezeichnung der Kategorie Docker Compose in der Seitenleiste tutorialSidebar"
+  },
+  "sidebar.tutorialSidebar.category.section-help": {
+    "message": "Hilfe",
+    "description": "Die Bezeichnung des Abschnitts Help in der Seitenleiste tutorialSidebar"
   }
 }

@@ -66,7 +66,8 @@ Ein Puffer ist ein Werkzeug, das verwendet wird, um **das Einzugsgebiet um einen
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Konfigurieren Sie die <code>Polygon-Vereinigung</code> Einstellung:
+  <div class="content">
+  Konfigurieren Sie die <code>Polygon-Vereinigung</code> Einstellung:
     <ul>
       <li><b>Deaktiviert</b>: GOAT generiert einzelne Puffer um jede Eingabegeometrie</li>
       <li><b>Aktiviert</b>: GOAT erstellt eine <b>geometrische Vereinigung aller Schritte der Puffer-Polygone</b>. Der Puffer mit der größten Ausdehnung umfasst auch alle Pufferbereiche der kleineren Ausdehnung. Dieser Ansatz ist nützlich, wenn Sie die Gesamtfläche sehen möchten, die von allen Ihren Pufferschritten zusammen abgedeckt wird.</li>

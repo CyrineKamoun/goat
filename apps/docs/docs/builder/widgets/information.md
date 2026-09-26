@@ -25,7 +25,8 @@ This section contains **widgets that provide information about your project** la
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Under <code>Layers</code>, select which layers to show in the widget using the checkboxes. For each layer, click the ⋮ icon to access per-layer settings:
+  <div class="content">
+  Under <code>Layers</code>, select which layers to show in the widget using the checkboxes. For each layer, click the ⋮ icon to access per-layer settings:
   <ul>
     <li><code>Show in legend</code> — toggle whether the layer's legend is shown</li>
     <li><code>Download</code> — allow viewers to download this layer's data</li>
@@ -36,7 +37,8 @@ This section contains **widgets that provide information about your project** la
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Under <code>Layout</code>, configure how the layer list is displayed:
+  <div class="content">
+  Under <code>Layout</code>, configure how the layer list is displayed:
   <ul>
     <li><code>Layout style</code>: <code>Tree</code> (hierarchical list) or <code>Tabs</code> (tabbed navigation)</li>
     <li><code>Visibility toggle</code>: icon style for the show/hide control — <code>Eye</code>, <code>Checkbox</code>, or <code>Switch</code></li>

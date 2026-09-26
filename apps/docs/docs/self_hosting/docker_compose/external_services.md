@@ -1,0 +1,173 @@
+---
+sidebar_position: 3
+sidebar_label: External services
+---
+
+# External services
+
+Out of the box, the bundle runs everything itself. You can replace the bundled object storage and the bundled login server with your own, connect an email server, and switch on optional integrations. All of this is configured in `.env`; apply every change with:
+
+```bash
+docker compose up -d
+```
+
+The bundled components are chosen with `COMPOSE_PROFILES`:
+
+| Profile | Component |
+|---|---|
+| `garage` | Bundled S3 object storage. Remove it to use your own S3. |
+| `keycloak` | Bundled login server. Remove it to use your own Keycloak. |
+| `backup` | Nightly backups (see [Backups](./operations.md#backups)). |
+
+The default is `COMPOSE_PROFILES=garage,keycloak`.
+
+## Your own S3 storage {#s3}
+
+GOAT stores uploaded files in an S3 bucket, and avatars and images in a second, publicly readable bucket. Any S3-compatible storage works.
+
+:::tip Decide before the first start
+Set up your own storage before you start GOAT for the first time. Data already in the bundled Garage is not moved to your storage.
+:::
+
+### 1. Prepare the buckets {#s3-buckets}
+
+- **Uploads bucket** (`S3_BUCKET_NAME`, default `goat-uploads`). Browsers upload files straight to this bucket, so its CORS rules must allow `PUT` with a `Content-Type` header from the GOAT URL. The bundled Garage uses this rule, which you can adapt:
+
+  ```json
+  [
+    {
+      "AllowedOrigins": ["https://goat.example.org"],
+      "AllowedMethods": ["GET", "HEAD", "PUT"],
+      "AllowedHeaders": ["*"],
+      "ExposeHeaders": ["ETag"],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+  ```
+
+- **Assets bucket** (`ASSETS_BUCKET_NAME`, default `goat-assets`) for avatars and images. It must be readable without credentials at the address you set as `ASSETS_URL`.
+
+Both buckets are accessed with the same access key.
+
+### 2. Configure `.env` {#s3-env}
+
+Remove `garage` from `COMPOSE_PROFILES`, then set:
+
+| Setting | Meaning |
+|---|---|
+| `S3_ENDPOINT_URL` | The S3 endpoint as the server reaches it, e.g. `https://s3.example.org` |
+| `S3_PUBLIC_ENDPOINT_URL` | The S3 endpoint as browsers reach it; upload links point here |
+| `S3_REGION` | The region, e.g. `eu-central-1` |
+| `S3_BUCKET_NAME` | The uploads bucket |
+| `S3_FORCE_PATH_STYLE` | `true` for path-style addresses (`endpoint/bucket/key`), `false` for virtual-hosted style (`bucket.endpoint/key`) |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Your access key. Replace the values that `setup.sh` generated for Garage. |
+| `ASSETS_S3_ENDPOINT_URL` | Endpoint of the assets bucket; defaults to `S3_ENDPOINT_URL` |
+| `ASSETS_BUCKET_NAME` | The assets bucket |
+| `ASSETS_URL` | Public address of the assets bucket, e.g. `https://assets.example.org` |
+
+`GARAGE_RPC_SECRET` and `GARAGE_ADMIN_TOKEN` are not used without the bundled Garage.
+
+## Your own Keycloak {#keycloak}
+
+GOAT can use a Keycloak you already run instead of the bundled one.
+
+### Client requirements {#keycloak-client}
+
+Create a client for GOAT in your realm with these settings:
+
+| Setting | Value |
+|---|---|
+| Client type | Confidential (client authentication on), with the standard flow enabled |
+| Valid redirect URIs | `<GOAT URL>/*`, e.g. `https://goat.example.org/*` |
+| Web origins | `<GOAT URL>` |
+| Service account | Enabled, with the `realm-management` roles **`view-users`** and **`manage-users`** |
+
+GOAT uses the service account to read user accounts, to keep a user's name and email in Keycloak in step with their GOAT profile, and to delete an account when its user deletes it in GOAT.
+
+### Configure `.env` {#keycloak-env}
+
+Remove `keycloak` from `COMPOSE_PROFILES`, then set:
+
+| Setting | Meaning |
+|---|---|
+| `KEYCLOAK_PUBLIC_URL` | Keycloak as browsers reach it, e.g. `https://login.example.org` |
+| `KEYCLOAK_INTERNAL_URL` | Keycloak as the GOAT containers reach it; often the same URL |
+| `REALM_NAME` | Your realm |
+| `KEYCLOAK_CLIENT_ID` | The client ID |
+| `KEYCLOAK_CLIENT_SECRET` | The client secret. Replace the value that `setup.sh` generated. |
+
+Both URLs include Keycloak's relative path if yours uses one, such as `/auth`: `https://login.example.org/auth`.
+
+:::info The first administrator and smoke.sh
+With your own Keycloak, GOAT creates no user there. `smoke.sh` signs in with `GOAT_ADMIN_EMAIL` and `GOAT_ADMIN_PASSWORD` through a direct password login. To use it, set both to an existing user of your realm and enable *Direct access grants* on the client.
+:::
+
+If your Keycloak uses a certificate from a private CA, see [Company CA](./https.md#company-ca).
+
+## Email {#email}
+
+GOAT sends invitations, and Keycloak sends password resets, through **one SMTP server**. Email is off while `SMTP_HOST` is empty.
+
+| Setting | Meaning |
+|---|---|
+| `SMTP_HOST`, `SMTP_PORT` | The mail server, e.g. `smtp.example.org` and `587` |
+| `SMTP_SECURITY` | `starttls` (usually port 587), `ssl` (usually port 465) or `none` (e.g. an internal relay on port 25) |
+| `SMTP_USER`, `SMTP_PASSWORD` | The login. Leave both empty for a relay that accepts mail without one. |
+| `SMTP_FROM` | Sender address. Defaults to `SMTP_USER`, so it is required for a relay without login. |
+| `EMAILS_FROM_NAME` | Sender name, default `GOAT` |
+
+For example, a relay inside your network:
+
+```bash
+SMTP_HOST=mail.internal.example.org
+SMTP_PORT=25
+SMTP_SECURITY=none
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM=goat@example.org
+```
+
+After changing `SMTP_SECURITY`, run `./setup.sh` once: it derives the two flags `SMTP_STARTTLS` and `SMTP_SSL` that Keycloak needs. Then apply the change with `docker compose up -d`.
+
+:::info One place for the email settings
+The bundled Keycloak uses the same SMTP settings: on every `docker compose up -d`, the step `keycloak-sync` copies them from `.env` into the realm. Change them in `.env` only; changes made in the Keycloak admin console under *Realm settings → Email* are replaced on the next start.
+:::
+
+### Email branding {#email-branding}
+
+By default, GOAT's emails show the name `GOAT` and no footer links. These optional settings add your own:
+
+| Setting | Meaning |
+|---|---|
+| `EMAIL_BRAND_NAME` | Name shown in the emails |
+| `EMAIL_LOGO_URL` | Address of a logo image, shown instead of the name |
+| `EMAIL_CONTACT_URL` | Contact link in the footer |
+| `EMAIL_PRIVACY_URL` | Privacy policy link in the footer |
+
+## Login off {#no-login}
+
+For local tests and demos, GOAT can run without any login:
+
+```bash
+AUTH=False
+```
+
+Everybody who opens GOAT then acts as one built-in administrator.
+
+:::warning
+With `AUTH=False`, anyone who can reach the URL has full access to all data. Use it only for local or demo installations.
+:::
+
+## Optional integrations {#integrations}
+
+GOAT works without any of these. Each one switches on a feature that needs an outside service.
+
+| Setting | What it enables | Without it |
+|---|---|---|
+| `NEXT_PUBLIC_MAPTILER_KEY` | The satellite/hybrid basemap from MapTiler | That basemap is hidden; the other basemaps work |
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | Place search in the map's search box (Mapbox) | The search box finds no places |
+| `CATALOG_S3_BUCKET`, `CATALOG_S3_ENDPOINT_URL`, `CATALOG_S3_ACCESS_KEY_ID`, `CATALOG_S3_SECRET_ACCESS_KEY`, `CATALOG_S3_REGION` | The GOAT data catalog: a read-only bucket with the harmonised datasets, mirrored on a schedule | The catalog stays empty, and its sync is switched off |
+| `GEOCODING_URL`, `GEOCODING_AUTHORIZATION` | The geocoding service used by analysis tools | Analysis steps that need geocoding cannot run |
+| `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT` | Export of traces, metrics and logs to your OpenTelemetry collector | Nothing is exported |
+
+Links shown in the app and the source of the product artwork are listed in the [configuration reference](./configuration.md#integrations). The source of the routing base data is described under [Routing base data](./operations.md#base-data).

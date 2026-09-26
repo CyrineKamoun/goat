@@ -10,7 +10,7 @@ Mit Vorlagen **beginnen Sie mit etwas bereits Eingerichtetem** statt mit einer l
 - **Workflow-Vorlagen** — ein fertiger Analyse-Workflow, dem nur Ihre eigenen Daten fehlen. Sie geben die Eingabe-Layer an und führen ihn aus.
 - **Layout-Vorlagen** — druckfertige Seitenlayouts, wobei die Seitengröße in Millimetern angegeben ist.
 
-Diese Seite behandelt vor allem **Projektvorlagen**. Für die anderen beiden siehe [Einen Workflow als Vorlage speichern](../workflows/workflow_interface#3-how-to-use-the-workflow-interface) und die Layouts-Seite.
+Diese Seite behandelt vor allem **Projektvorlagen**. Für die anderen beiden siehe [Einen Workflow als Vorlage speichern](../workflows/workflow_interface#3-wie-man-die-workflow-benutzeroberfläche-verwendet) und die Layouts-Seite.
 
 ## Vorlagen durchsuchen
 

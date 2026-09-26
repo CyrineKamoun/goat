@@ -74,7 +74,7 @@ The Aggregate Points tool can be used to **analyze the characteristics of points
 
 :::tip NOTE
 
-To learn more about the H3 grid, you can visit the [Glossary](../../further_reading/glossary#H3-grid).
+To learn more about the H3 grid, you can visit the [Glossary](../../further_reading/glossary#h3-grid).
 
 :::
 

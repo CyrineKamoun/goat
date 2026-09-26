@@ -37,7 +37,8 @@ import TabItem from '@theme/TabItem';
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Under <code>Appearance</code>, configure the following options:
+  <div class="content">
+  Under <code>Appearance</code>, configure the following options:
   <ul>
     <li><code>Layout</code>: choose <code>Popup</code> or <code>Pinned</code></li>
     <li><code>Width</code>: set a fixed width in px, or leave as <code>Auto</code></li>

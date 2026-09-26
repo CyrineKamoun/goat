@@ -26,7 +26,8 @@ Dieser Abschnitt **enthält Widgets, die Informationen über Ihre Projektlayer**
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Unter <code>Layer</code> wählen Sie mithilfe der Kontrollkästchen aus, welche Layer im Widget angezeigt werden sollen. Klicken Sie für jeden Layer auf das ⋮-Symbol, um layerspezifische Einstellungen aufzurufen:
+  <div class="content">
+  Unter <code>Layer</code> wählen Sie mithilfe der Kontrollkästchen aus, welche Layer im Widget angezeigt werden sollen. Klicken Sie für jeden Layer auf das ⋮-Symbol, um layerspezifische Einstellungen aufzurufen:
   <ul>
     <li><code>In Legende anzeigen</code> — steuert, ob die Legende des Layers angezeigt wird</li>
     <li><code>Herunterladen</code> — erlaubt Betrachtern, die Daten dieses Layers herunterzuladen</li>
@@ -37,7 +38,8 @@ Dieser Abschnitt **enthält Widgets, die Informationen über Ihre Projektlayer**
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Unter <code>Layout</code> konfigurieren Sie die Darstellung der Layer-Liste:
+  <div class="content">
+  Unter <code>Layout</code> konfigurieren Sie die Darstellung der Layer-Liste:
   <ul>
     <li><code>Layout-Stil</code>: <code>Baum</code> (hierarchische Liste) oder <code>Tabs</code> (Tab-Navigation)</li>
     <li><code>Schalterstil</code>: Symbol für den Ein-/Ausblenden-Schalter — <code>Augensymbol</code>, <code>Checkbox</code> oder <code>Schalter</code></li>

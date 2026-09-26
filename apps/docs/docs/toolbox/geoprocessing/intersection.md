@@ -45,7 +45,8 @@ Computes the **geometric intersection of two vector layers.** The output contain
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Optionally, switch the toggle on <code>Field Selection</code> to choose which attributes to include in the output:
+  <div class="content">
+  Optionally, switch the toggle on <code>Field Selection</code> to choose which attributes to include in the output:
     <ul>
       <li>Select specific fields from the <code>Input layer</code> to keep in the result</li>
       <li>Select specific fields from the <code>Overlay layer</code> to keep in the result</li>

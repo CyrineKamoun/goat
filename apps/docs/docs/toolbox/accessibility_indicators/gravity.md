@@ -172,7 +172,8 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 
 <div class="step">
   <div class="step-number">10</div>
-  <div class="content">Choose a <code>Potential Type</code> to define how each opportunity is weighted:
+  <div class="content">
+  Choose a <code>Potential Type</code> to define how each opportunity is weighted:
     <ul>
       <li><b>Constant</b> — all opportunities have the same weight. Enter a numeric value (default: 1.0).</li>
       <li><b>Field</b> — use a numeric field from the <i>Input Layer</i> as the weight (e.g. number of departures, seats, or capacity).</li>

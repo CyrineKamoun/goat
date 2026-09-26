@@ -1,9 +1,8 @@
 // @ts-nocheck
 // Note: type annotations allow type checking and IDEs autocompletion
 
-const lightCodeTheme = require("prism-react-renderer/themes/github");
-// const darkCodeTheme = require('prism-react-renderer/themes/dracula');
-// const DarkTheme = require('@site/src/custom_theme.ts');
+const { themes: prismThemes } = require("prism-react-renderer");
+const { sidebarItemsGenerator } = require("./src/sidebar/sections");
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
@@ -15,7 +14,11 @@ const config = {
   organizationName: "plan4better",
   projectName: "goat",
   onBrokenLinks: "warn",
-  onBrokenMarkdownLinks: "warn",
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: "warn",
+    },
+  },
   i18n: {
     defaultLocale: "en",
     locales: ["en", "de"],
@@ -38,6 +41,7 @@ const config = {
         docs: {
           routeBasePath: "/",
           sidebarPath: require.resolve("./sidebars.js"),
+          sidebarItemsGenerator,
           editUrl: ({ locale, versionDocsDirPath, docPath }) => {
             const translation = locale || 'en';
             if (translation !== 'en') {
@@ -59,6 +63,7 @@ const config = {
     ],
   ],
   plugins: [
+    require.resolve("./src/plugins/markdown-source.js"),
     [
       "@docusaurus/plugin-content-docs",
       {
@@ -105,26 +110,26 @@ const config = {
       image: "img/GOAT_logo_white_green_crop_b.png",
       navbar: {
         logo: {
-          alt: "Plan4Better",
-          src: "https://assets.plan4better.de/img/logo/plan4better_standard.svg",
+          alt: "GOAT by Plan4Better",
+          src: "img/goat-lockup.svg",
         },
         items: [
           {
             type: "docSidebar",
             sidebarId: "tutorialSidebar",
-            position: "left",
+            position: "right",
             label: "Docs",
           },
           {
             to: "/tutorials",
             label: "Tutorials",
-            position: "left",
+            position: "right",
             activeBaseRegex: `/tutorials/`,
           },
           {
             to: "https://plan4better.de/en/blog/",
             label: "Blog",
-            position: "left",
+            position: "right",
           },
           {
             type: "localeDropdown",
@@ -140,6 +145,8 @@ const config = {
             href: "https://github.com/plan4better/goat",
             label: "GitHub",
             position: "right",
+            className: "header-github-link",
+            "aria-label": "GitHub",
           },
         ],
       },
@@ -185,6 +192,10 @@ const config = {
           },
         ],
         copyright: `Plan4Better GmbH 2026 | All Rights Reserved`,
+      },
+      prism: {
+        theme: prismThemes.github,
+        darkTheme: prismThemes.vsDark,
       },
       algolia: {
         indexName: 'goat-plan4better',

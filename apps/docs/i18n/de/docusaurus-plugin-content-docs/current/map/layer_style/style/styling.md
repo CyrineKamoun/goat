@@ -74,7 +74,8 @@ Der Abschnitt **Linienstil** ist nur für **Linien-Layer** verfügbar und steuer
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Wählen Sie unter <code>Pfeile</code> die Pfeilrichtung: <code>Keine</code>, <code>Vorwärts</code>, <code>Rückwärts</code> oder <code>Beide</code>. Bei Auswahl einer Richtung erscheinen weitere Einstellungen:
+  <div class="content">
+  Wählen Sie unter <code>Pfeile</code> die Pfeilrichtung: <code>Keine</code>, <code>Vorwärts</code>, <code>Rückwärts</code> oder <code>Beide</code>. Bei Auswahl einer Richtung erscheinen weitere Einstellungen:
     <ul>
       <li><code>Position</code> — wo die Pfeile platziert werden: <code>Wiederholen entlang der Linie</code>, <code>Linienanfang</code>, <code>Linienende</code>, <code>Beide Enden</code> oder <code>Mitte (eine pro Linie)</code>.</li>
       <li><code>Pfeilgröße</code> — Regler zur Steuerung der Pfeilgröße.</li>
@@ -88,7 +89,8 @@ Der Abschnitt **Linienstil** ist nur für **Linien-Layer** verfügbar und steuer
 
 <div class="step">
   <div class="step-number">9</div>
-  <div class="content">Erweitern Sie <code>Erweiterte Optionen</code>, um folgende Einstellungen vorzunehmen:
+  <div class="content">
+  Erweitern Sie <code>Erweiterte Optionen</code>, um folgende Einstellungen vorzunehmen:
     <ul>
       <li><code>Linienende</code> — wie Linienendpunkte dargestellt werden: <code>Stumpf</code>, <code>Rund</code> oder <code>Quadratisch</code>.</li>
       <li><code>Linienverbindung</code> — wie Ecken zwischen Liniensegmenten aussehen: <code>Abgeschrägt</code>, <code>Rund</code> oder <code>Spitz</code>.</li>
