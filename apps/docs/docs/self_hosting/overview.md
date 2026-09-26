@@ -1,0 +1,52 @@
+---
+sidebar_position: 1
+sidebar_label: Overview
+---
+
+# Self-hosting
+
+GOAT is open source, and you can run it on your own infrastructure. This section explains two ways to do that: **Docker Compose on a single server**, and **Kubernetes with Helm**.
+
+:::warning Community-supported
+Self-hosted deployments are **community-supported**. We do not offer official support for managing your infrastructure. If you would rather not run GOAT yourself, use the hosted version at [goat.plan4better.de](https://goat.plan4better.de).
+:::
+
+## What GOAT consists of {#components}
+
+GOAT is not one program but a set of services that work together. Both deployment options run the same GOAT images, which are published publicly at `ghcr.io/plan4better/goat`.
+
+| Component | What it does |
+|---|---|
+| **Web app** | The user interface you open in the browser. |
+| **Core API** | Users, organizations, teams, projects, folders and the metadata of your datasets. |
+| **GeoAPI** | Serves the data of your layers as OGC API Features and vector tiles. |
+| **Processes** | Starts analyses, imports and other jobs (OGC API Processes) and reports their status. |
+| **Catalog** | The GOAT data catalog, served as a STAC API. |
+| **Keycloak** | Login and user accounts. |
+| **PostgreSQL with PostGIS** | The databases of GOAT, Keycloak and Windmill. |
+| **Garage** | S3-compatible object storage for uploaded files and images. |
+| **Windmill** | The job engine. Its workers run the analysis tools, dataset imports, PDF printing and scheduled tasks. |
+| **Redis** | A cache for the GeoAPI. |
+| **Caddy** | The reverse proxy in front of everything. It is the only entry point and takes care of HTTPS. |
+
+## Which option? {#which-option}
+
+|   | Docker Compose | Kubernetes (Helm) |
+|---|---|---|
+| **Runs on** | One Linux server | A Kubernetes cluster you already operate |
+| **Included** | Everything in the table above, including Keycloak, Garage and HTTPS | The GOAT services and Windmill; PostgreSQL (through CloudNativePG) and Redis as optional sub-charts |
+| **You provide** | A server, and a DNS name if you want automatic HTTPS | S3 object storage, Keycloak (if users should log in), Ingress and TLS, storage |
+| **Setup** | `setup.sh` writes the configuration, `smoke.sh` checks the installation | A values file |
+
+:::tip Recommendation
+For a single server, the **Docker Compose bundle is the recommended path**. It contains every component, generates all passwords and keys for you, and ships with scripts for checks, backups and restores. Use the Helm chart if you already run Kubernetes and have S3 storage and a Keycloak available.
+:::
+
+## Next steps {#next-steps}
+
+- [Installation](./docker_compose/installation.md): requirements, download, first start and first login with Docker Compose.
+- [HTTPS and addresses](./docker_compose/https.md): the four TLS modes, your own certificate, running behind a load balancer.
+- [External services](./docker_compose/external_services.md): your own S3 or Keycloak, email, and optional integrations.
+- [Configuration reference](./docker_compose/configuration.md): every setting in `.env`.
+- [Operations](./docker_compose/operations.md): users, routing base data, backups, upgrades and troubleshooting.
+- [Kubernetes (Helm)](./kubernetes.md): what the Helm chart includes and what you have to set.

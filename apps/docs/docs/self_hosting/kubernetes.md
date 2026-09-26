@@ -1,0 +1,80 @@
+---
+sidebar_position: 3
+sidebar_label: Kubernetes (Helm)
+---
+
+# Kubernetes (Helm)
+
+GOAT has a Helm chart for Kubernetes clusters, published at `oci://ghcr.io/plan4better/charts/goat`. This page summarises what the chart includes and what you have to provide. The [chart README](https://github.com/plan4better/charts/tree/main/charts/goat) is the full reference for all values.
+
+:::tip One server? Use Docker Compose
+For a single server, the [Docker Compose bundle](./docker_compose/installation.md) is the recommended path. It includes the login server, object storage and HTTPS, which the Helm chart leaves to you.
+:::
+
+This page describes chart version **0.5.1**, which installs GOAT **v3.0.3** by default.
+
+## Install {#install}
+
+```bash
+helm install goat oci://ghcr.io/plan4better/charts/goat \
+  --version 0.5.1 \
+  --namespace goat --create-namespace \
+  --values your-values.yaml \
+  --wait --timeout 25m
+```
+
+A first install pulls several large images, which is why the timeout is long. A fresh cluster needs this one command only.
+
+## What the chart includes {#included}
+
+| Component | Default |
+|---|---|
+| core, web, geoapi, processes, catalog | on |
+| Windmill server and the default worker | on |
+| Windmill workers `tools`, `workflows` and `print` | **off** |
+| PostgreSQL through CloudNativePG (operator and cluster) | on, optional sub-chart |
+| Redis | on, optional sub-chart |
+| A shared data volume (`data`, 200 Gi, `ReadWriteOnce`) | on |
+| Caddy for custom domains | off |
+
+The chart does **not** include:
+
+- **Object storage.** GOAT needs an external S3-compatible storage.
+- **Keycloak.** If users should log in, you need an external Keycloak.
+
+You can also point the chart at an existing PostgreSQL or Redis instead of the bundled ones; the chart README lists the SQL your PostgreSQL needs.
+
+## What you have to set {#required-values}
+
+### Public URLs {#public-urls}
+
+The browser calls core, geoapi, processes and catalog directly, so the web app needs their public addresses. Give each service an Ingress with a host (`<service>.ingress.*`), and the URLs are derived from it, or set them explicitly in `web.publicUrls.api`, `.geoapi`, `.processes` and `.catalog`.
+
+:::warning
+Without these URLs, the web app shows a blank page.
+:::
+
+### Object storage {#storage}
+
+The chart ships placeholder values for S3. Replace them with your storage's endpoint, region, bucket and credentials in the configuration of core, geoapi and processes (`<service>.config.S3_*`, with the keys through `<service>.extraEnv`), and likewise for the analysis workers (below).
+
+### Login {#auth}
+
+Login is **off** by default (`global.auth.enabled: false`): every service then acts as one default user, so put such an installation behind your own access control. To switch login on, set `global.auth.enabled: true` and `global.auth.existingSecret` to a Secret with the keys `server-url`, `realm`, `client-id`, `client-secret` and `nextauth-secret`. One Secret serves all five services.
+
+### Analysis workers {#workers}
+
+The default Windmill worker only handles small jobs. **Analysis tools, dataset imports and workflows need the `tools` and `workflows` workers, and PDF printing needs the `print` worker.** All three are off by default. To use them:
+
+- Enable them with `windmill.workers.tools.enabled`, `windmill.workers.workflows.enabled` and `windmill.workers.print.enabled`.
+- The `tools` and `workflows` workers are pinned to nodes labelled `node.kubernetes.io/server-usage: geodata` with the toleration `geodata=true:NoSchedule`. Prepare such nodes, or override `nodeSelector` and `tolerations` for these workers. Otherwise their pods stay `Pending` and `helm install --wait` times out.
+- Give the workers the GOAT database and S3 settings through their `config` and `extraEnv`. Windmill passes only the variables listed in `WHITELIST_ENVS` on to the jobs; the chart ships a list that covers GOAT's tools, so add to it rather than replacing it.
+- Enable `windmill.scriptSync.enabled` to register GOAT's analysis tools and tasks in Windmill after the install. It is off by default.
+
+### Storage for several nodes {#rwx}
+
+The shared data volume defaults to `ReadWriteOnce`, which works on a single node. On a cluster with several nodes, set `data.accessMode: ReadWriteMany` with an RWX-capable storage class (`data.storageClassName`), or supply your own claim with `data.existingClaim`.
+
+## Further reading {#further-reading}
+
+The [chart README](https://github.com/plan4better/charts/tree/main/charts/goat) covers the details: bootstrapping a fresh cluster, the external PostgreSQL setup, authentication precedence, the shared data volume, the region new projects open in (`DEFAULT_PROJECT_VIEW_STATE`), schema migrations and the upgrade notes between chart versions.
