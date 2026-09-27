@@ -308,7 +308,9 @@ async def update_profile(
             f"img/users/{settings.ENVIRONMENT}/{file_name}",
             f"image/{extension}",
         )
-        user.avatar = f"https://assets.plan4better.de/img/users/{settings.ENVIRONMENT}/{file_name}"
+        user.avatar = (
+            f"{settings.ASSETS_URL}/img/users/{settings.ENVIRONMENT}/{file_name}"
+        )
     user_update = UserUpdate(
         **user.model_dump(exclude_unset=True, exclude_none=True),
     )

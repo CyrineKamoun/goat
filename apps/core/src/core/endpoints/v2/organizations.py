@@ -1,9 +1,11 @@
+import logging
 from typing import Any, List
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
+from keycloak.exceptions import KeycloakError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.core.config import settings
@@ -14,11 +16,13 @@ from core.db.models import Organization
 from core.db.models.invitation import Invitation, InvitationStatusEnum, InvitationType
 from core.db.models.organization import OrganizationRolesEnum
 from core.db.models.user import User
+from core.deps import keycloak as keycloak_deps
 from core.deps.auth import auth_z, is_superuser, user_token
 from core.endpoints.deps import get_db
 from core.schemas.email import EmailTemplateContent
 from core.schemas.invitations import (
     InvitationOrgCreate,
+    InvitationOrgCreateRead,
     InvitationOrgUpdate,
 )
 from core.schemas.organization import (
@@ -31,6 +35,8 @@ from core.schemas.organization import (
 )
 from core.utils.email import send_email
 from core.utils.i18n import trans as _
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -273,7 +279,7 @@ async def update_user_role_in_organization(
 @router.post(
     "/{organization_id}/invitations",
     summary="Invite a user to an organization",
-    response_model=Invitation,
+    response_model=InvitationOrgCreateRead,
     dependencies=[Depends(auth_z)],
 )
 async def invite_user_to_organization(
@@ -326,6 +332,26 @@ async def invite_user_to_organization(
     # check if organization organization has enough seats
     crud_organization.check_seats_quota(role=payload.role, organization=organization)
 
+    # An invitee who has used GOAT has a Keycloak account. For anyone else,
+    # create one before storing the invitation, so a failure leaves nothing
+    # half done.
+    created_keycloak_user_id = None
+    if not invited_user:
+        try:
+            created_keycloak_user_id = await keycloak_deps.create_invited_user(
+                payload.user_email
+            )
+        except KeycloakError:
+            logger.warning(
+                "keycloak account creation failed for an invitation to %s",
+                organization_id,
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="The account for the invited email can't be created right now.",
+            )
+
     # create invitation in db
     new_invitation = Invitation(
         send_by=user_id,
@@ -345,13 +371,16 @@ async def invite_user_to_organization(
     )
 
     invitation = await crud_invitation.create(db=db, obj_in=new_invitation)
+    invitation_url = (
+        f"{settings.CLIENT_URL}/onboarding/organization/invite/{invitation.id}"
+    )
     email_content = EmailTemplateContent(
-        artwork_url="https://assets.plan4better.de/img/email/organization_invited.png",
+        artwork_url=f"{settings.email_artwork_url}/img/email/organization_invited.png",
         title=_("You have been invited to join an organization"),
         message=_(
             "You have been invited to join an organization. Click on the button below to accept the invitation."
         ),
-        action_url=f"{settings.CLIENT_URL}/onboarding/organization/invite/{invitation.id}",
+        action_url=invitation_url,
         action_label=_("Join organization"),
     )
     send_email(
@@ -360,7 +389,17 @@ async def invite_user_to_organization(
         environment=email_content.model_dump(),
     )
 
-    return invitation
+    account_setup = None
+    if created_keycloak_user_id:
+        # The invitee lands on the invitation after setting a password.
+        sent = await keycloak_deps.send_account_setup_email(
+            created_keycloak_user_id, redirect_uri=invitation_url
+        )
+        account_setup = "email_sent" if sent else "manual"
+
+    return InvitationOrgCreateRead(
+        **invitation.model_dump(), account_setup=account_setup
+    )
 
 
 @router.patch(

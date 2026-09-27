@@ -1476,6 +1476,7 @@
   "member_delete_error": "Error removing member",
   "member_deleted_success": "Member removed",
   "member_invite_error": "Error inviting member",
+  "member_invited_account_manual": "Member invited. The email to set a password could not be sent: set the password for the new account in the Keycloak admin console.",
   "member_invited_success": "Member invited",
   "member_role_update_error": "Error updating member role",
   "member_role_updated_success": "Member role updated successfully",

@@ -1554,6 +1554,7 @@
   "member_delete_error": "Fehler beim Entfernen des Mitglieds",
   "member_deleted_success": "Mitglied entfernt",
   "member_invite_error": "Fehler beim Einladen eines Mitglieds",
+  "member_invited_account_manual": "Mitglied eingeladen. Die E-Mail zum Festlegen des Passworts konnte nicht gesendet werden: Legen Sie das Passwort für das neue Konto in der Keycloak-Administrationskonsole fest.",
   "member_invited_success": "Eingeladenes Mitglied",
   "member_role_update_error": "Fehler beim Aktualisieren der Mitgliedsrolle",
   "member_role_updated_success": "Die Mitgliedsrolle wurde erfolgreich aktualisiert",
