@@ -2,7 +2,7 @@
 
 Helm chart for deploying GOAT (Geo Open Accessibility Tool) on Kubernetes.
 
-## Scope (v0.5.1)
+## Scope (v0.6.0)
 
 | Service | Default | Notes |
 |---|---|---|
@@ -379,6 +379,13 @@ override the key names via the `existingSecretUserKey` /
 | `global.auth.existingSecret` | string | `""` | ONE Keycloak Secret for every service; keys named by `global.auth.existingSecretKeys` (`server-url`, `realm`, `client-id`, `client-secret`, `nextauth-secret`). |
 | `<service>.auth.enabled` | bool/null | `null` | Per-service override for `core`, `web`, `geoapi`, `processes`, `catalog`; null inherits `global.auth.enabled`. |
 | `<service>.auth.existingSecret` / `.existingSecretKeys` | string / map | `""` / `{}` | Per-service Secret / key names; empty inherits `global.auth`. |
+| `global.auth.provisionInvitedUsers` | bool | `false` | Invitations to an email without a Keycloak account create the account, and Keycloak emails a set-password link (`KEYCLOAK_PROVISION_INVITED_USERS`). For realms with self-registration off; core's client needs the realm-management roles `view-users` and `manage-users`. |
+| `global.caBundle.existingConfigMap` / `.existingSecret` / `.key` | string | `""` / `""` / `ca.crt` | A company CA certificate (PEM), mounted at `/etc/goat/ca/ca.pem` in core, web and the print, tools and workflows workers (see "Email and a company CA"). |
+| `email.host` | string | `""` | SMTP server for GOAT's invitations; email is off while empty. |
+| `email.port` / `.security` | int / string | `587` / `starttls` | `security`: `starttls`, `ssl` or `none`. |
+| `email.user` / `.from` / `.fromName` | string | `""` / `""` / `GOAT` | Login, sender address (defaults to `user`; required for a relay without login) and sender name. |
+| `email.existingSecret` / `.existingSecretKey` | string | `""` / `smtp-password` | Secret holding the SMTP password. |
+| `email.brandName` / `.logoUrl` / `.contactUrl` / `.privacyUrl` | string | `GOAT` / `""` | Name, logo and footer links of GOAT's emails. |
 | `core.ingress.enabled` | bool | `false` | Create Ingress resource for core API. |
 | `core.ingress.className` | string | `""` | Ingress controller name (`nginx`, `traefik`, …). |
 | `core.config.*` | map | see values.yaml | Non-secret env vars (rendered as ConfigMap). `S3_FORCE_PATH_STYLE=true` selects path-style addressing for any S3-compatible store; `MAX_UPLOAD_DATASET_FILE_SIZE` caps browser uploads (bytes, default 5 GB). Both must also be in the Windmill workers' `WHITELIST_ENVS`. |
@@ -479,6 +486,65 @@ install behind your own access control.
 Examples: `global.auth.enabled: true` with `geoapi.auth.enabled: false` runs
 everything but geoapi with auth; `processes.auth.existingSecret:
 processes-kc` points processes alone at another Secret.
+
+## Email and a company CA
+
+Core sends invitations through the SMTP server in `email`, with the password
+from a Secret:
+
+```bash
+kubectl -n goat create secret generic goat-smtp --from-literal=smtp-password='…'
+```
+
+```yaml
+email:
+  host: smtp.example.org
+  port: 587
+  security: starttls        # ssl on 465, none for a relay on 25
+  user: goat@example.org
+  existingSecret: goat-smtp
+```
+
+The links in those emails come from the public web URL (`web.auth.publicUrl`,
+else web's ingress) and the public API URL (`web.publicUrls.api`, else core's
+ingress, plus `/api/v2`), rendered as `CLIENT_URL` and `API_URL`; set either
+in `core.config` to override.
+
+Keycloak sends its own emails — password resets, and the set-password link
+for accounts created by `global.auth.provisionInvitedUsers` — with the SMTP
+settings of its realm (*Realm settings → Email*). Configure the same server
+there; the chart does not manage Keycloak.
+
+When the relay, Keycloak or the pages the print worker opens use a
+certificate from a private CA, put the CA certificate (PEM) into a ConfigMap
+or Secret and name it in `global.caBundle`:
+
+```bash
+kubectl -n goat create configmap corporate-ca --from-file=ca.crt=corporate-ca.pem
+```
+
+```yaml
+global:
+  caBundle:
+    existingConfigMap: corporate-ca
+    key: ca.crt
+```
+
+The chart mounts it at `/etc/goat/ca/ca.pem` and sets `GOAT_CA_BUNDLE` in core
+and the print, tools and workflows workers and `NODE_EXTRA_CA_CERTS` in web.
+Each of them trusts it in addition to the public CAs. A variable you set
+yourself in that service's `config` or `extraEnv` wins.
+
+## Uploaded images — `ASSETS_URL`
+
+Project and dataset thumbnails, avatars and dashboard images are stored in the
+bucket `core.config.AWS_S3_ASSETS_BUCKET` (default `goat-assets`) and reach the
+browser as `ASSETS_URL/<key>`. Set `core.config.ASSETS_URL` to the bucket's
+public URL; the bucket must be publicly readable. Unset, core assumes a bucket
+on AWS (`https://<bucket>.s3.<region>.amazonaws.com`). For S3 outside AWS also
+set `ASSETS_S3_ENDPOINT_URL` (core refuses to start without `ASSETS_URL` then)
+and, if the store needs it, `ASSETS_S3_FORCE_PATH_STYLE: "true"`. GOAT's own
+artwork ships in the web image under `/assets` and needs none of this.
 
 ## The shared data volume
 
@@ -668,11 +734,28 @@ helm template my-release deploy/helm/goat/ -f deploy/helm/goat/ci/values-externa
 
 | Chart version | Adds | Notes |
 |---|---|---|
+| `0.6.0` | `email` (SMTP for invitations, password from a Secret, email branding) with `CLIENT_URL` / `API_URL` derived for the links in emails; `global.auth.provisionInvitedUsers`; `global.caBundle` (company CA for core, web and the print, tools and workflows workers) | `core.config` drops the `ASSETS_URL` and `AWS_S3_ASSETS_BUCKET` placeholders — see "Upgrading 0.5.1 → 0.6.0" |
 | `0.5.1` | GOAT v3.0.3 (no runtime downloads in the workers, `ROOT_PATH`, `sync_base_data`); `global.auth`: one auth switch + one Keycloak Secret for core, web, geoapi, processes, catalog; `geoapi.auth` / `processes.auth` | Fixes: geoapi + processes ran auth ON at chart defaults (401 on feature edits and every job route) and, with auth on, validated tokens against plan4better's dev Keycloak; a fresh install's processes had no windmill token (every tool run failed until a manual restart); `processes.windmillAutoWire: false` was ignored. No values change needed — see "Upgrading 0.5.0 → 0.5.1" |
 | `0.5.0` | GOAT v3.0.2: `catalog` service (STAC API + MCP); shared `data` volume; single-command fresh install (DuckLake + windmill DB bootstrap moved from hooks to init containers); `REDIS_URL`, web `NEXT_PUBLIC_*` and windmill `WHITELIST_ENVS` fixes; bundled Postgres image moves from CNPG's default major 17 to 18 (`ghcr.io/cloudnative-pg/postgis:18-3.6-system-trixie`) | BREAKING: `helm upgrade` DELETES `<fullname>-windmill-tools-data` and `<fullname>-windmill-workflows-data` unless you first `kubectl annotate` them `helm.sh/resource-policy=keep` (worker `persistence` superseded by `data`, no automatic migration; the upgrade fails until you do or set `windmill.workers.legacyPersistence.acknowledgeDeletion` — see upgrade note 1 below); geoapi + processes now default on |
 | `0.4.0` | automatic schema migrations (`core.migrate.*` hook); `NEXT_PUBLIC_AUTH_DISABLED` → `NEXT_PUBLIC_AUTH` | BREAKING: flip the web auth flag in your values |
 | `0.2.0` | windmill (server + 4 workers), caddy (custom-domains) | Both off by default for opt-in; one knob each to enable |
 | `0.1.0` | initial — core, web, geoapi, processes templates | First public release |
+
+### Upgrading 0.5.1 → 0.6.0
+
+1. **Uploaded images.** `core.config` no longer ships
+   `ASSETS_URL: https://example.com/assets` and
+   `AWS_S3_ASSETS_BUCKET: placeholder`. If your values set neither, uploaded
+   images had URLs on example.com; set `core.config.ASSETS_URL` (and
+   `ASSETS_S3_ENDPOINT_URL` for S3 outside AWS) now, and
+   `AWS_S3_ASSETS_BUCKET` if your bucket is not called `goat-assets`. Images
+   uploaded before keep the URL stored with them.
+2. **Email** is new and off until `email.host` is set. SMTP settings you
+   already pass through `core.config` or `core.extraEnv` keep working and win
+   over the `email` block.
+3. **Core gets `CLIENT_URL` and `API_URL`** from the public web and API URLs,
+   where it used to fall back to `http://localhost:3000` and
+   `http://localhost:8000/api/v2`. Values you set in `core.config` win.
 
 ### Upgrading 0.5.0 → 0.5.1
 

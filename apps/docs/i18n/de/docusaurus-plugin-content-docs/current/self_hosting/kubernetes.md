@@ -12,13 +12,13 @@ Für Kubernetes-Cluster gibt es ein Helm-Chart für GOAT, veröffentlicht unter 
 Für einen einzelnen Server ist das [Docker-Compose-Paket](./docker_compose/installation.md) der empfohlene Weg. Es enthält den Anmeldeserver, den Objektspeicher und HTTPS, die das Helm-Chart Ihnen überlässt.
 :::
 
-Diese Seite beschreibt die Chart-Version **0.5.1**, die standardmäßig GOAT **v3.0.3** installiert.
+Diese Seite beschreibt die Chart-Version **0.6.0**, die standardmäßig GOAT **v3.0.3** installiert.
 
 ## Installation {#install}
 
 ```bash
 helm install goat oci://ghcr.io/plan4better/charts/goat \
-  --version 0.5.1 \
+  --version 0.6.0 \
   --namespace goat --create-namespace \
   --values your-values.yaml \
   --wait --timeout 25m
@@ -62,6 +62,17 @@ Das Chart bringt Platzhalter für S3 mit. Ersetzen Sie sie durch Endpunkt, Regio
 ### Anmeldung {#auth}
 
 Die Anmeldung ist standardmäßig **aus** (`global.auth.enabled: false`): Alle Dienste handeln dann als ein Standardbenutzer, stellen Sie eine solche Installation also hinter Ihre eigene Zugriffskontrolle. Um die Anmeldung einzuschalten, setzen Sie `global.auth.enabled: true` und `global.auth.existingSecret` auf ein Secret mit den Schlüsseln `server-url`, `realm`, `client-id`, `client-secret` und `nextauth-secret`. Ein Secret versorgt alle fünf Dienste.
+
+### Hochgeladene Bilder {#assets}
+
+Vorschaubilder von Projekten und Datensätzen, Profilbilder und Bilder in Dashboards liegen im Bucket `core.config.AWS_S3_ASSETS_BUCKET` und erreichen den Browser über `core.config.ASSETS_URL`. Setzen Sie `ASSETS_URL` auf die öffentliche URL des Buckets und machen Sie den Bucket öffentlich lesbar. GOATs eigene Grafiken liefert die Web-App selbst aus; sie brauchen beides nicht.
+
+### E-Mail und Einladungen {#email}
+
+- **`email`** legt den SMTP-Server fest, über den core Einladungen verschickt, mit dem Passwort aus einem Secret (`email.existingSecret`). Die Links in diesen E-Mails entstehen aus den öffentlichen URLs von Web-App und API.
+- **Keycloak** verschickt seine eigenen E-Mails, etwa zum Zurücksetzen des Passworts, mit den SMTP-Einstellungen seines Realms. Tragen Sie dort denselben Server ein.
+- **`global.auth.provisionInvitedUsers: true`** lässt eine Einladung das Keycloak-Konto anlegen, und Keycloak schickt einen Link zum Setzen des Passworts. Nutzen Sie es, wenn Ihr Realm keine Selbstregistrierung erlaubt. Der Keycloak-Client von core braucht dann die realm-management-Rollen `view-users` und `manage-users`.
+- **`global.caBundle`** nennt eine ConfigMap oder ein Secret mit dem Zertifikat einer eigenen CA, für ein SMTP-Relay, ein Keycloak oder Seiten, die der Druck-Worker öffnet, deren Zertifikat von einer privaten CA stammt. Das Chart bindet es in core, die Web-App und die Worker `print`, `tools` und `workflows` ein.
 
 ### Analyse-Worker {#workers}
 

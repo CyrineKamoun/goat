@@ -55,8 +55,75 @@
                   "type": "string"
                 }
               }
+            },
+            "provisionInvitedUsers": {
+              "type": "boolean"
             }
           }
+        },
+        "caBundle": {
+          "type": "object",
+          "properties": {
+            "existingConfigMap": {
+              "type": "string"
+            },
+            "existingSecret": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "email": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "security": {
+          "type": "string",
+          "enum": [
+            "starttls",
+            "ssl",
+            "none"
+          ]
+        },
+        "user": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "fromName": {
+          "type": "string"
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "existingSecretKey": {
+          "type": "string"
+        },
+        "brandName": {
+          "type": "string"
+        },
+        "logoUrl": {
+          "type": "string"
+        },
+        "contactUrl": {
+          "type": "string"
+        },
+        "privacyUrl": {
+          "type": "string"
         }
       }
     },

@@ -85,6 +85,15 @@ spec:
             {{- end }}
             {{- end }}
             {{- end }}
+            {{- with .Values.email }}
+            {{- if and .host .existingSecret (not (include "goat.env.inExtraEnv" (dict "values" $.Values.core "key" "SMTP_PASSWORD"))) }}
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .existingSecret }}
+                  key: {{ .existingSecretKey | default "smtp-password" }}
+            {{- end }}
+            {{- end }}
             {{- with .Values.core.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -102,19 +111,26 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if or .Values.data.enabled .Values.core.extraVolumeMounts }}
+          {{- $caBundle := include "goat.caBundle.enabled" . }}
+          {{- if or .Values.data.enabled .Values.core.extraVolumeMounts $caBundle }}
           volumeMounts:
             {{- if .Values.data.enabled }}
             {{- include "goat.data.mounts.core" . | nindent 12 }}
+            {{- end }}
+            {{- if $caBundle }}
+            {{- include "goat.caBundle.mount" . | nindent 12 }}
             {{- end }}
             {{- with .Values.core.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
-      {{- if or .Values.data.enabled .Values.core.extraVolumes }}
+      {{- if or .Values.data.enabled .Values.core.extraVolumes $caBundle }}
       volumes:
         {{- if .Values.data.enabled }}
         {{- include "goat.data.volume" . | nindent 8 }}
+        {{- end }}
+        {{- if $caBundle }}
+        {{- include "goat.caBundle.volume" . | nindent 8 }}
         {{- end }}
         {{- with .Values.core.extraVolumes }}
         {{- toYaml . | nindent 8 }}

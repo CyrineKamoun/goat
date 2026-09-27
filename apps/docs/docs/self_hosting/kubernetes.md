@@ -12,13 +12,13 @@ GOAT has a Helm chart for Kubernetes clusters, published at `oci://ghcr.io/plan4
 For a single server, the [Docker Compose bundle](./docker_compose/installation.md) is the recommended path. It includes the login server, object storage and HTTPS, which the Helm chart leaves to you.
 :::
 
-This page describes chart version **0.5.1**, which installs GOAT **v3.0.3** by default.
+This page describes chart version **0.6.0**, which installs GOAT **v3.0.3** by default.
 
 ## Install {#install}
 
 ```bash
 helm install goat oci://ghcr.io/plan4better/charts/goat \
-  --version 0.5.1 \
+  --version 0.6.0 \
   --namespace goat --create-namespace \
   --values your-values.yaml \
   --wait --timeout 25m
@@ -62,6 +62,17 @@ The chart ships placeholder values for S3. Replace them with your storage's endp
 ### Login {#auth}
 
 Login is **off** by default (`global.auth.enabled: false`): every service then acts as one default user, so put such an installation behind your own access control. To switch login on, set `global.auth.enabled: true` and `global.auth.existingSecret` to a Secret with the keys `server-url`, `realm`, `client-id`, `client-secret` and `nextauth-secret`. One Secret serves all five services.
+
+### Uploaded images {#assets}
+
+Project and dataset thumbnails, avatars and dashboard images are stored in the bucket `core.config.AWS_S3_ASSETS_BUCKET` and reach the browser from `core.config.ASSETS_URL`. Set `ASSETS_URL` to the bucket's public URL and make the bucket publicly readable. GOAT's own artwork ships in the web app and needs neither.
+
+### Email and invitations {#email}
+
+- **`email`** sets the SMTP server core sends invitations through, with the password from a Secret (`email.existingSecret`). The links in these emails are built from the public web and API URLs.
+- **Keycloak** sends its own emails, such as password resets, with the SMTP settings of its realm. Configure the same server there.
+- **`global.auth.provisionInvitedUsers: true`** lets an invitation create the Keycloak account, and Keycloak emails a link to set the password. Use it when your realm has self-registration off. Core's Keycloak client then needs the realm-management roles `view-users` and `manage-users`.
+- **`global.caBundle`** names a ConfigMap or Secret with a company CA certificate, for an SMTP relay, a Keycloak or pages the print worker opens that use a certificate from a private CA. The chart mounts it into core, web and the `print`, `tools` and `workflows` workers.
 
 ### Analysis workers {#workers}
 

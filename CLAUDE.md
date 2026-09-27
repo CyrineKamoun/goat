@@ -137,6 +137,15 @@ Copy `.env.example` to `.env`. Key variables:
 - For Docusaurus docs, also check existing DE pages (e.g. `i18n/de/...`) to confirm which terms are already in use and to maintain consistency.
 - **Screen recordings are MP4, screenshots are WebP — never GIF.** Embed a recording with `<Video src={require('/img/….mp4').default} alt="…" />` (registered globally, no import); it plays muted and looped like a GIF. Convert with `ffmpeg -i in.gif -movflags +faststart -pix_fmt yuv420p -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -crf 26 out.mp4` and `ffmpeg -i in.png -c:v libwebp -quality 85 out.webp`. The PR `file-size` check rejects images over 1 MB, videos over 4 MB and other files over 2 MB (`scripts/check-file-sizes.sh`; exceptions go in `.github/large-files.txt`). Don't commit source files (`original_files/`, `.pptx`) next to the published images.
 
+## Deployment Targets Follow Every Change
+
+- **MUST: a change to anything a deployment sees updates every place GOAT is deployed from, in the same change.** That covers a new, renamed or removed setting or environment variable, a changed default, a new service, job, port, volume, secret or image, and changed URL or auth wiring. Update all of:
+  - `deploy/compose`: `.env.example` (with a comment), `compose.yaml`, `setup.sh` when it derives the value, `tests/`, the bundle README;
+  - `deploy/helm/goat`: `values.yaml`, `values.schema.json`, templates, unit tests in `tests/`, the chart README (values table and version history); `deploy/helm/check.sh` must pass;
+  - the Kubernetes overlays of Plan4Better's own dev and prod clusters (separate infra repository);
+  - the self-hosting docs in `apps/docs`, English and German.
+- Before calling such a change done, grep the setting's name across `deploy/` and `apps/docs/` and account for every target: updated, or not applicable and why.
+
 ## Docs Diagram Exports (Figma API)
 
 Diagrams used in the documentation are exported from Figma file `SmmQgQZ9QvWwg62NBlJcN8` (P4B-Website) using the Figma API. To re-export a diagram:

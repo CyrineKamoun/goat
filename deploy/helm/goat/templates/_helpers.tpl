@@ -403,3 +403,52 @@ Params: values, root.
 {{- end -}}
 {{- $v -}}
 {{- end }}
+
+{{/*
+──── Company CA ─────────────────────────────────────────────────────────────
+`global.caBundle` names a ConfigMap or a Secret holding a PEM CA certificate.
+Mounted at /etc/goat/ca/ca.pem in core, web and the Windmill print, tools
+and workflows workers; each points its own variable at that file.
+*/}}
+{{- define "goat.caBundle.enabled" -}}
+{{- $ca := .Values.global.caBundle | default dict -}}
+{{- if and $ca.existingConfigMap $ca.existingSecret -}}
+{{- fail "global.caBundle: set existingConfigMap or existingSecret, not both" -}}
+{{- end -}}
+{{- if or $ca.existingConfigMap $ca.existingSecret -}}true{{- end -}}
+{{- end }}
+
+{{- define "goat.caBundle.path" -}}/etc/goat/ca/ca.pem{{- end }}
+
+{{- define "goat.caBundle.volume" -}}
+{{- $ca := .Values.global.caBundle -}}
+- name: goat-ca-bundle
+{{- if $ca.existingSecret }}
+  secret:
+    secretName: {{ $ca.existingSecret }}
+    items:
+      - key: {{ $ca.key | default "ca.crt" }}
+        path: ca.pem
+{{- else }}
+  configMap:
+    name: {{ $ca.existingConfigMap }}
+    items:
+      - key: {{ $ca.key | default "ca.crt" }}
+        path: ca.pem
+{{- end }}
+{{- end }}
+
+{{- define "goat.caBundle.mount" -}}
+- name: goat-ca-bundle
+  mountPath: /etc/goat/ca
+  readOnly: true
+{{- end }}
+
+{{/*
+Public URL of core's API (API_URL, with /api/v2): web.publicUrls.api, else
+core's ingress.
+*/}}
+{{- define "goat.core.publicApiUrl" -}}
+{{- $base := .Values.web.publicUrls.api | default (include "goat.ingressUrl" (dict "ingress" .Values.core.ingress)) | trimSuffix "/" -}}
+{{- if $base -}}{{ printf "%s/api/v2" $base }}{{- end -}}
+{{- end }}

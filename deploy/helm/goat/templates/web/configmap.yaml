@@ -45,4 +45,8 @@ data:
   {{- with .Values.web.statusFeedUrl }}
   NEXT_PUBLIC_STATUS_FEED_URL: {{ . | quote }}
   {{- end }}
+  {{- /* Node adds this file to its trusted CAs (NextAuth → Keycloak). */}}
+  {{- if and (include "goat.caBundle.enabled" .) (not (include "goat.env.userSet" (dict "values" .Values.web "key" "NODE_EXTRA_CA_CERTS"))) }}
+  NODE_EXTRA_CA_CERTS: {{ include "goat.caBundle.path" . | quote }}
+  {{- end }}
 {{- end }}

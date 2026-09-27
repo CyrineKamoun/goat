@@ -120,13 +120,24 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.web.extraVolumeMounts }}
+          {{- $caBundle := include "goat.caBundle.enabled" $ }}
+          {{- if or .Values.web.extraVolumeMounts $caBundle }}
           volumeMounts:
+            {{- if $caBundle }}
+            {{- include "goat.caBundle.mount" $ | nindent 12 }}
+            {{- end }}
+            {{- with .Values.web.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
-      {{- with .Values.web.extraVolumes }}
+      {{- if or .Values.web.extraVolumes $caBundle }}
       volumes:
+        {{- if $caBundle }}
+        {{- include "goat.caBundle.volume" $ | nindent 8 }}
+        {{- end }}
+        {{- with .Values.web.extraVolumes }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       {{- with .Values.web.nodeSelector }}
       nodeSelector:

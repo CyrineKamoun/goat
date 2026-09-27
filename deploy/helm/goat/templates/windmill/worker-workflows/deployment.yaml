@@ -75,27 +75,34 @@ spec:
             {{- with $worker.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- if or .Values.data.enabled $worker.persistence.enabled }}
+          {{- $caBundle := include "goat.caBundle.enabled" $ }}
+          {{- if or .Values.data.enabled $worker.persistence.enabled $caBundle }}
           volumeMounts:
             {{- if .Values.data.enabled }}
             {{- include "goat.data.mounts.full" . | nindent 12 }}
-            {{- else }}
+            {{- else if $worker.persistence.enabled }}
             - name: data
               mountPath: /app/data
+            {{- end }}
+            {{- if $caBundle }}
+            {{- include "goat.caBundle.mount" $ | nindent 12 }}
             {{- end }}
           {{- end }}
           {{- with $worker.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- if or .Values.data.enabled $worker.persistence.enabled }}
+      {{- if or .Values.data.enabled $worker.persistence.enabled $caBundle }}
       volumes:
         {{- if .Values.data.enabled }}
         {{- include "goat.data.volume" . | nindent 8 }}
-        {{- else }}
+        {{- else if $worker.persistence.enabled }}
         - name: data
           persistentVolumeClaim:
             claimName: {{ $worker.persistence.existingClaim | default (printf "%s-windmill-workflows-data" (include "goat.fullname" .)) }}
+        {{- end }}
+        {{- if $caBundle }}
+        {{- include "goat.caBundle.volume" $ | nindent 8 }}
         {{- end }}
       {{- end }}
       {{- with $worker.nodeSelector }}

@@ -32,4 +32,30 @@ data:
   {{- if $processesUrl }}
   GOAT_PROCESSES_URL: {{ $processesUrl | quote }}
   {{- end }}
+  {{- /* Links in core's emails. A key set in core.config / core.extraEnv is
+         used as is. */}}
+  {{- $clientUrl := include "goat.web.publicUrl" . | trimSuffix "/" }}
+  {{- if and $clientUrl (not (include "goat.env.userSet" (dict "values" .Values.core "key" "CLIENT_URL"))) }}
+  CLIENT_URL: {{ $clientUrl | quote }}
+  {{- end }}
+  {{- $apiUrl := include "goat.core.publicApiUrl" . }}
+  {{- if and $apiUrl (not (include "goat.env.userSet" (dict "values" .Values.core "key" "API_URL"))) }}
+  API_URL: {{ $apiUrl | quote }}
+  {{- end }}
+  {{- if not (include "goat.env.userSet" (dict "values" .Values.core "key" "KEYCLOAK_PROVISION_INVITED_USERS")) }}
+  KEYCLOAK_PROVISION_INVITED_USERS: {{ ternary "true" "false" (eq (toString .Values.global.auth.provisionInvitedUsers) "true") | quote }}
+  {{- end }}
+  {{- /* Email (the `email` block). Empty values are left out: core treats
+         an unset SMTP_HOST as email off. */}}
+  {{- $email := .Values.email | default dict }}
+  {{- range $pair := list (list "SMTP_HOST" $email.host) (list "SMTP_PORT" $email.port) (list "SMTP_SECURITY" $email.security) (list "SMTP_USER" $email.user) (list "SMTP_FROM" $email.from) (list "EMAILS_FROM_NAME" $email.fromName) (list "EMAIL_BRAND_NAME" $email.brandName) (list "EMAIL_LOGO_URL" $email.logoUrl) (list "EMAIL_CONTACT_URL" $email.contactUrl) (list "EMAIL_PRIVACY_URL" $email.privacyUrl) }}
+  {{- $key := index $pair 0 }}
+  {{- $value := toString (index $pair 1 | default "") }}
+  {{- if and $value $email.host (not (include "goat.env.userSet" (dict "values" $.Values.core "key" $key))) }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if and (include "goat.caBundle.enabled" .) (not (include "goat.env.userSet" (dict "values" .Values.core "key" "GOAT_CA_BUNDLE"))) }}
+  GOAT_CA_BUNDLE: {{ include "goat.caBundle.path" . | quote }}
+  {{- end }}
 {{- end }}

@@ -66,6 +66,51 @@ global:
       clientSecret: client-secret    # the Keycloak-generated client secret
       nextauthSecret: nextauth-secret  # NextAuth.js signing key (web only)
 
+    # Invitations to an email with no Keycloak account yet: true makes core
+    # create the account and Keycloak email a link to set the password
+    # (KEYCLOAK_PROVISION_INVITED_USERS). Needed when the realm has
+    # self-registration off; core's client then needs a service account with
+    # the realm-management roles `view-users` and `manage-users`. false (the
+    # default) leaves account creation to the realm's own registration page.
+    provisionInvitedUsers: false
+
+  # ── Company CA ───────────────────────────────────────────────────────────
+  # A private CA certificate (PEM) the services trust in addition to the
+  # public CAs: core for the SMTP relay (GOAT_CA_BUNDLE), web for Keycloak
+  # (NODE_EXTRA_CA_CERTS), the Windmill print, tools and workflows workers
+  # for the pages and services they call (GOAT_CA_BUNDLE). Name a ConfigMap
+  # or a Secret in the release namespace and the key holding the PEM; the
+  # chart mounts it at /etc/goat/ca/ca.pem. Both empty = public CAs only.
+  caBundle:
+    existingConfigMap: ""
+    existingSecret: ""
+    key: ca.crt
+
+# ─── Email ─────────────────────────────────────────────────────────────────
+# The SMTP server core sends invitations and notifications through. Email is
+# off while `host` is empty. Keycloak sends its own emails (password resets,
+# the set-password link for invited accounts) with the SMTP settings of its
+# realm: set the same server there (Realm settings → Email).
+# Every key here is rendered into core's environment unless core.config or
+# core.extraEnv sets the same variable.
+email:
+  host: ""                         # SMTP_HOST, e.g. smtp.example.org
+  port: 587                        # SMTP_PORT
+  security: starttls               # SMTP_SECURITY: starttls (usually 587), ssl (465) or none (e.g. a relay on 25)
+  user: ""                         # SMTP_USER; empty for a relay that accepts mail without login
+  from: ""                         # SMTP_FROM; defaults to `user`, required for a relay without login
+  fromName: GOAT                   # EMAILS_FROM_NAME
+  # The SMTP password (SMTP_PASSWORD), from a Secret in the release namespace.
+  existingSecret: ""
+  existingSecretKey: smtp-password
+  # Branding of GOAT's own emails. Without a logo URL they carry GOAT's logo
+  # from the web app (<web URL>/assets/...); without contact or privacy URL
+  # the footer has no links.
+  brandName: GOAT                  # EMAIL_BRAND_NAME
+  logoUrl: ""                      # EMAIL_LOGO_URL
+  contactUrl: ""                   # EMAIL_CONTACT_URL
+  privacyUrl: ""                   # EMAIL_PRIVACY_URL
+
 # ─── Shared data volume ────────────────────────────────────────────────────
 # ONE volume, mounted by seven components. The windmill tools and workflows
 # workers WRITE to it (the catalog mirror via sync_catalog, the geoip database
@@ -118,12 +163,32 @@ core:
     # mount the volume somewhere else.
     CATALOG_DATA_DIR: "/app/data/catalog"
     GEOIP_DATA_DIR: "/app/data/geoip"
+    # Uploaded images (project and dataset thumbnails, avatars, dashboard
+    # images) go to the bucket AWS_S3_ASSETS_BUCKET and reach the browser as
+    # ASSETS_URL/<key>, so ASSETS_URL must be the bucket's public URL. Unset,
+    # core assumes a bucket on AWS (https://<bucket>.s3.<region>.amazonaws.com).
+    # For any other S3 store set ASSETS_S3_ENDPOINT_URL (core refuses to start
+    # without ASSETS_URL then) and, if it needs path-style URLs,
+    # ASSETS_S3_FORCE_PATH_STYLE. The bucket must be publicly readable.
+    AWS_S3_ASSETS_BUCKET: "goat-assets"
+    # ASSETS_URL: "https://assets.example.org"
+    # ASSETS_S3_ENDPOINT_URL: "https://s3.example.org"
+    # ASSETS_S3_FORCE_PATH_STYLE: "true"
+    #
+    # GOAT's own artwork (default thumbnails, avatars, logos) ships in the web
+    # image and is served under /assets. Set STATIC_ASSETS_URL only to load it
+    # from somewhere else.
+    # STATIC_ASSETS_URL: ""
+    #
+    # CLIENT_URL (links in invitation emails) and API_URL (links in activation
+    # emails) are derived from web.auth.publicUrl or web's ingress, and from
+    # web.publicUrls.api or core's ingress (+ /api/v2). Set them here to
+    # override.
+    #
     # The GOAT core image initializes boto3 + several feature clients at boot
     # and crashes if these are missing. Placeholders here let the pod start;
     # override with real values for any features you actually use.
     AWS_REGION: "us-east-1"
-    AWS_S3_ASSETS_BUCKET: "placeholder"
-    ASSETS_URL: "https://example.com/assets"
     MAPBOX_TOKEN: "placeholder"
     KEYCLOAK_SERVER_URL: "http://placeholder-keycloak"
     GOAT_ROUTING_HOST: "http://placeholder-routing"
@@ -883,7 +948,7 @@ windmill:
         # Windmill hands user scripts ONLY what this lists — without it they see
         # an empty environment and every goatlib job fails. Matches the upstream
         # compose list at v3.0.2. Add your own names rather than replacing it.
-        WHITELIST_ENVS: "MAX_UPLOAD_DATASET_FILE_SIZE,POSTGRES_SERVER,POSTGRES_PORT,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_DATABASE_URI,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,TILES_DATA_DIR,DATA_DIR,S3_PROVIDER,S3_FORCE_PATH_STYLE,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION,CATALOG_S3_BUCKET,CATALOG_S3_ENDPOINT_URL,CATALOG_S3_ACCESS_KEY_ID,CATALOG_S3_SECRET_ACCESS_KEY,CATALOG_S3_REGION,OD_MATRIX_BASE_PATH,STREET_NETWORK_EDGES_BASE_PATH,STREET_NETWORK_NODES_BASE_PATH,PT_NETWORK_BASE_PATH,GTFS_DATA_PATH,GEOCODING_URL,GEOCODING_AUTHORIZATION"
+        WHITELIST_ENVS: "MAX_UPLOAD_DATASET_FILE_SIZE,POSTGRES_SERVER,POSTGRES_PORT,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_DATABASE_URI,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,TILES_DATA_DIR,DATA_DIR,S3_PROVIDER,S3_FORCE_PATH_STYLE,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION,CATALOG_S3_BUCKET,CATALOG_S3_ENDPOINT_URL,CATALOG_S3_ACCESS_KEY_ID,CATALOG_S3_SECRET_ACCESS_KEY,CATALOG_S3_REGION,OD_MATRIX_BASE_PATH,STREET_NETWORK_EDGES_BASE_PATH,STREET_NETWORK_NODES_BASE_PATH,PT_NETWORK_BASE_PATH,GTFS_DATA_PATH,GEOCODING_URL,GEOCODING_AUTHORIZATION,GOAT_CA_BUNDLE"
       extraEnv: []
       resources: {}
       podSecurityContext: {}
@@ -920,7 +985,7 @@ windmill:
         WORKER_GROUP: "workflows"
         WORKER_TAGS: "workflows"
         # See workers.tools.config.WHITELIST_ENVS above — same default applies here.
-        WHITELIST_ENVS: "MAX_UPLOAD_DATASET_FILE_SIZE,POSTGRES_SERVER,POSTGRES_PORT,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_DATABASE_URI,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,TILES_DATA_DIR,DATA_DIR,S3_PROVIDER,S3_FORCE_PATH_STYLE,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION,CATALOG_S3_BUCKET,CATALOG_S3_ENDPOINT_URL,CATALOG_S3_ACCESS_KEY_ID,CATALOG_S3_SECRET_ACCESS_KEY,CATALOG_S3_REGION,OD_MATRIX_BASE_PATH,STREET_NETWORK_EDGES_BASE_PATH,STREET_NETWORK_NODES_BASE_PATH,PT_NETWORK_BASE_PATH,GTFS_DATA_PATH,GEOCODING_URL,GEOCODING_AUTHORIZATION"
+        WHITELIST_ENVS: "MAX_UPLOAD_DATASET_FILE_SIZE,POSTGRES_SERVER,POSTGRES_PORT,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,POSTGRES_DATABASE_URI,DUCKLAKE_DATA_DIR,DUCKLAKE_CATALOG_SCHEMA,TILES_DATA_DIR,DATA_DIR,S3_PROVIDER,S3_FORCE_PATH_STYLE,S3_ENDPOINT_URL,S3_PUBLIC_ENDPOINT_URL,S3_ACCESS_KEY_ID,S3_SECRET_ACCESS_KEY,S3_BUCKET_NAME,S3_REGION,CATALOG_S3_BUCKET,CATALOG_S3_ENDPOINT_URL,CATALOG_S3_ACCESS_KEY_ID,CATALOG_S3_SECRET_ACCESS_KEY,CATALOG_S3_REGION,OD_MATRIX_BASE_PATH,STREET_NETWORK_EDGES_BASE_PATH,STREET_NETWORK_NODES_BASE_PATH,PT_NETWORK_BASE_PATH,GTFS_DATA_PATH,GEOCODING_URL,GEOCODING_AUTHORIZATION,GOAT_CA_BUNDLE"
       extraEnv: []
       resources: {}
       podSecurityContext: {}

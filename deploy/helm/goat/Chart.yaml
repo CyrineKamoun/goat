@@ -4,6 +4,24 @@ description: |
   Helm chart for GOAT (Geo Open Accessibility Tool) — a WebGIS platform for
   spatial analysis, accessibility modeling, and collaborative mapping.
 
+  v0.6.0:
+
+  - NEW: `email` — the SMTP server core sends invitations through (host,
+    port, security, user, sender, password from `existingSecret`) and the
+    branding of GOAT's emails. Core also gets CLIENT_URL and API_URL, the
+    links in its emails, from the web and API public URLs.
+  - NEW: `global.auth.provisionInvitedUsers` — invitations create the
+    Keycloak account (KEYCLOAK_PROVISION_INVITED_USERS) for realms without
+    self-registration.
+  - NEW: `global.caBundle` — a company CA certificate from a ConfigMap or
+    Secret, mounted into core (SMTP relay), web (Keycloak) and the print,
+    tools and workflows workers.
+  - `core.config` no longer ships `ASSETS_URL: https://example.com/assets`
+    or `AWS_S3_ASSETS_BUCKET: placeholder`: uploaded images got URLs on
+    example.com. The bucket now defaults to `goat-assets`; set ASSETS_URL
+    (and ASSETS_S3_ENDPOINT_URL for S3 outside AWS) to the bucket's public
+    URL.
+
   v0.5.1:
 
   - Tracks GOAT v3.0.3: the Windmill workers ship the Python runtimes
@@ -143,7 +161,7 @@ description: |
     `NEXT_PUBLIC_AUTH` (inverted meaning), matching the upstream single
     AUTH switch.
 type: application
-version: 0.5.1
+version: 0.6.0
 appVersion: "v3.0.3"   # GOAT release every image defaults to; override per service with <service>.image.tag
 icon: https://goat.plan4better.de/favicon.ico
 home: https://github.com/plan4better/goat/tree/main/deploy/helm/goat

@@ -79,6 +79,14 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- if include "goat.caBundle.enabled" $ }}
+          volumeMounts:
+            {{- include "goat.caBundle.mount" $ | nindent 12 }}
+          {{- end }}
+      {{- if include "goat.caBundle.enabled" $ }}
+      volumes:
+        {{- include "goat.caBundle.volume" $ | nindent 8 }}
+      {{- end }}
       {{- with $worker.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
