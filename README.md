@@ -27,11 +27,11 @@ Intelligent software for modern web mapping and integrated planning
 <p align="center">
   <picture>
     <!-- Dark theme -->
-    <source srcset="apps/docs/assets/goat_screenshot_dark.webp" media="(prefers-color-scheme: dark)">
+    <source srcset=".github/assets/goat_screenshot_dark.webp" media="(prefers-color-scheme: dark)">
     <!-- Light theme -->
-    <source srcset="apps/docs/assets/goat_screenshot_light.webp" media="(prefers-color-scheme: light)">
+    <source srcset=".github/assets/goat_screenshot_light.webp" media="(prefers-color-scheme: light)">
     <!-- Fallback -->
-    <img src="apps/docs/assets/goat_screenshot_light.webp" alt="GOAT Screenshot" width="1527">
+    <img src=".github/assets/goat_screenshot_light.webp" alt="GOAT Screenshot" width="1527">
   </picture>
 </p>
 
@@ -158,23 +158,6 @@ which allows anyone to use, modify, and distribute the software under the terms 
 The full platform — including user management, teams, and organizations — is part
 of the open-source core. Optional commercial services (hosting, support, and
 enterprise capabilities) are available for organizations that need them.
-
-This structure makes GOAT accessible for everyone, while providing extended functionalities through
-optional commercial services.
-
-
-|                                   | GPLv3 | Commercial |
-| --------------------------------- | :---: | :--------: |
-| Self‑host the core platform       | ✅    | ✅         |
-| Use for commercial purposes       | ✅    | ✅         |
-| Teams & organizations             | ✅    | ✅         |
-| Clone privately                   | ✅    | ✅         |
-| Fork publicly                     | ✅    | ✅         |
-| Modify and redistribute           | ✅    | ❌ (commercial components excluded) |
-| Keep derivative work private      | ❌    | ✅ (commercial components only) |
-| Authentication integrations       | ❌    | ✅         |
-| Hosted SaaS version               | ❌    | ✅         |
-| Official support                  | ❌    | ✅         |
 
 
 ## ✍️ Contributing
