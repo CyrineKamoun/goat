@@ -8,8 +8,8 @@ description: "Aus welchen Diensten GOAT besteht, von Web-App und APIs bis Keyclo
 
 GOAT ist Open Source, und Sie können es auf Ihrer eigenen Infrastruktur betreiben. Dieser Abschnitt beschreibt zwei Wege dafür: **Docker Compose auf einem einzelnen Server** und **Kubernetes mit Helm**.
 
-:::warning Community-Support
-Selbst gehostete Installationen werden **von der Community unterstützt**. Für den Betrieb Ihrer Infrastruktur bieten wir keinen offiziellen Support an. Wenn Sie GOAT nicht selbst betreiben möchten, nutzen Sie die gehostete Version unter [goat.plan4better.de](https://goat.plan4better.de).
+:::info Unterstützung beim Selbst-Hosting
+Fragen und Fehlermeldungen sind in den [GitHub-Issues](https://github.com/plan4better/goat/issues) willkommen und werden beantwortet, sobald es die Zeit erlaubt. Plan4Better unterstützt außerdem Organisationen, die GOAT selbst betreiben, etwa bei der Einrichtung oder dem Upgrade einer Installation, der Anpassung an ihre Infrastruktur oder mit Schulungen für ihr Team: [Kontakt aufnehmen](https://plan4better.de/de/contact/). Wenn Sie GOAT nicht selbst betreiben möchten, nutzen Sie die gehostete Version unter [goat.plan4better.de](https://goat.plan4better.de).
 :::
 
 ## Woraus GOAT besteht {#components}

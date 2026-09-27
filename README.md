@@ -146,8 +146,12 @@ behind both live in [`deploy/`](deploy/): the Compose bundle in
 [`deploy/compose`](deploy/compose/), the chart in
 [`deploy/helm/goat`](deploy/helm/goat/).
 
-**Important:** self-hosted installations are community-supported. We do not
-offer official support for running your infrastructure.
+**Help with self-hosting:** questions and bug reports are welcome in
+[GitHub issues](https://github.com/plan4better/goat/issues), answered as time
+allows. Plan4Better also supports organizations that run GOAT themselves, for
+example with setting up or upgrading an installation, adapting it to their
+infrastructure or training their team:
+[get in touch](https://plan4better.de/en/contact/).
 
 
 ## 👩‍⚖️ License
