@@ -110,43 +110,44 @@ GOAT is a **monorepo** project leveraging a modern, full-stack architecture.
 ### ☁️ Cloud Version
 GOAT is also available as a fully hosted cloud service.  If you prefer not to manage your own infrastructure, you can get started instantly with our trial version and choose from one of our available subscription tiers. Get started at <a href="https://goat.plan4better.de" target="_blank" rel="noopener noreferrer">goat.plan4better.de</a>.
 
-### 🐳 Self-hosting (Docker)
+### 🖥️ Self-hosting
 
-GOAT runs on a single Linux server with Docker Compose: web app and APIs, login
-(Keycloak), object storage (Garage), PostgreSQL/PostGIS, the Windmill job engine
-and a Caddy proxy that takes care of HTTPS (Let's Encrypt, your own certificate,
-or plain HTTP behind your own load balancer).
+GOAT runs on your own infrastructure in two ways:
 
-**Important:** self-hosted deployments are community-supported. We do not offer
-official support for managing your infrastructure.
+| | Docker Compose | Kubernetes (Helm) |
+|---|---|---|
+| **For** | A single Linux server | An existing Kubernetes cluster |
+| **Includes** | Everything: web app and APIs, login (Keycloak), object storage, PostgreSQL/PostGIS, the Windmill job engine and HTTPS | GOAT's services, PostgreSQL, Redis and Windmill; you provide S3 storage and, for login, Keycloak |
+| **Guide** | [Installation](https://goat.plan4better.de/docs/self_hosting/docker_compose/installation) | [Kubernetes](https://goat.plan4better.de/docs/self_hosting/kubernetes) |
 
-Each GOAT release ships the deployment bundle as `goat-compose-<version>.tar.gz`
-on its [GitHub release page](https://github.com/plan4better/goat/releases); the
-same files live in [`deploy/compose/`](deploy/compose/).
+**Docker Compose.** Every GOAT release ships the bundle as
+`goat-compose-<version>.tar.gz` on its
+[release page](https://github.com/plan4better/goat/releases). With Docker
+Engine 24+ and Docker Compose 2.23+ installed:
 
 ```bash
 tar xzf goat-compose-<version>.tar.gz && cd goat-compose
-./setup.sh             # public URL, TLS mode, admin email -> .env with random secrets
+./setup.sh             # public URL, HTTPS mode, admin email -> .env with generated passwords
 docker compose up -d
-./smoke.sh             # verifies the installation end to end
+./smoke.sh             # checks the installation end to end
 ```
 
-Docker Engine 24+ and Docker Compose 2.23+ must be installed; the bundle checks
-them but does not install them. The self-hosting guide covers the rest:
+**Kubernetes.** The Helm chart is published as
+`oci://ghcr.io/plan4better/charts/goat`:
 
-- [Overview](https://goat.plan4better.de/docs/self_hosting/overview): Docker Compose or Kubernetes, what each includes
-- [Installation](https://goat.plan4better.de/docs/self_hosting/docker_compose/installation): requirements, setup, first login
-- [HTTPS and addresses](https://goat.plan4better.de/docs/self_hosting/docker_compose/https): TLS modes, load balancer, company CA
-- [External services](https://goat.plan4better.de/docs/self_hosting/docker_compose/external_services): your own S3, Keycloak, email
-- [Operations](https://goat.plan4better.de/docs/self_hosting/docker_compose/operations): users, base data, backups, upgrades, troubleshooting
-- [Configuration reference](https://goat.plan4better.de/docs/self_hosting/docker_compose/configuration): every setting in `.env`
-- [Kubernetes](https://goat.plan4better.de/docs/self_hosting/kubernetes): the Helm chart, whose source lives in [`deploy/helm/goat/`](deploy/helm/goat/)
+```bash
+helm install goat oci://ghcr.io/plan4better/charts/goat \
+  --namespace goat --create-namespace --values your-values.yaml --wait --timeout 25m
+```
 
-A short version for the server lives next to the files in
-[`deploy/compose/README.md`](deploy/compose/README.md).
+The [self-hosting guide](https://goat.plan4better.de/docs/self_hosting/overview) compares the two and covers the
+configuration, HTTPS, external services, backups and upgrades. The files
+behind both live in [`deploy/`](deploy/): the Compose bundle in
+[`deploy/compose`](deploy/compose/), the chart in
+[`deploy/helm/goat`](deploy/helm/goat/).
 
-The `compose.yaml` in the repository root is for local development only
-(infrastructure services, plus the `dev` profile with a devcontainer).
+**Important:** self-hosted installations are community-supported. We do not
+offer official support for running your infrastructure.
 
 
 ## 👩‍⚖️ License
@@ -162,3 +163,18 @@ enterprise capabilities) are available for organizations that need them.
 
 ## ✍️ Contributing
 We welcome contributions of all kinds, bug reports, documentation improvements, new features, and feedback that helps strengthen the platform. Please see our [contributing guide](/CONTRIBUTING.md).
+
+### Local development
+
+The `compose.yaml` in the repository root runs the infrastructure for local
+development (PostgreSQL, MinIO, Redis, Windmill); the apps run on your machine:
+
+```bash
+cp .env.example .env
+docker compose up -d        # infrastructure
+pnpm install && pnpm web    # web app on http://localhost:3000
+uv sync --all-packages      # Python services, then for example:
+cd apps/core && uv run uvicorn core.main:app --reload --port 8000
+```
+
+It is not a way to run GOAT in production; use the self-hosting options above.
