@@ -47,6 +47,7 @@ import asyncpg
 import duckdb
 
 from goatlib.bundles.artifacts.storage import resolve_artifact
+from goatlib.config.io import DEFAULT_MAX_UPLOAD_BYTES
 from goatlib.io.config import (
     PARQUET_COMPRESSION,
     PARQUET_ROW_GROUP_SIZE,
@@ -139,7 +140,7 @@ class ToolSettings:
     s3_region_name: str = "us-east-1"
     s3_bucket_name: str | None = None  # Bucket for user uploads/imports
     # Largest object a browser upload may be; checked before download.
-    max_upload_dataset_file_size: int = 5 * 1024 * 1024 * 1024
+    max_upload_dataset_file_size: int = DEFAULT_MAX_UPLOAD_BYTES
 
     # Schema for customer tables
     customer_schema: str = "customer"
@@ -215,8 +216,9 @@ class ToolSettings:
         except Exception:
             pass  # wmill not available or variable doesn't exist
 
-        # Fall back to environment variable
-        return os.environ.get(name, default)
+        # Fall back to environment variable. Empty counts as unset: Windmill
+        # passes whitelisted variables the worker lacks as "".
+        return os.environ.get(name) or default
 
     @classmethod
     def from_env(cls: type[Self]) -> Self:
@@ -292,7 +294,7 @@ class ToolSettings:
             # `CUSTOMER_SCHEMA` is accepted as a fallback for older deployments.
             max_upload_dataset_file_size=int(
                 cls._get_secret(
-                    "MAX_UPLOAD_DATASET_FILE_SIZE", str(5 * 1024 * 1024 * 1024)
+                    "MAX_UPLOAD_DATASET_FILE_SIZE", str(DEFAULT_MAX_UPLOAD_BYTES)
                 )
             ),
             customer_schema=cls._get_secret("SCHEMA", "")

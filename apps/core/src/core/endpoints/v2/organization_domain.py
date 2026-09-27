@@ -39,6 +39,22 @@ from core.services.provisioner import CustomDomainProvisioner
 router = APIRouter()
 
 
+def _require_custom_domains() -> None:
+    """400 while custom domains are off (``CUSTOM_DOMAIN_CNAME_TARGET`` empty).
+
+    Listing, reading and deleting stay available, so domains registered
+    while the feature was on can still be removed.
+    """
+    if not settings.custom_domains_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "custom domains are not enabled on this instance "
+                "(CUSTOM_DOMAIN_CNAME_TARGET is not set)"
+            ),
+        )
+
+
 @router.get(
     "/",
     summary="List custom domains for an organization",
@@ -88,6 +104,7 @@ async def create_domain(
     the canonical target, also notifies the provisioner so the user
     doesn't need to wait for the next cron tick.
     """
+    _require_custom_domains()
     domain = OrganizationDomain(
         organization_id=organization_id,
         base_domain=payload.base_domain,
@@ -188,6 +205,7 @@ async def recheck_domain(
     cert issuance yet, we notify the provisioner here as well so the user
     gets immediate feedback rather than waiting for the cron.
     """
+    _require_custom_domains()
     domain = await crud.get(async_session, id=domain_id)
     if not domain or domain.organization_id != organization_id:
         raise HTTPException(
