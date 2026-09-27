@@ -57,15 +57,13 @@ Without these URLs, the web app shows a blank page.
 
 ### Object storage {#storage}
 
-The chart ships placeholder values for S3. Replace them with your storage's endpoint, region, bucket and credentials in the configuration of core, geoapi and processes (`<service>.config.S3_*`, with the keys through `<service>.extraEnv`), and likewise for the analysis workers (below).
+Describe your S3 store once in `global.s3`: the bucket for uploads, the provider, endpoint, region and whether it needs path-style URLs, and a Secret with the access key pair (`global.s3.existingSecret`). Core, geoapi, processes and the analysis workers (below) all get these settings.
+
+Uploaded images, such as project and dataset thumbnails, avatars and dashboard images, go to a second bucket in the same store (`global.s3.assets.bucket`). Browsers load them straight from that bucket, so make it publicly readable and set its public URL in `global.s3.assets.publicUrl`. Outside AWS the URL is required. GOAT's own artwork ships in the web app and needs neither.
 
 ### Login {#auth}
 
 Login is **off** by default (`global.auth.enabled: false`): every service then acts as one default user, so put such an installation behind your own access control. To switch login on, set `global.auth.enabled: true` and `global.auth.existingSecret` to a Secret with the keys `server-url`, `realm`, `client-id`, `client-secret` and `nextauth-secret`. One Secret serves all five services.
-
-### Uploaded images {#assets}
-
-Project and dataset thumbnails, avatars and dashboard images are stored in the bucket `core.config.AWS_S3_ASSETS_BUCKET` and reach the browser from `core.config.ASSETS_URL`. Set `ASSETS_URL` to the bucket's public URL and make the bucket publicly readable. GOAT's own artwork ships in the web app and needs neither.
 
 ### Email and invitations {#email}
 
@@ -80,7 +78,7 @@ The default Windmill worker only handles small jobs. **Analysis tools, dataset i
 
 - Enable them with `windmill.workers.tools.enabled`, `windmill.workers.workflows.enabled` and `windmill.workers.print.enabled`.
 - The `tools` and `workflows` workers are pinned to nodes labelled `node.kubernetes.io/server-usage: geodata` with the toleration `geodata=true:NoSchedule`. Prepare such nodes, or override `nodeSelector` and `tolerations` for these workers. Otherwise their pods stay `Pending` and `helm install --wait` times out.
-- Give the workers the GOAT database and S3 settings through their `config` and `extraEnv`. Windmill passes only the variables listed in `WHITELIST_ENVS` on to the jobs; the chart ships a list that covers GOAT's tools, so add to it rather than replacing it.
+- The chart gives these workers what GOAT's jobs need: the GOAT database, the S3 store, the catalog bucket, the address of the web app for printing and, with login on, the Keycloak client the print worker signs in with. Windmill passes only the variables listed in `WHITELIST_ENVS` on to the jobs; the chart builds that list, including every variable you add to a worker's `config` or `extraEnv`.
 - Enable `windmill.scriptSync.enabled` to register GOAT's analysis tools and tasks in Windmill after the install. It is off by default.
 
 ### Storage for several nodes {#rwx}

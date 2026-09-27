@@ -57,15 +57,13 @@ Ohne diese URLs zeigt die Web-App eine leere Seite.
 
 ### Objektspeicher {#storage}
 
-Das Chart bringt Platzhalter für S3 mit. Ersetzen Sie sie durch Endpunkt, Region, Bucket und Zugangsdaten Ihres Speichers in der Konfiguration von core, geoapi und processes (`<service>.config.S3_*`, die Schlüssel über `<service>.extraEnv`), und ebenso für die Analyse-Worker (siehe unten).
+Beschreiben Sie Ihren S3-Speicher einmal in `global.s3`: den Bucket für Uploads, Anbieter, Endpunkt, Region, ob der Speicher Pfad-URLs (path style) braucht, und ein Secret mit dem Zugangsschlüssel-Paar (`global.s3.existingSecret`). core, geoapi, processes und die Analyse-Worker (siehe unten) erhalten alle diese Einstellungen.
+
+Hochgeladene Bilder, etwa Vorschaubilder von Projekten und Datensätzen, Profilbilder und Bilder in Dashboards, liegen in einem zweiten Bucket desselben Speichers (`global.s3.assets.bucket`). Browser laden sie direkt aus diesem Bucket; machen Sie ihn deshalb öffentlich lesbar und tragen Sie seine öffentliche URL in `global.s3.assets.publicUrl` ein. Außerhalb von AWS ist die URL Pflicht. GOATs eigene Grafiken liefert die Web-App selbst aus; sie brauchen beides nicht.
 
 ### Anmeldung {#auth}
 
 Die Anmeldung ist standardmäßig **aus** (`global.auth.enabled: false`): Alle Dienste handeln dann als ein Standardbenutzer, stellen Sie eine solche Installation also hinter Ihre eigene Zugriffskontrolle. Um die Anmeldung einzuschalten, setzen Sie `global.auth.enabled: true` und `global.auth.existingSecret` auf ein Secret mit den Schlüsseln `server-url`, `realm`, `client-id`, `client-secret` und `nextauth-secret`. Ein Secret versorgt alle fünf Dienste.
-
-### Hochgeladene Bilder {#assets}
-
-Vorschaubilder von Projekten und Datensätzen, Profilbilder und Bilder in Dashboards liegen im Bucket `core.config.AWS_S3_ASSETS_BUCKET` und erreichen den Browser über `core.config.ASSETS_URL`. Setzen Sie `ASSETS_URL` auf die öffentliche URL des Buckets und machen Sie den Bucket öffentlich lesbar. GOATs eigene Grafiken liefert die Web-App selbst aus; sie brauchen beides nicht.
 
 ### E-Mail und Einladungen {#email}
 
@@ -80,7 +78,7 @@ Der Standard-Worker von Windmill übernimmt nur kleine Jobs. **Analyse-Werkzeuge
 
 - Schalten Sie sie mit `windmill.workers.tools.enabled`, `windmill.workers.workflows.enabled` und `windmill.workers.print.enabled` ein.
 - Die Worker `tools` und `workflows` sind an Nodes mit dem Label `node.kubernetes.io/server-usage: geodata` und der Toleration `geodata=true:NoSchedule` gebunden. Bereiten Sie solche Nodes vor oder überschreiben Sie `nodeSelector` und `tolerations` für diese Worker. Andernfalls bleiben ihre Pods im Zustand `Pending`, und `helm install --wait` läuft in den Timeout.
-- Geben Sie den Workern die Einstellungen für die GOAT-Datenbank und S3 über ihre `config` und `extraEnv`. Windmill reicht nur die Variablen an die Jobs weiter, die in `WHITELIST_ENVS` stehen; das Chart bringt eine Liste mit, die GOATs Werkzeuge abdeckt. Ergänzen Sie sie, statt sie zu ersetzen.
+- Das Chart gibt diesen Workern, was GOATs Jobs brauchen: die GOAT-Datenbank, den S3-Speicher, den Katalog-Bucket, die Adresse der Web-App für den Druck und, bei eingeschalteter Anmeldung, den Keycloak-Client, mit dem sich der Druck-Worker anmeldet. Windmill reicht nur die Variablen an die Jobs weiter, die in `WHITELIST_ENVS` stehen; das Chart stellt diese Liste zusammen, einschließlich jeder Variable, die Sie in `config` oder `extraEnv` eines Workers ergänzen.
 - Schalten Sie `windmill.scriptSync.enabled` ein, um GOATs Analyse-Werkzeuge und Aufgaben nach der Installation in Windmill zu registrieren. Die Einstellung ist standardmäßig aus.
 
 ### Speicher für mehrere Nodes {#rwx}

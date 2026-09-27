@@ -182,11 +182,14 @@ tests:
           path: data.KEYCLOAK_PROVISION_INVITED_USERS
           value: "true"
 
-  - it: ships no assets URL placeholder
+  - it: ships no assets or S3 placeholders
     template: core/configmap.yaml
     asserts:
       - notExists:
           path: data.ASSETS_URL
-      - equal:
+      - notExists:
           path: data.AWS_S3_ASSETS_BUCKET
-          value: goat-assets
+      - notExists:
+          path: data.S3_ENDPOINT_URL
+      - notExists:
+          path: data.S3_BUCKET_NAME

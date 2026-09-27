@@ -75,6 +75,57 @@
               "minLength": 1
             }
           }
+        },
+        "s3": {
+          "type": "object",
+          "properties": {
+            "bucket": {
+              "type": "string"
+            },
+            "provider": {
+              "type": "string"
+            },
+            "endpointUrl": {
+              "type": "string"
+            },
+            "publicEndpointUrl": {
+              "type": "string"
+            },
+            "region": {
+              "type": "string"
+            },
+            "forcePathStyle": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            },
+            "existingSecret": {
+              "type": "string"
+            },
+            "existingSecretKeys": {
+              "type": "object",
+              "properties": {
+                "accessKeyId": {
+                  "type": "string"
+                },
+                "secretAccessKey": {
+                  "type": "string"
+                }
+              }
+            },
+            "assets": {
+              "type": "object",
+              "properties": {
+                "bucket": {
+                  "type": "string"
+                },
+                "publicUrl": {
+                  "type": "string"
+                }
+              }
+            }
+          }
         }
       }
     },

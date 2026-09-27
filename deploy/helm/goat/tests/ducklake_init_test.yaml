@@ -96,6 +96,11 @@ tests:
       postgresql.cluster.enabled: false
       postgresql.external.host: "pg.example.com"
       postgresql.external.existingSecret: "pg-secret"
+      geoapi.extraEnv:
+        - name: S3_ACCESS_KEY_ID
+          value: placeholder-s3-key
+        - name: S3_SECRET_ACCESS_KEY
+          value: placeholder-s3-secret
     asserts:
       - equal:
           path: spec.template.spec.initContainers[0].envFrom[0].configMapRef.name

@@ -6,6 +6,18 @@ description: |
 
   v0.6.0:
 
+  - NEW: `global.s3` — ONE S3 store (bucket, provider, endpoint, public
+    endpoint, region, path style, key pair from `existingSecret`, and the
+    assets bucket with its public URL) for core, geoapi, processes and the
+    Windmill workers. The S3 and assets placeholders in their `config` and
+    `extraEnv` defaults are gone; values set there keep winning.
+  - The print, tools and workflows workers get what GOAT's jobs read: the
+    GOAT database and DuckLake, S3, the catalog bucket, PRINT_BASE_URL (the
+    in-cluster web service; the code default only matched a release named
+    `goat`) and, with auth wired, the Keycloak client the print worker logs
+    in with. WHITELIST_ENVS is built from all of it plus every name in the
+    worker's `config` and `extraEnv`, instead of a fixed list that missed
+    newer variables. Before, the print worker got none of this.
   - NEW: `email` — the SMTP server core sends invitations through (host,
     port, security, user, sender, password from `existingSecret`) and the
     branding of GOAT's emails. Core also gets CLIENT_URL and API_URL, the
@@ -18,9 +30,7 @@ description: |
     tools and workflows workers.
   - `core.config` no longer ships `ASSETS_URL: https://example.com/assets`
     or `AWS_S3_ASSETS_BUCKET: placeholder`: uploaded images got URLs on
-    example.com. The bucket now defaults to `goat-assets`; set ASSETS_URL
-    (and ASSETS_S3_ENDPOINT_URL for S3 outside AWS) to the bucket's public
-    URL.
+    example.com. `global.s3.assets.publicUrl` sets the real one.
 
   v0.5.1:
 

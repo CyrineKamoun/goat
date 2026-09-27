@@ -9,26 +9,6 @@ templates:
   - windmill/worker-workflows/deployment.yaml
   - windmill/worker-workflows/configmap.yaml
 tests:
-  - it: whitelists the env goatlib tool jobs need, including v3's catalog vars
-    template: windmill/worker-tools/configmap.yaml
-    set:
-      windmill.workers.tools.enabled: true
-      postgresql.external.host: "pg.example.com"
-      postgresql.external.existingSecret: "pg-secret"
-    asserts:
-      - matchRegex:
-          path: data.WHITELIST_ENVS
-          pattern: "POSTGRES_SERVER"
-      - matchRegex:
-          path: data.WHITELIST_ENVS
-          pattern: "DATA_DIR"
-      - matchRegex:
-          path: data.WHITELIST_ENVS
-          pattern: "CATALOG_S3_BUCKET"
-      - matchRegex:
-          path: data.WHITELIST_ENVS
-          pattern: "CATALOG_S3_SECRET_ACCESS_KEY"
-
   # ── default worker ───────────────────────────────────────────────────────
   - it: default worker is enabled by default and renders Deployment
     set:

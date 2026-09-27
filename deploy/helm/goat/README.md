@@ -388,7 +388,11 @@ override the key names via the `existingSecretUserKey` /
 | `email.brandName` / `.logoUrl` / `.contactUrl` / `.privacyUrl` | string | `GOAT` / `""` | Name, logo and footer links of GOAT's emails. |
 | `core.ingress.enabled` | bool | `false` | Create Ingress resource for core API. |
 | `core.ingress.className` | string | `""` | Ingress controller name (`nginx`, `traefik`, …). |
-| `core.config.*` | map | see values.yaml | Non-secret env vars (rendered as ConfigMap). `S3_FORCE_PATH_STYLE=true` selects path-style addressing for any S3-compatible store; `MAX_UPLOAD_DATASET_FILE_SIZE` caps browser uploads (bytes, default 5 GB). Both must also be in the Windmill workers' `WHITELIST_ENVS`. |
+| `core.config.*` | map | see values.yaml | Non-secret env vars (rendered as ConfigMap). `MAX_UPLOAD_DATASET_FILE_SIZE` caps browser uploads (bytes, default 5 GB); set it in the Windmill workers' `config` too, for the jobs that import the files. |
+| `global.s3.bucket` | string | `""` | S3 bucket for uploads; setting it gives core, geoapi, processes and the print, tools and workflows workers the store below (see "Object storage"). |
+| `global.s3.provider` / `.endpointUrl` / `.publicEndpointUrl` / `.region` / `.forcePathStyle` | string / bool | `""` / `false` | The store: provider (`minio` forces path-style URLs), in-cluster endpoint (empty = AWS), browser-facing endpoint for upload links, region, path-style URLs. |
+| `global.s3.existingSecret` / `.existingSecretKeys` | string / map | `""` / `access-key-id`, `secret-access-key` | Secret with the access key pair. |
+| `global.s3.assets.bucket` / `.publicUrl` | string | `goat-assets` / `""` | Bucket for uploaded images in the same store and its public URL (`ASSETS_URL`); `publicUrl` is required with an `endpointUrl`. |
 | `web.enabled` | bool | `true` | Deploy `goat-web` (Next.js frontend). |
 | `web.ingress.enabled` | bool | `false` | Create Ingress for the web UI (requires `hosts` populated). |
 | `geoapi.enabled` | bool | `true` | Deploy `goat-geoapi`. Its `ducklake-init` init container creates the DuckLake catalog (see below). |
@@ -535,16 +539,46 @@ and the print, tools and workflows workers and `NODE_EXTRA_CA_CERTS` in web.
 Each of them trusts it in addition to the public CAs. A variable you set
 yourself in that service's `config` or `extraEnv` wins.
 
-## Uploaded images — `ASSETS_URL`
+## Object storage — `global.s3`
 
-Project and dataset thumbnails, avatars and dashboard images are stored in the
-bucket `core.config.AWS_S3_ASSETS_BUCKET` (default `goat-assets`) and reach the
-browser as `ASSETS_URL/<key>`. Set `core.config.ASSETS_URL` to the bucket's
-public URL; the bucket must be publicly readable. Unset, core assumes a bucket
-on AWS (`https://<bucket>.s3.<region>.amazonaws.com`). For S3 outside AWS also
-set `ASSETS_S3_ENDPOINT_URL` (core refuses to start without `ASSETS_URL` then)
-and, if the store needs it, `ASSETS_S3_FORCE_PATH_STYLE: "true"`. GOAT's own
-artwork ships in the web image under `/assets` and needs none of this.
+GOAT keeps uploads (datasets, exports, prints) in one S3 bucket and uploaded
+images (project and dataset thumbnails, avatars, dashboard images) in a
+second one. `global.s3` describes the store once:
+
+```bash
+kubectl -n goat create secret generic goat-s3 \
+  --from-literal=access-key-id='…' --from-literal=secret-access-key='…'
+```
+
+```yaml
+global:
+  s3:
+    bucket: goat-uploads
+    provider: minio                              # or aws, hetzner, garage, …
+    endpointUrl: http://minio.storage.svc:9000   # empty on AWS
+    publicEndpointUrl: https://s3.example.org    # how browsers reach it, if different
+    region: us-east-1
+    forcePathStyle: true
+    existingSecret: goat-s3
+    assets:
+      bucket: goat-assets
+      publicUrl: https://s3.example.org/goat-assets
+```
+
+Once `bucket` is set, core, geoapi, processes and the Windmill print, tools
+and workflows workers get `S3_*` from it; core also gets the assets bucket
+(`AWS_S3_ASSETS_BUCKET`, `ASSETS_URL`, `ASSETS_S3_ENDPOINT_URL`,
+`ASSETS_S3_FORCE_PATH_STYLE` and the same key pair as `AWS_*`). Browsers load
+uploaded images straight from `assets.publicUrl`, so that bucket must be
+publicly readable. Outside AWS (`endpointUrl` set) `assets.publicUrl` is
+required: core refuses to start without it, and the chart stops the install
+first. On AWS it defaults to `https://<bucket>.s3.<region>.amazonaws.com`.
+
+A variable set in a service's own `config` or `extraEnv` wins, for example
+`core.config.ASSETS_URL` for a CDN in front of the images, or an assets
+bucket in another store with its own `AWS_*` key pair in `core.extraEnv`.
+GOAT's own artwork ships in the web image under `/assets` and needs none of
+this.
 
 ## The shared data volume
 
@@ -687,6 +721,25 @@ full read-write at `/app/data`. Each worker's own `persistence.*` block is
 only used as a fallback when `data.enabled: false`, and creates a separate,
 worker-specific PVC instead.
 
+**What the jobs get.** Windmill runs GOAT's tools, imports, workflows and
+prints as scripts inside the `tools`, `workflows` and `print` workers, and
+hands a script only the variables named in `WHITELIST_ENVS`. The chart gives
+these three workers what the scripts read and builds that list itself:
+
+- the GOAT database (`POSTGRES_*`, from `postgresql.*`) and DuckLake
+  (`DUCKLAKE_*`, from `ducklakeBootstrap.*`);
+- S3 from `global.s3` and the catalog bucket from `catalog.s3`;
+- `PRINT_BASE_URL`, the in-cluster web service the print worker renders;
+- with `global.auth` wired to a Secret, the Keycloak client the print worker
+  logs in with (`KEYCLOAK_*`, `REALM_NAME`);
+- `GOAT_CA_BUNDLE` with `global.caBundle`.
+
+Every name in a worker's `config` and `extraEnv` joins the list too, so a
+setting added there (e.g. `GEOCODING_URL`) reaches the scripts. A variable set
+there wins over the chart's; a `WHITELIST_ENVS` set there replaces the built
+list. The `default` worker runs only Windmill's own small jobs and gets none
+of this.
+
 Without a tainted node available, the worker pods will sit in `Pending` and the chart's `helm install --wait` will time out. Don't enable them unless you've prepared the node side.
 
 ### `caddy` — custom-domains feature
@@ -734,7 +787,7 @@ helm template my-release deploy/helm/goat/ -f deploy/helm/goat/ci/values-externa
 
 | Chart version | Adds | Notes |
 |---|---|---|
-| `0.6.0` | `email` (SMTP for invitations, password from a Secret, email branding) with `CLIENT_URL` / `API_URL` derived for the links in emails; `global.auth.provisionInvitedUsers`; `global.caBundle` (company CA for core, web and the print, tools and workflows workers) | `core.config` drops the `ASSETS_URL` and `AWS_S3_ASSETS_BUCKET` placeholders — see "Upgrading 0.5.1 → 0.6.0" |
+| `0.6.0` | `global.s3` (one S3 store for core, geoapi, processes and the workers, uploads and uploaded images); the print, tools and workflows workers get GOAT's database, DuckLake, S3, catalog bucket, `PRINT_BASE_URL` and Keycloak client, with `WHITELIST_ENVS` built by the chart; `email` (SMTP for invitations, password from a Secret, email branding) with `CLIENT_URL` / `API_URL` derived for the links in emails; `global.auth.provisionInvitedUsers`; `global.caBundle` (company CA for core, web and the print, tools and workflows workers) | The S3 and assets placeholders are gone from `core`, `geoapi` and `processes`, and the workers' fixed `WHITELIST_ENVS` is replaced by a built one — see "Upgrading 0.5.1 → 0.6.0" |
 | `0.5.1` | GOAT v3.0.3 (no runtime downloads in the workers, `ROOT_PATH`, `sync_base_data`); `global.auth`: one auth switch + one Keycloak Secret for core, web, geoapi, processes, catalog; `geoapi.auth` / `processes.auth` | Fixes: geoapi + processes ran auth ON at chart defaults (401 on feature edits and every job route) and, with auth on, validated tokens against plan4better's dev Keycloak; a fresh install's processes had no windmill token (every tool run failed until a manual restart); `processes.windmillAutoWire: false` was ignored. No values change needed — see "Upgrading 0.5.0 → 0.5.1" |
 | `0.5.0` | GOAT v3.0.2: `catalog` service (STAC API + MCP); shared `data` volume; single-command fresh install (DuckLake + windmill DB bootstrap moved from hooks to init containers); `REDIS_URL`, web `NEXT_PUBLIC_*` and windmill `WHITELIST_ENVS` fixes; bundled Postgres image moves from CNPG's default major 17 to 18 (`ghcr.io/cloudnative-pg/postgis:18-3.6-system-trixie`) | BREAKING: `helm upgrade` DELETES `<fullname>-windmill-tools-data` and `<fullname>-windmill-workflows-data` unless you first `kubectl annotate` them `helm.sh/resource-policy=keep` (worker `persistence` superseded by `data`, no automatic migration; the upgrade fails until you do or set `windmill.workers.legacyPersistence.acknowledgeDeletion` — see upgrade note 1 below); geoapi + processes now default on |
 | `0.4.0` | automatic schema migrations (`core.migrate.*` hook); `NEXT_PUBLIC_AUTH_DISABLED` → `NEXT_PUBLIC_AUTH` | BREAKING: flip the web auth flag in your values |
@@ -743,17 +796,26 @@ helm template my-release deploy/helm/goat/ -f deploy/helm/goat/ci/values-externa
 
 ### Upgrading 0.5.1 → 0.6.0
 
-1. **Uploaded images.** `core.config` no longer ships
-   `ASSETS_URL: https://example.com/assets` and
-   `AWS_S3_ASSETS_BUCKET: placeholder`. If your values set neither, uploaded
-   images had URLs on example.com; set `core.config.ASSETS_URL` (and
-   `ASSETS_S3_ENDPOINT_URL` for S3 outside AWS) now, and
-   `AWS_S3_ASSETS_BUCKET` if your bucket is not called `goat-assets`. Images
-   uploaded before keep the URL stored with them.
-2. **Email** is new and off until `email.host` is set. SMTP settings you
+1. **S3 moves to `global.s3`.** `core.config`, `geoapi.config` and
+   `processes.config` no longer ship S3 placeholders (`S3_PROVIDER: minio`,
+   `S3_ENDPOINT_URL: http://placeholder-s3`, `S3_BUCKET_NAME:
+   goat-placeholder`, `AWS_REGION`, `AWS_S3_ASSETS_BUCKET: placeholder`,
+   `ASSETS_URL: https://example.com/assets`), and their `extraEnv` defaults no
+   longer carry placeholder key pairs. Real S3 values you set in those blocks
+   keep working and win. To set the store once, move them into `global.s3`
+   and drop the per-service copies. Without either, the services start but
+   uploads fail, as before. Uploaded images whose URL was stored on
+   example.com keep that URL.
+2. **Workers.** The print, tools and workflows workers now get the GOAT
+   database, DuckLake, S3, the catalog bucket and `PRINT_BASE_URL` from the
+   chart, and a `WHITELIST_ENVS` it builds. If your values set
+   `windmill.workers.<worker>.config.WHITELIST_ENVS`, that list still replaces
+   the built one; remove it to let the chart keep the list complete. Worker
+   `config` / `extraEnv` entries for the same variables keep winning.
+3. **Email** is new and off until `email.host` is set. SMTP settings you
    already pass through `core.config` or `core.extraEnv` keep working and win
    over the `email` block.
-3. **Core gets `CLIENT_URL` and `API_URL`** from the public web and API URLs,
+4. **Core gets `CLIENT_URL` and `API_URL`** from the public web and API URLs,
    where it used to fall back to `http://localhost:3000` and
    `http://localhost:8000/api/v2`. Values you set in `core.config` win.
 
@@ -920,4 +982,4 @@ changes on the pods:
 
 ## License
 
-EUPL-1.2.
+GPLv3, like the rest of GOAT (see [`LICENSE`](../../../LICENSE)).

@@ -72,6 +72,9 @@ spec:
                   key: {{ include "windmill.postgresql.passwordKey" . }}
             - name: DATABASE_URL
               value: "postgres://$(_WMILL_DB_USER):$(_WMILL_DB_PASSWORD)@{{ include "windmill.postgresql.host" . }}:{{ include "windmill.postgresql.port" . }}/{{ include "windmill.postgresql.database" . }}?sslmode=prefer"
+            # GOAT's settings for the jobs this worker runs, and the
+            # WHITELIST_ENVS that hands them on (_storage_workers.tpl).
+            {{- include "goat.worker.env" (dict "root" $ "values" $worker) | trim | nindent 12 }}
             {{- with $worker.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

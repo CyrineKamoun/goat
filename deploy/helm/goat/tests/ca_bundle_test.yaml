@@ -138,7 +138,7 @@ tests:
             mountPath: /etc/goat/ca
             readOnly: true
 
-  - it: passes GOAT_CA_BUNDLE on to the tools worker's scripts
+  - it: points the tools worker at the bundle
     template: windmill/worker-tools/configmap.yaml
     set:
       global.caBundle.existingConfigMap: corp-ca
@@ -146,6 +146,12 @@ tests:
       - equal:
           path: data.GOAT_CA_BUNDLE
           value: /etc/goat/ca/ca.pem
+
+  - it: passes GOAT_CA_BUNDLE on to the tools worker's jobs
+    template: windmill/worker-tools/deployment.yaml
+    set:
+      global.caBundle.existingConfigMap: corp-ca
+    asserts:
       - matchRegex:
-          path: data.WHITELIST_ENVS
+          path: spec.template.spec.containers[0].env[?(@.name == "WHITELIST_ENVS")].value
           pattern: (^|,)GOAT_CA_BUNDLE(,|$)
