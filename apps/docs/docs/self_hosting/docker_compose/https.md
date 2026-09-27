@@ -35,7 +35,7 @@ All four modes have been tested, including `off` behind a load balancer.
 Requirements:
 
 - The DNS name resolves to the server.
-- Ports **80 and 443** reach the server from the internet, because Let's Encrypt validates the domain through them.
+- Port **443** reaches the server from the internet: Let's Encrypt validates the domain through it. Also open port **80** if `http://` addresses should redirect to HTTPS; Caddy can then validate through port 80 as well.
 - The URL has no port.
 
 Caddy then gets the certificate on the first start, renews it on its own and redirects HTTP to HTTPS.
@@ -43,7 +43,7 @@ Caddy then gets the certificate on the first start, renews it on its own and red
 The email for Let's Encrypt (`--acme-email`, stored as `GOAT_ACME_EMAIL`) is optional; Let's Encrypt uses it for expiry notices. Let's Encrypt rejects contacts on domains outside the public DNS, and your site would then get no certificate. `setup.sh` therefore refuses addresses ending in `.test`, `.local`, `.localhost`, `.invalid` or `.example`, and addresses at `example.com`, `example.org`, `example.net` or `localhost`. Use a real address or leave the field empty.
 
 :::tip Certificate not issued?
-Check that ports 80 and 443 reach the server and that the DNS name resolves to it, then look at `docker compose logs caddy`.
+Check that port 443 reaches the server from the internet and that the DNS name resolves to it, then look at `docker compose logs caddy`.
 :::
 
 ## Your own certificate (`custom`) {#custom}
@@ -107,13 +107,13 @@ In this mode Caddy does not publish port 443 on the server, so the port stays fr
 
 ## Company CA {#company-ca}
 
-If certificates in your network come from a private certificate authority, for example the certificate of your load balancer or of your own Keycloak, GOAT has to trust that CA. Put the CA certificate (PEM) into `./certs` and set its path inside the containers in `.env`:
+If certificates in your network come from a private certificate authority, for example the certificate of your load balancer, of your own Keycloak or of your SMTP relay, GOAT has to trust that CA. Put the CA certificate (PEM) into `./certs` and set its path inside the containers in `.env`:
 
 ```bash
 GOAT_CA_BUNDLE=/certs/company-ca.pem
 ```
 
-Apply the change with `docker compose up -d`. GOAT's web server and the job workers, including the PDF print worker, then trust the CA. `GOAT_CA_BUNDLE` holds one file; in `internal` mode `setup.sh` uses it for Caddy's root certificate.
+Apply the change with `docker compose up -d`. GOAT's web server, the job workers including the PDF print worker, and the senders of email (GOAT and the bundled Keycloak) then trust the CA in addition to the public ones. `GOAT_CA_BUNDLE` holds one file, which may contain several certificates. In `internal` mode `setup.sh` uses it for Caddy's root certificate; to trust a company CA as well, put both certificates into one file in `./certs`.
 
 ## HSTS and security headers {#hsts}
 

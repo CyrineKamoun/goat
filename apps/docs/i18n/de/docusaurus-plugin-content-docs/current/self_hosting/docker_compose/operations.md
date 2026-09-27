@@ -141,8 +141,8 @@ Die Logs aller Dienste werden automatisch rotiert.
 
 Ein einmaliger Dienst mit einem anderen Exit-Code zeigt den Grund in seinen Logs, z. B. `docker compose logs core-migrate`.
 
-**Let's Encrypt schlägt fehl** (Modus `auto`): Prüfen Sie, ob die Ports 80 und 443 den Server aus dem Internet erreichen und der DNS-Name auf ihn auflöst. Sehen Sie sich dann `docker compose logs caddy` an. Siehe auch [Automatisches Zertifikat](./https.md#auto).
+**Let's Encrypt schlägt fehl** (Modus `auto`): Prüfen Sie, ob Port 443 den Server aus dem Internet erreicht und der DNS-Name auf ihn auflöst. Sehen Sie sich dann `docker compose logs caddy` an. Siehe auch [Automatisches Zertifikat](./https.md#auto).
 
 **Einzugsgebiete, Heatmaps oder ÖV-Analysen schlagen fehl:** Wahrscheinlich fehlen die [Routing-Basisdaten](#base-data) für das Gebiet.
 
-**E-Mails kommen nicht an:** Prüfen Sie die [E-Mail-Einstellungen](./external_services.md#email) und das Log des letzten Versuchs: `docker compose logs core` für GOATs E-Mails, `docker compose logs keycloak` für Passwort-E-Mails.
+**E-Mails kommen nicht an:** Prüfen Sie die [E-Mail-Einstellungen](./external_services.md#email) und das Log des letzten Versuchs: `docker compose logs core` für GOATs E-Mails, `docker compose logs keycloak` für Passwort-E-Mails. Ein Zertifikatsfehler dort (`CERTIFICATE_VERIFY_FAILED`, `PKIX path building failed`) bedeutet, dass das Zertifikat des Relays von einer CA stammt, der GOAT noch nicht vertraut; siehe [Firmen-CA](./https.md#company-ca).

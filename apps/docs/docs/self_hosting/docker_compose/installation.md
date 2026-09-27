@@ -24,7 +24,7 @@ This page walks you through them, from the requirements to your first login.
 
 In addition, you need:
 
-- **Open ports 80 and 443**, or the one port you choose for plain HTTP. Nothing else has to be reachable from outside.
+- **Open port 443**, plus port 80 for the redirect from `http://` to HTTPS, or the one port you choose for plain HTTP. Nothing else has to be reachable from outside.
 - **A DNS name pointing at the server** if you want automatic HTTPS with Let's Encrypt.
 - **Outgoing internet access** to pull the images from `ghcr.io`, and for the routing base data, the basemaps and the optional integrations.
 - **`openssl`** for `setup.sh`, and **`curl` and `jq`** for `smoke.sh`.

@@ -130,20 +130,24 @@ SMTP_FROM=goat@example.org
 
 Führen Sie nach einer Änderung von `SMTP_SECURITY` einmal `./setup.sh` aus: Es leitet die beiden Schalter `SMTP_STARTTLS` und `SMTP_SSL` ab, die Keycloak benötigt. Übernehmen Sie die Änderung dann mit `docker compose up -d`.
 
+Mit `starttls` oder `ssl` prüfen GOAT und Keycloak das Zertifikat des Relays gegen die öffentlichen Zertifizierungsstellen. Stammt das Zertifikat Ihres Relays von einer Firmen-CA, setzen Sie `GOAT_CA_BUNDLE` wie unter [Firmen-CA](./https.md#company-ca) beschrieben; sonst schlägt der Versand mit einem Zertifikatsfehler fehl.
+
 :::info Ein Ort für die E-Mail-Einstellungen
 Das mitgelieferte Keycloak verwendet dieselben SMTP-Einstellungen: Bei jedem `docker compose up -d` überträgt der Schritt `keycloak-sync` sie aus `.env` in den Realm. Ändern Sie sie nur in `.env`; Änderungen in der Keycloak-Admin-Konsole unter *Realm settings → Email* werden beim nächsten Start ersetzt.
 :::
 
 ### E-Mail-Branding {#email-branding}
 
-Standardmäßig zeigen GOATs E-Mails den Namen `GOAT` und keine Links in der Fußzeile. Mit diesen optionalen Einstellungen fügen Sie Ihre eigenen hinzu:
+Standardmäßig zeigen die E-Mails von GOAT und von Keycloak den Namen `GOAT` und keine Links in der Fußzeile. Mit diesen optionalen Einstellungen fügen Sie in beiden Ihre eigenen hinzu:
 
 | Einstellung | Bedeutung |
 |---|---|
 | `EMAIL_BRAND_NAME` | Name, der in den E-Mails erscheint |
 | `EMAIL_LOGO_URL` | Adresse eines Logo-Bildes, das statt des Namens erscheint |
-| `EMAIL_CONTACT_URL` | Kontakt-Link in der Fußzeile |
-| `EMAIL_PRIVACY_URL` | Link zur Datenschutzerklärung in der Fußzeile |
+| `EMAIL_CONTACT_URL` | Kontakt-Link in der Fußzeile. Die App verwendet ihn auch für ihre <code>Kontakt</code>-Links. |
+| `EMAIL_PRIVACY_URL` | Link zur Datenschutzerklärung in der Fußzeile. Auch die Anmeldeseite verlinkt darauf. |
+
+Die Bilder in den E-Mails kommen von GOATs öffentlicher URL (`<öffentliche URL>/assets`) oder von `STATIC_ASSETS_URL`, falls gesetzt. Die Mailprogramme der Empfänger laden sie von dort, die Adresse muss für sie also erreichbar sein.
 
 ## Ohne Anmeldung {#no-login}
 

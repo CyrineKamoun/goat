@@ -35,7 +35,7 @@ Alle vier Modi wurden getestet, auch `off` hinter einem Load Balancer.
 Voraussetzungen:
 
 - Der DNS-Name löst auf den Server auf.
-- Die Ports **80 und 443** erreichen den Server aus dem Internet, denn Let's Encrypt prüft die Domain über diese Ports.
+- Port **443** erreicht den Server aus dem Internet: Let's Encrypt prüft die Domain darüber. Öffnen Sie auch Port **80**, wenn `http://`-Adressen auf HTTPS umleiten sollen; Caddy kann die Domain dann auch über Port 80 prüfen lassen.
 - Die URL enthält keinen Port.
 
 Caddy holt das Zertifikat dann beim ersten Start, erneuert es selbstständig und leitet HTTP auf HTTPS um.
@@ -43,7 +43,7 @@ Caddy holt das Zertifikat dann beim ersten Start, erneuert es selbstständig und
 Die E-Mail-Adresse für Let's Encrypt (`--acme-email`, gespeichert als `GOAT_ACME_EMAIL`) ist optional; Let's Encrypt verschickt daran Ablaufhinweise. Let's Encrypt lehnt Kontakte auf Domains außerhalb des öffentlichen DNS ab, und Ihre Seite bekäme dann kein Zertifikat. `setup.sh` weist deshalb Adressen zurück, die auf `.test`, `.local`, `.localhost`, `.invalid` oder `.example` enden, sowie Adressen bei `example.com`, `example.org`, `example.net` oder `localhost`. Verwenden Sie eine echte Adresse oder lassen Sie das Feld leer.
 
 :::tip Kein Zertifikat ausgestellt?
-Prüfen Sie, ob die Ports 80 und 443 den Server erreichen und der DNS-Name auf ihn auflöst, und sehen Sie sich dann `docker compose logs caddy` an.
+Prüfen Sie, ob Port 443 den Server aus dem Internet erreicht und der DNS-Name auf ihn auflöst, und sehen Sie sich dann `docker compose logs caddy` an.
 :::
 
 ## Eigenes Zertifikat (`custom`) {#custom}
@@ -107,13 +107,13 @@ In diesem Modus veröffentlicht Caddy Port 443 auf dem Server nicht, sodass der 
 
 ## Firmen-CA {#company-ca}
 
-Stammen Zertifikate in Ihrem Netz von einer privaten Zertifizierungsstelle, etwa das Zertifikat Ihres Load Balancers oder Ihres eigenen Keycloak, muss GOAT dieser CA vertrauen. Legen Sie das CA-Zertifikat (PEM) in `./certs` und tragen Sie seinen Pfad innerhalb der Container in `.env` ein:
+Stammen Zertifikate in Ihrem Netz von einer privaten Zertifizierungsstelle, etwa das Zertifikat Ihres Load Balancers, Ihres eigenen Keycloak oder Ihres SMTP-Relays, muss GOAT dieser CA vertrauen. Legen Sie das CA-Zertifikat (PEM) in `./certs` und tragen Sie seinen Pfad innerhalb der Container in `.env` ein:
 
 ```bash
 GOAT_CA_BUNDLE=/certs/company-ca.pem
 ```
 
-Übernehmen Sie die Änderung mit `docker compose up -d`. GOATs Webserver und die Job-Worker, einschließlich des PDF-Druck-Workers, vertrauen der CA dann. `GOAT_CA_BUNDLE` nimmt eine Datei auf; im Modus `internal` verwendet `setup.sh` die Einstellung für Caddys Stammzertifikat.
+Übernehmen Sie die Änderung mit `docker compose up -d`. GOATs Webserver, die Job-Worker einschließlich des PDF-Druck-Workers und die Absender von E-Mails (GOAT und das mitgelieferte Keycloak) vertrauen der CA dann zusätzlich zu den öffentlichen. `GOAT_CA_BUNDLE` nimmt eine Datei auf, die mehrere Zertifikate enthalten darf. Im Modus `internal` verwendet `setup.sh` die Einstellung für Caddys Stammzertifikat; um zusätzlich einer Firmen-CA zu vertrauen, legen Sie beide Zertifikate in eine Datei in `./certs`.
 
 ## HSTS und Sicherheits-Header {#hsts}
 

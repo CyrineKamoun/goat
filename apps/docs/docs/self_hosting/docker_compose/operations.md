@@ -141,8 +141,8 @@ The logs of every service rotate automatically.
 
 A one-time service with another exit code shows why in its logs, e.g. `docker compose logs core-migrate`.
 
-**Let's Encrypt fails** (`auto` mode): check that ports 80 and 443 reach the server from the internet and that the DNS name resolves to it. Then look at `docker compose logs caddy`. See also [Automatic certificate](./https.md#auto).
+**Let's Encrypt fails** (`auto` mode): check that port 443 reaches the server from the internet and that the DNS name resolves to it. Then look at `docker compose logs caddy`. See also [Automatic certificate](./https.md#auto).
 
 **Catchment areas, heatmaps or public transport analyses fail:** the [routing base data](#base-data) for the area is probably missing.
 
-**Emails do not arrive:** check the [email settings](./external_services.md#email) and the log of the last email attempt: `docker compose logs core` for GOAT's emails, `docker compose logs keycloak` for password emails.
+**Emails do not arrive:** check the [email settings](./external_services.md#email) and the log of the last email attempt: `docker compose logs core` for GOAT's emails, `docker compose logs keycloak` for password emails. A certificate error there (`CERTIFICATE_VERIFY_FAILED`, `PKIX path building failed`) means the relay's certificate comes from a CA that GOAT does not trust yet; see [Company CA](./https.md#company-ca).

@@ -130,20 +130,24 @@ SMTP_FROM=goat@example.org
 
 After changing `SMTP_SECURITY`, run `./setup.sh` once: it derives the two flags `SMTP_STARTTLS` and `SMTP_SSL` that Keycloak needs. Then apply the change with `docker compose up -d`.
 
+With `starttls` or `ssl`, GOAT and Keycloak check the relay's certificate against the public certificate authorities. If your relay's certificate comes from a company CA, set `GOAT_CA_BUNDLE` as described under [Company CA](./https.md#company-ca); otherwise sending fails with a certificate error.
+
 :::info One place for the email settings
 The bundled Keycloak uses the same SMTP settings: on every `docker compose up -d`, the step `keycloak-sync` copies them from `.env` into the realm. Change them in `.env` only; changes made in the Keycloak admin console under *Realm settings → Email* are replaced on the next start.
 :::
 
 ### Email branding {#email-branding}
 
-By default, GOAT's emails show the name `GOAT` and no footer links. These optional settings add your own:
+By default, the emails from GOAT and from Keycloak show the name `GOAT` and no footer links. These optional settings add your own, in both:
 
 | Setting | Meaning |
 |---|---|
 | `EMAIL_BRAND_NAME` | Name shown in the emails |
 | `EMAIL_LOGO_URL` | Address of a logo image, shown instead of the name |
-| `EMAIL_CONTACT_URL` | Contact link in the footer |
-| `EMAIL_PRIVACY_URL` | Privacy policy link in the footer |
+| `EMAIL_CONTACT_URL` | Contact link in the footer. The app uses it too, for its <code>Contact us</code> links. |
+| `EMAIL_PRIVACY_URL` | Privacy policy link in the footer. The login page links to it too. |
+
+The images in the emails come from GOAT's public URL (`<public URL>/assets`), or from `STATIC_ASSETS_URL` if you set it. Recipients' mail clients load them from there, so the address must be reachable for them.
 
 ## Login off {#no-login}
 

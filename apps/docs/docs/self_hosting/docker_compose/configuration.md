@@ -29,7 +29,7 @@ Apply changes with `docker compose up -d`.
 | `GOAT_ACME_EMAIL` | empty | Optional contact for Let's Encrypt expiry notices (`auto` only) |
 | `GOAT_TRUSTED_PROXIES` | `private_ranges` | Addresses allowed to set `X-Forwarded-*` headers (your load balancer), as CIDRs separated by spaces |
 | `GOAT_ADMIN_ALLOW_CIDRS` | `0.0.0.0/0 ::/0` | Networks allowed to open the Keycloak admin console under `/keycloak/admin` |
-| `GOAT_CA_BUNDLE` | empty | Path inside the containers of an extra CA certificate (PEM) in `./certs`; set by setup.sh in `internal` mode. See [Company CA](./https.md#company-ca). |
+| `GOAT_CA_BUNDLE` | empty | Path inside the containers of extra CA certificates (PEM) in `./certs`, e.g. your company CA for your load balancer, Keycloak or SMTP relay; set by setup.sh in `internal` mode. See [Company CA](./https.md#company-ca). |
 | `GOAT_HTTP_PORT` | `80` | Port for HTTP; set by setup.sh from the URL or `--http-port` |
 | `GOAT_HTTPS_PORT` | `443` | Port for HTTPS; set by setup.sh from the URL |
 | `GOAT_HOSTNAME`, `GOAT_NETWORK_ALIAS`, `GOAT_SITE_ADDRESS`, `GOAT_HTTPS_PUBLISH`, `GOAT_KEYCLOAK_SSL_REQUIRED` | | Derived; set by setup.sh |
@@ -101,10 +101,10 @@ The memory defaults suit a 16 GB machine. As a rule of thumb, set `POSTGRES_SHAR
 | `NEXT_PUBLIC_MAPBOX_TOKEN` | empty | Mapbox token for the place search |
 | `CATALOG_S3_BUCKET`, `CATALOG_S3_ENDPOINT_URL`, `CATALOG_S3_ACCESS_KEY_ID`, `CATALOG_S3_SECRET_ACCESS_KEY`, `CATALOG_S3_REGION` | empty | The GOAT data catalog (read-only bucket with the harmonised datasets) |
 | `GEOCODING_URL`, `GEOCODING_AUTHORIZATION` | empty | Geocoding service used by analysis tools |
-| `NEXT_PUBLIC_WEBSITE_URL` | `https://www.plan4better.de` | Website link and feeds shown in the app |
+| `NEXT_PUBLIC_WEBSITE_URL` | empty | A website that publishes GOAT's blog and changelog feeds. It fills the news on the Home page and provides the welcome video and the privacy and support links in the menu; while empty, none of these are shown. |
 | `NEXT_PUBLIC_STATUS_FEED_URL` | empty | Status feed shown in the app |
 | `NEXT_PUBLIC_DOCS_URL` | `https://goat.plan4better.de/docs` | Documentation link in the app |
-| `STATIC_ASSETS_URL` | `https://assets.plan4better.de` | Product artwork: icons, default thumbnails, email images |
+| `STATIC_ASSETS_URL` | *(commented out)* | A mirror or CDN for the product artwork (icons, default thumbnails, email images). While unset, GOAT serves the artwork itself under `/assets`. |
 | `OTEL_ENABLED` | `false` | Export traces, metrics and logs through OpenTelemetry |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | empty | Your OpenTelemetry (OTLP) endpoint |
 
@@ -121,7 +121,7 @@ See [Email](./external_services.md#email) for how these work together.
 | `SMTP_FROM` | empty | Sender address; `SMTP_USER` when empty |
 | `EMAILS_FROM_NAME` | `GOAT` | Sender name |
 | `SMTP_STARTTLS`, `SMTP_SSL` | `true`, `false` | Derived from `SMTP_SECURITY`; set by setup.sh |
-| `EMAIL_BRAND_NAME`, `EMAIL_LOGO_URL`, `EMAIL_CONTACT_URL`, `EMAIL_PRIVACY_URL` | *(commented out)* | Optional branding: name, logo instead of the name, footer links |
+| `EMAIL_BRAND_NAME`, `EMAIL_LOGO_URL`, `EMAIL_CONTACT_URL`, `EMAIL_PRIVACY_URL` | *(commented out)* | Optional branding of GOAT's and Keycloak's emails: name, logo instead of the name, footer links. See [Email branding](./external_services.md#email-branding). |
 
 ## Backups {#backups}
 

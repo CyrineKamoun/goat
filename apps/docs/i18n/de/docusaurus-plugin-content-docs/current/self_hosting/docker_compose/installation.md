@@ -24,7 +24,7 @@ Diese Seite führt Sie Schritt für Schritt durch diese Befehle, von den Vorauss
 
 Außerdem benötigen Sie:
 
-- **Offene Ports 80 und 443** oder den einen Port, den Sie für unverschlüsseltes HTTP wählen. Sonst muss nichts von außen erreichbar sein.
+- **Offener Port 443**, dazu Port 80 für die Umleitung von `http://` auf HTTPS, oder der eine Port, den Sie für unverschlüsseltes HTTP wählen. Sonst muss nichts von außen erreichbar sein.
 - **Einen DNS-Namen, der auf den Server zeigt**, wenn Sie automatisches HTTPS mit Let's Encrypt möchten.
 - **Ausgehenden Internetzugang**, um die Images von `ghcr.io` zu laden, sowie für die Routing-Basisdaten, die Grundkarten und die optionalen Integrationen.
 - **`openssl`** für `setup.sh` sowie **`curl` und `jq`** für `smoke.sh`.
