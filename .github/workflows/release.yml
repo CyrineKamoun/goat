@@ -339,3 +339,48 @@ jobs:
             page.pdf(path='/tmp/smoke.pdf')
             b.close()
         "
+
+  # The single-server deployment bundle (deploy/compose), pinned to this
+  # release's images. Attached to the tag's GitHub release; created as a
+  # draft when the release does not exist yet.
+  release-compose-bundle:
+    needs:
+      - release-docker-web
+      - release-docker-core
+      - release-docker-geoapi
+      - release-docker-catalog
+      - release-docker-processes
+      - release-docker-keycloak
+      - release-docker-windmill-server
+      - release-docker-windmill-worker-default
+      - release-docker-windmill-worker-tools
+      - release-docker-windmill-worker-print
+    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: deploy/compose
+      - name: Check the bundle
+        run: |
+          bash deploy/compose/tests/setup-check.sh
+          bash deploy/compose/tests/config-check.sh
+      - name: Build the bundle
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist/goat-compose
+          rsync -a --exclude compose.build.yaml --exclude tests deploy/compose/ dist/goat-compose/
+          sed -i "s/^GOAT_VERSION=.*/GOAT_VERSION=${TAG}/" dist/goat-compose/.env.example
+          grep -q "^GOAT_VERSION=${TAG}$" dist/goat-compose/.env.example
+          tar -C dist -czf "dist/goat-compose-${TAG}.tar.gz" goat-compose
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --draft --verify-tag --title "$TAG" --notes ""
+          gh release upload "$TAG" "dist/goat-compose-${TAG}.tar.gz" --clobber

@@ -43,6 +43,10 @@ on:
         description: "Catalog (STAC service) changed"
         value: ${{ jobs.checks.outputs.catalog }}
 
+      compose-bundle:
+        description: "Single-server deployment bundle (deploy/compose) changed"
+        value: ${{ jobs.checks.outputs.compose-bundle }}
+
 permissions:
   contents: read
 
@@ -65,6 +69,7 @@ jobs:
       workers: ${{ steps.changes.outputs.workers }}
       windmill: ${{ steps.changes.outputs.windmill }}
       catalog: ${{ steps.changes.outputs.catalog }}
+      compose-bundle: ${{ steps.changes.outputs.compose-bundle }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
@@ -134,6 +139,9 @@ jobs:
                 - 'packages/python/goatobs/**'
                 - 'pyproject.toml'
                 - 'uv.lock'
+
+            compose-bundle:
+                - 'deploy/compose/**'
 
             # What the tools and print worker images are built from.
             workers:

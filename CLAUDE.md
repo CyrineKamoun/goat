@@ -73,7 +73,8 @@ cd apps/core && uv run alembic revision --autogenerate -m "description"  # Creat
 ```bash
 docker compose up -d              # Start infra only (PostgreSQL, MinIO, Redis, Windmill)
 docker compose --profile dev up -d   # Infra + devcontainer
-docker compose --profile prod up -d  # Full production stack
+docker compose --profile workers up -d   # Infra + tools/workflows/print workers (released images)
+# Deploying GOAT itself (single server): see deploy/compose/README.md
 ```
 
 ## Frontend Architecture

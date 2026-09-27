@@ -273,6 +273,7 @@ FROM worker-base AS worker-print
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     libnss3 \
+    libnss3-tools \
     libnspr4 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \

@@ -2,7 +2,7 @@
 
 <p align="center">
 <a href="https://plan4better.de/goat" target="_blank" rel="noopener noreferrer">
-<img width="120" alt="GOAT Frontend Alternative Logo" src="https://assets.plan4better.de/img/logo/goat_icon_standard.png">
+<img width="120" alt="GOAT logo" src="apps/web/public/assets/svg/goat-logo.svg">
 </a>
 
 <h1 align="center">GOAT</h1>
@@ -112,145 +112,30 @@ GOAT is also available as a fully hosted cloud service.  If you prefer not to ma
 
 ### 🐳 Self-hosting (Docker)
 
-**Official support:** We provide a maintained `compose.yaml` for running the full GOAT stack in a production‑like environment.
+GOAT runs on a single Linux server with Docker Compose: web app and APIs, login
+(Keycloak), object storage (Garage), PostgreSQL/PostGIS, the Windmill job engine
+and a Caddy proxy that takes care of HTTPS (Let's Encrypt, your own certificate,
+or plain HTTP behind your own load balancer).
 
-**Important:** While we provide Docker resources, **self‑hosted deployments are community‑supported**. We do not offer official support for managing your infrastructure.
+**Important:** self-hosted deployments are community-supported. We do not offer
+official support for managing your infrastructure.
 
-The images for each GOAT service are published on GitHub Container Registry.
-
-
-#### Requirements
-
-Make sure the following are installed on your server or local machine:
-
-- Docker  
-- Docker Compose (plugin syntax: `docker compose`)  
-- At least 12 GB RAM recommended
-
-#### Docker Compose Profiles
-
-The `compose.yaml` uses profiles to control which services start:
-
-| Profile | Description |
-|---------|-------------|
-| (none) | Infrastructure only: PostgreSQL, MinIO, Redis, Windmill server/worker |
-| `dev` | Infrastructure + devcontainer with local code mounts for development |
-| `prod` | Infrastructure + all production services (core, geoapi, web, processes, catalog, workers) |
-
-#### Running GOAT with Docker Compose (recommended for most users)
-
-The `prod` profile provisions:
-
-- PostgreSQL with PostGIS  
-- MinIO (S3 compatible storage)  
-- Redis  
-- Windmill (workflow engine for analytics tools)
-- GOAT Core (FastAPI backend)  
-- GOAT GeoAPI (FastAPI backend for geodata)  
-- GOAT Processes (OGC API Processes)
-- GOAT Catalog (STAC API for the data catalog)
-- GOAT Web (Next.js frontend)
-
-#### 1. Clone the repository
+Each GOAT release ships the deployment bundle as `goat-compose-<version>.tar.gz`
+on its [GitHub release page](https://github.com/plan4better/goat/releases); the
+same files live in [`deploy/compose/`](deploy/compose/).
 
 ```bash
-git clone https://github.com/plan4better/goat.git
-cd goat
+tar xzf goat-compose-<version>.tar.gz && cd goat-compose
+./setup.sh             # public URL, TLS mode, admin email -> .env with random secrets
+docker compose up -d
+./smoke.sh             # verifies the installation end to end
 ```
 
-#### 2. Create your configuration file
+Requirements, TLS modes, external S3/Keycloak, backups and upgrades are described
+in [`deploy/compose/README.md`](deploy/compose/README.md).
 
-Copy `.env.example` to `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Update environment variables as needed (see "Environment Variables" section below).
-
-#### 3. Start the GOAT stack
-
-```bash
-docker compose --profile prod up -d
-```
-
-This will automatically pull the latest images and start all services.
-
-#### 4. Access GOAT
-
-| Service | URL |
-|---------|-----|
-| Web UI | <a href="http://localhost:3000" target="_blank" rel="noopener noreferrer">http://localhost:3000</a> |
-| Core API | <a href="http://localhost:8000/api" target="_blank" rel="noopener noreferrer">http://localhost:8000/api</a> |
-| GeoAPI | <a href="http://localhost:8100" target="_blank" rel="noopener noreferrer">http://localhost:8100</a> |
-| Processes API | <a href="http://localhost:8300" target="_blank" rel="noopener noreferrer">http://localhost:8300</a> |
-| Catalog API (STAC) | <a href="http://localhost:8400/stac" target="_blank" rel="noopener noreferrer">http://localhost:8400/stac</a> |
-| Windmill UI | <a href="http://localhost:8110" target="_blank" rel="noopener noreferrer">http://localhost:8110</a> |
-| MinIO Console | <a href="http://localhost:9001" target="_blank" rel="noopener noreferrer">http://localhost:9001</a> |
-
-#### Updating GOAT
-
-To update an existing installation:
-
-```bash
-docker compose --profile prod down
-docker compose --profile prod pull
-docker compose --profile prod up -d
-```
-
-#### Clean Restart (reset all data)
-
-To completely reset the installation including all data:
-
-```bash
-docker compose --profile prod down
-docker volume rm goat_goat-data
-docker compose --profile prod up -d
-```
-
-#### Build Images Locally
-
-If you are developing the GOAT codebase or making changes to `apps/core`, `apps/geoapi`, or `apps/web`, you may need to build images manually.
-
-```bash
-docker compose --profile prod up -d --build
-```
-
-Only use this if you're modifying the GOAT source code.
-
-
-#### Required Environment Variables
-
-| Variable | Description |
-|---------|-------------|
-| `POSTGRES_USER` | Username for PostgreSQL authentication |
-| `POSTGRES_PASSWORD` | Password for PostgreSQL authentication |
-| `POSTGRES_SERVER` | Hostname of the Postgres service (usually `db`) |
-| `POSTGRES_DB` | Name of the PostgreSQL database |
-| `S3_PROVIDER` | Storage provider (e.g., `minio`) |
-| `S3_ACCESS_KEY_ID` | Access key for S3 / MinIO |
-| `S3_SECRET_ACCESS_KEY` | Secret key for S3 / MinIO |
-| `S3_ENDPOINT_URL` | Internal S3 endpoint (`http://minio:9000`) |
-| `S3_BUCKET_NAME` | Name of the S3 bucket to create/use |
-| `S3_REGION` | Region (may remain empty for MinIO) |
-| `S3_PUBLIC_ENDPOINT_URL` | Public URL for accessing S3 objects |
-| `AUTH` | Auth switch for all services and the web app (True/False). With `False`, the Keycloak variables are not needed and a default user/organization is seeded |
-| `NEXT_PUBLIC_API_URL` | Public URL of the Core API |
-| `NEXT_PUBLIC_GEOAPI_URL` | Public URL of the GeoAPI (tiles/features) |
-| `NEXT_PUBLIC_PROCESSES_URL` | Public URL of the Processes API |
-| `NEXT_PUBLIC_DOCS_URL` | URL for documentation |
-| `NEXT_PUBLIC_MAPBOX_TOKEN` | Mapbox token for the map search control (geocoding) |
-| `KEYCLOAK_SERVER_URL` | Base URL of the Keycloak server (derives the issuer together with `REALM_NAME`) |
-| `REALM_NAME` | Keycloak realm |
-| `KEYCLOAK_CLIENT_ID` | Keycloak client (web login, core admin, print worker) |
-| `KEYCLOAK_CLIENT_SECRET` | Keycloak client secret |
-| `WINDMILL_TOKEN` | Token for the Windmill workflow engine (analytics tools) |
-| `NEXTAUTH_URL` | Public URL of the Web UI (also drives `NEXT_PUBLIC_APP_URL`) |
-| `NEXTAUTH_SECRET` | Secret key for Auth.js sessions |
-
-See [`.env.example`](/.env.example) for the full list, including optional
-settings such as the `AUTH=False` default identity (`DEFAULT_USER_*`,
-`DEFAULT_ORGANIZATION_NAME`, `DEFAULT_QUOTA_*`), SMTP, and Stripe.
+The `compose.yaml` in the repository root is for local development only
+(infrastructure services, plus the `dev` profile with a devcontainer).
 
 
 ## 👩‍⚖️ License
