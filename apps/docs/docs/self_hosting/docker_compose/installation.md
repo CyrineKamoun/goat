@@ -29,6 +29,8 @@ In addition, you need:
 - **Outgoing internet access** to pull the images from `ghcr.io`, and for the routing base data, the basemaps and the optional integrations.
 - **`openssl`** for `setup.sh`, and **`curl` and `jq`** for `smoke.sh`.
 
+The bundle does not install or upgrade Docker. Install it by following the [Docker documentation](https://docs.docker.com/engine/install/), on Ubuntu with [Docker's apt repository](https://docs.docker.com/engine/install/ubuntu/). The distribution's own `docker.io` package is often too old. `setup.sh` checks the Docker Engine and Compose versions before it writes anything, and `smoke.sh` checks for `curl` and `jq`; both stop with a message if something is missing or too old.
+
 :::info
 The GOAT images are public. You do not need to log in to a registry.
 :::
@@ -135,13 +137,13 @@ A few services only prepare the installation and then stop: `data-init`, `core-m
 
 `smoke.sh` checks the whole installation step by step and prints `PASS` or `FAIL` for each step:
 
-1. All one-time services finished successfully, and all long-running services are healthy.
+1. All one-time services finished successfully, and all long-running services are healthy. Services whose health check has not passed yet, right after `docker compose up -d`, get up to five minutes (`SMOKE_WAIT`, in seconds).
 2. The web app, the Core API, GeoAPI, Processes and Catalog answer under the public URL, and GeoAPI builds its links with the public URL.
 3. Keycloak announces the public URL as its issuer, and the first administrator can log in.
 4. The administrator belongs to an organization and has a profile.
 5. A small GeoJSON file is uploaded, imported as a layer, served as a vector tile, and used in a buffer analysis.
 
-`./smoke.sh --quick` runs steps 1 to 4 only. If a step fails, `smoke.sh` stops, names the step and prints the last log lines of the service involved.
+`./smoke.sh --quick` runs steps 1 to 3 only. If a step fails, `smoke.sh` stops, names the step and prints the last log lines of the service involved.
 
 :::info What smoke.sh changes
 `smoke.sh` works with the account of the first administrator. It deletes the test datasets it imports again at the end, so nothing stays in <code>My Content</code>. If the administrator has no organization yet, it creates one named **GOAT**; to choose the name yourself, sign in first (step 5) and run `smoke.sh` afterwards, or rename it later under <code>Settings</code> → <code>Organization</code> → <code>Profile</code>. `./smoke.sh --quick` only checks the services and the login and changes nothing.

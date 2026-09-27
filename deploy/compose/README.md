@@ -5,6 +5,13 @@ its APIs, a login server (Keycloak), object storage (Garage), the database
 (PostgreSQL with PostGIS), the job engine (Windmill) and a proxy (Caddy) that
 handles HTTPS.
 
+This file is the short version. The full guide is in the GOAT documentation:
+[Installation](https://goat.plan4better.de/docs/self_hosting/docker_compose/installation) ·
+[HTTPS and addresses](https://goat.plan4better.de/docs/self_hosting/docker_compose/https) ·
+[External services](https://goat.plan4better.de/docs/self_hosting/docker_compose/external_services) ·
+[Operations](https://goat.plan4better.de/docs/self_hosting/docker_compose/operations) ·
+[Configuration reference](https://goat.plan4better.de/docs/self_hosting/docker_compose/configuration)
+
 ## Requirements
 
 | | Minimum (trial) | Recommended |
@@ -18,7 +25,12 @@ handles HTTPS.
 - For automatic HTTPS: a DNS name pointing at the server.
 - Outgoing internet access for the base data download, the basemaps and the
   optional integrations.
-- `curl` and `jq` for `smoke.sh`.
+- `openssl` for `setup.sh`, `curl` and `jq` for `smoke.sh`.
+
+The bundle does not install or upgrade Docker: install it from
+[Docker's own packages](https://docs.docker.com/engine/install/) (the
+distribution's `docker.io` package is often too old). `setup.sh` checks the
+versions and stops if one is missing or too old.
 
 ## Install
 
@@ -51,6 +63,8 @@ certificate into `./certs` and set `GOAT_CA_BUNDLE=/certs/<file>.pem` in `.env`.
 This also covers an SMTP relay whose certificate comes from that CA: GOAT and
 Keycloak verify the relay's certificate against the public CAs and this file.
 
+More in the docs: [HTTPS and addresses](https://goat.plan4better.de/docs/self_hosting/docker_compose/https)
+
 ## Using your own S3 or Keycloak
 
 - **S3:** remove `garage` from `COMPOSE_PROFILES` and set `S3_*` and `ASSETS_*` in
@@ -64,6 +78,8 @@ Keycloak verify the relay's certificate against the public CAs and this file.
   `view-users` and `manage-users`.
 - **No login at all** (local demos only): `AUTH=False`. Everybody acts as one
   built-in administrator.
+
+More in the docs: [External services](https://goat.plan4better.de/docs/self_hosting/docker_compose/external_services)
 
 ## Optional integrations
 
@@ -90,6 +106,8 @@ the client secret from `.env` into the realm. GOAT's emails show the name `GOAT`
 links by default; `EMAIL_BRAND_NAME`, `EMAIL_LOGO_URL`, `EMAIL_CONTACT_URL` and
 `EMAIL_PRIVACY_URL` add your own name, logo and footer links.
 
+More in the docs: [External services → Optional integrations](https://goat.plan4better.de/docs/self_hosting/docker_compose/external_services#integrations)
+
 ## Routing base data
 
 Catchment areas, heatmaps and the public-transport tools need the street
@@ -105,6 +123,8 @@ full set is tens of GB, so choose the region you work in.
 The data comes from `GOAT_BASE_DATA_URL` (Plan4Better's public base-data
 server by default; point it at an internal mirror if needed).
 
+More in the docs: [Operations → Routing base data](https://goat.plan4better.de/docs/self_hosting/docker_compose/operations#base-data)
+
 ## Administration
 
 - **Users** are added by inviting them in GOAT. For an email without a login
@@ -119,6 +139,8 @@ server by default; point it at an internal mirror if needed).
 - **Parallel analyses:** `GOAT_TOOLS_WORKERS` (each worker may use up to 4 GB).
 - **Logs:** `docker compose logs -f <service>`; they rotate automatically.
 
+More in the docs: [Operations](https://goat.plan4better.de/docs/self_hosting/docker_compose/operations)
+
 ## Backups
 
 Add `backup` to `COMPOSE_PROFILES` and run `docker compose up -d`. Every night at
@@ -132,6 +154,8 @@ Copy `./backups` off the server with your usual tooling (e.g. `rclone`, `restic`
 Keep a copy of `.env` with your backups: the restored databases and storage
 expect the passwords and keys it holds.
 
+More in the docs: [Operations → Backups](https://goat.plan4better.de/docs/self_hosting/docker_compose/operations#backups)
+
 ## Upgrade
 
 ```bash
@@ -144,6 +168,8 @@ docker compose up -d   # database migrations run automatically
 ./smoke.sh --quick
 ```
 
+More in the docs: [Operations → Upgrades](https://goat.plan4better.de/docs/self_hosting/docker_compose/operations#upgrade)
+
 ## Troubleshooting
 
 - `./smoke.sh` names the failing step and prints the logs of the service involved.
@@ -151,3 +177,5 @@ docker compose up -d   # database migrations run automatically
   service should show `Exited (0)`; everything else `healthy` or `running`.
 - Let's Encrypt fails: check that port 443 reaches the server and the DNS name
   resolves to it; `docker compose logs caddy`.
+
+More in the docs: [Operations → Troubleshooting](https://goat.plan4better.de/docs/self_hosting/docker_compose/operations#troubleshooting)

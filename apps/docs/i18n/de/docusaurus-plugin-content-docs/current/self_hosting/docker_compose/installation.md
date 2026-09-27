@@ -29,6 +29,8 @@ Außerdem benötigen Sie:
 - **Ausgehenden Internetzugang**, um die Images von `ghcr.io` zu laden, sowie für die Routing-Basisdaten, die Grundkarten und die optionalen Integrationen.
 - **`openssl`** für `setup.sh` sowie **`curl` und `jq`** für `smoke.sh`.
 
+Das Paket installiert und aktualisiert Docker nicht. Installieren Sie es nach der [Docker-Dokumentation](https://docs.docker.com/engine/install/), unter Ubuntu mit [Dockers apt-Paketquelle](https://docs.docker.com/engine/install/ubuntu/). Das `docker.io`-Paket der Distribution ist oft zu alt. `setup.sh` prüft die Versionen von Docker Engine und Compose, bevor es etwas schreibt, und `smoke.sh` prüft, ob `curl` und `jq` vorhanden sind; beide brechen mit einer Meldung ab, wenn etwas fehlt oder zu alt ist.
+
 :::info
 Die GOAT-Images sind öffentlich. Sie müssen sich bei keiner Registry anmelden.
 :::
@@ -135,13 +137,13 @@ Einige Dienste bereiten die Installation nur vor und beenden sich dann: `data-in
 
 `smoke.sh` prüft die gesamte Installation Schritt für Schritt und gibt für jeden Schritt `PASS` oder `FAIL` aus:
 
-1. Alle einmaligen Dienste wurden erfolgreich beendet, und alle dauerhaft laufenden Dienste sind gesund.
+1. Alle einmaligen Dienste wurden erfolgreich beendet, und alle dauerhaft laufenden Dienste sind gesund. Dienste, deren Health-Check direkt nach `docker compose up -d` noch nicht bestanden ist, bekommen bis zu fünf Minuten Zeit (`SMOKE_WAIT`, in Sekunden).
 2. Web-App, Core API, GeoAPI, Processes und Catalog antworten unter der öffentlichen URL, und die GeoAPI bildet ihre Links mit der öffentlichen URL.
 3. Keycloak nennt die öffentliche URL als Aussteller (Issuer), und der erste Administrator kann sich anmelden.
 4. Der Administrator gehört zu einer Organisation und hat ein Profil.
 5. Eine kleine GeoJSON-Datei wird hochgeladen, als Layer importiert, als Vektorkachel ausgeliefert und in einer Puffer-Analyse verwendet.
 
-`./smoke.sh --quick` führt nur die Schritte 1 bis 4 aus. Schlägt ein Schritt fehl, hält `smoke.sh` an, nennt den Schritt und gibt die letzten Log-Zeilen des betroffenen Dienstes aus.
+`./smoke.sh --quick` führt nur die Schritte 1 bis 3 aus. Schlägt ein Schritt fehl, hält `smoke.sh` an, nennt den Schritt und gibt die letzten Log-Zeilen des betroffenen Dienstes aus.
 
 :::info Was smoke.sh verändert
 `smoke.sh` arbeitet mit dem Konto des ersten Administrators. Die Test-Datensätze, die es importiert, löscht es am Ende wieder, sodass in <code>Meine Inhalte</code> nichts zurückbleibt. Hat der Administrator noch keine Organisation, legt das Skript eine mit dem Namen **GOAT** an; um den Namen selbst zu wählen, melden Sie sich zuerst an (Schritt 5) und starten `smoke.sh` danach, oder benennen Sie sie später unter <code>Einstellungen</code> → <code>Organisation</code> → <code>Profil</code> um. `./smoke.sh --quick` prüft nur die Dienste und die Anmeldung und verändert nichts.

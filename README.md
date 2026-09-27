@@ -131,8 +131,19 @@ docker compose up -d
 ./smoke.sh             # verifies the installation end to end
 ```
 
-Requirements, TLS modes, external S3/Keycloak, backups and upgrades are described
-in [`deploy/compose/README.md`](deploy/compose/README.md).
+Docker Engine 24+ and Docker Compose 2.23+ must be installed; the bundle checks
+them but does not install them. The self-hosting guide covers the rest:
+
+- [Overview](https://goat.plan4better.de/docs/self_hosting/overview): Docker Compose or Kubernetes, what each includes
+- [Installation](https://goat.plan4better.de/docs/self_hosting/docker_compose/installation): requirements, setup, first login
+- [HTTPS and addresses](https://goat.plan4better.de/docs/self_hosting/docker_compose/https): TLS modes, load balancer, company CA
+- [External services](https://goat.plan4better.de/docs/self_hosting/docker_compose/external_services): your own S3, Keycloak, email
+- [Operations](https://goat.plan4better.de/docs/self_hosting/docker_compose/operations): users, base data, backups, upgrades, troubleshooting
+- [Configuration reference](https://goat.plan4better.de/docs/self_hosting/docker_compose/configuration): every setting in `.env`
+- [Kubernetes](https://goat.plan4better.de/docs/self_hosting/kubernetes): the Helm chart
+
+A short version for the server lives next to the files in
+[`deploy/compose/README.md`](deploy/compose/README.md).
 
 The `compose.yaml` in the repository root is for local development only
 (infrastructure services, plus the `dev` profile with a devcontainer).

@@ -9,6 +9,9 @@
 set -uo pipefail
 
 cd "$(dirname "$0")"
+for tool in curl jq; do
+  command -v "$tool" >/dev/null || { echo "smoke.sh: $tool is not installed" >&2; exit 1; }
+done
 QUICK=0
 [ "${1:-}" = "--quick" ] && QUICK=1
 
@@ -40,9 +43,23 @@ bad=$(docker compose ps -a --format '{{.Service}} {{.State}} {{.ExitCode}}' |
 [ -z "$bad" ] && pass || fail "not completed: $bad" "$(echo "$bad" | head -n1)"
 
 step "long-running services are healthy"
-unhealthy=$(docker compose ps --format '{{.Service}} {{.Health}}' |
-  awk '$2!="" && $2!="healthy" {print $1}' | sort -u | tr '\n' ' ')
-[ -z "$unhealthy" ] && pass || fail "unhealthy: $unhealthy" "$(echo "$unhealthy" | cut -d' ' -f1)"
+# Right after `docker compose up -d` some health checks have not passed yet:
+# services still starting get up to SMOKE_WAIT seconds, one reported
+# unhealthy fails at once.
+deadline=$((SECONDS + ${SMOKE_WAIT:-300}))
+while :; do
+  health=$(docker compose ps --format '{{.Service}} {{.Health}}')
+  unhealthy=$(awk '$2=="unhealthy" {print $1}' <<< "$health" | sort -u | tr '\n' ' ')
+  starting=$(awk '$2=="starting" {print $1}' <<< "$health" | sort -u | tr '\n' ' ')
+  { [ -n "$unhealthy" ] || [ -z "$starting" ] || [ "$SECONDS" -ge "$deadline" ]; } && break
+  sleep 5
+done
+if [ -n "$unhealthy" ]; then
+  fail "unhealthy: $unhealthy" "$(echo "$unhealthy" | cut -d' ' -f1)"
+elif [ -n "$starting" ]; then
+  fail "still starting after ${SMOKE_WAIT:-300}s: $starting" "$(echo "$starting" | cut -d' ' -f1)"
+fi
+pass
 
 # --- 2. Routes ---------------------------------------------------------------
 check_status() {

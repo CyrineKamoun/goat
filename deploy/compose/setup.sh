@@ -44,16 +44,23 @@ done
 die() { echo "setup.sh: $*" >&2; exit 1; }
 
 # --- Requirements -------------------------------------------------------------
-command -v docker >/dev/null || die "docker is not installed"
+# Checks only; installing or upgrading Docker is up to the server's operator.
+install_hint="see https://docs.docker.com/engine/install/"
+command -v docker >/dev/null || die "docker is not installed; $install_hint"
 command -v openssl >/dev/null || die "openssl is not installed"
+at_least() {
+  # at_least VERSION MAJOR MINOR: VERSION (x.y[.z]) is MAJOR.MINOR or newer.
+  local major=${1%%.*} rest=${1#*.}
+  local minor=${rest%%.*}
+  [ "$major" -gt "$2" ] || { [ "$major" -eq "$2" ] && [ "$minor" -ge "$3" ]; }
+}
 if [ -z "${SETUP_SKIP_DOCKER_CHECK:-}" ]; then
-  compose_version=$(docker compose version --short 2>/dev/null | sed 's/^v//') || die "docker compose plugin missing"
-  major=${compose_version%%.*}
-  rest=${compose_version#*.}
-  minor=${rest%%.*}
-  if [ "$major" -lt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -lt 23 ]; }; then
-    die "docker compose >= 2.23 required (found $compose_version)"
-  fi
+  engine_version=$(docker version --format '{{.Server.Version}}' 2>/dev/null) \
+    || die "cannot reach the Docker daemon; is it running, and may this user use it (root or the docker group)?"
+  at_least "$engine_version" 24 0 || die "Docker Engine >= 24 required (found $engine_version); $install_hint"
+  compose_version=$(docker compose version --short 2>/dev/null | sed 's/^v//') \
+    || die "the Docker Compose plugin is missing; $install_hint"
+  at_least "$compose_version" 2 23 || die "Docker Compose >= 2.23 required (found $compose_version); $install_hint"
 fi
 
 # --- .env helpers -------------------------------------------------------------
