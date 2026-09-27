@@ -140,7 +140,7 @@ them but does not install them. The self-hosting guide covers the rest:
 - [External services](https://goat.plan4better.de/docs/self_hosting/docker_compose/external_services): your own S3, Keycloak, email
 - [Operations](https://goat.plan4better.de/docs/self_hosting/docker_compose/operations): users, base data, backups, upgrades, troubleshooting
 - [Configuration reference](https://goat.plan4better.de/docs/self_hosting/docker_compose/configuration): every setting in `.env`
-- [Kubernetes](https://goat.plan4better.de/docs/self_hosting/kubernetes): the Helm chart
+- [Kubernetes](https://goat.plan4better.de/docs/self_hosting/kubernetes): the Helm chart, whose source lives in [`deploy/helm/goat/`](deploy/helm/goat/)
 
 A short version for the server lives next to the files in
 [`deploy/compose/README.md`](deploy/compose/README.md).

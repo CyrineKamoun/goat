@@ -113,3 +113,5 @@ base_networks/*
 .ds-sync/
 ds-bundle/
 .design-sync
+# Helm chart: written by `helm dependency update`
+deploy/helm/goat/Chart.lock

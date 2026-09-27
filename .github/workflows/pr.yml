@@ -115,10 +115,27 @@ jobs:
       - name: 🧪 compose.yaml and Caddyfile render for every variant
         run: bash deploy/compose/tests/config-check.sh
 
+  helm-chart:
+    name: helm-chart
+    needs: file-changes
+    if: ${{ needs.file-changes.outputs.helm == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            deploy/helm
+            .github/actions/helm-tools
+      - uses: ./.github/actions/helm-tools
+      - name: 🧪 Lint, unit tests, render and schema-check every fixture
+        run: ./deploy/helm/check.sh
+
   required:
     # file-changes too: when it fails, every job after it is skipped, not
     # failed, and would count as passed.
-    needs: [file-changes, lint, test, build, analyze, file-size, compose-bundle]
+    needs: [file-changes, lint, test, build, analyze, file-size, compose-bundle, helm-chart]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
