@@ -82,7 +82,7 @@ helm install goat oci://ghcr.io/plan4better/charts/goat \
   --values your-values.yaml --wait --timeout 25m
 ```
 
-`scripts/smoke-k3d.sh` in this repo runs exactly that against a throwaway
+`deploy/helm/smoke-k3d.sh` in the GOAT repository runs exactly that against a throwaway
 k3d cluster with the full bundled profile (`ci/values-smoke.yaml`) and then
 checks every service. (Before chart 0.5.0 this took three sequenced
 `helm install`/`helm upgrade` calls; no phases remain.) Three things make it
@@ -136,7 +136,7 @@ out from under a running cluster. That means:
   **not** update an already-installed cluster's CRDs as part of `helm
   upgrade`. If a new chart version bumps that dependency, apply the new
   vendored CRDs yourself first: `kubectl apply -f
-  charts/goat/crds/cloudnative-pg-crds.yaml` (or your own copy from the
+  deploy/helm/goat/crds/cloudnative-pg-crds.yaml` (or your own copy from the
   new `cloudnative-pg` subchart version), then run the upgrade.
 - The vendored copy has to be kept in sync with the pinned
   `cloudnative-pg` version by hand — there is no automation for this. See
@@ -652,16 +652,16 @@ The chart targets any conformant Kubernetes cluster:
 ## Development
 
 ```sh
-# install helm-unittest plugin — same version CI pins (.github/workflows/ci.yml).
+# install helm-unittest plugin — same version CI pins (.github/workflows/helm.yml).
 # The tests use `kubernetesProvider` and `failedTemplate.errorPattern`, which
 # older plugin versions silently ignore; v1.x itself needs Helm >= 3.17.
 helm plugin install https://github.com/helm-unittest/helm-unittest --version v1.1.0
 
 # run unit tests
-helm unittest charts/goat/
+helm unittest deploy/helm/goat/
 
 # render with external-deps fixture
-helm template my-release charts/goat/ -f charts/goat/ci/values-external-deps.yaml
+helm template my-release deploy/helm/goat/ -f deploy/helm/goat/ci/values-external-deps.yaml
 ```
 
 ## Compatibility / version history

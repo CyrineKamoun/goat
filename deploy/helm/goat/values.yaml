@@ -1,5 +1,3 @@
-# /home/p4b/goat/charts/goat/values.yaml
-#
 # Ships templates for: core, web, catalog, geoapi, processes, windmill,
 # caddy, ducklake/postgresql bootstrap. Defaults: core, web, catalog, geoapi
 # and processes enabled (a bare install deploys the full data plane);

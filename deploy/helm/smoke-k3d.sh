@@ -5,7 +5,7 @@
 #
 # A fresh cluster installs with ONE `helm install --wait` — that is what this
 # script asserts. Two things make that possible:
-#   - The CNPG operator's CRDs are vendored under charts/goat/crds/, which Helm
+#   - The CNPG operator's CRDs are vendored under goat/crds/, which Helm
 #     applies before rendering any template, so the operator and the chart's
 #     Postgres `Cluster` CR can be created in the same call.
 #   - The one-time bootstrap that geoapi/processes (the DuckLake catalog) and
@@ -21,7 +21,7 @@ set -euo pipefail
 CLUSTER="${CLUSTER:-goat-smoke}"
 NS="${NS:-goat}"
 RELEASE="${RELEASE:-goat}"
-CHART_DIR="$(cd "$(dirname "$0")/.." && pwd)/charts/goat"
+CHART_DIR="$(cd "$(dirname "$0")" && pwd)/goat"
 VALUES="$CHART_DIR/ci/values-smoke.yaml"
 
 cleanup() {

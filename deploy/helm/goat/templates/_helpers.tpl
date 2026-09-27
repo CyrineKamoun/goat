@@ -1,5 +1,3 @@
-{{/* /home/p4b/goat/charts/goat/templates/_helpers.tpl */}}
-
 {{/*
 Expand the name of the chart.
 */}}

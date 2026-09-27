@@ -22,6 +22,10 @@ GOAT is an open-source WebGIS platform for integrated planning, built as a monor
 - `apps/routing` — FastAPI routing/navigation service
 - `packages/python/goatlib` — Shared library: all analytics tools, analysis algorithms, data I/O, Pydantic models
 
+**Deployment** (`deploy/`):
+- `deploy/compose` — single-server Docker Compose bundle, released as `goat-compose-<tag>.tar.gz` on every `v*` tag; tests in `deploy/compose/tests/`
+- `deploy/helm/goat` — Helm chart, own version in `Chart.yaml`, released to `oci://ghcr.io/plan4better/charts/goat` on `helm-<version>` tags (`.github/workflows/helm.yml`, no GitHub release); `deploy/helm/check.sh` runs lint + unit tests + renders
+
 **Key architectural separation**: Layer metadata lives in PostgreSQL (managed by `core`), layer data lives in DuckLake (managed by `geoapi`). The `processes` service is separated from `geoapi` to prevent long-running analytics jobs from blocking tile/feature requests.
 
 ## Common Commands

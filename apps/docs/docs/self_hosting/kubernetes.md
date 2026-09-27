@@ -6,7 +6,7 @@ description: "Install GOAT with the Helm chart and set what it leaves to you: pu
 
 # Kubernetes (Helm)
 
-GOAT has a Helm chart for Kubernetes clusters, published at `oci://ghcr.io/plan4better/charts/goat`. This page summarises what the chart includes and what you have to provide. The [chart README](https://github.com/plan4better/charts/tree/main/charts/goat) is the full reference for all values.
+GOAT has a Helm chart for Kubernetes clusters, published at `oci://ghcr.io/plan4better/charts/goat`. This page summarises what the chart includes and what you have to provide. The [chart README](https://github.com/plan4better/goat/tree/main/deploy/helm/goat) is the full reference for all values.
 
 :::tip One server? Use Docker Compose
 For a single server, the [Docker Compose bundle](./docker_compose/installation.md) is the recommended path. It includes the login server, object storage and HTTPS, which the Helm chart leaves to you.
@@ -78,4 +78,4 @@ The shared data volume defaults to `ReadWriteOnce`, which works on a single node
 
 ## Further reading {#further-reading}
 
-The [chart README](https://github.com/plan4better/charts/tree/main/charts/goat) covers the details: bootstrapping a fresh cluster, the external PostgreSQL setup, authentication precedence, the shared data volume, the region new projects open in (`DEFAULT_PROJECT_VIEW_STATE`), schema migrations and the upgrade notes between chart versions.
+The [chart README](https://github.com/plan4better/goat/tree/main/deploy/helm/goat) covers the details: bootstrapping a fresh cluster, the external PostgreSQL setup, authentication precedence, the shared data volume, the region new projects open in (`DEFAULT_PROJECT_VIEW_STATE`), schema migrations and the upgrade notes between chart versions.

@@ -92,7 +92,7 @@ description: |
     at the point `postInitSQL` runs, so referencing it there failed initdb
     outright every time, regardless of timing.
   - A fresh cluster now installs with ONE `helm install --wait` (verified by
-    `scripts/smoke-k3d.sh` against a new k3d cluster with the full bundled
+    `deploy/helm/smoke-k3d.sh` against a new k3d cluster with the full bundled
     profile). Two changes make that possible: the CNPG operator's CRDs are
     vendored under `crds/` (subchart's own CRD creation off via
     `cloudnative-pg.crds.create: false`), so the operator and the Postgres
@@ -146,10 +146,9 @@ type: application
 version: 0.5.1
 appVersion: "v3.0.3"   # GOAT release every image defaults to; override per service with <service>.image.tag
 icon: https://goat.plan4better.de/favicon.ico
-home: https://github.com/plan4better/charts/tree/main/charts/goat
+home: https://github.com/plan4better/goat/tree/main/deploy/helm/goat
 sources:
-  - https://github.com/plan4better/charts        # chart source
-  - https://github.com/plan4better/goat          # application source
+  - https://github.com/plan4better/goat          # chart (deploy/helm/goat) and application source
 maintainers:
   - name: plan4better
     email: info@plan4better.de
@@ -184,7 +183,7 @@ keywords:
 #     silently deleting a CRD and the custom resources depending on it).
 #     Bumping the cloudnative-pg dependency version below does NOT update
 #     an already-installed cluster's CRDs — that needs an explicit, manual
-#     `kubectl apply -f charts/goat/crds/cloudnative-pg-crds.yaml` (or
+#     `kubectl apply -f deploy/helm/goat/crds/cloudnative-pg-crds.yaml` (or
 #     equivalent) as its own operational step.
 #   - The vendored copy must be kept in sync with the `cloudnative-pg`
 #     version pinned below by hand — there is no automation for this.

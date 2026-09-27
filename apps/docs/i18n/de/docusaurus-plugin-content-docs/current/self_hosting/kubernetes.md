@@ -6,7 +6,7 @@ description: "Installieren Sie GOAT mit dem Helm-Chart und legen Sie fest, was e
 
 # Kubernetes (Helm)
 
-Für Kubernetes-Cluster gibt es ein Helm-Chart für GOAT, veröffentlicht unter `oci://ghcr.io/plan4better/charts/goat`. Diese Seite fasst zusammen, was das Chart enthält und was Sie bereitstellen müssen. Die [README des Charts](https://github.com/plan4better/charts/tree/main/charts/goat) ist die vollständige Referenz aller Values.
+Für Kubernetes-Cluster gibt es ein Helm-Chart für GOAT, veröffentlicht unter `oci://ghcr.io/plan4better/charts/goat`. Diese Seite fasst zusammen, was das Chart enthält und was Sie bereitstellen müssen. Die [README des Charts](https://github.com/plan4better/goat/tree/main/deploy/helm/goat) ist die vollständige Referenz aller Values.
 
 :::tip Ein Server? Nutzen Sie Docker Compose
 Für einen einzelnen Server ist das [Docker-Compose-Paket](./docker_compose/installation.md) der empfohlene Weg. Es enthält den Anmeldeserver, den Objektspeicher und HTTPS, die das Helm-Chart Ihnen überlässt.
@@ -78,4 +78,4 @@ Das gemeinsame Daten-Volume verwendet standardmäßig `ReadWriteOnce`, was auf e
 
 ## Weiterführende Informationen {#further-reading}
 
-Die [README des Charts](https://github.com/plan4better/charts/tree/main/charts/goat) behandelt die Details: die Installation auf einem frischen Cluster, die Einrichtung eines externen PostgreSQL, die Rangfolge der Authentifizierungseinstellungen, das gemeinsame Daten-Volume, die Region, in der neue Projekte öffnen (`DEFAULT_PROJECT_VIEW_STATE`), Schema-Migrationen und die Upgrade-Hinweise zwischen den Chart-Versionen.
+Die [README des Charts](https://github.com/plan4better/goat/tree/main/deploy/helm/goat) behandelt die Details: die Installation auf einem frischen Cluster, die Einrichtung eines externen PostgreSQL, die Rangfolge der Authentifizierungseinstellungen, das gemeinsame Daten-Volume, die Region, in der neue Projekte öffnen (`DEFAULT_PROJECT_VIEW_STATE`), Schema-Migrationen und die Upgrade-Hinweise zwischen den Chart-Versionen.

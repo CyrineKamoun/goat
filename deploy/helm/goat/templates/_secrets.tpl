@@ -1,5 +1,3 @@
-{{/* /home/p4b/goat/charts/goat/templates/_secrets.tpl */}}
-
 {{/*
 Resolve the secret NAME holding the postgres user credentials.
 - If postgresql.cluster.enabled: CNPG creates a "<cluster>-app" secret containing username + password keys.

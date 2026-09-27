@@ -47,6 +47,10 @@ on:
         description: "Single-server deployment bundle (deploy/compose) changed"
         value: ${{ jobs.checks.outputs.compose-bundle }}
 
+      helm:
+        description: "Helm chart (deploy/helm) changed"
+        value: ${{ jobs.checks.outputs.helm }}
+
 permissions:
   contents: read
 
@@ -72,6 +76,7 @@ jobs:
       windmill: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.windmill }}
       catalog: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.catalog }}
       compose-bundle: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.compose-bundle }}
+      helm: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.helm }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
@@ -144,6 +149,10 @@ jobs:
 
             compose-bundle:
                 - 'deploy/compose/**'
+
+            helm:
+                - 'deploy/helm/**'
+                - '.github/actions/helm-tools/**'
 
             # What the tools and print worker images are built from.
             workers:
