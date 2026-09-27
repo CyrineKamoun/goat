@@ -58,18 +58,20 @@ jobs:
     permissions:
       pull-requests: read
       contents: read
+    # A manual run (workflow_dispatch) counts every area as changed, so
+    # running a workflow by hand rebuilds and retests everything.
     outputs:
-      web: ${{ steps.changes.outputs.web }}
-      core: ${{ steps.changes.outputs.core }}
-      geoapi: ${{ steps.changes.outputs.geoapi }}
-      docs: ${{ steps.changes.outputs.docs }}
-      keycloak-theme: ${{ steps.changes.outputs.keycloak-theme }}
-      storybook: ${{ steps.changes.outputs.storybook }}
-      processes: ${{ steps.changes.outputs.processes }}
-      workers: ${{ steps.changes.outputs.workers }}
-      windmill: ${{ steps.changes.outputs.windmill }}
-      catalog: ${{ steps.changes.outputs.catalog }}
-      compose-bundle: ${{ steps.changes.outputs.compose-bundle }}
+      web: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.web }}
+      core: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.core }}
+      geoapi: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.geoapi }}
+      docs: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.docs }}
+      keycloak-theme: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.keycloak-theme }}
+      storybook: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.storybook }}
+      processes: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.processes }}
+      workers: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.workers }}
+      windmill: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.windmill }}
+      catalog: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.catalog }}
+      compose-bundle: ${{ github.event_name == 'workflow_dispatch' && 'true' || steps.changes.outputs.compose-bundle }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
