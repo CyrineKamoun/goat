@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { Trans } from "react-i18next";
 
 import { useOrganization } from "@/lib/api/users";
+import { CONTACT_URL } from "@/lib/constants";
 import { getNextMonthDate } from "@/lib/utils/helpers";
 
 import QuotaStatus from "@/components/common/QuotaStatus";
@@ -32,6 +33,13 @@ export default function Usage() {
     };
   }, [organization]);
 
+  // Without a contact page the alerts keep the word, unlinked.
+  const contactAnchor = CONTACT_URL ? (
+    <Link sx={{ fontWeight: "bold" }} target="_blank" href={CONTACT_URL} />
+  ) : (
+    <span />
+  );
+
   return (
     <>
       <Box sx={{ p: 4 }}>
@@ -54,13 +62,7 @@ export default function Usage() {
                         i18nKey="common:organization_credits_quota_alert"
                         components={{
                           b: <b />,
-                          anchor: (
-                            <Link
-                              sx={{ fontWeight: "bold" }}
-                              target="_blank"
-                              href="https://plan4better.de/contact"
-                            />
-                          ),
+                          anchor: contactAnchor,
                         }}
                       />
                     </Alert>
@@ -111,13 +113,7 @@ export default function Usage() {
                       i18nKey="common:organization_storage_quota_alert"
                       components={{
                         b: <b />,
-                        anchor: (
-                          <Link
-                            sx={{ fontWeight: "bold" }}
-                            target="_blank"
-                            href="https://plan4better.de/contact"
-                          />
-                        ),
+                        anchor: contactAnchor,
                       }}
                     />
                   </Alert>
@@ -166,13 +162,7 @@ export default function Usage() {
                       i18nKey="common:organization_projects_quota_alert"
                       components={{
                         b: <b />,
-                        anchor: (
-                          <Link
-                            sx={{ fontWeight: "bold" }}
-                            target="_blank"
-                            href="https://plan4better.de/contact"
-                          />
-                        ),
+                        anchor: contactAnchor,
                       }}
                     />
                   </Alert>

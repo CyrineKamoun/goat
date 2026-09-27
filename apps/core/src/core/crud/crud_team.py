@@ -65,7 +65,9 @@ class CRUDTeam(CRUDBase[Team, TeamCreate, TeamUpdate]):
                 f"img/users/{settings.ENVIRONMENT}/{file_name}",
                 f"image/{extension}",
             )
-            team_obj.avatar = f"https://assets.plan4better.de/img/users/{settings.ENVIRONMENT}/{file_name}"
+            team_obj.avatar = (
+                f"{settings.ASSETS_URL}/img/users/{settings.ENVIRONMENT}/{file_name}"
+            )
         updated_team = await self.update(db=db, db_obj=db_obj, obj_in=team_obj)
 
         return updated_team

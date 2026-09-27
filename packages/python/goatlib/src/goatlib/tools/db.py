@@ -256,8 +256,7 @@ class ToolDatabaseService:
         size: int = 0,
         properties: dict[str, Any] | None = None,
         other_properties: dict[str, Any] | None = None,
-        thumbnail_url: str
-        | None = "https://assets.plan4better.de/img/goat_new_dataset_thumbnail.png",
+        thumbnail_url: str | None = "/assets/img/goat_new_dataset_thumbnail.png",
         tool_type: str | None = None,
         job_id: str | None = None,
     ) -> dict[str, Any] | None:
@@ -276,7 +275,8 @@ class ToolDatabaseService:
             size: Size of the layer data in bytes
             properties: Layer properties (style, etc.)
             other_properties: Additional properties
-            thumbnail_url: Layer thumbnail URL (defaults to standard thumbnail)
+            thumbnail_url: Layer thumbnail URL (defaults to the standard
+                thumbnail the web app ships, root-relative)
             tool_type: Tool type that created this layer (e.g., "catchment_area")
             job_id: Windmill job ID that created this layer
 

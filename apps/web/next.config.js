@@ -2,6 +2,27 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
   enabled: process.env.ANALYZE === "true",
 });
 
+/** `next/image` hosts besides the defaults: the static product asset host
+ * when `NEXT_PUBLIC_ASSETS_URL` is an absolute URL at build time. The
+ * default root-relative `/assets` is served by this app and needs none. */
+const imageRemotePatterns = () => {
+  const patterns = [
+    { protocol: "https", hostname: "assets.plan4better.de" },
+    { protocol: "https", hostname: "source.unsplash.com" },
+  ];
+  const assetsUrl = (process.env.NEXT_PUBLIC_ASSETS_URL ?? "").trim();
+  if (!/^https?:\/\//i.test(assetsUrl)) return patterns;
+  try {
+    const { protocol, hostname, port } = new URL(assetsUrl);
+    if (!patterns.some((p) => p.hostname === hostname)) {
+      patterns.push({ protocol: protocol.replace(/:$/, ""), hostname, ...(port ? { port } : {}) });
+    }
+  } catch {
+    // Not a parseable URL: only the defaults apply.
+  }
+  return patterns;
+};
+
 const nextConfig = {
   output: "standalone",
   env: {
@@ -30,10 +51,7 @@ const nextConfig = {
     "/api/pwa-icon/**": ["../../node_modules/.pnpm/@img+sharp-libvips-*/**/*"],
   },
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "assets.plan4better.de" },
-      { protocol: "https", hostname: "source.unsplash.com" },
-    ],
+    remotePatterns: imageRemotePatterns(),
   },
 };
 

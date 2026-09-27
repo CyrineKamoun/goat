@@ -15,6 +15,7 @@ import {
   useOrganizationMembers,
 } from "@/lib/api/organizations";
 import { useOrganization } from "@/lib/api/users";
+import { CONTACT_URL } from "@/lib/constants";
 import { invitationStatusEnum } from "@/lib/validations/invitation";
 import type { OrganizationMember } from "@/lib/validations/organization";
 import { organizationRoles, organizationRolesEnum } from "@/lib/validations/organization";
@@ -243,12 +244,10 @@ const OrganizationMembers = () => {
                       values={{ role_type: quotaStatus }}
                       components={{
                         b: <b />,
-                        anchor: (
-                          <Link
-                            sx={{ fontWeight: "bold" }}
-                            target="_blank"
-                            href="https://plan4better.de/contact"
-                          />
+                        anchor: CONTACT_URL ? (
+                          <Link sx={{ fontWeight: "bold" }} target="_blank" href={CONTACT_URL} />
+                        ) : (
+                          <span />
                         ),
                       }}
                     />

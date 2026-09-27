@@ -14,7 +14,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import { useDateFnsLocale } from "@/i18n/utils";
 
 import { useOrganization, useUserProfile } from "@/lib/api/users";
-import { CONTACT_US_URL, DOCS_URL, WEBSITE_URL } from "@/lib/constants";
+import { CONTACT_URL, DOCS_URL, SUPPORT_MAILTO, privacyPolicyUrl } from "@/lib/constants";
 import { setSelectedLayers } from "@/lib/store/layer/slice";
 import { setMapMode } from "@/lib/store/map/slice";
 import { setActiveRightPanel } from "@/lib/store/map/slice";
@@ -139,26 +139,30 @@ export default function Header(props: HeaderProps) {
         },
       },
     ];
-    const commonMenuItems = [
-      {
+    const privacyUrl = privacyPolicyUrl(lng ? "de" : "en");
+    const commonMenuItems: PopperMenuItem[] = [];
+    if (SUPPORT_MAILTO) {
+      commonMenuItems.push({
         id: "report_issue",
         icon: ICON_NAME.BUG,
         label: t("common:report_an_issue"),
         group: "help",
         onClick: () => {
-          window.open("mailto:info@plan4better.de?subject=GOAT%20Support%20Request");
+          window.open(SUPPORT_MAILTO);
         },
-      },
-      {
+      });
+    }
+    if (privacyUrl) {
+      commonMenuItems.push({
         id: "privacy_policy",
         icon: ICON_NAME.COOKIES,
         label: t("common:privacy_policy"),
         group: "privacy",
         onClick: () => {
-          window.open(`${WEBSITE_URL}${lng}/about-us/privacy`, "_blank");
+          window.open(privacyUrl, "_blank");
         },
-      },
-    ];
+      });
+    }
 
     const homeItem = editorMenuItems[0]; // reuse the already-defined "home" item
 
@@ -346,9 +350,13 @@ export default function Header(props: HeaderProps) {
                         fontStyle: "normal",
                       },
                     }}
-                    onClick={() => {
-                      window.open(CONTACT_US_URL, "_blank");
-                    }}
+                    onClick={
+                      CONTACT_URL
+                        ? () => {
+                            window.open(CONTACT_URL, "_blank");
+                          }
+                        : undefined
+                    }
                   />
                 )}
                 {props.mapHeader && (

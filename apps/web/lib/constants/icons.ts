@@ -1,4 +1,6 @@
-export const MAKI_ICONS_BASE_URL = "https://assets.plan4better.de/icons/maki";
+import { ASSETS_URL } from "@/lib/constants";
+
+export const MAKI_ICONS_BASE_URL = `${ASSETS_URL}/icons/maki`;
 export const MAKI_ICON_SIZE = 24; // px
 export const NO_ICON_ICON = "hospital";
 export const MAKI_ICON_TYPES = [
@@ -56,7 +58,7 @@ export const MAKI_ICON_TYPES = [
       "traffic-light-solid",
       "water-solid",
       "wheelchair-solid",
-      "wind-turbine-solid-pro",
+      "wind_turbine",
       "waste-basket"
     ]
   },
@@ -111,11 +113,10 @@ export const MAKI_ICON_TYPES = [
       "cart-shopping-solid",
       "basket-shopping-solid",
       "tags-solid",
-      "bread-loaf-solid",
-      "butcher_meat",
-      "farm_shop_basket",
-      "library-icon",
-      "grocery-or-supermarket",
+      "bakery",
+      "meat",
+      "library",
+      "grocery",
       "pharmacy"
     ]
   },
@@ -198,9 +199,8 @@ export const MAKI_ICON_TYPES = [
     icons: [
       "aerialway",
       "bicycle-share",
-      "bike_parking_big",
+      "bicycle_parked",
       "bicycle",
-      "electric-bike-icon",
       "bus",
       "ferry-JP",
       "ferry",

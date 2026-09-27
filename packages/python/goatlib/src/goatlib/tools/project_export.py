@@ -120,10 +120,11 @@ class ProjectExportRunner(SimpleToolRunner):
                 "tags": project_row["tags"],
             }
 
-            # 2. Thumbnail S3 key
+            # 2. Thumbnail S3 key. A URL or a root-relative path (the artwork
+            # the web app ships) is not in the bucket.
             thumbnail_s3_key: str | None = None
             thumb_url = project_row["thumbnail_url"]
-            if thumb_url and not thumb_url.startswith("http"):
+            if thumb_url and not thumb_url.startswith(("http", "/")):
                 thumbnail_s3_key = thumb_url
 
             # 3. UserProjectLink — initial_view_state. The exporter's own row

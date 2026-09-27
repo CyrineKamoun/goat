@@ -164,8 +164,9 @@ class IProjectRead(ContentBaseAttributes, DateTimeBase):
         if not value:
             return settings.DEFAULT_PROJECT_THUMBNAIL
 
-        # If already a full URL, return as-is
-        if value.startswith(("http://", "https://")):
+        # A full URL or a root-relative path (the artwork the web app
+        # ships) is returned as-is
+        if value.startswith(("http://", "https://", "/")):
             return value
 
         # It's an S3 key, generate presigned URL
@@ -409,8 +410,9 @@ class ProjectPublicProjectConfig(BaseModel):
         if not value:
             return settings.DEFAULT_PROJECT_THUMBNAIL
 
-        # If already a full URL, return as-is
-        if value.startswith(("http://", "https://")):
+        # A full URL or a root-relative path (the artwork the web app
+        # ships) is returned as-is
+        if value.startswith(("http://", "https://", "/")):
             return value
 
         # It's an S3 key, generate presigned URL
