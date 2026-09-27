@@ -120,9 +120,11 @@ jobs:
       image-name: ghcr.io/${{ github.repository }}/core
       title: "GOAT Core"
       description: "GOAT's core API for users, organizations, projects and layer metadata."
+      # AUTH=false: with auth on the settings require a Keycloak URL, which
+      # an import check does not need.
       smoke-command: |
         cd /app
-        export POSTGRES_SERVER=localhost POSTGRES_USER=smoke POSTGRES_PASSWORD=smoke POSTGRES_DB=smoke
+        export AUTH=false POSTGRES_SERVER=localhost POSTGRES_USER=smoke POSTGRES_PASSWORD=smoke POSTGRES_DB=smoke
         python -c "import core.main"
 
   release-docker-geoapi:
@@ -140,8 +142,11 @@ jobs:
       image-name: ghcr.io/${{ github.repository }}/geoapi
       title: "GOAT GeoAPI"
       description: "GOAT's OGC API Features and Tiles service for layer data."
+      # AUTH=false: with auth on the settings require a Keycloak URL, which
+      # an import check does not need.
       smoke-command: |
         cd /app
+        export AUTH=false
         python -c "import geoapi.main"
         python -c "import duckdb; c = duckdb.connect(config={'autoinstall_known_extensions': False}); [c.execute(f'LOAD {e}') for e in ('spatial', 'httpfs', 'postgres', 'ducklake', 'h3')]"
         command -v tippecanoe-overzoom
@@ -161,8 +166,11 @@ jobs:
       image-name: ghcr.io/${{ github.repository }}/catalog
       title: "GOAT Catalog"
       description: "GOAT's STAC API for searching and browsing the data catalog."
+      # AUTH=false: with auth on the settings require a Keycloak URL, which
+      # an import check does not need.
       smoke-command: |
         cd /app
+        export AUTH=false
         python -c "import catalog.main"
         python -c "import duckdb, os; c = duckdb.connect(config={'extension_directory': os.environ['DUCKDB_EXTENSION_DIRECTORY'], 'autoinstall_known_extensions': False}); c.execute('LOAD spatial')"
 
@@ -181,8 +189,11 @@ jobs:
       image-name: ghcr.io/${{ github.repository }}/processes
       title: "GOAT Processes"
       description: "GOAT's OGC API Processes service, which runs the analysis tools."
+      # AUTH=false: with auth on the settings require a Keycloak URL, which
+      # an import check does not need.
       smoke-command: |
         cd /app
+        export AUTH=false
         python -c "import processes.main"
         python -c "import duckdb; c = duckdb.connect(config={'autoinstall_known_extensions': False}); [c.execute(f'LOAD {e}') for e in ('spatial', 'httpfs', 'postgres', 'ducklake', 'h3')]"
 
