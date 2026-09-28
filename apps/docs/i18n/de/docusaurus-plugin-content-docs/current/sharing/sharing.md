@@ -51,28 +51,20 @@ Wenn Sie einen Datensatz/ein Projekt mit einem Team oder einer Organisation teil
 
 ## Zugriff auf einen Datensatz, ein Projekt oder einen Ordner verwalten
 
-<div class="step">
-   <div class="step-number">1</div>
-   <div class="content">Klicken Sie bei Ihrem Datensatz oder Projekt auf <code>Mehr Optionen</code> <img src={require('/img/icons/3dots.png').default} alt="Mehr Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/>.</div>
-</div>
-<div class="step">
-   <div class="step-number">2</div>
-   <div class="content">Wählen Sie <b>Teilen</b> und wählen Sie eine Organisation oder ein Team aus.</div>
-</div>
-<div class="step">
-   <div class="step-number">3</div>
-   <div class="content">Gewähren Sie allen Mitgliedern <b>Viewer</b>- oder <b>Editor</b>-Zugriff nach Bedarf.</div>
-</div>
+Öffnen Sie das <code>Mehr Optionen</code>-Menü <img src={require('/img/icons/3dots.png').default} alt="Mehr Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> des Inhalts und wählen Sie <code>Teilen</code>. Der Dialog hat drei Tabs:
+
+- **Personen**: mit einer **einzelnen Person** aus Ihrer Organisation teilen. Suchen Sie sie; der Inhalt erscheint bei ihr unter `Mit mir geteilt` und bleibt, wo er liegt.
+- **Teams**: mit einem ganzen **Team oder einer Organisation** teilen. Gewähren Sie den Mitgliedern <code>Viewer</code>- oder <code>Editor</code>-Zugriff, oder <code>Kein Zugriff</code>, um ihn zu entziehen.
+- **Öffentlich**: einen **Datensatz oder ein Projekt für alle GOAT-Nutzer öffentlich** machen (siehe [Einen Datensatz öffentlich machen](#einen-datensatz-öffentlich-machen)).
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <Video src={require('/img/sharing/share_project.mp4').default} alt="Teilen-Zugriff in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
 </div>
 <p> </p>
 
-<div class="step">
-   <div class="step-number">4</div>
-   <div class="content">Wenn Sie den Zugriff entziehen möchten, klicken Sie auf <code>Mehr Optionen</code> <img src={require('/img/icons/3dots.png').default} alt="Mehr Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> und wählen Sie <code>Kein Zugriff</code>.</div>
-</div>
+:::info
+Um den Zugriff zu entziehen, öffnen Sie den <code>Teilen</code>-Dialog erneut und setzen Sie die Rolle zurück auf <code>Kein Zugriff</code>.
+:::
 
 ### Einen Ordner teilen
 
@@ -102,6 +94,59 @@ Sie finden geteilte Elemente in Ihrem Workspace:
 - Projekte, die mit Ihnen geteilt wurden: <code>Workspace</code> → <code>Projects</code> → <code>Teams</code> / <code>Organizations</code>
   
 - Datensätze, die mit Ihnen geteilt wurden: <code>Workspace</code> → <code>Datasets</code> → <code>Teams</code> / <code>Organizations</code>
+
+## Rechte übertragen
+
+Sie können einen Inhalt **an ein Team oder eine Organisation übergeben**, sodass er nicht mehr Ihnen persönlich gehört. Dies funktioniert für Datensätze, Projekte, Workflows und Layouts.
+
+<div class="step">
+   <div class="step-number">1</div>
+   <div class="content">Öffnen Sie das <code>Weitere Optionen</code>-Menü <img src={require('/img/icons/3dots.png').default} alt="Weitere Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> des Inhalts, wählen Sie <code>Teilen</code>, öffnen Sie den Tab <code>Teams</code> und wählen Sie <code>Rechte übertragen</code>.</div>
+</div>
+<div class="step">
+   <div class="step-number">2</div>
+   <div class="content">Wählen Sie das Team oder die Organisation, das/die den Inhalt besitzen soll.</div>
+</div>
+<div class="step">
+   <div class="step-number">3</div>
+   <div class="content">Bei einem Projekt <strong>kreuzen Sie die Datensätze an, die mitwandern sollen</strong>. Angekreuzte Datensätze gehören dann ebenfalls dem Team, sodass das Projekt sie nicht verliert, wenn Sie es verlassen. Nicht angekreuzte <strong>bleiben, wo sie sind</strong>, und das Team sieht sie weiterhin über das Projekt.</div>
+</div>
+<div class="step">
+   <div class="step-number">4</div>
+   <div class="content">Aktivieren Sie optional <code>Verknüpfung am alten Ort hinterlassen</code>, damit der Inhalt weiterhin von seinem bisherigen Ort erreichbar ist, und bestätigen Sie die Übertragung.</div>
+</div>
+
+Nach einer Übertragung:
+
+- Der Inhalt **verlässt „Meine Inhalte"** und gehört dem Team (oder der Organisation). Er bleibt beim Team, auch wenn Sie es später verlassen.
+- **Alle im Team oder in der Organisation erhalten Zugriff.** Persönliche Freigaben für einzelne Personen werden entfernt, da die Mitgliedschaft im Bereich übernimmt.
+- Datensätze, die weiterhin **von Projekten anderswo genutzt werden, behalten Lesezugriff**, sodass diese Projekte weiter funktionieren.
+
+:::info
+Das Übertragen der Rechte ändert, wem der Inhalt gehört, und ersetzt dessen persönliche Freigaben. Wenn Sie anderen nur Zugriff geben möchten, ohne ihn zu übergeben, verwenden Sie stattdessen <code>Teilen</code>.
+:::
+
+## Einen Datensatz öffentlich machen
+
+Als Eigentümer eines Datensatzes können Sie ihn **für alle GOAT-Nutzer öffentlich** machen.
+
+<div class="step">
+   <div class="step-number">1</div>
+   <div class="content">Öffnen Sie das <code>Weitere Optionen</code>-Menü <img src={require('/img/icons/3dots.png').default} alt="Weitere Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> des Datensatzes, wählen Sie <code>Teilen</code>, öffnen Sie den Tab <code>Öffentlich</code> und aktivieren Sie <code>Öffentlich für alle GOAT-Nutzer</code>.</div>
+</div>
+
+Sobald er öffentlich ist, kann **jeder angemeldete GOAT-Nutzer, in jeder Organisation, den Datensatz ansehen und zu seinen Projekten hinzufügen**. Er wird nirgends aufgelistet; man erreicht ihn über die Projekte und Vorlagen, die ihn enthalten, und die Bearbeitungsrechte ändern sich nicht. Wenn ein öffentlicher Datensatz mit einer Vorlage mitgeliefert wird, wird er mit einem **öffentlich-Badge** angezeigt.
+
+## Papierkorb
+
+Gelöschte Inhalte werden nicht sofort entfernt. Sie **wandern zuerst in den Papierkorb**.
+
+- Beim Löschen wird ein Inhalt in den **Papierkorb** verschoben, wo er **30 Tage lang wiederhergestellt** werden kann.
+- Öffnen Sie den Papierkorb, um einen Inhalt <code>Wiederherstellen</code> zu lassen, oder belassen Sie ihn dort: Inhalte werden **30 Tage nach dem Löschen** endgültig entfernt.
+
+:::info
+Wenn Sie die Rechte an einem Ordner übertragen, wandern darin enthaltene, gelöschte Inhalte mit und bleiben im Papierkorb.
+:::
 
 ## Rollen
 
