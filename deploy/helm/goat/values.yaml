@@ -844,6 +844,8 @@ windmill:
       config:
         MODE: "worker"
         WORKER_GROUP: "default"
+        # Seconds a job may run before Windmill cancels it.
+        JOB_DEFAULT_TIMEOUT: "300"
       extraEnv: []
       resources: {}
       podSecurityContext: {}
@@ -867,6 +869,7 @@ windmill:
         MODE: "worker"
         WORKER_GROUP: "print"
         WORKER_TAGS: "print"
+        JOB_DEFAULT_TIMEOUT: "300"
       extraEnv: []
       resources: {}
       podSecurityContext: {}
@@ -892,6 +895,8 @@ windmill:
         MODE: "worker"
         WORKER_GROUP: "tools"
         WORKER_TAGS: "tools"
+        # Analyses on large datasets run long.
+        JOB_DEFAULT_TIMEOUT: "2500"
       extraEnv: []
       resources: {}
       podSecurityContext: {}
@@ -927,6 +932,8 @@ windmill:
         MODE: "worker"
         WORKER_GROUP: "workflows"
         WORKER_TAGS: "workflows"
+        # A workflow waits for the tool jobs it starts.
+        JOB_DEFAULT_TIMEOUT: "1800"
       extraEnv: []
       resources: {}
       podSecurityContext: {}

@@ -4,6 +4,10 @@ templates:
   - windmill/worker-tools/deployment.yaml
   - windmill/worker-workflows/deployment.yaml
   - windmill/worker-default/deployment.yaml
+  - windmill/worker-print/configmap.yaml
+  - windmill/worker-tools/configmap.yaml
+  - windmill/worker-workflows/configmap.yaml
+  - windmill/worker-default/configmap.yaml
 set:
   postgresql.cluster.enabled: false
   postgresql.external.host: "pg.example.com"
@@ -188,3 +192,31 @@ tests:
           content:
             name: WHITELIST_ENVS
           any: true
+
+  - it: gives each worker the job timeout of its kind of work
+    template: windmill/worker-tools/configmap.yaml
+    asserts:
+      - equal:
+          path: data.JOB_DEFAULT_TIMEOUT
+          value: "2500"
+
+  - it: gives workflows time to wait for their tool jobs
+    template: windmill/worker-workflows/configmap.yaml
+    asserts:
+      - equal:
+          path: data.JOB_DEFAULT_TIMEOUT
+          value: "1800"
+
+  - it: keeps print and default jobs short
+    template: windmill/worker-print/configmap.yaml
+    asserts:
+      - equal:
+          path: data.JOB_DEFAULT_TIMEOUT
+          value: "300"
+
+  - it: keeps the default worker's jobs short
+    template: windmill/worker-default/configmap.yaml
+    asserts:
+      - equal:
+          path: data.JOB_DEFAULT_TIMEOUT
+          value: "300"

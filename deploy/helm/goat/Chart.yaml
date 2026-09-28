@@ -18,6 +18,9 @@ description: |
     in with. WHITELIST_ENVS is built from all of it plus every name in the
     worker's `config` and `extraEnv`, instead of a fixed list that missed
     newer variables. Before, the print worker got none of this.
+  - Every worker gets a JOB_DEFAULT_TIMEOUT for its kind of work (tools
+    2500 s, workflows 1800 s, print and default 300 s), the values GOAT's
+    own deployments use, instead of Windmill's default.
   - NEW: `email` — the SMTP server core sends invitations through (host,
     port, security, user, sender, password from `existingSecret`) and the
     branding of GOAT's emails. Core also gets CLIENT_URL and API_URL, the
