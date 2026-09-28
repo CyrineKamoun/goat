@@ -5,7 +5,11 @@ sidebar_position: 2
 
 # Public Sharing
 
-**Sharing a project publicly allows anyone to view your map without needing a GOAT account.** This feature is ideal for showcasing spatial analysis, sharing insights, or embedding interactive maps on external platforms.
+In GOAT you can make two kinds of content public: a **project**, so anyone can open its map without a GOAT account, and a **dataset**, so all signed-in GOAT users can use it. This page covers both.
+
+## Publishing a Project to the Web
+
+You can **publish a project so anyone can view its map without a GOAT account**. This is ideal for showcasing spatial analysis, sharing insights, or embedding interactive maps on external platforms.
 
 Publishing creates a **snapshot** of the project: the public page shows the project as it was when you published it, while the project itself stays where it is and keeps its access rights. Visitors see the project as it is laid out in the [Dashboard](../builder/builder_interface).
 
@@ -109,3 +113,14 @@ The public page does not follow later changes to the project. To update it with 
   <div class="step-number">2</div>
   <div class="content">Under <code>Take it offline</code>, click <code>Unpublish</code>. The link stops working for everyone, including embedded maps. You can publish again at any time.</div>
 </div>
+
+## Making a Dataset Public
+
+As a dataset's owner, you can **make it public to all GOAT users**. This does not create a public link or a snapshot: it only opens the dataset to other signed-in GOAT users.
+
+<div class="step">
+   <div class="step-number">1</div>
+   <div class="content">Open the dataset's <code>More options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu, choose <code>Share</code>, open the <code>Public</code> tab and turn on <code>Public to all GOAT users</code>.</div>
+</div>
+
+Once public, **every signed-in GOAT user, in any organization, can view the dataset and add it to their projects**. It is not listed anywhere; people reach it through the projects and templates that include it, and editing rights do not change. When a public dataset ships with a template, it is shown with a **public badge**.

@@ -55,7 +55,7 @@ Wenn Sie einen Datensatz/ein Projekt mit einem Team oder einer Organisation teil
 
 - **Personen**: mit einer **einzelnen Person** aus Ihrer Organisation teilen. Suchen Sie sie; der Inhalt erscheint bei ihr unter `Mit mir geteilt` und bleibt, wo er liegt.
 - **Teams**: mit einem ganzen **Team oder einer Organisation** teilen. Gewähren Sie den Mitgliedern <code>Viewer</code>- oder <code>Editor</code>-Zugriff, oder <code>Kein Zugriff</code>, um ihn zu entziehen.
-- **Öffentlich**: einen **Datensatz oder ein Projekt für alle GOAT-Nutzer öffentlich** machen (siehe [Einen Datensatz öffentlich machen](#einen-datensatz-öffentlich-machen)).
+- **Öffentlich**: einen **Datensatz** für alle GOAT-Nutzer öffentlich machen; bei einem **Projekt** eine öffentliche Momentaufnahme veröffentlichen, die jeder ohne GOAT-Konto öffnen kann. Beides wird unter [Öffentliches Teilen](./public.md) behandelt.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <Video src={require('/img/sharing/share_project.mp4').default} alt="Teilen-Zugriff in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
@@ -118,7 +118,7 @@ Sie können einen Inhalt **an ein Team oder eine Organisation übergeben**, soda
 
 Nach einer Übertragung:
 
-- Der Inhalt **verlässt „Meine Inhalte"** und gehört dem Team (oder der Organisation). Er bleibt beim Team, auch wenn Sie es später verlassen.
+- Der Inhalt verlässt **„Meine Inhalte"** und gehört dem Team (oder der Organisation). Er bleibt beim Team, auch wenn Sie es später verlassen.
 - **Alle im Team oder in der Organisation erhalten Zugriff.** Persönliche Freigaben für einzelne Personen werden entfernt, da die Mitgliedschaft im Bereich übernimmt.
 - Datensätze, die weiterhin **von Projekten anderswo genutzt werden, behalten Lesezugriff**, sodass diese Projekte weiter funktionieren.
 
@@ -126,20 +126,11 @@ Nach einer Übertragung:
 Das Übertragen der Rechte ändert, wem der Inhalt gehört, und ersetzt dessen persönliche Freigaben. Wenn Sie anderen nur Zugriff geben möchten, ohne ihn zu übergeben, verwenden Sie stattdessen <code>Teilen</code>.
 :::
 
-## Einen Datensatz öffentlich machen
-
-Als Eigentümer eines Datensatzes können Sie ihn **für alle GOAT-Nutzer öffentlich** machen.
-
-<div class="step">
-   <div class="step-number">1</div>
-   <div class="content">Öffnen Sie das <code>Weitere Optionen</code>-Menü <img src={require('/img/icons/3dots.png').default} alt="Weitere Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> des Datensatzes, wählen Sie <code>Teilen</code>, öffnen Sie den Tab <code>Öffentlich</code> und aktivieren Sie <code>Öffentlich für alle GOAT-Nutzer</code>.</div>
-</div>
-
-Sobald er öffentlich ist, kann **jeder angemeldete GOAT-Nutzer, in jeder Organisation, den Datensatz ansehen und zu seinen Projekten hinzufügen**. Er wird nirgends aufgelistet; man erreicht ihn über die Projekte und Vorlagen, die ihn enthalten, und die Bearbeitungsrechte ändern sich nicht. Wenn ein öffentlicher Datensatz mit einer Vorlage mitgeliefert wird, wird er mit einem **öffentlich-Badge** angezeigt.
-
 ## Papierkorb
 
 Gelöschte Inhalte werden nicht sofort entfernt. Sie **wandern zuerst in den Papierkorb**.
+
+Den Papierkorb finden Sie unter <code>Inhalt</code>, im Panel <code>Bereiche</code> auf der linken Seite.
 
 - Beim Löschen wird ein Inhalt in den **Papierkorb** verschoben, wo er **30 Tage lang wiederhergestellt** werden kann.
 - Öffnen Sie den Papierkorb, um einen Inhalt <code>Wiederherstellen</code> zu lassen, oder belassen Sie ihn dort: Inhalte werden **30 Tage nach dem Löschen** endgültig entfernt.

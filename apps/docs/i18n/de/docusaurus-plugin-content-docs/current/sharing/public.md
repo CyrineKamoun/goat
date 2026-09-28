@@ -5,7 +5,11 @@ sidebar_position: 2
 
 # Öffentliches Teilen
 
-**Wenn Sie ein Projekt öffentlich teilen, kann jeder Ihre Karte ansehen, ohne ein GOAT-Konto zu benötigen.** Diese Funktion eignet sich ideal, um räumliche Analysen zu präsentieren, Einblicke zu teilen oder interaktive Karten auf externen Plattformen einzubetten.
+In GOAT können Sie zwei Arten von Inhalten öffentlich machen: ein **Projekt**, damit jeder seine Karte ohne GOAT-Konto ansehen kann, und einen **Datensatz**, damit alle angemeldeten GOAT-Nutzer ihn verwenden können. Diese Seite behandelt beides.
+
+## Ein Projekt im Web veröffentlichen
+
+Sie können ein **Projekt veröffentlichen, sodass jeder seine Karte ohne GOAT-Konto ansehen kann**. Das eignet sich ideal, um räumliche Analysen zu präsentieren, Einblicke zu teilen oder interaktive Karten auf externen Plattformen einzubetten.
 
 Beim Veröffentlichen entsteht eine **Momentaufnahme** des Projekts: Die öffentliche Seite zeigt das Projekt so, wie es zum Zeitpunkt der Veröffentlichung war, während das Projekt selbst an seinem Platz bleibt und seine Zugriffsrechte behält. Besucher sehen das Projekt so, wie es im [Dashboard](../builder/builder_interface) angeordnet ist.
 
@@ -104,3 +108,14 @@ Die öffentliche Seite übernimmt spätere Änderungen am Projekt nicht automati
   <div class="step-number">2</div>
   <div class="content">Klicken Sie unter <code>Offline nehmen</code> auf <code>Veröffentlichung aufheben</code>. Der Link funktioniert dann für niemanden mehr, auch nicht in eingebetteten Karten. Sie können jederzeit erneut veröffentlichen.</div>
 </div>
+
+## Einen Datensatz öffentlich machen
+
+Als Eigentümer eines Datensatzes können Sie ihn **für alle GOAT-Nutzer öffentlich** machen. Dabei entsteht kein öffentlicher Link und keine Momentaufnahme: Der Datensatz wird nur für andere angemeldete GOAT-Nutzer geöffnet.
+
+<div class="step">
+   <div class="step-number">1</div>
+   <div class="content">Öffnen Sie das <code>Weitere Optionen</code>-Menü <img src={require('/img/icons/3dots.png').default} alt="Weitere Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> des Datensatzes, wählen Sie <code>Teilen</code>, öffnen Sie den Tab <code>Öffentlich</code> und aktivieren Sie <code>Öffentlich für alle GOAT-Nutzer</code>.</div>
+</div>
+
+Sobald er öffentlich ist, kann **jeder angemeldete GOAT-Nutzer, in jeder Organisation, den Datensatz ansehen und zu seinen Projekten hinzufügen**. Er wird nirgends aufgelistet; man erreicht ihn über die Projekte und Vorlagen, die ihn enthalten, und die Bearbeitungsrechte ändern sich nicht. Wenn ein öffentlicher Datensatz mit einer Vorlage mitgeliefert wird, wird er mit einem **öffentlich-Badge** angezeigt.

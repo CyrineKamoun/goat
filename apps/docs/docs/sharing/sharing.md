@@ -57,7 +57,7 @@ Open the item's <code>More options</code> <img src={require('/img/icons/3dots.pn
 
 - **People**: share with an **individual person** from your organization. Search for them; the item lands in their `Shared with me` and stays where it lives.
 - **Teams**: share with a whole **Team or Organization**. Grant its members <code>viewer</code> or <code>editor</code> access, or <code>no access</code> to withdraw it.
-- **Public**: make a **dataset or project public to all GOAT users** (see [Making a dataset public](#making-a-dataset-public)).
+- **Public**: for a **dataset**, make it public to all GOAT users; for a **project**, publish a public web snapshot that anyone can open without a GOAT account. Both are covered in [Public Sharing](./public.md).
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <Video src={require('/img/sharing/share_project.mp4').default} alt="Sharing Access in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
@@ -121,7 +121,7 @@ You can **hand an item over to a team or organization** so that it no longer bel
 
 After a transfer:
 
-- The item **leaves your My Content** and the team (or organization) owns it. It stays with the team even if you later leave it.
+- The item leaves your **My Content** and the team (or organization) owns it. It stays with the team even if you later leave it.
 - **Everyone in that team or organization gets access.** Personal shares with individual people are removed, since space membership takes over.
 - Datasets still **used by projects elsewhere keep read access**, so those projects keep working.
 
@@ -129,20 +129,11 @@ After a transfer:
 Transferring ownership changes who the item belongs to and replaces its personal shares. If you only want to give others access without handing it over, use <code>Share</code> instead.
 :::
 
-## Making a dataset public
-
-As a dataset's owner you can make it **public to all GOAT users**.
-
-<div class="step">
-   <div class="step-number">1</div>
-   <div class="content">Open the dataset's <code>More options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu, choose <code>Share</code>, open the <code>Public</code> tab and turn on <code>Public to all GOAT users</code>.</div>
-</div>
-
-Once public, **every signed-in GOAT user, in any organization, can view the dataset and add it to their projects**. It is not listed anywhere; people reach it through the projects and templates that include it, and editing rights do not change. When a public dataset ships with a template, it is shown with a **public badge**.
-
 ## Trash
 
 Deleted items are not removed immediately. They **go to the Trash first**.
+
+You find the Trash in <code>Content</code>, in the <code>Spaces</code> panel on the left.
 
 - Deleting an item moves it to the **Trash**, where it can be **restored for 30 days**.
 - Open the Trash to <code>Restore</code> an item, or leave it: items are removed for good **30 days after deletion**.
