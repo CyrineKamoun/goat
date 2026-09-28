@@ -147,7 +147,7 @@ Redis — host. Bundled sub-chart service is <release>-redis-master.
 */}}
 {{- define "goat.redis.host" -}}
 {{- if .Values.redis.enabled -}}
-{{- printf "%s-redis-master" .Release.Name -}}
+{{- include "goat.serviceFullname" (dict "context" . "component" "redis") -}}
 {{- else -}}
 {{- required "redis.external.host is required when redis.enabled is false" .Values.redis.external.host -}}
 {{- end -}}
@@ -173,12 +173,12 @@ Redis — whether a password is in play at all.
 {{- end }}
 
 {{/*
-Redis — the Secret holding the password. The bitnami sub-chart creates
-<release>-redis with the key `redis-password`.
+Redis — the Secret holding the password: redis.auth.existingSecret, else the
+one the chart generates (templates/redis/secret.yaml).
 */}}
 {{- define "goat.redis.secretName" -}}
 {{- if .Values.redis.enabled -}}
-{{- printf "%s-redis" .Release.Name -}}
+{{- .Values.redis.auth.existingSecret | default (printf "%s-redis" (include "goat.fullname" .)) -}}
 {{- else -}}
 {{- .Values.redis.external.existingSecret -}}
 {{- end -}}
@@ -186,7 +186,7 @@ Redis — the Secret holding the password. The bitnami sub-chart creates
 
 {{- define "goat.redis.passwordKey" -}}
 {{- if .Values.redis.enabled -}}
-redis-password
+{{- if .Values.redis.auth.existingSecret -}}{{- .Values.redis.auth.existingSecretPasswordKey | default "redis-password" -}}{{- else -}}redis-password{{- end -}}
 {{- else -}}
 {{- .Values.redis.external.existingSecretPasswordKey -}}
 {{- end -}}

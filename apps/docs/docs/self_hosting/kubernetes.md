@@ -34,7 +34,7 @@ A first install pulls several large images, which is why the timeout is long. A 
 | Windmill server and the default worker | on |
 | Windmill workers `tools`, `workflows` and `print` | **off** |
 | PostgreSQL through CloudNativePG (operator and cluster) | on, optional sub-chart |
-| Redis | on, optional sub-chart |
+| Redis | on, optional |
 | A shared data volume (`data`, 200 Gi, `ReadWriteOnce`) | on |
 | Caddy for custom domains | off |
 

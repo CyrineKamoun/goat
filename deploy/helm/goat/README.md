@@ -63,8 +63,7 @@ This deploys 7 Deployments: `goat-core`, `goat-web`, `goat-catalog`,
 `goat-geoapi`, `goat-processes`, `goat-windmill-server`,
 `goat-windmill-worker-default` (plus the CNPG operator's own Deployment, a
 `goat-data` PersistentVolumeClaim (200Gi by default — see "The shared data
-volume" below), and the bundled Redis's `goat-redis-master` /
-`goat-redis-replicas` StatefulSets). It requires the CloudNativePG
+volume" below), and the bundled Redis Deployment `goat-redis`). It requires the CloudNativePG
 operator's CRDs to be installable in your cluster.
 
 A cluster that has never seen this chart before installs with that one
@@ -406,8 +405,9 @@ override the key names via the `existingSecretUserKey` /
 | `postgresql.operator.enabled` | bool | `true` | Install CNPG operator sub-chart. |
 | `postgresql.external.host` | string | `""` | External Postgres host; required if cluster disabled. |
 | `postgresql.external.existingSecret` | string | `""` | K8s Secret with `username`+`password`. |
-| `redis.enabled` | bool | `true` | Bundled Redis sub-chart. |
-| `redis.image.repository` | string | `bitnamilegacy/redis` | Bitnami moved free images to `bitnamilegacy` in Aug 2025. |
+| `redis.enabled` | bool | `true` | Bundled Redis, geoapi's cache: the official `redis` image, nothing kept on disk, least recently used keys evicted at `redis.maxmemory` (`256mb`). |
+| `redis.image.repository` / `.tag` | string | `redis` / `7.4-alpine` | The official Redis image, the one the Docker Compose bundle runs. |
+| `redis.auth.existingSecret` / `.existingSecretPasswordKey` | string | `""` / `redis-password` | Secret with the password; empty = generated on install and kept on upgrades. Set one when Argo CD or `helm template` renders the chart. |
 | `windmill.server.enabled` | bool | `true` | Deploy windmill server (workflow engine). |
 | `windmill.workers.default.enabled` | bool | `true` | Deploy default windmill worker. |
 | `windmill.workers.default.replicaCount` | int | `1` | Scale workers via this knob. |
@@ -417,7 +417,6 @@ override the key names via the `existingSecretUserKey` /
 | `caddy.enabled` | bool | `false` | Custom-domains feature (LoadBalancer + ACME on-demand TLS). |
 | `caddy.acmeEmail` | string | `admin@example.com` | Email for Let's Encrypt issuance — override per deployment. |
 | `global.imageRegistry` | string | `""` | Mirror override for airgap deployments. |
-| `global.security.allowInsecureImages` | bool | `true` | Required by bitnami sub-charts to accept `bitnamilegacy` images. |
 | `data.enabled` | bool | `true` | Create/mount the shared `data` volume (see below). |
 | `data.existingClaim` | string | `""` | Use a pre-provisioned claim instead of creating one. |
 | `data.accessMode` | string | `ReadWriteOnce` | **Set `ReadWriteMany` on multi-node clusters** with an RWX-capable StorageClass. |
@@ -791,7 +790,7 @@ helm template my-release deploy/helm/goat/ -f deploy/helm/goat/ci/values-externa
 
 | Chart version | Adds | Notes |
 |---|---|---|
-| `0.6.0` | `global.s3` (one S3 store for core, geoapi, processes and the workers, uploads and uploaded images); the print, tools and workflows workers get GOAT's database, DuckLake, S3, catalog bucket, `PRINT_BASE_URL` and Keycloak client, with `WHITELIST_ENVS` built by the chart, and job timeouts per worker (`JOB_DEFAULT_TIMEOUT`); `email` (SMTP for invitations, password from a Secret, email branding) with `CLIENT_URL` / `API_URL` derived for the links in emails; `global.auth.provisionInvitedUsers`; `global.caBundle` (company CA for core, web and the print, tools and workflows workers) | The S3 and assets placeholders are gone from `core`, `geoapi` and `processes`, and the workers' fixed `WHITELIST_ENVS` is replaced by a built one — see "Upgrading 0.5.1 → 0.6.0" |
+| `0.6.0` | `global.s3` (one S3 store for core, geoapi, processes and the workers, uploads and uploaded images); the print, tools and workflows workers get GOAT's database, DuckLake, S3, catalog bucket, `PRINT_BASE_URL` and Keycloak client, with `WHITELIST_ENVS` built by the chart, and job timeouts per worker (`JOB_DEFAULT_TIMEOUT`); the chart's own Redis on the official image instead of the Bitnami sub-chart; `email` (SMTP for invitations, password from a Secret, email branding) with `CLIENT_URL` / `API_URL` derived for the links in emails; `global.auth.provisionInvitedUsers`; `global.caBundle` (company CA for core, web and the print, tools and workflows workers) | The S3 and assets placeholders are gone from `core`, `geoapi` and `processes`, and the workers' fixed `WHITELIST_ENVS` is replaced by a built one — see "Upgrading 0.5.1 → 0.6.0" |
 | `0.5.1` | GOAT v3.0.3 (no runtime downloads in the workers, `ROOT_PATH`, `sync_base_data`); `global.auth`: one auth switch + one Keycloak Secret for core, web, geoapi, processes, catalog; `geoapi.auth` / `processes.auth` | Fixes: geoapi + processes ran auth ON at chart defaults (401 on feature edits and every job route) and, with auth on, validated tokens against plan4better's dev Keycloak; a fresh install's processes had no windmill token (every tool run failed until a manual restart); `processes.windmillAutoWire: false` was ignored. No values change needed — see "Upgrading 0.5.0 → 0.5.1" |
 | `0.5.0` | GOAT v3.0.2: `catalog` service (STAC API + MCP); shared `data` volume; single-command fresh install (DuckLake + windmill DB bootstrap moved from hooks to init containers); `REDIS_URL`, web `NEXT_PUBLIC_*` and windmill `WHITELIST_ENVS` fixes; bundled Postgres image moves from CNPG's default major 17 to 18 (`ghcr.io/cloudnative-pg/postgis:18-3.6-system-trixie`) | BREAKING: `helm upgrade` DELETES `<fullname>-windmill-tools-data` and `<fullname>-windmill-workflows-data` unless you first `kubectl annotate` them `helm.sh/resource-policy=keep` (worker `persistence` superseded by `data`, no automatic migration; the upgrade fails until you do or set `windmill.workers.legacyPersistence.acknowledgeDeletion` — see upgrade note 1 below); geoapi + processes now default on |
 | `0.4.0` | automatic schema migrations (`core.migrate.*` hook); `NEXT_PUBLIC_AUTH_DISABLED` → `NEXT_PUBLIC_AUTH` | BREAKING: flip the web auth flag in your values |
@@ -816,10 +815,17 @@ helm template my-release deploy/helm/goat/ -f deploy/helm/goat/ci/values-externa
    `windmill.workers.<worker>.config.WHITELIST_ENVS`, that list still replaces
    the built one; remove it to let the chart keep the list complete. Worker
    `config` / `extraEnv` entries for the same variables keep winning.
-3. **Email** is new and off until `email.host` is set. SMTP settings you
+3. **Redis** is the chart's own Deployment on the official `redis` image;
+   the Bitnami sub-chart and its `bitnamilegacy/redis` image, which no longer
+   gets updates, are gone. The upgrade replaces the old Redis StatefulSets
+   and Secret with a new Redis and a new generated password, so geoapi's
+   cache starts empty once. Sub-chart values (`redis.architecture`,
+   `redis.master.*`, `redis.replica.*`, `global.security.allowInsecureImages`)
+   are no longer read; `redis.external.*` is unchanged.
+4. **Email** is new and off until `email.host` is set. SMTP settings you
    already pass through `core.config` or `core.extraEnv` keep working and win
    over the `email` block.
-4. **Core gets `CLIENT_URL` and `API_URL`** from the public web and API URLs,
+5. **Core gets `CLIENT_URL` and `API_URL`** from the public web and API URLs,
    where it used to fall back to `http://localhost:3000` and
    `http://localhost:8000/api/v2`. Values you set in `core.config` win.
 

@@ -35,7 +35,7 @@ GOAT ist nicht ein einzelnes Programm, sondern eine Reihe von Diensten, die zusa
 |   | Docker Compose | Kubernetes (Helm) |
 |---|---|---|
 | **Läuft auf** | Einem Linux-Server | Einem Kubernetes-Cluster, den Sie bereits betreiben |
-| **Enthalten** | Alles aus der Tabelle oben, einschließlich Keycloak, Garage und HTTPS | Die GOAT-Dienste und Windmill; PostgreSQL (über CloudNativePG) und Redis als optionale Sub-Charts |
+| **Enthalten** | Alles aus der Tabelle oben, einschließlich Keycloak, Garage und HTTPS | Die GOAT-Dienste und Windmill; PostgreSQL (über CloudNativePG) und Redis, beide optional |
 | **Sie stellen bereit** | Einen Server und einen DNS-Namen, wenn Sie automatisches HTTPS möchten | S3-Objektspeicher, Keycloak (wenn sich Benutzer anmelden sollen), Ingress und TLS, Speicher |
 | **Einrichtung** | `setup.sh` schreibt die Konfiguration, `smoke.sh` prüft die Installation | Eine Values-Datei |
 

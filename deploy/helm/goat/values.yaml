@@ -13,11 +13,6 @@ global:
   imagePullSecrets: []             # e.g. [{name: ghcr-pull-secret}]
   commonLabels: {}
   storageClass: ""                 # default StorageClass for all PVCs ("" = cluster default)
-  # Required by bitnami sub-charts when using bitnamilegacy images (post-Aug 2025).
-  # If you bring your own redis/keycloak/etc images from non-bitnami registries,
-  # you can keep this true; it only relaxes the sub-chart's own image-check.
-  security:
-    allowInsecureImages: true
 
   # ── Authentication (OIDC / Keycloak) — ONE switch for the whole release ──
   # core, web, geoapi, processes and catalog all follow `global.auth.enabled`
@@ -1111,20 +1106,36 @@ postgresql:
     sslMode: prefer
 
 # ─── Redis ─────────────────────────────────────────────────────────────────
-# The bitnami/redis sub-chart's default image registry (docker.io/bitnami)
-# was retired in August 2025; free images are now at bitnamilegacy. Pin the
-# redis sub-chart image to bitnamilegacy and acknowledge via the chart's
-# security flag. See https://github.com/bitnami/charts/issues/30850.
+# ─── Redis ─────────────────────────────────────────────────────────────────
+# geoapi's cache (vector tiles and the like), on the official Redis image. It
+# keeps nothing on disk and, at `maxmemory`, evicts the least recently used
+# keys, so losing it only costs a warm-up.
 redis:
   enabled: true
   image:
     registry: docker.io
-    repository: bitnamilegacy/redis
+    repository: redis
+    tag: "7.4-alpine"
+    pullPolicy: IfNotPresent
+  maxmemory: 256mb
   auth:
     enabled: true
-  master:
-    persistence:
-      enabled: false               # cache; no PV needed
+    # A Secret with the password. Empty: the chart generates one on install and
+    # keeps it on every upgrade. Set one when a tool renders the chart without
+    # cluster access (Argo CD, `helm template`): it cannot read the generated
+    # password back and would replace it on every sync.
+    existingSecret: ""
+    existingSecretPasswordKey: redis-password
+  resources:
+    limits:
+      memory: 320Mi                # maxmemory plus Redis' own overhead
+  podSecurityContext: {}
+  securityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  podLabels: {}
   # Used when `enabled: false` — point the chart at a Redis you already run.
   external:
     host: ""

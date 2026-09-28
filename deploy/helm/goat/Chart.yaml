@@ -18,6 +18,11 @@ description: |
     in with. WHITELIST_ENVS is built from all of it plus every name in the
     worker's `config` and `extraEnv`, instead of a fixed list that missed
     newer variables. Before, the print worker got none of this.
+  - Redis: the chart runs its own on the official `redis:7.4-alpine`
+    image (the one the Docker Compose bundle runs) instead of the Bitnami
+    sub-chart, whose `bitnamilegacy/redis` image no longer gets updates.
+    One Deployment, nothing on disk, LRU eviction at `redis.maxmemory`;
+    `global.security.allowInsecureImages` is gone with it.
   - Every worker gets a JOB_DEFAULT_TIMEOUT for its kind of work (tools
     2500 s, workflows 1800 s, print and default 300 s), the values GOAT's
     own deployments use, instead of Windmill's default.
@@ -191,10 +196,8 @@ keywords:
   - accessibility
   - routing
 
-# Sub-chart dependencies. Each is gated on `<name>.enabled` per the spec.
-# Phase 1 only exercises `redis`; cnpg-operator is declared so the bundled
-# profile renders correctly under `helm template`. Other deps (keycloak,
-# rabbitmq, minio) land in Phase 2/3.
+# Sub-chart dependencies, each gated on its `enabled` value: the CloudNativePG
+# operator for the bundled PostgreSQL.
 # CNPG's CRDs are ALSO vendored directly under crds/cloudnative-pg-crds.yaml
 # (a verbatim, un-templated copy of the cloudnative-pg subchart's own
 # templates/crds/crds.yaml at the pinned 0.22.1 version below), with the
@@ -227,7 +230,3 @@ dependencies:
     version: "0.22.x"
     repository: https://cloudnative-pg.github.io/charts
     condition: postgresql.operator.enabled
-  - name: redis
-    version: "20.5.x"
-    repository: oci://registry-1.docker.io/bitnamicharts
-    condition: redis.enabled

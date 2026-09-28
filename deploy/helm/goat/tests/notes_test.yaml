@@ -113,3 +113,8 @@ tests:
     asserts:
       - notMatchRegexRaw:
           pattern: "mixed authentication"
+
+  - it: names the bundled redis password Secret
+    asserts:
+      - matchRegexRaw:
+          pattern: get secret goat-redis -o jsonpath='\{\.data\.redis-password\}'
