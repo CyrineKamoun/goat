@@ -7,9 +7,9 @@ sidebar_position: 4
 
 Mit Vorlagen **beginnen Sie mit etwas bereits Eingerichtetem** statt mit einer leeren Arbeitsfläche. GOAT bietet drei Arten:
 
-- **Projektvorlagen** — öffnen ein vorbereitetes Projekt mit gestalteten Layern, fertigen Analysen und einem Dashboard. Ein guter Ausgangspunkt, wenn Sie ein vollständiges Beispiel erkunden oder anpassen möchten.
-- **Workflow-Vorlagen** — ein fertiger Analyse-Workflow, dem nur Ihre eigenen Daten fehlen. Sie geben die Eingabe-Layer an und führen ihn aus.
-- **Layout-Vorlagen** — druckfertige Seitenlayouts, wobei die Seitengröße in Millimetern angegeben ist.
+- **Projektvorlagen**: öffnen ein vorbereitetes Projekt mit gestalteten Layern, fertigen Analysen und einem Dashboard. Ein guter Ausgangspunkt, wenn Sie ein vollständiges Beispiel erkunden oder anpassen möchten.
+- **Workflow-Vorlagen**: ein fertiger Analyse-Workflow, dem nur Ihre eigenen Daten fehlen. Sie geben die Eingabe-Layer an und führen ihn aus.
+- **Layout-Vorlagen**: druckfertige Seitenlayouts, wobei die Seitengröße in Millimetern angegeben ist.
 
 Diese Seite behandelt vor allem **Projektvorlagen**. Für die anderen beiden siehe [Einen Workflow als Vorlage speichern](../workflows/workflow_interface#3-wie-man-die-workflow-benutzeroberfläche-verwendet) und die Layouts-Seite.
 
@@ -17,8 +17,8 @@ Diese Seite behandelt vor allem **Projektvorlagen**. Für die anderen beiden sie
 
 Auf der **Startseite** zeigt die Reihe `Mit einer Vorlage starten` die verfügbaren Vorlagen. Sie können:
 
-- **Nach Art filtern** — `Alle Vorlagen`, `Projekt`, `Workflow` oder `Layout`.
-- **Nach Quelle filtern** — woher die Vorlage stammt: `Alle`, `GOAT`, `Meine`, `Team` oder `Organisation`.
+- **Nach Art filtern**: `Alle Vorlagen`, `Projekt`, `Workflow` oder `Layout`.
+- **Nach Quelle filtern**: woher die Vorlage stammt, `Alle`, `GOAT`, `Meine`, `Team` oder `Organisation`.
 - Über `Alle Vorlagen` die vollständige Vorlagenübersicht öffnen, in der Sie Vorlagen **durchsuchen** und eine vor der Verwendung in der **Vorschau** ansehen können.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

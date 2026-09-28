@@ -67,7 +67,7 @@ The canvas workspace is where you can drag and drop nodes, zoom, pan, and select
 
 **Minimap**: Located in the bottom right corner of the canvas, providing an overview navigator for complex workflows.
 
-**Data View Controls**: Located at the bottom of the canvas. Select a node to activate the panel — it shows the data of that node's layer:
+**Data View Controls**: Located at the bottom of the canvas. Select a node to activate the panel. It shows the data of that node's layer:
 - <code>Table</code>: Opens the attribute table of the selected node's layer
 - <code>Map</code>: Opens a map preview of the selected node's layer (only available if the layer has geometry)
 
@@ -89,7 +89,7 @@ This tab contains categorized tools available for workflow construction, similar
   - <code>Save as dataset</code>: Save workflow results as permanent datasets. Configure the **Dataset name**, toggle **Add to project** to automatically add the result to the project layer list, and enable **Overwrite on re-run** to replace the previously exported dataset each time the workflow runs instead of creating a new one.
 
 :::tip Good practice
-Give each **Save as dataset** node a descriptive name and enable **Overwrite on re-run** when running the same workflow repeatedly — this keeps your project clean by avoiding duplicate layers after each run.
+Give each **Save as dataset** node a descriptive name and enable **Overwrite on re-run** when running the same workflow repeatedly. This keeps your project clean by avoiding duplicate layers after each run.
 :::
 
 - **Accessibility Indicators**
