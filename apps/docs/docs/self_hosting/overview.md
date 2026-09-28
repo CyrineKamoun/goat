@@ -9,7 +9,7 @@ description: "The services GOAT consists of, from web app and APIs to Keycloak, 
 GOAT is open source, and you can run it on your own infrastructure. This section explains two ways to do that: **Docker Compose on a single server**, and **Kubernetes with Helm**.
 
 :::info Help with self-hosting
-Questions and bug reports are welcome in [GitHub issues](https://github.com/plan4better/goat/issues), answered as time allows. Plan4Better also supports organizations that run GOAT themselves, for example with setting up or upgrading an installation, adapting it to their infrastructure or training their team: [get in touch](https://plan4better.de/en/contact/). If you would rather not run GOAT yourself, use the hosted version at [goat.plan4better.de](https://goat.plan4better.de).
+Questions and bug reports are welcome in [GitHub issues](https://github.com/plan4better/goat/issues), answered as time allows. If GOAT should run on your own infrastructure without your team operating it, Plan4Better offers **managed on-premise deployment**: we set GOAT up on your servers, keep it up to date and look after its operation, and we help with connecting it to your systems or training your team. [Get in touch](https://plan4better.de/en/contact/). If it doesn't have to run on your infrastructure, use the hosted version at [goat.plan4better.de](https://goat.plan4better.de).
 :::
 
 ## What GOAT consists of {#components}
