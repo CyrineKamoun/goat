@@ -50,7 +50,7 @@ import {
   selectVariables,
 } from "@/lib/store/workflow/selectors";
 import { requestMapView, requestTableView, updateNode } from "@/lib/store/workflow/slice";
-import { sqlInputAlias } from "@/lib/utils/workflowHandles";
+import { sqlInputsByHandle } from "@/lib/utils/workflowHandles";
 import type { ContentItem } from "@/lib/validations/content";
 import type { WorkflowNode } from "@/lib/validations/workflow";
 
@@ -271,18 +271,8 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
       layerName: string;
     }> = [];
 
-    // The runner fills one input per target handle and names it after the handle
-    // (input_layer_2_id is input_2), and a skipped If branch leaves the handle to
-    // the live one. Mirror that so the aliases listed here are the ones the query
-    // runs with.
-    const edgeByHandle = new Map<string, (typeof incomingEdges)[number]>();
-    for (const edge of incomingEdges) {
-      const handle = edge.targetHandle || "input_layer_1_id";
-      if (!edgeByHandle.has(handle)) edgeByHandle.set(handle, edge);
-    }
-
-    for (const [handleName, edge] of [...edgeByHandle].sort(([a], [b]) => a.localeCompare(b))) {
-      const alias = sqlInputAlias(handleName, inputs.length);
+    // One entry per handle, under the aliases the runner registers (sqlInputsByHandle).
+    for (const { handle: handleName, edge, alias } of sqlInputsByHandle(incomingEdges)) {
       const sourceNode = nodes.find((n) => n.id === edge.source);
       const sourceData = sourceNode?.data as Record<string, unknown> | undefined;
 

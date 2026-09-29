@@ -26,14 +26,18 @@ export function edgeDerivedInputHandles(edges: Edge[], nodeId: string): string[]
 }
 
 /**
- * The table alias a Custom SQL query uses for the input on `handle`, the way
- * the SQL runner derives it: `input_layer_N_id` is always `input_N`, whatever
- * else is wired, and a handle that already is an alias stays one. Anything
- * else falls back to its position among the listed inputs.
+ * The inputs of a Custom SQL node, one per target handle, under the aliases its
+ * query runs with. The workflow runner fills one input per handle, a later edge
+ * into the same handle replacing an earlier one (so of an If's two branches the
+ * live one wins), then renumbers the connected handles from 1 in sorted order:
+ * with only handles 2 and 3 wired, the query reads `input_1` and `input_2`.
  */
-export function sqlInputAlias(handle: string, index: number): string {
-  const numbered = /^input_layer_(\d+)_id$/.exec(handle);
-  if (numbered) return `input_${numbered[1]}`;
-  if (/^input_\d+$/.test(handle)) return handle;
-  return `input_${index + 1}`;
+export function sqlInputsByHandle<E extends { targetHandle?: string | null }>(
+  edges: E[]
+): Array<{ handle: string; edge: E; alias: string }> {
+  const byHandle = new Map<string, E>();
+  for (const edge of edges) byHandle.set(edge.targetHandle || "input_layer_1_id", edge);
+  return [...byHandle]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([handle, edge], index) => ({ handle, edge, alias: `input_${index + 1}` }));
 }

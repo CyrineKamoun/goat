@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { edgeDerivedInputHandles, sqlInputAlias } from "@/lib/utils/workflowHandles";
+import { edgeDerivedInputHandles, sqlInputsByHandle } from "@/lib/utils/workflowHandles";
 
 const edge = (target: string, targetHandle: string | null, id = `${target}-${targetHandle}`) =>
   ({ id, source: "src", target, targetHandle }) as never;
@@ -43,20 +43,27 @@ describe("edgeDerivedInputHandles", () => {
   });
 });
 
-describe("sqlInputAlias", () => {
-  it("names an input after its handle, as the SQL runner does", () => {
-    expect(sqlInputAlias("input_layer_1_id", 0)).toBe("input_1");
-    // Only inputs 2 and 3 wired: the query still reads input_2 and input_3.
-    expect(sqlInputAlias("input_layer_2_id", 0)).toBe("input_2");
-    expect(sqlInputAlias("input_layer_3_id", 1)).toBe("input_3");
+describe("sqlInputsByHandle", () => {
+  const sqlEdge = (source: string, targetHandle: string | null) => ({ source, targetHandle });
+
+  it("numbers the connected inputs from 1 in handle order, as the workflow runner compacts them", () => {
+    // Drawn out of order and with handle 1 empty: the runner still registers input_1 and input_2.
+    const inputs = sqlInputsByHandle([sqlEdge("b", "input_layer_3_id"), sqlEdge("a", "input_layer_2_id")]);
+
+    expect(inputs.map((i) => [i.handle, i.alias, i.edge.source])).toEqual([
+      ["input_layer_2_id", "input_1", "a"],
+      ["input_layer_3_id", "input_2", "b"],
+    ]);
   });
 
-  it("keeps a handle that already is an alias", () => {
-    expect(sqlInputAlias("input_2", 0)).toBe("input_2");
+  it("lists a handle fed by two edges once, keeping the last edge as the runner does", () => {
+    const inputs = sqlInputsByHandle([sqlEdge("if-true", "input_layer_1_id"), sqlEdge("if-false", "input_layer_1_id")]);
+
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0].edge.source).toBe("if-false");
   });
 
-  it("falls back to the position for any other handle", () => {
-    expect(sqlInputAlias("input", 0)).toBe("input_1");
-    expect(sqlInputAlias("input_layer_id", 1)).toBe("input_2");
+  it("treats an edge without a handle as input 1", () => {
+    expect(sqlInputsByHandle([sqlEdge("a", null)])[0]).toMatchObject({ handle: "input_layer_1_id", alias: "input_1" });
   });
 });
