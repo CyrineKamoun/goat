@@ -24,3 +24,16 @@ export function edgeDerivedInputHandles(edges: Edge[], nodeId: string): string[]
   }
   return handles;
 }
+
+/**
+ * The table alias a Custom SQL query uses for the input on `handle`, the way
+ * the SQL runner derives it: `input_layer_N_id` is always `input_N`, whatever
+ * else is wired, and a handle that already is an alias stays one. Anything
+ * else falls back to its position among the listed inputs.
+ */
+export function sqlInputAlias(handle: string, index: number): string {
+  const numbered = /^input_layer_(\d+)_id$/.exec(handle);
+  if (numbered) return `input_${numbered[1]}`;
+  if (/^input_\d+$/.test(handle)) return handle;
+  return `input_${index + 1}`;
+}

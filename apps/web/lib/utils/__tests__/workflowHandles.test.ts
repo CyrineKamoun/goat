@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { edgeDerivedInputHandles } from "@/lib/utils/workflowHandles";
+import { edgeDerivedInputHandles, sqlInputAlias } from "@/lib/utils/workflowHandles";
 
 const edge = (target: string, targetHandle: string | null, id = `${target}-${targetHandle}`) =>
   ({ id, source: "src", target, targetHandle }) as never;
@@ -40,5 +40,23 @@ describe("edgeDerivedInputHandles", () => {
     const edges = [edge("tool-a", "input"), edge("tool-a", null)];
 
     expect(edgeDerivedInputHandles(edges, "tool-a")).toEqual([]);
+  });
+});
+
+describe("sqlInputAlias", () => {
+  it("names an input after its handle, as the SQL runner does", () => {
+    expect(sqlInputAlias("input_layer_1_id", 0)).toBe("input_1");
+    // Only inputs 2 and 3 wired: the query still reads input_2 and input_3.
+    expect(sqlInputAlias("input_layer_2_id", 0)).toBe("input_2");
+    expect(sqlInputAlias("input_layer_3_id", 1)).toBe("input_3");
+  });
+
+  it("keeps a handle that already is an alias", () => {
+    expect(sqlInputAlias("input_2", 0)).toBe("input_2");
+  });
+
+  it("falls back to the position for any other handle", () => {
+    expect(sqlInputAlias("input", 0)).toBe("input_1");
+    expect(sqlInputAlias("input_layer_id", 1)).toBe("input_2");
   });
 });
