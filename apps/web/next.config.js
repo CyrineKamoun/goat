@@ -41,6 +41,12 @@ const nextConfig = {
     NEXT_PUBLIC_APP_ENVIRONMENT:
       process.env.NEXT_PUBLIC_APP_ENVIRONMENT ?? process.env.ENVIRONMENT ?? "",
   },
+  // Hostnames besides localhost that may load the dev server's own resources
+  // (HMR, /_next/*), e.g. when it is opened over a VPN name. Comma-separated.
+  allowedDevOrigins: (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   reactStrictMode: true,
   transpilePackages: ["@p4b/ui", "@p4b/tsconfig"],
   // The pwa-icon routes use sharp, whose libvips shared library is loaded by
