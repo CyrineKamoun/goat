@@ -173,10 +173,12 @@ const CustomColorScale = (props: CustomColorScaleProps) => {
   // Every style change deep-clones the layer style, so the saved color map
   // arrives as a new array even when nothing in it changed. Keying on its
   // content keeps unsaved row edits across unrelated changes (e.g. No data).
-  const savedColorMapKey = JSON.stringify({
-    colorMap: colorSet.selectedColor.color_map ?? null,
-    colorLegends: colorSet.selectedColor.color_legends ?? null,
-  });
+  const savedColorMap = colorSet.selectedColor.color_map;
+  const savedColorLegends = colorSet.selectedColor.color_legends;
+  const savedColorMapKey = React.useMemo(
+    () => JSON.stringify({ colorMap: savedColorMap ?? null, colorLegends: savedColorLegends ?? null }),
+    [savedColorMap, savedColorLegends]
+  );
 
   const getValueMaps = React.useCallback(() => {
     const saved = JSON.parse(savedColorMapKey) as {
