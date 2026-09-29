@@ -113,12 +113,15 @@ export const useDatasetCollectionItems = (
     fetcher
   );
   // With keepPreviousPage, the current page stays visible while another page or
-  // sort order of the same dataset loads; a different dataset never shows it.
+  // sort order of the same dataset loads; a different dataset, or a request that
+  // failed, never shows it.
   const previous = useRef<{ datasetId: string; data: DatasetCollectionItems } | null>(null);
   if (data) previous.current = { datasetId, data };
   const shown =
     data ??
-    (options?.keepPreviousPage && previous.current?.datasetId === datasetId ? previous.current.data : undefined);
+    (options?.keepPreviousPage && !error && previous.current?.datasetId === datasetId
+      ? previous.current.data
+      : undefined);
   return { data: shown, isLoading, isError: error, mutate };
 };
 
