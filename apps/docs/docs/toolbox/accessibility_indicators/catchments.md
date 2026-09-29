@@ -31,7 +31,7 @@ Catchment Area includes the following additional features:
 - **Access and egress mode** — configure how users travel to and from PT stations (walking, cycling, pedelec, or car).
 
 :::info
-Catchment Area computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/).
+Catchment Area computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/). You can also [import your own routing network](../../data/builtin_datasets) to analyse other regions.
 :::
 
 ## 2. Example use cases
