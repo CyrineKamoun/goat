@@ -102,6 +102,11 @@ You can find shared items in your workspace:
 
 You can **hand an item over to a team or organization** so that it no longer belongs to you personally. This works for datasets, projects, workflows and layouts.
 
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/sharing/transfer_ownership.webp').default} alt="Transfer ownership on the Teams tab of the Share dialog" style={{ maxHeight: "480px", maxWidth: "480px", objectFit: "contain"}}/>
+</div>
+<p> </p>
+
 <div class="step">
    <div class="step-number">1</div>
    <div class="content">Open the item's <code>More options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu, choose <code>Share</code>, open the <code>Teams</code> tab and select <code>Transfer ownership</code>.</div>

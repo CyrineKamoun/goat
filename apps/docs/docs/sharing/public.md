@@ -20,7 +20,7 @@ Public sharing is view-only. If you want others to **edit the map**, share it on
 ## How to Share a Map Publicly? 
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <Video src={require('/img/sharing/sharing_public.mp4').default} alt="Public Sharing on GOAT" style={{ maxHeight: "auto", maxWidth: "80%", objectFit: "cover"}}/>
+  <img src={require('/img/sharing/public_tab_published.webp').default} alt="The Public tab before and after publishing a project" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
 </div>
 <p></p>
 
@@ -31,27 +31,29 @@ Public sharing is view-only. If you want others to **edit the map**, share it on
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Open the <code>Public</code> tab. As long as the project is not published, it shows <code>This project is private</code>.</div>
+  <div class="content">Open the <code>Public</code> tab.</div>
 </div>
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Click <code>Publish to web</code>. The tab now shows <code>Published</code> and when the snapshot was taken.</div>
+  <div class="content">Click <code>Publish to web</code>.</div>
 </div>
 
 Now you can:
 
-- <code>Copy link</code> under <code>Address</code> – <b>Share the direct link</b> so others can open the map in their browser.
+- <code>Copy link</code> under <code>Address</code>: <b>Share the direct link</b> so others can open the map in their browser.
 
-- <code>Copy</code> next to <code>Embed Code</code> under <code>Embed</code> – <b>Embed the map</b> as an iframe in websites or tools that support HTML and iframes.
+- <code>Copy</code> next to <code>Embed Code</code> under <code>Embed</code>: <b>Embed the map</b> as an iframe in websites or tools that support HTML and iframes.
 
 ## Other Settings on the Public Tab
 
 Once the project is published, the <code>Public</code> tab also offers these settings:
 
-- <code>Address</code> – If your organization has set up a custom domain, choose here whether the map is served from it or from the <code>GOAT default domain</code>. Without a custom domain, this section only shows the link. Custom domains are set up under [Settings](../workspace/settings).
+- <code>Address</code>: If your organization has set up a custom domain, choose here whether the map is served from it or from the <code>GOAT default domain</code>. Without a custom domain, this section only shows the link. Custom domains are set up under [Settings](../workspace/settings).
 
-- <code>Measurement</code> – Choose an analytics instance to measure visits to the public page, or <code>No tracking</code>. If your organization has not configured any analytics instance, the tab says so. With an instance selected, the <code>Cookie consent banner</code> switch decides whether visitors are asked before tracking starts. Turning it off shows a warning, because tracking without consent is not compliant with GDPR in Germany and most of the EU.
+- <code>Measurement</code>: Here you decide whether visits to the public page are counted. What you see depends on your organization:
+    - If it has **no analytics instance** yet, this section shows <code>No analytics instances configured</code> and where to add one. Setting one up is described under [Analytics](../workspace/settings#analytics).
+    - If it **has one or more instances**, pick one to count visits, or choose <code>No tracking</code>. When you pick an instance, the <code>Cookie consent banner</code> switch appears: leave it on to ask visitors before tracking starts. If you turn it off, GOAT shows a warning, because tracking people without their consent is not allowed under GDPR in Germany and most of the EU.
 
 ## Adjusting Map Extent
 

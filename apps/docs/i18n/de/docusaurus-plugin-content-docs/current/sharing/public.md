@@ -20,7 +20,7 @@ Beim Veröffentlichen entsteht eine **Momentaufnahme** des Projekts: Die öffent
 ## Wie teile ich eine Karte öffentlich?
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <Video src={require('/img/sharing/sharing_public.mp4').default} alt="Öffentliches Teilen in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <img src={require('/img/sharing/public_tab_published_de.webp').default} alt="Der Tab Öffentlich vor und nach dem Veröffentlichen eines Projekts" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
 </div>
 <p> </p>
 
@@ -31,27 +31,29 @@ Beim Veröffentlichen entsteht eine **Momentaufnahme** des Projekts: Die öffent
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Öffnen Sie den Tab <code>Öffentlich</code>. Solange das Projekt nicht veröffentlicht ist, zeigt er <code>Dieses Projekt ist privat</code>.</div>
+  <div class="content">Öffnen Sie den Tab <code>Öffentlich</code>.</div>
 </div>
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Klicken Sie auf <code>Im Web veröffentlichen</code>. Der Tab zeigt nun <code>Veröffentlicht</code> und wann die Momentaufnahme erstellt wurde.</div>
+  <div class="content">Klicken Sie auf <code>Im Web veröffentlichen</code>.</div>
 </div>
 
 Nun können Sie:
 
-- <code>Link kopieren</code> unter <code>Adresse</code> – <b>Teilen Sie den Direktlink</b>, damit andere die Karte im Browser öffnen können.
+- <code>Link kopieren</code> unter <code>Adresse</code>: <b>Teilen Sie den Direktlink</b>, damit andere die Karte im Browser öffnen können.
 
-- <code>Kopieren</code> neben <code>Code einbetten</code> unter <code>Einbetten</code> – <b>Betten Sie die Karte</b> als iframe in Websites oder Tools ein, die HTML und iframes unterstützen.
+- <code>Kopieren</code> neben <code>Code einbetten</code> unter <code>Einbetten</code>: <b>Betten Sie die Karte</b> als iframe in Websites oder Tools ein, die HTML und iframes unterstützen.
 
 ## Weitere Einstellungen im Tab „Öffentlich“
 
 Sobald das Projekt veröffentlicht ist, bietet der Tab <code>Öffentlich</code> außerdem diese Einstellungen:
 
-- <code>Adresse</code> – Wenn Ihre Organisation eine eigene Domain eingerichtet hat, wählen Sie hier, ob die Karte über diese Domain oder über die <code>GOAT-Standarddomain</code> bereitgestellt wird. Ohne eigene Domain zeigt dieser Abschnitt nur den Link. Eigene Domains richten Sie unter [Einstellungen](../workspace/settings) ein.
+- <code>Adresse</code>: Wenn Ihre Organisation eine eigene Domain eingerichtet hat, wählen Sie hier, ob die Karte über diese Domain oder über die <code>GOAT-Standarddomain</code> bereitgestellt wird. Ohne eigene Domain zeigt dieser Abschnitt nur den Link. Eigene Domains richten Sie unter [Einstellungen](../workspace/settings) ein.
 
-- <code>Messung</code> – Wählen Sie eine Analytics-Instanz, um Besuche der öffentlichen Seite zu messen, oder <code>Kein Tracking</code>. Hat Ihre Organisation keine Analytics-Instanz konfiguriert, weist der Tab darauf hin. Ist eine Instanz ausgewählt, legt der Schalter <code>Cookie-Einwilligungsbanner</code> fest, ob Besucher gefragt werden, bevor das Tracking startet. Wenn Sie ihn ausschalten, erscheint eine Warnung, da Tracking ohne Einwilligung in Deutschland und den meisten EU-Ländern nicht mit der DSGVO vereinbar ist.
+- <code>Messung</code>: Hier legen Sie fest, ob Besuche der öffentlichen Seite gezählt werden. Was Sie sehen, hängt von Ihrer Organisation ab:
+    - Hat sie noch **keine Analytics-Instanz**, zeigt dieser Abschnitt <code>Keine Analytics-Instanzen konfiguriert</code> und wo Sie eine hinzufügen. Das Einrichten ist unter [Analytics](../workspace/settings#analytics) beschrieben.
+    - Hat sie **eine oder mehrere Instanzen**, wählen Sie eine, um Besuche zu zählen, oder <code>Kein Tracking</code>. Sobald Sie eine Instanz wählen, erscheint der Schalter <code>Cookie-Einwilligungsbanner</code>: Lassen Sie ihn an, um Besucher zu fragen, bevor das Tracking startet. Schalten Sie ihn aus, zeigt GOAT eine Warnung, denn ohne Einwilligung ist Tracking in Deutschland und den meisten EU-Ländern nicht mit der DSGVO vereinbar.
 
 ## Kartenausdehnung anpassen
 

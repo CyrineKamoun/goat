@@ -99,6 +99,11 @@ Sie finden geteilte Elemente in Ihrem Workspace:
 
 Sie können einen Inhalt **an ein Team oder eine Organisation übergeben**, sodass er nicht mehr Ihnen persönlich gehört. Dies funktioniert für Datensätze, Projekte, Workflows und Layouts.
 
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/sharing/transfer_ownership_de.webp').default} alt="Rechte übertragen im Tab Teams des Teilen-Dialogs" style={{ maxHeight: "480px", maxWidth: "480px", objectFit: "contain"}}/>
+</div>
+<p> </p>
+
 <div class="step">
    <div class="step-number">1</div>
    <div class="content">Öffnen Sie das <code>Weitere Optionen</code>-Menü <img src={require('/img/icons/3dots.png').default} alt="Weitere Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> des Inhalts, wählen Sie <code>Teilen</code>, öffnen Sie den Tab <code>Teams</code> und wählen Sie <code>Rechte übertragen</code>.</div>
