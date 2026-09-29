@@ -238,7 +238,9 @@ const CustomColorScale = (props: CustomColorScaleProps) => {
   }
 
   function deleteStep(item: ColorItem) {
-    if (valueMaps.length === 2) {
+    // Breaks need two steps to form an interval; an ordinal map can style a single value.
+    const minSteps = props.selectedColorScaleMethod === "custom_breaks" ? 2 : 1;
+    if (valueMaps.length <= minSteps) {
       return;
     }
     const index = valueMaps.findIndex((color) => color.id === item.id);
