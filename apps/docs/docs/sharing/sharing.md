@@ -41,7 +41,7 @@ Sharing **does not duplicate** your data, only grants access to it.
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <Video src={require('/img/sharing/manage_team_members.mp4').default} alt="Teams in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <img src={require('/img/sharing/manage_team_members.webp').default} alt="Managing team members in Settings" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
 </div>
 <p> </p>
 
@@ -60,7 +60,7 @@ Open the item's <code>More options</code> <img src={require('/img/icons/3dots.pn
 - **Public**: for a **dataset**, make it public to all GOAT users; for a **project**, publish a public web snapshot that anyone can open without a GOAT account. Both are covered in [Public Sharing](./public.md).
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <Video src={require('/img/sharing/share_project.mp4').default} alt="Sharing Access in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <img src={require('/img/sharing/share_dialog_tabs.webp').default} alt="Opening Share and the People, Teams and Public tabs" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
 </div>
 <p> </p>
 

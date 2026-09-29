@@ -39,7 +39,7 @@ Das Teilen **dupliziert nicht** Ihre Daten, sondern gewährt nur Zugriff darauf.
 </div>
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <Video src={require('/img/sharing/manage_team_members.mp4').default} alt="Teams in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <img src={require('/img/sharing/manage_team_members_de.webp').default} alt="Mitglieder in den Einstellungen verwalten" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
 </div>
 <p> </p>
 
@@ -58,7 +58,7 @@ Wenn Sie einen Datensatz/ein Projekt mit einem Team oder einer Organisation teil
 - **Öffentlich**: einen **Datensatz** für alle GOAT-Nutzer öffentlich machen; bei einem **Projekt** eine öffentliche Momentaufnahme veröffentlichen, die jeder ohne GOAT-Konto öffnen kann. Beides wird unter [Öffentliches Teilen](./public.md) behandelt.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <Video src={require('/img/sharing/share_project.mp4').default} alt="Teilen-Zugriff in GOAT" style={{ maxHeight: "750px", maxWidth: "750px", objectFit: "cover"}}/>
+  <img src={require('/img/sharing/share_dialog_tabs_de.webp').default} alt="Teilen öffnen und die Tabs Personen, Teams und Öffentlich" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
 </div>
 <p> </p>
 
