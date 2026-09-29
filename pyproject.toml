@@ -63,6 +63,7 @@ exclude = ["venv", ".venv", "alembic", "data", "packages/cpp"]
 # unresolved imports and syntax errors and powers autocomplete/navigation.
 [tool.pyright]
 typeCheckingMode = "off"
+exclude = ["**/node_modules", "**/__pycache__", "**/.*", "**/data", "apps/docs/build"]
 
 [tool.ruff.lint]
 select = ["F", "E", "W", "N", "I", "ANN"]
