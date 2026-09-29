@@ -137,6 +137,11 @@ Gelöschte Inhalte werden nicht sofort entfernt. Sie **wandern zuerst in den Pap
 
 Den Papierkorb finden Sie unter <code>Inhalt</code>, im Panel <code>Bereiche</code> auf der linken Seite.
 
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/sharing/trash_de.webp').default} alt="Papierkorb unten im Panel Bereiche unter Inhalt" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
+</div>
+<p> </p>
+
 - Beim Löschen wird ein Inhalt in den **Papierkorb** verschoben, wo er **30 Tage lang wiederhergestellt** werden kann.
 - Öffnen Sie den Papierkorb, um einen Inhalt <code>Wiederherstellen</code> zu lassen, oder belassen Sie ihn dort: Inhalte werden **30 Tage nach dem Löschen** endgültig entfernt.
 

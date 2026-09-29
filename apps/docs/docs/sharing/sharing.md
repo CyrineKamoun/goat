@@ -140,6 +140,11 @@ Deleted items are not removed immediately. They **go to the Trash first**.
 
 You find the Trash in <code>Content</code>, in the <code>Spaces</code> panel on the left.
 
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/sharing/trash.webp').default} alt="Trash at the bottom of the Spaces panel in Content" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
+</div>
+<p> </p>
+
 - Deleting an item moves it to the **Trash**, where it can be **restored for 30 days**.
 - Open the Trash to <code>Restore</code> an item, or leave it: items are removed for good **30 days after deletion**.
 
