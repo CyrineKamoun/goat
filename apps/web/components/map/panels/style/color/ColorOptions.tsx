@@ -18,6 +18,7 @@ const ColorOptions = ({
   layerFields,
   selectedField,
   collapsed,
+  showOpacity = type === "color",
   onStyleChange,
 }: {
   type: "color" | "stroke_color";
@@ -27,6 +28,8 @@ const ColorOptions = ({
   selectedField?: LayerFieldType;
   layerFields: LayerFieldType[];
   collapsed?: boolean;
+  /** Layer opacity slider; on by default for fill color only. Lines have no fill, so their stroke color carries it. */
+  showOpacity?: boolean;
   onStyleChange?: (newStyle: FeatureLayerProperties) => void;
 }) => {
   const { t } = useTranslation("common");
@@ -54,11 +57,11 @@ const ColorOptions = ({
     }),
     [layerStyle, onStyleChange, type]
   );
-  const [opacity, setOpacity] = useState(layerStyle?.opacity || 1);
+  const [opacity, setOpacity] = useState(layerStyle?.opacity ?? 1);
 
   // Resets opacity when layerStyle changes
   useEffect(() => {
-    setOpacity(layerStyle?.opacity || 1);
+    setOpacity(layerStyle?.opacity ?? 1);
   }, [layerStyle]);
 
   return (
@@ -141,7 +144,7 @@ const ColorOptions = ({
               }}
             />
           )}
-          {type === "color" && (
+          {showOpacity && (
             <>
               <FormLabelHelper label={t("opacity")} color="inherit" />
               <SliderInput

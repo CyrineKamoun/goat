@@ -551,6 +551,7 @@ const LayerStylePanel = ({ projectId }: { projectId: string }) => {
 
                       <ColorOptions
                         type="stroke_color"
+                        showOpacity={activeLayer?.feature_layer_geometry_type === "line"}
                         layerStyle={layerProperties}
                         active={!!layerProperties.stroked}
                         layerFields={layerFields}

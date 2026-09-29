@@ -39,7 +39,7 @@ Fill color defines the interior appearance of point and polygon features.
 </div>
 
 :::info
-<code>Opacity</code> applies to the fill only. <code>Stroke Color</code> has no opacity setting: outlines of points and polygons are always drawn fully opaque, and line layers have no <code>Opacity</code> control in the <code>Style</code> section.
+<code>Opacity</code> applies to the fill only. <code>Stroke Color</code> has no opacity setting: outlines of points and polygons are always drawn fully opaque. Line layers have no fill, so their <code>Opacity</code> slider is in the advanced options of <code>Color</code>.
 :::
 
 ### Stroke color
