@@ -120,6 +120,13 @@ const Settings = ({
               selectedField={selectedField}
               setSelectedField={(field) => {
                 const newStyle = JSON.parse(JSON.stringify(layerStyle)) || {};
+                // The size range defaults to start at 0, which renders the smallest
+                // features invisibly. On first use start it at the fixed size instead.
+                const size = newStyle[type];
+                const range = newStyle[`${type}_range`] ?? [0, 50];
+                if (field && !newStyle[`${type}_field`] && range[0] === 0 && typeof size === "number" && size > 0) {
+                  newStyle[`${type}_range`] = [size, Math.max(range[1], size * 2)];
+                }
                 newStyle[`${type}_field`] = field;
                 if (onStyleChange) {
                   onStyleChange(newStyle);
