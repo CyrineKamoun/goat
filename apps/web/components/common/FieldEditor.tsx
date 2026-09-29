@@ -733,42 +733,49 @@ const FieldEditor: React.FC<FieldEditorProps> = ({
 
                 {showFormat && (
                   <>
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                      {t("number_format")}
-                    </Typography>
-                    <Stack direction="row" spacing={1}>
-                      <Select
-                        size="small"
-                        fullWidth
-                        value={String(cfg.decimals ?? "auto")}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          handleDisplayConfigChange(selectedField.id, {
-                            decimals: v === "auto" ? "auto" : Number(v),
-                          });
-                        }}>
-                        {DECIMALS_OPTIONS.map((o) => (
-                          <MenuItem key={String(o)} value={String(o)}>
-                            {o === "auto" ? t("auto") : o}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                      {unitOptions.length > 0 && (
+                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                      <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          {t("decimals")}
+                        </Typography>
                         <Select
                           size="small"
                           fullWidth
-                          value={cfg.unit ?? "auto"}
-                          onChange={(e) =>
+                          value={String(cfg.decimals ?? "auto")}
+                          onChange={(e) => {
+                            const v = e.target.value;
                             handleDisplayConfigChange(selectedField.id, {
-                              unit: e.target.value,
-                            })
-                          }>
-                          {unitOptions.map((u) => (
-                            <MenuItem key={u} value={u}>
-                              {u === "auto" ? t("auto") : u}
+                              decimals: v === "auto" ? "auto" : Number(v),
+                            });
+                          }}>
+                          {DECIMALS_OPTIONS.map((o) => (
+                            <MenuItem key={String(o)} value={String(o)}>
+                              {o === "auto" ? t("auto") : o}
                             </MenuItem>
                           ))}
                         </Select>
+                      </Stack>
+                      {unitOptions.length > 0 && (
+                        <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {t("unit")}
+                          </Typography>
+                          <Select
+                            size="small"
+                            fullWidth
+                            value={cfg.unit ?? "auto"}
+                            onChange={(e) =>
+                              handleDisplayConfigChange(selectedField.id, {
+                                unit: e.target.value,
+                              })
+                            }>
+                            {unitOptions.map((u) => (
+                              <MenuItem key={u} value={u}>
+                                {u === "auto" ? t("auto") : u}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </Stack>
                       )}
                     </Stack>
                     <FormControlLabel
