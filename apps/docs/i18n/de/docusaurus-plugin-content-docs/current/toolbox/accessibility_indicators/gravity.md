@@ -21,7 +21,7 @@ Die Heatmap Gravity zeigt ein **farbcodiertes hexagonales Raster, das die Erreic
 
 Sie können das **Verkehrsmittel**, den **Gelegenheits-Layer**, das **Reisekostenlimit** sowie die **Sensitivität** und das **Destinationspotenzial** einstellen, um die Berechnung der Erreichbarkeit zu verfeinern.
 
-- Der **Gelegenheits-Layer enthält punktbasierte Zieldaten** (wie POIs, Haltestellen, Schulen, Einrichtungen oder benutzerdefinierte Punkte). Sie können mehrere Ziel-Layer auswählen, die zu einer einzigen Heatmap kombiniert werden.
+- Der **Gelegenheits-Layer enthält punkt- oder polygonbasierte Zieldaten** (wie POIs, Haltestellen, Schulen, Einrichtungen, Parks oder benutzerdefinierte Daten). Sie können mehrere Ziel-Layer auswählen, die zu einer einzigen Heatmap kombiniert werden.
 
 - Die **Sensitivität steuert, wie schnell die Erreichbarkeit mit zunehmenden Reisekosten abnimmt**, während das **Destinationspotenzial es ermöglicht, Zielen mit höherer Kapazität oder Qualität mehr Gewicht zu geben** (z. B. ein größerer Supermarkt oder eine Haltestelle mit mehr Abfahrten). Zusammen mit der gewählten **Widerstandsfunktion definieren diese Einstellungen, wie die Erreichbarkeit berechnet wird**.
 
@@ -158,7 +158,7 @@ Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Ein
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Wählen Sie Ihren <code>Eingabe-Layer</code> aus dem Dropdown-Menü. Dies kann jeder zuvor erstellte Layer mit punktbasierten Daten sein.</div>
+  <div class="content">Wählen Sie Ihren <code>Eingabe-Layer</code> aus dem Dropdown-Menü. Dies kann jeder zuvor erstellte Layer mit punkt- oder polygonbasierten Daten sein.</div>
 </div>
 
 <div class="step">

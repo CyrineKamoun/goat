@@ -20,7 +20,7 @@ The heatmap Gravity displays a **color-coded hexagonal grid showing the accessib
 
 You can specify the **routing type**, **opportunity layer**, **travel cost limit**, and adjust **sensitivity** and **destination potential** to fine-tune how accessibility is calculated.
 
-- The **Opportunity layer contains point-based destination data** (such as POIs, transit stops, schools, amenities, or custom points). You can select multiple opportunity layers, which will be combined into a single unified heatmap.
+- The **Opportunity layer contains point or polygon based destination data** (such as POIs, transit stops, schools, amenities, parks, or custom data). You can select multiple opportunity layers, which will be combined into a single unified heatmap.
 
 - The **Sensitivity controls how quickly accessibility decreases with increasing travel cost**, while the **Destination potential lets you give more weight to destinations with higher capacity or quality** (e.g., a larger supermarket or a bus stop with more departures). Together with the chosen **Impedance function, these settings define how accessibility is calculated**.
 
@@ -157,7 +157,7 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Select your <code>Input Layer</code> from the drop-down menu. This can be any previously created layer containing point-based data.</div>
+  <div class="content">Select your <code>Input Layer</code> from the drop-down menu. This can be any previously created layer containing point or polygon based data.</div>
 </div>
 
 <div class="step">
