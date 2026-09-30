@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import useSWR from "swr";
 
 import { apiRequestAuth, fetcher } from "@/lib/api/fetcher";
@@ -102,12 +103,26 @@ export const updateLayerDataset = async (
   return executeProcessAsync("layer_update", inputs);
 };
 
-export const useDatasetCollectionItems = (datasetId: string, queryParams?: GetCollectionItemsQueryParams) => {
+export const useDatasetCollectionItems = (
+  datasetId: string,
+  queryParams?: GetCollectionItemsQueryParams,
+  options?: { keepPreviousPage?: boolean }
+) => {
   const { data, isLoading, error, mutate } = useSWR<DatasetCollectionItems>(
     () => (datasetId ? [`${COLLECTIONS_API_BASE_URL}/${datasetId}/items`, queryParams] : null),
     fetcher
   );
-  return { data, isLoading, isError: error, mutate };
+  // With keepPreviousPage, the current page stays visible while another page or
+  // sort order of the same dataset loads; a different dataset, or a request that
+  // failed, never shows it.
+  const previous = useRef<{ datasetId: string; data: DatasetCollectionItems } | null>(null);
+  if (data) previous.current = { datasetId, data };
+  const shown =
+    data ??
+    (options?.keepPreviousPage && !error && previous.current?.datasetId === datasetId
+      ? previous.current.data
+      : undefined);
+  return { data: shown, isLoading, isError: error, mutate };
 };
 
 export const useLayerQueryables = (layerId: string) => {

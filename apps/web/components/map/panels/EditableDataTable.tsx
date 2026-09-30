@@ -187,6 +187,9 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   // Sort state
   const [sortBy, setSortBy] = useState<string | undefined>(undefined);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  // The layer the sort was chosen on. The table stays mounted across layer
+  // switches, so a sort column must never be sent for another layer.
+  const [sortLayerId, setSortLayerId] = useState<string | undefined>(undefined);
 
   // Selection state (single row)
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
@@ -412,23 +415,27 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
       limit: rowsPerPage,
       offset: page * rowsPerPage,
     };
-    if (sortBy) {
+    if (sortBy && sortLayerId === layerId) {
       params.sortby = sortDirection === "desc" ? `-${sortBy}` : sortBy;
     }
     if (combinedFilter) {
       params.filter = combinedFilter;
     }
     return params;
-  }, [page, rowsPerPage, sortBy, sortDirection, combinedFilter]);
+  }, [page, rowsPerPage, sortBy, sortDirection, sortLayerId, layerId, combinedFilter]);
 
   // Fetch data
-  const { data: collectionData, isLoading, mutate } = useDatasetCollectionItems(layerId, queryParams);
+  const { data: collectionData, isLoading, mutate } = useDatasetCollectionItems(layerId, queryParams, {
+    keepPreviousPage: true,
+  });
 
   const filteredFeatures = collectionData?.features || [];
 
   // Reset page when layer changes
   useEffect(() => {
     setPage(0);
+    setSortBy(undefined);
+    setSortDirection("asc");
     setSelectedRowId(null);
     setDirtyCells(new Map());
     setEditingCell(null);
@@ -521,6 +528,7 @@ const EditableDataTable: React.FC<EditableDataTableProps> = ({
   // --- Sort ---
 
   const handleSort = (field: string, direction?: SortDirection) => {
+    setSortLayerId(layerId);
     if (direction) {
       setSortBy(field);
       setSortDirection(direction);

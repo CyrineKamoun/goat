@@ -189,7 +189,7 @@ const Selector = (props: SelectorProps) => {
                     />
                   )
                 )}
-                <Typography variant="body2" fontWeight="bold" noWrap>
+                <Typography variant="body2" fontWeight="bold" noWrap title={selectedItems.label}>
                   {selectedItems.label}
                 </Typography>
               </div>
@@ -268,6 +268,7 @@ const Selector = (props: SelectorProps) => {
             <Typography
               variant="body2"
               fontWeight="bold"
+              title={item.label}
               style={{
                 overflow: "hidden",
                 textOverflow: "ellipsis",

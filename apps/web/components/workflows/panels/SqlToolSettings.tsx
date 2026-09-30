@@ -50,6 +50,7 @@ import {
   selectVariables,
 } from "@/lib/store/workflow/selectors";
 import { requestMapView, requestTableView, updateNode } from "@/lib/store/workflow/slice";
+import { sqlInputsByHandle } from "@/lib/utils/workflowHandles";
 import type { ContentItem } from "@/lib/validations/content";
 import type { WorkflowNode } from "@/lib/validations/workflow";
 
@@ -270,16 +271,14 @@ export default function SqlToolSettings({ node, onBack }: SqlToolSettingsProps) 
       layerName: string;
     }> = [];
 
-    for (const edge of incomingEdges) {
-      const handleName = edge.targetHandle || "input_layer_1_id";
-      const idx = inputs.length + 1;
-      const alias = `input_${idx}`;
+    // One entry per handle, under the aliases the runner registers (sqlInputsByHandle).
+    for (const { handle: handleName, edge, alias } of sqlInputsByHandle(incomingEdges)) {
       const sourceNode = nodes.find((n) => n.id === edge.source);
       const sourceData = sourceNode?.data as Record<string, unknown> | undefined;
 
       let layerUuid: string | undefined;
       // Use result_layer_name for tool nodes, fall back to translated processId or label
-      let layerName = `Input ${idx}`;
+      let layerName = `Input ${alias.slice("input_".length)}`;
       if (sourceData?.type === "tool") {
         const toolConfig = sourceData.config as Record<string, unknown> | undefined;
         layerName =

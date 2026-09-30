@@ -43,7 +43,7 @@ Füllfarbe definiert das Innere Erscheinungsbild von Punkt- und Polygon-Features
 
 
 :::info
-<code>Deckkraft</code> gilt nur für die Füllung. <code>Strichfarbe</code> hat keine Einstellung für die Deckkraft: Umrisse von Punkten und Polygonen werden immer vollständig deckend gezeichnet, und für Linien-Layer gibt es im Bereich <code>Stil</code> keinen Regler <code>Deckkraft</code>.
+<code>Deckkraft</code> gilt nur für die Füllung. <code>Strichfarbe</code> hat keine Einstellung für die Deckkraft: Umrisse von Punkten und Polygonen werden immer vollständig deckend gezeichnet. Linien-Layer haben keine Füllung, daher finden Sie ihren Regler <code>Deckkraft</code> in den erweiterten Optionen von <code>Farbe</code>.
 :::
 
 ### Strichfarbe
