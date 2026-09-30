@@ -9,7 +9,7 @@ This tool allows you to **extract input features that fall within the clip layer
 
 ## 1. Explanation
 
-Refers to the process of **extracting a portion of a vector dataset based on the boundary of another polygon layer.** It acts like a "cookie cutter"—only the features (or parts of features) from the input layer that fall inside the clip layer are retained. The attributes of the input features are preserved, but the clip layer's attributes are not transferred.
+Refers to the process of **extracting a portion of a vector dataset based on the boundary of another polygon layer.** It acts like a "cookie cutter": only the features (or parts of features) from the input layer that fall inside the clip layer are retained. The attributes of the input features are preserved, but the clip layer's attributes are not transferred.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 

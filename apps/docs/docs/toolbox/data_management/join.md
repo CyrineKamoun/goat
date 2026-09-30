@@ -46,7 +46,7 @@ When each target feature matches at most one feature in the Join Layer, the resu
 
 ### One-to-Many
 
-When one target feature matches multiple features in the Join Layer, the result contains one row per match — the target geometry is repeated for each matching record.
+When one target feature matches multiple features in the Join Layer, the result contains one row per match: the target geometry is repeated for each matching record.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/toolbox/data_management/join/attribute_join_one_to_many.webp').default} alt="One-to-Many Join: Inner Join vs Left Join" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "cover"}}/>
@@ -56,7 +56,7 @@ When one target feature matches multiple features in the Join Layer, the result 
 
 <TabItem value="spatial" label="Spatial Join" className="tabItemBox">
 
-A Spatial Join links features based on their geometric relationship — no shared field is needed. Each feature in the Target Layer is matched to features in the Join Layer that satisfy the selected spatial relationship.
+A Spatial Join links features based on their geometric relationship, no shared field is needed. Each feature in the Target Layer is matched to features in the Join Layer that satisfy the selected spatial relationship.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: "32px", marginBottom: "32px" }}>
   <img src={require('/img/toolbox/data_management/join/spatial_relationships.webp').default} alt="Spatial Relationship Types" style={{ maxHeight: "auto", maxWidth: "70%", objectFit: "cover"}}/>
@@ -70,7 +70,7 @@ A Spatial Join links features based on their geometric relationship — no share
 | `Overlaps` | Features partially overlap but neither is fully inside the other. |
 | `Completely Contains` | Target feature fully contains the join feature. |
 | `Covers` | Target feature fully contains the join feature. |
-| `Disjoint` | Features have no spatial relationship — they do not touch or overlap. |
+| `Disjoint` | Features have no spatial relationship: they do not touch or overlap. |
 | `Touches` | Features share a boundary but do not overlap. |
 | `Within Distance` | Features are within a specified distance of each other. |
 | `Identical To` | Features have exactly the same geometry. |
@@ -81,7 +81,7 @@ A Spatial Join links features based on their geometric relationship — no share
 
 <TabItem value="spatial_attribute" label="Spatial and Attribute Join" className="tabItemBox">
 
-This method requires **both** a spatial relationship and a matching attribute value to be satisfied. A feature is only joined if it meets both conditions simultaneously. Use this when location alone is not enough — for example, matching buildings that are within a district **and** share the same land-use classification.
+This method requires **both** a spatial relationship and a matching attribute value to be satisfied. A feature is only joined if it meets both conditions simultaneously. Use this when location alone is not enough. For example, matching buildings that are within a district **and** share the same land-use classification.
 
 In this example, population data is joined to Berlin districts using both conditions. Matching on the `namgem` attribute alone could incorrectly assign population values from a city like Potsdam if the name matches. Adding a spatial condition (`Intersects`) ensures only points that lie inside the correct district and share the same `namgem` value are joined.
 
@@ -181,7 +181,7 @@ In this example, population data is joined to Berlin districts using both condit
   <ul>
     <li><code>Select operation</code>: choose one of: <code>Count</code>, <code>Sum</code>, <code>Min</code>, <code>Max</code>, <code>Mean</code>, or <code>Standard Deviation</code>.</li>
     <li><code>Select field</code>: choose the numeric field from the Join Layer to aggregate (hidden when operation is <code>Count</code>).</li>
-    <li><code>Result column name</code> (optional) — name for the output column. Leave empty to use the default name (e.g. <code>count</code> or <code>fieldname_operation</code>).</li>
+    <li><code>Result column name</code> (optional): name for the output column. Leave empty to use the default name (e.g. <code>count</code> or <code>fieldname_operation</code>).</li>
   </ul>
   </div>
 </div>

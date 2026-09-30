@@ -92,7 +92,7 @@ The **Line style** section is available for **line layers only** and controls th
     <ul>
       <li><code>Cap</code>: how line endpoints are rendered: <code>Butt</code>, <code>Round</code>, or <code>Square</code>.</li>
       <li><code>Join</code>: how corners between line segments look: <code>Bevel</code>, <code>Round</code>, or <code>Miter</code>.</li>
-      <li><code>Offset</code>: shifts the line visually left or right of its actual geometry. Useful for parallel roads or directional lanes. Note: this is a visual shift only — hit-testing and snapping still use the original geometry.</li>
+      <li><code>Offset</code>: shifts the line visually left or right of its actual geometry. Useful for parallel roads or directional lanes. Note: this is a visual shift only: hit-testing and snapping still use the original geometry.</li>
     </ul>
   </div>
 </div>

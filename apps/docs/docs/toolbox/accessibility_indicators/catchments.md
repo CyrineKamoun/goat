@@ -12,7 +12,7 @@ import TabItem from '@theme/TabItem';
 <iframe width="674" height="378" src="https://www.youtube.com/embed/_clsR386b9w?si=ZInxlY_TjYiEda23" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 </div>
 
-Catchment Area shows **how far people can travel within a certain travel time or distance, using one or more transport modes** — with extended output shapes, custom step sizes, and additional public transport settings.
+Catchment Area shows **how far people can travel within a certain travel time or distance, using one or more transport modes**, with extended output shapes, custom step sizes, and additional public transport settings.
 
 ## 1. Explanation
 
@@ -110,11 +110,11 @@ For suitable travel time limits by amenity type, see the [Location Tool](https:/
 
 #### Shape style
 
-*(Walk, Bicycle, and Pedelec only — visible when Catchment area shape is set to Polygon)*
+*(Walk, Bicycle, and Pedelec only, visible when Catchment area shape is set to Polygon)*
 
 Choose how polygons are shaped when there are multiple starting points:
 
-- **Combined across origins** *(default)* — all starting points are merged into a single shared catchment polygon per step.
+- **Combined across origins** *(default)*: all starting points are merged into a single shared catchment polygon per step.
 - **Separated by origin**: each starting point gets its own individual catchment polygon per step.
 
 #### Steps style
@@ -141,7 +141,7 @@ Choose how the isochrone steps are displayed:
 
 #### Maximum Transfers
 
-Set the `Maximum transfers` to limit how many PT connections are allowed per trip. For example, setting it to `1` means only trips with at most one transfer are included — direct connections and one-change journeys.
+Set the `Maximum transfers` to limit how many PT connections are allowed per trip. For example, setting it to `1` means only trips with at most one transfer are included: direct connections and one-change journeys.
 
 #### Access & Egress Mode
 
@@ -210,14 +210,14 @@ The result layer is automatically styled with a color scale ranging from the sho
 
 ### Time window
 
-For public transport, the catchment is computed over a **time window** — defined by a day of the week and a start and end time — rather than for a single departure. The engine evaluates **every departure minute** within this window and retains the **fastest** journey to each reachable location. The result is not an average across departures, but the best case among them, yielding the largest possible catchment area. A journey is considered within the window based solely on its start time, independent of its end time or duration.
+For public transport, the catchment is computed over a **time window** (defined by a day of the week and a start and end time) rather than for a single departure. The engine evaluates **every departure minute** within this window and retains the **fastest** journey to each reachable location. The result is not an average across departures, but the best case among them, yielding the largest possible catchment area. A journey is considered within the window based solely on its start time, independent of its end time or duration.
 
 ### Visualization
 
 The algorithm used to derive the catchment shape depends on the routing mode:
 
 - **Walk, Bicycle, Pedelec, and Public Transport**: the shape is derived from the routing grid using the [Marching Squares contour line algorithm](https://en.wikipedia.org/wiki/Marching_squares), a computer graphics algorithm generating 2D contour lines from rectangular value arrays ([de Queiroz Neto et al. 2016](#6-references)). This transforms the routing grid from a 2D array into smooth polygon contours for visualization and spatial analysis.
-- **Car**: the shape is derived using DuckDB's [`ST_ConcaveHull`](https://duckdb.org/docs/current/core_extensions/spatial/functions#st_concavehull) function, which wraps tightly around the set of reachable points to produce the catchment polygon. A dynamic concavity ratio is applied based on the number of reached nodes: `0.5` for fewer than 10,000 nodes, `0.3` for fewer than 50,000, and `0.2` otherwise — lower values produce tighter, more concave shapes for large catchments, while higher values yield smoother outlines for small ones.
+- **Car**: the shape is derived using DuckDB's [`ST_ConcaveHull`](https://duckdb.org/docs/current/core_extensions/spatial/functions#st_concavehull) function, which wraps tightly around the set of reachable points to produce the catchment polygon. A dynamic concavity ratio is applied based on the number of reached nodes: `0.5` for fewer than 10,000 nodes, `0.3` for fewer than 50,000, and `0.2` otherwise. Lower values produce tighter, more concave shapes for large catchments, while higher values yield smoother outlines for small ones.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/toolbox/accessibility_indicators/catchments/wiki.webp').default} alt="Marching Squares illustration" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "contain"}}/>

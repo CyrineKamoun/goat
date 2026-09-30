@@ -158,16 +158,16 @@ The Balanced Zones method uses a **genetic algorithm** to find optimal spatial g
 4. The best solutions are combined and mutated across multiple generations to progressively improve the result.
 5. The algorithm stops when no further improvement is found or the maximum number of generations is reached.
 
-The algorithm uses **spatial neighbor graphs** to ensure contiguous zone growth — features are assigned to zones through their spatial neighbors, promoting compact and connected clusters.
+The algorithm uses **spatial neighbor graphs** to ensure contiguous zone growth: features are assigned to zones through their spatial neighbors, promoting compact and connected clusters.
 
 
 #### Fitness function:
 Each candidate solution is scored based on:
 - **Size variance**: How evenly the zones are sized (primary objective).
-- **Compactness penalty** (optional) — Penalizes zones where the maximum distance threshold is exceeded.
+- **Compactness penalty** (optional): penalizes zones where the maximum distance threshold is exceeded.
 
 
-All constraints (equal size, compactness) are **soft constraints** — the algorithm optimizes toward them but does not enforce them as hard limits.
+All constraints (equal size, compactness) are **soft constraints**: the algorithm optimizes toward them but does not enforce them as hard limits.
 
 #### Algorithm parameters:
 

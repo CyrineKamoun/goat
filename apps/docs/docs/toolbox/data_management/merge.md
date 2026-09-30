@@ -9,7 +9,7 @@ This tool allows you to **combine two or more layers into a single output layer*
 
 ## 1. Explanation
 
-Merging stacks features from multiple layers into one layer. Unlike a join, no matching is required — all features from all input layers are simply combined. This is useful when you have the same type of data split across multiple layers and want to work with it as a single dataset.
+Merging stacks features from multiple layers into one layer. Unlike a join, no matching is required: all features from all input layers are simply combined. This is useful when you have the same type of data split across multiple layers and want to work with it as a single dataset.
 
 **Key behaviour:**
 - Features from all input layers are included in the output.

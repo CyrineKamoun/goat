@@ -19,12 +19,12 @@ The Heatmap 2SFCA (Two-Step Floating Catchment Area) tool **produces a color-cod
 
 ## 1. Explanation
 
-The 2SFCA method measures **spatial accessibility by considering both supply (capacity of facilities) and demand (population)**. Unlike simple supply-demand ratios per administrative unit, 2SFCA accounts for cross-boundary access — people can reach facilities in neighboring areas, and facilities serve populations beyond their own district.
+The 2SFCA method measures **spatial accessibility by considering both supply (capacity of facilities) and demand (population)**. Unlike simple supply-demand ratios per administrative unit, 2SFCA accounts for cross-boundary access: people can reach facilities in neighboring areas, and facilities serve populations beyond their own district.
 The result is a **supply-to-demand ratio at the level of hexagonal grid cells**. The tool works in two steps:
 
-1. **Step 1 — Capacity Demand Ratios:** For each facility location, compute how much capacity is available relative to the total demand (population) within its catchment area. This produces a supply-to-demand ratio per facility.
+1. **Step 1, Capacity Demand Ratios:** For each facility location, compute how much capacity is available relative to the total demand (population) within its catchment area. This produces a supply-to-demand ratio per facility.
 
-2. **Step 2 — Cumulative Accessibility:** For each grid cell, sum the capacity ratios of all reachable facilities. The result represents how well-served each location is.
+2. **Step 2, Cumulative Accessibility:** For each grid cell, sum the capacity ratios of all reachable facilities. The result represents how well-served each location is.
 
 You can configure the **routing type**, **opportunity layers** (with capacity fields), **demand layer** (with population field), **travel time limits**, and choose between three **2SFCA variants**.
 - The **Opportunity layers contain facility data** with a capacity attribute (e.g., number of hospital beds, square meters of retail space, school seats).
@@ -113,7 +113,7 @@ Heatmap computation is available across **over 30 European countries** for `Walk
 
 <TabItem value="twosfca" label="Standard 2SFCA" default className="tabItemBox">
 
-The standard 2SFCA method uses **binary catchments**: a facility either serves a population location (if within the travel time limit) or it does not. There is no distance weighting — all locations within the catchment are treated equally.
+The standard 2SFCA method uses **binary catchments**: a facility either serves a population location (if within the travel time limit) or it does not. There is no distance weighting, all locations within the catchment are treated equally.
 
 This is the simplest variant and works well when you want a straightforward supply-demand ratio.
 
@@ -121,7 +121,7 @@ This is the simplest variant and works well when you want a straightforward supp
 
 <TabItem value="e2sfca" label="Enhanced 2SFCA (E2SFCA)" className="tabItemBox">
 
-The Enhanced 2SFCA method adds **distance decay weighting** using an impedance function. In both steps, interactions are weighted by how far apart the facility and population are — closer locations receive higher weight. This produces more realistic results, reflecting that people are more likely to use nearby facilities.
+The Enhanced 2SFCA method adds **distance decay weighting** using an impedance function. In both steps, interactions are weighted by how far apart the facility and population are, so closer locations receive higher weight. This produces more realistic results, reflecting that people are more likely to use nearby facilities.
 
 Requires selecting an **impedance function** and **sensitivity** value.
 
@@ -170,7 +170,7 @@ Calculates weights using a power function. The sensitivity parameter controls th
 
 <TabItem value="cumulative" label="Cumulative" className="tabItemBox">
 
-Applies a full weight of 1 to every facility within the travel time limit and 0 beyond it, with no distance decay. Unlike the other functions, it does not use the sensitivity parameter — all reachable facilities count equally. For details, see [Technical details](#calculation).
+Applies a full weight of 1 to every facility within the travel time limit and 0 beyond it, with no distance decay. Unlike the other functions, it does not use the sensitivity parameter, so all reachable facilities count equally. For details, see [Technical details](#calculation).
 
 </TabItem>
 
@@ -260,7 +260,7 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 
 ### Results
 
-Once the calculation is complete, a result layer will be added to the map. This *Heatmap 2SFCA* layer contains a color-coded hexagonal grid where each cell shows the computed accessibility value — the supply-to-demand ratio at that location.
+Once the calculation is complete, a result layer will be added to the map. This *Heatmap 2SFCA* layer contains a color-coded hexagonal grid where each cell shows the computed accessibility value, the supply-to-demand ratio at that location.
 
 - **Higher values** indicate better accessibility: more supply capacity is available relative to the local demand.
 - **Lower values** indicate underserved areas: the population exceeds the available capacity of reachable facilities.
@@ -316,7 +316,7 @@ When multiple edges (streets) of the road network intersect a hexagonal cell, th
 
 The 2SFCA method computes accessibility in two steps:
 
-#### Step 1 — Capacity Demand Ratio
+#### Step 1: Capacity Demand Ratio
 
 For each facility location *j*, compute the ratio of its capacity to the total demand within its catchment:
 
@@ -334,7 +334,7 @@ Where:
 - *t<sub>0</sub>* = travel time limit (maximum catchment)
 - *f(t<sub>kj</sub>)* = impedance function (distance weight)
 
-#### Step 2 — Cumulative Accessibility
+#### Step 2: Cumulative Accessibility
 
 For each grid cell *i*, sum the capacity demand ratios of all reachable facilities:
 
@@ -373,7 +373,7 @@ The different calculation approaches change how distance is perceived and measur
 
 - The **Enhanced 2SFCA** introduces **distance decay weighting** producing  differenciation of the accessibility based on the distance, with a **higher accessibility**  (value of 1.1) for closer cells. However, cells equidistant from facilities receive identical accessibility regardless of absolute distance (e.g., two cells both 1-minute away or in 2-minute away all get **1**).
 
-- The **Modified 2SFCA** applies **squared impedance weights** in Step 2, producing stronger distance penalties with values like **0.9** and **0.5** (compared to E2SFCA's **1.1** and **0.9** for similar positions). It takes into account absolute distance in opposition to E2SFCA — for example, two cells both 2 minutes away get lower accessibility (**0.6**) than two cells both 1 minute away (**0.8**).
+- The **Modified 2SFCA** applies **squared impedance weights** in Step 2, producing stronger distance penalties with values like **0.9** and **0.5** (compared to E2SFCA's **1.1** and **0.9** for similar positions). It takes into account absolute distance in opposition to E2SFCA. For example, two cells both 2 minutes away get lower accessibility (**0.6**) than two cells both 1 minute away (**0.8**).
 
 **Choosing the appropriate variant** depends on your specific analysis objectives and how sensitive your target population is to travel distance. 
 

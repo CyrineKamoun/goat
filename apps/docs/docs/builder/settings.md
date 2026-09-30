@@ -13,8 +13,8 @@ In the Settings section, **you can configure the map controls, branding, social 
 
 ## Map
 
-- `Toolbar` — shows the top bar with the GOAT logo, project name, last saved timestamp, and project info in Viewer mode.
-- `Scalebar` — shows a scale on the map for measuring distances from one point to another.
+- `Toolbar`: shows the top bar with the GOAT logo, project name, last saved timestamp, and project info in Viewer mode.
+- `Scalebar`: shows a scale on the map for measuring distances from one point to another.
 
 ### Control layout
 
@@ -34,7 +34,7 @@ Available controls:
 
 ### Allowed basemaps
 
-Restrict which basemaps viewers can switch to. Select one or more basemaps from the dropdown — viewers will only see the ones you enable here. Only shown when `Basemap switcher` is placed in any position.
+Restrict which basemaps viewers can switch to. Select one or more basemaps from the dropdown, and viewers will only see the ones you enable here. Only shown when `Basemap switcher` is placed in any position.
 
 ### Zoom limits
 
@@ -46,11 +46,11 @@ Limit how far dashboard viewers can zoom in and out. A range slider lets you set
 
 Customize the visual identity of your dashboard for Viewer mode.
 
-- `Font` — select a typeface from the dropdown. Choose `Custom…` to enter a **Font file URL** and **Font Family** name for a custom typeface.
-- `Primary Color` — set the main accent color used for buttons and highlights.
-- `Icon Color` — set the color for icons throughout the dashboard.
-- `Font Color` — set the text color used across the dashboard.
-- `Favicon` — upload a custom browser tab icon. Click `×` to remove it.
+- `Font`: select a typeface from the dropdown. Choose `Custom…` to enter a **Font file URL** and **Font Family** name for a custom typeface.
+- `Primary Color`: set the main accent color used for buttons and highlights.
+- `Icon Color`: set the color for icons throughout the dashboard.
+- `Font Color`: set the text color used across the dashboard.
+- `Favicon`: upload a custom browser tab icon. Click `×` to remove it.
 
 ---
 
@@ -65,7 +65,7 @@ Customize how your dashboard appears when shared via social media or messaging a
 
 ## General
 
-- `Language` — set the dashboard display language. Options: `Auto (Browser Default)`, `English`, `Deutsch`.
+- `Language`: set the dashboard display language. Options: `Auto (Browser Default)`, `English`, `Deutsch`.
 
 ---
 

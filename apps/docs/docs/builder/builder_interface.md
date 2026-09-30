@@ -69,7 +69,7 @@ To delete a panel, click <code>Delete Panel</code> at the bottom of the settings
 
 ## Widgets
 
-**Widgets are the building blocks of your dashboard**. They let you display data, statistics, charts, and project elements—like text or images. Each widget is highly customizable: you can adjust its content, appearance, and behavior to fit your needs, whether you want to highlight key numbers, visualize trends, or add context with text and graphics.
+**Widgets are the building blocks of your dashboard**. They let you display data, statistics, charts, and project elements, like text or images. Each widget is highly customizable: you can adjust its content, appearance, and behavior to fit your needs, whether you want to highlight key numbers, visualize trends, or add context with text and graphics.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
   <img src={require('/img/builder/widgets.webp').default} alt="Dashboard Interface Overview in GOAT" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>

@@ -70,7 +70,7 @@ Cost function for **pedelec**:
 If an edge is of class `pedestrian` or `crosswalk`, we assume the rider would dismount and walk their bicycle/pedelec. The cost for this type of segment is: `cost = length / speed`
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '0.75rem' }}>
-  <img src={require('/img/routing/bicycle_edge_cost.png').default} alt="Cycling network edge cost by topology — surface and slope multipliers" style={{ maxWidth: "100%", objectFit: "contain"}}/>
+  <img src={require('/img/routing/bicycle_edge_cost.png').default} alt="Cycling network edge cost by topology, surface and slope multipliers" style={{ maxWidth: "100%", objectFit: "contain"}}/>
 </div>
 
 :::note

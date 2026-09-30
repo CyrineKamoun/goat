@@ -42,10 +42,10 @@ This section contains **widgets that provide information about your project** la
   Under <code>Layout</code>, configure how the layer list is displayed:
   <ul>
     <li><code>Layout style</code>: <code>Tree</code> (hierarchical list) or <code>Tabs</code> (tabbed navigation)</li>
-    <li><code>Visibility toggle</code>: icon style for the show/hide control — <code>Eye</code>, <code>Checkbox</code>, or <code>Switch</code></li>
+    <li><code>Visibility toggle</code>: icon style for the show/hide control: <code>Eye</code>, <code>Checkbox</code>, or <code>Switch</code></li>
     <li><code>Visibility position</code>: <code>Left</code> or <code>Right</code></li>
     <li><code>Show search bar</code>: add a search box above the layer list</li>
-    <li>When <code>Layout style</code> is set to <code>Tabs</code>: additional options appear — <code>Show group name</code>, <code>Show group icons</code>, and <code>Show all toggle</code>. When <code>Show all toggle</code> is enabled, a <strong>Show all</strong> row appears above the layer list in each tab, allowing viewers to toggle all layers in the active tab on or off at once. The toggle uses the same style (Eye, Checkbox, or Switch) as the per-layer visibility control.</li>
+    <li>When <code>Layout style</code> is set to <code>Tabs</code>: additional options appear: <code>Show group name</code>, <code>Show group icons</code>, and <code>Show all toggle</code>. When <code>Show all toggle</code> is enabled, a <strong>Show all</strong> row appears above the layer list in each tab, allowing viewers to toggle all layers in the active tab on or off at once. The toggle uses the same style (Eye, Checkbox, or Switch) as the per-layer visibility control.</li>
     <li><code>Hide field names</code>: hide field name labels in the widget</li>
   </ul>
   </div>
@@ -58,7 +58,7 @@ This section contains **widgets that provide information about your project** la
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Under <code>Layer actions</code>, choose the <code>Action mode</code>: <code>Compact menu</code> (actions hidden behind a ⋮ icon) or <code>Direct actions</code> (actions shown inline) — and select which actions viewers can perform per layer: <code>Style</code>, <code>View data</code>, <code>Properties</code>, <code>Zoom to</code>.</div>
+  <div class="content">Under <code>Layer actions</code>, choose the <code>Action mode</code>: <code>Compact menu</code> (actions hidden behind a ⋮ icon) or <code>Direct actions</code> (actions shown inline), and select which actions viewers can perform per layer: <code>Style</code>, <code>View data</code>, <code>Properties</code>, <code>Zoom to</code>.</div>
 </div>
 
 

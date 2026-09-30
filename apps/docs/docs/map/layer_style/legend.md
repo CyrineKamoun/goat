@@ -43,7 +43,7 @@ When using attribute-based styling with a color scale (any classification method
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Below each color step row you will see a text input with the placeholder <code>Legend label</code>. Type a custom label — for example <code>Low</code>, <code>Medium</code>, or <code>High</code>: to replace the numeric value in the legend.</div>
+  <div class="content">Below each color step row you will see a text input with the placeholder <code>Legend label</code>. Type a custom label, for example <code>Low</code>, <code>Medium</code>, or <code>High</code>, to replace the numeric value in the legend.</div>
 </div>
 
 <div class="step">

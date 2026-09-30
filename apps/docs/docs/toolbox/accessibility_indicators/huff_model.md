@@ -20,7 +20,7 @@ The Huff Model **predicts the probability of consumers in a reference area visit
 ## 1. Explanation
 
 The Huff Model is a **spatial interaction model that estimates how demand (e.g., customers, residents) is distributed among competing supply locations (e.g., stores, facilities)**. 
-The model works on a simple principle: **a location's probability of being chosen depends on its attractiveness relative to all competing locations, weighted by travel time**. A large, nearby shopping center will capture more demand than a small, distant one — but the exact split depends on the balance of attractiveness and distance for all available options.
+The model works on a simple principle: **a location's probability of being chosen depends on its attractiveness relative to all competing locations, weighted by travel time**. A large, nearby shopping center will capture more demand than a small, distant one, but the exact split depends on the balance of attractiveness and distance for all available options.
 
 The result is a **probability score for each supply location**, representing the share of total demand it captures from the reference area. This enables direct comparison of how well different facilities compete for the same customer base.
 
@@ -34,7 +34,7 @@ You can configure the routing type, opportunity layers (with capacity fields), d
 
 
 
-**Key difference:** Unlike the Heatmaps, which visualize accessibility per grid cell, the *Huff Model* produces a **probability per supply location** — showing what share of total demand each facility captures.
+**Key difference:** Unlike the Heatmaps, which visualize accessibility per grid cell, the *Huff Model* produces a **probability per supply location**, showing what share of total demand each facility captures.
 
 :::info
 
@@ -186,7 +186,7 @@ Ideally, collect data on actual customer visits or market shares to estimate opt
 
 Once the calculation is complete, a result layer will be added to the map. Each feature in the result layer represents a **supply location** with its computed market share/probability expressed in percent.
 
-- **Higher probability** values indicate that a facility captures a larger share of the total demand — it is more competitive relative to alternatives.
+- **Higher probability** values indicate that a facility captures a larger share of the total demand, so it is more competitive relative to alternatives.
 - **Lower probability** values indicate that a facility captures less demand, either because it is less attractive, farther away, or faces strong competition from nearby alternatives.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>

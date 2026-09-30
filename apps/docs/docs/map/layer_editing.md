@@ -35,7 +35,7 @@ Once a layer is created, you can add and edit features directly on the map.
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Use the <strong>editing toolbar</strong> at the bottom of the map: click <code>+</code> to <strong>add a new feature</strong> and click on the map to draw the geometry. The <b>Feature Attributes</b> panel opens on the right — <strong>fill in the attribute values</strong> and click <code>Done</code>.</div>
+  <div class="content">Use the <strong>editing toolbar</strong> at the bottom of the map: click <code>+</code> to <strong>add a new feature</strong> and click on the map to draw the geometry. The <b>Feature Attributes</b> panel opens on the right, then <strong>fill in the attribute values</strong> and click <code>Done</code>.</div>
 </div>
 
 <div class="step">
@@ -54,7 +54,7 @@ Once a layer is created, you can add and edit features directly on the map.
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Click <code>Edit fields</code> in the table toolbar to open the <b>Edit fields</b> dialog, then click <code>+ Add field</code>. A new field is added to the list — select its <b>Field type</b> on the right (<code>Text</code>, <code>Number</code>, <code>Date</code>, <code>Boolean</code>, or <code>Formula</code>, a computed field, see <a href="#formula-fields">Formula fields</a> below), and rename the field in the list. To remove a field, click the <code>—</code> icon next to it. Click <code>Save</code> when done.</div>
+  <div class="content">Click <code>Edit fields</code> in the table toolbar to open the <b>Edit fields</b> dialog, then click <code>+ Add field</code>. A new field is added to the list. Select its <b>Field type</b> on the right (<code>Text</code>, <code>Number</code>, <code>Date</code>, <code>Boolean</code>, or <code>Formula</code>, a computed field, see <a href="#formula-fields">Formula fields</a> below), and rename the field in the list. To remove a field, click the <code>—</code> icon next to it. Click <code>Save</code> when done.</div>
 </div>
 
 <div class="step">
@@ -64,7 +64,7 @@ Once a layer is created, you can add and edit features directly on the map.
 
 ### Formula fields
 
-A **Formula** field's value is calculated from an expression you write, similar to a formula column in a spreadsheet. The expression can reference your other fields — for example, divide population by area to get density — or combine text fields into one. The result is applied to every feature in the layer.
+A **Formula** field's value is calculated from an expression you write, similar to a formula column in a spreadsheet. The expression can reference your other fields (for example, divide population by area to get density) or combine text fields into one. The result is applied to every feature in the layer.
 
 <div class="step">
   <div class="step-number">1</div>

@@ -4,7 +4,7 @@ description: "Route a layer to the True or False branch of a workflow with the C
 
 # Conditional
 
-The **Conditional** node routes an input layer to the **True** or **False** branch based on a condition you define. The layer is passed through unchanged — a condition is true when at least one feature satisfies it.
+The **Conditional** node routes an input layer to the **True** or **False** branch based on a condition you define. The layer is passed through unchanged. A condition is true when at least one feature satisfies it.
 
 ## Node Structure
 
@@ -53,4 +53,4 @@ Click the <code>{"{}"}</code> icon in any value field to insert a workflow varia
 
 ## Execution status
 
-After running, the Conditional node shows a status chip — **Completed**, **Failed**, or **Skipped** — indicating which branch was taken. To remove all conditions, click **Clear Filter**.
+After running, the Conditional node shows a status chip (**Completed**, **Failed**, or **Skipped**) indicating which branch was taken. To remove all conditions, click **Clear Filter**.
