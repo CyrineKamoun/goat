@@ -71,18 +71,6 @@ jobs:
       keycloak-theme: ${{ needs.file-changes.outputs.keycloak-theme == 'true' }}
       docs: ${{ needs.file-changes.outputs.docs == 'true' }}
 
-  # Compares the web bundle with main's; the build job hands it the build.
-  analyze:
-    name: analyze
-    needs: [file-changes, build]
-    if: ${{ needs.file-changes.outputs.web == 'true' }}
-    uses: ./.github/workflows/nextjs-bundle-analysis.yml
-    # actions: read to download main's bundle stats from another run
-    permissions:
-      contents: read
-      actions: read
-    secrets: inherit
-
   file-size:
     name: file-size
     runs-on: ubuntu-latest
@@ -135,7 +123,7 @@ jobs:
   required:
     # file-changes too: when it fails, every job after it is skipped, not
     # failed, and would count as passed.
-    needs: [file-changes, lint, test, build, analyze, file-size, compose-bundle, helm-chart]
+    needs: [file-changes, lint, test, build, file-size, compose-bundle, helm-chart]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

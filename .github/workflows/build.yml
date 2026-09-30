@@ -35,10 +35,10 @@ jobs:
       - name: 📥 Monorepo install
         uses: ./.github/actions/pnpm-install
 
+      # web only: the root build script builds every app (docs, storybook and
+      # the keycloak theme too), which have build jobs of their own.
       - name: 🏗️ GOAT build
-        uses: ./.github/actions/pnpm-cache-build
-        with:
-          cwd: ${{ github.workspace }}
+        run: pnpm exec turbo run build --filter=@p4b/web
 
   storybook:
     name: storybook
