@@ -68,7 +68,7 @@ The ÖV-Güteklassen indicator is decisive and can be used to highlight deficits
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Optional: Click <code>Station Configuration</code> to customize the classification thresholds and buffer distances for station categories.</div>
+  <div class="content">Optional: Click <code>Station configuration</code> to change how stations are classified. The dialog starts from a ready-made profile and lets you adjust the frequency thresholds, transport mode groups, station categories and buffer distances. Click <code>Apply</code> to keep your changes. See <a href="#station-configuration">Station configuration</a> for what each setting does.</div>
 </div>
 
 ### Result Layer
@@ -135,10 +135,29 @@ First, the number of departures per public transport mode (train, metro, tram, a
  
   <p></p>
 
-  <img src={require('/img/toolbox/accessibility_indicators/gueteklassen/oev_figure_en.png').default} alt="ÖV-Güteklassen Calculation" style={{ maxHeight: "auto", maxWidth: "30%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/accessibility_indicators/gueteklassen/oev_figure_en.png').default} alt="ÖV-Güteklassen Calculation" style={{ maxHeight: "400px", maxWidth: "100%", objectFit: "contain", marginTop: "24px"}}/>
 </div>
 
 <div></div>
+
+### Station configuration
+
+By default, GOAT classifies stations with the standard scheme from the Swiss ARE model described above. If you need a different scheme, open <code>Station configuration</code> in the tool and adjust it. Your changes apply only to that calculation. The dialog has five parts, and they work together in this order: a station's average service interval and its transport mode decide its **category**, and the category and buffer distance then decide the **quality class** that each catchment ring receives.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/accessibility_indicators/gueteklassen/station_configuration.webp').default} alt="The Station configuration dialog with its five parts and default values" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
+</div>
+<p> </p>
+
+- <code>Configuration profile</code>: a ready-made starting point. Three profiles are available, <code>Frequency up to 60 minutes</code>, <code>Frequency up to 120 minutes</code> (the default) and <code>Frequency up to 210 minutes</code>. They differ in how many frequency tiers they cover. As soon as you edit any table, the profile switches to <code>Custom</code>.
+
+- <code>Frequency thresholds (minutes)</code>: the service intervals used to sort stations, entered as minute values (default <code>5, 10, 20, 40, 60, 120</code>). Each value is the upper bound of an interval, so the tiers read as "up to 5 minutes", "over 5 up to 10 minutes", and so on. A station is placed in a tier by its **average frequency**: the more often it is served, the higher the tier.
+
+- <code>Transport mode groups</code>: each transport mode belongs to one of three groups, <code>A</code>, <code>B</code> or <code>C</code>. By default rail and metro are in group A, tram and funicular in group B, and bus and the remaining modes in group C. Group A ranks highest. When a station is served by several modes, the highest group it has decides its type.
+
+- <code>Station categories</code>: a table with one row per frequency tier and one column per mode group (A, B, C). Each cell holds the **category** given to a station in that tier and group. This is the core lookup that turns frequency and mode into a single station category.
+
+- <code>Distance classes</code>: a table with one row per station category and one column per buffer distance in metres (default <code>300</code>, <code>500</code>, <code>750</code> and <code>1000</code> m). Each cell holds the **quality class** that a buffer ring of that size around a station of that category receives. This is what sets how far each category reaches. Where rings from different stations overlap, the better class wins.
 
 ### Visualization
 

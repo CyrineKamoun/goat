@@ -69,7 +69,7 @@ Die Berechnung der ÖV-Güteklassen ist für Gebiete verfügbar, in denen GTFS-D
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Optional: Klicken Sie auf <code>Haltestellenkonfiguration</code>, um die Klassifizierungsgrenzen und Pufferabstände für Stationskategorien anzupassen.</div>
+  <div class="content">Optional: Klicken Sie auf <code>Haltestellenkonfiguration</code>, um zu ändern, wie Haltestellen klassifiziert werden. Der Dialog geht von einem vorgefertigten Profil aus und lässt Sie die Taktgrenzen, Verkehrsmittelgruppen, Haltestellenkategorien und Pufferabstände anpassen. Klicken Sie auf <code>Anwenden</code>, um Ihre Änderungen zu übernehmen. Siehe <a href="#haltestellenkonfiguration">Haltestellenkonfiguration</a> für die Bedeutung der einzelnen Einstellungen.</div>
 </div>
 
 ### Ergebnis-Layer
@@ -132,10 +132,29 @@ Zunächst wird die Anzahl der Abfahrten pro öffentlichem Verkehrsmittel (Zug, U
     <img src={require('/img/toolbox/accessibility_indicators/gueteklassen/determination_oev_gueteklasse_de.webp').default} alt="Bestimmung der ÖV-Güteklassen" style={{ maxHeight: "auto", maxWidth: "45%", objectFit: "cover"}}/>
   </div>
 
-  <img src={require('/img/toolbox/accessibility_indicators/gueteklassen/oev_figure_de.png').default} alt="ÖV-Güteklassen Berechnung" style={{ maxHeight: "auto", maxWidth: "30%", objectFit: "cover"}}/>
+  <img src={require('/img/toolbox/accessibility_indicators/gueteklassen/oev_figure_de.png').default} alt="ÖV-Güteklassen Berechnung" style={{ maxHeight: "400px", maxWidth: "100%", objectFit: "contain", marginTop: "24px"}}/>
 </div>
 
 <div></div>
+
+### Haltestellenkonfiguration
+
+Standardmäßig klassifiziert GOAT Haltestellen mit dem oben beschriebenen Standardschema des Schweizer ARE-Modells. Wenn Sie ein anderes Schema benötigen, öffnen Sie im Werkzeug die <code>Haltestellenkonfiguration</code> und passen es an. Ihre Änderungen gelten nur für diese Berechnung. Der Dialog besteht aus fünf Teilen, die in dieser Reihenfolge zusammenwirken: Das durchschnittliche Taktintervall einer Haltestelle und ihr Verkehrsmittel bestimmen ihre **Kategorie**, und Kategorie und Pufferabstand bestimmen dann die **Güteklasse**, die jeder Ring des Einzugsgebiets erhält.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  <img src={require('/img/toolbox/accessibility_indicators/gueteklassen/station_configuration_de.webp').default} alt="Der Dialog Haltestellenkonfiguration mit seinen fünf Teilen und Standardwerten" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
+</div>
+<p> </p>
+
+- <code>Konfigurationsprofil</code>: ein vorgefertigter Ausgangspunkt. Es gibt drei Profile: <code>Takt bis 60 Minuten</code>, <code>Takt bis 120 Minuten</code> (Standard) und <code>Takt bis 210 Minuten</code>. Sie unterscheiden sich darin, wie viele Taktstufen sie abdecken. Sobald Sie eine Tabelle bearbeiten, wechselt das Profil auf <code>Custom</code>.
+
+- <code>Taktgrenzen (Minuten)</code>: die Taktintervalle, nach denen Haltestellen einsortiert werden, als Minutenwerte eingegeben (Standard <code>5, 10, 20, 40, 60, 120</code>). Jeder Wert ist die Obergrenze eines Intervalls, sodass die Stufen "bis 5 Minuten", "über 5 bis 10 Minuten" und so weiter lauten. Eine Haltestelle wird nach ihrer **durchschnittlichen Taktung** einer Stufe zugeordnet: Je häufiger sie bedient wird, desto höher die Stufe.
+
+- <code>Verkehrsmittelgruppen</code>: Jedes Verkehrsmittel gehört zu einer von drei Gruppen, <code>A</code>, <code>B</code> oder <code>C</code>. Standardmäßig sind Bahn und U-Bahn in Gruppe A, Tram und Standseilbahn in Gruppe B sowie Bus und die übrigen Verkehrsmittel in Gruppe C. Gruppe A hat den höchsten Rang. Wird eine Haltestelle von mehreren Verkehrsmitteln bedient, bestimmt die höchste vorhandene Gruppe ihren Typ.
+
+- <code>Haltestellenkategorien</code>: eine Tabelle mit einer Zeile je Taktstufe und einer Spalte je Verkehrsmittelgruppe (A, B, C). Jede Zelle enthält die **Kategorie**, die eine Haltestelle in dieser Stufe und Gruppe erhält. Dies ist die zentrale Zuordnung, die Takt und Verkehrsmittel zu einer einzigen Haltestellenkategorie zusammenführt.
+
+- <code>Distanzklassen</code>: eine Tabelle mit einer Zeile je Haltestellenkategorie und einer Spalte je Pufferabstand in Metern (Standard <code>300</code>, <code>500</code>, <code>750</code> und <code>1000</code> m). Jede Zelle enthält die **Güteklasse**, die ein Pufferring dieser Größe um eine Haltestelle dieser Kategorie erhält. Damit wird festgelegt, wie weit jede Kategorie reicht. Wo sich Ringe verschiedener Haltestellen überlappen, gewinnt die bessere Klasse.
 
 ### Visualisierung
 
