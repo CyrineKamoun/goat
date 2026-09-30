@@ -94,7 +94,7 @@ Das Tabellen-Widget **zeigt Daten eines Layers als scrollbare Tabelle**. Sie kö
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Im Modus Dashboard-Konfiguration verwenden Sie <code>Sortieren nach</code> und <code>Aufsteigend sortieren</code>, um die Standard-Zeilenreihenfolge festzulegen. Betrachter können die Tabelle auch interaktiv sortieren, indem sie auf eine Spaltenüberschrift klicken — der erste Klick sortiert aufsteigend, ein zweiter Klick absteigend und ein dritter Klick hebt die Sortierung auf. Ein Pfeilsymbol in der Überschrift zeigt die aktive Sortierrichtung an.</div>
+  <div class="content">Im Modus Dashboard-Konfiguration verwenden Sie <code>Sortieren nach</code> und <code>Aufsteigend sortieren</code>, um die Standard-Zeilenreihenfolge festzulegen. Betrachter können die Tabelle auch interaktiv sortieren, indem sie auf eine Spaltenüberschrift klicken: der erste Klick sortiert aufsteigend, ein zweiter Klick absteigend und ein dritter Klick hebt die Sortierung auf. Ein Pfeilsymbol in der Überschrift zeigt die aktive Sortierrichtung an.</div>
 </div>
 
 <div class="step">
@@ -104,7 +104,7 @@ Das Tabellen-Widget **zeigt Daten eines Layers als scrollbare Tabelle**. Sie kö
   <ul>
     <li><code>Sticky header</code>: Spaltenüberschrift beim Scrollen sichtbar halten</li>
     <li><code>Show totals</code>: Summenzeile am Ende der Tabelle anzeigen</li>
-    <li><code>Display mode</code> (<code>Flat</code> / <code>Collapsible</code>) — verfügbar wenn ein sekundäres Gruppierungsfeld gesetzt ist oder im SQL-Modus. Im Modus <code>Collapsible</code> können Sie zusätzlich <code>Start expanded</code> und <code>Show subtotals</code> aktivieren.</li>
+    <li><code>Display mode</code> (<code>Flat</code> / <code>Collapsible</code>): verfügbar wenn ein sekundäres Gruppierungsfeld gesetzt ist oder im SQL-Modus. Im Modus <code>Collapsible</code> können Sie zusätzlich <code>Start expanded</code> und <code>Show subtotals</code> aktivieren.</li>
   </ul>
   </div>
 </div>

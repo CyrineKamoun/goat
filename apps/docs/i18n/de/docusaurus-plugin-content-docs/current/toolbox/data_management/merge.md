@@ -9,7 +9,7 @@ Mit diesem Werkzeug können Sie **zwei oder mehr Layer zu einem einzigen Ausgabe
 
 ## 1. Erklärung
 
-Beim Zusammenführen werden Objekte aus mehreren Layern in einem Layer vereint. Im Gegensatz zur Verbindung (Join) ist kein Abgleich erforderlich — alle Objekte aller Eingabe-Layer werden einfach kombiniert. Dies ist hilfreich, wenn Sie denselben Datentyp auf mehrere Layer aufgeteilt haben und damit als einheitlichen Datensatz arbeiten möchten.
+Beim Zusammenführen werden Objekte aus mehreren Layern in einem Layer vereint. Im Gegensatz zur Verbindung (Join) ist kein Abgleich erforderlich: alle Objekte aller Eingabe-Layer werden einfach kombiniert. Dies ist hilfreich, wenn Sie denselben Datentyp auf mehrere Layer aufgeteilt haben und damit als einheitlichen Datensatz arbeiten möchten.
 
 **Wichtige Verhaltensweisen:**
 - Objekte aller Eingabe-Layer sind im Ergebnis enthalten.

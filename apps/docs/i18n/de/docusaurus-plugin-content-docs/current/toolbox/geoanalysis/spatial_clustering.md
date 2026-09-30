@@ -158,16 +158,16 @@ Die Methode Ausgeglichene Zonen verwendet einen **genetischen Algorithmus**, um 
 4. Die besten Lösungen werden über mehrere Generationen hinweg kombiniert und mutiert, um das Ergebnis schrittweise zu verbessern.
 5. Der Algorithmus stoppt, wenn keine weitere Verbesserung gefunden wird oder die maximale Anzahl an Generationen erreicht ist.
 
-Der Algorithmus verwendet **räumliche Nachbarschaftsgraphen**, um zusammenhängendes Zonenwachstum sicherzustellen — Features werden Zonen durch ihre räumlichen Nachbarn zugewiesen, was kompakte und verbundene Cluster fördert.
+Der Algorithmus verwendet **räumliche Nachbarschaftsgraphen**, um zusammenhängendes Zonenwachstum sicherzustellen: Features werden Zonen durch ihre räumlichen Nachbarn zugewiesen, was kompakte und verbundene Cluster fördert.
 
 
 #### Fitness-Funktion:
 Jede Lösungskandidat wird bewertet basierend auf:
 - **Größenvarianz**: Wie gleichmäßig die Zonen dimensioniert sind (primäres Ziel).
-- **Kompaktheitsstrafe** (optional) — Bestraft Zonen, bei denen der maximale Distanzschwellenwert überschritten wird.
+- **Kompaktheitsstrafe** (optional): bestraft Zonen, bei denen der maximale Distanzschwellenwert überschritten wird.
 
 
-Alle Einschränkungen (gleiche Größe, Kompaktheit) sind **weiche Einschränkungen** — der Algorithmus optimiert darauf hin, erzwingt sie jedoch nicht als harte Grenzen.
+Alle Einschränkungen (gleiche Größe, Kompaktheit) sind **weiche Einschränkungen**: der Algorithmus optimiert darauf hin, erzwingt sie jedoch nicht als harte Grenzen.
 
 #### Algorithmus-Parameter:
 

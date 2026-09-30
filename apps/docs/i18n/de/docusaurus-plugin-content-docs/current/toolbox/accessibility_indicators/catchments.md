@@ -12,7 +12,7 @@ import TabItem from '@theme/TabItem';
 <iframe width="674" height="378" src="https://www.youtube.com/embed/GA_6PbhAA6k?si=4mA2OdTPGCl7iVRi&amp;start=46" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 </div>
 
-Einzugsgebiet zeigt **wie weit Menschen innerhalb einer bestimmten Reisezeit oder Entfernung, mit einem oder mehreren Verkehrsmitteln reisen können** — mit erweiterten Ausgabeformen, anpassbaren Schrittgrößen und zusätzlichen Einstellungen für den öffentlichen Verkehr.
+Einzugsgebiet zeigt **wie weit Menschen innerhalb einer bestimmten Reisezeit oder Entfernung, mit einem oder mehreren Verkehrsmitteln reisen können**, mit erweiterten Ausgabeformen, anpassbaren Schrittgrößen und zusätzlichen Einstellungen für den öffentlichen Verkehr.
 
 ## 1. Erklärung
 
@@ -110,11 +110,11 @@ Geeignete Reisezeitlimits nach Einrichtungstyp finden Sie im [Standortwerkzeug](
 
 #### Form der Geometrien
 
-*(Nur für Zu Fuß, Fahrrad und Pedelec — sichtbar wenn die Form des Einzugsgebiets auf Polygon gesetzt ist)*
+*(Nur für Zu Fuß, Fahrrad und Pedelec, sichtbar wenn die Form des Einzugsgebiets auf Polygon gesetzt ist)*
 
 Wählen Sie, wie die Polygone bei mehreren Startpunkten geformt werden:
 
-- **Zusammengefasst über Startpunkte** *(Standard)* — alle Startpunkte werden pro Schritt zu einem gemeinsamen Einzugsgebietspolygon zusammengeführt.
+- **Zusammengefasst über Startpunkte** *(Standard)*: alle Startpunkte werden pro Schritt zu einem gemeinsamen Einzugsgebietspolygon zusammengeführt.
 - **Getrennt nach Startpunkt**: jeder Startpunkt erhält pro Schritt ein eigenes individuelles Einzugsgebietspolygon.
 
 #### Darstellung der Schritte
@@ -141,7 +141,7 @@ Wählen Sie, wie die Isochronen-Schritte dargestellt werden:
 
 #### Maximale Umstiege
 
-Legen Sie die `Maximalen Umstiege` fest, um die Anzahl der zulässigen ÖV-Verbindungen pro Fahrt zu begrenzen. Beispiel: Bei Wert `1` werden nur Fahrten mit maximal einem Umstieg berücksichtigt — Direktverbindungen und Fahrten mit einem Wechsel.
+Legen Sie die `Maximalen Umstiege` fest, um die Anzahl der zulässigen ÖV-Verbindungen pro Fahrt zu begrenzen. Beispiel: Bei Wert `1` werden nur Fahrten mit maximal einem Umstieg berücksichtigt: Direktverbindungen und Fahrten mit einem Wechsel.
 
 #### Zugangsart & Abgangsart
 
@@ -216,7 +216,7 @@ Für den öffentlichen Verkehr wird das Einzugsgebiet über ein **Zeitfenster** 
 Der verwendete Algorithmus zur Ableitung der Einzugsgebietsform hängt vom Routing-Modus ab:
 
 - **Zu Fuß, Fahrrad, Pedelec und ÖPNV**: die Form wird aus dem Routing-Raster mithilfe des [Marching-Squares-Konturlinien-Algorithmus](https://de.wikipedia.org/wiki/Marching_Squares "Wikipedia: Marching Squares") abgeleitet, einem Computergraphik-Algorithmus, der zweidimensionale Konturlinien aus einem rechteckigen Wertearray erzeugt ([de Queiroz Neto et al. 2016](#6-referenzen)). Dieser Algorithmus transformiert das Routing-Raster von einem 2D-Array in glatte Polygonkonturen für die Visualisierung und räumliche Analyse.
-- **Auto**: die Form wird mithilfe der DuckDB-Funktion [`ST_ConcaveHull`](https://duckdb.org/docs/current/core_extensions/spatial/functions#st_concavehull) abgeleitet, die sich eng um die erreichbaren Punkte legt, um das Einzugsgebiets-Polygon zu erzeugen. Es wird ein dynamisches Konkavitätsverhältnis basierend auf der Anzahl erreichter Knoten verwendet: `0,5` bei weniger als 10.000 Knoten, `0,3` bei weniger als 50.000 und `0,2` andernfalls — niedrigere Werte erzeugen engere, stärker konkave Formen bei großen Einzugsgebieten, höhere Werte glattere Konturen bei kleinen.
+- **Auto**: die Form wird mithilfe der DuckDB-Funktion [`ST_ConcaveHull`](https://duckdb.org/docs/current/core_extensions/spatial/functions#st_concavehull) abgeleitet, die sich eng um die erreichbaren Punkte legt, um das Einzugsgebiets-Polygon zu erzeugen. Es wird ein dynamisches Konkavitätsverhältnis basierend auf der Anzahl erreichter Knoten verwendet: `0,5` bei weniger als 10.000 Knoten, `0,3` bei weniger als 50.000 und `0,2` andernfalls. Niedrigere Werte erzeugen engere, stärker konkave Formen bei großen Einzugsgebieten, höhere Werte glattere Konturen bei kleinen.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/toolbox/accessibility_indicators/catchments/wiki.webp').default} alt="Marching-Squares-Illustration" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "contain"}}/>

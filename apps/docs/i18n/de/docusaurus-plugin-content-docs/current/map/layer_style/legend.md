@@ -46,7 +46,7 @@ Bei der attributbasierten Darstellung mit einer Farbskala (jede Klassifizierungs
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Unterhalb jeder Farbstufen-Zeile sehen Sie ein Textfeld mit dem Platzhalter <code>Legendenbezeichnung</code>. Geben Sie eine eigene Bezeichnung ein — z. B. <code>Niedrig</code>, <code>Mittel</code> oder <code>Hoch</code>: um den numerischen Wert in der Legende zu ersetzen.</div>
+  <div class="content">Unterhalb jeder Farbstufen-Zeile sehen Sie ein Textfeld mit dem Platzhalter <code>Legendenbezeichnung</code>. Geben Sie eine eigene Bezeichnung ein, z. B. <code>Niedrig</code>, <code>Mittel</code> oder <code>Hoch</code>, um den numerischen Wert in der Legende zu ersetzen.</div>
 </div>
 
 <div class="step">

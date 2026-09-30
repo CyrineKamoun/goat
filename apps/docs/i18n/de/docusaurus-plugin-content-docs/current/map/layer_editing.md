@@ -35,7 +35,7 @@ Sobald der Layer erstellt wurde, können Sie Features direkt auf der Karte hinzu
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Verwenden Sie die <strong>Bearbeitungsleiste</strong> am unteren Kartenrand: Klicken Sie auf <code>+</code>, um ein <strong>neues Feature hinzuzufügen</strong>, und klicken Sie auf die Karte, um die Geometrie zu zeichnen. Das Panel <b>Feature-Attribute</b> öffnet sich auf der rechten Seite — <strong>füllen Sie die Attributwerte</strong> aus und klicken Sie auf <code>Fertig</code>.</div>
+  <div class="content">Verwenden Sie die <strong>Bearbeitungsleiste</strong> am unteren Kartenrand: Klicken Sie auf <code>+</code>, um ein <strong>neues Feature hinzuzufügen</strong>, und klicken Sie auf die Karte, um die Geometrie zu zeichnen. Das Panel <b>Feature-Attribute</b> öffnet sich auf der rechten Seite, dann <strong>füllen Sie die Attributwerte</strong> aus und klicken Sie auf <code>Fertig</code>.</div>
 </div>
 
 <div class="step">
@@ -54,7 +54,7 @@ Sobald der Layer erstellt wurde, können Sie Features direkt auf der Karte hinzu
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Klicken Sie in der Tabellen-Symbolleiste auf <code>Felder bearbeiten</code>, um den Dialog <b>Felder bearbeiten</b> zu öffnen, und klicken Sie dann auf <code>+ Feld hinzufügen</code>. Ein neues Feld wird der Liste hinzugefügt — wählen Sie rechts seinen <b>Feldtyp</b> (<code>Text</code>, <code>Number</code>, <code>Date</code>, <code>Boolean</code> oder <code>Formula</code>, ein berechnetes Feld, siehe <a href="#formelfelder">Formelfelder</a> unten) und benennen Sie das Feld in der Liste um. Um ein Feld zu entfernen, klicken Sie auf das <code>—</code>-Symbol daneben. Klicken Sie auf <code>Speichern</code>, wenn Sie fertig sind.</div>
+  <div class="content">Klicken Sie in der Tabellen-Symbolleiste auf <code>Felder bearbeiten</code>, um den Dialog <b>Felder bearbeiten</b> zu öffnen, und klicken Sie dann auf <code>+ Feld hinzufügen</code>. Ein neues Feld wird der Liste hinzugefügt. Wählen Sie rechts seinen <b>Feldtyp</b> (<code>Text</code>, <code>Number</code>, <code>Date</code>, <code>Boolean</code> oder <code>Formula</code>, ein berechnetes Feld, siehe <a href="#formelfelder">Formelfelder</a> unten) und benennen Sie das Feld in der Liste um. Um ein Feld zu entfernen, klicken Sie auf das <code>—</code>-Symbol daneben. Klicken Sie auf <code>Speichern</code>, wenn Sie fertig sind.</div>
 </div>
 
 <div class="step">
@@ -64,7 +64,7 @@ Sobald der Layer erstellt wurde, können Sie Features direkt auf der Karte hinzu
 
 ### Formelfelder
 
-Der Wert eines <b>Formula</b>-Felds wird aus einem Ausdruck berechnet, den Sie schreiben — ähnlich wie eine Formelspalte in einer Tabellenkalkulation. Der Ausdruck kann Ihre anderen Felder referenzieren — teilen Sie zum Beispiel die Bevölkerung durch die Fläche, um die Dichte zu erhalten — oder Textfelder zusammenführen. Das Ergebnis wird auf jedes Feature im Layer angewendet.
+Der Wert eines <b>Formula</b>-Felds wird aus einem Ausdruck berechnet, den Sie schreiben, ähnlich wie eine Formelspalte in einer Tabellenkalkulation. Der Ausdruck kann Ihre anderen Felder referenzieren (teilen Sie zum Beispiel die Bevölkerung durch die Fläche, um die Dichte zu erhalten) oder Textfelder zusammenführen. Das Ergebnis wird auf jedes Feature im Layer angewendet.
 
 <div class="step">
   <div class="step-number">1</div>

@@ -13,8 +13,8 @@ Im Einstellungsbereich können Sie **die Kartensteuerung, das Branding, Social S
 
 ## Karte
 
-- `Werkzeugleiste` — zeigt die obere Leiste mit dem GOAT-Logo, Projektnamen, Zuletzt-gespeichert-Zeitstempel und Projektinfo im Betrachter-Modus.
-- `Maßstabsleiste` — zeigt eine Skala auf der Karte, mit der Abstände von einem Punkt zum anderen gemessen werden können.
+- `Werkzeugleiste`: zeigt die obere Leiste mit dem GOAT-Logo, Projektnamen, Zuletzt-gespeichert-Zeitstempel und Projektinfo im Betrachter-Modus.
+- `Maßstabsleiste`: zeigt eine Skala auf der Karte, mit der Abstände von einem Punkt zum anderen gemessen werden können.
 
 ### Steuerungslayout
 
@@ -34,7 +34,7 @@ Verfügbare Steuerelemente:
 
 ### Erlaubte Hintergrundkarten
 
-Legen Sie fest, welche Hintergrundkarten Betrachter verwenden können. Wählen Sie eine oder mehrere aus dem Dropdown aus — Betrachter sehen nur die hier aktivierten Optionen. Wird nur angezeigt, wenn `Auswahl Hintergrundkarten` an einer Position platziert ist.
+Legen Sie fest, welche Hintergrundkarten Betrachter verwenden können. Wählen Sie eine oder mehrere aus dem Dropdown aus, und Betrachter sehen nur die hier aktivierten Optionen. Wird nur angezeigt, wenn `Auswahl Hintergrundkarten` an einer Position platziert ist.
 
 ### Zoom-Grenzen
 
@@ -46,11 +46,11 @@ Begrenzen, wie weit Dashboard-Betrachter hinein- und herauszoomen können. Mit e
 
 Passen Sie die visuelle Identität Ihres Dashboards für den Betrachter-Modus an.
 
-- `Schriftart` — wählen Sie eine Schriftart aus dem Dropdown. Wählen Sie `Eigene…`, um eine **Schriftdatei-URL** und einen **Schriftart**-Namen für eine eigene Schriftart einzugeben.
-- `Primärfarbe` — legen Sie die Hauptakzentfarbe für Schaltflächen und Hervorhebungen fest.
-- `Symbolfarbe` — legen Sie die Farbe für Symbole im Dashboard fest.
-- `Schriftfarbe` — legen Sie die Textfarbe im gesamten Dashboard fest.
-- `Favicon` — laden Sie ein benutzerdefiniertes Browser-Tab-Symbol hoch. Klicken Sie auf `×`, um es zu entfernen.
+- `Schriftart`: wählen Sie eine Schriftart aus dem Dropdown. Wählen Sie `Eigene…`, um eine **Schriftdatei-URL** und einen **Schriftart**-Namen für eine eigene Schriftart einzugeben.
+- `Primärfarbe`: legen Sie die Hauptakzentfarbe für Schaltflächen und Hervorhebungen fest.
+- `Symbolfarbe`: legen Sie die Farbe für Symbole im Dashboard fest.
+- `Schriftfarbe`: legen Sie die Textfarbe im gesamten Dashboard fest.
+- `Favicon`: laden Sie ein benutzerdefiniertes Browser-Tab-Symbol hoch. Klicken Sie auf `×`, um es zu entfernen.
 
 ---
 
@@ -65,7 +65,7 @@ Legen Sie fest, wie Ihr Dashboard beim Teilen in sozialen Medien oder Messenger-
 
 ## Allgemein
 
-- `Sprache` — legen Sie die Anzeigesprache des Dashboards fest. Optionen: `Automatisch (Browser-Standard)`, `English`, `Deutsch`.
+- `Sprache`: legen Sie die Anzeigesprache des Dashboards fest. Optionen: `Automatisch (Browser-Standard)`, `English`, `Deutsch`.
 
 ---
 

@@ -4,7 +4,7 @@ description: "Legen Sie Variablen vom Typ Text oder Zahl mit Standardwert an, f�
 
 # Variablen
 
-**Workflow-Variablen** ermöglichen es Ihnen, wiederverwendbare Werte zu definieren, die zur Laufzeit gesetzt werden können, ohne den Workflow zu bearbeiten. Nutzen Sie sie, um Ihre Analyse flexibel und teilbar zu machen — Mitarbeitende können denselben Workflow mit anderen Parametern ausführen, ohne die Workflow-Struktur zu ändern.
+**Workflow-Variablen** ermöglichen es Ihnen, wiederverwendbare Werte zu definieren, die zur Laufzeit gesetzt werden können, ohne den Workflow zu bearbeiten. Nutzen Sie sie, um Ihre Analyse flexibel und teilbar zu machen: Mitarbeitende können denselben Workflow mit anderen Parametern ausführen, ohne die Workflow-Struktur zu ändern.
 
 Variablen verwenden die Syntax `{{@variable_name}}` und können in die meisten Werkzeugparameter eingefügt werden.
 
@@ -16,8 +16,8 @@ Variablen verwenden die Syntax `{{@variable_name}}` und können in die meisten W
 
 | Typ | Verwendung |
 |---|---|
-| **Text** | Textwerte — Namen, Beschriftungen, Filterkriterien |
-| **Zahl** | Numerische Werte — Entfernungen, Schwellenwerte, Zählungen |
+| **Text** | Textwerte: Namen, Beschriftungen, Filterkriterien |
+| **Zahl** | Numerische Werte: Entfernungen, Schwellenwerte, Zählungen |
 
 ## Variablen erstellen
 
@@ -33,7 +33,7 @@ Variablen verwenden die Syntax `{{@variable_name}}` und können in die meisten W
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Geben Sie einen <strong>Namen</strong> ein. Namen müssen mit einem Buchstaben oder Unterstrich beginnen und dürfen nur Buchstaben, Ziffern und Unterstriche enthalten — keine Leerzeichen (z. B. <code>puffer_abstand</code>, nicht <code>puffer abstand</code>).</div>
+  <div class="content">Geben Sie einen <strong>Namen</strong> ein. Namen müssen mit einem Buchstaben oder Unterstrich beginnen und dürfen nur Buchstaben, Ziffern und Unterstriche enthalten, keine Leerzeichen (z. B. <code>puffer_abstand</code>, nicht <code>puffer abstand</code>).</div>
 </div>
 
 <div class="step">
@@ -53,7 +53,7 @@ Variablen verwenden die Syntax `{{@variable_name}}` und können in die meisten W
 
 ## Variablen in Werkzeugparametern verwenden
 
-Klicken Sie auf das <code>{"{}"}</code>-Symbol in einem kompatiblen Parameterfeld und wählen Sie die gewünschte Variable aus dem Menü. Nach dem Einfügen zeigt das Feld den Variablenverweis (z. B. <code>{"{{@variable_name}}"}</code>) grün hervorgehoben an — das signalisiert, dass das Feld durch eine Variable gesteuert wird.
+Klicken Sie auf das <code>{"{}"}</code>-Symbol in einem kompatiblen Parameterfeld und wählen Sie die gewünschte Variable aus dem Menü. Nach dem Einfügen zeigt das Feld den Variablenverweis (z. B. <code>{"{{@variable_name}}"}</code>) grün hervorgehoben an. Das signalisiert, dass das Feld durch eine Variable gesteuert wird.
 
 :::tip
 Verwenden Sie beschreibende Namen, die den Zweck des Parameters klar angeben: `puffer_abstand` statt `abstand`, `poi_typ` statt `typ`.

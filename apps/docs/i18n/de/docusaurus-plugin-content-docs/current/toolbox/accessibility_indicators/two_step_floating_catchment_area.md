@@ -22,9 +22,9 @@ Die Heatmap 2SFCA (Two-Step Floating Catchment Area)-Methode **visualisiert räu
 Die 2SFCA-Methode misst die **räumliche Erreichbarkeit unter Berücksichtigung von Angebot (Kapazität der Einrichtungen) und Nachfrage (Bevölkerung)**. Im Gegensatz zu einfachen Angebot-Nachfrage-Verhältnissen pro Verwaltungseinheit berücksichtigt 2SFCA grenzüberschreitende Zugänge – Menschen können Einrichtungen in benachbarten Gebieten erreichen, und Einrichtungen versorgen Bevölkerungsgruppen über ihren eigenen Bezirk hinaus.
 Das Ergebnis ist ein **Verhältnis von Angebot zu Nachfrage auf der Ebene hexagonaler Rasterzellen**. Das Werkzeug arbeitet in zwei Schritten:
 
-1. **Schritt 1 — Kapazitäts-Nachfrage-Verhältnisse:** Für jeden Standort einer Einrichtung wird berechnet, wie viel Kapazität im Verhältnis zur Gesamtnachfrage (Bevölkerung) in ihrem Einzugsgebiet verfügbar ist. Dies ergibt ein Angebot-Nachfrage-Verhältnis pro Einrichtung.
+1. **Schritt 1, Kapazitäts-Nachfrage-Verhältnisse:** Für jeden Standort einer Einrichtung wird berechnet, wie viel Kapazität im Verhältnis zur Gesamtnachfrage (Bevölkerung) in ihrem Einzugsgebiet verfügbar ist. Dies ergibt ein Angebot-Nachfrage-Verhältnis pro Einrichtung.
 
-2. **Schritt 2 — Kumulative Erreichbarkeit:** Für jede Rasterzelle werden die Kapazitätsverhältnisse aller erreichbaren Einrichtungen summiert. Das Ergebnis zeigt, wie gut jeder Standort versorgt ist.
+2. **Schritt 2, Kumulative Erreichbarkeit:** Für jede Rasterzelle werden die Kapazitätsverhältnisse aller erreichbaren Einrichtungen summiert. Das Ergebnis zeigt, wie gut jeder Standort versorgt ist.
 
 Sie können den **Routing-Modus**, **Gelegenheits-Layer** (mit Kapazitätsfeld), **Bedarfs-Layer** (mit Bevölkerungsfeld), **Reisezeitlimits** konfigurieren und zwischen drei **2SFCA-Varianten** wählen.
 - Die **Gelegenheits-Layer enthalten Einrichtungsdaten** mit einem Kapazitätsattribut (z. B. Anzahl der Krankenhausbetten, Quadratmeter Verkaufsfläche, Schulplätze).
@@ -244,7 +244,7 @@ Benötigen Sie Hilfe bei der Auswahl einer geeigneten Reisezeitgrenze für versc
 
 <div class="step">
   <div class="step-number">16</div>
-  <div class="content">Optional können Sie unter <code>Erweiterte Optionen</code> ein <code>Referenzgebiet</code> auswählen — einen Polygon-Layer, der das vollständige Untersuchungsgebiet definiert. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; Zellen außerhalb der berechneten Erreichbarkeit werden als <code>NULL</code> dargestellt und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
+  <div class="content">Optional können Sie unter <code>Erweiterte Optionen</code> ein <code>Referenzgebiet</code> auswählen, einen Polygon-Layer, der das vollständige Untersuchungsgebiet definiert. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; Zellen außerhalb der berechneten Erreichbarkeit werden als <code>NULL</code> dargestellt und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
 </div>
 
 ### Ergebnis-Layer
@@ -317,7 +317,7 @@ Wenn mehrere Kanten (Straßen) des Straßennetzes eine sechseckige Zelle schneid
 
 Die 2SFCA-Methode berechnet die Erreichbarkeit in zwei Schritten:
 
-#### Schritt 1 — Kapazitäts-Nachfrage-Verhältnis
+#### Schritt 1: Kapazitäts-Nachfrage-Verhältnis
 
 Für jeden Einrichtungsstandort *j* wird das Verhältnis seiner Kapazität zur Gesamtnachfrage in seinem Einzugsgebiet berechnet:
 
@@ -335,7 +335,7 @@ Wobei:
 - *t<sub>0</sub>* = Reisezeitlimit (maximales Einzugsgebiet)
 - *f(t<sub>kj</sub>)* = Widerstandsfunktion (Distanzgewicht)
 
-#### Schritt 2 — Kumulative Erreichbarkeit
+#### Schritt 2: Kumulative Erreichbarkeit
 
 Für jede Rasterzelle *i* werden die Kapazitäts-Nachfrage-Verhältnisse aller erreichbaren Einrichtungen summiert:
 

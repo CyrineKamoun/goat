@@ -4,7 +4,7 @@ description: "Leiten Sie einen Layer mit dem Bedingung-Knoten in den Wahr- oder 
 
 # Bedingung
 
-Der **Bedingung**-Knoten leitet eine Eingabeebene basierend auf einer definierten Bedingung an den **Wahr**- oder **Falsch**-Zweig weiter. Die Ebene wird unverändert weitergegeben — eine Bedingung gilt als wahr, wenn mindestens ein Feature sie erfüllt.
+Der **Bedingung**-Knoten leitet eine Eingabeebene basierend auf einer definierten Bedingung an den **Wahr**- oder **Falsch**-Zweig weiter. Die Ebene wird unverändert weitergegeben. Eine Bedingung gilt als wahr, wenn mindestens ein Feature sie erfüllt.
 
 ## Knotenstruktur
 
@@ -53,4 +53,4 @@ Klicken Sie auf das <code>{"{}"}</code>-Symbol in einem Wertfeld, um eine Workfl
 
 ## Ausführungsstatus
 
-Nach der Ausführung zeigt der Bedingung-Knoten einen Statuschip — **Abgeschlossen**, **Fehlgeschlagen** oder **Übersprungen** — der angibt, welcher Zweig genommen wurde. Um alle Bedingungen zu entfernen, klicken Sie auf **Filter löschen**.
+Nach der Ausführung zeigt der Bedingung-Knoten einen Statuschip (**Abgeschlossen**, **Fehlgeschlagen** oder **Übersprungen**), der angibt, welcher Zweig genommen wurde. Um alle Bedingungen zu entfernen, klicken Sie auf **Filter löschen**.

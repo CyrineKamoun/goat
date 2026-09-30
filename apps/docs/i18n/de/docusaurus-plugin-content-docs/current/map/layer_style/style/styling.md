@@ -99,7 +99,7 @@ Der Abschnitt **Linienstil** ist nur für **Linien-Layer** verfügbar und steuer
     <ul>
       <li><code>Linienende</code>: wie Linienendpunkte dargestellt werden: <code>Stumpf</code>, <code>Rund</code> oder <code>Quadratisch</code>.</li>
       <li><code>Linienverbindung</code>: wie Ecken zwischen Liniensegmenten aussehen: <code>Abgeschrägt</code>, <code>Rund</code> oder <code>Spitz</code>.</li>
-      <li><code>Versatz</code>: verschiebt die Linie visuell nach links oder rechts von ihrer tatsächlichen Geometrie. Nützlich für parallele Straßen oder Richtungsfahrbahnen. Hinweis: Nur visuell — Auswahl und Fangen verwenden weiterhin die Originalgeometrie.</li>
+      <li><code>Versatz</code>: verschiebt die Linie visuell nach links oder rechts von ihrer tatsächlichen Geometrie. Nützlich für parallele Straßen oder Richtungsfahrbahnen. Hinweis: nur visuell, Auswahl und Fangen verwenden weiterhin die Originalgeometrie.</li>
     </ul>
   </div>
 </div>
