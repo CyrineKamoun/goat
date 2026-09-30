@@ -29,8 +29,8 @@ This section contains **widgets that provide information about your project** la
   <div class="content">
   Under <code>Layers</code>, select which layers to show in the widget using the checkboxes. For each layer, click the ⋮ icon to access per-layer settings:
   <ul>
-    <li><code>Show in legend</code> — toggle whether the layer's legend is shown</li>
-    <li><code>Download</code> — allow viewers to download this layer's data</li>
+    <li><code>Show in legend</code>: toggle whether the layer's legend is shown</li>
+    <li><code>Download</code>: allow viewers to download this layer's data</li>
   </ul>
   For groups, click the icon to <code>Change icon</code>, and click the ⓘ button to add or edit group info text (Markdown supported).
   </div>
@@ -58,7 +58,7 @@ This section contains **widgets that provide information about your project** la
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Under <code>Layer actions</code>, choose the <code>Action mode</code> — <code>Compact menu</code> (actions hidden behind a ⋮ icon) or <code>Direct actions</code> (actions shown inline) — and select which actions viewers can perform per layer: <code>Style</code>, <code>View data</code>, <code>Properties</code>, <code>Zoom to</code>.</div>
+  <div class="content">Under <code>Layer actions</code>, choose the <code>Action mode</code>: <code>Compact menu</code> (actions hidden behind a ⋮ icon) or <code>Direct actions</code> (actions shown inline) — and select which actions viewers can perform per layer: <code>Style</code>, <code>View data</code>, <code>Properties</code>, <code>Zoom to</code>.</div>
 </div>
 
 

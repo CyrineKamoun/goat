@@ -16,9 +16,9 @@ Das Verknüpfen ist der Prozess des Anhängens von Feldern aus einem Layer (Join
 
 **GOAT unterstützt drei Verknüpfungsmethoden:**
 
-- **Attributiv** — Abgleich von Features basierend auf einem gemeinsamen Feld (z. B. Postleitzahl in beiden Layern).
-- **Räumlich** — Abgleich von Features basierend auf ihrer geometrischen Beziehung (z. B. Features, die sich schneiden).
-- **Räumlich und Attributiv** — Erfordert sowohl eine räumliche Überschneidung als auch ein passendes Attribut.
+- **Attributiv**: Abgleich von Features basierend auf einem gemeinsamen Feld (z. B. Postleitzahl in beiden Layern).
+- **Räumlich**: Abgleich von Features basierend auf ihrer geometrischen Beziehung (z. B. Features, die sich schneiden).
+- **Räumlich und Attributiv**: Erfordert sowohl eine räumliche Überschneidung als auch ein passendes Attribut.
 
 <Tabs>
 <TabItem value="attribute" label="Attribut-Verknüpfung" default className="tabItemBox">
@@ -33,8 +33,8 @@ Eine attributive Verknüpfung verbindet zwei Layer durch den Vergleich von Werte
 
 Der `Verbindungstyp` bestimmt, welche Features in der Ausgabe erscheinen:
 
-- **Inner Join** — nur Features mit einer Übereinstimmung in beiden Layern werden behalten. Features ohne Übereinstimmung werden entfernt.
-- **Left Join** — alle Features des Ziel-Layers werden behalten. Features ohne Übereinstimmung erhalten `NULL` für die verknüpften Felder.
+- **Inner Join**: nur Features mit einer Übereinstimmung in beiden Layern werden behalten. Features ohne Übereinstimmung werden entfernt.
+- **Left Join**: alle Features des Ziel-Layers werden behalten. Features ohne Übereinstimmung erhalten `NULL` für die verknüpften Felder.
 
 ### Eins zu Eins
 
@@ -117,12 +117,12 @@ In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüp
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Wählen Sie Ihren <code>Ziel-Layer</code> — den Hauptlayer, dessen Geometrie Sie behalten möchten.</div>
+  <div class="content">Wählen Sie Ihren <code>Ziel-Layer</code>: den Hauptlayer, dessen Geometrie Sie behalten möchten.</div>
 </div>
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Wählen Sie Ihren <code>Join-Layer</code> — den Layer, der die Felder enthält, die Sie hinzufügen möchten.</div>
+  <div class="content">Wählen Sie Ihren <code>Join-Layer</code>: den Layer, der die Felder enthält, die Sie hinzufügen möchten.</div>
 </div>
 
 ### Abgleichmethode
@@ -137,7 +137,7 @@ In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüp
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Klicken Sie unter <code>Attributbeziehung</code> auf <code>Hinzufügen Zuordnungsfelder</code>, und wählen Sie dann das <code>Ziel-Feld</code> und das <code>Join-Feld</code> — das gemeinsame Feld, das zur Zuordnung von Features zwischen den beiden Layern verwendet wird.</div>
+  <div class="content">Klicken Sie unter <code>Attributbeziehung</code> auf <code>Hinzufügen Zuordnungsfelder</code>, und wählen Sie dann das <code>Ziel-Feld</code> und das <code>Join-Feld</code>: das gemeinsame Feld, das zur Zuordnung von Features zwischen den beiden Layern verwendet wird.</div>
 </div>
 
 </TabItem>
@@ -179,8 +179,8 @@ In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüp
   <div class="content">
   Aktivieren Sie optional <code>Verknüpfungsfelder hinzufügen</code>, um festzulegen, welche Felder aus dem Join-Layer in die Ausgabe aufgenommen werden sollen, und/oder aktivieren Sie <code>Statistiken berechnen</code>, um aggregierte Werte zu berechnen, wenn mehrere Join-Layer-Datensätze einem einzelnen Ziel-Layer-Feature entsprechen. Wenn <code>Statistiken berechnen</code> aktiviert ist, konfigurieren Sie die Statistik:
   <ul>
-    <li><code>Operation auswählen</code> — wählen Sie eine der folgenden Optionen: <code>Anzahl</code>, <code>Summe</code>, <code>Min</code>, <code>Max</code>, <code>Durchschnitt</code> oder <code>Standardabweichung</code>.</li>
-    <li><code>Feld auswählen</code> — wählen Sie das numerische Feld aus dem Join-Layer, das aggregiert werden soll (ausgeblendet bei <code>Anzahl</code>).</li>
+    <li><code>Operation auswählen</code>: wählen Sie eine der folgenden Optionen: <code>Anzahl</code>, <code>Summe</code>, <code>Min</code>, <code>Max</code>, <code>Durchschnitt</code> oder <code>Standardabweichung</code>.</li>
+    <li><code>Feld auswählen</code>: wählen Sie das numerische Feld aus dem Join-Layer, das aggregiert werden soll (ausgeblendet bei <code>Anzahl</code>).</li>
     <li><code>Name der Ergebnisspalte</code> (optional) — Name für die Ausgabespalte. Leer lassen für Standardname (z. B. <code>count</code> oder <code>Feldname_Operation</code>).</li>
   </ul>
   </div>

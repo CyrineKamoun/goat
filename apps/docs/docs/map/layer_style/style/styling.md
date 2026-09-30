@@ -75,10 +75,10 @@ The **Line style** section is available for **line layers only** and controls th
   <div class="content">
   Under <code>Arrows</code>, choose the arrowhead direction: <code>None</code>, <code>Forward</code>, <code>Backward</code>, or <code>Both</code>. When any direction is selected, additional controls appear:
     <ul>
-      <li><code>Placement</code> — where the arrows are placed: <code>Repeat along line</code>, <code>Start of line</code>, <code>End of line</code>, <code>Both ends</code>, or <code>Center (one per line)</code>.</li>
-      <li><code>Arrow size</code> — slider to control the arrowhead size.</li>
-      <li><code>Arrow spacing</code> — slider to control the distance between repeated arrows (only visible when Placement is <code>Repeat along line</code>).</li>
-      <li><code>Allow overlap</code> — checkbox to prevent arrows from being hidden when they overlap.</li>
+      <li><code>Placement</code>: where the arrows are placed: <code>Repeat along line</code>, <code>Start of line</code>, <code>End of line</code>, <code>Both ends</code>, or <code>Center (one per line)</code>.</li>
+      <li><code>Arrow size</code>: slider to control the arrowhead size.</li>
+      <li><code>Arrow spacing</code>: slider to control the distance between repeated arrows (only visible when Placement is <code>Repeat along line</code>).</li>
+      <li><code>Allow overlap</code>: checkbox to prevent arrows from being hidden when they overlap.</li>
     </ul>
   </div>
 </div>
@@ -90,9 +90,9 @@ The **Line style** section is available for **line layers only** and controls th
   <div class="content">
   Expand <code>Advanced Options</code> to configure:
     <ul>
-      <li><code>Cap</code> — how line endpoints are rendered: <code>Butt</code>, <code>Round</code>, or <code>Square</code>.</li>
-      <li><code>Join</code> — how corners between line segments look: <code>Bevel</code>, <code>Round</code>, or <code>Miter</code>.</li>
-      <li><code>Offset</code> — shifts the line visually left or right of its actual geometry. Useful for parallel roads or directional lanes. Note: this is a visual shift only — hit-testing and snapping still use the original geometry.</li>
+      <li><code>Cap</code>: how line endpoints are rendered: <code>Butt</code>, <code>Round</code>, or <code>Square</code>.</li>
+      <li><code>Join</code>: how corners between line segments look: <code>Bevel</code>, <code>Round</code>, or <code>Miter</code>.</li>
+      <li><code>Offset</code>: shifts the line visually left or right of its actual geometry. Useful for parallel roads or directional lanes. Note: this is a visual shift only — hit-testing and snapping still use the original geometry.</li>
     </ul>
   </div>
 </div>

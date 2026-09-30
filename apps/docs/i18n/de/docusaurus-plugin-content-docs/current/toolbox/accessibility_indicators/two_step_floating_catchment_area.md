@@ -110,7 +110,7 @@ Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Ein
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Wählen Sie ein <code>Referenzgebiet</code> — einen Polygon-Layer, der Ihr Untersuchungsgebiet darstellt. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; nicht erreichbare Zellen erhalten den Wert <code>NULL</code> und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
+  <div class="content">Wählen Sie ein <code>Referenzgebiet</code>: einen Polygon-Layer, der Ihr Untersuchungsgebiet darstellt. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; nicht erreichbare Zellen erhalten den Wert <code>NULL</code> und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
 </div>
 
 <div class="step">
@@ -200,7 +200,7 @@ Wendet innerhalb des Reisezeitlimits ein volles Gewicht von 1 auf jede Einrichtu
 
 <div class="step">
   <div class="step-number">10</div>
-  <div class="content">Wählen Sie das <code>Nachfragefeld</code> – ein numerisches Feld aus Ihrem Bedarfs-Layer, das die Anzahl potenzieller Nutzer darstellt (z. B. Bevölkerung, Anzahl der Haushalte).</div>
+  <div class="content">Wählen Sie das <code>Nachfragefeld</code>: ein numerisches Feld aus Ihrem Bedarfs-Layer, das die Anzahl potenzieller Nutzer darstellt (z. B. Bevölkerung, Anzahl der Haushalte).</div>
 </div>
 
 ### Gelegenheiten
@@ -220,8 +220,8 @@ Wendet innerhalb des Reisezeitlimits ein volles Gewicht von 1 auf jede Einrichtu
   <div class="content">
   Wählen Sie einen <code>Potenzialtyp</code>, um festzulegen, wie die Kapazität jeder Einrichtung bestimmt wird:
     <ul>
-      <li><b>Constant</b> — alle Einrichtungen haben die gleiche Kapazität. Geben Sie einen numerischen Wert ein (Standard: 1.0).</li>
-      <li><b>Field</b> — verwenden Sie ein numerisches Feld aus dem <i>Eingabe-Layer</i> als Kapazität (z. B. Anzahl der Betten, Sitze oder Quadratmeter).</li>
+      <li><b>Constant</b>: alle Einrichtungen haben die gleiche Kapazität. Geben Sie einen numerischen Wert ein (Standard: 1.0).</li>
+      <li><b>Field</b>: verwenden Sie ein numerisches Feld aus dem <i>Eingabe-Layer</i> als Kapazität (z. B. Anzahl der Betten, Sitze oder Quadratmeter).</li>
     </ul>
   </div>
 </div>

@@ -83,10 +83,10 @@ Der Wert eines <b>Formula</b>-Felds wird aus einem Ausdruck berechnet, den Sie s
 
 **Beispiele:**
 
-- <code>"population" / "area_km2"</code> — Bevölkerungsdichte
-- <code>round("population" / "area_km2", 1)</code> — Dichte auf eine Nachkommastelle gerundet
-- <code>concat_ws(', ', "city", "country")</code> — Textfelder zusammenführen (z. B. `Berlin, Germany`)
-- <code>if("population" &gt; 100000, 'large', 'small')</code> — nach einem Schwellenwert klassifizieren
+- <code>"population" / "area_km2"</code>: Bevölkerungsdichte
+- <code>round("population" / "area_km2", 1)</code>: Dichte auf eine Nachkommastelle gerundet
+- <code>concat_ws(', ', "city", "country")</code>: Textfelder zusammenführen (z. B. `Berlin, Germany`)
+- <code>if("population" &gt; 100000, 'large', 'small')</code>: nach einem Schwellenwert klassifizieren
 
 :::info
 Die Werte einer Formel werden automatisch aktualisiert, wenn sich die referenzierten Felder ändern. Eine Formel muss einen Zahlen-, Text-, Wahr/Falsch- oder Datumswert ergeben. Formelfelder sind nur für bereits vorhandene Layer verfügbar.

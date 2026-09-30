@@ -199,7 +199,7 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
 
 <div class="step">
   <div class="step-number">10</div>
-  <div class="content">Choose the <code>Demand Field</code> — a numeric field from your demand layer representing the number of potential users (e.g., population, number of households).</div>
+  <div class="content">Choose the <code>Demand Field</code>: a numeric field from your demand layer representing the number of potential users (e.g., population, number of households).</div>
 </div>
 
 ### Opportunities
@@ -219,8 +219,8 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
   <div class="content">
   Choose a <code>Potential Type</code> to define how each facility's capacity is determined:
     <ul>
-      <li><b>Constant</b> — all facilities have the same capacity. Enter a numeric value (default: 1.0).</li>
-      <li><b>Field</b> — use a numeric field from the <i>Input Layer</i> as the capacity (e.g., number of beds, seats, or square meters).</li>
+      <li><b>Constant</b>: all facilities have the same capacity. Enter a numeric value (default: 1.0).</li>
+      <li><b>Field</b>: use a numeric field from the <i>Input Layer</i> as the capacity (e.g., number of beds, seats, or square meters).</li>
     </ul>
   </div>
 </div>
@@ -243,7 +243,7 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 
 <div class="step">
   <div class="step-number">16</div>
-  <div class="content">Optionally, expand <code>Advanced Options</code> and select a <code>Reference Area</code> — a polygon layer that defines the full study area. When set, the heatmap extends to cover all H3 cells within that polygon, with cells outside the computed reach shown as <code>NULL</code> to expose coverage gaps and underserved areas.</div>
+  <div class="content">Optionally, expand <code>Advanced Options</code> and select a <code>Reference Area</code>: a polygon layer that defines the full study area. When set, the heatmap extends to cover all H3 cells within that polygon, with cells outside the computed reach shown as <code>NULL</code> to expose coverage gaps and underserved areas.</div>
 </div>
 
 ### Result Layer

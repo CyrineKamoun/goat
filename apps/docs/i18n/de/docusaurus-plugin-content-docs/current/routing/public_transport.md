@@ -84,6 +84,6 @@ Die **Zugangs-Etappe** (vom Ausgangsort zur ÖV-Haltestelle) und die **Abgangs-E
 | Huff-Modell | <code>Zu Fuß</code> | <code>Zeit</code> | 30 Minuten |
 | Reisekostenmatrix | <code>Zu Fuß</code>, <code>Fahrrad</code>, <code>Pedelec</code>, <code>Auto</code> | <code>Zeit</code> oder <code>Entfernung</code> | Bis zum gesamten <code>Limit</code> |
 
-- **Geschwindigkeit** — die für die Etappe verwendete Reisegeschwindigkeit (bei Berechnung nach `Zeit`).
+- **Geschwindigkeit**: die für die Etappe verwendete Reisegeschwindigkeit (bei Berechnung nach `Zeit`).
 
 Standardmäßig verwenden die Zugangs- und die Abgangs-Etappe `Zu Fuß`, ein `Zeit`-Limit von `15 Min` und eine Geschwindigkeit von `5 km/h`.

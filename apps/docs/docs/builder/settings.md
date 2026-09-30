@@ -58,8 +58,8 @@ Customize the visual identity of your dashboard for Viewer mode.
 
 Customize how your dashboard appears when shared via social media or messaging apps.
 
-- **Preview image** — drag and drop or click to upload an image (recommended: 1200×630 pixels). Falls back to the default GOAT preview when unset.
-- **Description** — add a short description (up to 300 characters) used in social previews and search results.
+- **Preview image**: drag and drop or click to upload an image (recommended: 1200×630 pixels). Falls back to the default GOAT preview when unset.
+- **Description**: add a short description (up to 300 characters) used in social previews and search results.
 
 ---
 
@@ -88,7 +88,7 @@ When a viewer activates a layer group, a Tabs widget switches to a tab you choos
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Select the <code>Target widget</code> — the Tabs widget whose active tab should change.</div>
+  <div class="content">Select the <code>Target widget</code>: the Tabs widget whose active tab should change.</div>
 </div>
 
 <div class="step">
@@ -107,7 +107,7 @@ When a viewer shows or hides a layer, one or more other layers are shown or hidd
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Select the <code>Source layer</code> — the layer whose visibility is watched.</div>
+  <div class="content">Select the <code>Source layer</code>: the layer whose visibility is watched.</div>
 </div>
 
 <div class="step">

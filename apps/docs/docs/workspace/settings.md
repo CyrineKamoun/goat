@@ -105,7 +105,7 @@ Under **White Label**, you can publish dashboards on your own domain and configu
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">In the <strong>Add custom domain</strong> dialog, enter your <code>Domain name</code> — either a subdomain (e.g. <code>dashboards.example.com</code>) or an apex domain (e.g. <code>example.com</code>). Click <code>Continue</code>.</div>
+  <div class="content">In the <strong>Add custom domain</strong> dialog, enter your <code>Domain name</code>: either a subdomain (e.g. <code>dashboards.example.com</code>) or an apex domain (e.g. <code>example.com</code>). Click <code>Continue</code>.</div>
 </div>
 
 <div class="step">
@@ -159,10 +159,10 @@ GOAT currently supports **Matomo** as the analytics provider.
   <div class="content">
   In the <strong>Add analytics</strong> dialog, fill in:
     <ul>
-      <li><code>Name</code> — a label to tell instances apart, e.g. <code>Client XY Matomo</code>.</li>
-      <li><code>Provider</code> — select <code>Matomo</code>.</li>
-      <li><code>Matomo URL</code> — your Matomo instance URL including trailing slash (e.g. <code>https://matomo.example.org/</code>).</li>
-      <li><code>Site ID</code> — found in Matomo → Administration → Websites.</li>
+      <li><code>Name</code>: a label to tell instances apart, e.g. <code>Client XY Matomo</code>.</li>
+      <li><code>Provider</code>: select <code>Matomo</code>.</li>
+      <li><code>Matomo URL</code>: your Matomo instance URL including trailing slash (e.g. <code>https://matomo.example.org/</code>).</li>
+      <li><code>Site ID</code>: found in Matomo → Administration → Websites.</li>
     </ul>
   </div>
 </div>

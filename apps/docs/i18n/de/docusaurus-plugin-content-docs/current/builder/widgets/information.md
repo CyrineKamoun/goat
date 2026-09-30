@@ -30,8 +30,8 @@ Dieser Abschnitt **enthält Widgets, die Informationen über Ihre Projektlayer**
   <div class="content">
   Unter <code>Layer</code> wählen Sie mithilfe der Kontrollkästchen aus, welche Layer im Widget angezeigt werden sollen. Klicken Sie für jeden Layer auf das ⋮-Symbol, um layerspezifische Einstellungen aufzurufen:
   <ul>
-    <li><code>In Legende anzeigen</code> — steuert, ob die Legende des Layers angezeigt wird</li>
-    <li><code>Herunterladen</code> — erlaubt Betrachtern, die Daten dieses Layers herunterzuladen</li>
+    <li><code>In Legende anzeigen</code>: steuert, ob die Legende des Layers angezeigt wird</li>
+    <li><code>Herunterladen</code>: erlaubt Betrachtern, die Daten dieses Layers herunterzuladen</li>
   </ul>
   Für Gruppen können Sie auf das Symbol klicken, um das <code>Symbol zu ändern</code>, und auf die ⓘ-Schaltfläche, um Gruppeninformationen hinzuzufügen oder zu bearbeiten (Markdown unterstützt).
   </div>
@@ -59,7 +59,7 @@ Dieser Abschnitt **enthält Widgets, die Informationen über Ihre Projektlayer**
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Unter <code>Layer-Aktionen</code> wählen Sie den <code>Aktionsmodus</code> — <code>Kompaktmenü</code> (Aktionen hinter einem ⋮-Symbol) oder <code>Direktaktionen</code> (Aktionen direkt angezeigt) — und legen fest, welche Aktionen Betrachter pro Layer ausführen können: <code>Stil</code>, <code>Daten anzeigen</code>, <code>Eigenschaften</code>, <code>Zoomen auf</code>.</div>
+  <div class="content">Unter <code>Layer-Aktionen</code> wählen Sie den <code>Aktionsmodus</code>: <code>Kompaktmenü</code> (Aktionen hinter einem ⋮-Symbol) oder <code>Direktaktionen</code> (Aktionen direkt angezeigt) — und legen fest, welche Aktionen Betrachter pro Layer ausführen können: <code>Stil</code>, <code>Daten anzeigen</code>, <code>Eigenschaften</code>, <code>Zoomen auf</code>.</div>
 </div>
 
 

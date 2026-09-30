@@ -26,7 +26,7 @@ The result is a **probability score for each supply location**, representing the
 
 You can configure the routing type, opportunity layers (with capacity fields), demand layer (with population field), reference area, travel time limits, and calibrate your model.
 
-- **Reference area** — A polygon defining the study area. Only demand and opportunities within this area are considered.
+- **Reference area**: A polygon defining the study area. Only demand and opportunities within this area are considered.
 
 - The **Opportunity layers contain facility data** with an attractivity attribute (e.g., number of hospital beds, square meters of retail space, school seats).
 
@@ -111,7 +111,7 @@ Huff Model computation is available across **over 30 European countries** for `W
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Select your <code>Reference Area</code> — a polygon layer defining the study area boundary. Only demand and opportunities within this area are included in the analysis.</div>
+  <div class="content">Select your <code>Reference Area</code>: a polygon layer defining the study area boundary. Only demand and opportunities within this area are included in the analysis.</div>
 </div>
 
 :::tip Hint
@@ -129,7 +129,7 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Choose the <code>Demand Field</code> — a numeric field from your demand layer representing the number of potential consumers (e.g., population, number of households).</div>
+  <div class="content">Choose the <code>Demand Field</code>: a numeric field from your demand layer representing the number of potential consumers (e.g., population, number of households).</div>
 </div>
 
 ### Opportunities
@@ -141,7 +141,7 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 
 <div class="step">
   <div class="step-number">10</div>
-  <div class="content">Choose the <code>Attractivity Field</code> — a numeric field representing the attractiveness of each facility (e.g., floor area in m², number of products, quality score).</div>
+  <div class="content">Choose the <code>Attractivity Field</code>: a numeric field representing the attractiveness of each facility (e.g., floor area in m², number of products, quality score).</div>
 </div>
 
 ### Advanced Configuration

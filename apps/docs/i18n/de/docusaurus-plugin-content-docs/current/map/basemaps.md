@@ -138,9 +138,9 @@ Die Grundkarte ist in fünf Layer-Gruppen unterteilt:
 | **Sonstiges** | Übrige Layer |
 
 Für jede Gruppe können Sie:
-- **Sichtbarkeit umschalten** — die Gruppe mit dem Schalter rechts vollständig ein- oder ausblenden
-- **Position** — `Über` oder `Unter` wählen, um festzulegen, ob die Gruppe über oder unter Ihren eigenen Layern dargestellt wird
-- **Bezugslayer** — auswählen, welcher Ihrer Layer als Referenz dient (Standard: *Alle meine Layer*)
+- **Sichtbarkeit umschalten**: die Gruppe mit dem Schalter rechts vollständig ein- oder ausblenden
+- **Position**: `Über` oder `Unter` wählen, um festzulegen, ob die Gruppe über oder unter Ihren eigenen Layern dargestellt wird
+- **Bezugslayer**: auswählen, welcher Ihrer Layer als Referenz dient (Standard: *Alle meine Layer*)
 
 Klicken Sie auf **Zurücksetzen**, um alle Gruppen auf ihre Standardpositionen und -sichtbarkeit zurückzusetzen.
 

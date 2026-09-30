@@ -58,8 +58,8 @@ Passen Sie die visuelle Identität Ihres Dashboards für den Betrachter-Modus an
 
 Legen Sie fest, wie Ihr Dashboard beim Teilen in sozialen Medien oder Messenger-Apps erscheint.
 
-- **Vorschaubild** — Bild hierher ziehen oder klicken, um es hochzuladen (empfohlen: 1200×630 Pixel). Falls nicht gesetzt, wird das Standard-GOAT-Vorschaubild verwendet.
-- **Beschreibung** — fügen Sie eine kurze Beschreibung (bis zu 300 Zeichen) hinzu, die in Social-Media-Vorschauen und Suchergebnissen verwendet wird.
+- **Vorschaubild**: Bild hierher ziehen oder klicken, um es hochzuladen (empfohlen: 1200×630 Pixel). Falls nicht gesetzt, wird das Standard-GOAT-Vorschaubild verwendet.
+- **Beschreibung**: fügen Sie eine kurze Beschreibung (bis zu 300 Zeichen) hinzu, die in Social-Media-Vorschauen und Suchergebnissen verwendet wird.
 
 ---
 
@@ -88,7 +88,7 @@ Wenn ein Betrachter eine Layer-Gruppe aktiviert, wechselt ein Tabs-Widget zu ein
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Wählen Sie das <code>Ziel-Widget</code> — das Tabs-Widget, dessen aktiver Tab gewechselt werden soll.</div>
+  <div class="content">Wählen Sie das <code>Ziel-Widget</code>: das Tabs-Widget, dessen aktiver Tab gewechselt werden soll.</div>
 </div>
 
 <div class="step">
@@ -107,7 +107,7 @@ Wenn ein Betrachter einen Layer ein- oder ausblendet, werden ein oder mehrere an
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Wählen Sie den <code>Quell-Layer</code> — den Layer, dessen Sichtbarkeit überwacht wird.</div>
+  <div class="content">Wählen Sie den <code>Quell-Layer</code>: den Layer, dessen Sichtbarkeit überwacht wird.</div>
 </div>
 
 <div class="step">

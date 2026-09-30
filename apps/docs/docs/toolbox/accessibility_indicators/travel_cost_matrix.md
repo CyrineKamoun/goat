@@ -62,7 +62,7 @@ The Travel Cost Matrix is designed for **batch computation across many origins a
 
 - Select the <code>Choose PT Modes</code> to analyze: Bus, Tram, Rail, Subway, Ferry, Cable Car, Gondola, and/or Funicular.
 - Select the <code>Day</code> (<code>Weekday</code>, <code>Saturday</code>, or <code>Sunday</code>) and set the <code>Start Time</code> and <code>End Time</code> for the analysis time window.
-- Set the <code>Travel time limit (min)</code> — the maximum journey duration to consider.
+- Set the <code>Travel time limit (min)</code>: the maximum journey duration to consider.
 - Optionally, enable <code>Advanced options</code> to configure <code>Max. transfers</code>, <code>Access Mode</code>, and <code>Egress Mode</code>.
 
 </TabItem>
@@ -72,12 +72,12 @@ The Travel Cost Matrix is designed for **batch computation across many origins a
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Under <b>Origins</b>, select your <code>Origins layer</code> (a point layer where each feature is a starting location) and set the <code>Origins label</code> — the column used to identify origins in the result matrix.</div>
+  <div class="content">Under <b>Origins</b>, select your <code>Origins layer</code> (a point layer where each feature is a starting location) and set the <code>Origins label</code>: the column used to identify origins in the result matrix.</div>
 </div>
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Under <b>Destinations</b>, select your <code>Destinations layer</code> (a point layer where each feature is a target location) and set the <code>Destinations label</code> — the column used to identify destinations in the result matrix.</div>
+  <div class="content">Under <b>Destinations</b>, select your <code>Destinations layer</code> (a point layer where each feature is a target location) and set the <code>Destinations label</code>: the column used to identify destinations in the result matrix.</div>
 </div>
 
 ### Result layer

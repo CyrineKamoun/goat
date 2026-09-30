@@ -176,8 +176,8 @@ Need help choosing a suitable travel time limit for various common amenities? Th
   <div class="content">
   Choose a <code>Potential Type</code> to define how each opportunity is weighted:
     <ul>
-      <li><b>Constant</b> — all opportunities have the same weight. Enter a numeric value (default: 1.0).</li>
-      <li><b>Field</b> — use a numeric field from the <i>Input Layer</i> as the weight (e.g. number of departures, seats, or capacity).</li>
+      <li><b>Constant</b>: all opportunities have the same weight. Enter a numeric value (default: 1.0).</li>
+      <li><b>Field</b>: use a numeric field from the <i>Input Layer</i> as the weight (e.g. number of departures, seats, or capacity).</li>
       <li><b>Expression</b>: offered for polygon layers only. Under <code>Potential expression</code>, choose <b>Area</b> or <b>Perimeter</b> to weight each polygon by its size, so a large park counts for more than a small one. Both are measured in the web map projection, so they work as relative weights within your study area rather than as exact square metres or metres.</li>
     </ul>
   </div>

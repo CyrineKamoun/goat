@@ -26,7 +26,7 @@ Das Ergebnis ist ein **Wahrscheinlichkeitswert für jeden Angebotsstandort**, de
 
 Sie können das Verkehrsmittel, den Gelegenheiten-Layer (mit Kapazitätsfeldern), den Nachfrage-Layer (mit Bevölkerungsfeld), das Referenzgebiet und Reisezeitlimits konfigurieren und Ihr Modell kalibrieren.
 
-- **Referenzgebiet** — Ein Polygon, das das Untersuchungsgebiet definiert. Nur Nachfrage und Gelegenheiten innerhalb dieses Gebiets werden berücksichtigt.
+- **Referenzgebiet**: Ein Polygon, das das Untersuchungsgebiet definiert. Nur Nachfrage und Gelegenheiten innerhalb dieses Gebiets werden berücksichtigt.
 
 - Der **Gelegenheiten-Layer enthält Einrichtungsdaten** mit einem Attraktivitätsattribut (z. B. Anzahl der Krankenhausbetten, Quadratmeter Verkaufsfläche, Schulplätze).
 
@@ -110,7 +110,7 @@ Die Berechnung des Huff-Modells ist für `Walk`, `Bicycle`, `Pedelec` und `Auto`
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Wählen Sie Ihr <code>Referenzgebiet</code> – einen Polygon-Layer, der die Grenze des Untersuchungsgebiets definiert. Nur Nachfrage und Ziele innerhalb dieses Gebiets werden in die Analyse einbezogen.</div>
+  <div class="content">Wählen Sie Ihr <code>Referenzgebiet</code>: einen Polygon-Layer, der die Grenze des Untersuchungsgebiets definiert. Nur Nachfrage und Ziele innerhalb dieses Gebiets werden in die Analyse einbezogen.</div>
 </div>
 
 :::tip Hinweis
@@ -128,7 +128,7 @@ Benötigen Sie Hilfe bei der Auswahl einer geeigneten Reisezeitgrenze für versc
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Wählen Sie das <code>Nachfragefeld</code> – ein numerisches Feld aus Ihrem Nachfrage-Layer, das die Anzahl potenzieller Verbraucher darstellt (z. B. Bevölkerung, Anzahl der Haushalte).</div>
+  <div class="content">Wählen Sie das <code>Nachfragefeld</code>: ein numerisches Feld aus Ihrem Nachfrage-Layer, das die Anzahl potenzieller Verbraucher darstellt (z. B. Bevölkerung, Anzahl der Haushalte).</div>
 </div>
 
 ### Gelegenheiten
@@ -140,7 +140,7 @@ Benötigen Sie Hilfe bei der Auswahl einer geeigneten Reisezeitgrenze für versc
 
 <div class="step">
   <div class="step-number">10</div>
-  <div class="content">Wählen Sie das <code>Attraktivitätsfeld</code> – ein numerisches Feld, das die Attraktivität jeder Einrichtung darstellt (z. B. Verkaufsfläche in m², Anzahl der Produkte, Qualitätsbewertung).</div>
+  <div class="content">Wählen Sie das <code>Attraktivitätsfeld</code>: ein numerisches Feld, das die Attraktivität jeder Einrichtung darstellt (z. B. Verkaufsfläche in m², Anzahl der Produkte, Qualitätsbewertung).</div>
 </div>
 
 ### Erweiterte Konfiguration

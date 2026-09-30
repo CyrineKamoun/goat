@@ -83,10 +83,10 @@ A **Formula** field's value is calculated from an expression you write, similar 
 
 **Examples:**
 
-- <code>"population" / "area_km2"</code> — population density
-- <code>round("population" / "area_km2", 1)</code> — density rounded to one decimal
-- <code>concat_ws(', ', "city", "country")</code> — combine text fields (e.g. `Berlin, Germany`)
-- <code>if("population" &gt; 100000, 'large', 'small')</code> — classify by a threshold
+- <code>"population" / "area_km2"</code>: population density
+- <code>round("population" / "area_km2", 1)</code>: density rounded to one decimal
+- <code>concat_ws(', ', "city", "country")</code>: combine text fields (e.g. `Berlin, Germany`)
+- <code>if("population" &gt; 100000, 'large', 'small')</code>: classify by a threshold
 
 :::info
 A formula's values update automatically when the fields it references change. A formula must produce a number, text, true/false, or date value. Formula fields are only available on existing layers.

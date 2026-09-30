@@ -159,10 +159,10 @@ GOAT unterstützt derzeit **Matomo** als Analytics-Anbieter.
   <div class="content">
   Füllen Sie im Dialog <strong>Analytics hinzufügen</strong> folgende Felder aus:
     <ul>
-      <li><code>Name</code> — ein Label zur Unterscheidung der Instanzen, z. B. <code>Client XY Matomo</code>.</li>
-      <li><code>Anbieter</code> — wählen Sie <code>Matomo</code>.</li>
-      <li><code>Matomo-URL</code> — die URL Ihrer Matomo-Instanz inklusive abschließendem Schrägstrich (z. B. <code>https://matomo.example.org/</code>).</li>
-      <li><code>Site-ID</code> — zu finden in Matomo → Administration → Websites.</li>
+      <li><code>Name</code>: ein Label zur Unterscheidung der Instanzen, z. B. <code>Client XY Matomo</code>.</li>
+      <li><code>Anbieter</code>: wählen Sie <code>Matomo</code>.</li>
+      <li><code>Matomo-URL</code>: die URL Ihrer Matomo-Instanz inklusive abschließendem Schrägstrich (z. B. <code>https://matomo.example.org/</code>).</li>
+      <li><code>Site-ID</code>: zu finden in Matomo → Administration → Websites.</li>
     </ul>
   </div>
 </div>

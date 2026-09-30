@@ -81,6 +81,6 @@ The **access leg** (origin to public transport stop) and the **egress leg** (pub
 | Huff Model | <code>Walk</code> | <code>Time</code> | 30 minutes |
 | Travel Cost Matrix | <code>Walk</code>, <code>Bicycle</code>, <code>Pedelec</code>, <code>Car</code> | <code>Time</code> or <code>Distance</code> | Upto overall <code>Limit</code> |
 
-- **Speed** — the travel speed used for the leg (when calculating by `Time`).
+- **Speed**: the travel speed used for the leg (when calculating by `Time`).
 
 By default, both the access and egress legs use `Walk`, a `Time` limit of `15 min`, and a speed of `5 km/h`.

@@ -53,7 +53,7 @@ Die Berechnung der Anzahl Abfahrten ist für Gebiete verfügbar, in denen GTFS-D
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Wählen Sie das <code>Referenzgebiet</code> — einen Polygon-Layer, der das Untersuchungsgebiet definiert.</div>
+  <div class="content">Wählen Sie das <code>Referenzgebiet</code>: einen Polygon-Layer, der das Untersuchungsgebiet definiert.</div>
 </div>
 
 ### Ergebnis-Layer

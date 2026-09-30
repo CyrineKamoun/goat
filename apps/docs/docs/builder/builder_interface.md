@@ -16,10 +16,10 @@ Switching to Dashboard mode opens the Dashboard Interface, where **you can desig
 
 The following controls are available on the dashboard map. Their position can be configured in [Settings](./settings).
 
-- **Location search** — search for an address or place and pan the map to it
-- **Zoom controls** — zoom in and out buttons
-- **Basemaps** — switch between available basemaps. See [Basemaps](../map/basemaps)
-- **Measurements** — measure distances, areas, and routes directly on the map. See [Measurements](../map/measurements)
+- **Location search**: search for an address or place and pan the map to it
+- **Zoom controls**: zoom in and out buttons
+- **Basemaps**: switch between available basemaps. See [Basemaps](../map/basemaps)
+- **Measurements**: measure distances, areas, and routes directly on the map. See [Measurements](../map/measurements)
 
 ## Panels
 

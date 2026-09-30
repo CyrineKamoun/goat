@@ -138,9 +138,9 @@ The basemap is organised into five layer groups:
 | **Other** | Remaining layers |
 
 For each group you can:
-- **Toggle visibility** — show or hide the group entirely using the switch on the right
-- **Position** — choose `Above` or `Below` to control whether the group renders above or below your own layers
-- **Reference layer** — select which of your layers acts as the boundary (defaults to *All my layers*)
+- **Toggle visibility**: show or hide the group entirely using the switch on the right
+- **Position**: choose `Above` or `Below` to control whether the group renders above or below your own layers
+- **Reference layer**: select which of your layers acts as the boundary (defaults to *All my layers*)
 
 Click **Reset** to restore all groups to their default positions and visibility.
 

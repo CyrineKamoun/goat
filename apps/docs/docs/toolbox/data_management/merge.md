@@ -48,9 +48,9 @@ Merging stacks features from multiple layers into one layer. Unlike a join, no m
   <div class="content">
   Expand <code>Merge Options</code> and configure the following toggles:
   <ul>
-    <li><code>Add Source Column</code> — adds a column to the output indicating which input layer each feature came from.</li>
-    <li><code>Validate Geometry Types</code> — checks that all input layers share the same geometry type before merging.</li>
-    <li><code>Promote To Multi</code> — converts single-part geometries to multi-part (e.g. Polygon → MultiPolygon) to ensure compatibility across inputs.</li>
+    <li><code>Add Source Column</code>: adds a column to the output indicating which input layer each feature came from.</li>
+    <li><code>Validate Geometry Types</code>: checks that all input layers share the same geometry type before merging.</li>
+    <li><code>Promote To Multi</code>: converts single-part geometries to multi-part (e.g. Polygon → MultiPolygon) to ensure compatibility across inputs.</li>
   </ul>
   </div>
 </div>
