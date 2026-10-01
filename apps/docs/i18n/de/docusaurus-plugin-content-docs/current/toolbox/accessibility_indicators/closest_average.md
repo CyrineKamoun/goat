@@ -32,7 +32,7 @@ Die Heatmap zeigt ein farbkodiertes sechseckiges Raster, das **die durchschnittl
 
 :::info
 
-Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns](https://plan4better.de/de/contact/) gerne. Sie können auch [ein eigenes Routing-Netz importieren](../../data/builtin_datasets), um andere Regionen zu analysieren.
+Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns](https://plan4better.de/de/contact/) gerne. Sie können auch [ein eigenes Routing-Netz importieren](../../data/builtin_datasets.md#eigene-netze-importieren), um andere Regionen zu analysieren.
 
 :::
 

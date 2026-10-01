@@ -53,7 +53,7 @@ Wenn Sie einen Datensatz/ein Projekt mit einem Team oder einer Organisation teil
 
 Öffnen Sie das <code>Weitere Optionen</code>-Menü <img src={require('/img/icons/3dots.png').default} alt="Weitere Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> des Inhalts und wählen Sie <code>Teilen</code>. Der Dialog hat diese Tabs:
 
-- **Personen**: einen **Datensatz oder ein Projekt** mit einer **einzelnen Person** aus Ihrer Organisation teilen. Suchen Sie sie; der Inhalt erscheint bei ihr unter `Mit mir geteilt` und bleibt, wo er liegt. Ordner, Bundles und Vorlagen lassen sich nur mit Teams und der Organisation teilen.
+- **Personen**: einen **Datensatz, ein Projekt oder eine Vorlage** mit einer **einzelnen Person** aus Ihrer Organisation teilen. Suchen Sie sie; der Inhalt erscheint bei ihr unter `Mit mir geteilt` und bleibt, wo er liegt. Ordner und Datenpakete lassen sich nur mit Teams und der Organisation teilen.
 - **Teams**: mit einem ganzen **Team oder einer Organisation** teilen. Gewähren Sie den Mitgliedern <code>Viewer</code>- oder <code>Editor</code>-Zugriff, oder <code>Kein Zugriff</code>, um ihn zu entziehen.
 - **Öffentlich** (nur Datensätze und Projekte): einen **Datensatz** für alle GOAT-Nutzer öffentlich machen; bei einem **Projekt** eine öffentliche Momentaufnahme veröffentlichen, die jeder ohne GOAT-Konto öffnen kann. Beides wird unter [Öffentliches Teilen](./public.md) behandelt.
 
@@ -78,13 +78,9 @@ Sie können auch einen ganzen **Ordner** auf einmal teilen. Das Teilen eines Ord
    <div class="step-number">2</div>
    <div class="content">Wählen Sie eine <code>Organisation</code> oder ein <code>Team</code> und gewähren Sie <code>Viewer</code>- oder <code>Editor</code>-Zugriff nach Bedarf.</div>
 </div>
-<div class="step">
-   <div class="step-number">3</div>
-   <div class="content">Um den Zugriff zu entziehen, öffnen Sie den <code>Teilen</code>-Dialog erneut und setzen Sie die Rolle zurück auf <code>Kein Zugriff</code>.</div>
-</div>
 
 :::info
-Ein Ordner kann **entweder mit einer Organisation oder mit einem Team geteilt werden, nicht mit beiden gleichzeitig**. Elemente in einem geteilten Ordner erben den Zugriff des Ordners, sodass ein individuelles Teilen nicht erforderlich ist.
+Ein Ordner kann gleichzeitig mit mehreren Teams und der Organisation geteilt werden. Elemente in einem geteilten Ordner erben den Zugriff des Ordners, sodass ein individuelles Teilen nicht erforderlich ist.
 :::
 
 ### Geteilte Elemente aufrufen
@@ -93,7 +89,7 @@ Alles, was mit Ihnen geteilt wurde, persönlich oder über ein Team oder die Org
 
 ## Rechte übertragen
 
-Sie können einen Inhalt **an ein Team oder eine Organisation übergeben**, sodass er nicht mehr Ihnen persönlich gehört. Dies funktioniert für Datensätze, Projekte, Ordner, Bundles und Vorlagen, die Ihnen in **Meine Inhalte** gehören; bei Inhalten in einem Team- oder Organisationsbereich erscheint die Option nicht. Unter [Inhalt](../workspace/content.md#teilen-und-übertragen-sind-zweierlei) steht, wie sich das vom Teilen unterscheidet.
+Sie können einen Inhalt **an ein Team oder eine Organisation übergeben**, sodass er nicht mehr Ihnen persönlich gehört. Dies funktioniert für Datensätze, Projekte, Ordner, Datenpakete und Vorlagen, die Ihnen in **Meine Inhalte** gehören; bei Inhalten in einem Team- oder Organisationsbereich erscheint die Option nicht. Unter [Inhalt](../workspace/content.md#teilen-und-übertragen-sind-zweierlei) steht, wie sich das vom Teilen unterscheidet.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/sharing/transfer_ownership_de.webp').default} alt="Rechte übertragen im Tab Teams des Teilen-Dialogs" style={{ maxHeight: "480px", maxWidth: "480px", objectFit: "contain"}}/>
@@ -110,7 +106,7 @@ Sie können einen Inhalt **an ein Team oder eine Organisation übergeben**, soda
 </div>
 <div class="step">
    <div class="step-number">3</div>
-   <div class="content">Bei einem Projekt <strong>kreuzen Sie die Datensätze an, die mitwandern sollen</strong>. Angekreuzte Datensätze gehören dann ebenfalls dem Team, sodass das Projekt sie nicht verliert, wenn Sie es verlassen. Nicht angekreuzte <strong>bleiben, wo sie sind</strong>, und das Team sieht sie weiterhin über das Projekt.</div>
+   <div class="content">Bei einem Projekt legen Sie fest, <strong>welche Datensätze mitwandern</strong>: Alle Datensätze, die Ihnen gehören, sind zunächst angekreuzt; entfernen Sie das Häkchen bei denen, die Sie behalten möchten. Datensätze anderer lassen sich nicht ankreuzen. Angekreuzte Datensätze gehören dann ebenfalls dem Team, sodass das Projekt sie nicht verliert, wenn Sie es verlassen. Nicht angekreuzte <strong>bleiben, wo sie sind</strong>, und das Team sieht sie weiterhin über das Projekt.</div>
 </div>
 <div class="step">
    <div class="step-number">4</div>
@@ -119,7 +115,7 @@ Sie können einen Inhalt **an ein Team oder eine Organisation übergeben**, soda
 
 Nach einer Übertragung:
 
-- Der Inhalt verlässt **„Meine Inhalte"** und gehört dem Team (oder der Organisation). Er bleibt beim Team, auch wenn Sie es später verlassen.
+- Der Inhalt verlässt **„Meine Inhalte“** und gehört dem Team (oder der Organisation). Er bleibt beim Team, auch wenn Sie es später verlassen.
 - **Alle im Team oder in der Organisation erhalten Zugriff.** Persönliche Freigaben für einzelne Personen werden entfernt, da die Mitgliedschaft im Bereich übernimmt.
 - Datensätze, die weiterhin **von Projekten anderswo genutzt werden, behalten Lesezugriff**, sodass diese Projekte weiter funktionieren.
 
@@ -131,7 +127,7 @@ Das Übertragen der Rechte ändert, wem der Inhalt gehört, und ersetzt dessen p
 
 Gelöschte Inhalte werden nicht sofort entfernt. Sie **wandern zuerst in den Papierkorb**.
 
-Den Papierkorb finden Sie unter <code>Inhalt</code>, im Panel <code>Bereiche</code> auf der linken Seite.
+Jeder Bereich hat einen eigenen Papierkorb. Wählen Sie unter <code>Inhalt</code> im Panel <code>Bereiche</code> links einen Bereich; wenn Sie ihn besitzen, erscheint unten im Panel sein <code>Papierkorb</code>. Nur der Besitzer eines Bereichs kann dessen Papierkorb öffnen und Inhalte wiederherstellen; in einem Team-Bereich wenden Sie sich also an den Besitzer des Teams.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/sharing/trash_de.webp').default} alt="Papierkorb unten im Panel Bereiche unter Inhalt" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
@@ -156,7 +152,7 @@ Siehe die Tabelle unten, um zu erfahren, was jeder Benutzer innerhalb einer Orga
 
 :::info Wichtig
 
-Das Löschen eines Datensatzes aus einem geteilten Projekt, **das Sie besitzen**, führt dazu, dass es *auch für andere Benutzer gelöscht wird*.
+Das Löschen eines Datensatzes aus einem geteilten Projekt, **das Sie besitzen**, entfernt ihn *auch für andere Benutzer*. Er landet in Ihrem Papierkorb, sodass Sie ihn innerhalb von 30 Tagen wiederherstellen können.
 
 **Als Editor**: Wenn Sie einen Datensatz oder eine Ebene aus dem Projekt löschen, bleibt dieser *für den Besitzer weiterhin im persönlichen Datensatz erhalten*.
 

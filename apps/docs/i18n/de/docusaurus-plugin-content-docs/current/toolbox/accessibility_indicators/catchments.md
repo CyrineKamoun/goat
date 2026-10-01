@@ -31,7 +31,7 @@ Einzugsgebiet bietet folgende zusätzliche Funktionen:
 - **Zugangsart und Abgangsart** — konfiguriert, wie Nutzer zu ÖV-Haltestellen und von diesen weg gelangen (zu Fuß, mit dem Fahrrad, mit dem Pedelec oder mit dem Auto).
 
 :::info
-Die Berechnung der Einzugsgebiete ist für `Zu Fuß`, `Fahrrad`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns gerne](https://plan4better.de/de/contact/). Sie können auch [ein eigenes Routing-Netz importieren](../../data/builtin_datasets), um andere Regionen zu analysieren.
+Die Berechnung der Einzugsgebiete ist für `Zu Fuß`, `Fahrrad`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns gerne](https://plan4better.de/de/contact/). Sie können auch [ein eigenes Routing-Netz importieren](../../data/builtin_datasets.md#eigene-netze-importieren), um andere Regionen zu analysieren.
 :::
 
 ## 2. Anwendungsbeispiele

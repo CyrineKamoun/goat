@@ -59,7 +59,7 @@ Wählen Sie ein Element aus, oder mehrere, um damit zu arbeiten. Das Menü auf e
 
 **Teilen** gewährt Zugriff, während Sie Besitzer bleiben. Das ist sinnvoll, wenn Kolleginnen und Kollegen etwas sehen oder bearbeiten sollen, das weiterhin in Ihrer Verantwortung liegt.
 
-**Rechte übertragen** verschiebt das Element dauerhaft in den Bereich einer anderen Person. Das ist der richtige Weg, wenn ein Projekt tatsächlich den Besitzer wechselt, etwa bei einer Übergabe vor dem Wechsel aus einem Team.
+**Rechte übertragen** verschiebt das Element dauerhaft in den Bereich eines Teams oder der Organisation. Das ist der richtige Weg, wenn ein Projekt tatsächlich den Besitzer wechselt, etwa bei einer Übergabe vor dem Wechsel aus einem Team.
 
 Standardmäßig bleibt im Ursprungsbereich eine **Verknüpfung** zurück, als solche gekennzeichnet und mit dem echten Namen des Elements. Sie ist ein Verweis: Ein Klick darauf führt Sie zum Element an seinem neuen Ort.
 

@@ -122,7 +122,7 @@ As a dataset's owner, you can **make it public to all GOAT users**. This does no
 
 <div class="step">
    <div class="step-number">1</div>
-   <div class="content">Open the dataset's <code>More options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu, choose <code>Share</code>, open the <code>Public</code> tab and turn on <code>Public to all GOAT users</code>.</div>
+   <div class="content">Open the dataset's <code>More Options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu, choose <code>Share</code>, open the <code>Public</code> tab and turn on <code>Public to all GOAT users</code>.</div>
 </div>
 
 Once public, **every signed-in GOAT user, in any organization, can view the dataset and add it to their projects**. It is not listed anywhere; people reach it through the projects and templates that include it, and editing rights do not change. When a public dataset ships with a template, it is shown with a **public badge**.

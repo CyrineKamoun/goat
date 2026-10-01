@@ -35,7 +35,7 @@ Sharing **does not duplicate** your data, only grants access to it.
    If you are the <b>Owner</b> of the Organization, you can:
       <ul>
          <li>Click <code>+ New Member</code> to add a new member.</li>
-         <li>Click the <code>More options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px', verticalAlign: 'middle'}}/> menu and then on <code>Delete</code> to remove a member</li>
+         <li>Click the <code>More Options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px', verticalAlign: 'middle'}}/> menu and then on <code>Delete</code> to remove a member</li>
       </ul>
    </div>
 </div>
@@ -55,7 +55,7 @@ When you share a dataset/project with a Team/Organization, all members will have
 
 Open the item's <code>More Options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu and select <code>Share</code>. The dialog has these tabs:
 
-- **People**: share a **dataset or project** with an **individual person** from your organization. Search for them; the item appears in their `Shared with me` and stays where it lives. Folders, bundles and templates can only be shared with teams and the organization.
+- **People**: share a **dataset, project or template** with an **individual person** from your organization. Search for them; the item appears in their `Shared with me` and stays where it lives. Folders and bundles can only be shared with teams and the organization.
 - **Teams**: share with a whole **Team or Organization**. Grant its members <code>Viewer</code> or <code>Editor</code> access, or <code>No Access</code> to withdraw it.
 - **Public** (datasets and projects only): for a **dataset**, make it public to all GOAT users; for a **project**, publish a public web snapshot that anyone can open without a GOAT account. Both are covered in [Public Sharing](./public.md).
 
@@ -74,19 +74,15 @@ You can also share an entire **folder** at once. Sharing a folder grants access 
 
 <div class="step">
    <div class="step-number">1</div>
-   <div class="content">Click the <code>More options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu on a folder you own and select <code>Share</code>.</div>
+   <div class="content">Click the <code>More Options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu on a folder you own and select <code>Share</code>.</div>
 </div>
 <div class="step">
    <div class="step-number">2</div>
    <div class="content">Choose an <code>Organization</code> or <code>Team</code> and grant <code>Viewer</code> or <code>Editor</code> access as needed.</div>
 </div>
-<div class="step">
-   <div class="step-number">3</div>
-   <div class="content">To withdraw access, open the <code>Share</code> dialog again and set the role back to <code>No Access</code>.</div>
-</div>
 
 :::info
-A folder can be shared with **either one Organization or one Team, not both at the same time**. Items inside a shared folder inherit the folder's access, so sharing them individually is not needed.
+A folder can be shared with several teams and the organization at the same time. Items inside a shared folder inherit the folder's access, so sharing them individually is not needed.
 :::
 
 ### Accessing Shared Items
@@ -105,7 +101,7 @@ You can **hand an item over to a team or organization** so that it no longer bel
 
 <div class="step">
    <div class="step-number">1</div>
-   <div class="content">Open the item's <code>More options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu, choose <code>Share</code> and open the <code>Teams</code> tab. In the <code>Transfer Ownership</code> row, click <code>Transfer…</code>.</div>
+   <div class="content">Open the item's <code>More Options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu, choose <code>Share</code> and open the <code>Teams</code> tab. In the <code>Transfer Ownership</code> row, click <code>Transfer…</code>.</div>
 </div>
 <div class="step">
    <div class="step-number">2</div>
@@ -113,7 +109,7 @@ You can **hand an item over to a team or organization** so that it no longer bel
 </div>
 <div class="step">
    <div class="step-number">3</div>
-   <div class="content">For a project, <strong>tick the datasets that should move along</strong> with it. Ticked datasets become the team's too, so the project never loses them when you leave. Unticked ones <strong>stay where they are</strong>, and the team keeps seeing them through the project.</div>
+   <div class="content">For a project, choose <strong>which datasets move along</strong> with it: every dataset you own starts out ticked, so untick the ones you want to keep. Datasets owned by others can't be ticked. Ticked datasets become the team's too, so the project never loses them when you leave. Unticked ones <strong>stay where they are</strong>, and the team keeps seeing them through the project.</div>
 </div>
 <div class="step">
    <div class="step-number">4</div>
@@ -134,7 +130,7 @@ Transferring ownership changes who the item belongs to and replaces its personal
 
 Deleted items are not removed immediately. They **go to the Trash first**.
 
-You find the Trash in <code>Content</code>, in the <code>Spaces</code> panel on the left.
+Each space has its own Trash. In <code>Content</code>, select a space in the <code>Spaces</code> panel on the left; if you own that space, its <code>Trash</code> appears at the bottom of the panel. Only a space's owner can open its Trash and restore items, so in a team space, ask the team's owner.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/sharing/trash.webp').default} alt="Trash at the bottom of the Spaces panel in Content" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
@@ -159,7 +155,7 @@ See the table below to learn what each user can do within an Organization/Team a
 
 :::info Important
 
-Deleting a dataset from a shared project **that you own** will cause it to be *deleted for other users as well*.
+Deleting a dataset from a shared project **that you own** removes it *for other users as well*. It goes to your Trash, so you can still restore it within 30 days.
 **As an editor** if you delete a dataset or (layer from the) project, the *owner will still have it in their personal dataset*.
 
 :::
