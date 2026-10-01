@@ -194,7 +194,7 @@ Das Werkzeug Benutzerdefiniertes SQL erstellt eine neue temporäre Ebene, die Ih
 
 - **Tabelle**: Zeigt das Ergebnis in der Datenansicht unter der Leinwand
 - **Karte**: Zeigt das Ergebnis auf einer Karte (nur für Ergebnisse mit Geometriespalte)
-- **Dataset speichern**: Speichert das Ergebnis als permanenten Datensatz
+- **Datensatz speichern**: Speichert das Ergebnis als permanenten Datensatz
 
 Außerdem können Sie:
 

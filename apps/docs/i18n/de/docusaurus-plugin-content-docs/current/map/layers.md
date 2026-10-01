@@ -31,7 +31,7 @@ Sie können Layer aus [verschiedenen Quellen](../data/dataset_types) zu Ihrer Ka
 
 **Neue Daten**
 
-- **Datei hochladen**: ein Datensatz von Ihrem Gerät (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet sowie GTFS- und Overture-Archive)
+- **Datensatz hochladen**: ein Datensatz von Ihrem Gerät (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet sowie GTFS- und Overture-Archive)
 - **Layer erstellen**: ein neuer, leerer Layer, in den Sie zeichnen
 - **Dienst verbinden**: ein Layer, der über WFS, WMS, WMTS, XYZ-Kacheln oder COG bereitgestellt wird, per URL eingebunden
 
@@ -51,7 +51,7 @@ Sie können Layer aus [verschiedenen Quellen](../data/dataset_types) zu Ihrer Ka
 </div>
 
 <Tabs>
-  <TabItem value="Upload" label="Datei hochladen" default className="tabItemBox">
+  <TabItem value="Upload" label="Datensatz hochladen" default className="tabItemBox">
 
 <div class="step">
   <div class="step-number">3</div>

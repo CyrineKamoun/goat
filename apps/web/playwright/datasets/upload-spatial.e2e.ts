@@ -10,14 +10,14 @@ test.describe("Dataset Upload - Spatial Layer", () => {
   test("upload a GeoJSON point layer", async ({ page }) => {
     await page.goto("/content");
 
-    // Add new -> Dataset opens the upload dialog itself: a file upload is
+    // Add new -> Upload dataset opens the upload dialog itself: a file upload is
     // the only way to bring data into a space from this page (the
     // catalog/create sources belong to the map builder, where a layer is
     // added to a project).
     await page.getByRole("button", { name: "Add new" }).click();
-    await page.getByRole("menuitem", { name: "Dataset" }).click();
+    await page.getByRole("menuitem", { name: "Upload dataset" }).click();
 
-    await expect(page.getByRole("dialog").getByText("Upload file", { exact: true })).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("Upload dataset", { exact: true })).toBeVisible();
 
     // Upload the GeoJSON file via the hidden file input the dropzone wraps.
     const fileInput = page.locator('input[type="file"]');
@@ -41,7 +41,7 @@ test.describe("Dataset Upload - Spatial Layer", () => {
     await expect(uploadButton).toBeEnabled();
     await uploadButton.click();
 
-    await expect(page.getByRole("dialog").getByText("Upload file", { exact: true })).toBeHidden({
+    await expect(page.getByRole("dialog").getByText("Upload dataset", { exact: true })).toBeHidden({
       timeout: 10000,
     });
 

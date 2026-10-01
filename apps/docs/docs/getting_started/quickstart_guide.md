@@ -15,7 +15,7 @@ Welcome to GOAT! This quickstart guide will help you get up and running in no ti
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content">After signing in, you land on the <code>Home</code> page. Click <code>New Project</code> and select <code>Blank project</code>. On your first visit, click <code>New Project</code> in the <code>Set up your workspace</code> checklist instead. Alternatively, scroll down to <code>Start from a template</code>, click a template, then click <code>Use template</code> and follow the dialog.</div>
+  <div class="content">After signing in, you land on the <code>Home</code> page. Click <code>New project</code> and select <code>Blank project</code>. On your first visit, click <code>New project</code> in the <code>Set up your workspace</code> checklist instead. Alternatively, scroll down to <code>Start from a template</code>, click a template, then click <code>Use template</code> and follow the dialog.</div>
 </div>
 
 <div class="step">
@@ -32,7 +32,7 @@ You've landed in the map view of your new project. Now it's time to add some dat
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Click <code>Add layer</code> at the top of the <code>Layers</code> panel on the left. In an empty project, the button sits in the middle of the panel. Under <code>New data</code>, choose <code>Upload file</code>, <code>Create layer</code> to start an empty layer, or <code>Connect service</code> for a WMS, WMTS, WFS, XYZ or COG source. Under <code>Existing data</code>, choose <code>My datasets</code> or <code>Catalog</code> to add a dataset that is already in GOAT. For full details on each option, see [Layers](../map/layers).</div>
+  <div class="content">Click <code>Add layer</code> at the top of the <code>Layers</code> panel on the left. In an empty project, the button sits in the middle of the panel. Under <code>New data</code>, choose <code>Upload dataset</code>, <code>Create layer</code> to start an empty layer, or <code>Connect service</code> for a WMS, WMTS, WFS, XYZ or COG source. Under <code>Existing data</code>, choose <code>My datasets</code> or <code>Catalog</code> to add a dataset that is already in GOAT. For full details on each option, see [Layers](../map/layers).</div>
 </div>
 
 ## Explore the analysis tools

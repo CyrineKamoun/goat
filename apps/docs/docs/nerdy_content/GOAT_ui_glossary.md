@@ -179,7 +179,7 @@ This glossary lists the English and German labels of the main tools, features an
 | **Dataset Node** | **Datensatz-Knoten** | Input data source in workflow |
 | **Tool Node** | **Werkzeug-Knoten** | Analysis process in workflow |
 | **Export Node** | **Export-Knoten** | Output/save step in workflow |
-| Add Dataset | Datensatz hinzufügen | Node palette entry for a dataset node |
+| Add dataset | Datensatz hinzufügen | Node palette entry for a dataset node |
 | Data I/O | Daten I/O | Node palette group for dataset and export nodes |
 | Control | Steuerung | Node palette group for the Conditional node |
 | Conditional | Bedingung | Node that branches the workflow on a condition |
@@ -220,8 +220,8 @@ This glossary lists the English and German labels of the main tools, features an
 | **Custom SQL** | **Benutzerdefiniertes SQL** | Custom SQL query node in workflow |
 | Custom SQL Editor | SQL-Editor | Code editor for writing SQL queries |
 | SQL Query | SQL-Abfrage | Query of a Custom SQL node |
-| Save dataset | Dataset speichern | Save workflow result as a permanent dataset |
-| Save as Dataset | Als Datensatz speichern | Export workflow output as a new dataset |
+| Save dataset | Datensatz speichern | Save workflow result as a permanent dataset |
+| Save as dataset | Als Datensatz speichern | Export workflow output as a new dataset |
 
 ## Layouts & Print
 
@@ -293,7 +293,7 @@ This glossary lists the English and German labels of the main tools, features an
 |---------|--------|-------------|
 | **Data** | **Daten** | Data management |
 | Datasets | Datensätze | Data collections |
-| Upload file | Datei hochladen | Upload data files |
+| Upload dataset | Datensatz hochladen | Upload a data file as a dataset (Add layer, Add new, Home) |
 | My datasets | Meine Datensätze | Browse your datasets when adding a layer |
 | Create layer | Layer erstellen | Create an empty layer |
 | Connect service | Dienst verbinden | Add a layer from an external web service |
@@ -332,7 +332,7 @@ This glossary lists the English and German labels of the main tools, features an
 |---------|--------|-------------|
 | **Project** | **Projekt** | GOAT project |
 | Content | Inhalt | Workspace page with your projects, datasets and folders |
-| New Project | Neues Projekt | Create new project |
+| New project | Neues Projekt | Create new project |
 | Create project | Projekt erstellen | Menu entry to create a project |
 | Blank project | Leeres Projekt | Start a project without a template |
 | Project Name | Projektname | Name of project |
@@ -341,7 +341,7 @@ This glossary lists the English and German labels of the main tools, features an
 | Delete Project | Projekt löschen | Remove a project |
 | **Workspace** | **Workspace** | User workspace |
 | **Folder** | **Ordner** | Organization folder |
-| Create Folder | Ordner erstellen | Create new folder |
+| Create folder | Ordner erstellen | Create new folder |
 | Move to folder | In den Ordner verschieben | Organize content |
 
 ## Teams & Organizations

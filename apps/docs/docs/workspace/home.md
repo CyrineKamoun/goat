@@ -27,8 +27,8 @@ Move through the results with the arrow keys, open one with `Enter`, and close t
 
 Three buttons sit under the search box:
 
-- `New Project`: start a blank project, or import one exported from GOAT
-- `Add Dataset`: upload a file from your device (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet). External services such as WFS or WMS are connected from inside a project, with [Connect service](../map/layers#add-layers)
+- `New project`: start a blank project, or import one exported from GOAT
+- `Upload dataset`: upload a file from your device (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet). External services such as WFS or WMS are connected with `Connect service`, under [Add new](content#connecting-to-an-external-source) on the Content page or [Add layer](../map/layers#add-layers) in a project
 - `Browse catalog`: open the [Catalog](../workspace/catalog.md) to find ready-made data
 
 ## Jump back in

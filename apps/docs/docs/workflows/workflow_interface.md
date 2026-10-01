@@ -85,11 +85,11 @@ The right panel changes depending if there is a node selected or not. If no node
 This tab contains categorized tools available for workflow construction, similar to the Map Mode Toolbox. Drag and drop tools onto the canvas to add them to your workflow. The tools are organized into the following categories:
 
 - **Data I/O**
-  - <code>+ Add Dataset</code>: Create dataset nodes
-  - <code>Save as Dataset</code>: Save workflow results as permanent datasets. Configure the **Dataset name**, toggle **Add to project** to automatically add the result to the project layer list, and enable **Overwrite on re-run** to replace the previously exported dataset each time the workflow runs instead of creating a new one.
+  - <code>+ Add dataset</code>: Create dataset nodes
+  - <code>Save as dataset</code>: Save workflow results as permanent datasets. Configure the **Dataset name**, toggle **Add to project** to automatically add the result to the project layer list, and enable **Overwrite on re-run** to replace the previously exported dataset each time the workflow runs instead of creating a new one.
 
 :::tip Good practice
-Give each **Save as Dataset** node a descriptive name and enable **Overwrite on re-run** when running the same workflow repeatedly — this keeps your project clean by avoiding duplicate layers after each run.
+Give each **Save as dataset** node a descriptive name and enable **Overwrite on re-run** when running the same workflow repeatedly — this keeps your project clean by avoiding duplicate layers after each run.
 :::
 
 - **Accessibility Indicators**
@@ -161,7 +161,7 @@ Begin with simple 2-3 node workflows to understand the interface, then gradually
 
 <div class="step">
   <div class="step-number">1</div>
-  <div class="content"><strong>Add Data Sources</strong>: Add data to your workflow by either dragging <code>+ Add Dataset</code> from the right panel's Tools tab onto the canvas, or by dragging layers directly from the Project Layers panel on the left. Configure the dataset node to reference your input data layers.</div>
+  <div class="content"><strong>Add Data Sources</strong>: Add data to your workflow by either dragging <code>+ Add dataset</code> from the right panel's Tools tab onto the canvas, or by dragging layers directly from the Project Layers panel on the left. Configure the dataset node to reference your input data layers.</div>
 </div>
 
 <div class="step">
