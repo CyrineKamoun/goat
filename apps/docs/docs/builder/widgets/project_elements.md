@@ -107,7 +107,7 @@ The Links widget **displays a row of labelled links or popup triggers**, useful 
   <div class="content">
   Under <code>Options</code>:
   <ul>
-    <li><code>Separator</code>: visual divider between links: <code>Vertical line</code>, <code>Dot</code>, or <code>Dash</code>.</li>
+    <li><code>Separator</code>: visual divider between links (<code>Vertical line</code>, <code>Dot</code>, or <code>Dash</code>).</li>
     <li><code>Secondary text</code>: additional text shown alongside the links (e.g. a copyright notice).</li>
   </ul>
   </div>

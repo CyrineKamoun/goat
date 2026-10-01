@@ -72,12 +72,12 @@ Die Reisekostenmatrix ist für die **Massenberechnung über viele Ursprünge und
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Wählen Sie unter <b>Startpunkte</b> Ihren <code>Startpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Startort ist) und legen Sie die <code>Herkunft-Bezeichnung</code> fest, die Spalte zur Identifikation der Startpunkte in der Ergebnismatrix.</div>
+  <div class="content">Wählen Sie unter <b>Startpunkte</b> Ihren <code>Startpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Startort ist) und legen Sie die <code>Herkunft-Bezeichnung</code> fest, also die Spalte zur Identifikation der Startpunkte in der Ergebnismatrix.</div>
 </div>
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Wählen Sie unter <b>Zielpunkte</b> Ihren <code>Zielpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Zielort ist) und legen Sie die <code>Ziel-Bezeichnung</code> fest, die Spalte zur Identifikation der Zielpunkte in der Ergebnismatrix.</div>
+  <div class="content">Wählen Sie unter <b>Zielpunkte</b> Ihren <code>Zielpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Zielort ist) und legen Sie die <code>Ziel-Bezeichnung</code> fest, also die Spalte zur Identifikation der Zielpunkte in der Ergebnismatrix.</div>
 </div>
 
 ### Ergebnis-Layer

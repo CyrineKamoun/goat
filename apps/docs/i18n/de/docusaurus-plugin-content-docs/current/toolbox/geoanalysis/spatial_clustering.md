@@ -164,10 +164,10 @@ Der Algorithmus verwendet **räumliche Nachbarschaftsgraphen**, um zusammenhäng
 #### Fitness-Funktion:
 Jede Lösungskandidat wird bewertet basierend auf:
 - **Größenvarianz**: Wie gleichmäßig die Zonen dimensioniert sind (primäres Ziel).
-- **Kompaktheitsstrafe** (optional): bestraft Zonen, bei denen der maximale Distanzschwellenwert überschritten wird.
+- **Kompaktheitsstrafe** (optional): Bestraft Zonen, bei denen der maximale Distanzschwellenwert überschritten wird.
 
 
-Alle Einschränkungen (gleiche Größe, Kompaktheit) sind **weiche Einschränkungen**: der Algorithmus optimiert darauf hin, erzwingt sie jedoch nicht als harte Grenzen.
+Alle Einschränkungen (gleiche Größe, Kompaktheit) sind **weiche Einschränkungen**: Der Algorithmus optimiert darauf hin, erzwingt sie jedoch nicht als harte Grenzen.
 
 #### Algorithmus-Parameter:
 

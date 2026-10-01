@@ -67,7 +67,7 @@ Ihr MapTiler-API-Schlüssel ist in geteilten Projekten sichtbar. Verwenden Sie d
 
 ### Esri / ArcGIS
 
-Esri bietet eine Vielzahl professioneller Grundkarten, kein Konto oder API-Schlüssel erforderlich.
+Esri bietet eine Vielzahl professioneller Grundkarten. Ein Konto oder API-Schlüssel ist nicht erforderlich.
 
 **Beispiel-URL:**
 ```
@@ -78,7 +78,7 @@ https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/til
 
 ### OpenStreetMap
 
-OpenStreetMap (OSM) bietet kostenlose, gemeinschaftlich gepflegte Grundkarten, kein Konto oder API-Schlüssel erforderlich.
+OpenStreetMap (OSM) bietet kostenlose, gemeinschaftlich gepflegte Grundkarten. Ein Konto oder API-Schlüssel ist nicht erforderlich.
 
 **Beispiel-URL:**
 ```
@@ -110,7 +110,7 @@ OpenFreeMap ist ein spendenfinanzierter Dienst ohne Verfügbarkeitsgarantie. Die
 
 ### Carto Dark Matter
 
-Der Dark-Matter-Stil von Carto bietet eine dunkle, minimalistische Grundkarte, die sich besonders für datenintensive Karten eignet, bei denen helle Datenvisualisierungen hervorstechen sollen, kein Konto oder API-Schlüssel erforderlich.
+Der Dark-Matter-Stil von Carto bietet eine dunkle, minimalistische Grundkarte, die sich besonders für datenintensive Karten eignet, bei denen helle Datenvisualisierungen hervorstechen sollen. Ein Konto oder API-Schlüssel ist nicht erforderlich.
 
 **Beispiel-URL:**
 ```
@@ -123,7 +123,7 @@ Eine umfangreichere Liste kompatibler Grundkartenanbieter und Verbindungsanleitu
 
 ## Basemap-Layer anordnen
 
-Beim Bearbeiten einer eigenen Grundkarte ermöglicht der Tab **Layer** die einzelnen Teilebenengruppen der Grundkarte relativ zu Ihren eigenen Datenlayern anzuordnen, und einzelne Gruppen ein- oder auszublenden.
+Beim Bearbeiten einer eigenen Grundkarte ermöglicht der Tab **Layer** die einzelnen Teilebenengruppen der Grundkarte relativ zu Ihren eigenen Datenlayern anzuordnen und einzelne Gruppen ein- oder auszublenden.
 
 Um darauf zuzugreifen, klicken Sie auf das Bearbeitungssymbol einer eigenen Grundkarte im Grundkarten-Panel und wählen Sie dann den Tab **Layer**.
 

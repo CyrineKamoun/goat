@@ -94,7 +94,7 @@ Das Tabellen-Widget **zeigt Daten eines Layers als scrollbare Tabelle**. Sie kö
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Im Modus Dashboard-Konfiguration verwenden Sie <code>Sortieren nach</code> und <code>Aufsteigend sortieren</code>, um die Standard-Zeilenreihenfolge festzulegen. Betrachter können die Tabelle auch interaktiv sortieren, indem sie auf eine Spaltenüberschrift klicken: der erste Klick sortiert aufsteigend, ein zweiter Klick absteigend und ein dritter Klick hebt die Sortierung auf. Ein Pfeilsymbol in der Überschrift zeigt die aktive Sortierrichtung an.</div>
+  <div class="content">Im Modus Dashboard-Konfiguration verwenden Sie <code>Sortieren nach</code> und <code>Aufsteigend sortieren</code>, um die Standard-Zeilenreihenfolge festzulegen. Betrachter können die Tabelle auch interaktiv sortieren, indem sie auf eine Spaltenüberschrift klicken: Der erste Klick sortiert aufsteigend, ein zweiter Klick absteigend und ein dritter Klick hebt die Sortierung auf. Ein Pfeilsymbol in der Überschrift zeigt die aktive Sortierrichtung an.</div>
 </div>
 
 <div class="step">

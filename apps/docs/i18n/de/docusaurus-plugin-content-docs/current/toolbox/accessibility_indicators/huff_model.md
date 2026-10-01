@@ -20,7 +20,7 @@ Das Huff-Modell **prognostiziert die Wahrscheinlichkeit, mit der Konsumenten in 
 ## 1. Erklärung
 
 Das Huff-Modell ist ein **räumliches Interaktionsmodell, das schätzt, wie sich die Nachfrage (z. B. Kunden, Bewohner) auf konkurrierende Angebotsstandorte (z. B. Geschäfte, Einrichtungen) verteilt**.
-Das Modell funktioniert nach einem einfachen Prinzip: **Die Wahrscheinlichkeit, dass ein Standort gewählt wird, hängt von seiner Attraktivität im Verhältnis zu allen konkurrierenden Standorten ab, gewichtet nach der Reisezeit**. Ein großes, nahe gelegenes Einkaufszentrum wird mehr Nachfrage auf sich ziehen als ein kleines, weit entferntes. Die genaue Aufteilung hängt vom Gleichgewicht zwischen Attraktivität und Entfernung aller verfügbaren Optionen ab.
+Das Modell funktioniert nach einem einfachen Prinzip: **Die Wahrscheinlichkeit, dass ein Standort gewählt wird, hängt von seiner Attraktivität im Verhältnis zu allen konkurrierenden Standorten ab, gewichtet nach der Reisezeit**. Ein großes, nahe gelegenes Einkaufszentrum wird mehr Nachfrage auf sich ziehen als ein kleines, weit entferntes, aber die genaue Aufteilung hängt vom Gleichgewicht zwischen Attraktivität und Entfernung aller verfügbaren Optionen ab.
 
 Das Ergebnis ist ein **Wahrscheinlichkeitswert für jeden Angebotsstandort**, der den Anteil der Gesamtnachfrage darstellt, den er aus dem Referenzgebiet auf sich zieht. Dies ermöglicht einen direkten Vergleich, wie gut verschiedene Einrichtungen um denselben Kundenstamm konkurrieren.
 

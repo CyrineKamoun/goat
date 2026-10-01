@@ -111,7 +111,7 @@ Das Links-Widget **zeigt eine Reihe von beschrifteten Links oder Popup-Auslöser
   <div class="content">
   Unter <code>Optionen</code>:
   <ul>
-    <li><code>Trennzeichen</code>: visueller Trenner zwischen Links: <code>Vertikaler Strich</code>, <code>Punkt</code> oder <code>Strich</code>.</li>
+    <li><code>Trennzeichen</code>: visueller Trenner zwischen Links (<code>Vertikaler Strich</code>, <code>Punkt</code> oder <code>Strich</code>).</li>
     <li><code>Zusatztext</code>: zusätzlicher Text neben den Links (z.B. ein Copyright-Hinweis).</li>
   </ul>
   </div>

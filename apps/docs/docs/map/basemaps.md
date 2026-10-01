@@ -67,7 +67,7 @@ Your MapTiler API key will be visible in shared projects. Use MapTiler Cloud's k
 
 ### Esri / ArcGIS
 
-Esri provides a variety of professional basemaps, no account or API key required.
+Esri provides a variety of professional basemaps. No account or API key is required.
 
 **Sample URL:**
 ```
@@ -78,7 +78,7 @@ https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/til
 
 ### OpenStreetMap
 
-OpenStreetMap (OSM) provides free, community-maintained basemaps, no account or API key required.
+OpenStreetMap (OSM) provides free, community-maintained basemaps. No account or API key is required.
 
 **Sample URL:**
 ```
@@ -110,7 +110,7 @@ OpenFreeMap is a donation-funded service with no uptime guarantee. Its tiles are
 
 ### Carto Dark Matter
 
-Carto's Dark Matter style offers a dark, minimal basemap well suited to data-heavy maps where bright data visualisations need to stand out, no account or API key required.
+Carto's Dark Matter style offers a dark, minimal basemap well suited to data-heavy maps where bright data visualisations need to stand out. No account or API key is required.
 
 **Sample URL:**
 ```

@@ -113,7 +113,7 @@ Heatmap computation is available across **over 30 European countries** for `Walk
 
 <TabItem value="twosfca" label="Standard 2SFCA" default className="tabItemBox">
 
-The standard 2SFCA method uses **binary catchments**: a facility either serves a population location (if within the travel time limit) or it does not. There is no distance weighting, all locations within the catchment are treated equally.
+The standard 2SFCA method uses **binary catchments**: a facility either serves a population location (if within the travel time limit) or it does not. There is no distance weighting: all locations within the catchment are treated equally.
 
 This is the simplest variant and works well when you want a straightforward supply-demand ratio.
 

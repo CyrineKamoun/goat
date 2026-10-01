@@ -164,7 +164,7 @@ The algorithm uses **spatial neighbor graphs** to ensure contiguous zone growth:
 #### Fitness function:
 Each candidate solution is scored based on:
 - **Size variance**: How evenly the zones are sized (primary objective).
-- **Compactness penalty** (optional): penalizes zones where the maximum distance threshold is exceeded.
+- **Compactness penalty** (optional): Penalizes zones where the maximum distance threshold is exceeded.
 
 
 All constraints (equal size, compactness) are **soft constraints**: the algorithm optimizes toward them but does not enforce them as hard limits.

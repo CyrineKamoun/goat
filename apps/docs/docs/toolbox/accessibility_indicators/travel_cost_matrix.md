@@ -133,7 +133,7 @@ Travel costs are computed using the **same routing engine as the Catchment Area 
 
 ### Unbounded calculation limits
 
-When no maximum travel cost is set, the following limits apply based on the bounding-box diagonal of all origin–destination pairs (the straight-line distance across the smallest rectangle that contains all your origin and destination points, in other words, how far apart your two most distant points are):
+When no maximum travel cost is set, the following limits apply based on the bounding-box diagonal of all origin–destination pairs (the straight-line distance across the smallest rectangle that contains all your origin and destination points; in other words, how far apart your two most distant points are):
 
 | Routing mode | Maximum O-D extent (bounding-box diagonal) |
 |---|---|
