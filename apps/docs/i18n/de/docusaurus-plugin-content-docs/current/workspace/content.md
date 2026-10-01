@@ -77,7 +77,7 @@ Gelöschte Inhalte verschwinden nicht sofort: Sie landen im **Papierkorb**, aus 
 
 - **Neuer Ordner**, um Inhalte so zu gruppieren, wie es Ihnen passt
 - **Leeres Projekt** oder **Projekt importieren**
-- **Datensatz**, um eine Datei von Ihrem Gerät hochzuladen (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet sowie GTFS- und Overture-Archive)
+- **Datensatz hochladen**, um eine Datei von Ihrem Gerät hochzuladen (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet sowie GTFS- und Overture-Archive)
 - **Dienst verbinden**, um einen externen Layer per URL hinzuzufügen (WFS, WMS, WMTS, XYZ-Kacheln oder COG)
 - **Dokument hochladen**, für eine Datei, die zur Arbeit gehört, ohne selbst Daten zu sein
 
@@ -141,7 +141,7 @@ GOAT unterstützt mehrere Dateiformate zum Hochladen: **GeoPackage**, **GeoJSON*
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Klicken Sie auf <code>Neu</code> und wählen Sie <code>Datensatz</code>.</div>
+  <div class="content">Klicken Sie auf <code>Neu</code> und wählen Sie <code>Datensatz hochladen</code>.</div>
 </div>
 
 <div class="step">

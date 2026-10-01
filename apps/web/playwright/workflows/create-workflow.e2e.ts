@@ -14,13 +14,13 @@ test.describe("Workflow Management", () => {
     // behind its "Add new" menu instead.
     await page.goto("/content");
     await page.getByRole("button", { name: "Add new" }).click();
-    await page.getByRole("menuitem", { name: "New Project" }).click();
-    await expect(page.getByRole("heading", { name: "New Project" })).toBeVisible();
+    await page.getByRole("menuitem", { name: "Blank project" }).click();
+    await expect(page.getByRole("heading", { name: "New project" })).toBeVisible();
 
     // The dialog asks for a name and nothing else — the destination is the
     // folder being browsed.
     projectName = `E2E Workflow Test ${Date.now()}`;
-    await page.getByLabel("New Project").fill(projectName);
+    await page.getByLabel("New project").fill(projectName);
     await page.getByRole("button", { name: "Create project" }).click();
 
     await expect(page).toHaveURL(/\/map\//, { timeout: 30000 });

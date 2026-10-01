@@ -199,7 +199,7 @@ The Custom SQL tool creates a new temporary layer containing your query results,
 You can also:
 
 - Connect the output to other workflow tools for further analysis
-- Add a **Save as Dataset** node to save the results as a permanent dataset each time the workflow runs
+- Add a **Save as dataset** node to save the results as a permanent dataset each time the workflow runs
 
 :::info Variables Support
 Custom SQL queries support [workflow variables](variables.md) using the `{{@variable_name}}` syntax for parameterized queries. Type `{{@` in the editor to get a list of the workflow's variables.

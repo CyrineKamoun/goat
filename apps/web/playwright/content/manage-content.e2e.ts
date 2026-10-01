@@ -21,17 +21,17 @@ test.describe("Content Page Management Operations", () => {
     // dialog's Teams tab has a real row to pick from.
     await ensureSharedTeam(page);
 
-    // Create a folder via Add new -> New Folder, at the personal space root.
+    // Create a folder via Add new -> New folder, at the personal space root.
     // The dialog is one field and one button — its heading names what is
     // being created and its input carries that heading as a label.
     await page.goto("/content");
     await expect(page.getByRole("heading", { name: "Content" })).toBeVisible();
     await page.getByRole("button", { name: "Add new" }).click();
-    await page.getByRole("menuitem", { name: "New Folder" }).click();
-    await expect(page.getByRole("heading", { name: "New Folder" })).toBeVisible();
-    await page.getByLabel("New Folder").fill(folderName);
-    await page.getByRole("button", { name: "Create Folder" }).click();
-    await expect(page.getByRole("heading", { name: "New Folder" })).toBeHidden();
+    await page.getByRole("menuitem", { name: "New folder" }).click();
+    await expect(page.getByRole("heading", { name: "New folder" })).toBeVisible();
+    await page.getByLabel("New folder").fill(folderName);
+    await page.getByRole("button", { name: "Create folder" }).click();
+    await expect(page.getByRole("heading", { name: "New folder" })).toBeHidden();
     await expect(page.getByText(folderName)).toBeVisible({ timeout: 15000 });
 
     // Open it. Opening a folder is a real navigation now
@@ -43,11 +43,11 @@ test.describe("Content Page Management Operations", () => {
     await expect(page.getByText("Nothing here yet")).toBeVisible({ timeout: 15000 });
 
     // Create a project inside it — the folder is already the default
-    // destination, so Add new -> New Project only needs a name.
+    // destination, so Add new -> Blank project only needs a name.
     await page.getByRole("button", { name: "Add new" }).click();
-    await page.getByRole("menuitem", { name: "New Project" }).click();
-    await expect(page.getByRole("heading", { name: "New Project" })).toBeVisible();
-    await page.getByLabel("New Project").fill(projectName);
+    await page.getByRole("menuitem", { name: "Blank project" }).click();
+    await expect(page.getByRole("heading", { name: "New project" })).toBeVisible();
+    await page.getByLabel("New project").fill(projectName);
     await page.getByRole("button", { name: "Create project" }).click();
     await expect(page).toHaveURL(/\/map\//, { timeout: 30000 });
 

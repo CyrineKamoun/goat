@@ -75,11 +75,11 @@ Deleting content does not remove it straight away: it goes to the **Trash**, whe
 
 `Add new` on the Content page offers:
 
-- **New Folder**, to group content however suits you
+- **New folder**, to group content however suits you
 - **Blank project** or **Import project**
-- **Dataset**, to upload a file from your device (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet, and GTFS or Overture archives)
+- **Upload dataset**, to upload a file from your device (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet, and GTFS or Overture archives)
 - **Connect service**, to add an external layer by URL (WFS, WMS, WMTS, XYZ Tiles or COG)
-- **Upload Document**, for a file that belongs with the work without being data
+- **Upload document**, for a file that belongs with the work without being data
 
 A project can also be started from the Home page.
 
@@ -141,7 +141,7 @@ GOAT supports multiple file formats for upload: **GeoPackage**, **GeoJSON**, **S
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Click <code>Add new</code> and select <code>Dataset</code>.</div>
+  <div class="content">Click <code>Add new</code> and select <code>Upload dataset</code>.</div>
 </div>
 
 <div class="step">

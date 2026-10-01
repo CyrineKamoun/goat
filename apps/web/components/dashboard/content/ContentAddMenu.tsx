@@ -23,6 +23,7 @@ import { FOLDERS_API_BASE_URL, createFolder } from "@/lib/api/folders";
 import type { Space } from "@/lib/validations/content";
 
 import AddLayerDialog from "@/components/addLayer/AddLayerDialog";
+import { addLayerSource } from "@/components/addLayer/sources";
 import NameDialog from "@/components/dashboard/common/NameDialog";
 import type { NewProjectIntent } from "@/components/dashboard/common/NewProjectMenu";
 import {
@@ -48,12 +49,16 @@ interface ContentAddMenuProps {
   mobile?: boolean;
 }
 
+// The two entries this menu shares with the Add layer menu, labelled and drawn alike.
+const uploadSource = addLayerSource("upload");
+const connectSource = addLayerSource("connect");
+
 /**
  * The Content page's "Add new" control: one button, one menu (Folder / the
- * three project starts / Dataset / Connect service / Document). Folder asks
- * for a name and nothing else, and so does a blank project; the other two
- * project starts open the template browser and the archive import, all three
- * shared with Home through `NewProjectFlows`. Dataset opens the file-upload
+ * project starts / Upload dataset / Connect service / Document). Folder asks
+ * for a name and nothing else, and so does a blank project; Import project
+ * opens the archive import, both shared with Home through `NewProjectFlows`.
+ * Upload dataset opens the file-upload
  * dialog straight away, Connect service the dialog that reads a map service's
  * address, and Document its own upload modal. A new folder always
  * nests under whatever is currently being browsed — `folderId` when inside one, the
@@ -113,17 +118,18 @@ const ContentAddMenu = ({
       dividerBefore: index === 0,
       dividerAfter: index === NEW_PROJECT_ITEMS.length - 1,
     })),
+    // Label and icon from the Add layer menu's sources, so both menus show these two alike.
     {
       key: "dataset",
-      label: t("dataset"),
-      icon: ICON_NAME.LAYERS,
+      label: t(uploadSource.labelKey),
+      icon: uploadSource.icon,
       onSelect: () => setUploadOpen(true),
       disabled: rootMissing,
     },
     {
       key: "connect",
-      label: t("connect_service"),
-      icon: ICON_NAME.LINK,
+      label: t(connectSource.labelKey),
+      icon: connectSource.icon,
       onSelect: () => setConnectOpen(true),
       disabled: rootMissing,
     },
@@ -246,7 +252,7 @@ const ContentAddMenu = ({
       />
 
       {/* The two sources that need a folder rather than a project: a file
-       * upload ("Dataset") and a map service. Mounted only while open,
+       * upload and a map service. Mounted only while open,
        * because both flows resolve their starting folder once, at mount, and
        * never re-read `defaultFolderId`; a fresh instance per open picks up
        * whatever folder is being browsed now. Catalog and Create belong to

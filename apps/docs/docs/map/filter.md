@@ -150,7 +150,7 @@ This feature is currently under development. 🧑🏻‍💻
 
 **Remove whole filter**: Click <code>Clear Filter</code> at the bottom of the <code>Filter</code> tab to **remove all filters**.
 
-### Save as New Layer
+### Save as new layer
 
-Once the filter is applied, click <code>Save as New Layer</code> at the bottom of the <code>Filter</code> tab to **save the filtered result as a new dataset** in your workspace. This allows you to work with the filtered data independently.
+Once the filter is applied, click <code>Save as new layer</code> at the bottom of the <code>Filter</code> tab to **save the filtered result as a new dataset** in your workspace. This allows you to work with the filtered data independently.
 
