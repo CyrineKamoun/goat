@@ -20,11 +20,11 @@ The heatmap Gravity displays a **color-coded hexagonal grid showing the accessib
 
 You can specify the **routing type**, **opportunity layer**, **travel cost limit**, and adjust **sensitivity** and **destination potential** to fine-tune how accessibility is calculated.
 
-- The **Opportunity layer contains point-based destination data** (such as POIs, transit stops, schools, amenities, or custom points). You can select multiple opportunity layers, which will be combined into a single unified heatmap.
+- The **Opportunity layer contains point or polygon based destination data** (such as POIs, transit stops, schools, amenities, parks, or custom data). You can select multiple opportunity layers, which will be combined into a single unified heatmap.
 
 - The **Sensitivity controls how quickly accessibility decreases with increasing travel cost**, while the **Destination potential lets you give more weight to destinations with higher capacity or quality** (e.g., a larger supermarket or a bus stop with more departures). Together with the chosen **Impedance function, these settings define how accessibility is calculated**.
 
-- The **Potential Type** determines how each opportunity's weight is derived: use **Constant** to apply the same value to all opportunities, or **Field** to use a numeric attribute from the input layer (e.g., number of departures, seats, or capacity).
+- The **Potential Type** determines how each opportunity's weight is derived: use **Constant** to apply the same value to all opportunities, **Field** to use a numeric attribute from the input layer (e.g., number of departures, seats, or capacity), or, for polygon layers, **Expression** to weight each polygon by its area or perimeter.
 
 - Using **Destination potential helps prioritize certain opportunities over others**. For example, a larger but farther supermarket can be valued more than a smaller nearby one. This allows you to include qualitative information—such as size, frequency, or service level—when computing accessibility, resulting in a more realistic heatmap.
 
@@ -157,7 +157,7 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Select your <code>Input Layer</code> from the drop-down menu. This can be any previously created layer containing point-based data.</div>
+  <div class="content">Select your <code>Input Layer</code> from the drop-down menu. This can be any previously created layer containing point or polygon based data.</div>
 </div>
 
 <div class="step">
@@ -178,6 +178,7 @@ Need help choosing a suitable travel time limit for various common amenities? Th
     <ul>
       <li><b>Constant</b> — all opportunities have the same weight. Enter a numeric value (default: 1.0).</li>
       <li><b>Field</b> — use a numeric field from the <i>Input Layer</i> as the weight (e.g. number of departures, seats, or capacity).</li>
+      <li><b>Expression</b>: offered for polygon layers only. Under <code>Potential expression</code>, choose <b>Area</b> or <b>Perimeter</b> to weight each polygon by its size, so a large park counts for more than a small one. Both are measured in the web map projection, so they work as relative weights within your study area rather than as exact square metres or metres.</li>
     </ul>
   </div>
 </div>
