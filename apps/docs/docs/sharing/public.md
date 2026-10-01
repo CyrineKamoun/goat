@@ -1,5 +1,5 @@
 ---
-description: "Publish a project so anyone can view the map without a GOAT account, share it by URL or iframe, lock the map extent and republish after changes."
+description: "Publish a project so anyone can view the map without a GOAT account, share it by URL or iframe, lock the map extent and republish after changes, or make a dataset public to all GOAT users."
 sidebar_position: 2
 ---
 
@@ -17,7 +17,7 @@ Publishing creates a **snapshot** of the project: the public page shows the proj
 Public sharing is view-only. If you want others to **edit the map**, share it on the <code>People</code> and <code>Teams</code> tabs of the <code>Share</code> dialog. See [Teams & Members](../sharing).
 ::::
 
-## How to Share a Map Publicly? 
+### How to Share a Map Publicly? 
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/sharing/public_tab_published.webp').default} alt="The Public tab before and after publishing a project" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
@@ -45,7 +45,7 @@ Now you can:
 
 - <code>Copy</code> next to <code>Embed Code</code> under <code>Embed</code>: <b>Embed the map</b> as an iframe in websites or tools that support HTML and iframes.
 
-## Other Settings on the Public Tab
+### Other Settings on the Public Tab
 
 Once the project is published, the <code>Public</code> tab also offers these settings:
 
@@ -53,9 +53,9 @@ Once the project is published, the <code>Public</code> tab also offers these set
 
 - <code>Measurement</code>: Here you decide whether visits to the public page are counted. What you see depends on your organization:
     - If it has **no analytics instance** yet, this section shows <code>No analytics instances configured</code> and where to add one. Setting one up is described under [Analytics](../workspace/settings#analytics).
-    - If it **has one or more instances**, pick one to count visits, or choose <code>No tracking</code>. When you pick an instance, the <code>Cookie consent banner</code> switch appears: leave it on to ask visitors before tracking starts. If you turn it off, GOAT shows a warning, because tracking people without their consent is not allowed under GDPR in Germany and most of the EU.
+    - If it **has one or more instances**, pick one to count visits, or choose <code>No tracking</code>. Once you pick an instance, the <code>Cookie consent banner</code> switch below it can be used (with <code>No tracking</code> it is greyed out and reads <code>Not needed — nothing is tracked</code>): leave it on to ask visitors before tracking starts. If you turn it off, GOAT shows a warning, because tracking people without their consent is not allowed under GDPR in Germany and most of the EU.
 
-## Adjusting Map Extent
+### Adjusting Map Extent
 
 To control how far users can pan and zoom out, you can lock the map extent.
 
@@ -85,7 +85,7 @@ To limit the zoom levels instead, use <code>Zoom limits</code> in the Dashboard 
 If your map is already published, **you’ll need to republish it** for the changes to take effect. The link will remain the same.
 ::::
 
-## Updating a Public Map (Republish)
+### Updating a Public Map (Republish)
 
 The public page does not follow later changes to the project. To update it with your latest changes:
 
@@ -104,7 +104,7 @@ The public page does not follow later changes to the project. To update it with 
   <div class="content">Click <code>Republish</code>. The snapshot is replaced with the current state of the project; the link stays the same, so embedded maps show the new version as well.</div>
 </div>
 
-## Unpublishing a Map
+### Unpublishing a Map
 
 <div class="step">
   <div class="step-number">1</div>

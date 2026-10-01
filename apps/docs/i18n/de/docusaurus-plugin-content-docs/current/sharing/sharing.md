@@ -1,5 +1,5 @@
 ---
-description: "Verwalten Sie Team-Mitglieder in den Einstellungen und teilen Sie Datensätze, Projekte oder Ordner mit einem Team oder der Organisation als Viewer oder Editor."
+description: "Verwalten Sie Team-Mitglieder, teilen Sie Datensätze, Projekte und Ordner mit Personen, Teams oder der Organisation, übertragen Sie Inhalte an ein Team und stellen Sie Gelöschtes aus dem Papierkorb wieder her."
 sidebar_position: 6
 slug: /sharing
 ---
@@ -51,11 +51,11 @@ Wenn Sie einen Datensatz/ein Projekt mit einem Team oder einer Organisation teil
 
 ## Zugriff auf einen Datensatz, ein Projekt oder einen Ordner verwalten
 
-Öffnen Sie das <code>Mehr Optionen</code>-Menü <img src={require('/img/icons/3dots.png').default} alt="Mehr Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> des Inhalts und wählen Sie <code>Teilen</code>. Der Dialog hat drei Tabs:
+Öffnen Sie das <code>Weitere Optionen</code>-Menü <img src={require('/img/icons/3dots.png').default} alt="Weitere Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> des Inhalts und wählen Sie <code>Teilen</code>. Der Dialog hat diese Tabs:
 
-- **Personen**: mit einer **einzelnen Person** aus Ihrer Organisation teilen. Suchen Sie sie; der Inhalt erscheint bei ihr unter `Mit mir geteilt` und bleibt, wo er liegt.
+- **Personen**: einen **Datensatz oder ein Projekt** mit einer **einzelnen Person** aus Ihrer Organisation teilen. Suchen Sie sie; der Inhalt erscheint bei ihr unter `Mit mir geteilt` und bleibt, wo er liegt. Ordner, Bundles und Vorlagen lassen sich nur mit Teams und der Organisation teilen.
 - **Teams**: mit einem ganzen **Team oder einer Organisation** teilen. Gewähren Sie den Mitgliedern <code>Viewer</code>- oder <code>Editor</code>-Zugriff, oder <code>Kein Zugriff</code>, um ihn zu entziehen.
-- **Öffentlich**: einen **Datensatz** für alle GOAT-Nutzer öffentlich machen; bei einem **Projekt** eine öffentliche Momentaufnahme veröffentlichen, die jeder ohne GOAT-Konto öffnen kann. Beides wird unter [Öffentliches Teilen](./public.md) behandelt.
+- **Öffentlich** (nur Datensätze und Projekte): einen **Datensatz** für alle GOAT-Nutzer öffentlich machen; bei einem **Projekt** eine öffentliche Momentaufnahme veröffentlichen, die jeder ohne GOAT-Konto öffnen kann. Beides wird unter [Öffentliches Teilen](./public.md) behandelt.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/sharing/share_dialog_tabs_de.webp').default} alt="Teilen öffnen und die Tabs Personen, Teams und Öffentlich" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
@@ -72,7 +72,7 @@ Sie können auch einen ganzen **Ordner** auf einmal teilen. Das Teilen eines Ord
 
 <div class="step">
    <div class="step-number">1</div>
-   <div class="content">Klicken Sie bei einem Ordner, den Sie besitzen, auf <code>Mehr Optionen</code> <img src={require('/img/icons/3dots.png').default} alt="Mehr Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> und wählen Sie <code>Teilen</code>.</div>
+   <div class="content">Klicken Sie bei einem Ordner, den Sie besitzen, auf <code>Weitere Optionen</code> <img src={require('/img/icons/3dots.png').default} alt="Weitere Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> und wählen Sie <code>Teilen</code>.</div>
 </div>
 <div class="step">
    <div class="step-number">2</div>
@@ -89,15 +89,11 @@ Ein Ordner kann **entweder mit einer Organisation oder mit einem Team geteilt we
 
 ### Geteilte Elemente aufrufen
 
-Sie finden geteilte Elemente in Ihrem Workspace:
-
-- Projekte, die mit Ihnen geteilt wurden: <code>Workspace</code> → <code>Projects</code> → <code>Teams</code> / <code>Organizations</code>
-  
-- Datensätze, die mit Ihnen geteilt wurden: <code>Workspace</code> → <code>Datasets</code> → <code>Teams</code> / <code>Organizations</code>
+Alles, was mit Ihnen geteilt wurde, persönlich oder über ein Team oder die Organisation, erscheint unter <code>Mit mir geteilt</code> im Panel <code>Bereiche</code> unter [Inhalt](../workspace/content.md).
 
 ## Rechte übertragen
 
-Sie können einen Inhalt **an ein Team oder eine Organisation übergeben**, sodass er nicht mehr Ihnen persönlich gehört. Dies funktioniert für Datensätze, Projekte, Workflows und Layouts.
+Sie können einen Inhalt **an ein Team oder eine Organisation übergeben**, sodass er nicht mehr Ihnen persönlich gehört. Dies funktioniert für Datensätze, Projekte, Ordner, Bundles und Vorlagen, die Ihnen in **Meine Inhalte** gehören; bei Inhalten in einem Team- oder Organisationsbereich erscheint die Option nicht. Unter [Inhalt](../workspace/content.md#teilen-und-übertragen-sind-zweierlei) steht, wie sich das vom Teilen unterscheidet.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/sharing/transfer_ownership_de.webp').default} alt="Rechte übertragen im Tab Teams des Teilen-Dialogs" style={{ maxHeight: "480px", maxWidth: "480px", objectFit: "contain"}}/>
@@ -106,11 +102,11 @@ Sie können einen Inhalt **an ein Team oder eine Organisation übergeben**, soda
 
 <div class="step">
    <div class="step-number">1</div>
-   <div class="content">Öffnen Sie das <code>Weitere Optionen</code>-Menü <img src={require('/img/icons/3dots.png').default} alt="Weitere Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> des Inhalts, wählen Sie <code>Teilen</code>, öffnen Sie den Tab <code>Teams</code> und wählen Sie <code>Rechte übertragen</code>.</div>
+   <div class="content">Öffnen Sie das <code>Weitere Optionen</code>-Menü <img src={require('/img/icons/3dots.png').default} alt="Weitere Optionen" style={{ maxHeight: '20px', maxWidth: '20px'}}/> des Inhalts, wählen Sie <code>Teilen</code> und öffnen Sie den Tab <code>Teams</code>. Klicken Sie in der Zeile <code>Rechte übertragen</code> auf <code>Übertragen…</code>.</div>
 </div>
 <div class="step">
    <div class="step-number">2</div>
-   <div class="content">Wählen Sie das Team oder die Organisation, das/die den Inhalt besitzen soll.</div>
+   <div class="content">Wählen Sie unter <code>An</code> das Team oder die Organisation, das/die den Inhalt besitzen soll.</div>
 </div>
 <div class="step">
    <div class="step-number">3</div>
@@ -118,7 +114,7 @@ Sie können einen Inhalt **an ein Team oder eine Organisation übergeben**, soda
 </div>
 <div class="step">
    <div class="step-number">4</div>
-   <div class="content">Aktivieren Sie optional <code>Verknüpfung am alten Ort hinterlassen</code>, damit der Inhalt weiterhin von seinem bisherigen Ort erreichbar ist, und bestätigen Sie die Übertragung.</div>
+   <div class="content"><code>Verknüpfung am alten Ort hinterlassen</code> ist standardmäßig aktiviert, damit der Inhalt weiterhin von seinem bisherigen Ort erreichbar ist. Deaktivieren Sie die Option, wenn Sie keine Verknüpfung möchten, und bestätigen Sie die Übertragung.</div>
 </div>
 
 Nach einer Übertragung:

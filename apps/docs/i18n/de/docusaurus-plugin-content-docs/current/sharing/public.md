@@ -1,5 +1,5 @@
 ---
-description: "Veröffentlichen Sie ein Projekt, damit alle die Karte ohne GOAT-Konto sehen, teilen Sie es per URL oder iframe und sperren Sie die Kartenausdehnung."
+description: "Veröffentlichen Sie ein Projekt, damit alle die Karte ohne GOAT-Konto sehen, teilen Sie es per URL oder iframe und sperren Sie die Kartenausdehnung, oder machen Sie einen Datensatz für alle GOAT-Nutzer öffentlich."
 sidebar_position: 2
 ---
 
@@ -17,7 +17,7 @@ Beim Veröffentlichen entsteht eine **Momentaufnahme** des Projekts: Die öffent
 Öffentliches Teilen ist nur zum Ansehen. Wenn andere die Karte **bearbeiten** sollen, teilen Sie sie in den Tabs <code>Personen</code> und <code>Teams</code> des Dialogs <code>Teilen</code>. Siehe [Teams & Mitglieder](../sharing).
 ::::
 
-## Wie teile ich eine Karte öffentlich?
+### Wie teile ich eine Karte öffentlich?
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/sharing/public_tab_published_de.webp').default} alt="Der Tab Öffentlich vor und nach dem Veröffentlichen eines Projekts" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
@@ -45,7 +45,7 @@ Nun können Sie:
 
 - <code>Kopieren</code> neben <code>Code einbetten</code> unter <code>Einbetten</code>: <b>Betten Sie die Karte</b> als iframe in Websites oder Tools ein, die HTML und iframes unterstützen.
 
-## Weitere Einstellungen im Tab „Öffentlich“
+### Weitere Einstellungen im Tab „Öffentlich“
 
 Sobald das Projekt veröffentlicht ist, bietet der Tab <code>Öffentlich</code> außerdem diese Einstellungen:
 
@@ -53,9 +53,9 @@ Sobald das Projekt veröffentlicht ist, bietet der Tab <code>Öffentlich</code> 
 
 - <code>Messung</code>: Hier legen Sie fest, ob Besuche der öffentlichen Seite gezählt werden. Was Sie sehen, hängt von Ihrer Organisation ab:
     - Hat sie noch **keine Analytics-Instanz**, zeigt dieser Abschnitt <code>Keine Analytics-Instanzen konfiguriert</code> und wo Sie eine hinzufügen. Das Einrichten ist unter [Analytics](../workspace/settings#analytics) beschrieben.
-    - Hat sie **eine oder mehrere Instanzen**, wählen Sie eine, um Besuche zu zählen, oder <code>Kein Tracking</code>. Sobald Sie eine Instanz wählen, erscheint der Schalter <code>Cookie-Einwilligungsbanner</code>: Lassen Sie ihn an, um Besucher zu fragen, bevor das Tracking startet. Schalten Sie ihn aus, zeigt GOAT eine Warnung, denn ohne Einwilligung ist Tracking in Deutschland und den meisten EU-Ländern nicht mit der DSGVO vereinbar.
+    - Hat sie **eine oder mehrere Instanzen**, wählen Sie eine, um Besuche zu zählen, oder <code>Kein Tracking</code>. Sobald Sie eine Instanz wählen, lässt sich der Schalter <code>Cookie-Einwilligungsbanner</code> darunter verwenden (bei <code>Kein Tracking</code> ist er ausgegraut und zeigt <code>Nicht erforderlich — es wird nichts erfasst</code>): Lassen Sie ihn an, um Besucher zu fragen, bevor das Tracking startet. Schalten Sie ihn aus, zeigt GOAT eine Warnung, denn ohne Einwilligung ist Tracking in Deutschland und den meisten EU-Ländern nicht mit der DSGVO vereinbar.
 
-## Kartenausdehnung anpassen
+### Kartenausdehnung anpassen
 
 Um zu steuern, wie weit Nutzer die Karte verschieben und herauszoomen können, können Sie die Kartenausdehnung sperren.
 
@@ -83,7 +83,7 @@ Um stattdessen die Zoomstufen zu begrenzen, nutzen Sie <code>Zoom-Grenzen</code>
 Wenn Ihre Karte bereits veröffentlicht ist, **müssen Sie sie erneut veröffentlichen**, damit die Änderungen wirksam werden. Der Link bleibt gleich.
 ::::
 
-## Öffentliche Karte aktualisieren (erneut veröffentlichen)
+### Öffentliche Karte aktualisieren (erneut veröffentlichen)
 
 Die öffentliche Seite übernimmt spätere Änderungen am Projekt nicht automatisch. So aktualisieren Sie sie mit Ihren neuesten Änderungen:
 
@@ -100,7 +100,7 @@ Die öffentliche Seite übernimmt spätere Änderungen am Projekt nicht automati
   <div class="content">Klicken Sie auf <code>Aktualisieren</code>. Die Momentaufnahme wird durch den aktuellen Stand des Projekts ersetzt; der Link bleibt gleich, sodass auch eingebettete Karten die neue Version zeigen.</div>
 </div>
 
-## Veröffentlichung aufheben
+### Veröffentlichung aufheben
 
 <div class="step">
   <div class="step-number">1</div>

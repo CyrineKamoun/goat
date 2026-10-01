@@ -1,5 +1,5 @@
 ---
-description: "Manage team members in Settings and share datasets, projects or whole folders with a team or organization as viewer or editor, and see what each role can do."
+description: "Manage team members, share datasets, projects and folders with people, teams or the organization, transfer ownership to a team, and restore deleted items from the Trash."
 sidebar_position: 1
 ---
 
@@ -53,11 +53,11 @@ When you share a dataset/project with a Team/Organization, all members will have
 
 ## Managing access to a Dataset, Project, or Folder
 
-Open the item's <code>More options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu and select <code>Share</code>. The dialog has three tabs:
+Open the item's <code>More Options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu and select <code>Share</code>. The dialog has these tabs:
 
-- **People**: share with an **individual person** from your organization. Search for them; the item lands in their `Shared with me` and stays where it lives.
-- **Teams**: share with a whole **Team or Organization**. Grant its members <code>viewer</code> or <code>editor</code> access, or <code>no access</code> to withdraw it.
-- **Public**: for a **dataset**, make it public to all GOAT users; for a **project**, publish a public web snapshot that anyone can open without a GOAT account. Both are covered in [Public Sharing](./public.md).
+- **People**: share a **dataset or project** with an **individual person** from your organization. Search for them; the item appears in their `Shared with me` and stays where it lives. Folders, bundles and templates can only be shared with teams and the organization.
+- **Teams**: share with a whole **Team or Organization**. Grant its members <code>Viewer</code> or <code>Editor</code> access, or <code>No Access</code> to withdraw it.
+- **Public** (datasets and projects only): for a **dataset**, make it public to all GOAT users; for a **project**, publish a public web snapshot that anyone can open without a GOAT account. Both are covered in [Public Sharing](./public.md).
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/sharing/share_dialog_tabs.webp').default} alt="Opening Share and the People, Teams and Public tabs" style={{ maxHeight: "auto", maxWidth: "100%", objectFit: "contain"}}/>
@@ -65,7 +65,7 @@ Open the item's <code>More options</code> <img src={require('/img/icons/3dots.pn
 <p> </p>
 
 :::info
-To withdraw access, open the <code>Share</code> dialog again and set the role back to <code>no access</code>.
+To withdraw access, open the <code>Share</code> dialog again and set the role back to <code>No Access</code>.
 :::
 
 ### Sharing a Folder
@@ -78,11 +78,11 @@ You can also share an entire **folder** at once. Sharing a folder grants access 
 </div>
 <div class="step">
    <div class="step-number">2</div>
-   <div class="content">Choose an <code>Organization</code> or <code>Team</code> and grant <code>viewer</code> or <code>editor</code> access as needed.</div>
+   <div class="content">Choose an <code>Organization</code> or <code>Team</code> and grant <code>Viewer</code> or <code>Editor</code> access as needed.</div>
 </div>
 <div class="step">
    <div class="step-number">3</div>
-   <div class="content">To withdraw access, open the <code>Share</code> dialog again and set the role back to <code>no access</code>.</div>
+   <div class="content">To withdraw access, open the <code>Share</code> dialog again and set the role back to <code>No Access</code>.</div>
 </div>
 
 :::info
@@ -91,16 +91,12 @@ A folder can be shared with **either one Organization or one Team, not both at t
 
 ### Accessing Shared Items
 
-You can find shared items in your workspace:
-
-- **Projects shared with you**: <code>Workspace</code> → <code>Projects</code> → <code>Teams</code> / <code>Organizations</code>
-  
-- **Datasets shared with you**: <code>Workspace</code> → <code>Datasets</code> → <code>Teams</code> / <code>Organizations</code>
+Everything shared with you, personally or through a team or the organization, appears under <code>Shared with me</code> in the <code>Spaces</code> panel of [Content](../workspace/content.md).
 
 
 ## Transferring ownership
 
-You can **hand an item over to a team or organization** so that it no longer belongs to you personally. This works for datasets, projects, workflows and layouts.
+You can **hand an item over to a team or organization** so that it no longer belongs to you personally. This works for datasets, projects, folders, bundles and templates that you own in your **My Content**; for items in a team or organization space, the option does not appear. [Content](../workspace/content.md#sharing-and-transferring-are-different) explains how this differs from sharing.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/sharing/transfer_ownership.webp').default} alt="Transfer ownership on the Teams tab of the Share dialog" style={{ maxHeight: "480px", maxWidth: "480px", objectFit: "contain"}}/>
@@ -109,11 +105,11 @@ You can **hand an item over to a team or organization** so that it no longer bel
 
 <div class="step">
    <div class="step-number">1</div>
-   <div class="content">Open the item's <code>More options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu, choose <code>Share</code>, open the <code>Teams</code> tab and select <code>Transfer ownership</code>.</div>
+   <div class="content">Open the item's <code>More options</code> <img src={require('/img/icons/3dots.png').default} alt="More options" style={{ maxHeight: '20px', maxWidth: '20px'}}/> menu, choose <code>Share</code> and open the <code>Teams</code> tab. In the <code>Transfer Ownership</code> row, click <code>Transfer…</code>.</div>
 </div>
 <div class="step">
    <div class="step-number">2</div>
-   <div class="content">Pick the team or organization that should own the item.</div>
+   <div class="content">Under <code>To</code>, pick the team or organization that should own the item.</div>
 </div>
 <div class="step">
    <div class="step-number">3</div>
@@ -121,7 +117,7 @@ You can **hand an item over to a team or organization** so that it no longer bel
 </div>
 <div class="step">
    <div class="step-number">4</div>
-   <div class="content">Optionally enable <code>Leave a shortcut in the old location</code> so the item is still reachable from where it was, then confirm the transfer.</div>
+   <div class="content"><code>Leave a shortcut in the old location</code> is on by default, so the item stays reachable from where it was. Turn it off if you don't want one, then confirm the transfer.</div>
 </div>
 
 After a transfer:
