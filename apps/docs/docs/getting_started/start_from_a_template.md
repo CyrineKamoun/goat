@@ -7,9 +7,9 @@ sidebar_position: 4
 
 Templates let you **begin with something already set up** instead of a blank canvas. GOAT offers three kinds:
 
-- **Project templates** — open a prepared project with styled layers, finished analyses, and a dashboard. A good starting point when you want a complete example to explore or adapt.
-- **Workflow templates** — a ready-made analysis workflow where only your own data is missing. You supply the input layers and run it.
-- **Layout templates** — print-ready page layouts, with the page size given in millimetres.
+- **Project templates**: open a prepared project with styled layers, finished analyses, and a dashboard. A good starting point when you want a complete example to explore or adapt.
+- **Workflow templates**: a ready-made analysis workflow where only your own data is missing. You supply the input layers and run it.
+- **Layout templates**: print-ready page layouts, with the page size given in millimetres.
 
 This page focuses on **project templates**. For the other two, see [Save a workflow as a template](../workflows/workflow_interface#3-how-to-use-the-workflow-interface) and the Layouts page.
 
@@ -17,8 +17,8 @@ This page focuses on **project templates**. For the other two, see [Save a workf
 
 On the **Home** page, the `Start from a template` row shows the available templates. You can:
 
-- **Filter by kind** — `All templates`, `Project`, `Workflow`, or `Layout`.
-- **Filter by source** — who the template came from: `Everyone`, `GOAT`, `Mine`, `Team`, or `Organization`.
+- **Filter by kind**: `All templates`, `Project`, `Workflow`, or `Layout`.
+- **Filter by source**: who the template came from, `Everyone`, `GOAT`, `Mine`, `Team`, or `Organization`.
 - Click `All templates` to open the full template browser, where you can **search** templates and **preview** one before using it.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

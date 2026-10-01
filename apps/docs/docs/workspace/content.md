@@ -57,11 +57,11 @@ Select an item, or several, to act on them. The kebab menu on a card and the act
 
 ### Sharing and transferring are different
 
-**Sharing** grants access while you remain the owner. That suits colleagues need to see or edit something that is still yours to look after.
+**Sharing** grants access while you remain the owner. That suits cases where colleagues need to see or edit something that is still yours to look after.
 
-**Transferring ownership** moves the item into someone else's space for good. Reach for it when a project genuinely changes hands, for example when you hand a piece of work over before leaving a team.
+**Transferring ownership** moves the item into a team's or the organization's space for good. Reach for it when a project genuinely changes hands, for example when you hand a piece of work over before leaving a team.
 
-A transfer leaves a **shortcut** behind in the space the item came from, badged as such and carrying the item's real name. It is a pointer, so opening it takes you to the item where it now lives.
+By default, a transfer leaves a **shortcut** behind in the space the item came from, badged as such and carrying the item's real name. It is a pointer, so opening it takes you to the item where it now lives.
 
 :::info Who can see what
 An item shows its **audience**: private, shared with named people, shared with a team or organisation, or public. Folders and bundles can be shared with teams and the organisation.
@@ -69,7 +69,7 @@ An item shows its **audience**: private, shared with named people, shared with a
 
 ### Trash and restore
 
-Deleting content does not remove it straight away: it goes to the **Trash**, where the owner can **Restore** it. Content stays there until it is purged, so a delete made in error is recoverable.
+Deleting content does not remove it straight away: it goes to the **Trash**, where the owner can **Restore** it. Content stays there for **30 days** and is then removed for good, so a delete made in error is recoverable. See [Trash](../sharing/sharing.md#trash) for where to find it.
 
 ## Adding content
 

@@ -20,7 +20,7 @@ Der ÖV-Güteklassen-Indikator ist entscheidend und kann verwendet werden, um De
 
 :::info
 
-Die Berechnung der ÖV-Güteklassen ist für Gebiete verfügbar, in denen GTFS-Daten des öffentlichen Verkehrs in GOAT integriert sind. Derzeit unterstützte Regionen umfassen **Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich**. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns gerne](https://plan4better.de/de/contact/).
+Die Berechnung der ÖV-Güteklassen ist für Gebiete verfügbar, in denen GTFS-Daten des öffentlichen Verkehrs in GOAT integriert sind. Derzeit unterstützte Regionen umfassen **Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich**. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns gerne](https://plan4better.de/de/contact/). Sie können auch [ein eigenes ÖPNV-Netz importieren](../../data/builtin_datasets.md#eigenes-öpnv-netz), um andere Regionen zu analysieren.
 
 :::
 
