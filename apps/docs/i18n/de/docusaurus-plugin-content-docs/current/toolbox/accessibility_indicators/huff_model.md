@@ -20,20 +20,20 @@ Das Huff-Modell **prognostiziert die Wahrscheinlichkeit, mit der Konsumenten in 
 ## 1. Erklärung
 
 Das Huff-Modell ist ein **räumliches Interaktionsmodell, das schätzt, wie sich die Nachfrage (z. B. Kunden, Bewohner) auf konkurrierende Angebotsstandorte (z. B. Geschäfte, Einrichtungen) verteilt**.
-Das Modell funktioniert nach einem einfachen Prinzip: **Die Wahrscheinlichkeit, dass ein Standort gewählt wird, hängt von seiner Attraktivität im Verhältnis zu allen konkurrierenden Standorten ab, gewichtet nach der Reisezeit**. Ein großes, nahe gelegenes Einkaufszentrum wird mehr Nachfrage auf sich ziehen als ein kleines, weit entferntes – aber die genaue Aufteilung hängt vom Gleichgewicht zwischen Attraktivität und Entfernung aller verfügbaren Optionen ab.
+Das Modell funktioniert nach einem einfachen Prinzip: **Die Wahrscheinlichkeit, dass ein Standort gewählt wird, hängt von seiner Attraktivität im Verhältnis zu allen konkurrierenden Standorten ab, gewichtet nach der Reisezeit**. Ein großes, nahe gelegenes Einkaufszentrum wird mehr Nachfrage auf sich ziehen als ein kleines, weit entferntes, aber die genaue Aufteilung hängt vom Gleichgewicht zwischen Attraktivität und Entfernung aller verfügbaren Optionen ab.
 
 Das Ergebnis ist ein **Wahrscheinlichkeitswert für jeden Angebotsstandort**, der den Anteil der Gesamtnachfrage darstellt, den er aus dem Referenzgebiet auf sich zieht. Dies ermöglicht einen direkten Vergleich, wie gut verschiedene Einrichtungen um denselben Kundenstamm konkurrieren.
 
 Sie können das Verkehrsmittel, den Gelegenheiten-Layer (mit Kapazitätsfeldern), den Nachfrage-Layer (mit Bevölkerungsfeld), das Referenzgebiet und Reisezeitlimits konfigurieren und Ihr Modell kalibrieren.
 
-- **Referenzgebiet** — Ein Polygon, das das Untersuchungsgebiet definiert. Nur Nachfrage und Gelegenheiten innerhalb dieses Gebiets werden berücksichtigt.
+- **Referenzgebiet**: Ein Polygon, das das Untersuchungsgebiet definiert. Nur Nachfrage und Gelegenheiten innerhalb dieses Gebiets werden berücksichtigt.
 
 - Der **Gelegenheiten-Layer enthält Einrichtungsdaten** mit einem Attraktivitätsattribut (z. B. Anzahl der Krankenhausbetten, Quadratmeter Verkaufsfläche, Schulplätze).
 
 - Der **Nachfrage-Layer enthält Bevölkerungs- oder Nutzerdaten** (z. B. Einwohnerzahl, potenzielle Kunden), die die Nachfrage nach den Einrichtungen darstellen.
 
 
-**Wesentlicher Unterschied:** Im Gegensatz zu Heatmaps, die die Erreichbarkeit pro Rasterzelle visualisieren, erzeugt das *Huff-Modell* eine **Wahrscheinlichkeit pro Angebotsstandort** – und zeigt, welchen Anteil der Gesamtnachfrage jede Einrichtung erfasst.
+**Wesentlicher Unterschied:** Im Gegensatz zu Heatmaps, die die Erreichbarkeit pro Rasterzelle visualisieren, erzeugt das *Huff-Modell* eine **Wahrscheinlichkeit pro Angebotsstandort** und zeigt, welchen Anteil der Gesamtnachfrage jede Einrichtung erfasst.
 
 :::info
 
@@ -110,7 +110,7 @@ Die Berechnung des Huff-Modells ist für `Walk`, `Bicycle`, `Pedelec` und `Auto`
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Wählen Sie Ihr <code>Referenzgebiet</code> – einen Polygon-Layer, der die Grenze des Untersuchungsgebiets definiert. Nur Nachfrage und Ziele innerhalb dieses Gebiets werden in die Analyse einbezogen.</div>
+  <div class="content">Wählen Sie Ihr <code>Referenzgebiet</code>: einen Polygon-Layer, der die Grenze des Untersuchungsgebiets definiert. Nur Nachfrage und Ziele innerhalb dieses Gebiets werden in die Analyse einbezogen.</div>
 </div>
 
 :::tip Hinweis
@@ -128,7 +128,7 @@ Benötigen Sie Hilfe bei der Auswahl einer geeigneten Reisezeitgrenze für versc
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Wählen Sie das <code>Nachfragefeld</code> – ein numerisches Feld aus Ihrem Nachfrage-Layer, das die Anzahl potenzieller Verbraucher darstellt (z. B. Bevölkerung, Anzahl der Haushalte).</div>
+  <div class="content">Wählen Sie das <code>Nachfragefeld</code>: ein numerisches Feld aus Ihrem Nachfrage-Layer, das die Anzahl potenzieller Verbraucher darstellt (z. B. Bevölkerung, Anzahl der Haushalte).</div>
 </div>
 
 ### Gelegenheiten
@@ -140,7 +140,7 @@ Benötigen Sie Hilfe bei der Auswahl einer geeigneten Reisezeitgrenze für versc
 
 <div class="step">
   <div class="step-number">10</div>
-  <div class="content">Wählen Sie das <code>Attraktivitätsfeld</code> – ein numerisches Feld, das die Attraktivität jeder Einrichtung darstellt (z. B. Verkaufsfläche in m², Anzahl der Produkte, Qualitätsbewertung).</div>
+  <div class="content">Wählen Sie das <code>Attraktivitätsfeld</code>: ein numerisches Feld, das die Attraktivität jeder Einrichtung darstellt (z. B. Verkaufsfläche in m², Anzahl der Produkte, Qualitätsbewertung).</div>
 </div>
 
 ### Erweiterte Konfiguration
@@ -185,7 +185,7 @@ Idealerweise sammeln Sie Daten zu tatsächlichen Kundenbesuchen oder Marktanteil
 
 Sobald die Berechnung abgeschlossen ist, wird ein Ergebnis-Layer zur Karte hinzugefügt. Jedes Feature im Ergebnis-Layer stellt einen **Angebotsstandort** mit seiner berechneten Huff-Wahrscheinlichkeit dar.
 
-- **Höhere Wahrscheinlichkeitswerte** zeigen an, dass eine Einrichtung einen größeren Anteil der Gesamtnachfrage erfasst – sie ist im Vergleich zu Alternativen wettbewerbsfähiger.
+- **Höhere Wahrscheinlichkeitswerte** zeigen an, dass eine Einrichtung einen größeren Anteil der Gesamtnachfrage erfasst: Sie ist im Vergleich zu Alternativen wettbewerbsfähiger.
 - **Niedrigere Wahrscheinlichkeitswerte** zeigen an, dass eine Einrichtung weniger Nachfrage erfasst, entweder weil sie weniger attraktiv ist, weiter entfernt liegt oder starker Konkurrenz durch nahegelegene Alternativen ausgesetzt ist.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>

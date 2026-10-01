@@ -52,7 +52,7 @@ Trip Count Platform computation is available for areas where public transport GT
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Select the <code>Reference Area Layer</code> — a polygon layer defining the study area boundary.</div>
+  <div class="content">Select the <code>Reference Area Layer</code>: a polygon layer defining the study area boundary.</div>
 </div>
 
 

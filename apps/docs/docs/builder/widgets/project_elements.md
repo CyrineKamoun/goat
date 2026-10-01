@@ -90,8 +90,8 @@ The Links widget **displays a row of labelled links or popup triggers**, useful 
   <div class="content">
   Under <code>Links</code>, each item has a <code>URL</code> / <code>Popup</code> toggle:
   <ul>
-    <li><code>URL</code> — enter a <code>Label</code> and a destination URL.</li>
-    <li><code>Popup</code> — enter a <code>Label</code> and click <code>Configure popup</code> to set the <code>Popup type</code> (<code>Tooltip</code>, <code>Popup</code>, or <code>Dialog</code>), <code>Popup placement</code>, <code>Size</code> (<code>Small</code>, <code>Medium</code>, or <code>Large</code>), and the popup content (Markdown supported).</li>
+    <li><code>URL</code>: enter a <code>Label</code> and a destination URL.</li>
+    <li><code>Popup</code>: enter a <code>Label</code> and click <code>Configure popup</code> to set the <code>Popup type</code> (<code>Tooltip</code>, <code>Popup</code>, or <code>Dialog</code>), <code>Popup placement</code>, <code>Size</code> (<code>Small</code>, <code>Medium</code>, or <code>Large</code>), and the popup content (Markdown supported).</li>
   </ul>
   Drag items to reorder them. Click the × icon to delete a link.
   </div>
@@ -107,8 +107,8 @@ The Links widget **displays a row of labelled links or popup triggers**, useful 
   <div class="content">
   Under <code>Options</code>:
   <ul>
-    <li><code>Separator</code> — visual divider between links: <code>Vertical line</code>, <code>Dot</code>, or <code>Dash</code>.</li>
-    <li><code>Secondary text</code> — additional text shown alongside the links (e.g. a copyright notice).</li>
+    <li><code>Separator</code>: visual divider between links (<code>Vertical line</code>, <code>Dot</code>, or <code>Dash</code>).</li>
+    <li><code>Secondary text</code>: additional text shown alongside the links (e.g. a copyright notice).</li>
   </ul>
   </div>
 </div>

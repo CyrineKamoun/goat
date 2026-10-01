@@ -26,7 +26,7 @@ You can specify the **routing type**, **opportunity layer**, **travel cost limit
 
 - The **Potential Type** determines how each opportunity's weight is derived: use **Constant** to apply the same value to all opportunities, **Field** to use a numeric attribute from the input layer (e.g., number of departures, seats, or capacity), or, for polygon layers, **Expression** to weight each polygon by its area or perimeter.
 
-- Using **Destination potential helps prioritize certain opportunities over others**. For example, a larger but farther supermarket can be valued more than a smaller nearby one. This allows you to include qualitative information—such as size, frequency, or service level—when computing accessibility, resulting in a more realistic heatmap.
+- Using **Destination potential helps prioritize certain opportunities over others**. For example, a larger but farther supermarket can be valued more than a smaller nearby one. This allows you to include qualitative information, such as size, frequency, or service level, when computing accessibility, resulting in a more realistic heatmap.
 
 Influenced by all these properties, **the accessibility of a point can model complex real-world human behavior** and is a powerful measure for transport and accessibility planning.
 
@@ -176,8 +176,8 @@ Need help choosing a suitable travel time limit for various common amenities? Th
   <div class="content">
   Choose a <code>Potential Type</code> to define how each opportunity is weighted:
     <ul>
-      <li><b>Constant</b> — all opportunities have the same weight. Enter a numeric value (default: 1.0).</li>
-      <li><b>Field</b> — use a numeric field from the <i>Input Layer</i> as the weight (e.g. number of departures, seats, or capacity).</li>
+      <li><b>Constant</b>: all opportunities have the same weight. Enter a numeric value (default: 1.0).</li>
+      <li><b>Field</b>: use a numeric field from the <i>Input Layer</i> as the weight (e.g. number of departures, seats, or capacity).</li>
       <li><b>Expression</b>: offered for polygon layers only. Under <code>Potential expression</code>, choose <b>Area</b> or <b>Perimeter</b> to weight each polygon by its size, so a large park counts for more than a small one. Both are measured in the web map projection, so they work as relative weights within your study area rather than as exact square metres or metres.</li>
     </ul>
   </div>
@@ -194,7 +194,7 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 
 **How to choose the sensitivity value?**
 
-The best **sensitivity (β)** value depends on your analysis — there’s no single correct number. It defines **how quickly accessibility decreases as travel cost increases**.
+The best **sensitivity (β)** value depends on your analysis. There is no single correct number. It defines **how quickly accessibility decreases as travel cost increases**.
 
 - **Low β (urban scale):** Use a lower sensitivity for city-level analyses. This makes accessibility drop faster with distance, which fits urban contexts where many destinations are nearby and people usually choose the closest one.
 - **High β (regional scale):** Use a higher sensitivity for regional or rural analyses. This makes accessibility decrease more slowly, which reflects that people are willing to travel longer distances when options are fewer.
@@ -270,7 +270,7 @@ In simple terms, the accessibility (**A**) of a cell (**i**) depends on:
 - the **number or importance of destinations** (**O**) nearby, and  
 - the **travel cost** (**tᵢⱼ**) needed to reach them.
 
-The function **f(tᵢⱼ)** reduces the influence of destinations that are farther away — this is called the **impedance function**. In GOAT you can choose between different impedance types: `gaussian`, `linear`, `exponential`, `power`, or `cumulative`.
+The function **f(tᵢⱼ)** reduces the influence of destinations that are farther away. This is the **impedance function**. In GOAT you can choose between different impedance types: `gaussian`, `linear`, `exponential`, `power`, or `cumulative`.
 
 and adjust how strongly distance affects accessibility using the **sensitivity (β)** parameter. If **destination potential** is included, it further increases the weight of destinations with higher capacity or quality (e.g., larger stores or frequent transit stops).
 
@@ -344,7 +344,7 @@ Leveraging the *sensitivity* you define, the Gaussian function allows you to mod
 </MathJax.Provider>
 </div>
 
-Unlike the other functions, the cumulative function applies **no distance decay** within the travel cost limit **t̄**: every reachable destination counts equally. It therefore does not use the *sensitivity (β)* parameter — it simply counts the opportunities reachable within the limit.
+Unlike the other functions, the cumulative function applies **no distance decay** within the travel cost limit **t̄**: every reachable destination counts equally. It therefore does not use the *sensitivity (β)* parameter. It simply counts the opportunities reachable within the limit.
 
 The *sensitivity* parameter determines how accessibility changes with increasing travel cost. As the *sensitivity* parameter is decisive when measuring accessibility, GOAT allows you to adjust this. The graph shows how the willingness to walk decreases with increasing travel cost based on the selected impedance function and sensitivity value (β).
 

@@ -64,7 +64,7 @@ Die Berechnung der ÖV-Güteklassen ist für Gebiete verfügbar, in denen GTFS-D
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Wählen Sie das <code>Referenzgebiet</code> — einen Polygon-Layer, der das Untersuchungsgebiet definiert.</div>
+  <div class="content">Wählen Sie das <code>Referenzgebiet</code>: einen Polygon-Layer, der das Untersuchungsgebiet definiert.</div>
 </div>
 
 <div class="step">

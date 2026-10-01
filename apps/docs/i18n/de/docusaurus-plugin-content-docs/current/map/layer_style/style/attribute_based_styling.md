@@ -5,7 +5,7 @@ sidebar_position: 2
 
 # Attributbasiertes Styling
 
-**Sie können Layer basierend auf Daten-Attributen gestalten, um Unterschiede und Trends leicht zu identifizieren.** Jeder Visualisierungsaspekt—Füllfarbe, Strichfarbe, Strichbreite, Benutzerdefiniertes Symbol und Punkteinstellungen—kann nach jedem Feld in den Daten Ihres Layers gestaltet werden.
+**Sie können Layer basierend auf Daten-Attributen gestalten, um Unterschiede und Trends leicht zu identifizieren.** Jeder Visualisierungsaspekt (Füllfarbe, Strichfarbe, Strichbreite, Benutzerdefiniertes Symbol und Punkteinstellungen) kann nach jedem Feld in den Daten Ihres Layers gestaltet werden.
 
 <iframe width="100%" height="500" src="https://www.youtube.com/embed/cLIPMCOu4FQ?si=aydSJN_Pf0fusO9x" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
@@ -98,7 +98,7 @@ import TabItem from '@theme/TabItem';
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Klicken Sie auf <code>Marker (Ordinal)</code> und wählen Sie den Marker für jeden Kategoriewert — aus der <code>Bibliothek</code> oder durch Hochladen eines eigenen Markers unter <code>Benutzerdefiniert</code>.</div>
+  <div class="content">Klicken Sie auf <code>Marker (Ordinal)</code> und wählen Sie den Marker für jeden Kategoriewert: aus der <code>Bibliothek</code> oder durch Hochladen eines eigenen Markers unter <code>Benutzerdefiniert</code>.</div>
 </div>
 
 <div class="step">

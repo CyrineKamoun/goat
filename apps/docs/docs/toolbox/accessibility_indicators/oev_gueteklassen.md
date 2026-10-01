@@ -63,7 +63,7 @@ The ÖV-Güteklassen indicator is decisive and can be used to highlight deficits
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Select the <code>Reference Area Layer</code> — a polygon layer defining the study area boundary.</div>
+  <div class="content">Select the <code>Reference Area Layer</code>: a polygon layer defining the study area boundary.</div>
 </div>
 
 <div class="step">

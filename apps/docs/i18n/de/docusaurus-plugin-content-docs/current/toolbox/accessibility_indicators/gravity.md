@@ -27,13 +27,13 @@ Sie können das **Verkehrsmittel**, den **Gelegenheits-Layer**, das **Reisekoste
 
 - Der **Potenzialtyp** bestimmt, wie das Gewicht jedes Ziels abgeleitet wird: Mit **Constant** wird allen Zielen der gleiche Wert zugewiesen, mit **Field** wird ein numerisches Attribut aus dem Eingabe-Layer verwendet (z. B. Abfahrten, Sitzplätze oder Kapazität), und bei Polygon-Layern gewichtet **Expression** jedes Polygon nach seiner Fläche oder seinem Umfang.
 
-- Mit dem **Destinationspotenzial können bestimmte Ziele priorisiert werden**. Zum Beispiel kann ein größerer, aber weiter entfernter Supermarkt höher bewertet werden als ein kleinerer in der Nähe. So können qualitative Informationen – wie Größe, Frequenz oder Servicelevel – in die Berechnung einfließen, was zu einer realistischeren Heatmap führt.
+- Mit dem **Destinationspotenzial können bestimmte Ziele priorisiert werden**. Zum Beispiel kann ein größerer, aber weiter entfernter Supermarkt höher bewertet werden als ein kleinerer in der Nähe. So können qualitative Informationen wie Größe, Frequenz oder Servicelevel in die Berechnung einfließen, was zu einer realistischeren Heatmap führt.
 
 Beeinflusst durch all diese Eigenschaften kann **die Erreichbarkeit eines Punktes komplexes reales menschliches Verhalten modellieren** und ist ein leistungsfähiges Maß für Verkehrs- und Erreichbarkeitsplanung.
 
 :::tip
 
-**Wichtiger Unterschied:** Im Gegensatz zur *Heatmap Durchschnitt Reisezeit*, die den Reiseaufwand misst, zeigt die *Gravity-basierte Heatmap* die **Attraktivität** – also wie erreichbar und anziehend Ziele sind, wenn sowohl Entfernung als auch Qualität berücksichtigt werden.
+**Wichtiger Unterschied:** Im Gegensatz zur *Heatmap Durchschnitt Reisezeit*, die den Reiseaufwand misst, zeigt die *Gravity-basierte Heatmap* die **Attraktivität**, also wie erreichbar und anziehend Ziele sind, wenn sowohl Entfernung als auch Qualität berücksichtigt werden.
 
 :::
 
@@ -146,7 +146,7 @@ Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Ein
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Wählen Sie ein <code>Referenzgebiet</code> — einen Polygon-Layer, der Ihr Untersuchungsgebiet darstellt. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; nicht erreichbare Zellen erhalten den Wert <code>NULL</code> und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
+  <div class="content">Wählen Sie ein <code>Referenzgebiet</code>: einen Polygon-Layer, der Ihr Untersuchungsgebiet darstellt. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; nicht erreichbare Zellen erhalten den Wert <code>NULL</code> und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
 </div>
 
 <div class="step">
@@ -177,8 +177,8 @@ Benötigen Sie Hilfe bei der Wahl eines geeigneten Reisezeitlimits für verschie
   <div class="content">
   Wählen Sie den <code>Potenzialtyp</code>, um zu bestimmen, wie jedes Ziel gewichtet wird:
     <ul>
-      <li><b>Constant</b> — alle Ziele erhalten das gleiche Gewicht. Geben Sie einen numerischen Wert ein (Standard: 1.0).</li>
-      <li><b>Field</b> — verwenden Sie ein numerisches Feld aus dem <i>Eingabe-Layer</i> als Gewicht (z. B. Anzahl der Abfahrten, Sitzplätze oder Kapazität).</li>
+      <li><b>Constant</b>: alle Ziele erhalten das gleiche Gewicht. Geben Sie einen numerischen Wert ein (Standard: 1.0).</li>
+      <li><b>Field</b>: verwenden Sie ein numerisches Feld aus dem <i>Eingabe-Layer</i> als Gewicht (z. B. Anzahl der Abfahrten, Sitzplätze oder Kapazität).</li>
       <li><b>Expression</b>: nur bei Polygon-Layern verfügbar. Wählen Sie unter <code>Potenzialausdruck</code> <b>Area</b> oder <b>Perimeter</b>, um jedes Polygon nach seiner Größe zu gewichten, sodass ein großer Park mehr zählt als ein kleiner. Beide werden in der Webkarten-Projektion gemessen und eignen sich daher als relative Gewichte innerhalb Ihres Untersuchungsgebiets, nicht als exakte Quadratmeter oder Meter.</li>
     </ul>
   </div>
@@ -193,7 +193,7 @@ Benötigen Sie Hilfe bei der Wahl eines geeigneten Reisezeitlimits für verschie
 
 **Wie wählt man den Sensitivitätswert?**
 
-Der beste **Sensitivitätswert (β)** hängt von Ihrer Analyse ab – es gibt keine einzig richtige Zahl. Er definiert **wie schnell die Erreichbarkeit mit zunehmender Reisezeit abnimmt**.
+Der beste **Sensitivitätswert (β)** hängt von Ihrer Analyse ab. Es gibt keine einzig richtige Zahl. Er definiert **wie schnell die Erreichbarkeit mit zunehmender Reisezeit abnimmt**.
 
 - **Niedriges β (Stadt):** Verwenden Sie einen niedrigeren Wert für Analysen auf Stadtebene. Die Erreichbarkeit sinkt schneller mit der Entfernung, was für städtische Kontexte passt, in denen viele Ziele in der Nähe sind und meist das nächste gewählt wird.
 - **Hohes β (Region):** Verwenden Sie einen höheren Wert für Analysen auf regionaler oder ländlicher Ebene. Die Erreichbarkeit nimmt langsamer ab, da Menschen bereit sind, längere Strecken zu reisen, wenn es weniger Optionen gibt.
@@ -268,7 +268,7 @@ Einfach gesagt, die Erreichbarkeit (**A**) einer Zelle (**i**) hängt ab von:
 - der **Anzahl oder Bedeutung der Ziele** (**O**) in der Nähe und  
 - der **Reisezeit** (**tᵢⱼ**) zu diesen Zielen.
 
-Die Funktion **f(tᵢⱼ)** reduziert den Einfluss weiter entfernter Ziele – dies ist die **Widerstandsfunktion**. In GOAT können Sie zwischen verschiedenen Widerstandstypen wählen: `Gauß`, `Linear`, `Exponential`, `Potenz` oder `Kumulativ`.
+Die Funktion **f(tᵢⱼ)** reduziert den Einfluss weiter entfernter Ziele. Dies ist die **Widerstandsfunktion**. In GOAT können Sie zwischen verschiedenen Widerstandstypen wählen: `Gauß`, `Linear`, `Exponential`, `Potenz` oder `Kumulativ`.
 
 und einstellen, wie stark die Entfernung die Erreichbarkeit beeinflusst, mit dem **Sensitivitätsparameter (β)**. Falls ein **Destinationspotenzial** enthalten ist, erhöht dies zusätzlich das Gewicht von Zielen mit höherer Kapazität oder Qualität (z. B. größere Geschäfte oder häufige Haltestellen).
 
@@ -340,7 +340,7 @@ Mit der von Ihnen gewählten *Sensitivität* ermöglicht die Gaußfunktion, dies
 </MathJax.Provider>
 </div>
 
-Anders als die übrigen Funktionen wendet die kumulative Funktion **keinen Distanzabfall** innerhalb des Reisezeitlimits **t̄** an: Jedes erreichbare Ziel zählt gleich. Sie verwendet daher den Parameter *Sensitivität (β)* nicht – sie zählt einfach die innerhalb des Limits erreichbaren Gelegenheiten.
+Anders als die übrigen Funktionen wendet die kumulative Funktion **keinen Distanzabfall** innerhalb des Reisezeitlimits **t̄** an: Jedes erreichbare Ziel zählt gleich. Sie verwendet daher den Parameter *Sensitivität (β)* nicht; sie zählt einfach die innerhalb des Limits erreichbaren Gelegenheiten.
 
 Reisezeiten werden in Minuten gemessen. Für ein maximales Reisezeitlimit von 30 Minuten werden Ziele, die weiter entfernt sind, als nicht erreichbar betrachtet und gehen nicht in die Berechnung ein. Der *Sensitivitätsparameter* bestimmt, wie sich die Erreichbarkeit mit zunehmender Reisezeit verändert. Da der *Sensitivitätsparameter* entscheidend für die Messung der Erreichbarkeit ist, können Sie diesen in GOAT einstellen. Das Diagramm zeigt, wie die Bereitschaft zu Fuß zu gehen mit zunehmender Reisezeit je nach gewählter Widerstandsfunktion und Sensitivitätswert (β) abnimmt.
 

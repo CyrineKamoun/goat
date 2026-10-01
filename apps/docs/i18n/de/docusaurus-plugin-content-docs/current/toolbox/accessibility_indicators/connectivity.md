@@ -108,7 +108,7 @@ Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Ein
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Wählen Sie ein <code>Referenzgebiet</code> — einen Polygon-Layer, der Ihr Interessengebiet (AOI) definiert, für das die Heatmap berechnet werden soll.</div>
+  <div class="content">Wählen Sie ein <code>Referenzgebiet</code>: einen Polygon-Layer, der Ihr Interessengebiet (AOI) definiert, für das die Heatmap berechnet werden soll.</div>
 </div>
 
 

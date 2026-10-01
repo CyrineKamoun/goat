@@ -52,7 +52,7 @@ import TabItem from '@theme/TabItem';
 
 ## HTML-Modus
 
-Für vollständige Kontrolle über das Popup-Design wechseln Sie unter `Inhalt` vom Modus **Einfach** in den **HTML**-Modus. Damit können Sie benutzerdefiniertes HTML und CSS schreiben, um ansprechende, individuell gestaltete Popups zu erstellen — mit Bildern, gestalteten Karten, eigenen Schriften und dynamischen Feldwerten.
+Für vollständige Kontrolle über das Popup-Design wechseln Sie unter `Inhalt` vom Modus **Einfach** in den **HTML**-Modus. Damit können Sie benutzerdefiniertes HTML und CSS schreiben, um ansprechende, individuell gestaltete Popups zu erstellen, mit Bildern, gestalteten Karten, eigenen Schriften und dynamischen Feldwerten.
 
 <div class="step">
   <div class="step-number">1</div>

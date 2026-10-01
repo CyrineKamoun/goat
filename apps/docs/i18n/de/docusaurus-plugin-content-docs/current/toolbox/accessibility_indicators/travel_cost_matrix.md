@@ -55,14 +55,14 @@ Die Reisekostenmatrix ist für die **Massenberechnung über viele Ursprünge und
 </TabItem>
 <TabItem value="flight" label="Luftlinie" className="tabItemBox">
 
-**Berechnet die geradlinige geodätische Entfernung zwischen jedem Ursprungs-Ziel-Paar.** Es wird kein Routing-Netzwerk verwendet. Für diesen Modus gibt es keine Konfigurationsfelder — wählen Sie ihn einfach aus und fahren Sie mit dem Abschnitt Eingabe fort.
+**Berechnet die geradlinige geodätische Entfernung zwischen jedem Ursprungs-Ziel-Paar.** Es wird kein Routing-Netzwerk verwendet. Für diesen Modus gibt es keine Konfigurationsfelder, wählen Sie ihn einfach aus und fahren Sie mit dem Abschnitt Eingabe fort.
 
 </TabItem>
 <TabItem value="pt" label="ÖPNV" className="tabItemBox">
 
 - Wählen Sie unter <code>ÖV-Modi wählen</code> die gewünschten Verkehrsmittel: Bus, Straßenbahn, Bahn, U-Bahn, Fähre, Seilbahn, Gondel und/oder Standseilbahn.
 - Wählen Sie den <code>Tag</code> (<code>Wochentag</code>, <code>Samstag</code> oder <code>Sonntag</code>) und legen Sie <code>Startzeit</code> und <code>Endzeit</code> für das Analysezeitfenster fest.
-- Legen Sie das <code>Reisezeitlimit (Min)</code> fest — die maximale Reisedauer, die berücksichtigt werden soll.
+- Legen Sie das <code>Reisezeitlimit (Min)</code> fest, also die maximale Reisedauer, die berücksichtigt werden soll.
 - Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um <code>Max. Umstiege</code>, <code>Zugangsart</code> und <code>Abgangsart</code> zu konfigurieren.
 
 </TabItem>
@@ -72,12 +72,12 @@ Die Reisekostenmatrix ist für die **Massenberechnung über viele Ursprünge und
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Wählen Sie unter <b>Startpunkte</b> Ihren <code>Startpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Startort ist) und legen Sie die <code>Herkunft-Bezeichnung</code> fest — die Spalte zur Identifikation der Startpunkte in der Ergebnismatrix.</div>
+  <div class="content">Wählen Sie unter <b>Startpunkte</b> Ihren <code>Startpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Startort ist) und legen Sie die <code>Herkunft-Bezeichnung</code> fest, also die Spalte zur Identifikation der Startpunkte in der Ergebnismatrix.</div>
 </div>
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Wählen Sie unter <b>Zielpunkte</b> Ihren <code>Zielpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Zielort ist) und legen Sie die <code>Ziel-Bezeichnung</code> fest — die Spalte zur Identifikation der Zielpunkte in der Ergebnismatrix.</div>
+  <div class="content">Wählen Sie unter <b>Zielpunkte</b> Ihren <code>Zielpunkte-Layer</code> (ein Punktlayer, bei dem jedes Feature ein Zielort ist) und legen Sie die <code>Ziel-Bezeichnung</code> fest, also die Spalte zur Identifikation der Zielpunkte in der Ergebnismatrix.</div>
 </div>
 
 ### Ergebnis-Layer
@@ -115,7 +115,7 @@ Nach Abschluss der Berechnung wird ein **Tabellen-Layer** zum Kartenpanel hinzug
 
 OD-Paare, die den maximalen Reisekostenwert überschreiten, werden aus der Ausgabe ausgeschlossen.
 
-Ein **Ziel**-Punktlayer wird ebenfalls hinzugefügt, der alle ursprünglichen Zielattribute um einen berechneten **travel_cost**-Wert für jeden Punkt ergänzt — die **minimalen Kosten von einem beliebigen Ursprung** zu diesem Ziel. Dadurch lässt sich der Layer leicht darstellen und gestalten und zeigt, wie gut jedes Ziel vom nächstgelegenen Ursprung aus erreichbar ist.
+Ein **Ziel**-Punktlayer wird ebenfalls hinzugefügt, der alle ursprünglichen Zielattribute um einen berechneten **travel_cost**-Wert für jeden Punkt ergänzt, die **minimalen Kosten von einem beliebigen Ursprung** zu diesem Ziel. Dadurch lässt sich der Layer leicht darstellen und gestalten und zeigt, wie gut jedes Ziel vom nächstgelegenen Ursprung aus erreichbar ist.
 
 :::tip Tipp
 Möchten Sie diese Matrix für weitere Analysen verwenden? Verwenden Sie die Ergebnistabelle als Eingabe für andere Tools in einem [Workflow](../../map/layers.md) oder exportieren Sie sie als CSV für externe Tools.
@@ -133,7 +133,7 @@ Reisekosten werden mit der **gleichen Routing-Engine wie das Einzugsgebiet-Tool*
 
 ### Grenzen für unbeschränkte Berechnungen
 
-Wenn kein maximales Reisekostenlimit gesetzt wird, gelten folgende Grenzen basierend auf der Begrenzungsrahmen-Diagonale aller Ursprungs-Ziel-Paare (die Luftliniendistanz über das kleinste Rechteck, das alle Ihre Ursprungs- und Zielpunkte enthält — also wie weit Ihre beiden am weitesten voneinander entfernten Punkte auseinanderliegen):
+Wenn kein maximales Reisekostenlimit gesetzt wird, gelten folgende Grenzen basierend auf der Begrenzungsrahmen-Diagonale aller Ursprungs-Ziel-Paare (die Luftliniendistanz über das kleinste Rechteck, das alle Ihre Ursprungs- und Zielpunkte enthält, also wie weit Ihre beiden am weitesten voneinander entfernten Punkte auseinanderliegen):
 
 | Verkehrsmittel | Maximale OD-Ausdehnung (Begrenzungsrahmen-Diagonale) |
 |---|---|

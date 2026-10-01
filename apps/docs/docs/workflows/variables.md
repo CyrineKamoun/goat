@@ -4,7 +4,7 @@ description: "Define String or Number workflow variables with default values, in
 
 # Variables
 
-**Workflow Variables** allow you to define reusable values that can be set at run time without editing the workflow. Use them to make your analysis flexible and shareable — collaborators can run the same workflow with different parameters without touching the workflow structure.
+**Workflow Variables** allow you to define reusable values that can be set at run time without editing the workflow. Use them to make your analysis flexible and shareable: collaborators can run the same workflow with different parameters without touching the workflow structure.
 
 Variables use the syntax `{{@variable_name}}` and can be inserted into most tool parameter fields.
 
@@ -16,8 +16,8 @@ Variables use the syntax `{{@variable_name}}` and can be inserted into most tool
 
 | Type | Use for |
 |---|---|
-| **String** | Text values — names, labels, filter criteria |
-| **Number** | Numeric values — distances, thresholds, counts |
+| **String** | Text values: names, labels, filter criteria |
+| **Number** | Numeric values: distances, thresholds, counts |
 
 ## Creating Variables
 
@@ -33,7 +33,7 @@ Variables use the syntax `{{@variable_name}}` and can be inserted into most tool
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Enter a <strong>Name</strong>. Names must start with a letter or underscore and contain only letters, digits, and underscores — no spaces (e.g. <code>buffer_distance</code>, not <code>buffer distance</code>).</div>
+  <div class="content">Enter a <strong>Name</strong>. Names must start with a letter or underscore and contain only letters, digits, and underscores, no spaces (e.g. <code>buffer_distance</code>, not <code>buffer distance</code>).</div>
 </div>
 
 <div class="step">

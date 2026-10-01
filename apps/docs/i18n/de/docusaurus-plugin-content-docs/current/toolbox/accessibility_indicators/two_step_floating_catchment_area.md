@@ -19,12 +19,12 @@ Die Heatmap 2SFCA (Two-Step Floating Catchment Area)-Methode **visualisiert räu
 
 ## 1. Erklärung
 
-Die 2SFCA-Methode misst die **räumliche Erreichbarkeit unter Berücksichtigung von Angebot (Kapazität der Einrichtungen) und Nachfrage (Bevölkerung)**. Im Gegensatz zu einfachen Angebot-Nachfrage-Verhältnissen pro Verwaltungseinheit berücksichtigt 2SFCA grenzüberschreitende Zugänge – Menschen können Einrichtungen in benachbarten Gebieten erreichen, und Einrichtungen versorgen Bevölkerungsgruppen über ihren eigenen Bezirk hinaus.
+Die 2SFCA-Methode misst die **räumliche Erreichbarkeit unter Berücksichtigung von Angebot (Kapazität der Einrichtungen) und Nachfrage (Bevölkerung)**. Im Gegensatz zu einfachen Angebot-Nachfrage-Verhältnissen pro Verwaltungseinheit berücksichtigt 2SFCA grenzüberschreitende Zugänge: Menschen können Einrichtungen in benachbarten Gebieten erreichen, und Einrichtungen versorgen Bevölkerungsgruppen über ihren eigenen Bezirk hinaus.
 Das Ergebnis ist ein **Verhältnis von Angebot zu Nachfrage auf der Ebene hexagonaler Rasterzellen**. Das Werkzeug arbeitet in zwei Schritten:
 
-1. **Schritt 1 — Kapazitäts-Nachfrage-Verhältnisse:** Für jeden Standort einer Einrichtung wird berechnet, wie viel Kapazität im Verhältnis zur Gesamtnachfrage (Bevölkerung) in ihrem Einzugsgebiet verfügbar ist. Dies ergibt ein Angebot-Nachfrage-Verhältnis pro Einrichtung.
+1. **Schritt 1: Kapazitäts-Nachfrage-Verhältnisse.** Für jeden Standort einer Einrichtung wird berechnet, wie viel Kapazität im Verhältnis zur Gesamtnachfrage (Bevölkerung) in ihrem Einzugsgebiet verfügbar ist. Dies ergibt ein Angebot-Nachfrage-Verhältnis pro Einrichtung.
 
-2. **Schritt 2 — Kumulative Erreichbarkeit:** Für jede Rasterzelle werden die Kapazitätsverhältnisse aller erreichbaren Einrichtungen summiert. Das Ergebnis zeigt, wie gut jeder Standort versorgt ist.
+2. **Schritt 2: Kumulative Erreichbarkeit.** Für jede Rasterzelle werden die Kapazitätsverhältnisse aller erreichbaren Einrichtungen summiert. Das Ergebnis zeigt, wie gut jeder Standort versorgt ist.
 
 Sie können den **Routing-Modus**, **Gelegenheits-Layer** (mit Kapazitätsfeld), **Bedarfs-Layer** (mit Bevölkerungsfeld), **Reisezeitlimits** konfigurieren und zwischen drei **2SFCA-Varianten** wählen.
 - Die **Gelegenheits-Layer enthalten Einrichtungsdaten** mit einem Kapazitätsattribut (z. B. Anzahl der Krankenhausbetten, Quadratmeter Verkaufsfläche, Schulplätze).
@@ -32,13 +32,13 @@ Sie können den **Routing-Modus**, **Gelegenheits-Layer** (mit Kapazitätsfeld),
 - Der **Bedarfs-Layer enthält Bevölkerungs- oder Nutzerdaten** (z. B. Einwohnerzahl, potenzielle Kunden), die die Nachfrage nach den Einrichtungen darstellen.
 
 - Der **2SFCA-Typ** steuert, wie die Distanzgewichtung angewendet wird:
-  - **Standard 2SFCA** verwendet binäre Einzugsgebiete (drinnen oder draußen) – alle Standorte innerhalb des Reisezeitlimits werden gleich gewichtet, unabhängig von ihrer tatsächlichen Entfernung zu den Einrichtungen. Dies liefert klare, einfache Angebot-Nachfrage-Verhältnisse.
+  - **Standard 2SFCA** verwendet binäre Einzugsgebiete (drinnen oder draußen): Alle Standorte innerhalb des Reisezeitlimits werden gleich gewichtet, unabhängig von ihrer tatsächlichen Entfernung zu den Einrichtungen. Dies liefert klare, einfache Angebot-Nachfrage-Verhältnisse.
   - **Enhanced 2SFCA (E2SFCA)** gewichtet mittels einer Widerstandsfunktion in beiden Berechnungsschritten, wodurch ein realistischer Distanzabfall entsteht, bei dem näher gelegene Einrichtungen stärker zur Erreichbarkeit beitragen als entfernte.
   - **Modified 2SFCA (M2SFCA)** verwendet quadrierte Widerstandsgewichte im zweiten Schritt, was eine noch stärkere Bevorzugung von Nähe erzeugt. Diese Variante betont stark nahegelegene Einrichtungen, berücksichtigt aber immer noch entfernte Optionen, was ideal ist, wenn Reisekomfort entscheidend ist.
 
 :::tip
 
-**Wesentlicher Unterschied:** Im Gegensatz zur *Gravitationsbasierten Heatmap*, die die allgemeine Erreichbarkeit von Zielen misst, modelliert die *2SFCA Heatmap* explizit das **Gleichgewicht von Angebot und Nachfrage** – und zeigt, wo die Kapazität im Verhältnis zur bedürftigen Bevölkerung ausreichend oder unzureichend ist.
+**Wesentlicher Unterschied:** Im Gegensatz zur *Gravitationsbasierten Heatmap*, die die allgemeine Erreichbarkeit von Zielen misst, modelliert die *2SFCA Heatmap* explizit das **Gleichgewicht von Angebot und Nachfrage** und zeigt, wo die Kapazität im Verhältnis zur bedürftigen Bevölkerung ausreichend oder unzureichend ist.
 
 :::
 
@@ -110,7 +110,7 @@ Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Ein
 
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Wählen Sie ein <code>Referenzgebiet</code> — einen Polygon-Layer, der Ihr Untersuchungsgebiet darstellt. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; nicht erreichbare Zellen erhalten den Wert <code>NULL</code> und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
+  <div class="content">Wählen Sie ein <code>Referenzgebiet</code>: einen Polygon-Layer, der Ihr Untersuchungsgebiet darstellt. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; nicht erreichbare Zellen erhalten den Wert <code>NULL</code> und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
 </div>
 
 <div class="step">
@@ -128,7 +128,7 @@ Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Ein
 
 <TabItem value="twosfca" label="Standard 2SFCA" default className="tabItemBox">
 
-Die Standard 2SFCA-Methode verwendet **binäre Einzugsgebiete**: Eine Einrichtung versorgt einen Bevölkerungsstandort entweder (wenn innerhalb des Reisezeitlimits) oder nicht. Es gibt keine Distanzgewichtung – alle Standorte innerhalb des Einzugsgebiets werden gleich behandelt.
+Die Standard 2SFCA-Methode verwendet **binäre Einzugsgebiete**: Eine Einrichtung versorgt einen Bevölkerungsstandort entweder (wenn innerhalb des Reisezeitlimits) oder nicht. Es gibt keine Distanzgewichtung: Alle Standorte innerhalb des Einzugsgebiets werden gleich behandelt.
 
 Dies ist die einfachste Variante und eignet sich gut, wenn Sie ein direktes Angebot-Nachfrage-Verhältnis wünschen.
 
@@ -136,7 +136,7 @@ Dies ist die einfachste Variante und eignet sich gut, wenn Sie ein direktes Ange
 
 <TabItem value="e2sfca" label="Enhanced 2SFCA (E2SFCA)" className="tabItemBox">
 
-Die Enhanced 2SFCA-Methode fügt eine **Reisewiderstandsgewichtung** unter Verwendung einer Widerstandsfunktion hinzu. In beiden Schritten werden Interaktionen danach gewichtet, wie weit Einrichtung und Bevölkerung voneinander entfernt sind – nähere Standorte erhalten ein höheres Gewicht. Dies führt zu realistischeren Ergebnissen und spiegelt wider, dass Menschen eher nahegelegene Einrichtungen nutzen.
+Die Enhanced 2SFCA-Methode fügt eine **Reisewiderstandsgewichtung** unter Verwendung einer Widerstandsfunktion hinzu. In beiden Schritten werden Interaktionen danach gewichtet, wie weit Einrichtung und Bevölkerung voneinander entfernt sind: Nähere Standorte erhalten ein höheres Gewicht. Dies führt zu realistischeren Ergebnissen und spiegelt wider, dass Menschen eher nahegelegene Einrichtungen nutzen.
 
 Erfordert die Auswahl einer **Widerstandsfunktion** und eines **Sensitivitätswertes**.
 
@@ -185,7 +185,7 @@ Berechnet Gewichte unter Verwendung einer Potenzfunktion. Der Sensitivitätspara
 
 <TabItem value="cumulative" label="Kumulativ" className="tabItemBox">
 
-Wendet innerhalb des Reisezeitlimits ein volles Gewicht von 1 auf jede Einrichtung an und 0 darüber hinaus, ohne Distanzabfall. Anders als die übrigen Funktionen verwendet sie den Sensitivitätsparameter nicht – alle erreichbaren Einrichtungen zählen gleich. Details siehe [Technische Details](#berechnung).
+Wendet innerhalb des Reisezeitlimits ein volles Gewicht von 1 auf jede Einrichtung an und 0 darüber hinaus, ohne Distanzabfall. Anders als die übrigen Funktionen verwendet sie den Sensitivitätsparameter nicht: Alle erreichbaren Einrichtungen zählen gleich. Details siehe [Technische Details](#berechnung).
 
 </TabItem>
 
@@ -200,7 +200,7 @@ Wendet innerhalb des Reisezeitlimits ein volles Gewicht von 1 auf jede Einrichtu
 
 <div class="step">
   <div class="step-number">10</div>
-  <div class="content">Wählen Sie das <code>Nachfragefeld</code> – ein numerisches Feld aus Ihrem Bedarfs-Layer, das die Anzahl potenzieller Nutzer darstellt (z. B. Bevölkerung, Anzahl der Haushalte).</div>
+  <div class="content">Wählen Sie das <code>Nachfragefeld</code>: ein numerisches Feld aus Ihrem Bedarfs-Layer, das die Anzahl potenzieller Nutzer darstellt (z. B. Bevölkerung, Anzahl der Haushalte).</div>
 </div>
 
 ### Gelegenheiten
@@ -220,8 +220,8 @@ Wendet innerhalb des Reisezeitlimits ein volles Gewicht von 1 auf jede Einrichtu
   <div class="content">
   Wählen Sie einen <code>Potenzialtyp</code>, um festzulegen, wie die Kapazität jeder Einrichtung bestimmt wird:
     <ul>
-      <li><b>Constant</b> — alle Einrichtungen haben die gleiche Kapazität. Geben Sie einen numerischen Wert ein (Standard: 1.0).</li>
-      <li><b>Field</b> — verwenden Sie ein numerisches Feld aus dem <i>Eingabe-Layer</i> als Kapazität (z. B. Anzahl der Betten, Sitze oder Quadratmeter).</li>
+      <li><b>Constant</b>: alle Einrichtungen haben die gleiche Kapazität. Geben Sie einen numerischen Wert ein (Standard: 1.0).</li>
+      <li><b>Field</b>: verwenden Sie ein numerisches Feld aus dem <i>Eingabe-Layer</i> als Kapazität (z. B. Anzahl der Betten, Sitze oder Quadratmeter).</li>
     </ul>
   </div>
 </div>
@@ -244,7 +244,7 @@ Benötigen Sie Hilfe bei der Auswahl einer geeigneten Reisezeitgrenze für versc
 
 <div class="step">
   <div class="step-number">16</div>
-  <div class="content">Optional können Sie unter <code>Erweiterte Optionen</code> ein <code>Referenzgebiet</code> auswählen — einen Polygon-Layer, der das vollständige Untersuchungsgebiet definiert. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; Zellen außerhalb der berechneten Erreichbarkeit werden als <code>NULL</code> dargestellt und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
+  <div class="content">Optional können Sie unter <code>Erweiterte Optionen</code> ein <code>Referenzgebiet</code> auswählen, also einen Polygon-Layer, der das vollständige Untersuchungsgebiet definiert. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; Zellen außerhalb der berechneten Erreichbarkeit werden als <code>NULL</code> dargestellt und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
 </div>
 
 ### Ergebnis-Layer
@@ -261,7 +261,7 @@ Benötigen Sie Hilfe bei der Auswahl einer geeigneten Reisezeitgrenze für versc
 
 ### Ergebnisse
 
-Sobald die Berechnung abgeschlossen ist, wird ein Ergebnis-Layer zur Karte hinzugefügt. Dieser *Heatmap 2SFCA*-Layer enthält ein farbcodiertes hexagonales Raster, wobei jede Zelle den berechneten Erreichbarkeitswert anzeigt – das Verhältnis von Angebot zu Nachfrage an diesem Standort.
+Sobald die Berechnung abgeschlossen ist, wird ein Ergebnis-Layer zur Karte hinzugefügt. Dieser *Heatmap 2SFCA*-Layer enthält ein farbcodiertes hexagonales Raster, wobei jede Zelle den berechneten Erreichbarkeitswert anzeigt, also das Verhältnis von Angebot zu Nachfrage an diesem Standort.
 
 - **Höhere Werte** weisen auf eine bessere Erreichbarkeit hin: Im Verhältnis zur lokalen Nachfrage ist mehr Angebotskapazität verfügbar.
 - **Niedrigere Werte** weisen auf unterversorgte Gebiete hin: Die Bevölkerung übersteigt die verfügbare Kapazität der erreichbaren Einrichtungen.
@@ -286,7 +286,7 @@ Möchten Sie visuell ansprechende Karten erstellen, die eine klare Geschichte er
 
 Das folgende Beispiel veranschaulicht, wie die 2SFCA-Methode für jeden Schritt funktioniert.
 
-- **Schritt 1** berechnet ein Kapazitätsverhältnis für jedes Ziel: `R_j = S_j / Σ D_k` – die Kapazität des Ziels geteilt durch die Gesamtbevölkerung in seinem Einzugsgebiet. Ein Ziel mit 100 Betten, das 100 Personen versorgt, hat ein Verhältnis von 1.
+- **Schritt 1** berechnet ein Kapazitätsverhältnis für jedes Ziel: `R_j = S_j / Σ D_k`, also die Kapazität des Ziels geteilt durch die Gesamtbevölkerung in seinem Einzugsgebiet. Ein Ziel mit 100 Betten, das 100 Personen versorgt, hat ein Verhältnis von 1.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
 <img src={require('/img/toolbox/accessibility_indicators/heatmaps/two_step_floating_catchment_area/step1_2sfca.webp').default} alt="Heatmap 2SFCA Result in GOAT" style={{ maxHeight: "auto", maxWidth: "80%"}}/>
@@ -317,7 +317,7 @@ Wenn mehrere Kanten (Straßen) des Straßennetzes eine sechseckige Zelle schneid
 
 Die 2SFCA-Methode berechnet die Erreichbarkeit in zwei Schritten:
 
-#### Schritt 1 — Kapazitäts-Nachfrage-Verhältnis
+#### Schritt 1: Kapazitäts-Nachfrage-Verhältnis
 
 Für jeden Einrichtungsstandort *j* wird das Verhältnis seiner Kapazität zur Gesamtnachfrage in seinem Einzugsgebiet berechnet:
 
@@ -335,7 +335,7 @@ Wobei:
 - *t<sub>0</sub>* = Reisezeitlimit (maximales Einzugsgebiet)
 - *f(t<sub>kj</sub>)* = Widerstandsfunktion (Distanzgewicht)
 
-#### Schritt 2 — Kumulative Erreichbarkeit
+#### Schritt 2: Kumulative Erreichbarkeit
 
 Für jede Rasterzelle *i* werden die Kapazitäts-Nachfrage-Verhältnisse aller erreichbaren Einrichtungen summiert:
 
@@ -374,7 +374,7 @@ Die verschiedenen Berechnungsmethoden verändern, wie Distanz wahrgenommen und g
 
 - Die **Enhanced 2SFCA** führt eine **Reisewiderstandsgewichtung** ein, die eine Differenzierung der Erreichbarkeit basierend auf der Distanz erzeugt, mit einer **höheren Erreichbarkeit** (Wert von 1,1) für nähere Zellen. Zellen, die gleich weit von Einrichtungen entfernt sind, erhalten jedoch unabhängig von der absoluten Distanz dieselbe Erreichbarkeit (z. B. erhalten zwei Zellen, die beide 1 Minute entfernt sind, oder beide 2 Minuten entfernt sind, alle **1**).
 
-- Die **Modified 2SFCA** wendet in Schritt 2 **quadrierte Widerstandsgewichte** an, was stärkere Distanzstrafen mit Werten wie **0,9** und **0,5** erzeugt (verglichen mit 1,1 und 0,9 bei E2SFCA für ähnliche Positionen). Sie berücksichtigt im Gegensatz zu E2SFCA die absolute Distanz – zum Beispiel erhalten zwei Zellen, die beide 2 Minuten entfernt sind, eine geringere Erreichbarkeit (**0,6**) als zwei Zellen, die beide 1 Minute entfernt sind (**0,8**).
+- Die **Modified 2SFCA** wendet in Schritt 2 **quadrierte Widerstandsgewichte** an, was stärkere Distanzstrafen mit Werten wie **0,9** und **0,5** erzeugt (verglichen mit 1,1 und 0,9 bei E2SFCA für ähnliche Positionen). Sie berücksichtigt im Gegensatz zu E2SFCA die absolute Distanz. Zum Beispiel erhalten zwei Zellen, die beide 2 Minuten entfernt sind, eine geringere Erreichbarkeit (**0,6**) als zwei Zellen, die beide 1 Minute entfernt sind (**0,8**).
 
 **Die Wahl der geeigneten Variante** hängt von Ihren spezifischen Analysezielen ab und davon, wie empfindlich Ihre Zielbevölkerung auf Reisedistanzen reagiert.
 

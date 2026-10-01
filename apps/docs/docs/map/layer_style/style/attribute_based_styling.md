@@ -5,7 +5,7 @@ sidebar_position: 2
 
 # Attribute-based Styling
 
-**You can style layers based on data attributes to easily identify differences and trends.** Each visualization aspect—Fill Color, Stroke Color, Stroke Width, Custom Marker, and Point Settings—can be styled by any field in your layer's data.
+**You can style layers based on data attributes to easily identify differences and trends.** Each visualization aspect (Fill Color, Stroke Color, Stroke Width, Custom Marker, and Point Settings) can be styled by any field in your layer's data.
 
 <iframe width="100%" height="500" src="https://www.youtube.com/embed/cLIPMCOu4FQ?si=aydSJN_Pf0fusO9x" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
@@ -102,7 +102,7 @@ import TabItem from '@theme/TabItem';
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Click <code>Ordinal Markers</code> and choose the marker for each category value — pick from the <code>Library</code> or upload your own under <code>Custom</code>.</div>
+  <div class="content">Click <code>Ordinal Markers</code> and choose the marker for each category value: pick from the <code>Library</code> or upload your own under <code>Custom</code>.</div>
 </div>
 
 <div class="step">

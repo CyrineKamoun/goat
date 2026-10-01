@@ -12,7 +12,7 @@ import TabItem from '@theme/TabItem';
 <iframe width="674" height="378" src="https://www.youtube.com/embed/GA_6PbhAA6k?si=4mA2OdTPGCl7iVRi&amp;start=46" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 </div>
 
-Einzugsgebiet zeigt **wie weit Menschen innerhalb einer bestimmten Reisezeit oder Entfernung, mit einem oder mehreren Verkehrsmitteln reisen können** — mit erweiterten Ausgabeformen, anpassbaren Schrittgrößen und zusätzlichen Einstellungen für den öffentlichen Verkehr.
+Einzugsgebiet zeigt **wie weit Menschen innerhalb einer bestimmten Reisezeit oder Entfernung, mit einem oder mehreren Verkehrsmitteln reisen können**, mit erweiterten Ausgabeformen, anpassbaren Schrittgrößen und zusätzlichen Einstellungen für den öffentlichen Verkehr.
 
 ## 1. Erklärung
 
@@ -22,13 +22,13 @@ Einzugsgebiet bietet folgende zusätzliche Funktionen:
 
 **Für alle Routing-Modi:**
 
-- **Anpassbare Schrittgrößen** — jeden Isochronenschritt individuell definieren (z. B. 5, 10, 20, 30 Minuten) anstatt gleichmäßiger Abstände.
-- **Punktraster-Ausgabeform** — eine neue Ausgabeoption, bei der das Einzugsgebiet als Raster einzelner Punkte dargestellt wird, die jeweils den genauen Reisekostenwert anzeigen.
+- **Anpassbare Schrittgrößen**: jeden Isochronenschritt individuell definieren (z. B. 5, 10, 20, 30 Minuten) anstatt gleichmäßiger Abstände.
+- **Punktraster-Ausgabeform**: eine neue Ausgabeoption, bei der das Einzugsgebiet als Raster einzelner Punkte dargestellt wird, die jeweils den genauen Reisekostenwert anzeigen.
 
 **Nur für den öffentlichen Verkehr:**
 
-- **Maximale Anzahl an Umstiegen** — begrenzt die Anzahl der ÖV-Verbindungen pro Fahrt.
-- **Zugangsart und Abgangsart** — konfiguriert, wie Nutzer zu ÖV-Haltestellen und von diesen weg gelangen (zu Fuß, mit dem Fahrrad, mit dem Pedelec oder mit dem Auto).
+- **Maximale Anzahl an Umstiegen**: begrenzt die Anzahl der ÖV-Verbindungen pro Fahrt.
+- **Zugangsart und Abgangsart**: konfiguriert, wie Nutzer zu ÖV-Haltestellen und von diesen weg gelangen (zu Fuß, mit dem Fahrrad, mit dem Pedelec oder mit dem Auto).
 
 :::info
 Die Berechnung der Einzugsgebiete ist für `Zu Fuß`, `Fahrrad`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns gerne](https://plan4better.de/de/contact/). Sie können auch [ein eigenes Routing-Netz importieren](../../data/builtin_datasets.md#eigene-netze-importieren), um andere Regionen zu analysieren.
@@ -110,19 +110,19 @@ Geeignete Reisezeitlimits nach Einrichtungstyp finden Sie im [Standortwerkzeug](
 
 #### Form der Geometrien
 
-*(Nur für Zu Fuß, Fahrrad und Pedelec — sichtbar wenn die Form des Einzugsgebiets auf Polygon gesetzt ist)*
+*(Nur für Zu Fuß, Fahrrad und Pedelec, sichtbar wenn die Form des Einzugsgebiets auf Polygon gesetzt ist)*
 
 Wählen Sie, wie die Polygone bei mehreren Startpunkten geformt werden:
 
-- **Zusammengefasst über Startpunkte** *(Standard)* — alle Startpunkte werden pro Schritt zu einem gemeinsamen Einzugsgebietspolygon zusammengeführt.
-- **Getrennt nach Startpunkt** — jeder Startpunkt erhält pro Schritt ein eigenes individuelles Einzugsgebietspolygon.
+- **Zusammengefasst über Startpunkte** *(Standard)*: alle Startpunkte werden pro Schritt zu einem gemeinsamen Einzugsgebietspolygon zusammengeführt.
+- **Getrennt nach Startpunkt**: jeder Startpunkt erhält pro Schritt ein eigenes individuelles Einzugsgebietspolygon.
 
 #### Darstellung der Schritte
 
 Wählen Sie, wie die Isochronen-Schritte dargestellt werden:
 
-- **Getrennte Schritte** — jeder Schritt zeigt nur das Gebiet, das *zwischen* diesem und dem vorherigen Schritt erreichbar ist. Zum Beispiel zeigt bei Schritten bei 5, 10 und 15 Minuten die 10-Minuten-Zone nur das Gebiet, das zwischen 5 und 10 Minuten erreichbar ist.
-- **Kumulative Schritte** — jeder Schritt zeigt das *gesamte bis zu diesem Reisekostenwert erreichbare Gebiet*. Zum Beispiel umfasst die 10-Minuten-Zone alles, was innerhalb von 10 Minuten erreichbar ist, einschließlich der 5-Minuten-Zone.
+- **Getrennte Schritte**: jeder Schritt zeigt nur das Gebiet, das *zwischen* diesem und dem vorherigen Schritt erreichbar ist. Zum Beispiel zeigt bei Schritten bei 5, 10 und 15 Minuten die 10-Minuten-Zone nur das Gebiet, das zwischen 5 und 10 Minuten erreichbar ist.
+- **Kumulative Schritte**: jeder Schritt zeigt das *gesamte bis zu diesem Reisekostenwert erreichbare Gebiet*. Zum Beispiel umfasst die 10-Minuten-Zone alles, was innerhalb von 10 Minuten erreichbar ist, einschließlich der 5-Minuten-Zone.
 
 <p></p>
 
@@ -136,19 +136,19 @@ Für den öffentlichen Verkehr können Sie über die Erweiterten Optionen die <c
 
 Wählen Sie, wie die Isochronen-Schritte dargestellt werden:
 
-- **Getrennte Schritte** — jeder Schritt zeigt nur das Gebiet, das *zwischen* diesem und dem vorherigen Schritt erreichbar ist.
-- **Kumulative Schritte** — jeder Schritt zeigt das *gesamte bis zu diesem Reisekostenwert erreichbare Gebiet*.
+- **Getrennte Schritte**: jeder Schritt zeigt nur das Gebiet, das *zwischen* diesem und dem vorherigen Schritt erreichbar ist.
+- **Kumulative Schritte**: jeder Schritt zeigt das *gesamte bis zu diesem Reisekostenwert erreichbare Gebiet*.
 
 #### Maximale Umstiege
 
-Legen Sie die `Maximalen Umstiege` fest, um die Anzahl der zulässigen ÖV-Verbindungen pro Fahrt zu begrenzen. Beispiel: Bei Wert `1` werden nur Fahrten mit maximal einem Umstieg berücksichtigt — Direktverbindungen und Fahrten mit einem Wechsel.
+Legen Sie die `Maximalen Umstiege` fest, um die Anzahl der zulässigen ÖV-Verbindungen pro Fahrt zu begrenzen. Beispiel: Bei Wert `1` werden nur Fahrten mit maximal einem Umstieg berücksichtigt: Direktverbindungen und Fahrten mit einem Wechsel.
 
 #### Zugangsart & Abgangsart
 
 Konfigurieren Sie, wie Nutzer **zu** und **von** ÖV-Haltestellen gelangen:
 
-- **Zugangsart** — Verkehrsmittel zur Haltestelle (Zu Fuß, Fahrrad, Pedelec, Auto).
-- **Abgangsart** — Verkehrsmittel von der Haltestelle zum Ziel (Zu Fuß, Fahrrad, Pedelec, Auto).
+- **Zugangsart**: Verkehrsmittel zur Haltestelle (Zu Fuß, Fahrrad, Pedelec, Auto).
+- **Abgangsart**: Verkehrsmittel von der Haltestelle zum Ziel (Zu Fuß, Fahrrad, Pedelec, Auto).
 
 Für jeden Modus können Sie die **maximale Reisezeit oder Entfernung** sowie die **Reisegeschwindigkeit** konfigurieren. Beispielsweise können Sie einen Radfahrer modellieren, der mit 15 km/h bis zu 10 Minuten zur Bahnstation fährt.
 
@@ -191,8 +191,8 @@ Die Berechnungszeit variiert je nach Einstellungen. Den Fortschritt können Sie 
 
 Nach Abschluss der Berechnung werden die resultierenden Layer zur Karte hinzugefügt:
 
-- **Einzugsgebiet** — die berechneten Isochronen in der gewählten Form (Polygon, Netzwerk, Sechseckiges Gitter oder Punktraster). Durch Klick auf ein Feature kann das Attribut **travel_cost** eingesehen werden, das die Reisezeit (Minuten) oder Entfernung (Meter) anzeigt.
-- **Startpunkte** — ein Punktlayer mit den ausgewählten Startpositionen (wird nur erstellt, wenn Startpunkte auf der Karte gesetzt wurden, nicht bei Verwendung eines vorhandenen Layers).
+- **Einzugsgebiet**: die berechneten Isochronen in der gewählten Form (Polygon, Netzwerk, Sechseckiges Gitter oder Punktraster). Durch Klick auf ein Feature kann das Attribut **travel_cost** eingesehen werden, das die Reisezeit (Minuten) oder Entfernung (Meter) anzeigt.
+- **Startpunkte**: ein Punktlayer mit den ausgewählten Startpositionen (wird nur erstellt, wenn Startpunkte auf der Karte gesetzt wurden, nicht bei Verwendung eines vorhandenen Layers).
 
 Der Ergebnislayer wird automatisch mit einer Farbskala von der kürzesten bis zur längsten Reisekostenstufe eingefärbt.
 
@@ -209,14 +209,14 @@ Der Ergebnislayer wird automatisch mit einer Farbskala von der kürzesten bis zu
 
 ### Zeitfenster
 
-Für den öffentlichen Verkehr wird das Einzugsgebiet über ein **Zeitfenster** berechnet – definiert durch einen Wochentag sowie eine Start- und Endzeit – anstatt für eine einzelne Abfahrt. Die Engine wertet **jede Abfahrtsminute** innerhalb dieses Zeitfensters aus und behält die **schnellste** Verbindung zu jedem erreichbaren Ort. Das Ergebnis ist kein Durchschnitt über die Abfahrten, sondern der beste Fall unter ihnen, wodurch das größtmögliche Einzugsgebiet entsteht. Eine Verbindung gilt ausschließlich anhand ihrer Startzeit als innerhalb des Zeitfensters liegend, unabhängig von ihrer Endzeit oder Gesamtdauer.
+Für den öffentlichen Verkehr wird das Einzugsgebiet über ein **Zeitfenster** berechnet (definiert durch einen Wochentag sowie eine Start- und Endzeit) anstatt für eine einzelne Abfahrt. Die Engine wertet **jede Abfahrtsminute** innerhalb dieses Zeitfensters aus und behält die **schnellste** Verbindung zu jedem erreichbaren Ort. Das Ergebnis ist kein Durchschnitt über die Abfahrten, sondern der beste Fall unter ihnen, wodurch das größtmögliche Einzugsgebiet entsteht. Eine Verbindung gilt ausschließlich anhand ihrer Startzeit als innerhalb des Zeitfensters liegend, unabhängig von ihrer Endzeit oder Gesamtdauer.
 
 ### Visualisierung
 
 Der verwendete Algorithmus zur Ableitung der Einzugsgebietsform hängt vom Routing-Modus ab:
 
-- **Zu Fuß, Fahrrad, Pedelec und ÖPNV** — die Form wird aus dem Routing-Raster mithilfe des [Marching-Squares-Konturlinien-Algorithmus](https://de.wikipedia.org/wiki/Marching_Squares "Wikipedia: Marching Squares") abgeleitet, einem Computergraphik-Algorithmus, der zweidimensionale Konturlinien aus einem rechteckigen Wertearray erzeugt ([de Queiroz Neto et al. 2016](#6-referenzen)). Dieser Algorithmus transformiert das Routing-Raster von einem 2D-Array in glatte Polygonkonturen für die Visualisierung und räumliche Analyse.
-- **Auto** — die Form wird mithilfe der DuckDB-Funktion [`ST_ConcaveHull`](https://duckdb.org/docs/current/core_extensions/spatial/functions#st_concavehull) abgeleitet, die sich eng um die erreichbaren Punkte legt, um das Einzugsgebiets-Polygon zu erzeugen. Es wird ein dynamisches Konkavitätsverhältnis basierend auf der Anzahl erreichter Knoten verwendet: `0,5` bei weniger als 10.000 Knoten, `0,3` bei weniger als 50.000 und `0,2` andernfalls — niedrigere Werte erzeugen engere, stärker konkave Formen bei großen Einzugsgebieten, höhere Werte glattere Konturen bei kleinen.
+- **Zu Fuß, Fahrrad, Pedelec und ÖPNV**: die Form wird aus dem Routing-Raster mithilfe des [Marching-Squares-Konturlinien-Algorithmus](https://de.wikipedia.org/wiki/Marching_Squares "Wikipedia: Marching Squares") abgeleitet, einem Computergraphik-Algorithmus, der zweidimensionale Konturlinien aus einem rechteckigen Wertearray erzeugt ([de Queiroz Neto et al. 2016](#6-referenzen)). Dieser Algorithmus transformiert das Routing-Raster von einem 2D-Array in glatte Polygonkonturen für die Visualisierung und räumliche Analyse.
+- **Auto**: die Form wird mithilfe der DuckDB-Funktion [`ST_ConcaveHull`](https://duckdb.org/docs/current/core_extensions/spatial/functions#st_concavehull) abgeleitet, die sich eng um die erreichbaren Punkte legt, um das Einzugsgebiets-Polygon zu erzeugen. Es wird ein dynamisches Konkavitätsverhältnis basierend auf der Anzahl erreichter Knoten verwendet: `0,5` bei weniger als 10.000 Knoten, `0,3` bei weniger als 50.000 und `0,2` andernfalls. Niedrigere Werte erzeugen engere, stärker konkave Formen bei großen Einzugsgebieten, höhere Werte glattere Konturen bei kleinen.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
   <img src={require('/img/toolbox/accessibility_indicators/catchments/wiki.webp').default} alt="Marching-Squares-Illustration" style={{ maxHeight: "400px", maxWidth: "400px", objectFit: "contain"}}/>

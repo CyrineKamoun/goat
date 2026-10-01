@@ -52,7 +52,7 @@ import TabItem from '@theme/TabItem';
 
 ## HTML mode
 
-For full control over the popup design, switch from **Simple** to **HTML** mode under `Content`. This lets you write custom HTML and CSS to create rich, branded popups — with images, styled cards, custom fonts, and dynamic field values.
+For full control over the popup design, switch from **Simple** to **HTML** mode under `Content`. This lets you write custom HTML and CSS to create rich, branded popups, with images, styled cards, custom fonts, and dynamic field values.
 
 <div class="step">
   <div class="step-number">1</div>

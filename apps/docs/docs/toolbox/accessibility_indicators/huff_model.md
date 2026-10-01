@@ -20,13 +20,13 @@ The Huff Model **predicts the probability of consumers in a reference area visit
 ## 1. Explanation
 
 The Huff Model is a **spatial interaction model that estimates how demand (e.g., customers, residents) is distributed among competing supply locations (e.g., stores, facilities)**. 
-The model works on a simple principle: **a location's probability of being chosen depends on its attractiveness relative to all competing locations, weighted by travel time**. A large, nearby shopping center will capture more demand than a small, distant one — but the exact split depends on the balance of attractiveness and distance for all available options.
+The model works on a simple principle: **a location's probability of being chosen depends on its attractiveness relative to all competing locations, weighted by travel time**. A large, nearby shopping center will capture more demand than a small, distant one, but the exact split depends on the balance of attractiveness and distance for all available options.
 
 The result is a **probability score for each supply location**, representing the share of total demand it captures from the reference area. This enables direct comparison of how well different facilities compete for the same customer base.
 
 You can configure the routing type, opportunity layers (with capacity fields), demand layer (with population field), reference area, travel time limits, and calibrate your model.
 
-- **Reference area** — A polygon defining the study area. Only demand and opportunities within this area are considered.
+- **Reference area**: A polygon defining the study area. Only demand and opportunities within this area are considered.
 
 - The **Opportunity layers contain facility data** with an attractivity attribute (e.g., number of hospital beds, square meters of retail space, school seats).
 
@@ -34,7 +34,7 @@ You can configure the routing type, opportunity layers (with capacity fields), d
 
 
 
-**Key difference:** Unlike the Heatmaps, which visualize accessibility per grid cell, the *Huff Model* produces a **probability per supply location** — showing what share of total demand each facility captures.
+**Key difference:** Unlike the Heatmaps, which visualize accessibility per grid cell, the *Huff Model* produces a **probability per supply location**, showing what share of total demand each facility captures.
 
 :::info
 
@@ -111,7 +111,7 @@ Huff Model computation is available across **over 30 European countries** for `W
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Select your <code>Reference Area</code> — a polygon layer defining the study area boundary. Only demand and opportunities within this area are included in the analysis.</div>
+  <div class="content">Select your <code>Reference Area</code>: a polygon layer defining the study area boundary. Only demand and opportunities within this area are included in the analysis.</div>
 </div>
 
 :::tip Hint
@@ -129,7 +129,7 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 
 <div class="step">
   <div class="step-number">8</div>
-  <div class="content">Choose the <code>Demand Field</code> — a numeric field from your demand layer representing the number of potential consumers (e.g., population, number of households).</div>
+  <div class="content">Choose the <code>Demand Field</code>: a numeric field from your demand layer representing the number of potential consumers (e.g., population, number of households).</div>
 </div>
 
 ### Opportunities
@@ -141,7 +141,7 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 
 <div class="step">
   <div class="step-number">10</div>
-  <div class="content">Choose the <code>Attractivity Field</code> — a numeric field representing the attractiveness of each facility (e.g., floor area in m², number of products, quality score).</div>
+  <div class="content">Choose the <code>Attractivity Field</code>: a numeric field representing the attractiveness of each facility (e.g., floor area in m², number of products, quality score).</div>
 </div>
 
 ### Advanced Configuration
@@ -186,7 +186,7 @@ Ideally, collect data on actual customer visits or market shares to estimate opt
 
 Once the calculation is complete, a result layer will be added to the map. Each feature in the result layer represents a **supply location** with its computed market share/probability expressed in percent.
 
-- **Higher probability** values indicate that a facility captures a larger share of the total demand — it is more competitive relative to alternatives.
+- **Higher probability** values indicate that a facility captures a larger share of the total demand, so it is more competitive relative to alternatives.
 - **Lower probability** values indicate that a facility captures less demand, either because it is less attractive, farther away, or faces strong competition from nearby alternatives.
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
