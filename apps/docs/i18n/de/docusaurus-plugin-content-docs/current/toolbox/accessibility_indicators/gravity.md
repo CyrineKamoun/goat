@@ -179,7 +179,7 @@ Benötigen Sie Hilfe bei der Wahl eines geeigneten Reisezeitlimits für verschie
     <ul>
       <li><b>Constant</b> — alle Ziele erhalten das gleiche Gewicht. Geben Sie einen numerischen Wert ein (Standard: 1.0).</li>
       <li><b>Field</b> — verwenden Sie ein numerisches Feld aus dem <i>Eingabe-Layer</i> als Gewicht (z. B. Anzahl der Abfahrten, Sitzplätze oder Kapazität).</li>
-      <li><b>Expression</b>: nur bei Polygon-Layern verfügbar. Wählen Sie unter <code>Potenzialausdruck</code> <b>Area</b> (in Quadratmetern) oder <b>Perimeter</b> (in Metern), um jedes Polygon nach seiner Größe zu gewichten, sodass ein großer Park mehr zählt als ein kleiner.</li>
+      <li><b>Expression</b>: nur bei Polygon-Layern verfügbar. Wählen Sie unter <code>Potenzialausdruck</code> <b>Area</b> oder <b>Perimeter</b>, um jedes Polygon nach seiner Größe zu gewichten, sodass ein großer Park mehr zählt als ein kleiner. Beide werden in der Webkarten-Projektion gemessen und eignen sich daher als relative Gewichte innerhalb Ihres Untersuchungsgebiets, nicht als exakte Quadratmeter oder Meter.</li>
     </ul>
   </div>
 </div>
