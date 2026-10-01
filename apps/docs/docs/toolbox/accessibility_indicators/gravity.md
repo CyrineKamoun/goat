@@ -24,7 +24,7 @@ You can specify the **routing type**, **opportunity layer**, **travel cost limit
 
 - The **Sensitivity controls how quickly accessibility decreases with increasing travel cost**, while the **Destination potential lets you give more weight to destinations with higher capacity or quality** (e.g., a larger supermarket or a bus stop with more departures). Together with the chosen **Impedance function, these settings define how accessibility is calculated**.
 
-- The **Potential Type** determines how each opportunity's weight is derived: use **Constant** to apply the same value to all opportunities, or **Field** to use a numeric attribute from the input layer (e.g., number of departures, seats, or capacity).
+- The **Potential Type** determines how each opportunity's weight is derived: use **Constant** to apply the same value to all opportunities, **Field** to use a numeric attribute from the input layer (e.g., number of departures, seats, or capacity), or, for polygon layers, **Expression** to weight each polygon by its area or perimeter.
 
 - Using **Destination potential helps prioritize certain opportunities over others**. For example, a larger but farther supermarket can be valued more than a smaller nearby one. This allows you to include qualitative information—such as size, frequency, or service level—when computing accessibility, resulting in a more realistic heatmap.
 
@@ -178,6 +178,7 @@ Need help choosing a suitable travel time limit for various common amenities? Th
     <ul>
       <li><b>Constant</b> — all opportunities have the same weight. Enter a numeric value (default: 1.0).</li>
       <li><b>Field</b> — use a numeric field from the <i>Input Layer</i> as the weight (e.g. number of departures, seats, or capacity).</li>
+      <li><b>Expression</b>: offered for polygon layers only. Under <code>Potential expression</code>, choose <b>Area</b> (in square metres) or <b>Perimeter</b> (in metres) to weight each polygon by its size, so a large park counts for more than a small one.</li>
     </ul>
   </div>
 </div>

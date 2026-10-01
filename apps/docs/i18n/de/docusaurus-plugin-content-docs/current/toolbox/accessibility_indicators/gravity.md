@@ -25,7 +25,7 @@ Sie können das **Verkehrsmittel**, den **Gelegenheits-Layer**, das **Reisekoste
 
 - Die **Sensitivität steuert, wie schnell die Erreichbarkeit mit zunehmenden Reisekosten abnimmt**, während das **Destinationspotenzial es ermöglicht, Zielen mit höherer Kapazität oder Qualität mehr Gewicht zu geben** (z. B. ein größerer Supermarkt oder eine Haltestelle mit mehr Abfahrten). Zusammen mit der gewählten **Widerstandsfunktion definieren diese Einstellungen, wie die Erreichbarkeit berechnet wird**.
 
-- Der **Potenzialtyp** bestimmt, wie das Gewicht jedes Ziels abgeleitet wird: Mit **Constant** wird allen Zielen der gleiche Wert zugewiesen, oder mit **Field** wird ein numerisches Attribut aus dem Eingabe-Layer verwendet (z. B. Abfahrten, Sitzplätze oder Kapazität).
+- Der **Potenzialtyp** bestimmt, wie das Gewicht jedes Ziels abgeleitet wird: Mit **Constant** wird allen Zielen der gleiche Wert zugewiesen, mit **Field** wird ein numerisches Attribut aus dem Eingabe-Layer verwendet (z. B. Abfahrten, Sitzplätze oder Kapazität), und bei Polygon-Layern gewichtet **Expression** jedes Polygon nach seiner Fläche oder seinem Umfang.
 
 - Mit dem **Destinationspotenzial können bestimmte Ziele priorisiert werden**. Zum Beispiel kann ein größerer, aber weiter entfernter Supermarkt höher bewertet werden als ein kleinerer in der Nähe. So können qualitative Informationen – wie Größe, Frequenz oder Servicelevel – in die Berechnung einfließen, was zu einer realistischeren Heatmap führt.
 
@@ -179,6 +179,7 @@ Benötigen Sie Hilfe bei der Wahl eines geeigneten Reisezeitlimits für verschie
     <ul>
       <li><b>Constant</b> — alle Ziele erhalten das gleiche Gewicht. Geben Sie einen numerischen Wert ein (Standard: 1.0).</li>
       <li><b>Field</b> — verwenden Sie ein numerisches Feld aus dem <i>Eingabe-Layer</i> als Gewicht (z. B. Anzahl der Abfahrten, Sitzplätze oder Kapazität).</li>
+      <li><b>Expression</b>: nur bei Polygon-Layern verfügbar. Wählen Sie unter <code>Potenzialausdruck</code> <b>Area</b> (in Quadratmetern) oder <b>Perimeter</b> (in Metern), um jedes Polygon nach seiner Größe zu gewichten, sodass ein großer Park mehr zählt als ein kleiner.</li>
     </ul>
   </div>
 </div>
