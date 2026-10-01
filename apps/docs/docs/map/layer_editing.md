@@ -35,7 +35,7 @@ Once a layer is created, you can add and edit features directly on the map.
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Use the <strong>editing toolbar</strong> at the bottom of the map: click <code>+</code> to <strong>add a new feature</strong> and click on the map to draw the geometry. The <b>Feature Attributes</b> panel opens on the right, then <strong>fill in the attribute values</strong> and click <code>Done</code>.</div>
+  <div class="content">Use the <strong>editing toolbar</strong> at the bottom of the map: click <code>+</code> to <strong>add a new feature</strong> and click on the map to draw the geometry. The <b>Feature Attributes</b> panel opens on the right. <strong>Fill in the attribute values</strong> and click <code>Done</code>.</div>
 </div>
 
 <div class="step">

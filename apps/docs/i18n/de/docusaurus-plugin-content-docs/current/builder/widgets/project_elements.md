@@ -77,7 +77,7 @@ Das Tabs-Widget **gruppiert andere Widgets desselben Panels in Tab-Ansichten**, 
 
 ## Links
 
-Das Links-Widget **zeigt eine Reihe von beschrifteten Links oder Popup-Auslösern** an – nützlich für Navigation, Referenzen oder kontextbezogene Informationen.
+Das Links-Widget **zeigt eine Reihe von beschrifteten Links oder Popup-Auslösern** an, nützlich für Navigation, Referenzen oder kontextbezogene Informationen.
 
 <div class="step">
   <div class="step-number">1</div>

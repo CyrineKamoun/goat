@@ -9,7 +9,7 @@ Mit diesem Werkzeug können Sie **Eingabe-Features extrahieren, die innerhalb de
 
 ## 1. Erklärung
 
-Bezieht sich auf den Prozess der **Extraktion eines Teils eines Vektor-Datensatzes basierend auf der Grenze eines anderen Polygon-Layers.** Es funktioniert wie ein "Plätzchenausstecher" – nur die Features (oder Teile von Features) aus dem Eingabe-Layer, die innerhalb des Überlagerungs-Layers liegen, werden beibehalten. Die Attribute der Eingabe-Features werden erhalten, aber die Attribute des Überlagerungs-Layers werden nicht übertragen.
+Bezieht sich auf den Prozess der **Extraktion eines Teils eines Vektor-Datensatzes basierend auf der Grenze eines anderen Polygon-Layers.** Es funktioniert wie ein "Plätzchenausstecher": Nur die Features (oder Teile von Features) aus dem Eingabe-Layer, die innerhalb des Überlagerungs-Layers liegen, werden beibehalten. Die Attribute der Eingabe-Features werden erhalten, aber die Attribute des Überlagerungs-Layers werden nicht übertragen.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 

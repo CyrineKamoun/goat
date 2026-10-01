@@ -18,7 +18,7 @@ This page focuses on **project templates**. For the other two, see [Save a workf
 On the **Home** page, the `Start from a template` row shows the available templates. You can:
 
 - **Filter by kind**: `All templates`, `Project`, `Workflow`, or `Layout`.
-- **Filter by source**: who the template came from, `Everyone`, `GOAT`, `Mine`, `Team`, or `Organization`.
+- **Filter by source**: who the template came from (`Everyone`, `GOAT`, `Mine`, `Team` or `Organization`).
 - Click `All templates` to open the full template browser, where you can **search** templates and **preview** one before using it.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

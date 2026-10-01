@@ -70,7 +70,7 @@ Kostenfunktion für **Pedelec**:
 Wenn eine Kante der Klasse `Fußgänger` oder `Zebrastreifen` angehört, gehen wir davon aus, dass der Fahrer absteigt und sein Fahrrad/Pedelec schiebt. Die Kosten für diese Art von Segmenten sind: `Kosten = Länge / Geschwindigkeit`
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '0.75rem' }}>
-  <img src={require('/img/routing/bicycle_edge_cost_de.png').default} alt="Fahrradnetzwerk Kantenkosten nach Topologie, Belag- und Steigungsmultiplikatoren" style={{ maxWidth: "100%", objectFit: "contain"}}/>
+  <img src={require('/img/routing/bicycle_edge_cost_de.png').default} alt="Fahrradnetzwerk Kantenkosten nach Topologie: Belag- und Steigungsmultiplikatoren" style={{ maxWidth: "100%", objectFit: "contain"}}/>
 </div>
 
 :::note

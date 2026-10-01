@@ -35,7 +35,7 @@ Sobald der Layer erstellt wurde, können Sie Features direkt auf der Karte hinzu
 
 <div class="step">
   <div class="step-number">2</div>
-  <div class="content">Verwenden Sie die <strong>Bearbeitungsleiste</strong> am unteren Kartenrand: Klicken Sie auf <code>+</code>, um ein <strong>neues Feature hinzuzufügen</strong>, und klicken Sie auf die Karte, um die Geometrie zu zeichnen. Das Panel <b>Feature-Attribute</b> öffnet sich auf der rechten Seite, dann <strong>füllen Sie die Attributwerte</strong> aus und klicken Sie auf <code>Fertig</code>.</div>
+  <div class="content">Verwenden Sie die <strong>Bearbeitungsleiste</strong> am unteren Kartenrand: Klicken Sie auf <code>+</code>, um ein <strong>neues Feature hinzuzufügen</strong>, und klicken Sie auf die Karte, um die Geometrie zu zeichnen. Das Panel <b>Feature-Attribute</b> öffnet sich auf der rechten Seite. <strong>Füllen Sie die Attributwerte</strong> aus und klicken Sie auf <code>Fertig</code>.</div>
 </div>
 
 <div class="step">

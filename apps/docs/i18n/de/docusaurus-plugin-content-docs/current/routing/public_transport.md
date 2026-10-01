@@ -37,14 +37,14 @@ Eine ÖPNV-Fahrt besteht aus drei Abschnitten: dem **Zugangsweg** vom Startpunkt
 
 Das Routing für den öffentlichen Verkehr wird von GOATs eigener leistungsstarker Routing-Engine durchgeführt, die die Open-Source-Bibliothek **[nigiri](https://github.com/motis-project/nigiri)** einbindet. Nigiri ist eine C++-Bibliothek aus dem **[MOTIS-Projekt](https://github.com/motis-project/motis)**, die eine One-to-All-Verbindungssuche im öffentlichen Verkehr mithilfe des **RAPTOR**-Algorithmus bereitstellt.
 
-Die **Transit-Etappe** wird von nigiri berechnet, während die **Zugangs- und Abgangs-Etappen** (erste und letzte Meile) GOATs eigene **Dijkstra**-Implementierung verwenden – dasselbe Routing wie für aktive Mobilität und Auto. Dadurch bleibt das straßenbasierte Routing über alle Verkehrsträger hinweg konsistent.
+Die **Transit-Etappe** wird von nigiri berechnet, während die **Zugangs- und Abgangs-Etappen** (erste und letzte Meile) GOATs eigene **Dijkstra**-Implementierung verwenden, also dasselbe Routing wie für aktive Mobilität und Auto. Dadurch bleibt das straßenbasierte Routing über alle Verkehrsträger hinweg konsistent.
 
 
 ### Routing-Optionen
 
 #### Modi
 
-Analysen für die folgenden öffentlichen Verkehrsmodi werden derzeit von GOAT unterstützt. Wählen Sie einen oder mehrere aus – beachten Sie dabei, dass einige Modi nicht in allen Regionen verfügbar sind.
+Analysen für die folgenden öffentlichen Verkehrsmodi werden derzeit von GOAT unterstützt. Wählen Sie einen oder mehrere aus. Beachten Sie dabei, dass einige Modi nicht in allen Regionen verfügbar sind.
 
 `Bus`, `Straßenbahn`, `Bahn`, `U-Bahn`, `Fähre`, `Seilbahn`, `Gondel`, `Standseilbahn`.
 
@@ -58,8 +58,8 @@ Der Wochentag, der beim Routing im öffentlichen Verkehr berücksichtigt wird. W
 
 #### Start- und Endzeit
 
-Ein Zeitfenster für das Routing im öffentlichen Verkehr. Die Engine wertet **jede Abfahrtsminute** innerhalb dieses Zeitfensters aus und behält die **schnellste** Verbindung zu jedem erreichbaren Ort – es handelt sich nicht um einen Durchschnitt über das Zeitfenster. Das Ergebnis ist daher das bestmögliche, größtmögliche Einzugsgebiet vom angegebenen Startpunkt.  
-Eine Verbindung gilt als innerhalb des Zeitfensters liegend, **ausschließlich basierend auf ihrer Startzeit** – unabhängig von ihrer Endzeit oder Gesamtdauer.
+Ein Zeitfenster für das Routing im öffentlichen Verkehr. Die Engine wertet **jede Abfahrtsminute** innerhalb dieses Zeitfensters aus und behält die **schnellste** Verbindung zu jedem erreichbaren Ort. Es handelt sich nicht um einen Durchschnitt über das Zeitfenster. Das Ergebnis ist daher das bestmögliche, größtmögliche Einzugsgebiet vom angegebenen Startpunkt.  
+Eine Verbindung gilt als innerhalb des Zeitfensters liegend, **ausschließlich basierend auf ihrer Startzeit**, unabhängig von ihrer Endzeit oder Gesamtdauer.
 
 
 :::note

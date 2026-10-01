@@ -12,7 +12,7 @@ The Travel Cost Matrix tool **computes travel time or distance between a set of 
 
 ## 1. Explanation
 
-The Travel Cost Matrix calculates the **travel cost (time or distance) between every origin-destination pair** in two input layers, for a selected routing mode. The output is a table where each row represents one O-D connection and includes the origin identifier, destination identifier, and the computed travel cost.
+The Travel Cost Matrix calculates the **travel cost (time or distance) between every origin–destination pair** in two input layers, for a selected routing mode. The output is a table where each row represents one O-D connection and includes the origin identifier, destination identifier, and the computed travel cost.
 
 The Travel Cost Matrix is designed for **batch computation across many origins and destinations at once**. This makes it the right tool when you need the raw cost data to feed into further analyses, such as location scoring, supply-demand matching, or custom accessibility indices.
 
@@ -55,7 +55,7 @@ The Travel Cost Matrix is designed for **batch computation across many origins a
 </TabItem>
 <TabItem value="flight" label="Flight Distance" className="tabItemBox">
 
-**Computes the straight-line geodesic distance between every origin-destination pair.** No routing network is used. There are no configuration fields for this mode, so simply select it and proceed to the Input section.
+**Computes the straight-line geodesic distance between every origin–destination pair.** No routing network is used. There are no configuration fields for this mode, so simply select it and proceed to the Input section.
 
 </TabItem>
 <TabItem value="pt" label="Public Transport (PT)" className="tabItemBox">
@@ -105,7 +105,7 @@ Calculation time scales with the number of O-D pairs. Check the [status bar](../
 
 ### Results
 
-Once the calculation finishes, a **table layer** is added to the map panel. Each row represents one origin-destination pair that falls within the specified travel cost threshold. The `origin` and `destination` columns contain the values from your selected label columns.
+Once the calculation finishes, a **table layer** is added to the map panel. Each row represents one origin–destination pair that falls within the specified travel cost threshold. The `origin` and `destination` columns contain the values from your selected label columns.
 
 | Column | Description |
 |--------|-------------|
@@ -133,7 +133,7 @@ Travel costs are computed using the **same routing engine as the Catchment Area 
 
 ### Unbounded calculation limits
 
-When no maximum travel cost is set, the following limits apply based on the bounding-box diagonal of all origin-destination pairs (the straight-line distance across the smallest rectangle that contains all your origin and destination points, in other words, how far apart your two most distant points are):
+When no maximum travel cost is set, the following limits apply based on the bounding-box diagonal of all origin–destination pairs (the straight-line distance across the smallest rectangle that contains all your origin and destination points, in other words, how far apart your two most distant points are):
 
 | Routing mode | Maximum O-D extent (bounding-box diagonal) |
 |---|---|

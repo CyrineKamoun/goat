@@ -69,7 +69,7 @@ Das Werkzeug für räumliches Clustering ist derzeit **auf Punkt-Features beschr
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Legen Sie die <code>Anzahl der Cluster</code> fest – die Anzahl der zu erstellenden Zonen (Standard: 10).</div>
+  <div class="content">Legen Sie die <code>Anzahl der Cluster</code> fest, also die Anzahl der zu erstellenden Zonen (Standard: 10).</div>
 </div>
 
 ### Konfiguration

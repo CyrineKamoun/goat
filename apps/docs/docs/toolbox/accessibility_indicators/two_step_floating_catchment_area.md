@@ -22,9 +22,9 @@ The Heatmap 2SFCA (Two-Step Floating Catchment Area) tool **produces a color-cod
 The 2SFCA method measures **spatial accessibility by considering both supply (capacity of facilities) and demand (population)**. Unlike simple supply-demand ratios per administrative unit, 2SFCA accounts for cross-boundary access: people can reach facilities in neighboring areas, and facilities serve populations beyond their own district.
 The result is a **supply-to-demand ratio at the level of hexagonal grid cells**. The tool works in two steps:
 
-1. **Step 1, Capacity Demand Ratios:** For each facility location, compute how much capacity is available relative to the total demand (population) within its catchment area. This produces a supply-to-demand ratio per facility.
+1. **Step 1: Capacity Demand Ratios.** For each facility location, compute how much capacity is available relative to the total demand (population) within its catchment area. This produces a supply-to-demand ratio per facility.
 
-2. **Step 2, Cumulative Accessibility:** For each grid cell, sum the capacity ratios of all reachable facilities. The result represents how well-served each location is.
+2. **Step 2: Cumulative Accessibility.** For each grid cell, sum the capacity ratios of all reachable facilities. The result represents how well-served each location is.
 
 You can configure the **routing type**, **opportunity layers** (with capacity fields), **demand layer** (with population field), **travel time limits**, and choose between three **2SFCA variants**.
 - The **Opportunity layers contain facility data** with a capacity attribute (e.g., number of hospital beds, square meters of retail space, school seats).

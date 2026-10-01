@@ -18,7 +18,7 @@ Diese Seite behandelt vor allem **Projektvorlagen**. Für die anderen beiden sie
 Auf der **Startseite** zeigt die Reihe `Mit einer Vorlage starten` die verfügbaren Vorlagen. Sie können:
 
 - **Nach Art filtern**: `Alle Vorlagen`, `Projekt`, `Workflow` oder `Layout`.
-- **Nach Quelle filtern**: woher die Vorlage stammt, `Alle`, `GOAT`, `Meine`, `Team` oder `Organisation`.
+- **Nach Quelle filtern**: woher die Vorlage stammt (`Alle`, `GOAT`, `Meine`, `Team` oder `Organisation`).
 - Über `Alle Vorlagen` die vollständige Vorlagenübersicht öffnen, in der Sie Vorlagen **durchsuchen** und eine vor der Verwendung in der **Vorschau** ansehen können.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
