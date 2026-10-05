@@ -3,7 +3,8 @@
 The route layer (``auth_z`` -> ``authorization()``) is what enforces it: the
 seeded resources ask for ``update-organization`` to change a domain and
 ``read-organization`` to list one, and ``check_organization`` rejects a path
-naming an organization other than the caller's.
+naming an organization other than the caller's. That the real routes produce
+these patterns is pinned in ``tests/unit/test_organization_route_resources.py``.
 """
 
 from collections.abc import Awaitable, Callable
@@ -14,6 +15,7 @@ from core.core.config import settings
 from core.db.models.organization import Organization
 from core.db.models.user import User
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.authz.conftest import _call, find_resource
 
@@ -21,6 +23,8 @@ S = settings.SCHEMA
 DOMAINS = "organizations/{organization_id}/domains"
 DOMAIN = "organizations/{organization_id}/domains/{domain_id}"
 RECHECK = "organizations/{organization_id}/domains/{domain_id}/recheck"
+# check_organization's message for a path naming another organization.
+OTHER_ORG = "does not correspond to organization from user"
 
 
 async def _authorized(
@@ -31,6 +35,22 @@ async def _authorized(
         f"SELECT {S}.authorization(:u, :res, :path, :m)",
         {"u": user_id, "res": pattern, "path": path, "m": method},
     )
+
+
+async def _denial(
+    db: AsyncSession, user_id: UUID, pattern: str, path: str, method: str
+) -> str:
+    """Why authorization() refused, so a test can tell the organization
+    check apart from any other failure that would also read as "denied"."""
+    try:
+        await db.execute(
+            text(f"SELECT {S}.authorization(:u, :res, :path, :m)"),
+            {"u": user_id, "res": pattern, "path": path, "m": method},
+        )
+    except DBAPIError as error:
+        await db.rollback()
+        return str(error.orig)
+    return ""
 
 
 async def _user_with_role(
@@ -102,13 +122,13 @@ async def test_only_admins_of_the_organization_change_its_domains(
             await _authorized(db_session, editor_id, pattern, path, method) is False
         ), f"an editor must not {method} {pattern}"
         assert await _authorized(db_session, viewer_id, pattern, path, method) is False
-        assert (
-            await _authorized(db_session, outside_id, pattern, path, method) is False
+        assert OTHER_ORG in await _denial(
+            db_session, outside_id, pattern, path, method
         ), f"an admin of another organization must not {method} {pattern}"
 
     # Members may see which domains their organization has; outsiders may not.
     assert await _authorized(db_session, viewer_id, DOMAINS, domains, "GET") is True
-    assert await _authorized(db_session, outside_id, DOMAINS, domains, "GET") is False
+    assert OTHER_ORG in await _denial(db_session, outside_id, DOMAINS, domains, "GET")
 
 
 @pytest.mark.asyncio
@@ -133,7 +153,7 @@ async def test_an_organization_route_rejects_a_path_naming_another_organization(
     assert await _authorized(
         db_session, admin_id, pattern, f"organizations/{own}/profile", "PATCH"
     )
-    assert not await _authorized(
+    assert OTHER_ORG in await _denial(
         db_session, admin_id, pattern, f"organizations/{other}/profile", "PATCH"
     )
 
@@ -160,6 +180,6 @@ async def test_an_owner_cannot_delete_another_organization(
     assert await _authorized(
         db_session, owner_id, pattern, f"organizations/{own}", "DELETE"
     )
-    assert not await _authorized(
+    assert OTHER_ORG in await _denial(
         db_session, owner_id, pattern, f"organizations/{other}", "DELETE"
     )
