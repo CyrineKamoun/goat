@@ -106,6 +106,68 @@ async def test_space_view_lists_children_with_folders_first(
 
 
 @pytest.mark.asyncio
+async def test_space_view_pages_projects_ahead_of_newer_datasets(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    fixture_create_user: UUID,
+) -> None:
+    """The Content page groups the rows it has loaded into sections, so a
+    folder whose datasets were all edited after its projects must still
+    hand out every project on the first page."""
+    me = fixture_create_user
+    sid = (
+        await db_session.execute(
+            text(f"SELECT id FROM {S}.space WHERE user_id = :u"), {"u": me}
+        )
+    ).scalar_one()
+    f = await client.post(f"{settings.API_V2_STR}/folder", json={"name": "Mixed"})
+    fid = f.json()["id"]
+    project_ids = []
+    for n in range(3):
+        p = await client.post(
+            f"{settings.API_V2_STR}/project",
+            json={
+                "name": f"project {n}",
+                "folder_id": fid,
+                "initial_view_state": {
+                    "latitude": 48.1,
+                    "longitude": 11.5,
+                    "zoom": 10,
+                    "min_zoom": 0,
+                    "max_zoom": 20,
+                    "bearing": 0,
+                    "pitch": 0,
+                },
+            },
+        )
+        assert p.status_code in (200, 201), p.text
+        project_ids.append(p.json()["id"])
+    await db_session.execute(
+        text(
+            f"UPDATE {S}.project SET updated_at = now() - interval '1 day' "
+            "WHERE id = ANY(CAST(:ids AS uuid[]))"
+        ),
+        {"ids": project_ids},
+    )
+    for n in range(5):
+        await db_session.execute(
+            text(
+                f"INSERT INTO {S}.layer (id, name, type, feature_layer_type, "
+                "feature_layer_geometry_type, user_id, folder_id, space_id, updated_at) "
+                "VALUES (gen_random_uuid(), :n, 'feature', 'standard', 'point', "
+                ":u, :f, :s, now()) "
+            ),
+            {"n": f"layer {n}", "u": me, "f": fid, "s": sid},
+        )
+    await db_session.commit()
+
+    page = await _feed(client, space_id=str(sid), folder_id=fid, size=4)
+    types = [i["type"] for i in page["items"]]
+    assert types == ["project", "project", "project", "layer"]
+    assert page["total"] == 8
+
+
+@pytest.mark.asyncio
 async def test_shared_with_me_lists_user_grants_and_folder_grants_only(
     client: AsyncClient,
     db_session: AsyncSession,
