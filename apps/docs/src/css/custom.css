@@ -717,6 +717,34 @@ a.card:hover {
   height: auto;
 }
 
+/* Inline UI icons: the rule above would override their inline size, so
+   restore it and line them up with the text around them. */
+.theme-doc-markdown img[style*="max-width: 16px"] {
+  max-width: 16px !important;
+}
+
+.theme-doc-markdown img[style*="max-width: 20px"] {
+  max-width: 20px !important;
+}
+
+.theme-doc-markdown img[style*="max-width: 25px"] {
+  max-width: 25px !important;
+}
+
+.theme-doc-markdown img[style*="max-width: 40px"] {
+  max-width: 40px !important;
+}
+
+.theme-doc-markdown img:is(
+    [style*="max-width: 16px"],
+    [style*="max-width: 20px"],
+    [style*="max-width: 25px"],
+    [style*="max-width: 40px"]
+  ) {
+  vertical-align: middle;
+  border-radius: 0;
+}
+
 .theme-doc-markdown iframe {
   width: 100%;
   max-width: 100%;
