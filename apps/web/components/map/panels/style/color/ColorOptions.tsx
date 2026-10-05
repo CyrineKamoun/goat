@@ -34,10 +34,10 @@ const ColorOptions = ({
 }) => {
   const { t } = useTranslation("common");
 
-  // Color scales exist only for string (ordinal) and number (breaks) fields;
-  // offering datetime/boolean here would silently produce no scale at all.
+  // Color scales exist only for string/boolean (ordinal) and number (breaks) fields;
+  // offering datetime here would silently produce no scale at all.
   const colorableFields = useMemo(
-    () => layerFields.filter((f) => f.type === "string" || f.type === "number"),
+    () => layerFields.filter((f) => f.type === "string" || f.type === "number" || f.type === "boolean"),
     [layerFields]
   );
 
@@ -82,7 +82,7 @@ const ColorOptions = ({
             setSelectedField={(field) => {
               const newStyle = JSON.parse(JSON.stringify(layerStyle)) || {};
               newStyle[`${type}_field`] = field;
-              if (field?.type === "string") {
+              if (field?.type === "string" || field?.type === "boolean") {
                 newStyle[`${type}_scale`] = "ordinal";
               }
               if (field?.type === "number" && layerStyle?.[`${type}_scale`] == "ordinal") {
