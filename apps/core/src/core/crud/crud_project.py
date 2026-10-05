@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from goatlib.models.project import DEFAULT_INITIAL_VIEW_STATE
-from sqlalchemy import select, text
+from sqlalchemy import Text, cast, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import and_, not_, or_
 
@@ -482,7 +482,13 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
         initial_view_state = (
             await async_session.execute(
                 select(UserProjectLink.initial_view_state)
-                .where(UserProjectLink.project_id == project_id)
+                .where(
+                    UserProjectLink.project_id == project_id,
+                    UserProjectLink.initial_view_state.is_not(None),
+                    cast(UserProjectLink.initial_view_state, Text).not_in(
+                        ("{}", "null")
+                    ),
+                )
                 .order_by(
                     (UserProjectLink.user_id == project.user_id).desc(),
                     (UserProjectLink.user_id == user_id).desc(),

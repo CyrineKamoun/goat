@@ -34,8 +34,21 @@ logger = logging.getLogger(__name__)
 
 # Matched with fullmatch: `$` would also accept a trailing newline.
 UUID_RE = re.compile(r"[0-9a-f]{8}-?([0-9a-f]{4}-?){3}[0-9a-f]{12}", re.IGNORECASE)
-# "<workflow id>:<node id>:<layer id>" from workflow tool chaining.
-TEMP_LAYER_RE = re.compile(r"[A-Za-z0-9_-]+(:[A-Za-z0-9_-]+)+")
+# "<workflow id>:<node id>:<layer id>" from workflow tool chaining, checked
+# part by part (a single pattern over the whole id backtracks badly on long
+# input).
+TEMP_LAYER_PART_RE = re.compile(r"[A-Za-z0-9_-]+")
+MAX_REFERENCE_LENGTH = 200
+
+
+def is_temp_layer_id(text: str) -> bool:
+    parts = text.split(":")
+    return (
+        len(text) <= MAX_REFERENCE_LENGTH
+        and len(parts) >= 2
+        and all(TEMP_LAYER_PART_RE.fullmatch(part) for part in parts)
+    )
+
 
 # Layer fields a tool's schema does not mark as a layer selector.
 EXTRA_LAYER_FIELDS: dict[str, tuple[str, ...]] = {
@@ -157,7 +170,7 @@ class References:
         text = str(value)
         if UUID_RE.fullmatch(text):
             self.add("layer", text, action)
-        elif not TEMP_LAYER_RE.fullmatch(text):
+        elif not is_temp_layer_id(text):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="A layer input must be a layer id",
@@ -211,13 +224,20 @@ def _layer_shaped_values(data: Any) -> list[Any]:
                 and key not in NOT_LAYER_REFERENCES
                 and value not in (None, "", [])
             ):
-                found.extend(value if isinstance(value, list) else [value])
+                values = value if isinstance(value, list) else [value]
+                # A layer id, or an object or list holding one further down.
+                found.extend(
+                    v
+                    for v in values
+                    if v is not None and not isinstance(v, (dict, list))
+                )
+                found.extend(_layer_shaped_values(values))
             elif isinstance(value, (dict, list)):
                 found.extend(_layer_shaped_values(value))
     elif isinstance(data, list):
         for item in data:
             found.extend(_layer_shaped_values(item))
-    return [v for v in found if isinstance(v, str)]
+    return found
 
 
 def tool_references(

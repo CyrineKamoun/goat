@@ -1,5 +1,8 @@
 """User SQL may read its declared inputs and nothing else.
 
+The validator reads DuckDB's own parse tree, so whatever DuckDB would read is
+what gets checked: quoting and comments cannot hide a table.
+
 `preview-sql` runs user SQL on a connection with DuckLake attached, and the
 workflow if node places a user expression inside a query on one. So the
 validators accept only the input tables a request declares (plus the query's
@@ -24,6 +27,16 @@ INPUTS = {"input_1", "input_2"}
         "SELECT * FROM range(10)",
         "SELECT i FROM input_1, generate_series(1, 3) AS g(i)",
         "SELECT * FROM unnest([1, 2, 3])",
+        # Comment markers and keywords inside strings and quoted names.
+        "SELECT COALESCE(name, '--') FROM input_1",
+        "SELECT * FROM input_1 WHERE note LIKE '%--%' OR note LIKE '%/*%'",
+        'SELECT 1 AS "--", \'a;b\' AS "Update" FROM input_1',
+        "WITH RECURSIVE r(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM r WHERE n < 3) "
+        "SELECT * FROM r",
+        "SELECT * FROM input_1 UNION ALL SELECT * FROM input_2",
+        "FROM input_1 SELECT name",
+        "SELECT * EXCLUDE (geometry) FROM input_1 QUALIFY row_number() OVER () < 5",
+        "SELECT * FROM (VALUES (1), (2)) AS v(a)",
     ],
 )
 def test_queries_over_the_declared_inputs_pass(sql: str) -> None:
@@ -48,6 +61,18 @@ def test_queries_over_the_declared_inputs_pass(sql: str) -> None:
         "SELECT current_setting('s3_secret_access_key') FROM input_1",
         "SELECT * FROM range((SELECT count(*) FROM lake.user_x.t_y))",
         "SELECT * FROM generate_series(1, (SELECT max(id) FROM t_y))",
+        # A table hidden from a comment-stripping check by markers in strings.
+        "SELECT '/*' AS a, * FROM lake.main.t_v WHERE '*/' = '*/'",
+        'SELECT "/*", * FROM lake.main.t_x, input_1 AS "*/"',
+        "SELECT $$'$$, * FROM lake.main.t_x",
+        # A CTE name is visible inside its own query only.
+        "SELECT * FROM t_abc, (WITH t_abc AS (SELECT 1) SELECT * FROM t_abc) AS s",
+        "SELECT * FROM (SHOW TABLES)",
+        "SELECT * FROM (DESCRIBE input_1)",
+        "SELECT lake.main.f(1) FROM input_1",
+        "SELECT getvariable('x') FROM input_1",
+        "SELECT * FROM input_1; SELECT * FROM input_2",
+        "ATTACH 'other.db' AS other",
     ],
 )
 def test_anything_beyond_the_declared_inputs_is_refused(sql: str) -> None:
@@ -79,6 +104,12 @@ def test_a_condition_over_columns_passes(expression: str) -> None:
         "read_csv('/etc/passwd') IS NOT NULL",
         "getenv('HOME') = 'x'",
         "count(*) > 0) AS r FROM lake.user_x.t_y --",
+        # Closing the wrapping parenthesis to add clauses or columns.
+        "1=1) LIMIT (100000000",
+        "TRUE) GROUP BY (1",
+        "x > 1) ORDER BY (1",
+        "TRUE) AS r, 1 AS (x",
+        "name = 'a",
     ],
 )
 def test_a_condition_with_a_query_table_or_file_is_refused(expression: str) -> None:

@@ -356,3 +356,43 @@ def test_numeric_statistics_inputs_must_be_whole_numbers(
     )
     assert response.status_code == 422, response.text
     assert nothing_runs == []
+
+
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        {"reference_area_layer_id": {"layer_id": OTHER}},
+        {"layer_ids": [{"layer_id": OTHER}]},
+        {"source_layer_id": [None, OTHER]},
+    ],
+)
+def test_a_layer_id_nested_under_a_layer_key_is_checked(inputs: dict[str, Any]) -> None:
+    assert ("layer", OTHER, "read") in _entries(tool_references("buffer", inputs, USER))
+
+
+def test_a_long_layer_reference_is_refused_quickly() -> None:
+    import time
+
+    started = time.perf_counter()
+    for value in ("a" + "-" * 50_000, "a" + "-" * 50_000 + ":", "a:" * 30_000):
+        with pytest.raises(HTTPException):
+            tool_references("buffer", {"input_layer_id": value}, USER)
+    assert time.perf_counter() - started < 1
+
+
+def test_numeric_statistics_inputs_are_capped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    received: list[dict[str, Any]] = []
+
+    def run(process_id: str, inputs: dict[str, Any], *_: Any, **__: Any) -> Any:
+        received.append(dict(inputs))
+        return {"values": [], "total": 0}
+
+    monkeypatch.setattr(processes_router, "_execute_analytics_sync", run)
+    response = TestClient(app).post(
+        "/processes/histogram/execution",
+        json={"inputs": {"collection": LAYER, "column": "x", "num_bins": 10**9}},
+    )
+    assert response.status_code < 300, response.text
+    assert received and received[0]["num_bins"] == 1_000

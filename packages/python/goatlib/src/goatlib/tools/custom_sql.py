@@ -29,13 +29,7 @@ from goatlib.analysis.schemas.ui import (
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner
 from goatlib.tools.schemas import ToolInputBase
-from goatlib.utils.sql_validation import (  # noqa: F401 (re-exported)
-    FORBIDDEN_FUNCTION_PREFIXES,
-    FORBIDDEN_FUNCTIONS,
-    FORBIDDEN_SQL_KEYWORDS,
-    validate_sql_expression,
-    validate_sql_query,
-)
+from goatlib.utils.sql_validation import validate_sql_query
 
 logger = logging.getLogger(__name__)
 

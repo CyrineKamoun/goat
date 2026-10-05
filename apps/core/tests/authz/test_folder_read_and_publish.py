@@ -132,3 +132,49 @@ async def test_publish_and_unpublish_never_fail_on_missing_state(
     for _ in range(2):
         unpublished = await client.delete(f"{base}/unpublish", headers=headers)
         assert unpublished.status_code == 200, unpublished.text
+
+
+@pytest.mark.asyncio
+async def test_publish_skips_an_empty_view_for_the_publishers(
+    db_session: AsyncSession,
+    roles: dict[str, UUID],
+    auth_on: Callable[..., dict[str, str]],
+    make_org: Callable[[], Awaitable[Organization]],
+    make_user: Callable[..., Awaitable[User]],
+    make_folder: Callable[..., Awaitable[Any]],
+    make_layer: Callable[..., Awaitable[Any]],
+    make_project: Callable[..., Awaitable[Any]],
+) -> None:
+    world = await _world_with_admin(
+        db_session,
+        roles,
+        make_org,
+        make_user,
+        make_folder,
+        make_layer,
+        make_project,
+        in_organization_space=True,
+    )
+    project_id = world["ids"]["project_id"]
+    links = await db_session.execute(
+        select(UserProjectLink).where(UserProjectLink.project_id == project_id)
+    )
+    for link in links.scalars():
+        link.initial_view_state = {}
+        db_session.add(link)
+    publisher_view = {**DEFAULT_INITIAL_VIEW_STATE, "latitude": 12.5}
+    db_session.add(
+        UserProjectLink(
+            user_id=world["admin"],
+            project_id=project_id,
+            initial_view_state=publisher_view,
+        )
+    )
+    await db_session.commit()
+
+    published = await sweep_client().post(
+        f"{API}/project/{project_id}/publish", headers=auth_on(world["admin"])
+    )
+    assert published.status_code == 200, published.text
+    view = published.json()["config"]["project"]["initial_view_state"]
+    assert view["latitude"] == 12.5

@@ -555,26 +555,36 @@ async def get_process(request: Request, process_id: str) -> ProcessDescription:
 # === Process Execution ===
 
 
-# Numeric analytics inputs. Statistics write some of them into their SQL, so
-# anything but a whole number is refused before a query is built.
-_WHOLE_NUMBER_INPUTS = ("limit", "offset", "breaks", "num_bins")
+# Numeric analytics inputs -> their cap. Statistics write some of them into
+# their SQL, so anything but a whole number is refused before a query is
+# built; a larger number is lowered to the cap, so a request cannot size the
+# work (bins, classes, rows) without bound.
+_WHOLE_NUMBER_INPUTS: dict[str, int | None] = {
+    "limit": 10_000,
+    "offset": None,
+    "breaks": 100,
+    "num_bins": 1_000,
+}
 
 
 def _require_whole_numbers(inputs: dict[str, Any]) -> None:
-    for name in _WHOLE_NUMBER_INPUTS:
+    for name, cap in _WHOLE_NUMBER_INPUTS.items():
         value = inputs.get(name)
         if value is None:
             continue
-        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            raise HTTPException(
-                status_code=422,
-                detail={
-                    "type": OGC_EXCEPTION_INVALID_PARAMETER,
-                    "title": "Invalid parameter",
-                    "status": 422,
-                    "detail": f"{name} must be a whole number",
-                },
-            )
+        if not isinstance(value, bool) and isinstance(value, int) and value >= 0:
+            if cap is not None and value > cap:
+                inputs[name] = cap
+            continue
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "type": OGC_EXCEPTION_INVALID_PARAMETER,
+                "title": "Invalid parameter",
+                "status": 422,
+                "detail": f"{name} must be a whole number",
+            },
+        )
 
 
 @router.post(
