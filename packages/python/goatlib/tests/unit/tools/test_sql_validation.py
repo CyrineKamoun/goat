@@ -37,6 +37,8 @@ INPUTS = {"input_1", "input_2"}
         "FROM input_1 SELECT name",
         "SELECT * EXCLUDE (geometry) FROM input_1 QUALIFY row_number() OVER () < 5",
         "SELECT * FROM (VALUES (1), (2)) AS v(a)",
+        "WITH a AS (SELECT * FROM input_1), b AS (SELECT * FROM a) SELECT * FROM b",
+        "SELECT * FROM (WITH c AS (SELECT * FROM input_1) SELECT * FROM c) AS s",
     ],
 )
 def test_queries_over_the_declared_inputs_pass(sql: str) -> None:
@@ -65,8 +67,11 @@ def test_queries_over_the_declared_inputs_pass(sql: str) -> None:
         "SELECT '/*' AS a, * FROM lake.main.t_v WHERE '*/' = '*/'",
         'SELECT "/*", * FROM lake.main.t_x, input_1 AS "*/"',
         "SELECT $$'$$, * FROM lake.main.t_x",
-        # A CTE name is visible inside its own query only.
+        # A CTE name is visible inside its own query only, and only after
+        # its definition: DuckDB resolves these two against the catalog.
         "SELECT * FROM t_abc, (WITH t_abc AS (SELECT 1) SELECT * FROM t_abc) AS s",
+        "WITH a AS (SELECT * FROM t_abc), t_abc AS (SELECT 1) SELECT * FROM a",
+        "WITH t_abc AS (SELECT * FROM t_abc) SELECT * FROM t_abc",
         "SELECT * FROM (SHOW TABLES)",
         "SELECT * FROM (DESCRIBE input_1)",
         "SELECT lake.main.f(1) FROM input_1",

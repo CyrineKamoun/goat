@@ -75,7 +75,10 @@ def _parse(sql: str) -> dict[str, Any]:
         row = connection.execute("SELECT json_serialize_sql(?)", [sql]).fetchone()
     finally:
         connection.close()
-    tree = json.loads(row[0]) if row else {"error": True}
+    try:
+        tree = json.loads(row[0]) if row else {"error": True}
+    except RecursionError as e:
+        raise ValueError("The SQL is nested too deeply") from e
     if tree.get("error"):
         message = tree.get("error_message") or "Could not parse the SQL"
         raise ValueError(f"Only a single SELECT query is allowed: {message}")
@@ -113,12 +116,22 @@ def _check_tree(
     if not isinstance(node, dict):
         return
 
-    # A CTE is visible to its own query and everything inside it, not to
-    # the query around it.
+    # A CTE is visible to the CTEs defined after it and to the query body,
+    # not to the query around it, and not to the CTEs before it or to its own
+    # definition (DuckDB resolves those names against the catalog). Only a
+    # recursive CTE sees its own name.
     cte_map = node.get("cte_map")
-    if isinstance(cte_map, dict):
-        names = {str(entry.get("key", "")).lower() for entry in cte_map.get("map", [])}
-        visible_ctes = visible_ctes | names
+    if isinstance(cte_map, dict) and cte_map.get("map"):
+        defined: set[str] = set()
+        for entry in cte_map["map"]:
+            name = str(entry.get("key", "")).lower()
+            value = entry.get("value") or {}
+            query_node = (value.get("query") or {}).get("node") or {}
+            own = {name} if query_node.get("type") == "RECURSIVE_CTE_NODE" else set()
+            _check_tree(value, allowed, visible_ctes | defined | own)
+            defined.add(name)
+        visible_ctes = visible_ctes | defined
+        node = {key: value for key, value in node.items() if key != "cte_map"}
 
     kind = node.get("type")
     if "class" not in node:  # a FROM item or a query node, not an expression
@@ -176,7 +189,10 @@ def validate_sql_query(sql: str, allowed_tables: Iterable[str] | None = None) ->
         if allowed_tables is not None
         else None
     )
-    _check_tree(node, allowed, frozenset())
+    try:
+        _check_tree(node, allowed, frozenset())
+    except RecursionError as e:
+        raise ValueError("The SQL query is nested too deeply") from e
 
 
 def validate_sql_expression(expression: str) -> None:
@@ -205,4 +221,7 @@ def validate_sql_expression(expression: str) -> None:
         or '"SUBQUERY"' in json.dumps(node)
     ):
         raise ValueError("The expression may not contain a query, a table or a clause")
-    _check_tree(node, set(), frozenset())
+    try:
+        _check_tree(node, set(), frozenset())
+    except RecursionError as e:
+        raise ValueError("The expression is nested too deeply") from e
