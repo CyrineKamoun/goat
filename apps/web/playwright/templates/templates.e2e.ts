@@ -194,7 +194,9 @@ test.describe("Templates", () => {
     const band = page.locator("section").filter({ hasText: "Start from a template" });
     await expect(band).toBeVisible({ timeout: 15000 });
 
-    await band.getByRole("button", { name: "Mine" }).click();
+    // The source is a menu behind a pill named after the current source.
+    await band.getByRole("button", { name: "Everyone", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Mine", exact: true }).click();
     await expect(band.getByText(templateName, { exact: true })).toBeVisible({ timeout: 15000 });
   });
 
@@ -203,7 +205,9 @@ test.describe("Templates", () => {
 
     const band = page.locator("section").filter({ hasText: "Start from a template" });
     await expect(band).toBeVisible({ timeout: 15000 });
-    await band.getByRole("button", { name: "Mine" }).click();
+    // The source is a menu behind a pill named after the current source.
+    await band.getByRole("button", { name: "Everyone", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Mine", exact: true }).click();
 
     // The card has no control of its own to open the preview — the whole
     // surface is the click target, so the name is what gets clicked.
