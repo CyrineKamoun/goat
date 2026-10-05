@@ -209,6 +209,18 @@ def _shortcut_folder_scope(col: str) -> str:
     )
 
 
+# The Content page shows a space in sections (folders, shortcuts, projects,
+# templates, datasets) built from the pages it has loaded. Ranking by section
+# before the chosen order fills each page in the order the sections render, so
+# a folder with many recently edited datasets still lists all its projects on
+# the first page instead of only those that sort ahead of the datasets.
+_SPACE_SECTION_RANK = """CASE WHEN i.type = 'folder' THEN 0
+              WHEN i.is_shortcut THEN 1
+              WHEN i.type = 'project' THEN 2
+              WHEN i.type = 'template' THEN 3
+              ELSE 4 END"""
+
+
 def _space_view_sql(schema: str, order_col: str, order_dir: str) -> str:
     return f"""
 WITH RECURSIVE scope AS (
@@ -316,7 +328,7 @@ WITH RECURSIVE scope AS (
        {_item_scope("cs.folder_id")}
 )
 {_ITEMS_TAIL.format(S=schema)}
- ORDER BY (i.type = 'folder') DESC, {order_col} {order_dir}, i.type {order_dir}, i.id {order_dir}
+ ORDER BY {_SPACE_SECTION_RANK}, {order_col} {order_dir}, i.type {order_dir}, i.id {order_dir}
  LIMIT :size OFFSET :offset
 """
 
