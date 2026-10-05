@@ -6,12 +6,13 @@ is `playwright.config.ts` at the repo root.
 
 ## Where they run
 
-- **CI:** `.github/workflows/e2e.yml`, nightly at 02:30 UTC, on demand
-  ("Run workflow" in the Actions tab), and on PRs that change these specs,
-  the seed or the workflow. It starts the infra from the root `compose.yaml`,
-  core, geoapi, processes and catalog from source, and a production build of
-  the web app, all with `AUTH=False`. A failed run uploads the Playwright
-  report and every service's log as the `e2e-report` artifact.
+- **CI:** `.github/workflows/e2e.yml`, on every PR that changes the app, a
+  service or the suite, on every push to `main`, and on demand ("Run
+  workflow" in the Actions tab). It starts Postgres and Redis from
+  the root `compose.yaml`, Garage for S3, core, geoapi, processes and catalog
+  from source, and a production build of the web app, all with `AUTH=False`. A
+  failed run uploads the Playwright report and every service's log as the
+  `e2e-report` artifact. It is not a required check yet.
 - **Locally:** against a running app on port 3000, for example
   `pnpm exec playwright test --config=playwright.config.ts` from the repo
   root (pass the config explicitly when running from a worktree).

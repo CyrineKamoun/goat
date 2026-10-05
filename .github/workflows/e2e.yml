@@ -5,25 +5,31 @@ name: "E2E"
 # catalog with uvicorn, and a production build of the web app. AUTH=False, so
 # every request runs as the built-in default user and nothing logs in.
 #
-# Nightly, not on every PR: starting the stack takes most of the run, and the
-# suite exists to catch the app drifting away from its specs. A PR that
-# changes the specs, the seed or this workflow runs it too, so a change to
-# any of them is tested before it lands.
+# Runs on every PR that changes the app, a service or the suite itself, and on
+# every push to main (which also catches two PRs that only break together).
+# Not a required check yet: until the suite has proven stable, a red run
+# informs the PR without blocking it.
 #
 # Windmill is not started: uploads, tool and workflow runs never complete
 # here. The specs that need datasets get them from `core.scripts.seed_e2e`.
 
 on:
-  schedule:
-    - cron: "30 2 * * *" # 02:30 UTC, after the day's merges
-  workflow_dispatch:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
     paths:
       - ".github/workflows/e2e.yml"
-      - "apps/web/playwright/**"
       - "playwright.config.ts"
-      - "apps/core/src/core/scripts/seed_e2e.py"
+      - "apps/web/**"
+      - "apps/core/**"
+      - "apps/geoapi/**"
+      - "apps/processes/**"
+      - "apps/catalog/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "uv.lock"
+  workflow_dispatch:
 
 permissions:
   contents: read
