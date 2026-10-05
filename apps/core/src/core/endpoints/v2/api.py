@@ -61,12 +61,12 @@ router.include_router(template.router, prefix="/template", tags=["Template"])
 router.include_router(transfer.router, prefix="/content/transfer", tags=["Transfer"])
 router.include_router(
     organization_domain.router,
-    prefix="/organizations/{organization_id}/domains",
+    prefix="/organizations",
     tags=["Organization Domain"],
 )
 router.include_router(
     organization_analytics.router,
-    prefix="/organizations/{organization_id}/analytics",
+    prefix="/organizations",
     tags=["Organization Analytics"],
 )
 router.include_router(

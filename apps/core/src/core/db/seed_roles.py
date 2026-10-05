@@ -476,6 +476,13 @@ RESOURCES_PERMISSIONS = [
         "method": ["POST"],
         "permissions": ["read-team"],
     },
+    # Adding and removing members: any member of the organization reaches the
+    # handler, which decides (owner adds and removes, a member only leaves).
+    {
+        "url_pattern": "teams/{team_id}/users/{user_id}",
+        "method": ["POST", "DELETE"],
+        "permissions": ["read-team"],
+    },
     {
         "url_pattern": "teams/{team_id}/leave",
         "method": ["DELETE"],

@@ -2,10 +2,14 @@
 
 Phase 4 of the white-label custom domains feature.
 
-Note: as of v1, GOAT does not have an explicit "is org admin" guard at the
-endpoint layer; ``auth_z`` only confirms the user is authenticated. Org-admin
-gating is enforced at the UI level. This is a v1 limitation; tighten when
-the platform gains a proper org-role check.
+Access is enforced by ``auth_z``: the seeded resources require
+``update-organization`` (organization admins and owners) to add, recheck or
+delete a domain and ``read-organization`` to list them, and the organization
+in the path must be the caller's own. The router is mounted under
+``/organizations`` with the rest of the path on each route, so
+``route_pattern`` keeps ``{organization_id}`` as a placeholder.
+``tests/authz/test_organization_domain_route.py`` and
+``tests/unit/test_organization_route_resources.py`` pin this.
 """
 
 from typing import List
@@ -56,7 +60,7 @@ def _require_custom_domains() -> None:
 
 
 @router.get(
-    "/",
+    "/{organization_id}/domains/",
     summary="List custom domains for an organization",
     response_model=List[OrganizationDomainRead],
     status_code=200,
@@ -84,7 +88,7 @@ async def list_domains(
 
 
 @router.post(
-    "/",
+    "/{organization_id}/domains/",
     summary="Register a new custom domain for an organization",
     response_model=OrganizationDomainRead,
     status_code=status.HTTP_201_CREATED,
@@ -156,7 +160,7 @@ async def create_domain(
 
 
 @router.get(
-    "/{domain_id}",
+    "/{organization_id}/domains/{domain_id}",
     summary="Get a single custom domain by ID",
     response_model=OrganizationDomainRead,
     status_code=200,
@@ -185,7 +189,7 @@ async def get_domain(
 
 
 @router.post(
-    "/{domain_id}/recheck",
+    "/{organization_id}/domains/{domain_id}/recheck",
     summary="Re-run DNS verification + maybe trigger provisioning",
     response_model=OrganizationDomainRead,
     status_code=200,
@@ -230,7 +234,7 @@ async def recheck_domain(
 
 
 @router.delete(
-    "/{domain_id}",
+    "/{organization_id}/domains/{domain_id}",
     summary="Remove a custom domain (and release it from the provisioner)",
     response_model=None,
     status_code=status.HTTP_204_NO_CONTENT,
