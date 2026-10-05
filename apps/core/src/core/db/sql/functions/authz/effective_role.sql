@@ -17,8 +17,9 @@ LANGUAGE sql IMMUTABLE AS $$
 $$;
 
 /* Direct grants on one resource for one user, through every grantee kind.
-   Capped at rank 2 (editor): a grant row can never mint ownership — rank 3
-   is reachable only through the resource's own owner_id column. */
+   Capped at rank 2 (editor): a grant row can never mint ownership. Rank 3
+   comes only from the space (its owner, or an owner/admin of its team or
+   organization); creating an item gives no rights of its own. */
 CREATE OR REPLACE FUNCTION customer.direct_grant_rank(resource_type_input TEXT, resource_id_input UUID, user_id_input UUID)
 RETURNS INT
 LANGUAGE sql STABLE AS $$
