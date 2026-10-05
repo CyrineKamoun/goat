@@ -175,9 +175,9 @@ test.describe("Templates", () => {
     const dialog = page.getByRole("dialog").filter({ hasText: "Save as template" });
     await expect(dialog).toBeVisible();
 
-    // The name field is the only one carrying a "Name" placeholder; the
-    // dialog's other inputs are a bare textarea and a "Categories" combobox.
-    await dialog.getByPlaceholder("Name").fill(templateName);
+    // The name field is labelled "Name"; the dialog's other inputs are a
+    // description textarea and a "Categories" combobox.
+    await dialog.getByLabel("Name", { exact: true }).fill(templateName);
 
     // The dataset node's input is detected as `ship`, so the location defaults
     // (My Content → home) are all this save needs. Save stays disabled until
