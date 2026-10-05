@@ -227,10 +227,13 @@ test.describe("Templates", () => {
     await useDialog.getByLabel("Name", { exact: true }).fill(usedProjectName);
 
     // The inputs step lists the template's only input as shipping with it;
-    // there is nothing to bind, so it is a look and a click.
+    // there is nothing to bind, so it is a look and a click. That step no
+    // longer shows the "Add to a project" title, so the dialog is found by
+    // the new project's name, which it repeats in its summary.
     await useDialog.getByRole("button", { name: "Next" }).click();
-    await expect(useDialog.getByText("Ships with template")).toBeVisible();
-    await useDialog.getByRole("button", { name: "Create" }).click();
+    const inputsStep = page.getByRole("dialog").filter({ hasText: usedProjectName });
+    await expect(inputsStep.getByText("Ships with template")).toBeVisible();
+    await inputsStep.getByRole("button", { name: "Create" }).click();
 
     await expect(page).toHaveURL(/\/map\/[0-9a-f-]{36}/, { timeout: 60000 });
     usedProjectId = new URL(page.url()).pathname.split("/").pop();
