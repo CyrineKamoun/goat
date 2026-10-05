@@ -19,7 +19,7 @@ test("adds two datasets from My datasets to a project", async ({ page }) => {
   await page.goto("/home");
   await page.getByRole("button", { name: "New project" }).click();
   await page.getByRole("menuitem", { name: "Blank project" }).click();
-  await expect(page.getByRole("heading", { name: "New project" })).toBeVisible();
+  await expect(page.getByRole("dialog").getByText("New project", { exact: true })).toBeVisible();
 
   const projectName = `E2E Dataset Picker ${Date.now()}`;
   const nameField = page.getByLabel("New project");

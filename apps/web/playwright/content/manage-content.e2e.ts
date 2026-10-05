@@ -46,7 +46,7 @@ test.describe("Content Page Management Operations", () => {
     // destination, so Add new -> Blank project only needs a name.
     await page.getByRole("button", { name: "Add new" }).click();
     await page.getByRole("menuitem", { name: "Blank project" }).click();
-    await expect(page.getByRole("heading", { name: "New project" })).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("New project", { exact: true })).toBeVisible();
     await page.getByLabel("New project").fill(projectName);
     await page.getByRole("button", { name: "Create project" }).click();
     await expect(page).toHaveURL(/\/map\//, { timeout: 30000 });
