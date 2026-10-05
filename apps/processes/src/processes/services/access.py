@@ -15,6 +15,7 @@ temp directory; anything else, a file path in particular, is refused, since
 a tool would otherwise read it as given.
 """
 
+import asyncio
 import json
 import logging
 import re
@@ -31,9 +32,10 @@ from processes.services.access_sql import access_check_sql
 
 logger = logging.getLogger(__name__)
 
-UUID_RE = re.compile(r"^[0-9a-f]{8}-?([0-9a-f]{4}-?){3}[0-9a-f]{12}$", re.IGNORECASE)
+# Matched with fullmatch: `$` would also accept a trailing newline.
+UUID_RE = re.compile(r"[0-9a-f]{8}-?([0-9a-f]{4}-?){3}[0-9a-f]{12}", re.IGNORECASE)
 # "<workflow id>:<node id>:<layer id>" from workflow tool chaining.
-TEMP_LAYER_RE = re.compile(r"^[A-Za-z0-9_-]+(:[A-Za-z0-9_-]+)+$")
+TEMP_LAYER_RE = re.compile(r"[A-Za-z0-9_-]+(:[A-Za-z0-9_-]+)+")
 
 # Layer fields a tool's schema does not mark as a layer selector.
 EXTRA_LAYER_FIELDS: dict[str, tuple[str, ...]] = {
@@ -45,6 +47,13 @@ EXTRA_LAYER_FIELDS: dict[str, tuple[str, ...]] = {
     "catalog_materialize": ("layer_id",),
     "layer_delete_multi": ("layer_ids[]",),
 }
+# Any input key shaped like a layer reference, at any depth, is checked too,
+# whatever the schema says: the workflow runner folds numbered handles
+# (`opportunity_layer_4_id`, `input_layer_7_id`, `input_path_3`) and camelCase
+# keys (`additional_layers[].layerId`) into real tool inputs.
+LAYER_KEY_RE = re.compile(
+    r"^(?:\w+_)?layer(?:_\d+)?_id$|^(?:\w+_)?layer_ids$|^layerId$|^input_path(?:_\d+)?$"
+)
 # Layer-shaped fields that do not name a layer to check. -> why.
 NOT_LAYER_REFERENCES: dict[str, str] = {
     "layer_owner_id": "names whose storage holds the layer; the layer id itself is checked",
@@ -102,7 +111,10 @@ def _layer_selector_paths(schema: dict[str, Any]) -> set[str]:
     return found
 
 
-@lru_cache(maxsize=None)
+REGISTERED_TOOLS = frozenset(t.name for t in TOOL_REGISTRY)
+
+
+@lru_cache(maxsize=len(REGISTERED_TOOLS) + 1)
 def layer_fields(process_id: str) -> tuple[str, ...]:
     """Every input path of a tool that names a layer."""
     tool = next((t for t in TOOL_REGISTRY if t.name == process_id), None)
@@ -143,9 +155,9 @@ class References:
 
     def add_layer(self, value: Any, action: str = "read") -> None:
         text = str(value)
-        if UUID_RE.match(text):
+        if UUID_RE.fullmatch(text):
             self.add("layer", text, action)
-        elif not TEMP_LAYER_RE.match(text):
+        elif not TEMP_LAYER_RE.fullmatch(text):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="A layer input must be a layer id",
@@ -171,9 +183,41 @@ def _check_locations(
         key = inputs.get(name)
         if key in (None, ""):
             continue
-        own = f"users/{user_id}/" if user_id else None
-        if not own or ".." in str(key) or own not in f"/{key}":
+        if not _is_own_upload(str(key), user_id):
             raise _refuse(f"{name} must name one of the caller's own uploads")
+
+
+def _is_own_upload(key: str, user_id: UUID | None) -> bool:
+    """`<bucket path>/users/<caller>/imports/uploads/<file>`, the one shape
+    core hands out for uploads, with nothing after the file name."""
+    parts = key.split("/")
+    if user_id is None or ".." in parts or parts.count("users") != 1:
+        return False
+    at = parts.index("users")
+    return parts[at + 1 : at + 4] == [str(user_id), "imports", "uploads"] and (
+        len(parts) == at + 5 and bool(parts[at + 4])
+    )
+
+
+def _layer_shaped_values(data: Any) -> list[Any]:
+    """Values of every layer-shaped key, at any depth."""
+    found: list[Any] = []
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if (
+                isinstance(key, str)
+                and LAYER_KEY_RE.match(key)
+                and not key.startswith(("output", "result"))
+                and key not in NOT_LAYER_REFERENCES
+                and value not in (None, "", [])
+            ):
+                found.extend(value if isinstance(value, list) else [value])
+            elif isinstance(value, (dict, list)):
+                found.extend(_layer_shaped_values(value))
+    elif isinstance(data, list):
+        for item in data:
+            found.extend(_layer_shaped_values(item))
+    return [v for v in found if isinstance(v, str)]
 
 
 def tool_references(
@@ -185,6 +229,8 @@ def tool_references(
     for path in layer_fields(process_id):
         for value in _values(inputs, path):
             refs.add_layer(value, layer_action)
+    for value in _layer_shaped_values(inputs):
+        refs.add_layer(value, layer_action)
     for path in LAYER_PROJECT_FIELDS:
         for value in _values(inputs, path):
             refs.add("layer_project", value)
@@ -228,9 +274,11 @@ def workflow_references(
         data = node.get("data") or {}
         if data.get("type") == "dataset" and data.get("layerId"):
             refs.add_layer(data["layerId"])
-        elif data.get("type") == "tool" and data.get("processId"):
+        elif data.get("type") == "tool":
+            tool = str(data.get("processId") or "")
+            if tool not in REGISTERED_TOOLS:
+                raise _refuse(f"Unknown tool in workflow: {tool!r}")
             config = data.get("config") or {}
-            tool = str(data["processId"])
             for entry in tool_references(tool, config).entries:
                 if entry["kind"] not in ("project", "folder"):
                     refs.entries.append(entry)
@@ -242,11 +290,16 @@ def workflow_references(
 
 
 _pool: asyncpg.Pool | None = None
+_pool_lock = asyncio.Lock()
 
 
 async def _get_pool() -> asyncpg.Pool:
     global _pool
-    if _pool is None:
+    if _pool is not None:
+        return _pool
+    async with _pool_lock:
+        if _pool is not None:
+            return _pool
         # Same connection as geoapi's: separate parameters, so a password
         # character that is special in a URL cannot break it.
         _pool = await asyncpg.create_pool(

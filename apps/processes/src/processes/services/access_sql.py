@@ -26,7 +26,7 @@ WITH refs AS (
            CASE
                WHEN kind = 'layer_project' THEN (
                    SELECT lp.layer_id FROM {schema}.layer_project lp
-                    WHERE raw_id ~ '^[0-9]+$' AND lp.id = raw_id::bigint
+                    WHERE raw_id ~ '^[0-9]{{1,18}}$' AND lp.id = raw_id::bigint
                )
                WHEN raw_id ~* '^[0-9a-f]{{8}}-?([0-9a-f]{{4}}-?){{3}}[0-9a-f]{{12}}$'
                    THEN raw_id::uuid
@@ -41,9 +41,9 @@ SELECT kind, raw_id, action
     OR NOT (
         (checked_kind = 'layer' AND checked_action = 'read' AND EXISTS (
             SELECT 1
-              FROM {schema}.project_public pp,
-                   jsonb_array_elements(pp.config->'layers') AS l
-             WHERE l->>'layer_id' = ref_id::text
+              FROM {schema}.project_public pp
+             WHERE pp.config->'layers'
+                   @> jsonb_build_array(jsonb_build_object('layer_id', ref_id::text))
         ))
         OR COALESCE({schema}.can(checked_kind, ref_id, $1::uuid, checked_action), FALSE)
     )

@@ -155,6 +155,8 @@ async def test_unknown_and_malformed_ids_are_denied(world: dict[str, Any]) -> No
         _ref("layer", "/app/data/ducklake/somebody/t_x.parquet"),
         _ref("layer_project", "999999999"),
         _ref("layer_project", "not-a-number"),
+        _ref("layer_project", "99999999999999999999"),  # beyond bigint
+        _ref("layer", f"{uuid4()}' OR '1'='1"),
         _ref("project", "'; DROP TABLE layer; --", "write"),
     ]
     expected = {(r["kind"], r["id"], r["action"]) for r in refs}

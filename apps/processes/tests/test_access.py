@@ -129,6 +129,11 @@ class TestLocations:
             "goat/users/1c684d0f-f831-48a8-803f-98d7f00bbd23/imports/uploads/a.gpkg",
             f"goat/users/{USER}/../1c684d0f-f831-48a8-803f-98d7f00bbd23/a.gpkg",
             "goat/catalog/data/t_x.parquet",
+            f"goat/users/{USER}/imports/uploads/a/../../x.gpkg",
+            f"goat/users/{USER}/imports/uploads/nested/a.gpkg",
+            f"goat/users/{USER}/imports/uploads/",
+            f"goat/users/{USER}/users/1c684d0f-f831-48a8-803f-98d7f00bbd23/a.gpkg",
+            f"goat/users/1c684d0f-f831-48a8-803f-98d7f00bbd23/x/users/{USER}/imports/uploads/a.gpkg",
         ],
     )
     def test_an_import_of_someone_elses_object_is_refused(self, key: str) -> None:
@@ -163,6 +168,31 @@ def test_every_layer_shaped_field_of_every_tool_is_checked() -> None:
             ):
                 unchecked.append(f"{tool.name}.{name}")
     assert unchecked == [], unchecked
+
+
+@pytest.mark.parametrize(
+    ("tool", "inputs"),
+    [
+        # Numbered handles the workflow runner folds into real inputs.
+        ("custom_sql", {"input_layer_7_id": OTHER}),
+        ("heatmap_gravity", {"opportunity_layer_4_id": OTHER}),
+        ("merge", {"input_path_3": OTHER}),
+        # Nested and camelCase keys.
+        ("custom_sql", {"additional_layers": [{"alias": "x", "layerId": OTHER}]}),
+        ("buffer", {"extra": {"deep": [{"source_layer_id": OTHER}]}}),
+    ],
+)
+def test_a_layer_shaped_key_is_checked_wherever_it_sits(
+    tool: str, inputs: dict[str, Any]
+) -> None:
+    assert ("layer", OTHER, "read") in _entries(tool_references(tool, inputs, USER))
+
+
+def test_a_layer_shaped_key_holding_a_file_location_is_refused() -> None:
+    inputs = {"additional_layers": [{"layerId": "/app/data/ducklake/x.parquet"}]}
+    with pytest.raises(HTTPException) as refused:
+        tool_references("custom_sql", inputs, USER)
+    assert refused.value.status_code == 422
 
 
 class TestAnalyticsReferences:
@@ -254,4 +284,75 @@ def test_a_check_that_cannot_run_refuses_with_503(
         "/processes/feature-count/execution", json={"inputs": {"collection": LAYER}}
     )
     assert response.status_code == 503, response.text
+    assert nothing_runs == []
+
+
+@pytest.mark.parametrize("process_id", ["catchment_area", "", None, "../buffer"])
+def test_a_workflow_naming_an_unregistered_tool_is_refused(process_id: Any) -> None:
+    nodes = [{"data": {"type": "tool", "processId": process_id, "config": {}}}]
+    with pytest.raises(HTTPException) as refused:
+        workflow_references(nodes, PROJECT, FOLDER)
+    assert refused.value.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "value", [f"{LAYER}\n", f" {LAYER}", "wf:node\n", "wf:../../x", "wf:node/x"]
+)
+def test_a_layer_id_with_anything_around_it_is_refused(value: str) -> None:
+    with pytest.raises(HTTPException) as refused:
+        tool_references("buffer", {"input_layer_id": value}, USER)
+    assert refused.value.status_code == 422
+
+
+def test_the_server_sets_who_runs_a_job(monkeypatch: pytest.MonkeyPatch) -> None:
+    from processes.deps.auth import get_optional_user_id
+
+    submitted: list[dict[str, Any]] = []
+
+    async def submit(script_path: str, args: dict[str, Any], **_: Any) -> str:
+        submitted.append(args)
+        return "job-1"
+
+    monkeypatch.setattr(processes_router.windmill_client, "run_script_async", submit)
+    app.dependency_overrides[get_optional_user_id] = lambda: USER
+    try:
+        response = TestClient(app).post(
+            "/processes/buffer/execution",
+            json={
+                "inputs": {
+                    "input_layer_id": LAYER,
+                    "user_id": "1c684d0f-f831-48a8-803f-98d7f00bbd23",
+                    "_triggered_by_email": "someone@else.example",
+                    "triggered_by_email": "someone@else.example",
+                }
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_optional_user_id, None)
+    assert response.status_code < 300, response.text
+    (args,) = submitted
+    assert args["user_id"] == str(USER)
+    assert "triggered_by_email" not in args
+    assert "_triggered_by_email" not in args
+
+
+@pytest.mark.parametrize(
+    ("process_id", "field", "value"),
+    [
+        ("unique-values", "offset", "0; SELECT pw, 1 FROM lake.main.t_x --"),
+        ("unique-values", "limit", "(SELECT count(*) FROM lake.main.t_x)"),
+        ("aggregation-stats", "limit", "10"),
+        ("histogram", "num_bins", 2.5),
+        ("class-breaks", "breaks", True),
+        ("unique-values", "offset", -1),
+    ],
+)
+def test_numeric_statistics_inputs_must_be_whole_numbers(
+    nothing_runs: list[str], process_id: str, field: str, value: Any
+) -> None:
+    response = TestClient(app).post(
+        f"/processes/{process_id}/execution",
+        json={"inputs": {"collection": LAYER, "attribute": "name", field: value}},
+    )
+    assert response.status_code == 422, response.text
     assert nothing_runs == []
