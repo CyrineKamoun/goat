@@ -147,14 +147,14 @@ class References:
             self.add("layer", text, action)
         elif not TEMP_LAYER_RE.match(text):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="A layer input must be a layer id",
             )
 
 
 def _refuse(detail: str) -> HTTPException:
     return HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail
     )
 
 
