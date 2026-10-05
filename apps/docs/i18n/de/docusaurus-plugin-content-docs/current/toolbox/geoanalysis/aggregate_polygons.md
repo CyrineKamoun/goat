@@ -58,15 +58,11 @@ Im folgenden Beispiel werden die Polygone des *zu aggregierenden Layers* auf Hex
 <Tabs>
   <TabItem value="Polygon" label="Polygon" default className="tabItemBox">
 
- #### Polygon
-
 Wählen Sie den <code>Flächen-Layer</code>, der die Polygone enthält, auf denen Sie Ihre Polygondaten aggregieren möchten. Jedes Polygon des Eingabe-Layers wird in jeder Fläche berücksichtigt, die es schneidet.
 
 
   </TabItem>
   <TabItem value="H3 Grid" label="H3 Grid" className="tabItemBox">
-
- #### H3 Grid
 
 Wählen Sie die <code>H3-Auflösung</code>. Sie können Auflösungen zwischen <b>3</b> (durchschnittliche Kantenlänge von 69km) und <b>10</b> (durchschnittliche Kantenlänge von 70m) wählen. Höhere Werte erzeugen kleinere Hexagone. Jedes Polygon des Eingabe-Layers wird dem Hexagon zugeordnet, in dem sein Schwerpunkt liegt.
 

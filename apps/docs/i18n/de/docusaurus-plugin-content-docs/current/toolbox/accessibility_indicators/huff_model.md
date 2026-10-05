@@ -151,12 +151,12 @@ Idealerweise sammeln Sie Daten zu tatsächlichen Kundenbesuchen oder Marktanteil
 
 :::
 
-### Ergebnis-Layer
-
 <div class="step">
   <div class="step-number">12</div>
   <div class="content">Optional können Sie verschiedene Routing-Optionen für das gewählte Verkehrsmittel konfigurieren, etwa Reisegeschwindigkeit, maximale Anzahl an Umstiegen, Zu- und Abgangslimits und mehr. Weitere Informationen zu verkehrsmittelspezifischen Optionen finden Sie im Abschnitt [Routing](../../category/routing).</div>
 </div>
+
+### Ergebnis-Layer
 
 <div class="step">
   <div class="step-number">13</div>
