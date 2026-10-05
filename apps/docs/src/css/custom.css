@@ -671,6 +671,12 @@ a.card:hover {
   margin: 0;
 }
 
+/* Tabs straight after a step show that step's options: indent them to the
+   step text (number box 2.4rem + 20px, then 20px to the text). */
+.step + .tabs-container {
+  margin-left: calc(2.4rem + 40px);
+}
+
 .tabItemBox {
   margin-left: 10px;
 }

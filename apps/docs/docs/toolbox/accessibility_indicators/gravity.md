@@ -119,22 +119,21 @@ This function counts every destination within the travel cost limit equally, app
 
 </Tabs>
 
+<div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Set how travel is measured. The options depend on the <code>Transport mode</code> you picked in step 3:</div>
+</div>
+
 <Tabs>
 <TabItem value="active-car" label="Walk / Bicycle / Pedelec / Car" default className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">In the <code>Calculate by</code> menu, choose either the Time (minutes) or Distance (metres) cost type.</div>
-</div>
+In the <code>Calculate by</code> menu, choose either the Time (minutes) or Distance (metres) cost type.
 
 </TabItem>
 
 <TabItem value="public transport" label="Public Transport (PT)" className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Choose <code>PT modes</code> to analyze: Bus, Tram, Rail, Subway, Ferry, Cable Car, Gondola, and/or Funicular. Then, select the <code>Day</code> and <code>Arrival time</code> for the analysis. The best public transport journeys that reach the opportunities at or before this time will be considered.</div>
-</div>
+Choose <code>PT modes</code> to analyze: Bus, Tram, Rail, Subway, Ferry, Cable Car, Gondola, and/or Funicular. Then, select the <code>Day</code> and <code>Arrival time</code> for the analysis. The best public transport journeys that reach the opportunities at or before this time will be considered.
 
 </TabItem>
 </Tabs>
