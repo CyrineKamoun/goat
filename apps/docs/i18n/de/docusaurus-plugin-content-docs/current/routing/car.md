@@ -11,7 +11,7 @@ Das **Verkehrsmittel Auto** wird für alle Analysen in GOAT verwendet, die Autof
 
 ## 1. Ziele
 
-Car Routing wird für viele Indikatoren in GOAT verwendet, wie z.B. [Einzugsgebiete](../toolbox/accessibility_indicators/catchments) und [Heatmaps](../toolbox/accessibility_indicators/connectivity). 
+[Car Routing](https://www.plan4better.de/de/glossar/routing) wird für viele Indikatoren in GOAT verwendet, wie z.B. [Einzugsgebiete](../toolbox/accessibility_indicators/catchments) und [Heatmaps](../toolbox/accessibility_indicators/connectivity). 
 
 Für den Verkehrsträger Auto wird ein **angepasster Routing-Algorithmus** verwendet, der dabei **nur Wege berücksichtigt, die für das Fahren geeignet sind**.
 

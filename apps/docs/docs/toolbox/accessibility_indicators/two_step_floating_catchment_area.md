@@ -22,7 +22,7 @@ The Heatmap 2SFCA (Two-Step Floating Catchment Area) tool **produces a color-cod
 The 2SFCA method measures **spatial accessibility by considering both supply (capacity of facilities) and demand (population)**. Unlike simple supply-demand ratios per administrative unit, 2SFCA accounts for cross-boundary access: people can reach facilities in neighboring areas, and facilities serve populations beyond their own district.
 The result is a **supply-to-demand ratio at the level of hexagonal grid cells**. The tool works in two steps:
 
-1. **Step 1: Capacity Demand Ratios.** For each facility location, compute how much capacity is available relative to the total demand (population) within its catchment area. This produces a supply-to-demand ratio per facility.
+1. **Step 1: Capacity Demand Ratios.** For each facility location, compute how much capacity is available relative to the total demand (population) within its [catchment area](https://www.plan4better.de/en/glossary/catchment-area). This produces a supply-to-demand ratio per facility.
 
 2. **Step 2: Cumulative Accessibility.** For each grid cell, sum the capacity ratios of all reachable facilities. The result represents how well-served each location is.
 
@@ -82,7 +82,7 @@ Heatmap computation is available across **over 30 European countries** for `Walk
 | Bicycle | All paths accessible by bicycle (taking into account surface and slope) |
 | Pedelec | All paths accessible by pedelec (taking into account surface and slope) |
 | Car | All paths accessible by car (taking into account speed limits and one-way restrictions) |
-| Public Transport | All journeys possible by public transport (according to official GTFS schedules), considering walking access and egress to and from stops |
+| Public Transport | All journeys possible by public transport (according to official [GTFS](https://www.plan4better.de/en/glossary/gtfs) schedules), considering walking access and egress to and from stops |
 
 <Tabs>
 <TabItem value="active-car" label="Walk / Bicycle / Pedelec / Car" default className="tabItemBox">
@@ -182,7 +182,7 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
 
 <div class="step">
   <div class="step-number">7</div>
-  <div class="content">Select a <code>Reference area</code> - a polygon layer that represents your study area. When set, the heatmap extends to cover all H3 cells within that polygon, with inaccessible cells assigned a value of <code>NULL</code> to expose coverage gaps and underserved areas.</div>
+  <div class="content">Select a <code>Reference area</code> - a polygon layer that represents your study area. When set, the heatmap extends to cover all H3 cells within that polygon, with inaccessible cells assigned a value of <code>NULL</code> to expose [coverage gaps](https://www.plan4better.de/en/glossary/service-gaps) and underserved areas.</div>
 </div>
 
 <div class="step">
@@ -455,12 +455,12 @@ The cumulative function applies **no distance decay** and does not use the *sens
 
 ### Classification
 
-In order to classify the accessibility levels that were computed for each grid cell, a classification based on quantiles is used by default. 
+In order to classify the accessibility levels that were computed for each grid cell, a classification based on [quantiles](https://www.plan4better.de/en/glossary/quantile-classification) is used by default. 
 However, various other classification methods may be used instead. Read more in the **[Data Classification Methods](../../map/layer_style/style/attribute_based_styling#data-classification-methods)** section of the *Attribute-based Styling* page.
 
 ### Visualization 
 
-Heatmaps in GOAT utilize **[Uber's H3 grid-based](https://www.plan4better.de/en/glossary/h3-grid)** solution for efficient computation and easy-to-understand visualization. Behind the scenes, accessibility is computed on-the-fly by GOAT's own routing engine. For each *routing type*, the engine routes outward from the opportunities to discover the reachable H3 cells and their travel costs, then aggregates these into a per-cell accessibility score. Public transport uses the RAPTOR-based engine, while the active mobility and car modes use GOAT's Dijkstra implementation.
+Heatmaps in GOAT utilize **[Uber's H3 grid-based](https://www.plan4better.de/en/glossary/h3-grid)** solution for efficient computation and easy-to-understand visualization. Behind the scenes, accessibility is computed on-the-fly by GOAT's own routing engine. For each *routing type*, the engine routes outward from the opportunities to discover the reachable H3 cells and their travel costs, then aggregates these into a per-cell accessibility score. Public transport uses the RAPTOR-based engine, while the [active mobility](https://www.plan4better.de/en/glossary/active-mobility) and car modes use GOAT's Dijkstra implementation.
 
 The resolution and dimensions of the hexagonal grid used depend on the selected *routing type*:
 

@@ -17,7 +17,7 @@ Der Heatmap - Konnektivität Indikator **erstellt eine farbkodierte Karte zur Vi
 
 ## 1. Erklärung
 
-Die Heatmap verwendet ein farbkodiertes sechseckiges Gitter, um **zu zeigen, wie gut verschiedene Gebiete miteinander verbunden sind.** Als Eingabeparameter werden ein **Interessengebiet** (AOI), ein **Verkehrsmittel** (zu Fuß, Radfahren usw.) und ein **Reisezeitlimit** benötigt. Unter Berücksichtigung der realen Verkehrs- und Straßennetze berechnet sie die Konnektivität jedes Sechsecks innerhalb der AOI.
+Die [Heatmap](https://www.plan4better.de/de/glossar/heatmap) verwendet ein farbkodiertes sechseckiges Gitter, um **zu zeigen, wie gut verschiedene Gebiete miteinander verbunden sind.** Als Eingabeparameter werden ein **Interessengebiet** (AOI), ein **Verkehrsmittel** (zu Fuß, Radfahren usw.) und ein **Reisezeitlimit** benötigt. Unter Berücksichtigung der realen Verkehrs- und Straßennetze berechnet sie die Konnektivität jedes Sechsecks innerhalb der AOI.
 
 
 :::info
@@ -58,7 +58,7 @@ Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **üb
 | Fahrrad | Alle mit dem Fahrrad befahrbaren Wege (unter Berücksichtigung von Oberfläche und Steigung) |
 | Pedelec | Alle mit dem Pedelec befahrbaren Wege (unter Berücksichtigung von Oberfläche und Steigung) |
 | Auto | Alle mit dem Auto befahrbaren Wege (unter Berücksichtigung von Tempolimits und Einbahnstraßen) |
-| Öffentlicher Verkehr | Alle mit dem ÖV möglichen Fahrten (gemäß offiziellen GTFS-Fahrplänen), unter Berücksichtigung von Zu- und Abgang zu Fuß zu und von den Haltestellen |
+| Öffentlicher Verkehr | Alle mit dem ÖV möglichen Fahrten (gemäß offiziellen [GTFS](https://www.plan4better.de/de/glossar/gtfs)-Fahrplänen), unter Berücksichtigung von Zu- und Abgang zu Fuß zu und von den Haltestellen |
 
 <Tabs>
 <TabItem value="active-car" label="Zu Fuß / Fahrrad / Pedelec / Auto" default className="tabItemBox">
@@ -159,7 +159,7 @@ Die Konnektivitäts-Formel berechnet die Gesamtfläche (in Quadratmetern), von d
 
 ### Rasterzellen 
 
-Heatmaps in GOAT nutzen **[Ubers H3-rasterbasierte](https://www.plan4better.de/de/glossar/h3-gitter)** Lösung für effiziente Berechnungen und leicht verständliche Visualisierung. Im Hintergrund wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jedes *Verkehrsmittel* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der aktiven Mobilität und das Auto GOATs Dijkstra-Implementierung verwenden.
+Heatmaps in GOAT nutzen **[Ubers H3-rasterbasierte](https://www.plan4better.de/de/glossar/h3-gitter)** Lösung für effiziente Berechnungen und leicht verständliche Visualisierung. Im Hintergrund wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jedes *Verkehrsmittel* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der [aktiven Mobilität](https://www.plan4better.de/de/glossar/aktive-mobilitaet) und das Auto GOATs Dijkstra-Implementierung verwenden.
 
 Die Auflösung und Abmessungen des verwendeten sechseckigen Rasters hängen vom gewählten *Verkehrsmittel* ab:
 
@@ -179,4 +179,4 @@ Für weitere Einblicke in den Routing-Algorithmus, besuchen Sie [Routing](../../
 
 ### Visualisierung
 
-Zur Visualisierung verwendet das Ergebnis der Konnektivitätsanalyse standardmäßig eine Klassifizierungsmethode basierend auf Quantilen. Es können jedoch auch verschiedene andere Klassifizierungsmethoden verwendet werden. Lesen Sie mehr im Abschnitt **[Datenklassifizierungsmethoden](../../map/layer_style/style/attribute_based_styling#datenklassifizierungsmethoden)** der Seite *Attribut-basiertes Styling*.
+Zur Visualisierung verwendet das Ergebnis der Konnektivitätsanalyse standardmäßig eine Klassifizierungsmethode basierend auf [Quantilen](https://www.plan4better.de/de/glossar/quantilklassifizierung). Es können jedoch auch verschiedene andere Klassifizierungsmethoden verwendet werden. Lesen Sie mehr im Abschnitt **[Datenklassifizierungsmethoden](../../map/layer_style/style/attribute_based_styling#datenklassifizierungsmethoden)** der Seite *Attribut-basiertes Styling*.

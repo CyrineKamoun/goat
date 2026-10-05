@@ -20,7 +20,7 @@ Das Huff-Modell **prognostiziert die Wahrscheinlichkeit, mit der Konsumenten in 
 ## 1. Erklärung
 
 Das Huff-Modell ist ein **räumliches Interaktionsmodell, das schätzt, wie sich die Nachfrage (z. B. Kunden, Bewohner) auf konkurrierende Angebotsstandorte (z. B. Geschäfte, Einrichtungen) verteilt**.
-Das Modell funktioniert nach einem einfachen Prinzip: **Die Wahrscheinlichkeit, dass ein Standort gewählt wird, hängt von seiner Attraktivität im Verhältnis zu allen konkurrierenden Standorten ab, gewichtet nach der Reisezeit**. Ein großes, nahe gelegenes Einkaufszentrum wird mehr Nachfrage auf sich ziehen als ein kleines, weit entferntes, aber die genaue Aufteilung hängt vom Gleichgewicht zwischen Attraktivität und Entfernung aller verfügbaren Optionen ab.
+Das Modell funktioniert nach einem einfachen Prinzip: **Die Wahrscheinlichkeit, dass ein Standort gewählt wird, hängt von seiner Attraktivität im Verhältnis zu allen konkurrierenden Standorten ab, gewichtet nach der [Reisezeit](https://www.plan4better.de/de/glossar/reisezeit)**. Ein großes, nahe gelegenes Einkaufszentrum wird mehr Nachfrage auf sich ziehen als ein kleines, weit entferntes, aber die genaue Aufteilung hängt vom Gleichgewicht zwischen Attraktivität und Entfernung aller verfügbaren Optionen ab.
 
 Das Ergebnis ist ein **Wahrscheinlichkeitswert für jeden Angebotsstandort**, der den Anteil der Gesamtnachfrage darstellt, den er aus dem Referenzgebiet auf sich zieht. Dies ermöglicht einen direkten Vergleich, wie gut verschiedene Einrichtungen um denselben Kundenstamm konkurrieren.
 
@@ -33,7 +33,7 @@ Sie können das Verkehrsmittel, den Gelegenheiten-Layer (mit Kapazitätsfeldern)
 - Der **Nachfrage-Layer enthält Bevölkerungs- oder Nutzerdaten** (z. B. Einwohnerzahl, potenzielle Kunden), die die Nachfrage nach den Einrichtungen darstellen.
 
 
-**Wesentlicher Unterschied:** Im Gegensatz zu Heatmaps, die die Erreichbarkeit pro Rasterzelle visualisieren, erzeugt das *Huff-Modell* eine **Wahrscheinlichkeit pro Angebotsstandort** und zeigt, welchen Anteil der Gesamtnachfrage jede Einrichtung erfasst.
+**Wesentlicher Unterschied:** Im Gegensatz zu [Heatmaps](https://www.plan4better.de/de/glossar/heatmap), die die Erreichbarkeit pro Rasterzelle visualisieren, erzeugt das *Huff-Modell* eine **Wahrscheinlichkeit pro Angebotsstandort** und zeigt, welchen Anteil der Gesamtnachfrage jede Einrichtung erfasst.
 
 :::info
 
@@ -76,7 +76,7 @@ Die Berechnung des Huff-Modells ist für `Walk`, `Bicycle`, `Pedelec` und `Auto`
 | Fahrrad | Alle mit dem Fahrrad befahrbaren Wege (unter Berücksichtigung von Oberfläche und Steigung) |
 | Pedelec | Alle mit dem Pedelec befahrbaren Wege (unter Berücksichtigung von Oberfläche und Steigung) |
 | Auto | Alle mit dem Auto befahrbaren Wege (unter Berücksichtigung von Tempolimits und Einbahnstraßen) |
-| Öffentlicher Verkehr | Alle mit dem ÖV möglichen Fahrten (gemäß offiziellen GTFS-Fahrplänen), unter Berücksichtigung von Zu- und Abgang zu Fuß zu und von den Haltestellen |
+| Öffentlicher Verkehr | Alle mit dem ÖV möglichen Fahrten (gemäß offiziellen [GTFS](https://www.plan4better.de/de/glossar/gtfs)-Fahrplänen), unter Berücksichtigung von Zu- und Abgang zu Fuß zu und von den Haltestellen |
 
 <Tabs>
 <TabItem value="active-car" label="Zu Fuß / Fahrrad / Pedelec / Auto" default className="tabItemBox">

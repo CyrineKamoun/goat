@@ -11,7 +11,7 @@ The **Walk Routing** is used for all analyses in GOAT that contain walking trips
  
 ## 1. Objectives
 
-Walk routing is used for many indicators in GOAT, such as [Catchment Areas](../toolbox/accessibility_indicators/catchments "Visit Docs on Catchment Areas"), [Heatmaps](../toolbox/accessibility_indicators/connectivity "Visit Docs on Heatmaps"), the [Huff Model](../toolbox/accessibility_indicators/huff_model "Visit Docs on the Huff Model"), and the [Travel Cost Matrix](../toolbox/accessibility_indicators/travel_cost_matrix "Visit Docs on the Travel Cost Matrix"). A **custom routing algorithm** is used for the mode of walking, which **only considers paths that are suitable for pedestrians**. The walking `speed` can be adjusted by the user whenever an accessibility analysis is performed. 
+[Walk routing](https://www.plan4better.de/en/glossary/routing) is used for many indicators in GOAT, such as [Catchment Areas](../toolbox/accessibility_indicators/catchments "Visit Docs on Catchment Areas"), [Heatmaps](../toolbox/accessibility_indicators/connectivity "Visit Docs on Heatmaps"), the [Huff Model](../toolbox/accessibility_indicators/huff_model "Visit Docs on the Huff Model"), and the [Travel Cost Matrix](../toolbox/accessibility_indicators/travel_cost_matrix "Visit Docs on the Travel Cost Matrix"). A **custom routing algorithm** is used for the mode of walking, which **only considers paths that are suitable for pedestrians**. The walking `speed` can be adjusted by the user whenever an [accessibility analysis](https://www.plan4better.de/en/glossary/accessibility-analysis) is performed. 
 
 ## 2. Data
 

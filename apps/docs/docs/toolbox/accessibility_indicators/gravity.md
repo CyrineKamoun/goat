@@ -16,11 +16,11 @@ The Heatmap - Gravity indicator **produces a color-coded map to visualize the ac
 
 ## 1. Explanation
 
-The heatmap Gravity displays a **color-coded hexagonal grid showing the accessibility of destinations (opportunities) based on travel cost (time or distance) and destination attractiveness**. Accessibility is calculated using real-world transport networks and a gravity-based formula that reflects how people’s willingness to travel decreases with distance.
+The [heatmap](https://www.plan4better.de/en/glossary/heatmap) Gravity displays a **color-coded hexagonal grid showing the accessibility of destinations (opportunities) based on travel cost (time or distance) and destination attractiveness**. Accessibility is calculated using real-world transport networks and a [gravity-based formula](https://www.plan4better.de/en/glossary/gravity-model) that reflects how people’s willingness to travel decreases with distance.
 
 You can specify the **routing type**, **opportunity layer**, **travel cost limit**, and adjust **sensitivity** and **destination potential** to fine-tune how accessibility is calculated.
 
-- The **Opportunity layer contains point or polygon based destination data** (such as POIs, transit stops, schools, amenities, parks, or custom data). You can select multiple opportunity layers, which will be combined into a single unified heatmap.
+- The **Opportunity layer contains point or polygon based destination data** (such as [POIs](https://www.plan4better.de/en/glossary/point-of-interest), transit stops, schools, amenities, parks, or custom data). You can select multiple opportunity layers, which will be combined into a single unified heatmap.
 
 - The **Sensitivity controls how quickly accessibility decreases with increasing travel cost**, while the **Destination potential lets you give more weight to destinations with higher capacity or quality** (e.g., a larger supermarket or a bus stop with more departures). Together with the chosen **Impedance function, these settings define how accessibility is calculated**.
 
@@ -49,7 +49,7 @@ Heatmap computation is available across **over 30 European countries** for `Walk
 
  - Are there areas with high potential for transit-oriented development or opportunities for improving non-motorized transportation infrastructure, such as bike lanes or pedestrian-friendly streets?
 
- - What is the impact of a new amenity on local accessibility?
+ - What is the impact of a new amenity on [local accessibility](https://www.plan4better.de/en/glossary/local-accessibility)?
 
  - Is there potential to expand the availability of services such as bike sharing or car sharing stations?
 
@@ -78,7 +78,7 @@ Heatmap computation is available across **over 30 European countries** for `Walk
 | Bicycle | All paths accessible by bicycle (taking into account surface and slope) |
 | Pedelec | All paths accessible by pedelec (taking into account surface and slope) |
 | Car | All paths accessible by car (taking into account speed limits and one-way restrictions) |
-| Public Transport | All journeys possible by public transport (according to official GTFS schedules), considering walking access and egress to and from stops |
+| Public Transport | All journeys possible by public transport (according to official [GTFS](https://www.plan4better.de/en/glossary/gtfs) schedules), considering walking access and egress to and from stops |
 
 <div class="step">
   <div class="step-number">4</div>
@@ -145,7 +145,7 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Select a <code>Reference area</code> - a polygon layer that represents your study area. When set, the heatmap extends to cover all H3 cells within that polygon, with inaccessible cells assigned a value of <code>NULL</code> to expose coverage gaps and underserved areas.</div>
+  <div class="content">Select a <code>Reference area</code> - a polygon layer that represents your study area. When set, the heatmap extends to cover all H3 cells within that polygon, with inaccessible cells assigned a value of <code>NULL</code> to expose [coverage gaps](https://www.plan4better.de/en/glossary/service-gaps) and underserved areas.</div>
 </div>
 
 <div class="step">
@@ -357,7 +357,7 @@ import ImpedanceFunction from '@site/src/components/ImpedanceFunction';
 </div>
 
 ### Classification
-In order to classify the accessibility levels that were computed for each grid cell (for color-coded visualization), a classification based on **8 quantile group is used by default**. That means, each color covers 12,5 % of the grid cells. The area outside of the computed layer has no access within the defined travel cost.
+In order to classify the accessibility levels that were computed for each grid cell (for color-coded visualization), a classification based on **8 [quantile](https://www.plan4better.de/en/glossary/quantile-classification) group is used by default**. That means, each color covers 12,5 % of the grid cells. The area outside of the computed layer has no access within the defined travel cost.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 <img src={require('/img/toolbox/accessibility_indicators/heatmaps/gravity_based/gravity_default_classification.png').default} alt="gravity-default-classification" style={{ maxHeight: "auto", maxWidth: "40%"}}/>
@@ -368,7 +368,7 @@ However, various other classification methods may be used instead. Read more in 
 
 ### Visualization 
 
-Heatmaps in GOAT utilize **[Uber's H3 grid-based](https://www.plan4better.de/en/glossary/h3-grid)** solution for efficient computation and easy-to-understand visualization. Behind the scenes, accessibility is computed on-the-fly by GOAT's own routing engine. For each *routing type*, the engine routes outward from the opportunities to discover the reachable H3 cells and their travel costs, then aggregates these into a per-cell accessibility score. Public transport uses the RAPTOR-based engine, while the active mobility and car modes use GOAT's Dijkstra implementation.
+Heatmaps in GOAT utilize **[Uber's H3 grid-based](https://www.plan4better.de/en/glossary/h3-grid)** solution for efficient computation and easy-to-understand visualization. Behind the scenes, accessibility is computed on-the-fly by GOAT's own routing engine. For each *routing type*, the engine routes outward from the opportunities to discover the reachable H3 cells and their travel costs, then aggregates these into a per-cell accessibility score. Public transport uses the RAPTOR-based engine, while the [active mobility](https://www.plan4better.de/en/glossary/active-mobility) and car modes use GOAT's Dijkstra implementation.
 
 The resolution and dimensions of the hexagonal grid used depend on the selected *routing type*:
 

@@ -12,11 +12,11 @@ import TabItem from '@theme/TabItem';
 <iframe width="674" height="378" src="https://www.youtube.com/embed/GA_6PbhAA6k?si=4mA2OdTPGCl7iVRi&amp;start=46" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 </div>
 
-Einzugsgebiet zeigt **wie weit Menschen innerhalb einer bestimmten Reisezeit oder Entfernung, mit einem oder mehreren Verkehrsmitteln reisen können**, mit erweiterten Ausgabeformen, anpassbaren Schrittgrößen und zusätzlichen Einstellungen für den öffentlichen Verkehr.
+Einzugsgebiet zeigt **wie weit Menschen innerhalb einer bestimmten [Reisezeit](https://www.plan4better.de/de/glossar/reisezeit) oder Entfernung, mit einem oder mehreren Verkehrsmitteln reisen können**, mit erweiterten Ausgabeformen, anpassbaren Schrittgrößen und zusätzlichen Einstellungen für den öffentlichen Verkehr.
 
 ## 1. Erklärung
 
-Basierend auf festgelegten Startpunkten, maximaler Reisezeit oder Entfernung und Verkehrsmitteln **visualisiert das Tool die Erreichbarkeit anhand realer Routing-Netzwerke**. Die resultierenden Isochronen können mit räumlichen Datensätzen, wie Bevölkerungs- oder Infrastrukturdaten, verschnitten werden, um die Abdeckung zu bewerten und Erreichbarkeitslücken zu identifizieren.
+Basierend auf festgelegten Startpunkten, maximaler Reisezeit oder Entfernung und Verkehrsmitteln **visualisiert das Tool die Erreichbarkeit anhand realer Routing-Netzwerke**. Die resultierenden [Isochronen](https://www.plan4better.de/de/glossar/isochrone) können mit räumlichen Datensätzen, wie Bevölkerungs- oder Infrastrukturdaten, verschnitten werden, um die Abdeckung zu bewerten und Erreichbarkeitslücken zu identifizieren.
 
 Einzugsgebiet bietet folgende zusätzliche Funktionen:
 

@@ -49,7 +49,7 @@ All layers are visible across zoom levels 1-22 unless configured otherwise.
 
 ## Best practices
 
-**Detailed features** (Buildings, POIs): Use higher zoom levels (14-22) to prevent clutter.
+**Detailed features** (Buildings, [POIs](https://www.plan4better.de/en/glossary/point-of-interest)): Use higher zoom levels (14-22) to prevent clutter.
 
 **Regional data** (Demographics, Boundaries): Use intermediate levels (8-16) for context.
 

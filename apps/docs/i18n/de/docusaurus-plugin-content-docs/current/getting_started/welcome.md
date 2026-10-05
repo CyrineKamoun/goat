@@ -20,7 +20,7 @@ import { DocsHero, DocsSectionCards } from '@site/src/components/DocsHome';
 
 ## Was ist GOAT?
 
-GOAT ist wie ein super-intelligenter Assistent für Stadt-, Raum- und Verkehrsplanung. **Es ist eine WebGIS-Plattform voller reichhaltiger Daten und fortschrittlicher Werkzeuge, die Planern und GIS-Analysten hilft, faktenbasierte Entscheidungen zu treffen**. Mit GOAT können Sie Benchmarks berechnen, bestehende Situationen analysieren und sogar potenzielle Szenarien erstellen und bewerten. Die Plattform bietet eine moderne Benutzeroberfläche und einen intuitiven Benutzerfluss, um den Planungsprozess zu vereinfachen. **GOATs Hauptziel ist es, Sie zu befähigen, intelligenter zu planen, effektiver zusammenzuarbeiten und einen echten Unterschied in den Gemeinden zu machen, denen Sie dienen**.
+GOAT ist wie ein super-intelligenter Assistent für Stadt-, Raum- und Verkehrsplanung. **Es ist eine [WebGIS](https://www.plan4better.de/de/glossar/webgis)-Plattform voller reichhaltiger Daten und fortschrittlicher Werkzeuge, die Planern und GIS-Analysten hilft, faktenbasierte Entscheidungen zu treffen**. Mit GOAT können Sie Benchmarks berechnen, bestehende Situationen analysieren und sogar potenzielle Szenarien erstellen und bewerten. Die Plattform bietet eine moderne Benutzeroberfläche und einen intuitiven Benutzerfluss, um den Planungsprozess zu vereinfachen. **GOATs Hauptziel ist es, Sie zu befähigen, intelligenter zu planen, effektiver zusammenzuarbeiten und einen echten Unterschied in den Gemeinden zu machen, denen Sie dienen**.
 
 ## Mit GOAT können Sie:
 
@@ -31,7 +31,7 @@ GOAT ist wie ein super-intelligenter Assistent für Stadt-, Raum- und Verkehrspl
 ## Warum GOAT wählen?
 
 ### Erreichbarkeit im Mittelpunkt
-GOAT zeichnet sich durch seinen Fokus auf **Erreichbarkeitsindikatoren aus und macht es einfacher, Ungleichheiten in der Raum- und Verkehrsplanung zu identifizieren und anzugehen**. Im Gegensatz zu anderen Werkzeugen bietet GOAT gebrauchsfertige Features, um Ihnen zu helfen, die Erreichbarkeit in Ihren Projekten zu bewerten und zu verbessern.
+GOAT zeichnet sich durch seinen Fokus auf **Erreichbarkeitsindikatoren aus und macht es einfacher, Ungleichheiten in der Raum- und Verkehrsplanung zu identifizieren und anzugehen**. Im Gegensatz zu anderen Werkzeugen bietet GOAT gebrauchsfertige Features, um Ihnen zu helfen, [die Erreichbarkeit](https://www.plan4better.de/de/glossar/erreichbarkeit) in Ihren Projekten zu bewerten und zu verbessern.
 
 ### Integrierte Daten
 Mit seinen integrierten granularen Daten **macht es GOAT einfach, auf die Daten zuzugreifen, die Sie benötigen**. Falls es spezifische Daten gibt, die Sie hinzufügen möchten, freuen wir uns auf eine Diskussion!

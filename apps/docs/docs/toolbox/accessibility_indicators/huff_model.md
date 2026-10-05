@@ -20,7 +20,7 @@ The Huff Model **predicts the probability of consumers in a reference area visit
 ## 1. Explanation
 
 The Huff Model is a **spatial interaction model that estimates how demand (e.g., customers, residents) is distributed among competing supply locations (e.g., stores, facilities)**. 
-The model works on a simple principle: **a location's probability of being chosen depends on its attractiveness relative to all competing locations, weighted by travel time**. A large, nearby shopping center will capture more demand than a small, distant one, but the exact split depends on the balance of attractiveness and distance for all available options.
+The model works on a simple principle: **a location's probability of being chosen depends on its attractiveness relative to all competing locations, weighted by [travel time](https://www.plan4better.de/en/glossary/travel-time)**. A large, nearby shopping center will capture more demand than a small, distant one, but the exact split depends on the balance of attractiveness and distance for all available options.
 
 The result is a **probability score for each supply location**, representing the share of total demand it captures from the reference area. This enables direct comparison of how well different facilities compete for the same customer base.
 
@@ -34,7 +34,7 @@ You can configure the routing type, opportunity layers (with capacity fields), d
 
 
 
-**Key difference:** Unlike the Heatmaps, which visualize accessibility per grid cell, the *Huff Model* produces a **probability per supply location**, showing what share of total demand each facility captures.
+**Key difference:** Unlike the [Heatmaps](https://www.plan4better.de/en/glossary/heatmap), which visualize accessibility per grid cell, the *Huff Model* produces a **probability per supply location**, showing what share of total demand each facility captures.
 
 :::info
 
@@ -77,7 +77,7 @@ Huff Model computation is available across **over 30 European countries** for `W
 | Bicycle | All paths accessible by bicycle (taking into account surface and slope) |
 | Pedelec | All paths accessible by pedelec (taking into account surface and slope) |
 | Car | All paths accessible by car (taking into account speed limits and one-way restrictions) |
-| Public Transport | All journeys possible by public transport (according to official GTFS schedules), considering walking access and egress to and from stops |
+| Public Transport | All journeys possible by public transport (according to official [GTFS](https://www.plan4better.de/en/glossary/gtfs) schedules), considering walking access and egress to and from stops |
 
 <Tabs>
 <TabItem value="active-car" label="Walk / Bicycle / Pedelec / Car" default className="tabItemBox">

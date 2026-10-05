@@ -20,7 +20,7 @@ import { DocsHero, DocsSectionCards } from '@site/src/components/DocsHome';
 
 ## What is GOAT?
 
-GOAT is like having a super-smart assistant for urban, spatial and transport planning. **It’s a WebGIS platform packed with rich data and advanced tools, helping planners and GIS analysts make fact-based decisions**. With GOAT, you can compute benchmarks, analyze existing situations, and compare planning alternatives. The platform offers a modern user interface and an intuitive user flow, to simplify the planning process. **GOAT's main goal is to empower you to plan smarter, collaborate more effectively, and make a real difference in the communities you serve**.
+GOAT is like having a super-smart assistant for urban, spatial and transport planning. **It’s a [WebGIS](https://www.plan4better.de/en/glossary/webgis) platform packed with rich data and advanced tools, helping planners and GIS analysts make fact-based decisions**. With GOAT, you can compute benchmarks, analyze existing situations, and compare planning alternatives. The platform offers a modern user interface and an intuitive user flow, to simplify the planning process. **GOAT's main goal is to empower you to plan smarter, collaborate more effectively, and make a real difference in the communities you serve**.
 
 ## With GOAT, you can:
 
@@ -31,7 +31,7 @@ GOAT is like having a super-smart assistant for urban, spatial and transport pla
 ## Why Choose GOAT?
 
 ### Accessibility at the Core
-GOAT stands out for its focus on **accessibility indicators, making it easier to identify and address inequalities in spatial and transport planning**. Unlike other tools, GOAT offers ready-to-use features to help you assess and improve accessibility in your projects.
+GOAT stands out for its focus on **accessibility indicators, making it easier to identify and address inequalities in spatial and transport planning**. Unlike other tools, GOAT offers ready-to-use features to help you assess and [improve accessibility](https://www.plan4better.de/en/glossary/accessibility) in your projects.
 
 ### Integrated Data
 With its integrated granular data, **GOAT makes it easy to access the data you need**. If there’s any specific data you’d like to add, we’re happy to discuss it!

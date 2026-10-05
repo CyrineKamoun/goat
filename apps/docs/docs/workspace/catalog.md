@@ -133,7 +133,7 @@ These portals carry far more than spatial planning needs, including budget table
 
 ### Plan4Better datasets
 
-Alongside the harvested portals, the catalog holds datasets Plan4Better prepares and maintains. Points of interest are built from OpenStreetMap through a pipeline that regroups the raw tags into planning categories and corrects them. Public transport stops, stations and lines are derived from the GTFS feeds of transport operators, covering local, regional and long-distance services.
+Alongside the harvested portals, the catalog holds datasets Plan4Better prepares and maintains. [Points of interest](https://www.plan4better.de/en/glossary/point-of-interest) are built from OpenStreetMap through a pipeline that regroups the raw tags into planning categories and corrects them. Public transport stops, stations and lines are derived from the [GTFS](https://www.plan4better.de/en/glossary/gtfs) feeds of transport operators, covering local, regional and long-distance services.
 
 ## Data quality and maintenance
 

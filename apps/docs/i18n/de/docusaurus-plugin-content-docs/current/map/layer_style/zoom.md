@@ -50,7 +50,7 @@ Alle Layer sind über die Zoom-Stufen 1-22 sichtbar, sofern nicht anders konfigu
 
 ## Bewährte Praktiken
 
-<b>Detaillierte Features</b> (Gebäude, POIs): Verwenden Sie höhere Zoom-Stufen (14-22), um Durcheinander zu vermeiden.
+<b>Detaillierte Features</b> (Gebäude, [POIs](https://www.plan4better.de/de/glossar/point-of-interest)): Verwenden Sie höhere Zoom-Stufen (14-22), um Durcheinander zu vermeiden.
 
 <b>Regionale Daten</b> (Demografie, Grenzen): Verwenden Sie mittlere Stufen (8-16) für Kontext.
 

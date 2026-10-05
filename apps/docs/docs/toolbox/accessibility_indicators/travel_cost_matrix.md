@@ -8,17 +8,17 @@ import TabItem from '@theme/TabItem';
 
 # Travel Cost Matrix
 
-The Travel Cost Matrix tool **computes travel time or distance between a set of origins and a set of destinations**, producing a table that can be used for accessibility analysis, location planning, and spatial modeling.
+The Travel Cost Matrix tool **computes [travel time](https://www.plan4better.de/en/glossary/travel-time) or distance between a set of origins and a set of destinations**, producing a table that can be used for [accessibility analysis](https://www.plan4better.de/en/glossary/accessibility-analysis), [location planning](https://www.plan4better.de/en/glossary/site-selection), and spatial modeling.
 
 ## 1. Explanation
 
-The Travel Cost Matrix calculates the **travel cost (time or distance) between every origin–destination pair** in two input layers, for a selected routing mode. The output is a table where each row represents one O-D connection and includes the origin identifier, destination identifier, and the computed travel cost.
+The Travel Cost Matrix calculates the **travel cost (time or distance) between every [origin–destination pair](https://www.plan4better.de/en/glossary/origin-destination-matrix)** in two input layers, for a selected routing mode. The output is a table where each row represents one O-D connection and includes the origin identifier, destination identifier, and the computed travel cost.
 
 The Travel Cost Matrix is designed for **batch computation across many origins and destinations at once**. This makes it the right tool when you need the raw cost data to feed into further analyses, such as location scoring, supply-demand matching, or custom accessibility indices.
 
 ## 2. Example use cases
 
-- Computing walking times from all residential buildings to the nearest schools to identify underserved areas.
+- Computing walking times from all residential buildings to the nearest schools to identify [underserved areas](https://www.plan4better.de/en/glossary/deficit-area).
 - Calculating car travel times between a set of warehouses (origins) and retail stores (destinations) for logistics optimization.
 - Building an input matrix for a custom accessibility score that weights travel time by destination attractiveness.
 - Assessing how many destinations are reachable within a given travel time threshold from each origin.

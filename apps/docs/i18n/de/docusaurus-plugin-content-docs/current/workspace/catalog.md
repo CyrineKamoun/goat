@@ -133,7 +133,7 @@ Diese Portale enthalten weit mehr, als die Raumplanung benötigt, etwa Haushalts
 
 ### Datensätze von Plan4Better
 
-Neben den geernteten Portalen enthält der Katalog Datensätze, die Plan4Better selbst aufbereitet und pflegt. Points of Interest entstehen aus OpenStreetMap über eine Pipeline, die die Rohdaten-Tags in planerische Kategorien überführt und korrigiert. Haltestellen, Bahnhöfe und Linien des öffentlichen Verkehrs werden aus den GTFS-Feeds der Verkehrsunternehmen abgeleitet, für den Nah-, Regional- und Fernverkehr.
+Neben den geernteten Portalen enthält der Katalog Datensätze, die Plan4Better selbst aufbereitet und pflegt. [Points of Interest](https://www.plan4better.de/de/glossar/point-of-interest) entstehen aus OpenStreetMap über eine Pipeline, die die Rohdaten-Tags in planerische Kategorien überführt und korrigiert. Haltestellen, Bahnhöfe und Linien des öffentlichen Verkehrs werden aus den [GTFS](https://www.plan4better.de/de/glossar/gtfs)-Feeds der Verkehrsunternehmen abgeleitet, für den Nah-, Regional- und Fernverkehr.
 
 ## Datenqualität und Pflege
 

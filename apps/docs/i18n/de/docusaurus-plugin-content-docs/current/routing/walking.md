@@ -10,7 +10,7 @@ Das **Verkehrsmittel Zu Fuß**  wird für alle Analysen in GOAT verwendet, die z
  
 ## 1. Ziele
 
-Das Verkehrsmittel "Zu Fuß" wird für viele Indikatoren in GOAT verwendet, wie z.B. [Einzugsgebiete](../toolbox/accessibility_indicators/catchments "Dokumente der Einzugsgebiete"), [Heatmaps](../toolbox/accessibility_indicators/connectivity "Dokumente der Heatmaps"), das [Huff-Modell](../toolbox/accessibility_indicators/huff_model "Dokumente des Huff-Modells") und die [Reisekostenmatrix](../toolbox/accessibility_indicators/travel_cost_matrix "Dokumente der Reisekostenmatrix"). Für den Modus des Gehens wird ein **angepasster Routing-Algorithmus** verwendet, der dabei **nur Wege berücksichtigt, die für Fußgänger geeignet sind**. Die Gehgeschwindigkeit `Geschwindigkeit` kann vom Benutzer bei jeder Erreichbarkeitsanalyse angepasst werden. 
+Das Verkehrsmittel "Zu Fuß" wird für viele Indikatoren in GOAT verwendet, wie z.B. [Einzugsgebiete](../toolbox/accessibility_indicators/catchments "Dokumente der Einzugsgebiete"), [Heatmaps](../toolbox/accessibility_indicators/connectivity "Dokumente der Heatmaps"), das [Huff-Modell](../toolbox/accessibility_indicators/huff_model "Dokumente des Huff-Modells") und die [Reisekostenmatrix](../toolbox/accessibility_indicators/travel_cost_matrix "Dokumente der Reisekostenmatrix"). Für den Modus des Gehens wird ein **angepasster [Routing](https://www.plan4better.de/de/glossar/routing)-Algorithmus** verwendet, der dabei **nur Wege berücksichtigt, die für Fußgänger geeignet sind**. Die Gehgeschwindigkeit `Geschwindigkeit` kann vom Benutzer bei jeder [Erreichbarkeitsanalyse](https://www.plan4better.de/de/glossar/erreichbarkeitsanalyse) angepasst werden. 
 
 ## 2. Daten
 

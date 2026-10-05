@@ -17,11 +17,11 @@ Der Indikator Heatmap - Gravity **erzeugt eine farbcodierte Karte zur Visualisie
 
 ## 1. Erklärung
 
-Die Heatmap Gravity zeigt ein **farbcodiertes hexagonales Raster, das die Erreichbarkeit von Zielen (Gelegenheiten) basierend auf Reisekosten (Zeit oder Entfernung) und Attraktivität der Ziele darstellt**. Die Erreichbarkeit wird mit realen Verkehrsnetzen und einer gravitationsbasierten Formel berechnet, die widerspiegelt, wie die Reisebereitschaft mit zunehmender Entfernung abnimmt.
+Die [Heatmap](https://www.plan4better.de/de/glossar/heatmap) Gravity zeigt ein **farbcodiertes hexagonales Raster, das die Erreichbarkeit von Zielen (Gelegenheiten) basierend auf Reisekosten (Zeit oder Entfernung) und Attraktivität der Ziele darstellt**. Die Erreichbarkeit wird mit realen Verkehrsnetzen und einer [gravitationsbasierten Formel](https://www.plan4better.de/de/glossar/gravitationsmodell) berechnet, die widerspiegelt, wie die Reisebereitschaft mit zunehmender Entfernung abnimmt.
 
 Sie können das **Verkehrsmittel**, den **Gelegenheits-Layer**, das **Reisekostenlimit** sowie die **Sensitivität** und das **Destinationspotenzial** einstellen, um die Berechnung der Erreichbarkeit zu verfeinern.
 
-- Der **Gelegenheits-Layer enthält punkt- oder polygonbasierte Zieldaten** (wie POIs, Haltestellen, Schulen, Einrichtungen, Parks oder benutzerdefinierte Daten). Sie können mehrere Ziel-Layer auswählen, die zu einer einzigen Heatmap kombiniert werden.
+- Der **Gelegenheits-Layer enthält punkt- oder polygonbasierte Zieldaten** (wie [POIs](https://www.plan4better.de/de/glossar/point-of-interest), Haltestellen, Schulen, Einrichtungen, Parks oder benutzerdefinierte Daten). Sie können mehrere Ziel-Layer auswählen, die zu einer einzigen Heatmap kombiniert werden.
 
 - Die **Sensitivität steuert, wie schnell die Erreichbarkeit mit zunehmenden Reisekosten abnimmt**, während das **Destinationspotenzial es ermöglicht, Zielen mit höherer Kapazität oder Qualität mehr Gewicht zu geben** (z. B. ein größerer Supermarkt oder eine Haltestelle mit mehr Abfahrten). Zusammen mit der gewählten **Widerstandsfunktion definieren diese Einstellungen, wie die Erreichbarkeit berechnet wird**.
 
@@ -50,7 +50,7 @@ Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **üb
 
  - Gibt es Bereiche mit hohem Potenzial für eine verkehrsorientierte Entwicklung oder Möglichkeiten zur Verbesserung der Infrastruktur für den nicht-motorisierten Verkehr, wie Radwege oder fußgängerfreundliche Straßen?
 
- - Wie wirkt sich eine neue Einrichtung auf die lokale Erreichbarkeit aus?
+ - Wie wirkt sich eine neue Einrichtung auf die [lokale Erreichbarkeit](https://www.plan4better.de/de/glossar/lokale-erreichbarkeit) aus?
 
  - Gibt es Potenzial, die Verfügbarkeit von Diensten wie Fahrrad- oder Carsharing-Stationen zu erweitern?
 
@@ -79,7 +79,7 @@ Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **üb
 | Fahrrad | Alle mit dem Fahrrad befahrbaren Wege (unter Berücksichtigung von Oberfläche und Steigung) |
 | Pedelec | Alle mit dem Pedelec befahrbaren Wege (unter Berücksichtigung von Oberfläche und Steigung) |
 | Auto | Alle mit dem Auto befahrbaren Wege (unter Berücksichtigung von Tempolimits und Einbahnstraßen) |
-| Öffentlicher Verkehr | Alle mit dem ÖV möglichen Fahrten (gemäß offiziellen GTFS-Fahrplänen), unter Berücksichtigung von Zu- und Abgang zu Fuß zu und von den Haltestellen |
+| Öffentlicher Verkehr | Alle mit dem ÖV möglichen Fahrten (gemäß offiziellen [GTFS](https://www.plan4better.de/de/glossar/gtfs)-Fahrplänen), unter Berücksichtigung von Zu- und Abgang zu Fuß zu und von den Haltestellen |
 
 <div class="step">
   <div class="step-number">4</div>
@@ -146,7 +146,7 @@ Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Ein
 
 <div class="step">
   <div class="step-number">6</div>
-  <div class="content">Wählen Sie ein <code>Referenzgebiet</code>: einen Polygon-Layer, der Ihr Untersuchungsgebiet darstellt. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; nicht erreichbare Zellen erhalten den Wert <code>NULL</code> und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
+  <div class="content">Wählen Sie ein <code>Referenzgebiet</code>: einen Polygon-Layer, der Ihr Untersuchungsgebiet darstellt. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; nicht erreichbare Zellen erhalten den Wert <code>NULL</code> und zeigen so [Versorgungslücken](https://www.plan4better.de/de/glossar/versorgungsluecken) und unterversorgte Gebiete auf.</div>
 </div>
 
 <div class="step">
@@ -353,7 +353,7 @@ import ImpedanceFunction from '@site/src/components/ImpedanceFunction';
 </div>
 
 ### Klassifizierung
-Um die berechneten Erreichbarkeitswerte für jede Rasterzelle (zur farbcodierten Darstellung) zu klassifizieren, wird standardmäßig eine **Klassifizierung in 8 Quantilgruppen** verwendet. Das bedeutet, jede Farbe deckt 12,5 % der Rasterzellen ab. Der Bereich außerhalb des berechneten Layers hat innerhalb der definierten Reisezeit keinen Zugang.
+Um die berechneten Erreichbarkeitswerte für jede Rasterzelle (zur farbcodierten Darstellung) zu klassifizieren, wird standardmäßig eine **Klassifizierung in 8 [Quantilgruppen](https://www.plan4better.de/de/glossar/quantilklassifizierung)** verwendet. Das bedeutet, jede Farbe deckt 12,5 % der Rasterzellen ab. Der Bereich außerhalb des berechneten Layers hat innerhalb der definierten Reisezeit keinen Zugang.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 <img src={require('/img/toolbox/accessibility_indicators/heatmaps/gravity_based/gravity_default_classification_de.png').default} alt="gravity-default-classification" style={{ maxHeight: "auto", maxWidth: "40%"}}/>
@@ -365,7 +365,7 @@ Es können jedoch auch andere Klassifizierungsmethoden verwendet werden. Mehr da
 
 ### Visualisierung
 
-Heatmaps in GOAT nutzen die **[Uber H3 grid-basierte](https://www.plan4better.de/de/glossar/h3-gitter)** Lösung für effiziente Berechnung und leicht verständliche Visualisierung. Im Hintergrund wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jedes *Verkehrsmittel* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der aktiven Mobilität und das Auto GOATs Dijkstra-Implementierung verwenden.
+Heatmaps in GOAT nutzen die **[Uber H3 grid-basierte](https://www.plan4better.de/de/glossar/h3-gitter)** Lösung für effiziente Berechnung und leicht verständliche Visualisierung. Im Hintergrund wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jedes *Verkehrsmittel* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der [aktiven Mobilität](https://www.plan4better.de/de/glossar/aktive-mobilitaet) und das Auto GOATs Dijkstra-Implementierung verwenden.
 
 Die Auflösung und Dimensionen des verwendeten hexagonalen Rasters hängen vom gewählten *Verkehrsmittel* ab:
 
