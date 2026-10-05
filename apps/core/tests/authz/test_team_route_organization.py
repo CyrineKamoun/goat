@@ -72,6 +72,9 @@ async def test_team_routes_reject_a_team_of_another_organization(
     editor = await _user_with_role(
         db_session, make_user, org, roles["organization-editor"]
     )
+    viewer = await _user_with_role(
+        db_session, make_user, org, roles["organization-viewer"]
+    )
     outside_editor = await _user_with_role(
         db_session, make_user, other_org, roles["organization-editor"]
     )
@@ -114,6 +117,20 @@ async def test_team_routes_reject_a_team_of_another_organization(
             "teams/{team_id}/members",
             f"teams/{team}/members",
             "GET",
+        )
+        == ""
+    )
+
+    # Adding and removing members has its own resource, so an ordinary member
+    # reaches the handler (which lets them leave) instead of needing
+    # delete-team.
+    assert (
+        await _denial(
+            db_session,
+            viewer,
+            "teams/{team_id}/users/{user_id}",
+            f"teams/{team}/users/{viewer}",
+            "DELETE",
         )
         == ""
     )

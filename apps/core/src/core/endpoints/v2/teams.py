@@ -4,7 +4,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.crud.crud_team import team as crud_team
-from core.db.models.team import Team
+from core.crud.crud_user import user as crud_user
+from core.db.models.team import Team, TeamRolesEnum
 from core.db.models.user import User
 from core.deps.auth import auth_z, user_token
 from core.endpoints.deps import get_db
@@ -158,8 +159,24 @@ async def add_user_to_team(
     team_id: str,
 ) -> Any:
     """
-    Add a user to an team
+    Add a user to a team. Only the team's owner may, and only users of the
+    team's organization can be added.
     """
+    caller_role = await crud_team.get_member_role(
+        db=db, team_id=team_id, user_id=user_token["sub"]
+    )
+    if caller_role != TeamRolesEnum.owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the team's owner can add members",
+        )
+    team = await crud_team.get(db=db, id=team_id)
+    user = await crud_user.get(db, user_id)
+    if not team or not user or user.organization_id != team.organization_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only users of the team's organization can be added",
+        )
     member = await crud_team.add_team_member(db=db, team_id=team_id, user_id=user_id)
 
     return member
@@ -178,8 +195,25 @@ async def remove_user_from_team(
     team_id: str,
 ) -> Any:
     """
-    Remove a user from an team
+    Remove a user from a team. The team's owner may remove anyone but
+    themselves (the team would be left without an owner); every other
+    member may only remove themselves, which is leaving the team.
     """
+    caller_id = user_token["sub"]
+    caller_role = await crud_team.get_member_role(
+        db=db, team_id=team_id, user_id=caller_id
+    )
+    removes_self = str(user_id) == str(caller_id)
+    if caller_role == TeamRolesEnum.owner and removes_self:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The team's owner cannot leave the team; delete it instead",
+        )
+    if caller_role != TeamRolesEnum.owner and not (caller_role and removes_self):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the team's owner can remove other members",
+        )
 
     await crud_team.remove_team_member(db=db, team_id=team_id, user_id=user_id)
 
