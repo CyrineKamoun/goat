@@ -9,7 +9,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Heatmap - Konnektivität
-Der Heatmap - Konnektivität Indikator **erstellt eine farbkodierte Karte zur Visualisierung der Konnektivität von Orten innerhalb eines Interessengebiets** ([**AOI**](../../further_reading/glossary#area-of-interest-aoi "Was ist ein AOI?")).
+Der Heatmap - Konnektivität Indikator **erstellt eine farbkodierte Karte zur Visualisierung der Konnektivität von Orten innerhalb eines Interessengebiets** ([**AOI**](https://www.plan4better.de/de/glossar/area-of-interest "Was ist ein AOI?")).
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
 <iframe width="674" height="378" src="https://www.youtube.com/embed/A8f32ai4ddQ?si=PKUBBKu0vvEFLdEs&amp;start=46" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
@@ -159,7 +159,7 @@ Die Konnektivitäts-Formel berechnet die Gesamtfläche (in Quadratmetern), von d
 
 ### Rasterzellen 
 
-Heatmaps in GOAT nutzen **[Ubers H3-rasterbasierte](../../further_reading/glossary#h3-gitter)** Lösung für effiziente Berechnungen und leicht verständliche Visualisierung. Im Hintergrund wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jedes *Verkehrsmittel* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der aktiven Mobilität und das Auto GOATs Dijkstra-Implementierung verwenden.
+Heatmaps in GOAT nutzen **[Ubers H3-rasterbasierte](https://www.plan4better.de/de/glossar/h3-gitter)** Lösung für effiziente Berechnungen und leicht verständliche Visualisierung. Im Hintergrund wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jedes *Verkehrsmittel* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der aktiven Mobilität und das Auto GOATs Dijkstra-Implementierung verwenden.
 
 Die Auflösung und Abmessungen des verwendeten sechseckigen Rasters hängen vom gewählten *Verkehrsmittel* ab:
 

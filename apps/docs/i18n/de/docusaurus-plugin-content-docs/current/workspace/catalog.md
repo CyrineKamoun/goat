@@ -5,7 +5,7 @@ sidebar_position: 4
 
 # Katalog
 
-Der **Daten-Katalog** ist Ihr Zugang zur Erkundung von Plan4Betters umfassender Sammlung hochwertiger [Geodaten](../further_reading/glossary#geodaten). **Diese kuratierte Bibliothek bietet zuverlässige, sofort einsatzfähige Daten von offiziellen Open-Data-Anbietern und anderen vertrauenswürdigen Quellen**, die es Ihnen ermöglichen, sofort mit der Analyse und Visualisierung in Ihren GOAT-**Projekten** zu beginnen. Aus dem **Katalog** können Sie:
+Der **Daten-Katalog** ist Ihr Zugang zur Erkundung von Plan4Betters umfassender Sammlung hochwertiger [Geodaten](https://www.plan4better.de/de/glossar/geodaten). **Diese kuratierte Bibliothek bietet zuverlässige, sofort einsatzfähige Daten von offiziellen Open-Data-Anbietern und anderen vertrauenswürdigen Quellen**, die es Ihnen ermöglichen, sofort mit der Analyse und Visualisierung in Ihren GOAT-**Projekten** zu beginnen. Aus dem **Katalog** können Sie:
 
 - **Unsere Datensatz-Sammlung erkunden**, die mehrere thematische Bereiche und geografische Regionen umfasst
 - **Durchsuchen und filtern** nach Stichwort, Ort, Kategorie, Datengeber, Lizenz und mehr

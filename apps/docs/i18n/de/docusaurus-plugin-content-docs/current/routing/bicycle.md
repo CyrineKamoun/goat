@@ -35,7 +35,7 @@ Die Höhendaten stammen von **[Copernicus](https://www.copernicus.eu/de)** als *
 Die folgenden Schritte werden an den Daten durchgeführt, um ein **schnelles** und **genaues** Routing für Fahrrad/Pedelec zu ermöglichen:
 
  1. **Attribute Parsing:**  Kategorisierung der Attribute der Kanten (Straßen `Klasse` und `Oberfläche`).
- 2. **Geospatial Indexing:**  Nutzen des **[Uber H3 auf Gitter basierenden](../further_reading/glossary#h3-gitter)** Indexing für effizientes Routing.
+ 2. **Geospatial Indexing:**  Nutzen des **[Uber H3 auf Gitter basierenden](https://www.plan4better.de/de/glossar/h3-gitter)** Indexing für effizientes Routing.
  3. **Oberflächenwiderstandsberechnung:** Berechnung des Widerstands unter Berücksichtigung der Oberflächeneigenschaften.
  4. **Steigungswiderstandsberechnung:** Überlagerung von DEM auf Kanten zur Berechnung von Steigungsprofilen.
 

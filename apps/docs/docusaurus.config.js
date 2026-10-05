@@ -66,6 +66,7 @@ const config = {
   ],
   plugins: [
     require.resolve("./src/plugins/markdown-source.js"),
+    require.resolve("./src/plugins/glossary.js"),
     [
       "@docusaurus/plugin-content-docs",
       {

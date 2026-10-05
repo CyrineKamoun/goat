@@ -25,7 +25,7 @@ Die Daten der **[Overture Maps Foundation](https://overturemaps.org/)** werden i
 Die folgenden Schritte werden an den Daten durchgeführt, um **schnelles** und **genaues** Gehen zu ermöglichen:
 
  1. **Attribut-Parsing:** Kategorisierung der Attribute der Kanten (Straßen `Klasse`).
- 2. **Geospatial Indexing:**  Nutzung des **[Uber H3 auf Gitter basierend](../further_reading/glossary#h3-gitter)** Indexing für effizientes Routing.
+ 2. **Geospatial Indexing:**  Nutzung des **[Uber H3 auf Gitter basierend](https://www.plan4better.de/de/glossar/h3-gitter)** Indexing für effizientes Routing.
 
 ### Routing-Prozess-Schritte
 

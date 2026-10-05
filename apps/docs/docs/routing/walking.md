@@ -27,7 +27,7 @@ Data from the **[Overture Maps Foundation](https://overturemaps.org/)** is used 
 The following steps are performed on the data to enable **quick** and **accurate** routing for walking:
 
  1. **Attribute Parsing:** Categorizing attributes of edges (road `class`).
- 2. **Geospatial Indexing:**  Utilizing **[Uber's H3 grid-based](../further_reading/glossary#h3-grid)** indexing for efficient routing.
+ 2. **Geospatial Indexing:**  Utilizing **[Uber's H3 grid-based](https://www.plan4better.de/en/glossary/h3-grid)** indexing for efficient routing.
 
 
 ### Routing Process Steps

@@ -73,7 +73,7 @@ In the example below, the polygons of the *layer to aggregate* are summarized on
 
 :::tip NOTE
 
-To learn more about the H3 grid, you can visit the [Glossary](../../further_reading/glossary#h3-grid).
+To learn more about the H3 grid, you can visit the [Glossary](https://www.plan4better.de/en/glossary/h3-grid).
 
 :::
 

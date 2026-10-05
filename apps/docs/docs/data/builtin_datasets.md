@@ -68,7 +68,7 @@ Our street network represents real-world transportation infrastructure including
 **Processing Workflow:**
 1. **Data Import**: Street network data is imported in Geoparquet format from Overture Maps' [Transportation theme](https://docs.overturemaps.org/guides/transportation/)
 2. **Elevation Processing**: European DEM tiles are processed to extract topographical information
-3. **Spatial Indexing**: Network segments are organized using [Uber's H3 grid system](../further_reading/glossary#h3-grid) for efficient processing
+3. **Spatial Indexing**: Network segments are organized using [Uber's H3 grid system](https://www.plan4better.de/en/glossary/h3-grid) for efficient processing
 4. **Slope Calculation**: Surface gradients and slope impedance are computed for each street segment
 5. **Attribute Parsing**: Street classifications, speed limits, turning restrictions, and one-way designations are identified and standardized
 6. **Speed Limit Interpolation**: Missing speed limits are estimated based on street type and modal speeds

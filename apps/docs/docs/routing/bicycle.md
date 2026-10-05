@@ -35,7 +35,7 @@ Elevation data is sourced from **[Copernicus](https://www.copernicus.eu/en)** as
 The following steps are performed on the data to enable **quick** and **accurate** routing for bicycle/pedelec:
 
  1. **Attribute Parsing:** Categorizing attributes of edges (street `class` and `surface`).
- 2. **Geospatial Indexing:**  Utilizing **[Uber's H3 grid-based](../further_reading/glossary#h3-grid)** indexing for efficient routing.
+ 2. **Geospatial Indexing:**  Utilizing **[Uber's H3 grid-based](https://www.plan4better.de/en/glossary/h3-grid)** indexing for efficient routing.
  3. **Surface Impedance Computation:** Calculating impedance considering surface properties.
  4. **Slope Impedance Computation:** Overlaying DEM on edges to compute slope profiles.
 

@@ -69,7 +69,7 @@ Unser Straßennetzwerk repräsentiert reale Verkehrsinfrastruktur einschließlic
 **Verarbeitungsworkflow:**
 1. **Datenimport**: Straßennetzwerkdaten werden im Geoparquet-Format aus Overture Maps' [Transportation theme](https://docs.overturemaps.org/guides/transportation/) importiert
 2. **Höhenverarbeitung**: Europäische DEM-Kacheln werden verarbeitet, um topografische Informationen zu extrahieren
-3. **Räumliche Indexierung**: Netzwerksegmente werden mit [Ubers H3-Gittersystem](../further_reading/glossary#h3-gitter) für effiziente Verarbeitung organisiert
+3. **Räumliche Indexierung**: Netzwerksegmente werden mit [Ubers H3-Gittersystem](https://www.plan4better.de/de/glossar/h3-gitter) für effiziente Verarbeitung organisiert
 4. **Steigungsberechnung**: Oberflächengfäle und Steigungswiderstand werden für jedes Straßensegment berechnet
 5. **Attributanalyse**: Straßenklassifizierungen, Geschwindigkeitsbegrenzungen, Abbiegebeschränkungen und Einbahnstraßenbezeichnungen werden identifiziert und standardisiert
 6. **Geschwindigkeitsbegrenzungs-Interpolation**: Fehlende Geschwindigkeitsbegrenzungen werden basierend auf Straßentyp und modalen Geschwindigkeiten geschätzt

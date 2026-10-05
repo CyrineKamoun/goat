@@ -189,7 +189,7 @@ Um die berechneten Erreichbarkeitswerte für jede Rasterzelle zu klassifizieren,
 
 ### Visualisierung
 
-Heatmaps in GOAT nutzen die **[Uber H3 Gitter-basierte](../../further_reading/glossary#h3-gitter)** Lösung für effiziente Berechnungen und eine leicht verständliche Visualisierung. Hinter den Kulissen wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jedes *Verkehrsmittel* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der aktiven Mobilität und das Auto GOATs Dijkstra-Implementierung verwenden.
+Heatmaps in GOAT nutzen die **[Uber H3 Gitter-basierte](https://www.plan4better.de/de/glossar/h3-gitter)** Lösung für effiziente Berechnungen und eine leicht verständliche Visualisierung. Hinter den Kulissen wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jedes *Verkehrsmittel* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der aktiven Mobilität und das Auto GOATs Dijkstra-Implementierung verwenden.
 
 Die Auflösung und die Dimensionen des verwendeten sechseckigen Gitters hängen vom gewählten *Verkehrsmittel* ab:
 
