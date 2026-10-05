@@ -156,3 +156,47 @@ async def test_the_owner_removes_members_but_not_themselves(
     )
     assert removes_member.status_code == 200, removes_member.text
     assert team_setup["member"] not in await _members(db_session, team)
+
+
+async def _give_org_role(db: AsyncSession, user_id: UUID, role_id: UUID) -> None:
+    await db.execute(
+        text(f"INSERT INTO {S}.user_role (user_id, role_id) VALUES (:u, :r)"),
+        {"u": user_id, "r": role_id},
+    )
+    await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_only_the_owner_or_an_org_admin_renames_or_deletes_a_team(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    roles: dict[str, UUID],
+    team_setup: dict[str, Any],
+) -> None:
+    """An organization editor who does not own the team may neither rename
+    nor delete it; the team's owner and the organization's admins may."""
+    team = team_setup["team"]
+    editor, admin = team_setup["colleague"], team_setup["member"]
+    await _give_org_role(db_session, editor, roles["organization-editor"])
+    await _give_org_role(db_session, admin, roles["organization-admin"])
+
+    renamed_by_editor = await client.patch(
+        f"{TEAMS}/{team}/profile", json={"name": "Taken"}, headers=_as(editor)
+    )
+    assert renamed_by_editor.status_code == 403, renamed_by_editor.text
+    deleted_by_editor = await client.delete(f"{TEAMS}/{team}", headers=_as(editor))
+    assert deleted_by_editor.status_code == 403, deleted_by_editor.text
+
+    renamed_by_owner = await client.patch(
+        f"{TEAMS}/{team}/profile",
+        json={"name": "Planning 2"},
+        headers=_as(team_setup["owner"]),
+    )
+    assert renamed_by_owner.status_code == 200, renamed_by_owner.text
+    renamed_by_admin = await client.patch(
+        f"{TEAMS}/{team}/profile", json={"name": "Planning 3"}, headers=_as(admin)
+    )
+    assert renamed_by_admin.status_code == 200, renamed_by_admin.text
+
+    deleted_by_admin = await client.delete(f"{TEAMS}/{team}", headers=_as(admin))
+    assert deleted_by_admin.status_code == 200, deleted_by_admin.text

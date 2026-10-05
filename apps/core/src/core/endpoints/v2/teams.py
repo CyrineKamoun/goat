@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.crud.crud_team import team as crud_team
 from core.crud.crud_user import user as crud_user
+from core.db.models.organization import OrganizationRolesEnum
 from core.db.models.team import Team, TeamRolesEnum
 from core.db.models.user import User
 from core.deps.auth import auth_z, user_token
@@ -18,6 +19,23 @@ from core.schemas.team import (
 )
 
 router = APIRouter()
+
+
+async def _require_team_manager(db: AsyncSession, team_id: str, user_id: str) -> None:
+    """Renaming or deleting a team is for its owner and the organization's
+    admins and owners (who can clean up a team whose owner has left).
+    Organization editors and viewers get 403 for teams they do not own."""
+    team_role = await crud_team.get_member_role(db=db, team_id=team_id, user_id=user_id)
+    if team_role == TeamRolesEnum.owner:
+        return
+    user = await crud_user.get_user_with_roles(db_session=db, user_id=user_id)
+    org_roles = {link.role.name for link in user.role_links} if user else set()
+    if org_roles & {OrganizationRolesEnum.owner, OrganizationRolesEnum.admin}:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Only the team's owner or an organization admin can do this",
+    )
 
 
 @router.get(
@@ -109,14 +127,13 @@ async def update_team(
     *,
     db: AsyncSession = Depends(get_db),
     user_token: dict = Depends(user_token),
-    user_id: str | None = None,
     team_id: str,
     team: TeamUpdate = Body(..., examples=[request_examples["team"]["update"]]),
 ) -> Any:
     """
     Update a team
     """
-    user_id = user_id or user_token["sub"]
+    await _require_team_manager(db, team_id, user_token["sub"])
     db_obj = await crud_team.get(db=db, id=team_id)
     if not db_obj:
         raise HTTPException(
@@ -141,6 +158,7 @@ async def delete_team(
     """
     Delete a team
     """
+    await _require_team_manager(db, team_id, user_token["sub"])
     team = await crud_team.delete_team(db=db, team_id=team_id)
     return team
 
