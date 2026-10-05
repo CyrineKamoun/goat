@@ -69,7 +69,6 @@ async def test_avatar_url_is_built_from_assets_url(
             db=MagicMock(),
             user=UserProfileUpdate(avatar="data:image/png;base64,aGVsbG8="),
             user_token={"sub": USER_ID},
-            user_id=None,
         )
     key = upload.call_args.args[1]
     avatar = update_mock.call_args.kwargs["obj_in"].avatar
