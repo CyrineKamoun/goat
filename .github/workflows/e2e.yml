@@ -51,11 +51,27 @@ jobs:
         run: |
           cp .env.example .env
           data_dir="$GITHUB_WORKSPACE/data"
+          # Garage keys have their own shape: GK + 24 hex, and 64 hex.
+          key_id="GK$(openssl rand -hex 12)"
+          key_secret="$(openssl rand -hex 32)"
           cat >> .env <<EOF
           POSTGRES_SERVER=localhost
           DUCKLAKE_POSTGRES_SERVER=localhost
-          S3_ENDPOINT_URL=http://localhost:9000
-          ASSETS_S3_ENDPOINT_URL=http://localhost:9000
+          S3_ENDPOINT_URL=http://localhost:3900
+          S3_PUBLIC_ENDPOINT_URL=http://localhost:3900
+          ASSETS_S3_ENDPOINT_URL=http://localhost:3900
+          ASSETS_URL=http://localhost:3900/goat-assets
+          S3_PROVIDER=garage
+          S3_REGION=garage
+          AWS_REGION=garage
+          S3_ACCESS_KEY_ID=$key_id
+          S3_SECRET_ACCESS_KEY=$key_secret
+          AWS_ACCESS_KEY_ID=$key_id
+          AWS_SECRET_ACCESS_KEY=$key_secret
+          S3_BUCKET_NAME=goat
+          AWS_S3_ASSETS_BUCKET=goat-assets
+          GARAGE_RPC_SECRET=$(openssl rand -hex 32)
+          GARAGE_ADMIN_TOKEN=$(openssl rand -hex 32)
           DATA_DIR=$data_dir
           DUCKLAKE_DATA_DIR=$data_dir/ducklake
           TILES_DATA_DIR=$data_dir/tiles
@@ -71,8 +87,15 @@ jobs:
           # last value of a name too.
           grep -E '^[A-Z_][A-Z0-9_]*=' .env | sed 's/"//g' >> "$GITHUB_ENV"
 
-      - name: 🐘 Infra (Postgres, MinIO, Redis)
-        run: docker compose up -d --wait db minio redis && docker compose up minio-buckets
+      # S3 is Garage, as in the compose bundle (deploy/compose): MinIO no
+      # longer publishes images, so the root compose.yaml's cannot be pulled.
+      - name: 🐘 Infra (Postgres, Redis, Garage)
+        run: |
+          docker compose up -d --wait db redis
+          docker run -d --name garage -p 3900:3900 -p 3903:3903 \
+            -e GARAGE_RPC_SECRET -e GARAGE_ADMIN_TOKEN \
+            -v "$PWD/deploy/compose/init/garage/garage.toml:/etc/garage.toml:ro" \
+            dxflrs/garage:v2.4.1
 
       - name: 🐍 Install uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
@@ -87,6 +110,15 @@ jobs:
 
       - name: 📥 JS dependencies
         uses: ./.github/actions/pnpm-install
+
+      - name: 🪣 Buckets
+        env:
+          GARAGE_ADMIN_URL: http://localhost:3903
+          GARAGE_S3_URL: http://localhost:3900
+          GOAT_PUBLIC_URL: http://localhost:3000
+          UPLOADS_BUCKET: goat
+          ASSETS_BUCKET: goat-assets
+        run: uv run --no-sync python deploy/compose/init/garage/garage-init.py
 
       - name: 🗄️ Database, seed data, DuckLake catalog
         run: |
