@@ -25,6 +25,14 @@ analysis algorithms, geospatial I/O, and shared models used by the `core`,
 2. Register it in `tools/registry.py`
 3. Sync it to Windmill with `tools/sync_windmill.py`
 
+Tools run with service credentials and never check the caller themselves:
+the `processes` service checks every layer, project, folder and bundle a
+request names before it submits the job (`apps/processes/README.md`). A new
+input that names a layer needs `widget="layer-selector"` or an entry in that
+check. SQL a user writes goes through `validate_sql_query` /
+`validate_sql_expression` in `utils/sql_validation.py`, which allow the declared
+input aliases only.
+
 ## Development
 
 The repo is a uv workspace — sync everything from the repo root:

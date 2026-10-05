@@ -86,3 +86,22 @@ def test_hidden_fields_json_format(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_hidden_fields_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUTH", "false")
     assert Settings().HIDDEN_FIELDS == {"bbox", "$minx", "$miny", "$maxx", "$maxy"}
+
+
+@pytest.mark.parametrize("name", ["GEOAPI_ENFORCE_READ_AUTHZ", "ENFORCE_READ_AUTHZ"])
+def test_read_authz_enforcement_reads_both_names(
+    monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    """The Helm chart sets the bare name; it must not be silently ignored."""
+    monkeypatch.setenv("KEYCLOAK_SERVER_URL", "http://kc")
+    monkeypatch.setenv(name, "true")
+    assert Settings().ENFORCE_READ_AUTHZ is True
+
+
+def test_read_authz_enforcement_is_off_unless_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("KEYCLOAK_SERVER_URL", "http://kc")
+    monkeypatch.delenv("GEOAPI_ENFORCE_READ_AUTHZ", raising=False)
+    monkeypatch.delenv("ENFORCE_READ_AUTHZ", raising=False)
+    assert Settings().ENFORCE_READ_AUTHZ is False

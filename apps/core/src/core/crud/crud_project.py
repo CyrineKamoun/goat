@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from fastapi_pagination import Page
 from fastapi_pagination import Params as PaginationParams
 from goatlib.models.project import DEFAULT_INITIAL_VIEW_STATE
-from sqlalchemy import select, text
+from sqlalchemy import Text, cast, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import and_, not_, or_
 
@@ -449,7 +449,11 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
         )
 
     async def publish_project(
-        self, *, async_session: AsyncSession, project_id: UUID
+        self,
+        *,
+        async_session: AsyncSession,
+        project_id: UUID,
+        user_id: UUID | None = None,
     ) -> ProjectPublic:
         project = (
             (
@@ -471,20 +475,28 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
             .scalars()
             .first()
         )
-        user_project = (
-            (
-                await async_session.execute(
-                    select(UserProjectLink).where(
-                        and_(
-                            UserProjectLink.project_id == project_id,
-                            Project.user_id == UserProjectLink.user_id,
-                        )
-                    )
+        # The public page opens where the project's creator left it, else
+        # where the publisher did, else where any member did. A project with
+        # no view at all (its creator removed, no one else opened it) opens on
+        # the default view rather than failing the publish.
+        initial_view_state = (
+            await async_session.execute(
+                select(UserProjectLink.initial_view_state)
+                .where(
+                    UserProjectLink.project_id == project_id,
+                    UserProjectLink.initial_view_state.is_not(None),
+                    cast(UserProjectLink.initial_view_state, Text).not_in(
+                        ("{}", "null")
+                    ),
                 )
+                .order_by(
+                    (UserProjectLink.user_id == project.user_id).desc(),
+                    (UserProjectLink.user_id == user_id).desc(),
+                    UserProjectLink.id,
+                )
+                .limit(1)
             )
-            .scalars()
-            .first()
-        )
+        ).scalar_one_or_none() or dict(DEFAULT_INITIAL_VIEW_STATE)
         # D7: a non-shareable link never reaches the public config — publishing
         # would hand the layer to everyone, and its adder could not share it at
         # all.
@@ -522,7 +534,7 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
             description=project.description,
             tags=project.tags,
             thumbnail_url=project.thumbnail_url,
-            initial_view_state=user_project.initial_view_state,
+            initial_view_state=initial_view_state,
             basemap=project.basemap,
             custom_basemaps=project.custom_basemaps,
             # Kept in step with the layers above, so the public config never
@@ -573,11 +585,11 @@ class CRUDProject(CRUDBase[Project, Any, Any]):
             .scalars()
             .first()
         )
+        # Unpublishing a project that has no public page is a no-op, so a
+        # repeated click or a stale page cannot fail.
         if public_project:
             await async_session.delete(public_project)
             await async_session.commit()
-        else:
-            raise Exception("Project not found")
         return None
 
     async def unpublish_projects_in(

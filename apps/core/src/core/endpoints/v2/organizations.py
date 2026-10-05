@@ -17,7 +17,7 @@ from core.db.models.invitation import Invitation, InvitationStatusEnum, Invitati
 from core.db.models.organization import OrganizationRolesEnum
 from core.db.models.user import User
 from core.deps import keycloak as keycloak_deps
-from core.deps.auth import auth_z, is_superuser, user_token
+from core.deps.auth import auth_z, require_superuser, token_is_superuser, user_token
 from core.endpoints.deps import get_db
 from core.schemas.email import EmailTemplateContent
 from core.schemas.invitations import (
@@ -45,7 +45,7 @@ router = APIRouter()
     "",
     summary="Get all organizations",
     response_model=Page[OrganizationRead],
-    dependencies=[Depends(is_superuser)],
+    dependencies=[Depends(require_superuser)],
 )
 async def get_organizations(
     *,
@@ -102,7 +102,7 @@ async def create_organization(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User has already an organization",
         )
-    _is_superuser = is_superuser(user_token, False)
+    _is_superuser = token_is_superuser(user_token)
     organization = await crud_organization.create_organization(
         db=db,
         organization_obj=organization,

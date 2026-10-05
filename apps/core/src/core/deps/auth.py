@@ -62,21 +62,6 @@ def user_token(request: Request) -> Dict[str, Any]:
     return get_current_token_claims(request)
 
 
-def is_superuser(
-    user_token: Dict[str, Any] = Depends(user_token), throw_error: bool = True
-) -> bool:
-    is_superuser = False
-    if user_token.get("realm_access", {}).get("roles"):
-        is_superuser = "superuser" in user_token["realm_access"]["roles"]
-
-    if not is_superuser and throw_error:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
-        )
-
-    return is_superuser
-
-
 def token_is_superuser(user_token: Dict[str, Any]) -> bool:
     """Whether the token carries the `superuser` realm role. Pure function,
     no dependency injection, for handlers that branch on the role instead
@@ -87,11 +72,10 @@ def token_is_superuser(user_token: Dict[str, Any]) -> bool:
 def require_superuser(user_token: Dict[str, Any] = Depends(user_token)) -> None:
     """401 unless the caller's token carries the `superuser` realm role.
 
-    Unlike `is_superuser`, this takes no extra parameters. `is_superuser`'s
-    `throw_error` bool has no `Depends`/`Body` marker, so FastAPI exposes it
-    as a query parameter (`?throw_error=false`) that lets any caller skip the
-    check entirely — confirmed in the generated OpenAPI schema. This
-    dependency exposes nothing a caller can override.
+    It takes no parameters of its own: any parameter of a dependency becomes
+    a request parameter, so a bool one would let a caller switch the check
+    off from the query string. This dependency exposes nothing a caller can
+    set.
     """
     if not token_is_superuser(user_token):
         raise HTTPException(

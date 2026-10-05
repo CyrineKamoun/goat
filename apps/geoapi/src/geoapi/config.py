@@ -39,8 +39,14 @@ class Settings(BaseSettings):
 
     # Read authorization gate for tile/feature/metadata endpoints. Shadow
     # mode (False, default) only logs `read_authz.would_deny`; flip on dev
-    # only after that counter is quiet. Env: GEOAPI_ENFORCE_READ_AUTHZ.
-    ENFORCE_READ_AUTHZ: bool = False
+    # only after that counter is quiet. Env: GEOAPI_ENFORCE_READ_AUTHZ, or the
+    # bare ENFORCE_READ_AUTHZ the Helm chart sets.
+    ENFORCE_READ_AUTHZ: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "GEOAPI_ENFORCE_READ_AUTHZ", "ENFORCE_READ_AUTHZ"
+        ),
+    )
     # Keycloak: the bare env var, overridable per service with GEOAPI_*.
     # Required when AUTH is on (see _require_keycloak).
     KEYCLOAK_SERVER_URL: str = Field(
