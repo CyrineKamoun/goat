@@ -12,7 +12,7 @@ test.describe("Project Management", () => {
     await page.getByRole("menuitem", { name: "Blank project" }).click();
 
     // Dialog should appear
-    await expect(page.getByRole("heading", { name: "New project" })).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("New project", { exact: true })).toBeVisible();
 
     // Fill in project name. Home has no folder of its own being browsed, so
     // the project files into the caller's personal home folder with no
@@ -45,7 +45,7 @@ test.describe("Project Management", () => {
     await page.getByRole("menuitem", { name: "Blank project" }).click();
     // One field, one button: the destination is the folder being browsed
     // (My Content's root here), so the dialog only asks for a name.
-    await expect(page.getByRole("heading", { name: "New project" })).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("New project", { exact: true })).toBeVisible();
 
     const projectName = `E2E Project Page ${Date.now()}`;
     await page.getByLabel("New project").fill(projectName);

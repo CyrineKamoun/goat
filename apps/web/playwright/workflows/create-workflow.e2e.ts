@@ -15,7 +15,7 @@ test.describe("Workflow Management", () => {
     await page.goto("/content");
     await page.getByRole("button", { name: "Add new" }).click();
     await page.getByRole("menuitem", { name: "Blank project" }).click();
-    await expect(page.getByRole("heading", { name: "New project" })).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("New project", { exact: true })).toBeVisible();
 
     // The dialog asks for a name and nothing else — the destination is the
     // folder being browsed.
