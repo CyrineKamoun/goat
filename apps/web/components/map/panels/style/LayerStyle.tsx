@@ -284,7 +284,8 @@ const LayerStylePanel = ({ projectId }: { projectId: string }) => {
 
           const colorMap = [] as ColorMap;
           uniqueValues.items.slice(0, actualCount).forEach((item: LayerUniqueValues, index: number) => {
-            colorMap.push([[item.value], colors[index]]);
+            // Boolean columns come back as true/false; the color map and the match expression compare strings.
+            colorMap.push([[typeof item.value === "boolean" ? String(item.value) : item.value], colors[index]]);
           });
           newStyle[`${updateType}_range`].color_map = colorMap;
           newStyle[`${updateType}_range`].colors = colors;
