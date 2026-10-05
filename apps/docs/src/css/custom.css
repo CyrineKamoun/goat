@@ -663,6 +663,13 @@ a.card:hover {
   margin: 0;
 }
 
+/* The divider beside a step number is 60px tall, so beside a one-line step it
+   reaches below the step; tabs straight after a step keep clear of it. The
+   margin collapses with the step's 20px bottom margin, so it is the whole gap. */
+.step + .tabs-container {
+  margin-top: 36px;
+}
+
 .tabItemBox {
   margin-left: 10px;
 }
