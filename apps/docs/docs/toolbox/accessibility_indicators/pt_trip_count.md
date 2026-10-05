@@ -19,7 +19,7 @@ This indicator is the foundation for the [ÖV-Güteklassen](./oev_gueteklassen.m
 
 :::info
 
-Trip Count Platform computation is available for areas where public transport GTFS data is integrated into GOAT. Currently supported regions include **Germany, Switzerland, and the Haut-Rhin region of France**. If you need analyses beyond these regions, you can [import your own public transport network](../../data/builtin_datasets.md#your-own-public-transport-network) or [contact us](https://plan4better.de/en/contact/) and we will do it for you.
+Trip Count Platform computation is available for areas where public transport [GTFS data](https://www.plan4better.de/en/glossary/gtfs) is integrated into GOAT. Currently supported regions include **Germany, Switzerland, and the Haut-Rhin region of France**. If you need analyses beyond these regions, you can [import your own public transport network](../../data/builtin_datasets.md#your-own-public-transport-network) or [contact us](https://plan4better.de/en/contact/) and we will do it for you.
 
 :::
 
