@@ -125,7 +125,7 @@ In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüp
   <div class="content">Wählen Sie Ihren <code>Join-Layer</code>: den Layer, der die Felder enthält, die Sie hinzufügen möchten.</div>
 </div>
 
-### Abgleichmethode
+### Zuordnungsmethode
 
 <div class="step">
   <div class="step-number">4</div>
@@ -135,28 +135,19 @@ In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüp
 <Tabs>
 <TabItem value="attribute" label="Attributiv" default className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Klicken Sie unter <code>Attributbeziehung</code> auf <code>Hinzufügen Zuordnungsfelder</code>, und wählen Sie dann das <code>Ziel-Feld</code> und das <code>Join-Feld</code>: das gemeinsame Feld, das zur Zuordnung von Features zwischen den beiden Layern verwendet wird.</div>
-</div>
+Klicken Sie unter <code>Attributbeziehung</code> auf <code>Hinzufügen Zuordnungsfelder</code>, und wählen Sie dann das <code>Ziel-Feld</code> und das <code>Join-Feld</code>: das gemeinsame Feld, das zur Zuordnung von Features zwischen den beiden Layern verwendet wird.
 
 </TabItem>
 
 <TabItem value="spatial" label="Räumlich" className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Wählen Sie unter <code>Räumliche Beziehung</code> die gewünschte räumliche Beziehung aus. Bei Auswahl von <code>In einer Entfernung von</code> geben Sie die Entfernung und die Einheit an.</div>
-</div>
+Wählen Sie unter <code>Räumliche Beziehung</code> die gewünschte räumliche Beziehung aus. Bei Auswahl von <code>In einer Entfernung von</code> geben Sie die Entfernung und die Einheit an.
 
 </TabItem>
 
 <TabItem value="spatial_attribute" label="Räumlich und Attributiv" className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Konfigurieren Sie sowohl die <code>Räumliche Zuordnung</code> (räumliche Beziehung auswählen) als auch die <code>Attributbeziehung</code> (auf <code>Hinzufügen Zuordnungsfelder</code> klicken und Abgleichfelder auswählen). Beide Bedingungen müssen erfüllt sein, damit ein Feature verknüpft wird.</div>
-</div>
+Konfigurieren Sie sowohl die <code>Räumliche Zuordnung</code> (räumliche Beziehung auswählen) als auch die <code>Attributbeziehung</code> (auf <code>Hinzufügen Zuordnungsfelder</code> klicken und Abgleichfelder auswählen). Beide Bedingungen müssen erfüllt sein, damit ein Feature verknüpft wird.
 
 </TabItem>
 </Tabs>
@@ -164,18 +155,18 @@ In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüp
 ### Verknüpfungsoptionen
 
 <div class="step">
-  <div class="step-number">6</div>
+  <div class="step-number">5</div>
   <div class="content">Wählen Sie den <code>Verbindungstyp</code>: <code>Inner Join</code> (nur übereinstimmende Features behalten) oder <code>Left Join</code> (alle Ziel-Features behalten, nicht übereinstimmende erhalten NULL).</div>
 </div>
 
 <div class="step">
-  <div class="step-number">7</div>
+  <div class="step-number">6</div>
   <div class="content">Wählen Sie unter <code>Übereinstimmungen</code>: <code>Eins zu Eins</code> oder <code>Eins zu Viele</code>.</div>
 </div>
 
 
 <div class="step">
-  <div class="step-number">8</div>
+  <div class="step-number">7</div>
   <div class="content">
   Aktivieren Sie optional <code>Verknüpfungsfelder hinzufügen</code>, um festzulegen, welche Felder aus dem Join-Layer in die Ausgabe aufgenommen werden sollen, und/oder aktivieren Sie <code>Statistiken berechnen</code>, um aggregierte Werte zu berechnen, wenn mehrere Join-Layer-Datensätze einem einzelnen Ziel-Layer-Feature entsprechen. Wenn <code>Statistiken berechnen</code> aktiviert ist, konfigurieren Sie die Statistik:
   <ul>
@@ -187,6 +178,6 @@ In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüp
 </div>
 
 <div class="step">
-  <div class="step-number">9</div>
+  <div class="step-number">8</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Verknüpfung durchzuführen. Der Ergebnis-Layer wird der Karte hinzugefügt.</div>
 </div>

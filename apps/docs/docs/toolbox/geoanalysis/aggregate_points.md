@@ -59,19 +59,13 @@ The Aggregate Points tool can be used to **analyze the characteristics of points
 <Tabs>
   <TabItem value="Polygon" label="Polygon" default className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Select the <code>Area Layer</code> which contains the polygons on which you like to aggregate your point data.</div>
-</div>
+Select the <code>Area Layer</code> which contains the polygons on which you like to aggregate your point data.
 
 
   </TabItem>
   <TabItem value="H3 Grid" label="H3 Grid" className="tabItemBox">
 
- <div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Select the <code>H3 Resolution</code>. You can choose resolutions between 3 (average edge length of 69km) and 10 (average edge length of 70m). Higher values create smaller hexagons.</div>
-</div>
+Select the <code>H3 Resolution</code>. You can choose resolutions between 3 (average edge length of 69km) and 10 (average edge length of 70m). Higher values create smaller hexagons.
 
 :::tip NOTE
 
@@ -85,7 +79,7 @@ To learn more about the H3 grid, you can visit the [Glossary](../../further_read
 ### Statistics
 
 <div class="step">
-  <div class="step-number">6</div>
+  <div class="step-number">5</div>
   <div class="content">Under <code>Statistics Configuration</code>, select the <code>Operation</code>. For all operations except <b>Count</b>, also select the <code>Field</code> of the point layer to calculate the statistic on. Only numeric fields can be selected.</div>
 </div>
 
@@ -101,29 +95,29 @@ The following **operations** are available:
 | Standard Deviation | `number` | Calculates the standard deviation of the selected field        |
 
 <div class="step">
-  <div class="step-number">7</div>
+  <div class="step-number">6</div>
   <div class="content">Optionally, enter a <code>Result Name</code> for the result column. If you leave it empty, the column is called <code>count</code> for Count and <code>&lt;field&gt;_&lt;operation&gt;</code> otherwise (e.g. <code>population_sum</code>).</div>
 </div>
 
 <div class="step">
-  <div class="step-number">8</div>
-  <div class="content">To calculate further statistics in the same run, click on <code>Add Statistics Configuration</code> and repeat steps 6 and 7. You can add up to 30 statistics; to remove one, click the trash icon above it.</div>
+  <div class="step-number">7</div>
+  <div class="content">To calculate further statistics in the same run, click on <code>Add Statistics Configuration</code> and repeat steps 5 and 6. You can add up to 30 statistics; to remove one, click the trash icon above it.</div>
 </div>
 
 <div class="step">
-  <div class="step-number">9</div>
+  <div class="step-number">8</div>
   <div class="content">Optionally, click the options icon <img src={require('/img/icons/options.png').default} alt="Options" style={{ maxHeight: "20px", maxWidth: "20px", objectFit: "cover"}}/> in the <code>Statistics</code> header and select up to three <code>Group Fields</code> of the point layer. The statistics are then additionally calculated per group (per combination of values of these fields).</div>
 </div>
 
 ### Results
 
 <div class="step">
-  <div class="step-number">10</div>
+  <div class="step-number">9</div>
   <div class="content">Optionally, change the <code>Result layer name</code> (default: <b>Aggregate Points</b>).</div>
 </div>
 
 <div class="step">
-  <div class="step-number">11</div>
+  <div class="step-number">10</div>
   <div class="content">Click on <code>Run</code>.</div>
 </div>
 

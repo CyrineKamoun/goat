@@ -84,43 +84,27 @@ Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **üb
 | Auto | Alle mit dem Auto befahrbaren Wege (unter Berücksichtigung von Tempolimits und Einbahnstraßen) |
 | Öffentlicher Verkehr | Alle mit dem ÖV möglichen Fahrten (gemäß offiziellen GTFS-Fahrplänen), unter Berücksichtigung von Zu- und Abgang zu Fuß zu und von den Haltestellen |
 
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Legen Sie fest, wie die Reise gemessen wird. Die Optionen hängen vom <code>Verkehrsmittel</code> ab, das Sie in Schritt 3 gewählt haben:</div>
+</div>
+
 <Tabs>
 <TabItem value="active-car" label="Zu Fuß / Fahrrad / Pedelec / Auto" default className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Wählen Sie im Menü <code>Berechnung nach</code>, ob die Reisekosten als Zeit (Minuten) oder als Entfernung (Meter) gemessen werden.</div>
-</div>
+Wählen Sie im Menü <code>Berechnung nach</code>, ob die Reisekosten als Zeit (Minuten) oder als Entfernung (Meter) gemessen werden.
 
 </TabItem>
 
 <TabItem value="public transport" label="Öffentlicher Verkehr (ÖV)" className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Wählen Sie die zu analysierenden <code>ÖV-Modi</code>: Bus, Straßenbahn, Bahn, U-Bahn, Fähre, Seilbahn, Gondel und/oder Standseilbahn. Wählen Sie anschließend <code>Tag</code> und <code>Ankunftszeit</code> für die Analyse. Berücksichtigt werden die besten ÖV-Fahrten, die die Gelegenheiten bis zu dieser Zeit erreichen.</div>
-</div>
+Wählen Sie die zu analysierenden <code>ÖV-Modi</code>: Bus, Straßenbahn, Bahn, U-Bahn, Fähre, Seilbahn, Gondel und/oder Standseilbahn. Wählen Sie anschließend <code>Tag</code> und <code>Ankunftszeit</code> für die Analyse. Berücksichtigt werden die besten ÖV-Fahrten, die die Gelegenheiten bis zu dieser Zeit erreichen.
 
 </TabItem>
 </Tabs>
 
-#### Erweiterte Optionen
-
-Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Einstellungen für Routing und Heatmap-Erstellung vorzunehmen.
-
 <div class="step">
   <div class="step-number">5</div>
-  <div class="content">Wählen Sie ein <code>Referenzgebiet</code>: einen Polygon-Layer, der Ihr Untersuchungsgebiet darstellt. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; nicht erreichbare Zellen erhalten den Wert <code>NULL</code> und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">6</div>
-  <div class="content">Konfigurieren Sie verschiedene Routing-Optionen für das gewählte Verkehrsmittel, etwa Reisegeschwindigkeit, maximale Anzahl an Umstiegen, Zu- und Abgangslimits und mehr. Weitere Informationen zu verkehrsmittelspezifischen Optionen finden Sie im Abschnitt [Routing](../../category/routing).</div>
-</div>
-
-
-<div class="step">
-  <div class="step-number">7</div>
   <div class="content">Wählen Sie den <code>2SFCA-Typ</code>, den Sie verwenden möchten.</div>
 </div>
 
@@ -153,7 +137,7 @@ Erfordert die Auswahl einer **Widerstandsfunktion** und eines **Sensitivitätswe
 </Tabs>
 
 <div class="step">
-  <div class="step-number">8</div>
+  <div class="step-number">6</div>
   <div class="content">Wenn Sie <b>E2SFCA</b> oder <b>M2SFCA</b> verwenden, wählen Sie die <code>Widerstandsfunktion</code> für die Distanzgewichtung.</div>
 </div>
 
@@ -190,6 +174,20 @@ Wendet innerhalb des Reisezeitlimits ein volles Gewicht von 1 auf jede Einrichtu
 </TabItem>
 
 </Tabs>
+
+#### Erweiterte Optionen
+
+Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Einstellungen für Routing und Heatmap-Erstellung vorzunehmen.
+
+<div class="step">
+  <div class="step-number">7</div>
+  <div class="content">Wählen Sie ein <code>Referenzgebiet</code>: einen Polygon-Layer, der Ihr Untersuchungsgebiet darstellt. Wenn festgelegt, erweitert sich die Heatmap auf alle H3-Zellen innerhalb dieses Polygons; nicht erreichbare Zellen erhalten den Wert <code>NULL</code> und zeigen so Versorgungslücken und unterversorgte Gebiete auf.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">8</div>
+  <div class="content">Konfigurieren Sie verschiedene Routing-Optionen für das gewählte Verkehrsmittel, etwa Reisegeschwindigkeit, maximale Anzahl an Umstiegen, Zu- und Abgangslimits und mehr. Weitere Informationen zu verkehrsmittelspezifischen Optionen finden Sie im Abschnitt [Routing](../../category/routing).</div>
+</div>
 
 ### Bedarf
 

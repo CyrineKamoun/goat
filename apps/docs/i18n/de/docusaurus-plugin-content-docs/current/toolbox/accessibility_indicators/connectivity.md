@@ -60,32 +60,25 @@ Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **üb
 | Auto | Alle mit dem Auto befahrbaren Wege (unter Berücksichtigung von Tempolimits und Einbahnstraßen) |
 | Öffentlicher Verkehr | Alle mit dem ÖV möglichen Fahrten (gemäß offiziellen GTFS-Fahrplänen), unter Berücksichtigung von Zu- und Abgang zu Fuß zu und von den Haltestellen |
 
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Legen Sie fest, wie die Reise gemessen wird, und das Limit. Die Optionen hängen vom <code>Verkehrsmittel</code> ab, das Sie in Schritt 3 gewählt haben:</div>
+</div>
+
 <Tabs>
 <TabItem value="active-car" label="Zu Fuß / Fahrrad / Pedelec / Auto" default className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Wählen Sie im Menü <code>Berechnung nach</code>, ob die Reisekosten als Zeit (Minuten) oder als Entfernung (Meter) gemessen werden.</div>
-</div>
+Wählen Sie im Menü <code>Berechnung nach</code>, ob die Reisekosten als Zeit (Minuten) oder als Entfernung (Meter) gemessen werden.
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Geben Sie ein <code>Limit</code> in Minuten oder Metern für Ihre Heatmap ein. Dieses wird entsprechend dem zuvor gewählten Verkehrsmittel und der gewählten Maßeinheit verwendet.</div>
-</div>
+Geben Sie ein <code>Limit</code> in Minuten oder Metern für Ihre Heatmap ein. Dieses wird entsprechend dem zuvor gewählten Verkehrsmittel und der gewählten Maßeinheit verwendet.
 
 </TabItem>
 
 <TabItem value="public transport" label="Öffentlicher Verkehr (ÖV)" className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Wählen Sie die zu analysierenden <code>ÖV-Modi</code>: Bus, Straßenbahn, Bahn, U-Bahn, Fähre, Seilbahn, Gondel und/oder Standseilbahn. Wählen Sie anschließend <code>Tag</code> und <code>Ankunftszeit</code> für die Analyse. Berücksichtigt werden die besten ÖV-Fahrten, die die Gelegenheiten bis zu dieser Zeit erreichen.</div>
-</div>
+Wählen Sie die zu analysierenden <code>ÖV-Modi</code>: Bus, Straßenbahn, Bahn, U-Bahn, Fähre, Seilbahn, Gondel und/oder Standseilbahn. Wählen Sie anschließend <code>Tag</code> und <code>Ankunftszeit</code> für die Analyse. Berücksichtigt werden die besten ÖV-Fahrten, die die Gelegenheiten bis zu dieser Zeit erreichen.
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Geben Sie ein <code>Limit</code> in Minuten für Ihre Heatmap ein.</div>
-</div>
+Geben Sie ein <code>Limit</code> in Minuten für Ihre Heatmap ein.
 
 </TabItem>
 </Tabs>
@@ -100,14 +93,14 @@ Benötigen Sie Hilfe bei der Auswahl eines geeigneten Reisezeitlimits für versc
 Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Einstellungen für Routing und Heatmap-Erstellung vorzunehmen.
 
 <div class="step">
-  <div class="step-number">6</div>
+  <div class="step-number">5</div>
   <div class="content">Konfigurieren Sie verschiedene Routing-Optionen für das gewählte Verkehrsmittel, etwa Reisegeschwindigkeit, maximale Anzahl an Umstiegen, Zu- und Abgangslimits und mehr. Weitere Informationen zu verkehrsmittelspezifischen Optionen finden Sie im Abschnitt [Routing](../../category/routing).</div>
 </div>
 
 ### Referenzgebiet
 
 <div class="step">
-  <div class="step-number">7</div>
+  <div class="step-number">6</div>
   <div class="content">Wählen Sie ein <code>Referenzgebiet</code>: einen Polygon-Layer, der Ihr Interessengebiet (AOI) definiert, für das die Heatmap berechnet werden soll.</div>
 </div>
 
@@ -115,12 +108,12 @@ Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Ein
 ### Ergebnis-Layer
 
 <div class="step">
-  <div class="step-number">8</div>
+  <div class="step-number">7</div>
   <div class="content">Legen Sie den <code>Name der Ergebnislayer</code> für den Ausgabe-Heatmap-Layer fest.</div>
 </div>
 
 <div class="step">
-  <div class="step-number">9</div>
+  <div class="step-number">8</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Berechnung der Heatmap zu beginnen.</div>
 </div>
 

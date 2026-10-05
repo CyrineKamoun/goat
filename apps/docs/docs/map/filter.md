@@ -107,10 +107,8 @@ For the expressions **"Includes"** and **"Excludes"**, multiple values can be se
 
 <Tabs>
   <TabItem value="Map extent" label="Map extent" default className="tabItemBox">
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">With <code>Map Extent</code>, the layer <strong>automatically crops to the current map extent</strong>. To change the filter, zoom in/out and click the refresh icon (<code>Use current map extent</code>).</div>
-</div>
+
+With <code>Map Extent</code>, the layer <strong>automatically crops to the current map extent</strong>. To change the filter, zoom in/out and click the refresh icon (<code>Use current map extent</code>).
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 
