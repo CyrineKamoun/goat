@@ -636,15 +636,16 @@ a.card:hover {
 }
 
 .step-number {
-  flex: 0 0 auto;
-  min-width: 3.25rem;
+  /* The same width for every step, room for two digits (1.2em) plus the gap
+     to the line, so steps 10 and up line up with the rest. */
+  flex: 0 0 calc(1.2em + 20px);
   text-align: right;
   font-size: 2rem;
   font-weight: 700;
   line-height: 1;
   color: var(--goat-color-brand-ink);
   position: relative; /* This is needed to position the line */
-  padding-right: 30px; /* Space between the number and the line */
+  padding-right: 20px; /* Space between the number and the line */
   margin-right: 20px; /* Additional space if needed */
   /* Fill the step's height so the divider spans exactly the step: a fixed
      length stuck out above and below a short step, into a table or tab bar
