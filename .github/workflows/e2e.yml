@@ -1,0 +1,153 @@
+name: "E2E"
+
+# The Playwright suite (apps/web/playwright) against a stack started from
+# source: infra from the root compose.yaml, core, geoapi, processes and
+# catalog with uvicorn, and a production build of the web app. AUTH=False, so
+# every request runs as the built-in default user and nothing logs in.
+#
+# Nightly, not on every PR: starting the stack takes most of the run, and the
+# suite exists to catch the app drifting away from its specs. A PR that
+# changes the specs, the seed or this workflow runs it too, so a change to
+# any of them is tested before it lands.
+#
+# Windmill is not started: uploads, tool and workflow runs never complete
+# here. The specs that need datasets get them from `core.scripts.seed_e2e`.
+
+on:
+  schedule:
+    - cron: "30 2 * * *" # 02:30 UTC, after the day's merges
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/e2e.yml"
+      - "apps/web/playwright/**"
+      - "playwright.config.ts"
+      - "apps/core/src/core/scripts/seed_e2e.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v7
+
+      # One set of settings for the compose infra (which reads .env) and for
+      # every service, all of which read their settings from the environment:
+      # .env.example's localhost development values, pointed at services on
+      # this runner instead of compose service names. No status or website
+      # feeds: the run does not depend on the live website, and a fresh user
+      # would otherwise get the first-visit spotlight, a modal over every page.
+      - name: ⚙️ Environment
+        run: |
+          cp .env.example .env
+          data_dir="$GITHUB_WORKSPACE/data"
+          cat >> .env <<EOF
+          POSTGRES_SERVER=localhost
+          DUCKLAKE_POSTGRES_SERVER=localhost
+          S3_ENDPOINT_URL=http://localhost:9000
+          ASSETS_S3_ENDPOINT_URL=http://localhost:9000
+          DATA_DIR=$data_dir
+          DUCKLAKE_DATA_DIR=$data_dir/ducklake
+          TILES_DATA_DIR=$data_dir/tiles
+          GOAT_PROCESSES_URL=http://localhost:8300
+          WINDMILL_URL=http://localhost:1
+          NEXT_PUBLIC_CATALOG_URL=http://localhost:8400/stac
+          NEXT_PUBLIC_STATUS_FEED_URL=
+          NEXT_PUBLIC_WEBSITE_URL=
+          NEXTAUTH_SECRET=e2e-only-secret
+          EOF
+          mkdir -p "$data_dir"
+          # Later lines win, as in a shell `. .env`; GITHUB_ENV takes the
+          # last value of a name too.
+          grep -E '^[A-Z_][A-Z0-9_]*=' .env | sed 's/"//g' >> "$GITHUB_ENV"
+
+      - name: 🐘 Infra (Postgres, MinIO, Redis)
+        run: docker compose up -d --wait db minio redis && docker compose up minio-buckets
+
+      - name: 🐍 Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.9.2"
+          enable-cache: true
+          prune-cache: true
+      # As in the test jobs: gdal and the C++ routing package are imported
+      # lazily, by code paths the suite does not reach.
+      - name: 🐍 Python dependencies
+        run: uv sync --frozen --all-packages --all-extras --no-install-package gdal --no-install-package routing
+
+      - name: 📥 JS dependencies
+        uses: ./.github/actions/pnpm-install
+
+      - name: 🗄️ Database, seed data, DuckLake catalog
+        run: |
+          (cd apps/core && uv run --no-sync alembic upgrade head)
+          (cd apps/core && uv run --no-sync python -m core.scripts.initial_data)
+          (cd apps/core && uv run --no-sync python -m core.scripts.seed_e2e)
+          uv run --no-sync python -m goatlib.storage.ducklake_init
+
+      - name: 🚀 Services
+        run: |
+          mkdir -p logs
+          start() { (cd "apps/$1" && nohup uv run --no-sync uvicorn "$1.main:app" --port "$2" > "../../logs/$1.log" 2>&1 &) ; }
+          start core 8000
+          start geoapi 8100
+          start processes 8300
+          # catalog serves a parquet mirror this runner does not have; the
+          # specs only open its page, so a catalog that fails to start is
+          # tolerated (its log is kept for the report).
+          start catalog 8400
+
+      - name: 🏗️ Web build
+        run: pnpm --filter @p4b/web build
+
+      - name: 🌐 Web server
+        run: |
+          (cd apps/web && nohup pnpm start --port 3000 > ../../logs/web.log 2>&1 &)
+          for url in http://localhost:8000/api/healthz http://localhost:8100/ http://localhost:8300/ http://localhost:3000/; do
+            for i in $(seq 1 60); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)
+              [ "$code" != "000" ] && break
+              sleep 2
+            done
+            echo "$url -> $code"
+            [ "$code" != "000" ] || { echo "::error::$url never answered"; exit 1; }
+          done
+
+      - name: 🎭 Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --filter web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+      - name: 💾 Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: 📥 Install Playwright Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter web exec playwright install --with-deps chromium
+      - name: 📥 Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter web exec playwright install-deps chromium
+
+      - name: 🧪 Playwright
+        run: pnpm exec playwright test --config=playwright.config.ts
+
+      - name: 📤 Report and service logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: |
+            test-results/
+            logs/
+          retention-days: 14
