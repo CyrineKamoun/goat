@@ -50,6 +50,11 @@ from processes.models.processes import (
     StatusCode,
     StatusInfo,
 )
+from processes.services.access import (
+    analytics_references,
+    ensure_allowed,
+    tool_references,
+)
 from processes.services.analytics_registry import (
     LayerSearchProcessInput,
     analytics_registry,
@@ -642,6 +647,11 @@ async def execute_process(
                 },
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        # Every layer the query reads must be readable by the caller (a
+        # layer of a published project is readable by anyone).
+        await ensure_allowed(
+            user_id, analytics_references(process_id, execute_request.inputs)
+        )
         global _layer_search_inflight
         is_search = process_id == "layer-search"
         if is_search and _layer_search_inflight >= _LAYER_SEARCH_MAX_INFLIGHT:
@@ -714,6 +724,12 @@ async def execute_process(
                 "detail": f"Process '{process_id}' not found",
             },
         )
+
+    # The tool runs with service credentials: check here that the caller may
+    # read every layer it names and write where it puts its result.
+    await ensure_allowed(
+        user_id, tool_references(tool_info.name, execute_request.inputs, user_id)
+    )
 
     # Use the windmill_path from the registry (ensures correct casing)
     script_path = tool_info.windmill_path

@@ -29,7 +29,10 @@ It was split from geoapi so that long-running analysis can never block tile and 
 
 - **Async tools always need a user.** The server sets `user_id` in the job inputs from the token, so a client cannot submit a job as someone else.
 - **Jobs are private to their owner.** Status, results and dismiss compare the job's `user_id` with the caller and answer 404, not 403, for someone else's job.
-- **Some sync analytics are public**, so anonymous viewers of a published dashboard get their statistics. `layer-search` and `preview-sql` are allowed anonymously only when scoped to a published project's own layers; `validate-sql` always needs a token.
+- **Everything a request names is checked before it runs** (`src/processes/services/access.py`). Tools and analytics read with service credentials, so they never check the caller themselves. Every layer a request reads must be readable by the caller: in a published project, or allowed by `customer.can`. Every project and folder a tool writes to must be writable, and every bundle readable. A refusal answers 404, like a missing resource; a check that cannot run answers 503. The same rule covers `/workflows/{id}/execute` (dataset nodes and tool configs).
+- **Which inputs name a layer** comes from each tool's schema (`widget="layer-selector"`), plus `EXTRA_LAYER_FIELDS` in `access.py`. `tests/test_access.py` fails when a tool gains a layer-shaped field that neither covers.
+- **A layer input must be a layer id** (checked) or a workflow temp-layer id (resolved in the caller's own temp directory). File locations (`*_path`, `*_url` and the like) are filled by the runner; a caller-supplied one is refused, except `wfs_url`. An `s3_key` must sit under the caller's own `users/<id>/` upload prefix.
+- **Some sync analytics are public**, so anonymous viewers of a published dashboard get their statistics, for layers of a published project only. `layer-search` and `preview-sql` are allowed anonymously only when scoped to a published project's own layers; `validate-sql` always needs a token.
 - **Beta tools** are hidden from `GET /processes` unless the caller's email domain is listed in the Windmill variable named by `BETA_USER_EMAIL_DOMAINS_WM_PATH`.
 - With `AUTH=False` every caller is the built-in development user and sees that user's jobs.
 
