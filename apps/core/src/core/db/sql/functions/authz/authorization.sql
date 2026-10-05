@@ -41,7 +41,9 @@ BEGIN
     	FROM (SELECT jsonb_array_elements_text(extracted_params -> 'project_id') AS val) x
 	);
     team_ids := (extracted_params -> 'team_ids' )::TEXT::UUID[];
-    organization_id := (extracted_params -> 'organization_id' -> 1)::TEXT::UUID;
+    -- Each extracted value is a one-element JSON array; JSON arrays are
+    -- 0-indexed, and ->> unquotes the string for the cast.
+    organization_id := (extracted_params -> 'organization_id' ->> 0)::UUID;
 
     /*Get resource into a record*/
     rec_resource := customer.check_resource(requested_resource, requested_path, requested_method);

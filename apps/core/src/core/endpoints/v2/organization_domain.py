@@ -2,10 +2,11 @@
 
 Phase 4 of the white-label custom domains feature.
 
-Note: as of v1, GOAT does not have an explicit "is org admin" guard at the
-endpoint layer; ``auth_z`` only confirms the user is authenticated. Org-admin
-gating is enforced at the UI level. This is a v1 limitation; tighten when
-the platform gains a proper org-role check.
+Access is enforced by ``auth_z``: the seeded resources require
+``update-organization`` (organization admins and owners) to add, recheck or
+delete a domain and ``read-organization`` to list them, and the organization
+in the path must be the caller's own. ``tests/authz/test_organization_domain_route.py``
+pins this.
 """
 
 from typing import List
