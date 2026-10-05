@@ -20,7 +20,7 @@ Dieser Indikator ist die Grundlage für die [ÖV-Güteklassen](./oev_gueteklasse
 
 :::info
 
-Die Berechnung der Anzahl Abfahrten ist für Gebiete verfügbar, in denen [GTFS-Daten](https://www.plan4better.de/de/glossar/gtfs) des öffentlichen Verkehrs in GOAT integriert sind. Derzeit unterstützte Regionen umfassen **Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich**. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns gerne](https://plan4better.de/de/contact/). Sie können auch [ein eigenes ÖPNV-Netz importieren](../../data/builtin_datasets.md#eigenes-öpnv-netz), um andere Regionen zu analysieren.
+Die Berechnung der Anzahl Abfahrten ist für Gebiete verfügbar, in denen GTFS-Daten des öffentlichen Verkehrs in GOAT integriert sind. Derzeit unterstützte Regionen umfassen **Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich**. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns gerne](https://plan4better.de/de/contact/). Sie können auch [ein eigenes ÖPNV-Netz importieren](../../data/builtin_datasets.md#eigenes-öpnv-netz), um andere Regionen zu analysieren.
 
 :::
 
