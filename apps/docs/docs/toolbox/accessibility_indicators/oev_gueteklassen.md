@@ -19,7 +19,7 @@ The ÖV-Güteklassen indicator is decisive and can be used to highlight deficits
 
 :::info
 
-ÖV-Güteklassen computation is available for areas where public transport GTFS data is integrated into GOAT. Currently supported regions include **Germany, Switzerland, and the Haut-Rhin region of France**. If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/). You can also [import your own public transport network](../../data/builtin_datasets.md#your-own-public-transport-network) to analyse other regions.
+ÖV-Güteklassen computation is available for areas where public transport GTFS data is integrated into GOAT. Currently supported regions include **Germany, Switzerland, and the Haut-Rhin region of France**. If you need analyses beyond these regions, you can [import your own public transport network](../../data/builtin_datasets.md#your-own-public-transport-network) or [contact us](https://plan4better.de/en/contact/) and we will do it for you.
 
 :::
 

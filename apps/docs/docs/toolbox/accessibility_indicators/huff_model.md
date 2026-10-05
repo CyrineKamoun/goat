@@ -38,7 +38,7 @@ You can configure the routing type, opportunity layers (with capacity fields), d
 
 :::info
 
-Huff Model computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/ "Contact us"). You can also [import your own routing network](../../data/builtin_datasets.md#bringing-your-own-networks) to analyse other regions.
+Huff Model computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, you can [import your own routing network](../../data/builtin_datasets.md#bringing-your-own-networks) or [contact us](https://plan4better.de/en/contact/) and we will do it for you.
 
 :::
 
@@ -113,12 +113,6 @@ Huff Model computation is available across **over 30 European countries** for `W
   <div class="step-number">6</div>
   <div class="content">Select your <code>Reference Area</code>: a polygon layer defining the study area boundary. Only demand and opportunities within this area are included in the analysis.</div>
 </div>
-
-:::tip Hint
-
-Need help choosing a suitable travel time limit for various common amenities? The ["Standort-Werkzeug"](https://www.chemnitz.de/chemnitz/media/unsere-stadt/verkehr/verkehrsplanung/vep2040_standortwerkzeug.pdf) of the City of Chemnitz can provide helpful guidance.
-
-:::
 
 ### Demand
 

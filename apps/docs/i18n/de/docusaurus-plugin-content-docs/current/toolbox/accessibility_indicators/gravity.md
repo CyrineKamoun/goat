@@ -40,7 +40,7 @@ Beeinflusst durch all diese Eigenschaften kann **die Erreichbarkeit eines Punkte
 
 :::info
 
-Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns](https://plan4better.de/de/contact/) gerne. Sie können auch [ein eigenes Routing-Netz importieren](../../data/builtin_datasets.md#eigene-netze-importieren), um andere Regionen zu analysieren.
+Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, können Sie [ein eigenes Routing-Netz importieren](../../data/builtin_datasets.md#eigene-netze-importieren) oder uns gerne [kontaktieren](https://plan4better.de/de/contact/), damit wir das für Sie übernehmen.
 
 :::
 
@@ -165,12 +165,6 @@ Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Ein
   <div class="step-number">9</div>
   <div class="content">Geben Sie ein <code>Limit</code> für die Reisekosten Ihrer Heatmap ein. Dieses wird im Kontext des zuvor gewählten <i>Verkehrsmittels</i> verwendet.</div>
 </div>
-
-:::tip Hinweis
-
-Benötigen Sie Hilfe bei der Wahl eines geeigneten Reisezeitlimits für verschiedene Einrichtungen? Das ["Standort-Werkzeug"](https://www.chemnitz.de/chemnitz/media/unsere-stadt/verkehr/verkehrsplanung/vep2040_standortwerkzeug.pdf) der Stadt Chemnitz bietet hilfreiche Orientierung.
-
-:::
 
 <div class="step">
   <div class="step-number">10</div>

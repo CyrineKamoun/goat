@@ -23,32 +23,30 @@ Die visuelle Leinwand-Benutzeroberfläche macht komplexe räumliche Analyseautom
 Die Workflow-Benutzeroberfläche besteht aus zwei Hauptpanels und der Workflow-Leinwand und bietet einen intuitiven Arbeitsbereich für die visuelle Workflow-Konstruktion.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workflows/workflows_interface_de.webp').default} alt="Kartenoberfläche Übersicht" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/workflows/workflows_canvas-bars_de.webp').default} alt="Kartenoberfläche Übersicht" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div> 
 
 ### Workflow-Management und Projekt-Ebenen Panel
 Dieses Panel befindet sich links und ist in zwei Bereiche unterteilt:
 
-#### Workflow-Management
+**Workflow-Management**
 
 - **Neu**: Klicken Sie auf <code>+ Neu</code> und wählen Sie <code>Neu erstellen</code> oder <code>Aus Vorlage</code>, um neue analytische Pipelines zu erstellen
-
 - **Workflow-Liste**: Verwalten Sie vorhandene Workflows mit Optionen zum Umbenennen, Duplizieren und Löschen
 
-#### Projekt-Ebenen
+**Projekt-Ebenen**
 
 - **Ebenenbaum**: Schreibgeschützte Anzeige der Datenebenen des Projekts. Sie können sie per Drag-and-Drop auf die Leinwand ziehen, um den Workflow zu erstellen.
-
 - **Ebene hinzufügen**: Fügen Sie neue Ebenen zum Projekt hinzu, um sie im Workflow- und Kartenmodus zu verwenden.
 
 ### Workflow-Leinwand
 
-#### Leinwand-Arbeitsbereich
+**Leinwand-Arbeitsbereich**
 
 Der Leinwand-Arbeitsbereich ist der Ort, wo Sie Knoten per Drag-and-Drop bewegen, zoomen, schwenken und Elemente auswählen können. Er enthält mehrere Steuerungsbereiche:
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-  <img src={require('/img/workflows/workflows_canvas-bars_de.webp').default} alt="Kartenoberfläche Übersicht" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
+  <img src={require('/img/workflows/workflows_interface_de.webp').default} alt="Kartenoberfläche Übersicht" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div> 
 
 **Leinwand-Ansichtsleiste**: Befindet sich in der unteren linken Ecke der Leinwand:
@@ -78,7 +76,7 @@ Das rechte Panel ändert sich je nachdem, ob ein Knoten ausgewählt ist oder nic
   <img src={require('/img/workflows/workflow_right-panel_de.webp').default} alt="Kartenoberfläche Übersicht" style={{ maxHeight: "auto", maxWidth: "auto", objectFit: "cover"}}/>
 </div> 
 
-#### Werkzeuge und Verlauf Panel
+**Werkzeuge und Verlauf Panel**
 
 **Werkzeuge Tab**
 
@@ -92,32 +90,27 @@ Dieser Tab enthält kategorisierte Werkzeuge, die für die Workflow-Konstruktion
 Vergeben Sie für jeden **Als Datensatz speichern**-Knoten einen aussagekräftigen Namen und aktivieren Sie **Bei erneutem Ausführen überschreiben**, wenn Sie denselben Workflow mehrfach ausführen. So bleibt Ihr Projekt übersichtlich und es entstehen keine doppelten Layer nach jeder Ausführung.
 :::
 
-- **Erreichbarkeitsindikatoren**
-  - Alle Werkzeuge, die im Abschnitt [Erreichbarkeitsindikatoren](../category/accessibility-indicators) der Toolbox verfügbar sind
-
-- **Geoanalyse**
-  - Alle Werkzeuge, die im Abschnitt [Geoanalyse](../category/geoanalysis) der Toolbox verfügbar sind
-
-- **Geoprozessierung**
-  - Alle Werkzeuge, die im Abschnitt [Geoprozessierung](../category/geoprocessing) der Toolbox verfügbar sind
-  
+- **Erreichbarkeitsindikatoren**: Alle Werkzeuge, die im Abschnitt [Erreichbarkeitsindikatoren](../category/accessibility-indicators) der Toolbox verfügbar sind
+- **Geoanalyse**: Alle Werkzeuge, die im Abschnitt [Geoanalyse](../category/geoanalysis) der Toolbox verfügbar sind
+- **Geoprozessierung**: Alle Werkzeuge, die im Abschnitt [Geoprozessierung](../category/geoprocessing) der Toolbox verfügbar sind
 - **Datenmanagement**
   - [Verknüpfen](../toolbox/data_management/join.md), [Zusammenführen](../toolbox/data_management/merge.md) und andere Datenmanipulations-Werkzeuge
   - [Benutzerdefiniertes SQL](custom_sql.md): Erweiterte Datenverarbeitung mit SQL-Abfragen
-
-- **Steuerung**
-  - <code>Bedingung</code>: Fügt einen Verzweigungsknoten hinzu, der den Layer basierend auf definierten Bedingungen in einen <strong>Wahr</strong>- oder <strong>Falsch</strong>-Pfad weiterleitet. Siehe [Bedingung](if_clause).
+- **Steuerung**: Fügen Sie einen <code>Bedingung</code>-Knoten hinzu, der den Layer basierend auf definierten Bedingungen in einen <strong>Wahr</strong>- oder <strong>Falsch</strong>-Pfad weiterleitet. Siehe [Bedingung](if_clause).
 
 **Verlauf Tab**
+
 Hier können Sie Folgendes sehen:
 - **Ausführungsprotokoll**: Vorherige Workflow-Läufe mit Zeitstempeln und Status
 - **Ausführungsdetails**: Dauer, Erfolg-/Fehlerstatus und Fehlermeldungen
 - **Ergebniszugriff**: Links zu vorherigen Workflow-Ausgaben
 
-#### Konfigurations-Panel (Werkzeug-Knoten ausgewählt)
+**Konfigurations-Panel (Werkzeug-Knoten ausgewählt)**
+
 Wenn ein Werkzeug-Knoten ausgewählt ist, zeigt das rechte Panel das **Werkzeug-Konfigurations**-Panel an. Konfigurieren Sie alle werkzeugspezifischen Parameter für die ausgewählte Analyse. Sie können auch [Workflow-Variablen](variables.md) in Parameterfeldern für dynamische Werte verwenden.
 
-#### Datensatz Panel (Datensatz-Knoten ausgewählt)
+**Datensatz Panel (Datensatz-Knoten ausgewählt)**
+
 Wenn ein **Datensatz-Knoten** ausgewählt ist, erscheint das Datensatz-Panel mit zwei verfügbaren Tabs:
 
 **Quelle Tab**: Zeigen Sie Metadaten aus der Datenquelle an und greifen Sie auf Tabellen- und Kartenansichten zu. Sie können auch den dem Knoten zugewiesenen Datensatz von diesem Tab aus ändern.
@@ -204,19 +197,26 @@ Beginnen Sie mit einfachen 2-3 Knoten-Workflows, um die Benutzeroberfläche zu v
   <div class="content"><strong>Ergebnisse speichern</strong>: Fügen Sie Export-Knoten hinzu und konfigurieren Sie sie, um wichtige Ergebnisse als permanente Datensätze in Ihrem Projekt zu speichern.</div>
 </div>
 
-### Ergebnisse
-
-Die erfolgreiche Nutzung der Workflow-Benutzeroberfläche bietet:
-
-- **Reproduzierbare Analyse**: Dokumentierte analytische Prozesse, die mit verschiedenen Daten oder Parametern erneut ausgeführt werden können
-- **Effizienter Workflow**: Rationalisierte mehrstufige Analyseausführung mit automatischem Abhängigkeitsmanagement  
-- **Qualitätskontrolle**: Validierungsmöglichkeiten bei jedem Schritt komplexer analytischer Pipelines
-- **Kollaborative Dokumentation**: Visuelle Darstellung der Methodik für Teamfreigabe und Wissenstransfer
-- **Erweiterte Fähigkeiten**: Zugriff auf spezialisierte Werkzeuge wie [benutzerdefinierte SQL](custom_sql.md) und [Workflow-Variablen](variables.md) für anspruchsvolle Analysen
-
 :::info Auto-Speicher-Feature
 Workflows speichern Änderungen automatisch, während Sie sie erstellen. Das System bewahrt alle Konfigurationen, Verbindungen und Ausführungszustände auf.
 :::
+
+### Mit einer Vorlage starten
+
+<div class="step">
+  <div class="step-number">1</div>
+  <div class="content">Klicken Sie im <code>Workflows</code>-Panel auf <code>Aus Vorlage</code>, um die Vorlagenübersicht zu öffnen, gefiltert auf Workflow-Vorlagen.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">2</div>
+  <div class="content">Suchen oder blättern Sie, wählen Sie eine Vorlage für die <strong>Vorschau</strong> und klicken Sie auf <code>Vorlage verwenden</code>.</div>
+</div>
+
+<div class="step">
+  <div class="step-number">3</div>
+  <div class="content">Der Workflow wird zu Ihrem Projekt hinzugefügt. Wo die Vorlage eine Eingabe offen gelassen hat, wählen Sie einen Layer, sobald er im Projekt vorhanden ist.</div>
+</div>
 
 ### Einen Workflow als Vorlage speichern
 
@@ -250,23 +250,6 @@ Sobald ein Workflow eingerichtet ist, können Sie ihn als **Vorlage** speichern,
 :::info Aktualisieren statt duplizieren
 Wenn aus diesem Workflow bereits eine Vorlage gespeichert wurde, können Sie sie **aus der Quelle aktualisieren** mit der aktuellen Version, anstatt ein Duplikat zu erstellen. Da die Eingaben Teil des gespeicherten Snapshots sind, verwenden Sie <code>Vorlage aus Quelle aktualisieren</code>, um sie zu ändern.
 :::
-
-### Mit einer Vorlage starten
-
-<div class="step">
-  <div class="step-number">1</div>
-  <div class="content">Klicken Sie im <code>Workflows</code>-Panel auf <code>Aus Vorlage</code>, um die Vorlagenübersicht zu öffnen, gefiltert auf Workflow-Vorlagen.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">2</div>
-  <div class="content">Suchen oder blättern Sie, wählen Sie eine Vorlage für die <strong>Vorschau</strong> und klicken Sie auf <code>Vorlage verwenden</code>.</div>
-</div>
-
-<div class="step">
-  <div class="step-number">3</div>
-  <div class="content">Der Workflow wird zu Ihrem Projekt hinzugefügt. Wo die Vorlage eine Eingabe offen gelassen hat, wählen Sie einen Layer, sobald er im Projekt vorhanden ist.</div>
-</div>
 
 ## 4. Workflows aus der Kartenansicht ausführen
 

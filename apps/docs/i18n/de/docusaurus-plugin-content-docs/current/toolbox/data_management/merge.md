@@ -59,9 +59,3 @@ Beim Zusammenführen werden Objekte aus mehreren Layern in einem Layer vereint. 
   <div class="step-number">5</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um das Zusammenführen zu starten. Der Ergebnis-Layer wird der Karte hinzugefügt.</div>
 </div>
-
-:::tip Hinweis
-
-Die Berechnungsdauer variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/workspace_interface.md#job-status) verfolgen.
-
-:::

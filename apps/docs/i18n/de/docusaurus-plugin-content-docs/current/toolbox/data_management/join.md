@@ -190,9 +190,3 @@ In diesem Beispiel werden Bevölkerungsdaten mit Berliner Stadtbezirken verknüp
   <div class="step-number">9</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Verknüpfung durchzuführen. Der Ergebnis-Layer wird der Karte hinzugefügt.</div>
 </div>
-
-:::tip Hinweis
-
-Die Berechnungszeit variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/workspace_interface.md#job-status) verfolgen.
-
-:::

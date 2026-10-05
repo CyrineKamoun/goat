@@ -190,9 +190,3 @@ In this example, population data is joined to Berlin districts using both condit
   <div class="step-number">9</div>
   <div class="content">Click <code>Run</code> to execute the join. The result layer will be added to the map.</div>
 </div>
-
-:::tip Hint
-
-Calculation time varies by settings. Check the [status bar](../../workspace/workspace_interface.md#job-status) for progress.
-
-:::

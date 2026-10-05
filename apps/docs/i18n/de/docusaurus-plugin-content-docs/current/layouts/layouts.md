@@ -69,9 +69,6 @@ Ein von Ihnen gestaltetes Layout kann als **Vorlage** gespeichert und für ander
 Wenn aus diesem Layout bereits eine Vorlage gespeichert wurde, können Sie sie mit <code>Vorlage aus Quelle aktualisieren</code> mit der aktuellen Version aktualisieren, anstatt ein Duplikat zu erstellen.
 :::
 
-## Layout-Vorschau
-Die Layout-Vorschau ist der Hauptbereich, der das aktuelle Layout anzeigt, an dem Sie arbeiten. Sie können mit den Elementen interagieren, sie verschieben und sehen, wie sie im endgültigen Bericht erscheinen werden.
-
 ## Elementbereich
 Der Elementbereich enthält alle Werkzeuge, die Sie benötigen, um Elemente in Ihrem Layout hinzuzufügen und anzupassen. Sie können Karten, Textfelder, Bilder, Legenden, Maßstabsleisten, Nordpfeile und mehr hinzufügen.
 
@@ -94,7 +91,3 @@ Der Elementbereich enthält alle Werkzeuge, die Sie benötigen, um Elemente in I
   <div class="step-number">4</div>
   <div class="content">Mit einem ausgewählten Element verwenden Sie das <code>Eigenschaften-Panel</code> rechts, um <b>sein Aussehen und seine Einstellungen anzupassen</b>.</div>
 </div>
-
-## Layout-Navigation
-
-Sie können die <code>Zoom-Steuerung</code> unten rechts verwenden, um für detaillierte Positionierung <b>hinein- oder herauszuzoomen</b>. Sie können auch auf die Schaltfläche <code>An Bildschirm anpassen</code> klicken, um das <b>gesamte Layout auf einmal zu sehen</b>.
