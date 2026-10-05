@@ -20,7 +20,7 @@ from core.crud.crud_user import user as crud_user
 from core.db.models._link_model import UserRoleLink
 from core.db.models.invitation import Invitation, InvitationStatusEnum, InvitationType
 from core.db.models.organization import Organization
-from core.deps.auth import auth, auth_z, is_superuser, user_token
+from core.deps.auth import auth, auth_z, token_is_superuser, user_token
 from core.deps.keycloak import get_keycloak_user, keycloak_admin
 from core.endpoints.deps import get_db, get_user_id
 from core.schemas.common import OrderEnum
@@ -226,7 +226,7 @@ async def get_profile(
         enabled=keycloak_user.get("enabled"),
         topt=keycloak_user.get("totp"),
         roles=roles,
-        is_superuser=is_superuser(user_token, False),
+        is_superuser=token_is_superuser(user_token),
     )
     return user
 
