@@ -22,16 +22,18 @@ test.describe("Content Page Management Operations", () => {
     await ensureSharedTeam(page);
 
     // Create a folder via Add new -> New folder, at the personal space root.
-    // The dialog is one field and one button — its heading names what is
-    // being created and its input carries that heading as a label.
+    // The dialog is one field and one button — its title names what is
+    // being created and its input carries that title as a label. The title
+    // is plain text, not a heading, so it is found inside the dialog.
     await page.goto("/content");
     await expect(page.getByRole("heading", { name: "Content" })).toBeVisible();
     await page.getByRole("button", { name: "Add new" }).click();
     await page.getByRole("menuitem", { name: "New folder" }).click();
-    await expect(page.getByRole("heading", { name: "New folder" })).toBeVisible();
+    const folderDialog = page.getByRole("dialog").filter({ hasText: "New folder" });
+    await expect(folderDialog.getByText("New folder", { exact: true })).toBeVisible();
     await page.getByLabel("New folder").fill(folderName);
     await page.getByRole("button", { name: "Create folder" }).click();
-    await expect(page.getByRole("heading", { name: "New folder" })).toBeHidden();
+    await expect(folderDialog).toBeHidden();
     await expect(page.getByText(folderName)).toBeVisible({ timeout: 15000 });
 
     // Open it. Opening a folder is a real navigation now
