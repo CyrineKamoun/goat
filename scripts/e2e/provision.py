@@ -265,7 +265,7 @@ def ensure_dataset(client: httpx.Client, token: str, key: str) -> str:
                 f"{PROCESSES_URL}/jobs/{job_id}/results",
                 headers={"Authorization": f"Bearer {token}"},
             ).json()
-            imported = result.get("imported") or []
+            imported = result.get("result", {}).get("imported") or []
             if len(imported) != 1:
                 sys.exit(f"importing {name!r} gave {json.dumps(result)}")
             layer_id = str(imported[0]["layer_id"])
