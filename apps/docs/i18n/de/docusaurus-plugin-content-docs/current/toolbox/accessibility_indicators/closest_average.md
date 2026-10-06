@@ -32,7 +32,7 @@ Die [Heatmap](https://www.plan4better.de/de/glossar/heatmap) zeigt ein farbkodie
 
 :::info
 
-Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns](https://plan4better.de/de/contact/) gerne. Sie können auch [ein eigenes Routing-Netz importieren](../../data/builtin_datasets.md#eigene-netze-importieren), um andere Regionen zu analysieren.
+Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, können Sie [ein eigenes Routing-Netz importieren](../../data/builtin_datasets.md#eigene-netze-importieren) oder uns gerne [kontaktieren](https://plan4better.de/de/contact/), damit wir das für Sie übernehmen.
 
 :::
 
@@ -73,22 +73,21 @@ Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **üb
 | Auto | Alle mit dem Auto befahrbaren Wege (unter Berücksichtigung von Tempolimits und Einbahnstraßen) |
 | Öffentlicher Verkehr | Alle mit dem ÖV möglichen Fahrten (gemäß offiziellen [GTFS](https://www.plan4better.de/de/glossar/gtfs)-Fahrplänen), unter Berücksichtigung von Zu- und Abgang zu Fuß zu und von den Haltestellen |
 
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Legen Sie fest, wie die Reise gemessen wird. Die Optionen hängen vom <code>Verkehrsmittel</code> ab, das Sie in Schritt 3 gewählt haben:</div>
+</div>
+
 <Tabs>
 <TabItem value="active-car" label="Zu Fuß / Fahrrad / Pedelec / Auto" default className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Wählen Sie im Menü <code>Berechnung nach</code>, ob die Reisekosten als Zeit (Minuten) oder als Entfernung (Meter) gemessen werden.</div>
-</div>
+Wählen Sie im Menü <code>Berechnung nach</code>, ob die Reisekosten als Zeit (Minuten) oder als Entfernung (Meter) gemessen werden.
 
 </TabItem>
 
 <TabItem value="public transport" label="Öffentlicher Verkehr (ÖV)" className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Wählen Sie die zu analysierenden <code>ÖV-Modi</code>: Bus, Straßenbahn, Bahn, U-Bahn, Fähre, Seilbahn, Gondel und/oder Standseilbahn. Wählen Sie anschließend <code>Tag</code> und <code>Ankunftszeit</code> für die Analyse. Berücksichtigt werden die besten ÖV-Fahrten, die die Gelegenheiten bis zu dieser Zeit erreichen.</div>
-</div>
+Wählen Sie die zu analysierenden <code>ÖV-Modi</code>: Bus, Straßenbahn, Bahn, U-Bahn, Fähre, Seilbahn, Gondel und/oder Standseilbahn. Wählen Sie anschließend <code>Tag</code> und <code>Ankunftszeit</code> für die Analyse. Berücksichtigt werden die besten ÖV-Fahrten, die die Gelegenheiten bis zu dieser Zeit erreichen.
 
 </TabItem>
 </Tabs>

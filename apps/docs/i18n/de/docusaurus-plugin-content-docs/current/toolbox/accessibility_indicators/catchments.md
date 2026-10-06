@@ -31,7 +31,7 @@ Einzugsgebiet bietet folgende zusätzliche Funktionen:
 - **Zugangsart und Abgangsart**: konfiguriert, wie Nutzer zu ÖV-Haltestellen und von diesen weg gelangen (zu Fuß, mit dem Fahrrad, mit dem Pedelec oder mit dem Auto).
 
 :::info
-Die Berechnung der Einzugsgebiete ist für `Zu Fuß`, `Fahrrad`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, [kontaktieren Sie uns gerne](https://plan4better.de/de/contact/). Sie können auch [ein eigenes Routing-Netz importieren](../../data/builtin_datasets.md#eigene-netze-importieren), um andere Regionen zu analysieren.
+Die Berechnung der Einzugsgebiete ist für `Zu Fuß`, `Fahrrad`, `Pedelec` und `Auto` in **über 30 europäischen Ländern** verfügbar. Für `Öffentliche Verkehrsmittel` werden Deutschland, die Schweiz und die Region Haut-Rhin in Frankreich unterstützt. Wenn Sie Analysen außerhalb dieser Regionen benötigen, können Sie [ein eigenes Routing-Netz importieren](../../data/builtin_datasets.md#eigene-netze-importieren) oder uns gerne [kontaktieren](https://plan4better.de/de/contact/), damit wir das für Sie übernehmen.
 :::
 
 ## 2. Anwendungsbeispiele
@@ -70,12 +70,6 @@ Die Berechnung der Einzugsgebiete ist für `Zu Fuß`, `Fahrrad`, `Pedelec` und `
   - <code>Sechseckiges Gitter</code>: keine weitere Konfiguration erforderlich.
   - <code>Punktraster</code>: Sie müssen den <code>Punktraster-Layer</code> auswählen, auf den die Werte angewendet werden.
 
-:::tip Hinweis
-
-Geeignete Reisezeitlimits nach Einrichtungstyp finden Sie im [Standortwerkzeug](https://www.chemnitz.de/chemnitz/media/unsere-stadt/verkehr/verkehrsplanung/vep2040_standortwerkzeug.pdf) der Stadt Chemnitz.
-
-:::
-
 </TabItem>
 
 <TabItem value="public transport" label="ÖPNV" className="tabItemBox">
@@ -88,12 +82,6 @@ Geeignete Reisezeitlimits nach Einrichtungstyp finden Sie im [Standortwerkzeug](
   - <code>Sechseckiges Gitter</code>: keine weitere Konfiguration erforderlich.
   - <code>Punktraster</code>: Sie müssen den <code>Punktraster-Layer</code> auswählen, auf den die Werte angewendet werden.
 - Wählen Sie <code>Tag</code>, <code>Startzeit</code> und <code>Endzeit</code> für das Analysezeitfenster.
-
-:::tip Hinweis
-
-Geeignete Reisezeitlimits nach Einrichtungstyp finden Sie im [Standortwerkzeug](https://www.chemnitz.de/chemnitz/media/unsere-stadt/verkehr/verkehrsplanung/vep2040_standortwerkzeug.pdf) der Stadt Chemnitz.
-
-:::
 
 </TabItem>
 </Tabs>
@@ -115,7 +103,7 @@ Geeignete Reisezeitlimits nach Einrichtungstyp finden Sie im [Standortwerkzeug](
 Wählen Sie, wie die Polygone bei mehreren Startpunkten geformt werden:
 
 - **Zusammengefasst über Startpunkte** *(Standard)*: alle Startpunkte werden pro Schritt zu einem gemeinsamen Einzugsgebietspolygon zusammengeführt.
-- **Getrennt nach Startpunkt**: jeder Startpunkt erhält pro Schritt ein eigenes individuelles Einzugsgebietspolygon.
+- **Getrennt nach Startpunkt**: jeder Startpunkt erhält pro Schritt ein eigenes individuelles Einzugsgebietspolygon. Wenn Ihre Startpunkte aus einem Layer stammen, können Sie zusätzlich ein <code>Referenzfeld</code> wählen. Dessen Wert wird jedem Einzugsgebietspolygon als `origin` mitgegeben, sodass sich jedes Polygon dem Startpunkt zuordnen lässt, aus dem es berechnet wurde. Wenn Sie das Feld leer lassen, nummeriert `origin` die Startpunkte einfach durch (1, 2, 3 …). Wählen Sie daher ein Feld wie eine ID, wenn Sie die Ergebnisse Ihren Punkten zuordnen möchten. Das erleichtert die spätere Arbeit mit den Ergebnissen, zum Beispiel, um sie [wieder mit dem Startpunkte-Layer zu verbinden](../data_management/join.md).
 
 #### Darstellung der Schritte
 
@@ -180,12 +168,6 @@ Für jeden Modus können Sie die **maximale Reisezeit oder Entfernung** sowie di
   <div class="step-number">8</div>
   <div class="content">Klicken Sie auf <code>Ausführen</code>, um die Berechnung zu starten.</div>
 </div>
-
-:::tip Hinweis
-
-Die Berechnungszeit variiert je nach Einstellungen. Den Fortschritt können Sie in der [Statusleiste](../../workspace/workspace_interface.md#job-status) verfolgen.
-
-:::
 
 ### Ergebnisse
 

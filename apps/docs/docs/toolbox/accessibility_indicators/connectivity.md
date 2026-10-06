@@ -22,7 +22,7 @@ The [heatmap](https://www.plan4better.de/en/glossary/heatmap) uses a color-coded
 
 :::info
 
-Heatmap computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/). You can also [import your own routing network](../../data/builtin_datasets.md#bringing-your-own-networks) to analyse other regions.
+Heatmap computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, you can [import your own routing network](../../data/builtin_datasets.md#bringing-your-own-networks) or [contact us](https://plan4better.de/en/contact/) and we will do it for you.
 
 :::
 
@@ -49,7 +49,7 @@ Heatmap computation is available across **over 30 European countries** for `Walk
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Pick the <code>Routing Type</code> you would like to use for the heatmap.</div>
+  <div class="content">Pick the <code>Transport mode</code> you would like to use for the heatmap.</div>
 </div>
 
 | Mode | Considers |
@@ -60,32 +60,25 @@ Heatmap computation is available across **over 30 European countries** for `Walk
 | Car | All paths accessible by car (taking into account speed limits and one-way restrictions) |
 | Public Transport | All journeys possible by public transport (according to official [GTFS](https://www.plan4better.de/en/glossary/gtfs) schedules), considering walking access and egress to and from stops |
 
+<div class="step">
+  <div class="step-number">4</div>
+  <div class="content">Set how travel is measured and the cost limit. The options depend on the <code>Transport mode</code> you picked in step 3:</div>
+</div>
+
 <Tabs>
 <TabItem value="active-car" label="Walk / Bicycle / Pedelec / Car" default className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">In the <code>Calculate by</code> menu, choose either the Time (minutes) or Distance (metres) cost type.</div>
-</div>
+In the <code>Calculate by</code> menu, choose either the Time (minutes) or Distance (metres) cost type.
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Enter a cost <code>Limit</code> in minutes or metres for your heatmap. This will be used according to your previously selected transport mode and cost type.</div>
-</div>
+Enter a cost <code>Limit</code> in minutes or metres for your heatmap. This will be used according to your previously selected transport mode and cost type.
 
 </TabItem>
 
 <TabItem value="public transport" label="Public Transport (PT)" className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">4</div>
-  <div class="content">Choose <code>PT modes</code> to analyze: Bus, Tram, Rail, Subway, Ferry, Cable Car, Gondola, and/or Funicular. Then, select the <code>Day</code> and <code>Arrival time</code> for the analysis. The best public transport journeys that reach the opportunities at or before this time will be considered.</div>
-</div>
+Choose <code>PT modes</code> to analyze: Bus, Tram, Rail, Subway, Ferry, Cable Car, Gondola, and/or Funicular. Then, select the <code>Day</code> and <code>Arrival time</code> for the analysis. The best public transport journeys that reach the opportunities at or before this time will be considered.
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Enter a cost <code>Limit</code> in minutes for your heatmap.</div>
-</div>
+Enter a cost <code>Limit</code> in minutes for your heatmap.
 
 </TabItem>
 </Tabs>
@@ -99,14 +92,14 @@ Need help choosing a suitable travel time limit for various common amenities? Th
 Optionally, enable <code>Advanced options</code> to configure additional settings for routing and heatmap generation.
 
 <div class="step">
-  <div class="step-number">6</div>
+  <div class="step-number">5</div>
   <div class="content">Configure various routing options for your selected transport mode such as travel speed, max transfers, access/egress limits and more. Further information about mode-specific options can be found under the [Routing](../../category/routing) section.</div>
 </div>
 
 ### Reference layer
 
 <div class="step">
-  <div class="step-number">7</div>
+  <div class="step-number">6</div>
   <div class="content">Select the <code>Reference layer</code> (layer containing your area of interest) <strong>for which you would like to calculate the heatmap</strong>. This can be any polygon feature layer.</div>
 </div>
 
@@ -114,12 +107,12 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
 ### Result layer
 
 <div class="step">
-  <div class="step-number">8</div>
+  <div class="step-number">7</div>
   <div class="content">Set the <code>Result layer name</code> for the output heatmap layer.</div>
 </div>
 
 <div class="step">
-  <div class="step-number">9</div>
+  <div class="step-number">8</div>
   <div class="content">Click <code>Run</code> to start the calculation of the heatmap.</div>
 </div>
 

@@ -110,10 +110,8 @@ Für die Ausdrücke **"Enthält"** und **"Schließt aus"** können mehrere Werte
 
 <Tabs>
   <TabItem value="Map extent" label="Kartenausdehnung" default className="tabItemBox">
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Mit <code>Kartenausdehnung</code> wird der Layer <strong>automatisch auf die aktuelle Kartenausdehnung zugeschnitten</strong>. Um den Filter zu ändern, <strong>zoomen Sie hinein/heraus</strong> und klicken Sie auf das Aktualisieren-Symbol (<code>Aktuelle Kartenausdehnung verwenden</code>).</div>
-</div>
+
+Mit <code>Kartenausdehnung</code> wird der Layer <strong>automatisch auf die aktuelle Kartenausdehnung zugeschnitten</strong>. Um den Filter zu ändern, <strong>zoomen Sie hinein/heraus</strong> und klicken Sie auf das Aktualisieren-Symbol (<code>Aktuelle Kartenausdehnung verwenden</code>).
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
 

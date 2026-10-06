@@ -135,28 +135,19 @@ In this example, population data is joined to Berlin districts using both condit
 <Tabs>
 <TabItem value="attribute" label="Attribute" default className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Under <code>Attribute Relationship</code>, click <code>+ Add Match Field</code>, then select the <code>Target Field</code> and the <code>Join Field</code>: the shared field used to match features between the two layers.</div>
-</div>
+Under <code>Attribute Relationship</code>, click <code>+ Add Match Field</code>, then select the <code>Target Field</code> and the <code>Join Field</code>: the shared field used to match features between the two layers.
 
 </TabItem>
 
 <TabItem value="spatial" label="Spatial" className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Under <code>Spatial Match</code>, select the <code>Spatial Relationship</code>. If selecting <code>Within Distance</code>, specify the distance and unit.</div>
-</div>
+Under <code>Spatial Match</code>, select the <code>Spatial Relationship</code>. If selecting <code>Within Distance</code>, specify the distance and unit.
 
 </TabItem>
 
 <TabItem value="spatial_attribute" label="Spatial and Attribute" className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Configure both <code>Spatial Match</code> (select the spatial relationship) and <code>Attribute Relationship</code> (click <code>+ Add Match Field</code>, then select the matching fields). Both conditions must be met for a feature to be joined.</div>
-</div>
+Configure both <code>Spatial Match</code> (select the spatial relationship) and <code>Attribute Relationship</code> (click <code>+ Add Match Field</code>, then select the matching fields). Both conditions must be met for a feature to be joined.
 
 </TabItem>
 </Tabs>
@@ -164,18 +155,18 @@ In this example, population data is joined to Berlin districts using both condit
 ### Join Options
 
 <div class="step">
-  <div class="step-number">6</div>
+  <div class="step-number">5</div>
   <div class="content">Select the <code>Join Type</code>: <code>Inner Join</code> (keep only matched features) or <code>Left Join</code> (keep all target features, unmatched get NULL).</div>
 </div>
 
 <div class="step">
-  <div class="step-number">7</div>
+  <div class="step-number">6</div>
   <div class="content">Select the <code>Match Handling</code>: <code>One to One</code> or <code>One to Many</code>.</div>
 </div>
 
 
 <div class="step">
-  <div class="step-number">8</div>
+  <div class="step-number">7</div>
   <div class="content">
   Optionally, enable <code>Add Join Fields</code> to select which fields from the Join Layer to include in the output, and/or enable <code>Calculate Statistics</code> to compute aggregated values when multiple Join Layer records match a single Target Layer feature. When <code>Calculate Statistics</code> is enabled, configure the statistic:
   <ul>
@@ -187,12 +178,6 @@ In this example, population data is joined to Berlin districts using both condit
 </div>
 
 <div class="step">
-  <div class="step-number">9</div>
+  <div class="step-number">8</div>
   <div class="content">Click <code>Run</code> to execute the join. The result layer will be added to the map.</div>
 </div>
-
-:::tip Hint
-
-Calculation time varies by settings. Check the [status bar](../../workspace/workspace_interface.md#job-status) for progress.
-
-:::

@@ -39,7 +39,7 @@ Influenced by all these properties, **the accessibility of a point can model com
 
 :::info
 
-Heatmap computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/). You can also [import your own routing network](../../data/builtin_datasets.md#bringing-your-own-networks) to analyse other regions.
+Heatmap computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, you can [import your own routing network](../../data/builtin_datasets.md#bringing-your-own-networks) or [contact us](https://plan4better.de/en/contact/) and we will do it for you.
 
 :::
 
@@ -119,22 +119,21 @@ This function counts every destination within the travel cost limit equally, app
 
 </Tabs>
 
+<div class="step">
+  <div class="step-number">5</div>
+  <div class="content">Set how travel is measured. The options depend on the <code>Transport mode</code> you picked in step 3:</div>
+</div>
+
 <Tabs>
 <TabItem value="active-car" label="Walk / Bicycle / Pedelec / Car" default className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">In the <code>Calculate by</code> menu, choose either the Time (minutes) or Distance (metres) cost type.</div>
-</div>
+In the <code>Calculate by</code> menu, choose either the Time (minutes) or Distance (metres) cost type.
 
 </TabItem>
 
 <TabItem value="public transport" label="Public Transport (PT)" className="tabItemBox">
 
-<div class="step">
-  <div class="step-number">5</div>
-  <div class="content">Choose <code>PT modes</code> to analyze: Bus, Tram, Rail, Subway, Ferry, Cable Car, Gondola, and/or Funicular. Then, select the <code>Day</code> and <code>Arrival time</code> for the analysis. The best public transport journeys that reach the opportunities at or before this time will be considered.</div>
-</div>
+Choose <code>PT modes</code> to analyze: Bus, Tram, Rail, Subway, Ferry, Cable Car, Gondola, and/or Funicular. Then, select the <code>Day</code> and <code>Arrival time</code> for the analysis. The best public transport journeys that reach the opportunities at or before this time will be considered.
 
 </TabItem>
 </Tabs>
@@ -164,12 +163,6 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
   <div class="step-number">9</div>
   <div class="content">Choose a travel cost <code>Limit</code> for your heatmap. This will be used in the context of your previously selected <i>Transport mode</i>.</div>
 </div>
-
-:::tip Hint
-
-Need help choosing a suitable travel time limit for various common amenities? The ["Standort-Werkzeug"](https://www.chemnitz.de/chemnitz/media/unsere-stadt/verkehr/verkehrsplanung/vep2040_standortwerkzeug.pdf) of the City of Chemnitz can provide helpful guidance.
-
-:::
 
 <div class="step">
   <div class="step-number">10</div>

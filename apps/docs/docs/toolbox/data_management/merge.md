@@ -59,9 +59,3 @@ Merging stacks features from multiple layers into one layer. Unlike a join, no m
   <div class="step-number">5</div>
   <div class="content">Click <code>Run</code> to execute the merge. The result layer will be added to the map.</div>
 </div>
-
-:::tip Hint
-
-Calculation time varies by settings. Check the [status bar](../../workspace/workspace_interface.md#job-status) for progress.
-
-:::

@@ -31,7 +31,7 @@ Catchment Area includes the following additional features:
 - **Access and egress mode**: configure how users travel to and from PT stations (walking, cycling, pedelec, or car).
 
 :::info
-Catchment Area computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, feel free to [contact us](https://plan4better.de/en/contact/). You can also [import your own routing network](../../data/builtin_datasets.md#bringing-your-own-networks) to analyse other regions.
+Catchment Area computation is available across **over 30 European countries** for `Walk`, `Bicycle`, `Pedelec`, and `Car`. For `Public Transport`, Germany, Switzerland, and the Haut-Rhin region of France are supported. If you need analyses beyond these regions, you can [import your own routing network](../../data/builtin_datasets.md#bringing-your-own-networks) or [contact us](https://plan4better.de/en/contact/) and we will do it for you.
 :::
 
 ## 2. Example use cases
@@ -70,12 +70,6 @@ Catchment Area computation is available across **over 30 European countries** fo
   - <code>Hexagonal grid</code>: no further configuration is necessary.
   - <code>Point grid</code>: you need to select the <code>Point grid layer</code> where the values will be applied.
 
-:::tip Hint
-
-For suitable travel time limits by amenity type, see the [Location Tool](https://www.chemnitz.de/chemnitz/media/unsere-stadt/verkehr/verkehrsplanung/vep2040_standortwerkzeug.pdf) from the City of Chemnitz.
-
-:::
-
 </TabItem>
 
 <TabItem value="public transport" label="Public Transport (PT)" className="tabItemBox">
@@ -88,12 +82,6 @@ For suitable travel time limits by amenity type, see the [Location Tool](https:/
   - <code>Hexagonal grid</code>: no further configuration is necessary.
   - <code>Point grid</code>: you need to select the <code>Point grid layer</code> where the values will be applied.
 - Select the <code>Day</code>, <code>Start Time</code>, and <code>End Time</code> for the analysis time window.
-
-:::tip Hint
-
-For suitable travel time limits by amenity type, see the [Location Tool](https://www.chemnitz.de/chemnitz/media/unsere-stadt/verkehr/verkehrsplanung/vep2040_standortwerkzeug.pdf) from the City of Chemnitz.
-
-:::
 
 </TabItem>
 </Tabs>
@@ -115,7 +103,7 @@ For suitable travel time limits by amenity type, see the [Location Tool](https:/
 Choose how polygons are shaped when there are multiple starting points:
 
 - **Combined across origins** *(default)*: all starting points are merged into a single shared catchment polygon per step.
-- **Separated by origin**: each starting point gets its own individual catchment polygon per step.
+- **Separated by origin**: each starting point gets its own individual catchment polygon per step. If your starting points come from a layer, you can also choose a <code>Reference field</code>. Its value is written to each catchment polygon as `origin`, so every polygon can be traced back to the starting point it was computed from. If you leave it empty, `origin` simply numbers the starting points (1, 2, 3 …), so choose a field such as an ID if you want to match the results to your points. This makes the results easier to work with later, for example to [join them back](../data_management/join.md) to the starting points layer.
 
 #### Steps style
 
@@ -181,12 +169,6 @@ For each mode, configure the **maximum travel time or distance** and the **trave
   <div class="step-number">8</div>
   <div class="content">Click on <code>Run</code> to start the calculation.</div>
 </div>
-
-:::tip Hint
-
-Calculation time varies by settings. Check the [status bar](../../workspace/workspace_interface.md#job-status) for progress.
-
-:::
 
 ### Results
 

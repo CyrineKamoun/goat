@@ -69,9 +69,6 @@ A layout you have designed can be saved as a **template** and reused for other r
 If a template was already saved from this layout, you can <code>Update template from source</code> with the current version instead of creating a duplicate.
 :::
 
-## Layout Preview
-The Layout Preview is the main area that displays the current layout you are working on. You can interact with the elements, move them around, and see how they will appear in the final report.
-
 ## Elements Panel
 The Elements Panel contains all the tools you need to add and customize elements in your layout. You can add maps, text boxes, images, legends, scale bars, north arrows, and more.
 
@@ -94,9 +91,3 @@ The Elements Panel contains all the tools you need to add and customize elements
   <div class="step-number">4</div>
   <div class="content">With an element selected, use the <code>Properties Panel</code> on the right to <b>customize its appearance</b> and settings.</div>
 </div>
-
-## Layout Navigation
-
-You can use the <code>zoom controls</code> on the bottom right to <b>zoom in or out</b> for detailed positioning. You can also click the <code>fit to screen</code> button to <b>see the entire layout</b> at once.
-
-
