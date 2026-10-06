@@ -1,6 +1,6 @@
 import { type APIRequestContext, expect } from "@playwright/test";
 
-import { API_URL } from "./users";
+import { API_URL, castOf } from "./users";
 
 /**
  * Datasets as the API sees them: the suite's checks that an upload became a
@@ -23,3 +23,6 @@ export const rowCount = async (api: APIRequestContext, layerId: string): Promise
   expect(response.status(), await response.text()).toBe(200);
   return ((await response.json()) as { numberMatched: number }).numberMatched;
 };
+
+/** The id of one of the owner's provisioned datasets (auth on only). */
+export const datasetOf = (key: "points" | "table"): string => castOf().datasets[key];

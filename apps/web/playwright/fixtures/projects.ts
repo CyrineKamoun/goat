@@ -40,3 +40,24 @@ export const shareProjectWithUsers = async (
 export const deleteProject = async (api: APIRequestContext, projectId: string | undefined): Promise<void> => {
   if (projectId) await api.delete(`${API_URL}/api/v2/project/${projectId}`);
 };
+
+/** Adds datasets to a project, as its layers, in the order given. */
+export const addDatasetsToProject = async (
+  api: APIRequestContext,
+  projectId: string,
+  datasetIds: string[]
+): Promise<void> => {
+  const query = datasetIds.map((id) => `layer_ids=${id}`).join("&");
+  const added = await api.post(`${API_URL}/api/v2/project/${projectId}/layer?${query}`);
+  expect(added.ok(), await added.text()).toBeTruthy();
+};
+
+/** A project's layers: their names and the datasets behind them. */
+export const projectLayers = async (
+  api: APIRequestContext,
+  projectId: string
+): Promise<{ name: string; layer_id: string }[]> => {
+  const layers = await api.get(`${API_URL}/api/v2/project/${projectId}/layer`);
+  expect(layers.ok(), await layers.text()).toBeTruthy();
+  return (await layers.json()) as { name: string; layer_id: string }[];
+};

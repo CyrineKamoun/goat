@@ -1,11 +1,12 @@
-import path from "path";
-
 import { expect, test } from "@playwright/test";
+import path from "path";
 
 import { deleteContentItem } from "../fixtures/content";
 import { datasetIdByName, rowCount } from "../fixtures/datasets";
 import { apiAs } from "../fixtures/users";
 
+// Jobs run in Windmill and take longer than the suite's default timeout.
+test.describe.configure({ timeout: 360000 });
 const FIXTURES_DIR = path.join(__dirname, "../fixtures/data");
 
 test.describe("Dataset Upload - Non-Spatial Table", () => {

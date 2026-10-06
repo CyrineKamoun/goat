@@ -58,70 +58,15 @@ test.describe("Workflow Management", () => {
     await expect(page.getByText("Accessibility Indicators")).toBeVisible();
   });
 
-  // Skip: ReactFlow drag-and-drop uses a ref (dragDataRef) set by React's onDragStart
-  // which doesn't trigger from synthetic DOM DragEvents. Use codegen/manual recording instead.
-  test.skip("add tool nodes to workflow via drag and drop", async ({ page }) => {
+  test("add a tool node by dragging it onto the canvas", async ({ page }) => {
     await page.getByText("Workflows").click();
     await newWorkflow(page);
     await expect(page.getByRole("button", { name: "Run" })).toBeVisible({ timeout: 5000 });
 
-    // Get the canvas area and the source tool element
-    const canvas = page.locator(".react-flow");
-    await expect(canvas).toBeVisible();
-    const canvasBounds = await canvas.boundingBox();
-    expect(canvasBounds).toBeTruthy();
-
-    const bufferTool = page.getByText("Buffer").first();
-    const toolBounds = await bufferTool.boundingBox();
-    expect(toolBounds).toBeTruthy();
-
-    const startX = toolBounds!.x + toolBounds!.width / 2;
-    const startY = toolBounds!.y + toolBounds!.height / 2;
-    const endX = canvasBounds!.x + canvasBounds!.width / 2;
-    const endY = canvasBounds!.y + canvasBounds!.height / 2;
-
-    // ReactFlow requires custom dataTransfer data during drag/drop.
-    // We use page.evaluate to create proper DragEvent with DataTransfer.
-    await page.evaluate(
-      ({ sx, sy, ex, ey }) => {
-        const source = document.elementFromPoint(sx, sy);
-        const target = document.elementFromPoint(ex, ey);
-        if (!source || !target) return;
-
-        // Create a DataTransfer with the required data
-        const dt = new DataTransfer();
-        dt.setData("application/reactflow", "tool");
-
-        // Dispatch dragstart on the tool
-        source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
-
-        // Dispatch dragover on the canvas
-        target.dispatchEvent(
-          new DragEvent("dragover", {
-            bubbles: true,
-            cancelable: true,
-            clientX: ex,
-            clientY: ey,
-            dataTransfer: dt,
-          })
-        );
-
-        // Dispatch drop on the canvas
-        target.dispatchEvent(
-          new DragEvent("drop", {
-            bubbles: true,
-            cancelable: true,
-            clientX: ex,
-            clientY: ey,
-            dataTransfer: dt,
-          })
-        );
-      },
-      { sx: startX, sy: startY, ex: endX, ey: endY }
-    );
-
-    // Verify a Buffer node appeared on the canvas
-    await expect(page.locator('[roledescription="node"]').filter({ hasText: "Buffer" })).toBeVisible({
+    // A real pointer drag: the palette reads what is dragged in React's
+    // onDragStart, which synthetic DragEvents never reach.
+    await page.getByText("Buffer", { exact: true }).first().dragTo(page.locator(".react-flow__pane"));
+    await expect(page.locator(".react-flow__node").filter({ hasText: "Buffer" })).toBeVisible({
       timeout: 10000,
     });
   });
