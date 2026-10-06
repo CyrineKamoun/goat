@@ -20,6 +20,7 @@ describe("createLayer", () => {
       name: "Roads",
       folder_id: "folder-1",
       s3_key: "goat/users/u/imports/uploads/roads.gpkg",
+      public_read: false,
     });
 
     expect(executeMock).toHaveBeenCalledWith("layer_import", {
