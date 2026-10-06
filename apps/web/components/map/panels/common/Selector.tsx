@@ -133,6 +133,9 @@ const Selector = (props: SelectorProps) => {
           },
         }}
         IconComponent={() => null}
+        // The visible label is not a <label> tied to the field, so the
+        // combobox carries it as its accessible name.
+        SelectDisplayProps={{ "aria-label": label || placeholder }}
         sx={{ pr: 1 }}
         displayEmpty
         disabled={disabled}
