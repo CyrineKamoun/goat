@@ -240,7 +240,16 @@ jobs:
             -e JOB_DEFAULT_TIMEOUT=300 -v /app/data:/app/data "$image/windmill-worker-print:latest"
           mkdir -p "$(dirname "$WINDMILL_TOKEN_FILE")"
           uv run --no-sync python -m goatlib.windmill_init > /dev/null
-          uv run --no-sync sh deploy/compose/init/windmill/windmill-sync.sh
+          # A fresh Windmill answers before its last migration, which waits
+          # for the workers to register; scripts created before then fail.
+          # The sync is idempotent, so it is retried until Windmill takes it.
+          for attempt in $(seq 1 30); do
+            if uv run --no-sync sh deploy/compose/init/windmill/windmill-sync.sh > logs/windmill-sync.log 2>&1; then
+              echo "scripts synced on attempt $attempt"; break
+            fi
+            [ "$attempt" = 30 ] && { tail -20 logs/windmill-sync.log; echo "::error::Windmill sync never succeeded"; exit 1; }
+            sleep 10
+          done
 
       # core reads Keycloak's signing key at startup, so the realm must be
       # up before the services start.
