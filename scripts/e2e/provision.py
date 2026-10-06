@@ -9,18 +9,26 @@ core's real API, in GOAT:
 - newcomer, invitee: Keycloak users without an organization (onboarding,
   invitation acceptance).
 
-Writes them, with their ids and organization ids, to the JSON file the
-Playwright setup and specs read. Idempotent: users, organizations and
-memberships that already exist are reused, so a second run changes nothing.
+With `--datasets`, the owner then uploads the suite's datasets
+(`apps/web/playwright/fixtures/data`) the way the app does: a presigned PUT
+to S3, then the `layer_import` job, which needs Windmill and its workers.
+
+Writes them, with their ids, organization ids and dataset ids, to the JSON
+file the Playwright setup and specs read. Idempotent: users, organizations,
+memberships and datasets that already exist are reused, so a second run
+changes nothing.
 
 Only for a throwaway stack: it creates users with a known password.
 
-    uv run python scripts/e2e/provision.py
+    uv run python scripts/e2e/provision.py [--datasets]
 """
 
+import argparse
 import json
 import os
 import sys
+import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +43,7 @@ KC_ADMIN_PASSWORD = os.environ["E2E_KEYCLOAK_ADMIN_PASSWORD"]
 CORE_URL = (
     os.environ.get("E2E_CORE_URL", "http://localhost:8000").rstrip("/") + "/api/v2"
 )
+PROCESSES_URL = os.environ.get("E2E_PROCESSES_URL", "http://localhost:8300").rstrip("/")
 PASSWORD = os.environ.get("E2E_PASSWORD", "E2e-Passw0rd!")
 OUT = Path(os.environ.get("E2E_USERS_FILE", "apps/web/playwright/.auth/users.json"))
 
@@ -68,6 +77,14 @@ ORGANIZATION = {
 
 
 SETTINGS = {"preferred_language": "en", "client_theme": "light", "unit": "metric"}
+
+# The owner's datasets: a point layer and a table, by key in the users file.
+DATA_DIR = Path("apps/web/playwright/fixtures/data")
+DATASETS = {
+    "points": ("E2E Points", DATA_DIR / "points.geojson", "application/geo+json"),
+    "table": ("E2E Table", DATA_DIR / "table.csv", "text/csv"),
+}
+IMPORT_TIMEOUT_SECONDS = 300
 
 
 def email(role: str) -> str:
@@ -187,7 +204,83 @@ def ensure_member(
         )
 
 
+def home_folder(client: httpx.Client, token: str) -> str:
+    folders = core(client, token, "GET", "/folder")
+    folders.raise_for_status()
+    return str(next(f["id"] for f in folders.json() if f["name"] == "home"))
+
+
+def ensure_dataset(client: httpx.Client, token: str, key: str) -> str:
+    """Uploads one dataset and waits for its import, unless it exists."""
+    name, path, content_type = DATASETS[key]
+    found = core(client, token, "POST", "/layer", json={"search": name})
+    found.raise_for_status()
+    existing = [layer for layer in found.json()["items"] if layer["name"] == name]
+    if existing:
+        return str(existing[0]["id"])
+
+    body = path.read_bytes()
+    presigned = core(
+        client,
+        token,
+        "POST",
+        "/datasets/request-upload",
+        json={
+            "filename": path.name,
+            "content_type": content_type,
+            "file_size": len(body),
+        },
+    )
+    presigned.raise_for_status()
+    upload = presigned.json()
+    put = client.put(upload["url"], content=body, headers=upload["headers"])
+    if put.status_code >= 300:
+        sys.exit(f"uploading {path.name} failed: {put.status_code} {put.text}")
+
+    layer_id = str(uuid.uuid4())
+    submitted = client.post(
+        f"{PROCESSES_URL}/processes/layer_import/execution",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "inputs": {
+                "layer_id": layer_id,
+                "folder_id": home_folder(client, token),
+                "name": name,
+                "s3_key": upload["key"],
+            }
+        },
+    )
+    if submitted.status_code >= 300:
+        sys.exit(
+            f"importing {name!r} failed to start: {submitted.status_code} {submitted.text}"
+        )
+    job_id = submitted.json()["jobID"]
+
+    deadline = time.monotonic() + IMPORT_TIMEOUT_SECONDS
+    while time.monotonic() < deadline:
+        job = client.get(
+            f"{PROCESSES_URL}/jobs/{job_id}",
+            headers={"Authorization": f"Bearer {token}"},
+        ).json()
+        if job.get("status") == "successful":
+            print(f"imported {name!r} as {layer_id}")
+            return layer_id
+        if job.get("status") in ("failed", "dismissed"):
+            sys.exit(f"importing {name!r} failed: {json.dumps(job)}")
+        time.sleep(2)
+    sys.exit(f"importing {name!r} did not finish in {IMPORT_TIMEOUT_SECONDS}s")
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--datasets",
+        action="store_true",
+        help="also upload the owner's datasets (needs Windmill)",
+    )
+    args = parser.parse_args()
+    datasets: dict[str, str] = {}
+
     with httpx.Client(timeout=60) as client:
         token = admin_token(client)
         ids = {role: ensure_keycloak_user(client, token, role) for role in CAST}
@@ -214,6 +307,9 @@ def main() -> None:
                 sys.exit(
                     f"setting {role}'s language failed: {settings.status_code} {settings.text}"
                 )
+        if args.datasets:
+            owner = user_token(client, "owner")
+            datasets = {key: ensure_dataset(client, owner, key) for key in DATASETS}
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(
@@ -221,6 +317,7 @@ def main() -> None:
             {
                 "organization_id": organization_id,
                 "outsider_organization_id": outsider_organization_id,
+                "datasets": datasets,
                 "users": {
                     role: {"id": ids[role], "email": email(role), **CAST[role]}
                     for role in CAST
