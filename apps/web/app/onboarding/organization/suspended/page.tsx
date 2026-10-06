@@ -30,7 +30,7 @@ export default function OrganizationSuspended() {
       <>
         {status == "authenticated" && !isOrgLoading && organization?.suspended && (
           <AuthContainer
-            headerTitle={<>{t("organization_suspended")}</>}
+            headerTitle={<Typography variant="h5">{t("organization_suspended")}</Typography>}
             body={
               <>
                 <Stack spacing={4}>
