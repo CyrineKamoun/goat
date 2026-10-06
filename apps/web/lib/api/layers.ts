@@ -198,9 +198,10 @@ export const createLayer = async (
   projectId?: string
 ): Promise<Job> => {
   // Map to LayerImport process inputs
-  // user_id is extracted from JWT token by the server
+  // user_id is extracted from JWT token by the server. No layer id: the
+  // import names the layers it creates, and processes refuses a layer id
+  // the caller cannot read, which a new one never is.
   const inputs: Record<string, unknown> = {
-    layer_id: crypto.randomUUID(), // Generate new layer ID
     folder_id: payload.folder_id,
     name: payload.name,
     ...(payload.description && { description: payload.description }),

@@ -141,6 +141,18 @@ class TestLocations:
             tool_references("layer_import", {"s3_key": key}, USER)
         assert refused.value.status_code == 422
 
+    def test_the_web_apps_upload_names_only_the_destination_folder(self) -> None:
+        """What the upload dialog sends: the import creates its layers, so the
+        only resource to check is the folder they go into."""
+        inputs = {
+            "folder_id": FOLDER,
+            "name": "Roads",
+            "s3_key": f"goat/users/{USER}/imports/uploads/roads.gpkg",
+        }
+        assert tool_references("layer_import", inputs, USER).entries == [
+            {"kind": "folder", "id": FOLDER, "action": "write"}
+        ]
+
     def test_a_wfs_url_is_the_callers_to_name(self) -> None:
         inputs = {"wfs_url": "https://example.org/wfs"}
         assert tool_references("layer_import", inputs, USER).entries == []
