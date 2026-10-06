@@ -445,14 +445,7 @@ class TestDatasetLevelTextIsInherited:
 def test_a_collection_is_shaped_like_its_layers_not_like_their_bounding_box(
     published: tuple[Path, Path], tmp_path: Path
 ) -> None:
-    """The Koblenz case at test scale.
-
-    The fixture's layers sit in two far-apart places, so the envelope of their
-    extent covers a great deal of ground that holds no data. A dataset covering
-    North Rhine-Westphalia is the same shape of claim: Koblenz falls inside that
-    state's bounding box and outside the state, and collection-level spatial
-    filtering reads this column.
-    """
+    """The Koblenz case: the gap between two far-apart layers is not covered."""
     out, out_c = tmp_path / "catalog.parquet", tmp_path / "collections.parquet"
     build_mirror(*published, out, out_c)
     con = duckdb.connect()
@@ -470,14 +463,7 @@ def test_a_collection_is_shaped_like_its_layers_not_like_their_bounding_box(
 
 
 def test_a_bundle_of_tables_claims_nowhere(tmp_path: Path) -> None:
-    """A Collection whose every layer is a table must carry no geometry.
-
-    STAC requires a Collection to state a spatial extent, so one holding only
-    tables publishes the whole world -- and would answer every spatial query.
-    ``search.py`` kept such rows out with a ``goat:geometryType IS NOT NULL``
-    rule; a NULL geometry does it without one, because ``ST_Intersects`` against
-    NULL is never true.
-    """
+    """A table-only Collection carries no geometry: its STAC extent is the world."""
     con = duckdb.connect()
     con.execute("INSTALL spatial; LOAD spatial;")
     con.execute(

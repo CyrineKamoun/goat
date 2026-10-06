@@ -105,8 +105,7 @@ __all__ = [
 #:     tier — with `goat:topicRelevanceScore`, the same judgement as a number so
 #:     ordering needs no knowledge of that vocabulary. Higher is better.
 #: v10: a Collection's `geometry` is the union of its layers' footprints, not
-#:      the envelope of its extent -- a bbox cannot say that a dataset covering
-#:      North Rhine-Westphalia does not cover Koblenz.
+#:      the envelope of its extent -- a bbox cannot exclude Koblenz from NRW.
 MIRROR_FORMAT_VERSION = 10
 
 ITEMS_FILENAME = "items.parquet"
@@ -598,8 +597,7 @@ def build_mirror(
                 ON c.id = i.collection
         """
 
-        # The published extent is a bbox, so this is the fallback. The mirror
-        # prefers the members' own footprints, unioned below.
+        # The published extent is a bbox; the members' footprints win below.
         collection_geometry = _probe(
             con,
             collections_path,
@@ -611,9 +609,8 @@ def build_mirror(
             ),
             "",
         )
-        # NULL when no member is spatial -- a bundle of tables, which the
-        # envelope would hand the whole-world extent and so match everywhere.
-        # ST_Union_Agg over only NULLs returns an EMPTY collection, not NULL.
+        # NULL when no member is spatial: the envelope would hand a bundle of
+        # tables the whole world. ST_Union_Agg over NULLs returns EMPTY, not NULL.
         _collection_geometry = (
             "CASE WHEN m.collection IS NULL THEN c.geometry "
             "WHEN m.member_footprint IS NULL "
@@ -767,7 +764,8 @@ def build_mirror(
                 SELECT
                     collection,
                     count(*) AS member_count,
-                    ST_Union_Agg(geom) FILTER (WHERE geom IS NOT NULL)
+                    -- a degenerate member rectangle aborts the union in GEOS
+                    ST_Union_Agg(ST_MakeValid(geom)) FILTER (WHERE geom IS NOT NULL)
                         AS member_footprint,
                     CASE
                         WHEN count(DISTINCT geometry_type) = 1

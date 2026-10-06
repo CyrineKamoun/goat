@@ -11,12 +11,6 @@ UNGRADED_RELEVANCE = 1
 
 RELEVANCE_RANK_SQL = f'COALESCE("{TOPIC_SCORE_FIELD}", {UNGRADED_RELEVANCE})'
 
-#: How much ground a row covers, as the tiebreak behind the topic score. Read
-#: off the footprint, not the envelope: a dataset of metropolitan France and its
-#: overseas departments has a bounding box spanning 8,624 deg² and covers 71, so
-#: the envelope ranked it above everything it tied with on score. A row whose
-#: geometry is still the envelope rectangle measures the same either way, and a
-#: row with no geometry -- a table, or a bundle of them -- has no footprint to
-#: rank by and scores 0 rather than inheriting the whole-world extent STAC
-#: obliges its Collection to publish.
+#: How much ground a row covers, the tiebreak behind the topic score. Read off
+#: the footprint: an envelope over-claims, and a table has none and scores 0.
 BBOX_AREA_SQL = "COALESCE(ST_Area(geometry), 0)"
