@@ -47,7 +47,7 @@ Das Kategorien-Widget ermöglicht es Ihnen, die Verteilung eines kategorischen F
       <code>Wertbasierte Darstellung</code>: wenn aktiviert, werden Balken basierend auf dem ausgewählten Darstellungsfeld eingefärbt. Weitere Optionen erscheinen:
       <ul>
         <li><code>Darstellungsfeld</code>: wählen Sie <code>Statistikfeld</code> (Farbe nach Wert) oder <code>Gruppierungsfeld</code> (eine Farbe pro Kategorie)</li>
-        <li><code>Farbskala</code>: Klassifizierungsmethode (z.B. Quantil); nur sichtbar wenn Darstellungsfeld auf Statistikfeld gesetzt ist</li>
+        <li><code>Farbskala</code>: Klassifizierungsmethode (z.B. [Quantil](https://www.plan4better.de/de/glossar/quantilklassifizierung)); nur sichtbar wenn Darstellungsfeld auf Statistikfeld gesetzt ist</li>
         <li><code>Palette</code>: Farbpalette für das Diagramm</li>
         <li><code>Reihenfolge (n/n)</code>: listet alle Kategorienwerte auf. Mit <code>Alle hinzufügen</code> / <code>Alle entfernen</code> Kategorien ein- oder ausschließen. Ziehen Sie das ⋮⋮-Symbol zum Neuanordnen. Über das ⋮-Menü können einzelne Einträge <code>Umbenennen</code> oder <code>Entfernen</code> werden.</li>
       </ul>

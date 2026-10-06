@@ -77,7 +77,7 @@ Deleting content does not remove it straight away: it goes to the **Trash**, whe
 
 - **New folder**, to group content however suits you
 - **Blank project** or **Import project**
-- **Upload dataset**, to upload a file from your device (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet, and GTFS or Overture archives)
+- **Upload dataset**, to upload a file from your device (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet, and [GTFS](https://www.plan4better.de/en/glossary/gtfs) or [Overture](https://www.plan4better.de/en/glossary/overture-maps) archives)
 - **Connect service**, to add an external layer by URL (WFS, WMS, WMTS, XYZ Tiles or COG)
 - **Upload document**, for a file that belongs with the work without being data
 

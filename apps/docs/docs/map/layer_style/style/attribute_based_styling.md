@@ -163,7 +163,7 @@ Stroke Width attribute-based styling applies to **lines, polygons, and points**.
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Click <code>Size scale</code> to open the classification panel. Choose a <strong>classification method</strong> and set the number of <strong>Steps</strong> (2–10). Each step shows a size preview alongside the value range. The same methods as color classification are available: Quantile, Standard Deviation, Equal Interval, Heads and Tails, Custom Breaks, and Custom Ordinal.</div>
+  <div class="content">Click <code>Size scale</code> to open the classification panel. Choose a <strong>classification method</strong> and set the number of <strong>Steps</strong> (2–10). Each step shows a size preview alongside the value range. The same methods as color classification are available: [Quantile](https://www.plan4better.de/en/glossary/quantile-classification), [Standard Deviation](https://www.plan4better.de/en/glossary/standard-deviation-classification), [Equal Interval](https://www.plan4better.de/en/glossary/equal-interval-classification), Heads and Tails, Custom Breaks, and Custom Ordinal.</div>
 </div>
 
 :::note

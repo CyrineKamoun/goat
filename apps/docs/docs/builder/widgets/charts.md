@@ -46,7 +46,7 @@ The categories widget allows you to visualize the distribution of a categorical 
       <code>Value-based styling</code>: when enabled, bars are colored based on the selected styling field. Additional options appear:
       <ul>
         <li><code>Styling field</code>: choose <code>Statistics field</code> (color by computed value) or <code>Group-by field</code> (one color per category)</li>
-        <li><code>Color scale</code>: classification method (e.g. Quantile); shown when Styling field is set to Statistics field</li>
+        <li><code>Color scale</code>: classification method (e.g. [Quantile](https://www.plan4better.de/en/glossary/quantile-classification)); shown when Styling field is set to Statistics field</li>
         <li><code>Palette</code>: color palette for the chart</li>
         <li><code>Order (n/n)</code>: lists all category values. Use <code>Add all</code> / <code>Remove all</code> to include or exclude categories. Drag the ⋮⋮ handle to reorder. Use the ⋮ menu to <code>Rename</code> or <code>Remove</code> individual items.</li>
       </ul>

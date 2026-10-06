@@ -11,7 +11,7 @@ Das **Verkehrsmittel Auto** wird für alle Analysen in GOAT verwendet, die Autof
 
 ## 1. Ziele
 
-Car Routing wird für viele Indikatoren in GOAT verwendet, wie z.B. [Einzugsgebiete](../toolbox/accessibility_indicators/catchments) und [Heatmaps](../toolbox/accessibility_indicators/connectivity). 
+[Car Routing](https://www.plan4better.de/de/glossar/routing) wird für viele Indikatoren in GOAT verwendet, wie z.B. [Einzugsgebiete](../toolbox/accessibility_indicators/catchments) und [Heatmaps](../toolbox/accessibility_indicators/connectivity). 
 
 Für den Verkehrsträger Auto wird ein **angepasster Routing-Algorithmus** verwendet, der dabei **nur Wege berücksichtigt, die für das Fahren geeignet sind**.
 
@@ -29,7 +29,7 @@ Daten von der  **[Overture Maps Foundation](https://overturemaps.org/)**  werden
 Die folgenden Schritte werden an den Daten durchgeführt, um ein **schnelles** und **genaues** Routing für Autos zu ermöglichen:
 
 1.  **Attribut-Parsing:** Kategorisierung der Attribute von Kanten (Straßen `Klasse` und `Oberfläche`).
-2.  **Geospatial Indexing:**  Nutzung des  **[Uber H3 auf Gitter basierendes](../further_reading/glossary#h3-gitter)**  Indexing für effizientes Routing.
+2.  **Geospatial Indexing:**  Nutzung des  **[Uber H3 auf Gitter basierendes](https://www.plan4better.de/de/glossar/h3-gitter)**  Indexing für effizientes Routing.
 3.  **Extrahieren von Beschränkungen:** Identifizieren von Einweg-Zugangsbeschränkungen zusätzlich zu den Geschwindigkeitsbegrenzungen für beide Richtungen der Kante (`Maximalgeschwindigkeit vorwärts` and `Maximalgeschwindigkeit rückwärts`).
 
 ### Routing-Prozess-Schritte

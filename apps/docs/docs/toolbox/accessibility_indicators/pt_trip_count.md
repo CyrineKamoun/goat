@@ -15,7 +15,7 @@ This indicator displays the **average number of public transport departures** pe
 
 The **Trip Count Platform** shows the **average number of departures per hour for a selected time interval at each public transport platform**. You can view the sum for all modes or focus on a specific mode (e.g., bus, tram, metro, rail).
 
-This indicator is the foundation for the [ÖV-Güteklassen](./oev_gueteklassen.md) and is useful for **weak point analyses of local transport plans** (see, among others, [Guideline for Local Transport Planning in Bavaria](https://www.demografie-leitfaden-bayern.de/index.html)).
+This indicator is the foundation for the [ÖV-Güteklassen](./oev_gueteklassen.md) and is useful for **weak point analyses of [local transport plans](https://www.plan4better.de/en/glossary/local-public-transport-plan)** (see, among others, [Guideline for Local Transport Planning in Bavaria](https://www.demografie-leitfaden-bayern.de/index.html)).
 
 :::info
 

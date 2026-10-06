@@ -8,17 +8,17 @@ import TabItem from '@theme/TabItem';
 
 # Reisekostenmatrix
 
-Die Reisekostenmatrix **berechnet Reisezeit oder Entfernung zwischen einer Menge von Ursprüngen und einer Menge von Zielen** und erzeugt eine Tabelle, die für Erreichbarkeitsanalysen, Standortplanung und räumliche Modellierung verwendet werden kann.
+Die Reisekostenmatrix **berechnet [Reisezeit](https://www.plan4better.de/de/glossar/reisezeit) oder Entfernung zwischen einer Menge von Ursprüngen und einer Menge von Zielen** und erzeugt eine Tabelle, die für [Erreichbarkeitsanalysen](https://www.plan4better.de/de/glossar/erreichbarkeitsanalyse), [Standortplanung](https://www.plan4better.de/de/glossar/standortanalyse) und räumliche Modellierung verwendet werden kann.
 
 ## 1. Erklärung
 
-Die Reisekostenmatrix berechnet die **Reisekosten (Zeit oder Entfernung) zwischen jedem Ursprungs-Ziel-Paar** in zwei Eingabe-Layern für einen gewählten Routing-Modus. Das Ergebnis ist eine Tabelle, in der jede Zeile eine OD-Verbindung mit Ursprungskennung, Zielkennung und den berechneten Reisekosten darstellt.
+Die Reisekostenmatrix berechnet die **Reisekosten (Zeit oder Entfernung) zwischen jedem [Ursprungs-Ziel-Paar](https://www.plan4better.de/de/glossar/quelle-ziel-matrix)** in zwei Eingabe-Layern für einen gewählten Routing-Modus. Das Ergebnis ist eine Tabelle, in der jede Zeile eine OD-Verbindung mit Ursprungskennung, Zielkennung und den berechneten Reisekosten darstellt.
 
 Die Reisekostenmatrix ist für die **Massenberechnung über viele Ursprünge und Ziele gleichzeitig** ausgelegt. Dies macht sie zum richtigen Tool, wenn Sie die Rohdaten für weiterführende Analysen benötigen, z. B. für Standortbewertungen, Angebot-Nachfrage-Abgleiche oder individuelle Erreichbarkeitsindizes.
 
 ## 2. Anwendungsbeispiele
 
-- Berechnung von Gehzeiten von allen Wohngebäuden zu den nächstgelegenen Schulen, um unterversorgte Gebiete zu identifizieren.
+- Berechnung von Gehzeiten von allen Wohngebäuden zu den nächstgelegenen Schulen, um [unterversorgte Gebiete](https://www.plan4better.de/de/glossar/defizitgebiet) zu identifizieren.
 - Berechnung von Fahrzeiten zwischen einer Menge von Lagerhäusern (Ursprünge) und Einzelhandelsgeschäften (Ziele) zur Logistikoptimierung.
 - Erstellung einer Eingangsmatrix für einen individuellen Erreichbarkeitsindex, der die Reisezeit nach Attraktivität des Ziels gewichtet.
 - Bewertung, wie viele Ziele von jedem Ursprung aus innerhalb einer bestimmten Reisezeitgrenze erreichbar sind.

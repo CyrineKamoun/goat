@@ -9,7 +9,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 # Heatmap - Connectivity
-The Heatmap - Connectivity indicator **produces a color-coded map to visualize the connectivity of locations within an area of interest** ([**AOI**](../../further_reading/glossary#area-of-interest-aoi "What is an AOI?")).
+The Heatmap - Connectivity indicator **produces a color-coded map to visualize the connectivity of locations within an area of interest** ([**AOI**](https://www.plan4better.de/en/glossary/area-of-interest "What is an AOI?")).
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
 <iframe width="674" height="378" src="https://www.youtube.com/embed/PzWEIbcSf4Y?si=MB4LNSEkMmnzccuX" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
@@ -17,7 +17,7 @@ The Heatmap - Connectivity indicator **produces a color-coded map to visualize t
 
 ## 1. Explanation
 
-The heatmap uses a color-coded hexagonal grid to show **how well-connected different areas are.** It takes an **Area of Interest** (AOI), a **routing type** (walking, cycling, etc.), and a **travel time limit** as inputs. Considering real-world transport and street networks, it calculates the connectivity of each hexagon within the AOI.
+The [heatmap](https://www.plan4better.de/en/glossary/heatmap) uses a color-coded hexagonal grid to show **how well-connected different areas are.** It takes an **Area of Interest** (AOI), a **routing type** (walking, cycling, etc.), and a **travel time limit** as inputs. Considering real-world transport and street networks, it calculates the connectivity of each hexagon within the AOI.
 
 
 :::info
@@ -58,7 +58,7 @@ Heatmap computation is available across **over 30 European countries** for `Walk
 | Bicycle | All paths accessible by bicycle (taking into account surface and slope) |
 | Pedelec | All paths accessible by pedelec (taking into account surface and slope) |
 | Car | All paths accessible by car (taking into account speed limits and one-way restrictions) |
-| Public Transport | All journeys possible by public transport (according to official GTFS schedules), considering walking access and egress to and from stops |
+| Public Transport | All journeys possible by public transport (according to official [GTFS](https://www.plan4better.de/en/glossary/gtfs) schedules), considering walking access and egress to and from stops |
 
 <Tabs>
 <TabItem value="active-car" label="Walk / Bicycle / Pedelec / Car" default className="tabItemBox">
@@ -160,7 +160,7 @@ The connectivity formula calculates the total area (in square meters) from which
 
 ### Grid cells 
 
-Heatmaps in GOAT utilize **[Uber's H3 grid-based](../../further_reading/glossary#h3-grid)** solution for efficient computation and easy-to-understand visualization. Behind the scenes, accessibility is computed on-the-fly by GOAT's own routing engine. For each *routing type*, the engine routes outward from the opportunities to discover the reachable H3 cells and their travel costs, then aggregates these into a per-cell accessibility score. Public transport uses the RAPTOR-based engine, while the active mobility and car modes use GOAT's Dijkstra implementation.
+Heatmaps in GOAT utilize **[Uber's H3 grid-based](https://www.plan4better.de/en/glossary/h3-grid)** solution for efficient computation and easy-to-understand visualization. Behind the scenes, accessibility is computed on-the-fly by GOAT's own routing engine. For each *routing type*, the engine routes outward from the opportunities to discover the reachable H3 cells and their travel costs, then aggregates these into a per-cell accessibility score. Public transport uses the RAPTOR-based engine, while the [active mobility](https://www.plan4better.de/en/glossary/active-mobility) and car modes use GOAT's Dijkstra implementation.
 
 The resolution and dimensions of the hexagonal grid used depend on the selected *routing type*:
 
@@ -180,4 +180,4 @@ For further insights into the Routing algorithm, visit [Routing](../../category/
 
 ### Visualization
 
-For visualization, the result form the connectivity analysis, uses a classification method based on quantiles by default. However, various other classification methods may be used instead. Read more in the **[Data Classification Methods](../../map/layer_style/style/attribute_based_styling#data-classification-methods)** section of the *Attribute-based Styling* page.
+For visualization, the result form the connectivity analysis, uses a classification method based on [quantiles](https://www.plan4better.de/en/glossary/quantile-classification) by default. However, various other classification methods may be used instead. Read more in the **[Data Classification Methods](../../map/layer_style/style/attribute_based_styling#data-classification-methods)** section of the *Attribute-based Styling* page.

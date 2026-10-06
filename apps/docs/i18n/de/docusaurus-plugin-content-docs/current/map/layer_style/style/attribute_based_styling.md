@@ -157,7 +157,7 @@ Die attributbasierte Strichbreite gilt für **Linien, Polygone und Punkte**.
 
 <div class="step">
   <div class="step-number">4</div>
-  <div class="content">Klicken Sie auf <code>Größenskala</code>, um das Klassifizierungsfenster zu öffnen. Wählen Sie eine <strong>Klassifizierungsmethode</strong> und legen Sie die Anzahl der <strong>Schritte</strong> fest (2–10). Jeder Schritt zeigt eine Größenvorschau neben dem Wertebereich. Es stehen dieselben Methoden wie bei der Farbklassifizierung zur Verfügung: Quantil, Standardabweichung, Gleiches Intervall, Heads und Tails, Benutzerdefinierte Schritte und Benutzerdefinierte Ordinalskala.</div>
+  <div class="content">Klicken Sie auf <code>Größenskala</code>, um das Klassifizierungsfenster zu öffnen. Wählen Sie eine <strong>Klassifizierungsmethode</strong> und legen Sie die Anzahl der <strong>Schritte</strong> fest (2–10). Jeder Schritt zeigt eine Größenvorschau neben dem Wertebereich. Es stehen dieselben Methoden wie bei der Farbklassifizierung zur Verfügung: [Quantil](https://www.plan4better.de/de/glossar/quantilklassifizierung), [Standardabweichung](https://www.plan4better.de/de/glossar/standardabweichung-klassifizierung), [Gleiches Intervall](https://www.plan4better.de/de/glossar/gleiche-intervalle), Heads und Tails, Benutzerdefinierte Schritte und Benutzerdefinierte Ordinalskala.</div>
 </div>
 
 :::note

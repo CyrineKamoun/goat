@@ -11,7 +11,7 @@ The **Car Routing** is used for all analyses in GOAT that contain car trips.
 
 ## 1. Objectives
 
-Car routing is used for many indicators in GOAT, such as [Catchment Areas](../toolbox/accessibility_indicators/catchments) and [Heatmaps](../toolbox/accessibility_indicators/connectivity). 
+[Car routing](https://www.plan4better.de/en/glossary/routing) is used for many indicators in GOAT, such as [Catchment Areas](../toolbox/accessibility_indicators/catchments) and [Heatmaps](../toolbox/accessibility_indicators/connectivity). 
 
 A **custom routing algorithm** is used for the mode of the car, which **only considers paths that are suitable for driving**.
 
@@ -29,7 +29,7 @@ Data from the  **[Overture Maps Foundation](https://overturemaps.org/)**  is use
 The following steps are performed on the data to enable  **quick**  and  **accurate**  routing for cars:
 
 1.  **Attribute Parsing:**  Categorizing attributes of edges (street `class` and `surface`).
-2.  **Geospatial Indexing:**  Utilizing  **[Uber's H3 grid-based](../further_reading/glossary#h3-grid)**  indexing for efficient routing.
+2.  **Geospatial Indexing:**  Utilizing  **[Uber's H3 grid-based](https://www.plan4better.de/en/glossary/h3-grid)**  indexing for efficient routing.
 3.  **Extracting Restrictions:**  Identifying one-way access restrictions in addition to speed limits for both directions of the edge (`maxspeed_forward` and `maxspeed_backward`).
 
 ### Routing Process Steps

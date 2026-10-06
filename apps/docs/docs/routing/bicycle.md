@@ -13,7 +13,7 @@ The **Bicycle/Pedelec Routing** is used for all analyses in GOAT that contain cy
  
 ## 1. Objectives
 
-Bicycle/Pedelec routing is used for many indicators in GOAT, such as [Catchment Areas](../toolbox/accessibility_indicators/catchments "Visit Docs on Catchment Areas"), [Heatmaps](../toolbox/accessibility_indicators/connectivity "Visit Docs on Heatmaps"), the [Huff Model](../toolbox/accessibility_indicators/huff_model "Visit Docs on the Huff Model"), and the [Travel Cost Matrix](../toolbox/accessibility_indicators/travel_cost_matrix "Visit Docs on the Travel Cost Matrix"). A **custom routing algorithm** is used for the mode of bicycle/pedelec, which **only considers paths that are suitable for cycling**. Furthermore, the `surface` and `slope` have an impact on the cycling speed and are therefore considered in the routing. The average cycling `speed` can be adjusted by the user whenever an accessibility analysis is performed. Depending on the slope and surface of a path segment, the speed is adjusted accordingly. 
+[Bicycle/Pedelec routing](https://www.plan4better.de/en/glossary/routing) is used for many indicators in GOAT, such as [Catchment Areas](../toolbox/accessibility_indicators/catchments "Visit Docs on Catchment Areas"), [Heatmaps](../toolbox/accessibility_indicators/connectivity "Visit Docs on Heatmaps"), the [Huff Model](../toolbox/accessibility_indicators/huff_model "Visit Docs on the Huff Model"), and the [Travel Cost Matrix](../toolbox/accessibility_indicators/travel_cost_matrix "Visit Docs on the Travel Cost Matrix"). A **custom routing algorithm** is used for the mode of bicycle/pedelec, which **only considers paths that are suitable for cycling**. Furthermore, the `surface` and `slope` have an impact on the cycling speed and are therefore considered in the routing. The average cycling `speed` can be adjusted by the user whenever an [accessibility analysis](https://www.plan4better.de/en/glossary/accessibility-analysis) is performed. Depending on the slope and surface of a path segment, the speed is adjusted accordingly. 
 
 
 ## 2. Data
@@ -35,7 +35,7 @@ Elevation data is sourced from **[Copernicus](https://www.copernicus.eu/en)** as
 The following steps are performed on the data to enable **quick** and **accurate** routing for bicycle/pedelec:
 
  1. **Attribute Parsing:** Categorizing attributes of edges (street `class` and `surface`).
- 2. **Geospatial Indexing:**  Utilizing **[Uber's H3 grid-based](../further_reading/glossary#h3-grid)** indexing for efficient routing.
+ 2. **Geospatial Indexing:**  Utilizing **[Uber's H3 grid-based](https://www.plan4better.de/en/glossary/h3-grid)** indexing for efficient routing.
  3. **Surface Impedance Computation:** Calculating impedance considering surface properties.
  4. **Slope Impedance Computation:** Overlaying DEM on edges to compute slope profiles.
 

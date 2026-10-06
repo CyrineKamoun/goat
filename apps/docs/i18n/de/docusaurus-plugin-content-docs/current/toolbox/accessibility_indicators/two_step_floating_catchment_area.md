@@ -22,7 +22,7 @@ Die Heatmap 2SFCA (Two-Step Floating Catchment Area)-Methode **visualisiert räu
 Die 2SFCA-Methode misst die **räumliche Erreichbarkeit unter Berücksichtigung von Angebot (Kapazität der Einrichtungen) und Nachfrage (Bevölkerung)**. Im Gegensatz zu einfachen Angebot-Nachfrage-Verhältnissen pro Verwaltungseinheit berücksichtigt 2SFCA grenzüberschreitende Zugänge: Menschen können Einrichtungen in benachbarten Gebieten erreichen, und Einrichtungen versorgen Bevölkerungsgruppen über ihren eigenen Bezirk hinaus.
 Das Ergebnis ist ein **Verhältnis von Angebot zu Nachfrage auf der Ebene hexagonaler Rasterzellen**. Das Werkzeug arbeitet in zwei Schritten:
 
-1. **Schritt 1: Kapazitäts-Nachfrage-Verhältnisse.** Für jeden Standort einer Einrichtung wird berechnet, wie viel Kapazität im Verhältnis zur Gesamtnachfrage (Bevölkerung) in ihrem Einzugsgebiet verfügbar ist. Dies ergibt ein Angebot-Nachfrage-Verhältnis pro Einrichtung.
+1. **Schritt 1: Kapazitäts-Nachfrage-Verhältnisse.** Für jeden Standort einer Einrichtung wird berechnet, wie viel Kapazität im Verhältnis zur Gesamtnachfrage (Bevölkerung) in ihrem [Einzugsgebiet](https://www.plan4better.de/de/glossar/einzugsgebiet) verfügbar ist. Dies ergibt ein Angebot-Nachfrage-Verhältnis pro Einrichtung.
 
 2. **Schritt 2: Kumulative Erreichbarkeit.** Für jede Rasterzelle werden die Kapazitätsverhältnisse aller erreichbaren Einrichtungen summiert. Das Ergebnis zeigt, wie gut jeder Standort versorgt ist.
 
@@ -82,7 +82,7 @@ Die Heatmap-Berechnung ist für `Walk`, `Bicycle`, `Pedelec` und `Auto` in **üb
 | Fahrrad | Alle mit dem Fahrrad befahrbaren Wege (unter Berücksichtigung von Oberfläche und Steigung) |
 | Pedelec | Alle mit dem Pedelec befahrbaren Wege (unter Berücksichtigung von Oberfläche und Steigung) |
 | Auto | Alle mit dem Auto befahrbaren Wege (unter Berücksichtigung von Tempolimits und Einbahnstraßen) |
-| Öffentlicher Verkehr | Alle mit dem ÖV möglichen Fahrten (gemäß offiziellen GTFS-Fahrplänen), unter Berücksichtigung von Zu- und Abgang zu Fuß zu und von den Haltestellen |
+| Öffentlicher Verkehr | Alle mit dem ÖV möglichen Fahrten (gemäß offiziellen [GTFS](https://www.plan4better.de/de/glossar/gtfs)-Fahrplänen), unter Berücksichtigung von Zu- und Abgang zu Fuß zu und von den Haltestellen |
 
 <Tabs>
 <TabItem value="active-car" label="Zu Fuß / Fahrrad / Pedelec / Auto" default className="tabItemBox">
@@ -454,12 +454,12 @@ Die kumulative Funktion wendet **keinen Distanzabfall** an und verwendet den Par
 
 ### Klassifizierung
 
-Um die berechneten Erreichbarkeitsniveaus für jede Rasterzelle zu klassifizieren, wird standardmäßig eine Klassifizierung basierend auf Quantilen verwendet. 
+Um die berechneten Erreichbarkeitsniveaus für jede Rasterzelle zu klassifizieren, wird standardmäßig eine Klassifizierung basierend auf [Quantilen](https://www.plan4better.de/de/glossar/quantilklassifizierung) verwendet. 
 Es können jedoch auch verschiedene andere Klassifizierungsmethoden verwendet werden. Lesen Sie mehr im Abschnitt **[Datenklassifizierungsmethoden](../../map/layer_style/style/attribute_based_styling#datenklassifizierungsmethoden)** auf der Seite *Attributbasiertes Styling*.
 
 ### Visualisierung 
 
-Heatmaps in GOAT nutzen **[Ubers H3-Raster](../../further_reading/glossary#h3-gitter)**-Lösung für effiziente Berechnung und leicht verständliche Visualisierung. Im Hintergrund wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jeden *Routing-Modus* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der aktiven Mobilität und das Auto GOATs Dijkstra-Implementierung verwenden.
+Heatmaps in GOAT nutzen **[Ubers H3-Raster](https://www.plan4better.de/de/glossar/h3-gitter)**-Lösung für effiziente Berechnung und leicht verständliche Visualisierung. Im Hintergrund wird die Erreichbarkeit direkt zur Laufzeit von GOATs eigener Routing-Engine berechnet. Für jeden *Routing-Modus* routet die Engine von den Gelegenheiten ausgehend nach außen, um die erreichbaren H3-Zellen und deren Reisekosten zu ermitteln, und aggregiert diese anschließend zu einem Erreichbarkeitswert pro Zelle. Der öffentliche Verkehr nutzt die RAPTOR-basierte Engine, während die Verkehrsträger der [aktiven Mobilität](https://www.plan4better.de/de/glossar/aktive-mobilitaet) und das Auto GOATs Dijkstra-Implementierung verwenden.
 
 Die Auflösung und Dimensionen des verwendeten hexagonalen Rasters hängen vom gewählten *Routing-Modus* ab:
 

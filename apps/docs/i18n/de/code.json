@@ -401,5 +401,13 @@
   "goat.home.card.troubleshooting.description": {
     "message": "Lösungen für fehlgeschlagene Jobs und andere häufige Probleme.",
     "description": "Description of a section card on the docs landing page"
+  },
+  "glossary.preview.label": {
+    "message": "Glossar",
+    "description": "Small label above a glossary term preview"
+  },
+  "glossary.preview.readMore": {
+    "message": "Weiterlesen",
+    "description": "Button in a glossary term preview that opens the full entry"
   }
 }

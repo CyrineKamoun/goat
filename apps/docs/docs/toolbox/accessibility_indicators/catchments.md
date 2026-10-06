@@ -12,7 +12,7 @@ import TabItem from '@theme/TabItem';
 <iframe width="674" height="378" src="https://www.youtube.com/embed/_clsR386b9w?si=ZInxlY_TjYiEda23" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 </div>
 
-Catchment Area shows **how far people can travel within a certain travel time or distance, using one or more transport modes**, with extended output shapes, custom step sizes, and additional public transport settings.
+Catchment Area shows **how far people can travel within a certain [travel time](https://www.plan4better.de/en/glossary/travel-time) or distance, using one or more transport modes**, with extended output shapes, custom step sizes, and additional public transport settings.
 
 ## 1. Explanation
 
@@ -22,7 +22,7 @@ Catchment Area includes the following additional features:
 
 **For all routing modes:**
 
-- **Custom step sizes**: define each isochrone step independently (e.g., 5, 10, 20, 30 minutes) instead of using equally-spaced intervals.
+- **Custom step sizes**: define each [isochrone](https://www.plan4better.de/en/glossary/isochrone) step independently (e.g., 5, 10, 20, 30 minutes) instead of using equally-spaced intervals.
 - **Point Grid output shape**: a new result geometry option that represents the catchment as a grid of individual points, each showing its exact travel cost value.
 
 **For Public Transport only:**

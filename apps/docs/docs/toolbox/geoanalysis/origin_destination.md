@@ -14,7 +14,7 @@ The Origin Destination tool allows you to **visualize movement flows between dif
 
 ## 1. Explanation
 
-The Origin-Destination tool creates **straight lines connecting starting points (origins) to endpoints (destinations)** based on your data. It takes a matrix table with flow data and a geometry layer with locations, then **visualizes the connections and their weights** as lines on the map.
+The Origin-Destination tool creates **straight lines connecting starting points (origins) to endpoints (destinations)** based on your data. It takes a [matrix table](https://www.plan4better.de/en/glossary/origin-destination-matrix) with flow data and a geometry layer with locations, then **visualizes the connections and their weights** as lines on the map.
 
 The example below shows an *Input Table (Matrix Layer)* and the resulting *Origin-Destination Lines* based on the *Zipcode Areas (Geometry Layer)*.
 

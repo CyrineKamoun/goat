@@ -5,7 +5,7 @@ sidebar_position: 7
 
 # ÖV-Güteklassen
 
-The ÖV-Güteklassen indicator **classifies the quality of public transport services in a given area**, helping planners and stakeholders quickly identify well-served and underserved locations.
+The ÖV-Güteklassen indicator **classifies the quality of public transport services in a given area**, helping planners and stakeholders quickly identify well-served and [underserved locations](https://www.plan4better.de/en/glossary/deficit-area).
 
 <div style={{ display: 'flex', justifyContent: 'center' }}>
 <iframe width="674" height="378" src="https://www.youtube.com/embed/7YMhKkg2mtU?si=Wy1-ZjKGeJWt-K-I&amp;start=46" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
@@ -104,7 +104,7 @@ If you click on any station, **you can see details such as the stop name, averag
 
 ### Scientific Background
 
- The approach of Public Transport Quality Classes <i>(German: ÖV-Güteklassen)</i> is **methodologically superior compared to common catchment areas**. In 2011, the [Swiss Federal Office for Spatial Development (ARE)](https://www.are.admin.ch/are/de/home.html) started to use this indicator to **include the attractiveness of public transport services in the assessment of quality development**; since then, it has been considered an important instrument in formal planning processes in Switzerland. Later on, the Swiss model served as an inspiration for its application in Austria (e.g. Voralberg) and Germany (e.g. by [KCW](https://www.plan4better.de/en/references/calculation-of-public-transport-quality-classes-in-germany) and [Agora Verkehrswende](https://www.plan4better.de/en/references/accessibility-analyses-for-the-mobility-guarantee-and-public-transport-atlas-projects)).  
+ The approach of Public Transport Quality Classes <i>(German: ÖV-Güteklassen)</i> is **methodologically superior compared to common [catchment areas](https://www.plan4better.de/en/glossary/catchment-area)**. In 2011, the [Swiss Federal Office for Spatial Development (ARE)](https://www.are.admin.ch/are/de/home.html) started to use this indicator to **include the attractiveness of public transport services in the assessment of quality development**; since then, it has been considered an important instrument in formal planning processes in Switzerland. Later on, the Swiss model served as an inspiration for its application in Austria (e.g. Voralberg) and Germany (e.g. by [KCW](https://www.plan4better.de/en/references/calculation-of-public-transport-quality-classes-in-germany) and [Agora Verkehrswende](https://www.plan4better.de/en/references/accessibility-analyses-for-the-mobility-guarantee-and-public-transport-atlas-projects)).  
 
 The institutionalization of the indicator in German-speaking countries, as well as the comprehensible and at the same time differentiated calculation methodology, are important advantages of the <i>ÖV-Güteklassen</i>. 
 

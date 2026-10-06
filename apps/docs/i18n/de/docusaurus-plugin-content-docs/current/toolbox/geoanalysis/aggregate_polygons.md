@@ -78,7 +78,7 @@ Im folgenden Beispiel werden die Polygone des *zu aggregierenden Layers* auf Hex
 
 :::tip HINWEIS
 
-Um mehr über das H3-Gitter zu erfahren, können Sie das [Glossar](../../further_reading/glossary#h3-gitter) besuchen.
+Um mehr über das H3-Gitter zu erfahren, können Sie das [Glossar](https://www.plan4better.de/de/glossar/h3-gitter) besuchen.
 
 :::
 
