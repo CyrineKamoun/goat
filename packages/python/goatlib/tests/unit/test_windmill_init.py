@@ -181,3 +181,32 @@ def test_bootstrap_without_token_file(monkeypatch: pytest.MonkeyPatch) -> None:
         )
         == MINTED
     )
+
+
+def test_waits_through_connections_reset_while_windmill_starts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A proxy in front of a starting server (Docker's published port, a
+    Kubernetes service) accepts the connection and resets it."""
+    fake = FakeWindmill(valid_tokens={"tok-old"})
+    resets = [ConnectionResetError(104, "Connection reset by peer")] * 2
+
+    def _starting(base: str, path: str, **kwargs: Any) -> Any:
+        if path == "/version" and resets:
+            raise resets.pop()
+        return fake(base, path, **kwargs)
+
+    monkeypatch.setattr(windmill_init, "_api", _starting)
+    monkeypatch.setattr(windmill_init.time, "sleep", lambda _seconds: None)
+
+    assert (
+        windmill_init.bootstrap(
+            url="http://windmill",
+            workspace="goat",
+            admin_email="admin@windmill.dev",
+            desired_password="secret",
+            existing_token="tok-old",
+        )
+        == "tok-old"
+    )
+    assert not resets
