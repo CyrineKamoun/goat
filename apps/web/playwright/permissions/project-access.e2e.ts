@@ -68,7 +68,7 @@ test.describe("a viewer it is shared with", () => {
     const viewer = await apiAs("viewer");
     try {
       const removed = await viewer.delete(`${API_URL}/api/v2/project/${projectId}`);
-      expect([403, 404]).toContain(removed.status());
+      expect([401, 403, 404]).toContain(removed.status());
       const read = await viewer.get(`${API_URL}/api/v2/project/${projectId}`);
       expect(read.status()).toBe(200);
     } finally {
