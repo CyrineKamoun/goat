@@ -38,7 +38,10 @@ test.describe("the invitee", () => {
     await logIn(page, userOf("invitee").email, castOf().password);
     await page.waitForURL(/\/onboarding\/organization\/invite\//, { timeout: 30000 });
     await expect(
-      page.getByRole("heading", { name: /You have been invited to join the organization/ })
+      page.getByRole("heading", {
+        name: "You have been invited to join the organization: E2E Organization",
+        exact: true,
+      })
     ).toBeVisible();
     invitationPath = new URL(page.url()).pathname;
 

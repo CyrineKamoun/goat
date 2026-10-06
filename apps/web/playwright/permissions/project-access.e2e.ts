@@ -35,10 +35,12 @@ test.describe("an outsider", () => {
   test("is refused the project and does not see it anywhere", async ({ page }) => {
     const outsider = await apiAs("outsider");
     try {
+      // core answers a refused permission check with 401, a refused
+      // resource with 403 or 404: any of them is a refusal.
       const read = await outsider.get(`${API_URL}/api/v2/project/${projectId}`);
-      expect([403, 404]).toContain(read.status());
+      expect([401, 403, 404]).toContain(read.status());
       const removed = await outsider.delete(`${API_URL}/api/v2/project/${projectId}`);
-      expect([403, 404]).toContain(removed.status());
+      expect([401, 403, 404]).toContain(removed.status());
     } finally {
       await outsider.dispose();
     }

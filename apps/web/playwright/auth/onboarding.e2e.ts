@@ -27,10 +27,12 @@ test("a user without an organization creates one on first login", async ({ page 
   await page.getByRole("button", { name: "Next" }).click();
 
   await choose(page, /Organization type/, "Public sector");
+  await choose(page, /Organization size/, "5-25");
   await choose(page, /Industry/, "Architecture");
   await page.getByLabel(/Organization department/).fill("Mobility");
   await choose(page, /What are your main use cases\?/, "Geospatial data management and analysis");
   await page.getByRole("button", { name: "Next" }).click();
+  // Every profile field is required: the step does not let anyone on without them.
 
   await page.getByLabel(/Phone number/).fill("+49 89 1234567");
   await page.getByRole("combobox", { name: /Country/ }).fill("Germany");
