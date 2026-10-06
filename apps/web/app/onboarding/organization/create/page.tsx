@@ -94,23 +94,27 @@ export default function OrganizationOnBoarding() {
   const allowNextSecondStep = useMemo(() => {
     return (
       watchFormValues.type &&
+      watchFormValues.size &&
       watchFormValues.industry &&
       watchFormValues.department &&
       watchFormValues.use_case &&
       !errors.type &&
+      !errors.size &&
       !errors.industry &&
       !errors.department &&
       !errors.use_case
     );
-  }, [watchFormValues, errors.type, errors.industry, errors.department, errors.use_case]);
+  }, [watchFormValues, errors.type, errors.size, errors.industry, errors.department, errors.use_case]);
 
   const allowSubmit = useMemo(() => {
     return (
       watchFormValues.name &&
       watchFormValues.region &&
       watchFormValues.type &&
+      watchFormValues.size &&
       watchFormValues.industry &&
       watchFormValues.department &&
+      watchFormValues.use_case &&
       watchFormValues.phone_number &&
       watchFormValues.location
     );
