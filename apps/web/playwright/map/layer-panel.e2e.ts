@@ -86,7 +86,7 @@ test("a fill colour typed as hex is stored as RGB", async ({ page }) => {
 });
 
 test("the data table shows the layer's rows", async ({ page }) => {
-  await rowMenu(page, "E2E Points", "View data");
+  await rowMenu(page, "E2E Points", "View Data");
   await expect(page.getByText("1–25 of 26")).toBeVisible({ timeout: 30000 });
 });
 
