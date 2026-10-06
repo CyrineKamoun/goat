@@ -104,7 +104,10 @@ __all__ = [
 #: v9: `goat:topicRelevance` on a Collection — Plan4Better's topic relevance
 #:     tier — with `goat:topicRelevanceScore`, the same judgement as a number so
 #:     ordering needs no knowledge of that vocabulary. Higher is better.
-MIRROR_FORMAT_VERSION = 9
+#: v10: a Collection's `geometry` is the union of its layers' footprints, not
+#:      the envelope of its extent -- a bbox cannot say that a dataset covering
+#:      North Rhine-Westphalia does not cover Koblenz.
+MIRROR_FORMAT_VERSION = 10
 
 ITEMS_FILENAME = "items.parquet"
 COLLECTIONS_FILENAME = "collections.parquet"
@@ -595,9 +598,8 @@ def build_mirror(
                 ON c.id = i.collection
         """
 
-        # A Collection's spatial extent is a bbox, not a geometry column, so the
-        # mirror's geometry is that envelope. Collection-level spatial filtering
-        # is therefore bbox-precise, which is all a STAC extent is.
+        # The published extent is a bbox, so this is the fallback. The mirror
+        # prefers the members' own footprints, unioned below.
         collection_geometry = _probe(
             con,
             collections_path,
@@ -608,6 +610,15 @@ def build_mirror(
                 " extent.spatial.bbox[1][3], extent.spatial.bbox[1][4])",
             ),
             "",
+        )
+        # NULL when no member is spatial -- a bundle of tables, which the
+        # envelope would hand the whole-world extent and so match everywhere.
+        # ST_Union_Agg over only NULLs returns an EMPTY collection, not NULL.
+        _collection_geometry = (
+            "CASE WHEN m.collection IS NULL THEN c.geometry "
+            "WHEN m.member_footprint IS NULL "
+            "OR ST_IsEmpty(m.member_footprint) THEN CAST(NULL AS GEOMETRY) "
+            "ELSE m.member_footprint END"
         )
         collection_derived = {
             "datetime_start",
@@ -730,8 +741,9 @@ def build_mirror(
         )
         counted_collections = f"""
             SELECT
-                c.* EXCLUDE (datetime, datetime_start, datetime_end),
-                {_envelope_columns("c.geometry")},
+                c.* EXCLUDE (geometry, datetime, datetime_start, datetime_end),
+                {_collection_geometry}                         AS geometry,
+                {_envelope_columns(_collection_geometry)},
                 coalesce(m.member_count, 0)                     AS member_count,
                 m.member_geometry_type                          AS "goat:geometryType",
                 m.thumbnail_item                                AS thumbnail_item,
@@ -755,6 +767,8 @@ def build_mirror(
                 SELECT
                     collection,
                     count(*) AS member_count,
+                    ST_Union_Agg(geom) FILTER (WHERE geom IS NOT NULL)
+                        AS member_footprint,
                     CASE
                         WHEN count(DISTINCT geometry_type) = 1
                              AND count(geometry_type) = count(*)
@@ -766,6 +780,7 @@ def build_mirror(
                 FROM (
                     SELECT
                         i.collection,
+                        CAST({_geometry_expr(items, "i")} AS GEOMETRY) AS geom,
                         {member_geometry} AS geometry_type,
                         {member_start} AS member_start,
                         {member_end} AS member_end,

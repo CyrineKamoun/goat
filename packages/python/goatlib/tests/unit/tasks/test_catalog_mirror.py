@@ -440,3 +440,76 @@ class TestDatasetLevelTextIsInherited:
         assert "flüssen" in text, "description words must be searchable"
         assert "gewässer" in text, "keywords must be searchable"
         assert "bodenbedeckung" in text, "the item's own title still counts"
+
+
+def test_a_collection_is_shaped_like_its_layers_not_like_their_bounding_box(
+    published: tuple[Path, Path], tmp_path: Path
+) -> None:
+    """The Koblenz case at test scale.
+
+    The fixture's layers sit in two far-apart places, so the envelope of their
+    extent covers a great deal of ground that holds no data. A dataset covering
+    North Rhine-Westphalia is the same shape of claim: Koblenz falls inside that
+    state's bounding box and outside the state, and collection-level spatial
+    filtering reads this column.
+    """
+    out, out_c = tmp_path / "catalog.parquet", tmp_path / "collections.parquet"
+    build_mirror(*published, out, out_c)
+    con = duckdb.connect()
+    con.execute("LOAD spatial;")
+    # Between the polygon layer and the point layer, inside the envelope of both.
+    gap = "ST_Point(9.5, 49.0)"
+    in_geometry, in_envelope = con.execute(
+        f"""SELECT ST_Intersects(geometry, {gap}),
+                   ST_Intersects(ST_Envelope(geometry), {gap})
+              FROM read_parquet('{out_c.as_posix()}')"""
+    ).fetchone()
+    con.close()
+    assert in_envelope is True, "the gap must lie inside the bounding box"
+    assert in_geometry is False, "the collection must not claim the gap"
+
+
+def test_a_bundle_of_tables_claims_nowhere(tmp_path: Path) -> None:
+    """A Collection whose every layer is a table must carry no geometry.
+
+    STAC requires a Collection to state a spatial extent, so one holding only
+    tables publishes the whole world -- and would answer every spatial query.
+    ``search.py`` kept such rows out with a ``goat:geometryType IS NOT NULL``
+    rule; a NULL geometry does it without one, because ``ST_Intersects`` against
+    NULL is never true.
+    """
+    con = duckdb.connect()
+    con.execute("INSTALL spatial; LOAD spatial;")
+    con.execute(
+        """CREATE TABLE items AS SELECT * FROM (VALUES
+             ('t-1', 'c-tables', 'Population by age', 'de',
+              CAST(NULL AS GEOMETRY), NULL, 50),
+             ('t-2', 'c-tables', 'Households', 'de',
+              CAST(NULL AS GEOMETRY), NULL, 20)
+           ) AS t(id, collection, title, "language_code", geometry, bbox,
+                  "table:row_count")"""
+    )
+    con.execute(
+        """CREATE TABLE collections AS SELECT * FROM (VALUES
+             ('c-tables', 'Statistics', {'spatial': {'bbox': [[-180.0, -90.0, 180.0, 90.0]]}})
+           ) AS t(id, title, extent)"""
+    )
+    items_p, colls_p = tmp_path / "i.parquet", tmp_path / "c.parquet"
+    con.execute(f"COPY items TO '{items_p.as_posix()}' (FORMAT PARQUET)")
+    con.execute(f"COPY collections TO '{colls_p.as_posix()}' (FORMAT PARQUET)")
+    con.close()
+
+    out, out_c = tmp_path / "mi.parquet", tmp_path / "mc.parquet"
+    build_mirror(items_p, colls_p, out, out_c)
+    con = duckdb.connect()
+    con.execute("LOAD spatial;")
+    # The mirror is plain parquet, so the column reads back as WKB bytes.
+    geom, hit = con.execute(
+        f"""SELECT geometry,
+                   ST_Intersects(ST_GeomFromWKB(geometry),
+                                 ST_MakeEnvelope(6.0, 50.0, 7.0, 51.0))
+              FROM read_parquet('{out_c.as_posix()}')"""
+    ).fetchone()
+    con.close()
+    assert geom is None, "a bundle of tables must not claim the world"
+    assert hit is None, "and must not match a spatial query"
