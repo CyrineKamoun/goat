@@ -86,7 +86,6 @@ async def create_organization(
     *,
     db: AsyncSession = Depends(get_db),
     user_token: dict = Depends(user_token),
-    user_id: str | None = None,
     organization: OrganizationCreate = Body(
         ..., examples=[request_examples["organization"]["create"]]
     ),
@@ -95,7 +94,7 @@ async def create_organization(
     """
     Create a new organization
     """
-    user_id = user_id or user_token["sub"]
+    user_id = user_token["sub"]  # always the caller
     db_user = await crud_user.get(db=db, id=user_id)
     if db_user and db_user.organization_id:
         raise HTTPException(
@@ -123,7 +122,6 @@ async def update_organization(
     *,
     db: AsyncSession = Depends(get_db),
     user_token: dict = Depends(user_token),
-    user_id: str | None = None,
     organization_id: str,
     organization: OrganizationUpdate = Body(
         ..., examples=[request_examples["organization"]["update"]]
@@ -132,7 +130,6 @@ async def update_organization(
     """
     Update an organization
     """
-    user_id = user_id or user_token["sub"]
     db_obj = await crud_organization.get(db=db, id=organization_id)
     if not db_obj:
         raise HTTPException(
@@ -154,13 +151,11 @@ async def delete_organization(
     *,
     db: AsyncSession = Depends(get_db),
     user_token: dict = Depends(user_token),
-    user_id: str | None = None,
     organization_id: str,
 ) -> None:
     """
     Delete an organization
     """
-    user_id = user_id or user_token["sub"]
     organization_obj = await crud_organization.get(db=db, id=organization_id)
     if not organization_obj:
         raise HTTPException(
@@ -287,7 +282,6 @@ async def invite_user_to_organization(
     db: AsyncSession = Depends(get_db),
     organization_id: str,
     user_token: dict = Depends(user_token),
-    user_id: str | None = None,
     payload: InvitationOrgCreate = Body(
         ..., examples=[request_examples["organization"]["invite"]]
     ),
@@ -296,7 +290,7 @@ async def invite_user_to_organization(
     Add a user to an organization
     """
     # - check if email is already registered and has another org
-    user_id = user_id or user_token["sub"]
+    user_id = user_token["sub"]  # always the caller
     invited_user = await crud_user.get_by_key(
         db=db, key="email", value=payload.user_email
     )
@@ -413,7 +407,6 @@ async def update_organization_invitation(
     db: AsyncSession = Depends(get_db),
     organization_id: str,
     user_token: dict = Depends(user_token),
-    user_id: str | None = None,
     invitation_id: str,
     payload: InvitationOrgUpdate = Body(
         ..., examples=[request_examples["organization"]["invite_update"]]
@@ -422,7 +415,6 @@ async def update_organization_invitation(
     """
     Update an invitation
     """
-    user_id = user_id or user_token["sub"]
 
     invitation = await crud_invitation.get(db=db, id=invitation_id)
 

@@ -1,11 +1,12 @@
-"""The account routes act on the caller's own account, whatever the query says.
+"""Account and organization routes act as the caller, whatever the query says.
 
-`/users/profile`, `/users/organization` and `DELETE /users` used to take an
-optional `user_id` that replaced the token's subject, so any signed-in user,
-in any organization, could read another user's profile, change their name,
-email or avatar (an email change hands over the account through a password
-reset) or delete their Keycloak account. The web app never sends that
-parameter; each route now acts on the token's subject only.
+`/users/profile`, `/users/organization`, `DELETE /users` and the organization
+routes (create, profile, delete, invitations) used to take an optional
+`user_id` that replaced the token's subject, so a signed-in user could act as
+someone else: read or change another user's profile (an email change hands
+over the account through a password reset), delete their Keycloak account,
+or create an organization owned by them. The web app never sends that
+parameter; each route now acts as the token's subject only.
 
 Keycloak is replaced by a recorder, so these tests never reach a real one.
 """
@@ -135,3 +136,38 @@ async def test_writes_change_only_the_callers_own_account(
     delete = await client.delete(f"{API}/users", params=params, headers=headers)
     assert delete.status_code == 204, delete.text
     assert keycloak.deleted == [str(attacker_id)]
+
+
+@pytest.mark.asyncio
+async def test_an_organization_is_never_created_for_someone_else(
+    db_session: AsyncSession,
+    auth_on: Callable[..., dict[str, str]],
+    keycloak: _RecordingKeycloak,
+    make_user: Callable[..., Awaitable[User]],
+    people: dict[str, User],
+) -> None:
+    """A user without an organization, which a new signup is, cannot be made
+    the owner of an organization someone else creates."""
+    newcomer_id = (await make_user(None)).id
+    attacker_id = people["attacker"].id
+    await db_session.commit()
+
+    created = await sweep_client().post(
+        f"{API}/organizations",
+        params={"user_id": str(newcomer_id)},
+        headers=auth_on(attacker_id),
+        json={
+            "name": "Not yours",
+            "department": "Planning",
+            "industry": "urban_planning",
+            "location": "Munich",
+            "type": "government",
+            "use_case": "site_analysis_and_design_decision_support",
+            "region": "EU",
+        },
+    )
+    # The caller already has an organization, so creating one is refused...
+    assert created.status_code == 400, created.text
+    # ...and the newcomer named in the query is left without one.
+    db_session.expire_all()
+    assert await _column(db_session, "organization_id", newcomer_id) is None
