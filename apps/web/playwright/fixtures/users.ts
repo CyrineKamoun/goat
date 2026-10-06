@@ -31,6 +31,8 @@ type Cast = {
   organization_id: string;
   outsider_organization_id: string;
   users: Record<Role, CastUser>;
+  /** The owner's datasets, uploaded and imported by the provisioning. */
+  datasets: Record<"points" | "table" | "editable", string>;
 };
 
 /** The provisioned users' password: the CI run sets a fresh one, and both

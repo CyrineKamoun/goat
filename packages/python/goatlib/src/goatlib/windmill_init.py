@@ -38,7 +38,7 @@ import sys
 import tempfile
 import time
 from typing import Any
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 _DEFAULT_TIMEOUT_SECONDS = 30
@@ -194,8 +194,10 @@ def bootstrap(
         except HTTPError:
             return None
 
-    # 1. Wait for server. urlopen treats HTTP 4xx/5xx as HTTPError; any other
-    # network error is URLError (e.g. DNS, connection refused).
+    # 1. Wait for server. urlopen treats HTTP 4xx/5xx as HTTPError and
+    # failures to connect as URLError (DNS, connection refused); a proxy in
+    # front of a server that is still starting accepts and then resets the
+    # connection, which surfaces as a bare OSError. All three mean "not yet".
     waited = 0
     ready = False
     while waited < wait_max_seconds:
@@ -203,7 +205,7 @@ def bootstrap(
             _call("/version", json_resp=False)
             ready = True
             break
-        except (HTTPError, URLError, TimeoutError):
+        except OSError:
             time.sleep(wait_interval_seconds)
             waited += wait_interval_seconds
     if not ready:

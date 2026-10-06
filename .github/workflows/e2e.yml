@@ -4,17 +4,18 @@ name: "E2E"
 # source: infra from the root compose.yaml, core, geoapi, processes and
 # catalog with uvicorn, and a production build of the web app, with auth on:
 # Keycloak (the GOAT image, importing the compose bundle's realm) and Mailpit
-# to catch email. `scripts/e2e/provision.py` creates the test users per role
-# and their organizations through the real API; the Playwright setup logs
-# each one in once and the specs pick a role.
+# to catch email. Windmill runs the jobs, as in production: the released
+# server and worker images, with this checkout's goatlib mounted into the
+# tools and workflows workers, as the root compose.yaml's dev profile does.
+# `scripts/e2e/provision.py` creates the test users per role, their
+# organizations and the owner's datasets through the real API (an upload and
+# its import job); the Playwright setup logs each one in once and the specs
+# pick a role.
 #
 # Runs on every PR that changes the app, a service or the suite itself, and on
 # every push to main (which also catches two PRs that only break together).
 # Not a required check yet: until the suite has proven stable, a red run
 # informs the PR without blocking it.
-#
-# Windmill is not started: uploads, tool and workflow runs never complete
-# here. The specs that need datasets get them from `core.scripts.seed_e2e`.
 
 on:
   push:
@@ -45,10 +46,19 @@ jobs:
   e2e:
     name: playwright
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v7
+
+      # The Windmill images are large: pulled in the background while the
+      # rest installs.
+      - name: 🌬️ Pull the Windmill images
+        run: |
+          mkdir -p logs
+          for image in windmill-server windmill-worker-default windmill-worker-tools windmill-worker-print; do
+            nohup docker pull -q "ghcr.io/plan4better/goat/$image:latest" > "logs/pull-$image.log" 2>&1 &
+          done
 
       # One set of settings for the compose infra (which reads .env) and for
       # every service, all of which read their settings from the environment:
@@ -59,7 +69,12 @@ jobs:
       - name: ⚙️ Environment
         run: |
           cp .env.example .env
-          data_dir="$GITHUB_WORKSPACE/data"
+          # The services on the runner and the workers in their containers
+          # share one data directory at the same path, as DuckLake records
+          # absolute file paths.
+          data_dir=/app/data
+          sudo mkdir -p "$data_dir"
+          sudo chown "$(id -u):$(id -g)" "$data_dir"
           # Garage keys have their own shape: GK + 24 hex, and 64 hex.
           key_id="GK$(openssl rand -hex 12)"
           key_secret="$(openssl rand -hex 32)"
@@ -85,7 +100,12 @@ jobs:
           DUCKLAKE_DATA_DIR=$data_dir/ducklake
           TILES_DATA_DIR=$data_dir/tiles
           GOAT_PROCESSES_URL=http://localhost:8300
-          WINDMILL_URL=http://localhost:1
+          WINDMILL_URL=http://localhost:8110
+          WINDMILL_WORKSPACE=goat
+          WINDMILL_TOKEN_FILE=$data_dir/windmill/.token
+          WINDMILL_ADMIN_EMAIL=admin@windmill.dev
+          WINDMILL_ADMIN_PASSWORD=$(openssl rand -hex 16)
+          PRINT_BASE_URL=http://localhost:3000
           NEXT_PUBLIC_CATALOG_URL=http://localhost:8400/stac
           NEXT_PUBLIC_STATUS_FEED_URL=
           NEXT_PUBLIC_WEBSITE_URL=
@@ -173,6 +193,64 @@ jobs:
           (cd apps/core && uv run --no-sync python -m core.scripts.initial_data)
           uv run --no-sync python -m goatlib.storage.ducklake_init
 
+      # Jobs run in the released worker images, on the host network so
+      # that localhost reaches Postgres, Garage, Keycloak and the web app as
+      # it does for the services, and as the runner's user so that the
+      # services can write to what the jobs create in the data directory.
+      # The server keeps its own network: on the host's it would take port
+      # 8000 from core. Windmill passes a job only the variables in
+      # WHITELIST_ENVS, the compose bundle's list.
+      - name: 🌬️ Windmill
+        run: |
+          image=ghcr.io/plan4better/goat
+          windmill_db="postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5432/windmill?sslmode=disable"
+          whitelist=$(sed -n '/WHITELIST_ENVS: >-/{n;s/^ *//;p}' deploy/compose/compose.yaml)
+          [ -n "$whitelist" ] || { echo "::error::WHITELIST_ENVS not found in the compose bundle"; exit 1; }
+          # The settings every service reads, with the last value of a name
+          # winning, as in GITHUB_ENV.
+          grep -E '^[A-Z_][A-Z0-9_]*=' .env | sed 's/"//g' \
+            | awk -F= '{last[$1]=$0} END {for (k in last) print last[k]}' > "$RUNNER_TEMP/worker.env"
+          cat >> "$RUNNER_TEMP/worker.env" <<EOF
+          DATABASE_URL=$windmill_db
+          MODE=worker
+          DISABLE_NSJAIL=true
+          BASE_INTERNAL_URL=http://localhost:8110
+          POSTGRES_DATABASE_URI=postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5432/$POSTGRES_DB
+          WHITELIST_ENVS=$whitelist
+          EOF
+          for image_name in windmill-server windmill-worker-default windmill-worker-tools windmill-worker-print; do
+            docker pull -q "$image/$image_name:latest" > /dev/null
+          done
+          docker run -d --name windmill-server -p 8110:8000 --add-host host.docker.internal:host-gateway \
+            -e DATABASE_URL="${windmill_db/localhost/host.docker.internal}" -e MODE=server \
+            -e BASE_URL=http://localhost:8110 "$image/windmill-server:latest"
+          docker run -d --name windmill-worker-default --network host \
+            -e DATABASE_URL="$windmill_db" -e MODE=worker -e WORKER_GROUP=default \
+            -e DISABLE_SERVER=true -e DISABLE_NSJAIL=true -e BASE_INTERNAL_URL=http://localhost:8110 \
+            "$image/windmill-worker-default:latest"
+          goatlib="$PWD/packages/python/goatlib/src/goatlib:/venv/lib/python3.11/site-packages/goatlib:ro"
+          for group in tools workflows; do
+            docker run -d --name "windmill-worker-$group" --network host --user "$(id -u):$(id -g)" \
+              --env-file "$RUNNER_TEMP/worker.env" -e WORKER_GROUP="$group" -e WORKER_TAGS="$group" \
+              -e JOB_DEFAULT_TIMEOUT=1800 -v "$goatlib" -v /app/data:/app/data \
+              "$image/windmill-worker-tools:latest"
+          done
+          docker run -d --name windmill-worker-print --network host --user "$(id -u):$(id -g)" \
+            --env-file "$RUNNER_TEMP/worker.env" -e WORKER_GROUP=print -e WORKER_TAGS=print \
+            -e JOB_DEFAULT_TIMEOUT=300 -v /app/data:/app/data "$image/windmill-worker-print:latest"
+          mkdir -p "$(dirname "$WINDMILL_TOKEN_FILE")"
+          uv run --no-sync python -m goatlib.windmill_init > /dev/null
+          # A fresh Windmill answers before its last migration, which waits
+          # for the workers to register; scripts created before then fail.
+          # The sync is idempotent, so it is retried until Windmill takes it.
+          for attempt in $(seq 1 30); do
+            if uv run --no-sync sh deploy/compose/init/windmill/windmill-sync.sh > logs/windmill-sync.log 2>&1; then
+              echo "scripts synced on attempt $attempt"; break
+            fi
+            [ "$attempt" = 30 ] && { tail -20 logs/windmill-sync.log; echo "::error::Windmill sync never succeeded"; exit 1; }
+            sleep 10
+          done
+
       # core reads Keycloak's signing key at startup, so the realm must be
       # up before the services start.
       - name: 🔑 Wait for Keycloak
@@ -213,10 +291,7 @@ jobs:
           done
 
       - name: 👥 Test users, organizations, datasets
-        run: |
-          uv run --no-sync python scripts/e2e/provision.py
-          owner=$(jq -r .users.owner.id apps/web/playwright/.auth/users.json)
-          (cd apps/core && uv run --no-sync python -m core.scripts.seed_e2e --user-id "$owner")
+        run: uv run --no-sync python scripts/e2e/provision.py --datasets
 
       - name: 🎭 Playwright version
         id: playwright
@@ -239,7 +314,11 @@ jobs:
 
       - name: 🗒️ Container logs
         if: failure()
-        run: for c in keycloak mailpit garage; do docker logs "$c" > "logs/$c.log" 2>&1 || true; done
+        run: |
+          for c in keycloak mailpit garage windmill-server windmill-worker-default \
+            windmill-worker-tools windmill-worker-workflows windmill-worker-print; do
+            docker logs "$c" > "logs/$c.log" 2>&1 || true
+          done
 
       - name: 📤 Report and service logs
         if: failure()
