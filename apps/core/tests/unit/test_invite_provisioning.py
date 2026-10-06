@@ -70,7 +70,6 @@ async def _invite(
             db=MagicMock(),
             organization_id=ORG_ID,
             user_token={"sub": ADMIN_ID},
-            user_id=None,
             payload=InvitationOrgCreate(user_email=email, role="organization-editor"),
         )
     return result, send_email, create_invitation
