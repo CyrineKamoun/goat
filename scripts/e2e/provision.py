@@ -28,7 +28,6 @@ import json
 import os
 import sys
 import time
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -237,13 +236,11 @@ def ensure_dataset(client: httpx.Client, token: str, key: str) -> str:
     if put.status_code >= 300:
         sys.exit(f"uploading {path.name} failed: {put.status_code} {put.text}")
 
-    layer_id = str(uuid.uuid4())
     submitted = client.post(
         f"{PROCESSES_URL}/processes/layer_import/execution",
         headers={"Authorization": f"Bearer {token}"},
         json={
             "inputs": {
-                "layer_id": layer_id,
                 "folder_id": home_folder(client, token),
                 "name": name,
                 "s3_key": upload["key"],
@@ -263,6 +260,15 @@ def ensure_dataset(client: httpx.Client, token: str, key: str) -> str:
             headers={"Authorization": f"Bearer {token}"},
         ).json()
         if job.get("status") == "successful":
+            # The import names the layers it creates.
+            result = client.get(
+                f"{PROCESSES_URL}/jobs/{job_id}/results",
+                headers={"Authorization": f"Bearer {token}"},
+            ).json()
+            imported = result.get("imported") or []
+            if len(imported) != 1:
+                sys.exit(f"importing {name!r} gave {json.dumps(result)}")
+            layer_id = str(imported[0]["layer_id"])
             print(f"imported {name!r} as {layer_id}")
             return layer_id
         if job.get("status") in ("failed", "dismissed"):
