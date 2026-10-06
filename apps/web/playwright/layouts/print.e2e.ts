@@ -41,6 +41,8 @@ test("a new layout prints to a PDF", async ({ page }) => {
   const templates = page.getByRole("dialog").filter({ hasText: "New layout from a template" });
   await expect(templates).toBeVisible({ timeout: 30000 });
   await templates.getByRole("button", { name: "Use template" }).click();
+  const confirm = page.getByRole("dialog").filter({ hasText: "Add to project" });
+  await confirm.getByRole("button", { name: "Add to project" }).click();
   await expect(templates).toBeHidden();
 
   const print = page.getByRole("button", { name: "Print Layout" });

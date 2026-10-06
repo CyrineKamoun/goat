@@ -38,7 +38,7 @@ test("buffering the points adds a Buffer layer to the project", async ({ page })
   await page.getByRole("button", { name: "Open Toolbox" }).click({ timeout: 30000 });
   await page.getByText("Buffer", { exact: true }).first().click();
 
-  await page.getByRole("combobox", { name: "Select Layer" }).click();
+  await page.getByRole("combobox", { name: "Input layer" }).click();
   await page.getByRole("option", { name: "E2E Points" }).click();
   // The distances commit when the field loses focus.
   await page.getByPlaceholder("e.g. 100, 200, 300").fill("100");
