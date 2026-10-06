@@ -275,7 +275,6 @@ export default function OrganizationOnBoarding() {
                     sx={{ mt: theme.spacing(4) }}
                     fullWidth
                     ref={submitButtonRef}
-                    aria-label="finish-org-creation"
                     name="organization-submit"
                     type="submit"
                     disabled={!allowSubmit}>
