@@ -51,17 +51,14 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v7
 
-      # The Windmill images take about 10 GB; the runner's preinstalled
-      # Android, .NET and Haskell toolchains, which nothing here uses, make
-      # room for them. Pulled in the background while the rest installs.
-      - name: 🧹 Disk space, Windmill images
+      # The Windmill images are large: pulled in the background while the
+      # rest installs.
+      - name: 🌬️ Pull the Windmill images
         run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup
           mkdir -p logs
           for image in windmill-server windmill-worker-default windmill-worker-tools windmill-worker-print; do
             nohup docker pull -q "ghcr.io/plan4better/goat/$image:latest" > "logs/pull-$image.log" 2>&1 &
           done
-          df -h /
 
       # One set of settings for the compose infra (which reads .env) and for
       # every service, all of which read their settings from the environment:
@@ -244,7 +241,6 @@ jobs:
           mkdir -p "$(dirname "$WINDMILL_TOKEN_FILE")"
           uv run --no-sync python -m goatlib.windmill_init > /dev/null
           uv run --no-sync sh deploy/compose/init/windmill/windmill-sync.sh
-          df -h /
 
       # core reads Keycloak's signing key at startup, so the realm must be
       # up before the services start.
