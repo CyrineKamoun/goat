@@ -25,4 +25,4 @@ export const rowCount = async (api: APIRequestContext, layerId: string): Promise
 };
 
 /** The id of one of the owner's provisioned datasets (auth on only). */
-export const datasetOf = (key: "points" | "table"): string => castOf().datasets[key];
+export const datasetOf = (key: "points" | "table" | "editable"): string => castOf().datasets[key];

@@ -77,11 +77,17 @@ ORGANIZATION = {
 
 SETTINGS = {"preferred_language": "en", "client_theme": "light", "unit": "metric"}
 
-# The owner's datasets: a point layer and a table, by key in the users file.
+# The owner's datasets, by key in the users file.
 DATA_DIR = Path("apps/web/playwright/fixtures/data")
 DATASETS = {
     "points": ("E2E Points", DATA_DIR / "points.geojson", "application/geo+json"),
     "table": ("E2E Table", DATA_DIR / "table.csv", "text/csv"),
+    # Its own copy for the editing specs, so the others keep counting 26.
+    "editable": (
+        "E2E Editable Points",
+        DATA_DIR / "points.geojson",
+        "application/geo+json",
+    ),
 }
 IMPORT_TIMEOUT_SECONDS = 300
 
