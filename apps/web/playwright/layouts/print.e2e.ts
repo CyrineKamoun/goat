@@ -35,9 +35,13 @@ test.afterAll(async () => {
 });
 
 test("a new layout prints to a PDF", async ({ page }) => {
+  // A project without layouts offers one from a template on its own, with
+  // Blank chosen.
   await page.goto(`/map/${projectId}?mode=reports`);
-  await page.getByRole("button", { name: "New", exact: true }).click({ timeout: 30000 });
-  await page.getByRole("menuitem", { name: "From scratch" }).click();
+  const templates = page.getByRole("dialog").filter({ hasText: "New layout from a template" });
+  await expect(templates).toBeVisible({ timeout: 30000 });
+  await templates.getByRole("button", { name: "Use template" }).click();
+  await expect(templates).toBeHidden();
 
   const print = page.getByRole("button", { name: "Print Layout" });
   await expect(print).toBeEnabled();

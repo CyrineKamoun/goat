@@ -206,7 +206,13 @@ def ensure_member(
 def home_folder(client: httpx.Client, token: str) -> str:
     folders = core(client, token, "GET", "/folder")
     folders.raise_for_status()
-    return str(next(f["id"] for f in folders.json() if f["name"] == "home"))
+    # The list holds folders shared with the caller too, other users' homes
+    # among them.
+    return str(
+        next(
+            f["id"] for f in folders.json() if f["name"] == "home" and f.get("is_owned")
+        )
+    )
 
 
 def ensure_dataset(client: httpx.Client, token: str, key: str) -> str:
