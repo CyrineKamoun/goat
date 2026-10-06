@@ -8,12 +8,17 @@ layer and a table. Records only, with no DuckLake data behind them: the specs
 list, pick, share and add them, which reads metadata, and never assert on
 features or tiles.
 
-Runs only with AUTH=False, where the default user exists, and is idempotent:
-a dataset already present by name is left as it is.
+With AUTH=False the datasets go to the built-in default user. With auth on
+they go to the user named by `--user-id` (the e2e suite's owner, created by
+`scripts/e2e/provision.py`), which must then be given: there is no default
+account to fall back to. Idempotent: a dataset already present by name is
+left as it is.
 
-    uv run python -m core.scripts.seed_e2e   # from apps/core, after initial_data
+    uv run python -m core.scripts.seed_e2e                   # AUTH=False
+    uv run python -m core.scripts.seed_e2e --user-id <uuid>  # auth on
 """
 
+import argparse
 import asyncio
 import logging
 from uuid import UUID, uuid4
@@ -47,8 +52,7 @@ DATASETS: tuple[dict[str, object], ...] = (
 )
 
 
-async def seed_e2e(session: AsyncSession) -> None:
-    user_id = UUID(str(settings.DEFAULT_USER_ID))
+async def seed_e2e(session: AsyncSession, user_id: UUID) -> None:
     home = (
         await session.execute(
             select(Folder).where(Folder.user_id == user_id, Folder.name == "home")
@@ -56,7 +60,8 @@ async def seed_e2e(session: AsyncSession) -> None:
     ).scalar_one_or_none()
     if home is None:
         raise RuntimeError(
-            "The default user has no home folder: run initial_data first"
+            "The user has no home folder: run initial_data (AUTH=False) or "
+            "scripts/e2e/provision.py (auth on) first"
         )
     for dataset in DATASETS:
         exists = (
@@ -84,12 +89,16 @@ async def seed_e2e(session: AsyncSession) -> None:
 
 
 async def main() -> None:
-    if settings.AUTH is not False:
-        raise SystemExit("seed_e2e runs only with AUTH=False (the default user)")
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--user-id", type=UUID, help="owner of the datasets (auth on)")
+    args = parser.parse_args()
+    if args.user_id is None and settings.AUTH is not False:
+        raise SystemExit("seed_e2e with auth on needs --user-id")
+    user_id = args.user_id or UUID(str(settings.DEFAULT_USER_ID))
     session_manager.init(settings.ASYNC_SQLALCHEMY_DATABASE_URI)
     try:
         async with session_manager.session() as session:
-            await seed_e2e(session)
+            await seed_e2e(session, user_id)
     finally:
         await session_manager.close()
 

@@ -115,3 +115,6 @@ ds-bundle/
 .design-sync
 # Helm chart: written by `helm dependency update`
 deploy/helm/goat/Chart.lock
+
+# Playwright: provisioned e2e users and their saved sessions
+apps/web/playwright/.auth/

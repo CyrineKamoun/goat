@@ -2,8 +2,11 @@ name: "E2E"
 
 # The Playwright suite (apps/web/playwright) against a stack started from
 # source: infra from the root compose.yaml, core, geoapi, processes and
-# catalog with uvicorn, and a production build of the web app. AUTH=False, so
-# every request runs as the built-in default user and nothing logs in.
+# catalog with uvicorn, and a production build of the web app, with auth on:
+# Keycloak (the GOAT image, importing the compose bundle's realm) and Mailpit
+# to catch email. `scripts/e2e/provision.py` creates the test users per role
+# and their organizations through the real API; the Playwright setup logs
+# each one in once and the specs pick a role.
 #
 # Runs on every PR that changes the app, a service or the suite itself, and on
 # every push to main (which also catches two PRs that only break together).
@@ -87,6 +90,23 @@ jobs:
           NEXT_PUBLIC_STATUS_FEED_URL=
           NEXT_PUBLIC_WEBSITE_URL=
           NEXTAUTH_SECRET=e2e-only-secret
+          NEXTAUTH_URL=http://localhost:3000
+          AUTH=True
+          NEXT_PUBLIC_AUTH=True
+          KEYCLOAK_SERVER_URL=http://localhost:8080
+          REALM_NAME=goat
+          KEYCLOAK_CLIENT_ID=goat
+          KEYCLOAK_CLIENT_SECRET=$(openssl rand -hex 16)
+          NEXT_PUBLIC_KEYCLOAK_ISSUER=http://localhost:8080/realms/goat
+          NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=goat
+          KEYCLOAK_PROVISION_INVITED_USERS=True
+          E2E_KEYCLOAK_ADMIN_PASSWORD=$(openssl rand -hex 16)
+          E2E_PASSWORD=E2e-$(openssl rand -hex 12)!
+          E2E_AUTH=1
+          SMTP_HOST=localhost
+          SMTP_PORT=1025
+          SMTP_SECURITY=none
+          SMTP_FROM=goat@e2e.test
           EOF
           mkdir -p "$data_dir"
           # Later lines win, as in a shell `. .env`; GITHUB_ENV takes the
@@ -95,13 +115,34 @@ jobs:
 
       # S3 is Garage, as in the compose bundle (deploy/compose): MinIO no
       # longer publishes images, so the root compose.yaml's cannot be pulled.
-      - name: 🐘 Infra (Postgres, Redis, Garage)
+      # Keycloak is the GOAT image with the compose bundle's realm, as a
+      # self-hosted install runs it; it shares the compose Postgres, whose
+      # init creates the keycloak database. Mailpit catches the mail that
+      # core and Keycloak send (invitations, password setup).
+      - name: 🐘 Infra (Postgres, Redis, Garage, Keycloak, Mailpit)
         run: |
           docker compose up -d --wait db redis
           docker run -d --name garage -p 3900:3900 -p 3903:3903 \
             -e GARAGE_RPC_SECRET -e GARAGE_ADMIN_TOKEN \
             -v "$PWD/deploy/compose/init/garage/garage.toml:/etc/garage.toml:ro" \
             dxflrs/garage:v2.4.1
+          docker run -d --name mailpit -p 1025:1025 -p 8025:8025 axllent/mailpit:v1.27
+          docker run -d --name keycloak --network host \
+            -e KEYCLOAK_DATABASE_VENDOR=postgresql -e KEYCLOAK_DATABASE_HOST=localhost \
+            -e KEYCLOAK_DATABASE_PORT=5432 -e KEYCLOAK_DATABASE_NAME=keycloak \
+            -e KEYCLOAK_DATABASE_USER="$POSTGRES_USER" -e KEYCLOAK_DATABASE_PASSWORD="$POSTGRES_PASSWORD" \
+            -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD="$E2E_KEYCLOAK_ADMIN_PASSWORD" \
+            -e KEYCLOAK_EXTRA_ARGS=--import-realm -e KEYCLOAK_PRODUCTION=false \
+            -e KEYCLOAK_ENABLE_HEALTH_ENDPOINTS=true -e KC_HOSTNAME_STRICT=false \
+            -e GOAT_PUBLIC_URL=http://localhost:3000 -e GOAT_REALM=goat \
+            -e GOAT_CLIENT_ID=goat -e GOAT_CLIENT_SECRET="$KEYCLOAK_CLIENT_SECRET" \
+            -e GOAT_ADMIN_EMAIL=e2e-realm-admin@goat.test \
+            -e GOAT_ADMIN_PASSWORD="$E2E_KEYCLOAK_ADMIN_PASSWORD" -e GOAT_SSL_REQUIRED=none \
+            -e GOAT_SMTP_HOST=localhost -e GOAT_SMTP_PORT=1025 -e GOAT_SMTP_FROM=goat@e2e.test \
+            -e GOAT_SMTP_FROM_NAME=GOAT -e GOAT_SMTP_AUTH=false -e GOAT_SMTP_USER= \
+            -e GOAT_SMTP_PASSWORD= -e GOAT_SMTP_STARTTLS=false -e GOAT_SMTP_SSL=false \
+            -v "$PWD/deploy/compose/init/keycloak/realm-goat.json:/opt/bitnami/keycloak/data/import/realm-goat.json:ro" \
+            ghcr.io/plan4better/goat/keycloak:latest
 
       - name: 🐍 Install uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
@@ -130,8 +171,18 @@ jobs:
         run: |
           (cd apps/core && uv run --no-sync alembic upgrade head)
           (cd apps/core && uv run --no-sync python -m core.scripts.initial_data)
-          (cd apps/core && uv run --no-sync python -m core.scripts.seed_e2e)
           uv run --no-sync python -m goatlib.storage.ducklake_init
+
+      # core reads Keycloak's signing key at startup, so the realm must be
+      # up before the services start.
+      - name: 🔑 Wait for Keycloak
+        run: |
+          for i in $(seq 1 90); do
+            curl -sf http://localhost:8080/realms/goat >/dev/null && { echo "realm ready after $((i * 2))s"; exit 0; }
+            sleep 2
+          done
+          docker logs keycloak | tail -40
+          echo "::error::Keycloak realm never came up"; exit 1
 
       - name: 🚀 Services
         run: |
@@ -161,6 +212,12 @@ jobs:
             [ "$code" != "000" ] || { echo "::error::$url never answered"; exit 1; }
           done
 
+      - name: 👥 Test users, organizations, datasets
+        run: |
+          uv run --no-sync python scripts/e2e/provision.py
+          owner=$(jq -r .users.owner.id apps/web/playwright/.auth/users.json)
+          (cd apps/core && uv run --no-sync python -m core.scripts.seed_e2e --user-id "$owner")
+
       - name: 🎭 Playwright version
         id: playwright
         run: echo "version=$(pnpm --filter web exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
@@ -179,6 +236,10 @@ jobs:
 
       - name: 🧪 Playwright
         run: pnpm exec playwright test --config=playwright.config.ts
+
+      - name: 🗒️ Container logs
+        if: failure()
+        run: for c in keycloak mailpit garage; do docker logs "$c" > "logs/$c.log" 2>&1 || true; done
 
       - name: 📤 Report and service logs
         if: failure()

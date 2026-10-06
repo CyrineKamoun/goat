@@ -109,6 +109,7 @@ export default function UserInfoMenu() {
         arrow={false}
         onClose={() => setOpen(false)}>
         <IconButton
+          aria-label={t("account_menu")}
           onClick={() => {
             setOpen(!open);
           }}

@@ -1,13 +1,13 @@
 import type { APIRequestContext } from "@playwright/test";
-import { expect, request, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { locateContentCard } from "../fixtures/content";
+import { API_URL, apiAs } from "../fixtures/users";
 
 // Same base the web app builds its API clients from (see lib/api/templates.ts).
 // The source project and its workflow are fixtures, not part of what this spec
 // checks, so they are created straight against core rather than clicked
 // together through the map UI.
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
 const INITIAL_VIEW_STATE = {
   latitude: 48.1502132,
@@ -51,7 +51,7 @@ test.describe("Templates", () => {
   let usedProjectId: string | undefined;
 
   test.beforeAll(async () => {
-    apiContext = await request.newContext();
+    apiContext = await apiAs("owner");
 
     const spacesResponse = await apiContext.get(`${API_URL}/api/v2/space`);
     expect(spacesResponse.ok()).toBeTruthy();

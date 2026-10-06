@@ -228,7 +228,6 @@ const OrganizationMembers = () => {
                           sx={{ whiteSpace: "nowrap" }}
                           onClick={() => setOpenInviteModal(true)}
                           startIcon={<Icon fontSize="small" iconName={ICON_NAME.PLUS} />}
-                          aria-label="send-invite"
                           name="send-invite">
                           {t("new_org_member")}
                         </LoadingButton>

@@ -99,11 +99,7 @@ export const ensureSharedTeam = async (page: Page): Promise<void> => {
   const row = page.getByText(SHARED_TEAM_NAME, { exact: true });
   if ((await row.count()) > 0) return;
 
-  // The button's accessible name is "new-team-member", not its visible
-  // "New Team" text — settings/teams/page.tsx sets an `aria-label` that
-  // overrides the text content instead of matching it (app bug; not fixed
-  // here). Selecting by the plain `name` DOM attribute routes around it.
-  await page.locator('button[name="new-team-member"]').click();
+  await page.getByRole("button", { name: "New Team" }).click();
   // The dialog's title is plain text, not a heading.
   const dialog = page.getByRole("dialog").filter({ hasText: "Create team" });
   await expect(dialog).toBeVisible();
