@@ -57,6 +57,7 @@
     "NEXT_PUBLIC_AUTH",
     "AUTH",
     "E2E_AUTH",
+    "E2E_PASSWORD",
     "API_URL",
     "NEXT_RUNTIME",
     "NEXTAUTH_SECRET",

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { API_URL, apiAs, castOf, logIn, needsAuth, userOf } from "../fixtures/users";
+import { API_URL, PASSWORD, apiAs, logIn, needsAuth, userOf } from "../fixtures/users";
 
 /**
  * A new user's first login: with no organization they are sent to create
@@ -20,7 +20,7 @@ const choose = async (page: import("@playwright/test").Page, label: RegExp, opti
 };
 
 test("a user without an organization creates one on first login", async ({ page }) => {
-  await logIn(page, userOf("newcomer").email, castOf().password);
+  await logIn(page, userOf("newcomer").email, PASSWORD);
   await page.waitForURL(/\/onboarding\/organization\/create/, { timeout: 30000 });
 
   await page.getByLabel("Your organization's name").fill("Newcomer Planning");

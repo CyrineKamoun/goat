@@ -28,11 +28,15 @@ export const storageStatePath = (role: Role): string => path.join(AUTH_DIR, `${r
 
 type CastUser = { id: string; email: string; firstname: string; lastname: string };
 type Cast = {
-  password: string;
   organization_id: string;
   outsider_organization_id: string;
   users: Record<Role, CastUser>;
 };
+
+/** The provisioned users' password: the CI run sets a fresh one, and both
+ * `provision.py` and the specs read it from the environment, so it is never
+ * written to disk. */
+export const PASSWORD = process.env.E2E_PASSWORD ?? "E2e-Passw0rd!";
 
 let cast: Cast | undefined;
 
@@ -56,7 +60,7 @@ const accessToken = async (role: Role): Promise<string> => {
         client_id: process.env.KEYCLOAK_CLIENT_ID ?? "goat",
         client_secret: process.env.KEYCLOAK_CLIENT_SECRET ?? "",
         username: userOf(role).email,
-        password: castOf().password,
+        password: PASSWORD,
         scope: "openid",
       },
     });

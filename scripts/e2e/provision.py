@@ -219,7 +219,6 @@ def main() -> None:
     OUT.write_text(
         json.dumps(
             {
-                "password": PASSWORD,
                 "organization_id": organization_id,
                 "outsider_organization_id": outsider_organization_id,
                 "users": {

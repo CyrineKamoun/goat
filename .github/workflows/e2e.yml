@@ -101,6 +101,7 @@ jobs:
           NEXT_PUBLIC_KEYCLOAK_CLIENT_ID=goat
           KEYCLOAK_PROVISION_INVITED_USERS=True
           E2E_KEYCLOAK_ADMIN_PASSWORD=$(openssl rand -hex 16)
+          E2E_PASSWORD=E2e-$(openssl rand -hex 12)!
           E2E_AUTH=1
           SMTP_HOST=localhost
           SMTP_PORT=1025

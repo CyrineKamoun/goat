@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { castOf, logIn, needsAuth, userOf } from "../fixtures/users";
+import { PASSWORD, logIn, needsAuth, userOf } from "../fixtures/users";
 
 /**
  * Signing in and out through Keycloak's login page.
@@ -26,7 +26,7 @@ test("an anonymous visitor is sent to log in and brought back to the page they w
   await expect(page.locator("input[name=username]")).toBeVisible({ timeout: 30000 });
 
   await page.locator("input[name=username]").fill(userOf("editor").email);
-  await page.locator("input[name=password]").fill(castOf().password);
+  await page.locator("input[name=password]").fill(PASSWORD);
   await page.locator("button[name=login]").click();
 
   await page.waitForURL(/localhost:3000\/content/, { timeout: 30000 });
@@ -34,7 +34,7 @@ test("an anonymous visitor is sent to log in and brought back to the page they w
 });
 
 test("logging out ends the session", async ({ page }) => {
-  await logIn(page, userOf("editor").email, castOf().password);
+  await logIn(page, userOf("editor").email, PASSWORD);
   await expect(page.getByRole("heading", { level: 1 })).toContainText(userOf("editor").firstname);
 
   await page.getByRole("button", { name: "Account menu" }).click();

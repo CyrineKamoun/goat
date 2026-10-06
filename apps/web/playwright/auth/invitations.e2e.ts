@@ -1,6 +1,15 @@
 import { expect, test } from "@playwright/test";
 
-import { API_URL, apiAs, castOf, logIn, needsAuth, storageStatePath, userOf } from "../fixtures/users";
+import {
+  API_URL,
+  PASSWORD,
+  apiAs,
+  castOf,
+  logIn,
+  needsAuth,
+  storageStatePath,
+  userOf,
+} from "../fixtures/users";
 
 /**
  * Inviting someone into the organization, end to end: the owner invites from
@@ -35,7 +44,7 @@ test.describe("the invitee", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test("is taken to the invitation on first login, which nobody else can use", async ({ page, browser }) => {
-    await logIn(page, userOf("invitee").email, castOf().password);
+    await logIn(page, userOf("invitee").email, PASSWORD);
     await page.waitForURL(/\/onboarding\/organization\/invite\//, { timeout: 30000 });
     await expect(
       page.getByRole("heading", {
