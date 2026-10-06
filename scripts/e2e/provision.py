@@ -61,6 +61,9 @@ ORGANIZATION = {
     "type": "government",
     "use_case": "site_analysis_and_design_decision_support",
     "region": "EU",
+    # Optional in the API schema but NOT NULL in the table; without it core
+    # answers 409. The onboarding form always sends one.
+    "phone_number": "+49 89 0000000",
 }
 
 
