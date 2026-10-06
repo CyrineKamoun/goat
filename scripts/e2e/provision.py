@@ -67,6 +67,9 @@ ORGANIZATION = {
 }
 
 
+SETTINGS = {"preferred_language": "en", "client_theme": "light", "unit": "metric"}
+
+
 def email(role: str) -> str:
     return f"e2e-{role}@goat.test"
 
@@ -197,12 +200,19 @@ def main() -> None:
             client, user_token(client, "outsider"), "E2E Other Organization"
         )
         # Listing folders provisions each member's personal space and home
-        # folder, which the seed and the specs expect to exist.
+        # folder, which the seed and the specs expect to exist. New users
+        # default to German; the specs read the English labels.
         for role in ("owner", *MEMBERS, "outsider"):
-            listed = core(client, user_token(client, role), "GET", "/folder")
+            token = user_token(client, role)
+            listed = core(client, token, "GET", "/folder")
             if listed.status_code >= 300:
                 sys.exit(
                     f"provisioning {role}'s home folder failed: {listed.status_code} {listed.text}"
+                )
+            settings = core(client, token, "PUT", "/system/settings", json=SETTINGS)
+            if settings.status_code >= 300:
+                sys.exit(
+                    f"setting {role}'s language failed: {settings.status_code} {settings.text}"
                 )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)

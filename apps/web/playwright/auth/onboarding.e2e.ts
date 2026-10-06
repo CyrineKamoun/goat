@@ -34,7 +34,8 @@ test("a user without an organization creates one on first login", async ({ page 
 
   await page.getByLabel(/Phone number/).fill("+49 89 1234567");
   await page.getByRole("combobox", { name: /Country/ }).fill("Germany");
-  await page.getByRole("option", { name: "Germany", exact: true }).click();
+  // The option leads with the country's flag.
+  await page.getByRole("option", { name: /Germany/ }).click();
   await page.getByRole("button", { name: "Let's get started" }).click();
 
   await page.waitForURL(/\/home/, { timeout: 30000 });
