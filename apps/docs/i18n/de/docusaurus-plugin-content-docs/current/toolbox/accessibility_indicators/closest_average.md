@@ -101,12 +101,6 @@ Optional können Sie <code>Erweiterte Optionen</code> aktivieren, um weitere Ein
   <div class="content">Wählen Sie ein <code>Referenzgebiet</code>: einen Polygon-Layer, der Ihr Untersuchungsgebiet darstellt. Die Heatmap umfasst dann alle H3-Zellen innerhalb dieses Polygons. Für `Zu Fuß`, `Fahrrad`, `Pedelec` und `Auto` ersetzt es außerdem das <code>Limit</code>: Ziele außerhalb des Gebiets zählen ebenfalls, wenn sie innerhalb der Strecke liegen, die in der maximalen Reisezeit des Verkehrsmittels (45 Minuten, 90 für `Auto`) erreichbar ist; das Straßennetz wird für das Gebiet und diese Ziele geladen, und jede Zelle erhält ihre tatsächlichen durchschnittlichen Reisekosten, unabhängig davon, wie weit die Ziele entfernt sind. Eine Zelle ohne eigene Straße wird über die nächstgelegene Straße erreicht, einschließlich des Wegs vom Zellmittelpunkt dorthin; nur Zellen, die mehr als 500 m von jeder Straße entfernt sind, behalten den Wert <code>NULL</code>. Für `Öffentlicher Verkehr` gilt das <code>Limit</code> weiterhin.</div>
 </div>
 
-:::info
-
-Ein Referenzgebiet darf in der Auflösung des gewählten Verkehrsmittels höchstens 200.000 Sechseckzellen für `Zu Fuß`, `Fahrrad` und `Pedelec` und 40.000 für `Auto` umfassen (siehe [Visualisierung](#visualisierung)).
-
-:::
-
 <div class="step">
   <div class="step-number">6</div>
   <div class="content">Konfigurieren Sie verschiedene Routing-Optionen für das gewählte Verkehrsmittel, etwa Reisegeschwindigkeit, maximale Anzahl an Umstiegen, Zu- und Abgangslimits und mehr. Weitere Informationen zu verkehrsmittelspezifischen Optionen finden Sie im Abschnitt [Routing](../../category/routing).</div>

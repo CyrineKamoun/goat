@@ -77,14 +77,15 @@ _CONNECTIVITY_MAX_CELLS = 50_000
 # Cap on reference-area cells for a street closest-average run without a travel
 # budget, one value for active modes and one for car. One traversal from the
 # opportunities covers all the cells, so memory follows the network loaded
-# over the area: calibrated on a 4 GB worker (Basel + buffers,
-# Baden-Württemberg) to stay under ~3 GB even at k = 10. The active value is
-# bound by bicycle, whose coarser cells cover ~7x the ground of walking's.
+# over the area: measured on a 4 GB worker (Basel + buffers,
+# Baden-Württemberg). The active value is bound by bicycle, whose coarser cells
+# cover ~7x the ground of walking's. Car matches connectivity's cap; at k = 10
+# it nears ~3.4 GB.
 _CLOSEST_AVERAGE_MAX_CELLS: dict[RoutingMode, int] = {
     RoutingMode.walking: 200_000,
     RoutingMode.bicycle: 200_000,
     RoutingMode.pedelec: 200_000,
-    RoutingMode.car: 40_000,
+    RoutingMode.car: 50_000,
 }
 # Modes a PT leg can be made in — each has its own precomputed table. PT itself
 # is never an access/egress mode.

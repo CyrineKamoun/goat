@@ -99,12 +99,6 @@ Optionally, enable <code>Advanced options</code> to configure additional setting
   <div class="content">Select a <code>Reference area</code> - a polygon layer that represents your study area. The heatmap then covers all H3 cells within that polygon. For `Walk`, `Bicycle`, `Pedelec` and `Car`, it also replaces the travel cost <code>Limit</code>: destinations outside the area also count if they lie within the distance reachable in the mode's maximum travel time (45 minutes, 90 for `Car`); the street network is loaded for the area and those destinations, and every cell gets its actual average travel cost, however far away the destinations are. A cell without a street of its own is reached via the nearest street, including the walk from the cell's centre; only cells more than 500 m from any street keep the value <code>NULL</code>. For `Public Transport`, the <code>Limit</code> still applies.</div>
 </div>
 
-:::info
-
-A reference area can cover at most 200,000 hexagonal cells for `Walk`, `Bicycle` and `Pedelec`, and 40,000 for `Car`, at the resolution of the selected transport mode (see [Visualization](#visualization)).
-
-:::
-
 <div class="step">
   <div class="step-number">6</div>
   <div class="content">Configure various routing options for your selected transport mode such as travel speed, max transfers, access/egress limits and more. Further information about mode-specific options can be found under the [Routing](../../category/routing) section.</div>
