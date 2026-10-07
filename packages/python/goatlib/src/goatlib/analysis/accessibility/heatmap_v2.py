@@ -19,6 +19,7 @@ For each request:
 from __future__ import annotations
 
 import logging
+import math
 import tempfile
 import time
 from pathlib import Path
@@ -73,6 +74,18 @@ _PT_ACCESSEGRESS_RES = 9
 # (reverse-RAPTOR for PT, Dijkstra for street) — CPU-bound, not the temp-disk-
 # bound sampled-opportunity workload the generic cap guards against.
 _CONNECTIVITY_MAX_CELLS = 50_000
+# Cap on reference-area cells for a street closest-average run without a travel
+# budget, one value for active modes and one for car. One traversal from the
+# opportunities covers all the cells, so memory follows the network loaded
+# over the area: calibrated on a 4 GB worker (Basel + buffers,
+# Baden-Württemberg) to stay under ~3 GB even at k = 10. The active value is
+# bound by bicycle, whose coarser cells cover ~7x the ground of walking's.
+_CLOSEST_AVERAGE_MAX_CELLS: dict[RoutingMode, int] = {
+    RoutingMode.walking: 200_000,
+    RoutingMode.bicycle: 200_000,
+    RoutingMode.pedelec: 200_000,
+    RoutingMode.car: 40_000,
+}
 # Modes a PT leg can be made in — each has its own precomputed table. PT itself
 # is never an access/egress mode.
 _PT_ACCESSEGRESS_MODES = frozenset(
@@ -104,6 +117,32 @@ _MODE_SPEED_DEFAULTS: dict[RoutingMode, float] = {
     # Car uses per-edge OSM maxspeed (C++ ignores cfg.speed_km_h).
     RoutingMode.car: 0.0,
 }
+
+
+def _unbounded_by_reference_area(params: HeatmapV2Params) -> bool:
+    """A street closest-average run with a reference area has no travel
+    budget: the network loads over the area's bbox and every cell gets its real
+    cost to the nearest opportunities. PT keeps its budget."""
+    return (
+        params.heatmap_type == HeatmapType.closest_average
+        and bool(params.reference_area_path)
+        and params.routing_mode != RoutingMode.pt
+    )
+
+
+def _check_reference_area_cells(n_cells: int, max_cells: int) -> None:
+    if not n_cells:
+        raise ValueError(
+            "The reference area is empty or invalid. "
+            "Check that the layer contains valid polygons."
+        )
+    if n_cells > max_cells:
+        raise ValueError(
+            f"The reference area is too large to analyse: it covers "
+            f"{n_cells:,} grid cells, but the maximum is "
+            f"{max_cells:,}. "
+            "Please choose a smaller reference area."
+        )
 
 
 class HeatmapV2Tool(HeatmapToolBase):
@@ -271,12 +310,15 @@ class HeatmapV2Tool(HeatmapToolBase):
         max_cost: float | None = None,
         closest_k: int = 1,
         demand_path: str | None = None,
+        area_cells: list[tuple[float, float]] | None = None,
     ) -> Any:
         """Build a routing.HeatmapConfig for one opportunity layer.
 
         `max_cost` overrides the request-level value so each opportunity
         layer can use its own travel-time budget (matches the matrix-based
-        gravity tool's per-layer `max_cost` semantics).
+        gravity tool's per-layer `max_cost` semantics). `area_cells`
+        (reference-area cell centroids, EPSG:3857) load the street network over
+        the area instead of around the opportunities and are snapped into it.
         """
         routing = self._get_routing_module()
 
@@ -319,6 +361,8 @@ class HeatmapV2Tool(HeatmapToolBase):
         # An uploaded street network bundle's graph overrides the global network.
         cfg.edge_dir = str(params.edge_path or self._edge_dir)
         cfg.node_dir = str(params.node_path or self._node_dir)
+        if area_cells:
+            cfg.area_cell_centroids = [routing.Point3857(x, y) for x, y in area_cells]
         cfg.opportunities = [
             routing.Opportunity(
                 [routing.Point3857(sx, sy) for (sx, sy) in seeds],
@@ -419,6 +463,20 @@ class HeatmapV2Tool(HeatmapToolBase):
         )
         return [(float(x), float(y), 1.0) for x, y in rows], h3_resolution
 
+    def _reference_area_cells(
+        self: Self, params: HeatmapV2Params
+    ) -> list[tuple[float, float]]:
+        """The reference area's H3 cell centroids (EPSG:3857), after checking
+        the area against the mode's size cap."""
+        points, _ = self._rasterize_aoi_to_opportunities(
+            params.reference_area_path,
+            DEFAULT_H3_RESOLUTION[params.routing_mode],
+        )
+        _check_reference_area_cells(
+            len(points), _CLOSEST_AVERAGE_MAX_CELLS[params.routing_mode]
+        )
+        return [(x, y) for x, y, _ in points]
+
     # ----------------------- opportunity-layer resolution -------------------
 
     def _resolve_opportunity_layers(
@@ -446,18 +504,7 @@ class HeatmapV2Tool(HeatmapToolBase):
                 params.reference_area_path,
                 DEFAULT_H3_RESOLUTION[params.routing_mode],
             )
-            if not opp_points:
-                raise ValueError(
-                    "The reference area is empty or invalid. "
-                    "Check that the layer contains valid polygons."
-                )
-            if len(opp_points) > _CONNECTIVITY_MAX_CELLS:
-                raise ValueError(
-                    f"The reference area is too large to analyse: it covers "
-                    f"{len(opp_points):,} grid cells, but the maximum is "
-                    f"{_CONNECTIVITY_MAX_CELLS:,}. "
-                    "Please choose a smaller reference area."
-                )
+            _check_reference_area_cells(len(opp_points), _CONNECTIVITY_MAX_CELLS)
             # Connectivity: each AOI cell is a 1-seed opportunity (weight 1,
             # rep == the cell centroid). closest_k is unused.
             conn_groups = [([(x, y)], w, x, y) for (x, y, w) in opp_points]
@@ -490,7 +537,11 @@ class HeatmapV2Tool(HeatmapToolBase):
             # OpportunityV2 declares both fields with validated defaults, so
             # read them directly (no fallback needed).
             sensitivity = opp.sensitivity
-            layer_max_cost = float(opp.max_cost)
+            layer_max_cost = (
+                math.inf
+                if _unbounded_by_reference_area(params)
+                else float(opp.max_cost)
+            )
             n_destinations = opp.n_destinations
             layers.append(
                 (label, opp_groups, sensitivity, layer_max_cost, n_destinations)
@@ -578,6 +629,7 @@ class HeatmapV2Tool(HeatmapToolBase):
         params: HeatmapV2Params,
         scratch_dir: Path,
         demand_path: str | None = None,
+        area_cells: list[tuple[float, float]] | None = None,
     ) -> str:
         """Run compute_heatmap for one opportunity layer; load + round the
         result into a DuckDB temp table; return its name."""
@@ -591,6 +643,7 @@ class HeatmapV2Tool(HeatmapToolBase):
             max_cost=layer_max_cost,
             closest_k=n_destinations,
             demand_path=demand_path,
+            area_cells=area_cells,
         )
 
         t0 = time.perf_counter()
@@ -777,6 +830,10 @@ class HeatmapV2Tool(HeatmapToolBase):
                     scratch_dir,
                 )
                 logger.info("[Heatmap] 2SFCA demand rasterized: %.0f ms", lap())
+            area_cells: list[tuple[float, float]] | None = None
+            if _unbounded_by_reference_area(params):
+                area_cells = self._reference_area_cells(params)
+                logger.info("[Heatmap] Reference-area cells: %.0f ms", lap())
             score_tables: list[tuple[str, str]] = []
             for idx, (col, opp_pts, sens, max_cost, n_dest) in enumerate(layer_specs):
                 table = self._compute_layer_scores(
@@ -790,6 +847,7 @@ class HeatmapV2Tool(HeatmapToolBase):
                     params,
                     scratch_dir,
                     demand_path,
+                    area_cells,
                 )
                 score_tables.append((col, table))
             last_t = time.perf_counter()  # per-layer prints already accounted for time
