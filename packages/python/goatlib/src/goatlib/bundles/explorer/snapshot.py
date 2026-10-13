@@ -440,8 +440,14 @@ def _trip_stops(con: Any, warnings: Dict[str, int]) -> None:
                CAST(count(*) AS INTEGER) AS n_stops,
                sum(CAST(hash(stop_idx, pos) AS HUGEINT)) AS h1,
                sum(CAST(hash(pos, stop_idx, 'pattern') AS HUGEINT)) AS h2,
-               arg_min(coalesce(departure_s, arrival_s), stop_sequence) AS first_dep_s,
-               arg_max(coalesce(arrival_s, departure_s), stop_sequence) AS last_arr_s,
+               -- The times at the trip's first and last stop, or none: a trip
+               -- whose end has no time (a GTFS-Flex window, say) has no
+               -- schedule to run, and arg_min/arg_max would skip to the
+               -- nearest stop that has one.
+               arg_min_null(coalesce(departure_s, arrival_s), stop_sequence)
+                   AS first_dep_s,
+               arg_max_null(coalesce(arrival_s, departure_s), stop_sequence)
+                   AS last_arr_s,
                coalesce(sum(hop_m), 0) AS chain_m,
                max(shape_dist) - min(shape_dist) AS dist_delta
         FROM seq GROUP BY trip_id

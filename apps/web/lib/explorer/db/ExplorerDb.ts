@@ -1,0 +1,67 @@
+/**
+ * DuckDB-WASM in a worker, holding one bundle's snapshot.
+ *
+ * The worker and module are served by the app itself from
+ * `/vendor/duckdb/<version>/` (copied there by `scripts/copy-duckdb-wasm.mjs`),
+ * never from a CDN. The single-threaded "eh" build: threads need cross-origin
+ * isolation, which would break the map's cross-origin tiles.
+ *
+ * Client-only: import it dynamically, never from a server component.
+ */
+import type { AsyncDuckDB, AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
+
+import type { SqlRunner } from "@/lib/explorer/db/types";
+
+/** Well inside the 4 GB a wasm32 module can address; the largest feed the
+ * upload limit allows needs about 0.5 GB. */
+const MEMORY_LIMIT = "2560MB";
+
+export class ExplorerDb implements SqlRunner {
+  private constructor(
+    private readonly db: AsyncDuckDB,
+    private readonly conn: AsyncDuckDBConnection
+  ) {}
+
+  static async open(): Promise<ExplorerDb> {
+    const duckdb = await import("@duckdb/duckdb-wasm");
+    const base = `/vendor/duckdb/${duckdb.PACKAGE_VERSION}`;
+    const worker = new Worker(`${base}/duckdb-browser-eh.worker.js`);
+    const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
+    try {
+      await db.instantiate(`${base}/duckdb-eh.wasm`);
+      await db.open({ query: { castBigIntToDouble: true } });
+      const conn = await db.connect();
+      await conn.query(`SET memory_limit='${MEMORY_LIMIT}'`);
+      return new ExplorerDb(db, conn);
+    } catch (error) {
+      await db.terminate();
+      throw error;
+    }
+  }
+
+  async all<T = Record<string, unknown>>(sql: string): Promise<T[]> {
+    const table = await this.conn.query(sql);
+    return table.toArray().map((row) => row.toJSON() as T);
+  }
+
+  async exec(sql: string): Promise<void> {
+    await this.conn.query(sql);
+  }
+
+  /** Load one snapshot file as the table of its name. The buffer is released
+   * once the table holds the data. */
+  async loadParquet(name: string, bytes: Uint8Array): Promise<void> {
+    const file = `${name}.parquet`;
+    await this.db.registerFileBuffer(file, bytes);
+    try {
+      await this.conn.query(`CREATE OR REPLACE TABLE ${name} AS SELECT * FROM '${file}'`);
+    } finally {
+      await this.db.dropFile(file);
+    }
+  }
+
+  async close(): Promise<void> {
+    await this.conn.close();
+    await this.db.terminate();
+  }
+}

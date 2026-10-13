@@ -1,7 +1,7 @@
 """The Explorer snapshot of a small, hand-checked feed.
 
 The feed (``tests/fixtures/explorer_mini_gtfs``) has stops 0.01° of longitude
-apart at 52.5° N, about 678 m, and:
+apart at 52.5° N, about 677 m, and:
 
 - R1: T1 and T2 S1→S5 and T4 S1→S3 (a short turn numbered 10, 20, 30)
   in direction 0, T3 S5→S1 in direction 1; T1, T2, T4 give
@@ -164,7 +164,7 @@ def test_lengths_come_from_the_best_source_and_say_which(
     assert lengths["T4"] == (1360, 1)
     # No distances and no shape: the straight line from stop to stop.
     assert lengths["T3"][1] == 3
-    assert lengths["T3"][0] == pytest.approx(4 * 677.7, rel=0.01)
+    assert lengths["T3"][0] == pytest.approx(4 * 676.9, rel=0.01)
 
 
 def test_services_and_their_exceptions(snapshot: Dict[str, Any]) -> None:
@@ -210,3 +210,50 @@ def test_stop_times_are_compact_types(snapshot: Dict[str, Any]) -> None:
         "departure_s": "INTEGER",
         "shape_dist": "FLOAT",
     }
+
+
+def test_the_web_apps_copy_is_current(snapshot: Dict[str, Any]) -> None:
+    """The web app's tests read a committed copy of this snapshot; regenerate
+    it with ``tests/fixtures/explorer_web_fixture.py`` when this fails."""
+    repo = Path(__file__).parents[6]
+    web_fixture = repo / "apps" / "web" / "lib" / "explorer" / "__fixtures__" / "mini"
+    con = snapshot["con"]
+    for name in FILES:
+        built = f"read_parquet('{snapshot['dir']}/{name}.parquet')"
+        committed = f"read_parquet('{web_fixture}/{name}.parquet')"
+        for a, b in ((built, committed), (committed, built)):
+            extra = con.execute(f"SELECT count(*) FROM (FROM {a} EXCEPT ALL FROM {b})")
+            assert extra.fetchone()[0] == 0, f"{name}.parquet is stale"
+
+
+def test_a_trip_whose_end_has_no_time_has_no_schedule(tmp_path: Path) -> None:
+    """A GTFS-Flex trip gives its last stop a pickup window, not a time; it
+    must not look like a trip that arrives when it leaves."""
+    archive = tmp_path / "flex_gtfs.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        for f in sorted(FIXTURE.iterdir()):
+            text = f.read_text()
+            if f.name == "trips.txt":
+                text += "R1,WK,FLEX,Fifth,0,,\n"
+            if f.name == "stop_times.txt":
+                text += "FLEX,21:20:00,21:20:00,S1,1,\nFLEX,,,S2,2,\n"
+            zf.writestr(f.name, text)
+    work = tmp_path / "work"
+    work.mkdir()
+    paths = {
+        layer.role: layer.file_path
+        for layer in GtfsImporter().extract_layers(str(archive), str(work))
+    }
+    out = tmp_path / "snapshot"
+    out.mkdir()
+    con = bound_duckdb(duckdb.connect(), str(work))
+    build_snapshot(
+        con,
+        lambda role: f"read_parquet('{paths[role]}')" if role in paths else None,
+        str(out),
+    )
+    row = con.execute(
+        f"SELECT first_dep_s, last_arr_s FROM read_parquet('{out}/trips.parquet') "
+        "WHERE trip_id = 'FLEX'"
+    ).fetchall()
+    assert row == [(21 * 3600 + 20 * 60, None)]
