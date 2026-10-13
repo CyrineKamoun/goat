@@ -11,6 +11,7 @@ GeoAPI serves the **data** of a layer; core holds its metadata. It provides:
 - **Editing**: create, update and delete features and columns, and batch edits of a bundle's network layers.
 - **Expressions**: validating and previewing computed-column expressions.
 - **Download**: exporting a layer of a published project in common GIS formats.
+- **Explorer snapshots**: a public transport bundle as the compact, indexed Parquet files the Explorer loads into DuckDB-WASM (`/bundles/{bundleId}/explorer`).
 
 The collection id is the layer UUID. The full, current route list is the OpenAPI document at `/api/docs`.
 
@@ -25,6 +26,7 @@ Tiles and features are the latency-critical path every map view hits. Keeping th
 - **Promoted catalog datasets** are not DuckLake tables: they are parquet files under `CATALOG_LAYERS_DIR`, exposed through an in-memory view that adds the same `rowid`. They are read-only.
 - **PMTiles** live in `TILES_DATA_DIR` (user layers) and `CATALOG_TILES_DIR` (catalog layers). They are built outside geoapi, by goatlib tasks.
 - **Workflow previews** are parquet and PMTiles files under `/app/data/temporary/user_<id>/…`, read with `?temp=true`.
+- **Explorer snapshots** live in `DATA_DIR/explorer/<bundle id>/r<revision>.s<schema>/`, one per bundle revision, built by geoapi on the first request for it (`packages/python/goatlib/src/goatlib/bundles/explorer/snapshot.py` does the conversion). The manifest answers 202 while the build runs; the files' URLs name the revision, so they are cached for good. A build reads the revision and the DuckLake snapshot id together under the bundle's advisory lock, taken shared (`goatlib.bundles.locks`) — a writer of a bundle's layers takes it exclusively from its revision claim to its DuckLake commit — and reads every table at that snapshot. One build at a time per pod, on its own DuckLake connection, at most 512 MB plus spill; a `.building-r<n>` marker keeps a second pod from building the same revision. The previous revision is kept an hour for downloads in flight; stale temporary folders and snapshots untouched for 30 days are removed hourly.
 
 ## How It Stays Consistent
 
@@ -41,6 +43,7 @@ Tiles and features are the latency-critical path every map view hits. Keeping th
 - A layer of a published project is readable by anyone. Otherwise `customer.can('layer', …, 'read')` in core's database decides. **Read authorization runs in shadow mode by default** (`GEOAPI_ENFORCE_READ_AUTHZ=false`, also read as `ENFORCE_READ_AUTHZ`, the name the Helm chart sets): a denial is only logged as `read_authz.would_deny`, and the layer is served anyway.
 - Writes need a user and pass `customer.layer_write_allowed`. Features of a bundle member layer are edited through the bundle routes, though columns may still be added to it; catalog layers cannot be edited.
 - Download needs no token but only works for layers of a published project.
+- An Explorer snapshot is readable by whoever may read the bundle's stops layer: member layers carry the bundle's grants, and a project holding the bundle shares them, which are the two ways core lets a bundle be read.
 - A token must verify, and with `AUTH_ALLOWED_CLIENTS` set it must be issued to one of those clients (goatlib's `KeycloakAuth`). A token that fails is a 401 where a user is required; where a token is optional, the request runs as anonymous.
 - With `AUTH=False`, requests without a token run as the built-in development user.
 
