@@ -12,6 +12,7 @@
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import { serviceDayCounts } from "@/lib/explorer/derive/calendar";
 import type { TripRange } from "@/lib/explorer/derive/runs";
+import { modeOf } from "@/lib/explorer/modes";
 
 export interface Rate {
   per_km: number;
@@ -19,18 +20,11 @@ export interface Rate {
   per_hour: number | null;
 }
 
-/** Default rate by GTFS route type (basic and extended); bus otherwise. */
+/** Default rate by GTFS route type (basic or extended), until rates are set. */
 export function defaultRate(routeType: number | null): Rate {
-  const t = routeType ?? 3;
-  const basic = t >= 100 ? Math.floor(t / 100) : t;
-  // Extended types: 1xx rail, 4xx urban rail, 7xx bus, 9xx tram.
-  if (t >= 100) {
-    if (basic === 1 || basic === 4) return { per_km: 12, per_hour: null };
-    if (basic === 9) return { per_km: 7, per_hour: null };
-    return { per_km: 4.5, per_hour: null };
-  }
-  if (t === 0 || t === 5 || t === 11) return { per_km: 7, per_hour: null }; // tram, cable tram, trolleybus
-  if (t === 1 || t === 2 || t === 12) return { per_km: 12, per_hour: null }; // metro, rail, monorail
+  const mode = modeOf(routeType ?? 3);
+  if (mode === "tram" || mode === "cable_tram" || mode === "trolleybus") return { per_km: 7, per_hour: null };
+  if (mode === "metro" || mode === "rail" || mode === "monorail") return { per_km: 12, per_hour: null };
   return { per_km: 4.5, per_hour: null };
 }
 
@@ -42,21 +36,21 @@ export interface AnnualFigures {
   window_days: number;
 }
 
-/** A route's figures for a year, from every service it runs on. */
-export async function annualFigures(
+/** A year of the trips `where` selects (SQL over `trips`), priced at `rate`. */
+async function annualFor(
   db: SqlRunner,
-  route: TripRange,
+  where: string,
   window: [string, string],
-  rate: Rate
+  rate: Rate,
+  days?: Map<number, number>
 ): Promise<AnnualFigures> {
-  // A year at most, from the window's start: a feed covering more counts once.
-  const startMs = Date.parse(`${window[0]}T00:00:00Z`);
-  const yearEnd = new Date(startMs + 364 * 86_400_000).toISOString().slice(0, 10);
-  if (window[1] > yearEnd) window = [window[0], yearEnd];
-  const days = await serviceDayCounts(db, window[0], window[1]);
+  window = yearOf(window);
+  days ??= await serviceDayCounts(db, window[0], window[1]);
   const perService = await db.all<{ service_idx: number; km: number; hours: number }>(`
     WITH t AS (
-      SELECT * FROM trips WHERE trip_idx BETWEEN ${route.trip_lo ?? -1} AND ${route.trip_hi ?? -2}
+      -- Trips with a schedule: one without a first or last time never runs.
+      SELECT * FROM trips
+      WHERE (${where}) AND first_dep_s IS NOT NULL AND last_arr_s IS NOT NULL
     ),
     runs AS (
       SELECT service_idx, length_m, last_arr_s - first_dep_s AS secs, 1 AS n
@@ -87,4 +81,45 @@ export async function annualFigures(
     cost: km * rate.per_km + (rate.per_hour ? hours * rate.per_hour : 0),
     window_days: windowDays,
   };
+}
+
+/** A year at most, from the window's start: a feed covering more counts once. */
+function yearOf(window: [string, string]): [string, string] {
+  const startMs = Date.parse(`${window[0]}T00:00:00Z`);
+  const yearEnd = new Date(startMs + 364 * 86_400_000).toISOString().slice(0, 10);
+  return window[1] > yearEnd ? [window[0], yearEnd] : window;
+}
+
+/** A route's figures for a year, from every service it runs on. */
+export function annualFigures(
+  db: SqlRunner,
+  route: TripRange,
+  window: [string, string],
+  rate: Rate
+): Promise<AnnualFigures> {
+  return annualFor(db, `trip_idx BETWEEN ${route.trip_lo ?? -1} AND ${route.trip_hi ?? -2}`, window, rate);
+}
+
+/** The whole network's figures for a year, each route type at its rate. */
+export async function networkAnnualFigures(
+  db: SqlRunner,
+  window: [string, string],
+  rateFor: (routeType: number | null) => Rate = defaultRate
+): Promise<AnnualFigures> {
+  const year = yearOf(window);
+  const days = await serviceDayCounts(db, year[0], year[1]);
+  const types = await db.all<{ route_type: number | null }>("SELECT DISTINCT route_type FROM routes");
+  const total: AnnualFigures = { vehicle_km: 0, vehicle_hours: 0, cost: 0, window_days: 0 };
+  for (const { route_type } of types) {
+    const where =
+      route_type === null
+        ? "route_idx IN (SELECT route_idx FROM routes WHERE route_type IS NULL)"
+        : `route_idx IN (SELECT route_idx FROM routes WHERE route_type = ${route_type})`;
+    const f = await annualFor(db, where, year, rateFor(route_type), days);
+    total.vehicle_km += f.vehicle_km;
+    total.vehicle_hours += f.vehicle_hours;
+    total.cost += f.cost;
+    total.window_days = f.window_days;
+  }
+  return total;
 }

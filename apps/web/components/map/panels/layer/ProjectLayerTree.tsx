@@ -29,6 +29,7 @@ import { projectLayersKey } from "@/lib/api/projects";
 // Redux
 import { useUserProfile } from "@/lib/api/users";
 import { MAX_EDITABLE_LAYER_SIZE } from "@/lib/constants";
+import { openExplorer } from "@/lib/store/explorer/slice";
 import { emitInteractionEvent } from "@/lib/store/interaction/slice";
 import { setSelectedBundle, setSelectedLayers } from "@/lib/store/layer/slice";
 import { setActiveRightPanel, setDataPanelLayerId, setIsDataPanelOpen } from "@/lib/store/map/slice";
@@ -480,6 +481,16 @@ export const ProjectLayerTree = ({
   const startEditingGuard = useStartEditingGuard();
   // Which member layers of the project's bundles may be edited, by role.
   const bundleMemberGates = useBundleMemberGates(projectLayerGroups.map((group) => group.bundle_id));
+  // Bundle groups holding a GTFS feed, which the Explorer opens: a member
+  // with the stop_times role says so, whatever the group is called.
+  const ptBundleGroupIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const layer of projectLayers) {
+      const role = bundleMemberGates?.get(layer.layer_id)?.role;
+      if (role === "stop_times" && layer.layer_project_group_id) ids.add(layer.layer_project_group_id);
+    }
+    return ids;
+  }, [projectLayers, bundleMemberGates]);
 
   const [items, setItems] = useState<ProjectTreeItem[]>([]);
   const itemsRef = useRef<ProjectTreeItem[]>([]);
@@ -821,6 +832,15 @@ export const ProjectLayerTree = ({
       let menuOptions: PopperMenuItem[] = [];
       if (node.type === "group") {
         menuOptions = [
+          ...(item.isBundleGroup && ptBundleGroupIds.has(node.id) && mapMode === "data"
+            ? [
+                {
+                  id: MapLayerActions.OPEN_EXPLORER,
+                  label: t("explorer"),
+                  icon: ICON_NAME.BUS,
+                },
+              ]
+            : []),
           ...(node.extent
             ? [
                 {
@@ -1059,7 +1079,11 @@ export const ProjectLayerTree = ({
                       openMoreMenu(menuItem, target);
                     }
                   } else {
-                    if (menuItem.id === MapLayerActions.RENAME && node.type === "group") {
+                    if (menuItem.id === MapLayerActions.OPEN_EXPLORER && node.bundle_id) {
+                      dispatch(setIsDataPanelOpen(false));
+                      dispatch(setActiveRightPanel(undefined));
+                      dispatch(openExplorer({ bundleId: node.bundle_id, bundleName: node.name }));
+                    } else if (menuItem.id === MapLayerActions.RENAME && node.type === "group") {
                       setGroupModal({ open: true, mode: "rename", group: node });
                     } else if (menuItem.id === ContentActions.DELETE && node.type === "group") {
                       setGroupModal({ open: true, mode: "delete", group: node });
@@ -1128,6 +1152,7 @@ export const ProjectLayerTree = ({
       activeLayerId,
       activeRightPanel,
       bundleMemberGates,
+      ptBundleGroupIds,
     ]
   );
 

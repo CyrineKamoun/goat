@@ -26,12 +26,26 @@ export function activeServicesSql(date: string): string {
   )`;
 }
 
+/** Counted once per database and window: every route's annual figures and
+ * the network's need the same counts. */
+const dayCounts = new WeakMap<SqlRunner, Map<string, Promise<Map<number, number>>>>();
+
 /** How many days each service runs between `start` and `end`, inclusive. */
-export async function serviceDayCounts(
-  db: SqlRunner,
-  start: string,
-  end: string
-): Promise<Map<number, number>> {
+export function serviceDayCounts(db: SqlRunner, start: string, end: string): Promise<Map<number, number>> {
+  let byWindow = dayCounts.get(db);
+  if (!byWindow) dayCounts.set(db, (byWindow = new Map()));
+  const key = `${start}/${end}`;
+  let counts = byWindow.get(key);
+  if (!counts) {
+    counts = countServiceDays(db, start, end);
+    // A failed count is not kept: the next caller tries again.
+    counts.catch(() => byWindow?.delete(key));
+    byWindow.set(key, counts);
+  }
+  return counts;
+}
+
+async function countServiceDays(db: SqlRunner, start: string, end: string): Promise<Map<number, number>> {
   const rows = await db.all<{ service_idx: number; days: number }>(`
     WITH dates AS (
       SELECT CAST(d AS DATE) AS date

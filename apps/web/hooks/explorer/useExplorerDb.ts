@@ -34,9 +34,15 @@ export function useExplorerDb(bundleId: string | undefined): ExplorerDbState {
     (async () => {
       const manifest = await waitForManifest(bundleId, undefined, abort.signal);
       const { ExplorerDb } = await import("@/lib/explorer/db/ExplorerDb");
-      db = await ExplorerDb.open();
+      // A cancelled effect (an unmount, React's double mount in development)
+      // must not start a worker, nor leave one running that it started.
       if (abort.signal.aborted) return;
-      const opened = db;
+      const opened = await ExplorerDb.open();
+      if (abort.signal.aborted) {
+        await opened.close();
+        return;
+      }
+      db = opened;
       await loadSnapshot(
         opened,
         manifest,

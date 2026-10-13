@@ -30,6 +30,13 @@ import { useMeasureTool } from "@/hooks/map/useMeasureTool";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { FloatingPanel } from "@/components/common/FloatingPanel";
+import { ExplorerBottomBar } from "@/components/explorer/ExplorerBottomBar";
+import { ExplorerProvider } from "@/components/explorer/ExplorerContext";
+import {
+  EXPLORER_PANEL_WIDTH,
+  EXPLORER_PANEL_WIDTH_ROUTE,
+  ExplorerLeftPanel,
+} from "@/components/explorer/ExplorerLeftPanel";
 import AttributionControl from "@/components/map/controls/Attribution";
 import { BasemapSelector } from "@/components/map/controls/BasemapSelector";
 import { CustomBasemapDialog } from "@/components/map/controls/CustomBasemapDialog";
@@ -101,6 +108,20 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
   const [editing, setEditing] = useState<CustomBasemap | null>(null);
 
   const activeRight = useAppSelector((state) => state.map.activeRightPanel);
+  // The PT network Explorer takes over the panels (docs/pt-network-editor).
+  const explorerActive = useAppSelector((state) => state.explorer.active);
+  const explorerBundleId = useAppSelector((state) => state.explorer.bundleId);
+  const explorerCollapsed = useAppSelector((state) => state.explorer.leftCollapsed);
+  const explorerWide = useAppSelector(
+    (state) => state.explorer.leftTab === "explorer" && !!state.explorer.selectedRouteId
+  );
+  const leftWidth = !explorerActive
+    ? panelWidth
+    : explorerCollapsed
+      ? 48
+      : explorerWide
+        ? EXPLORER_PANEL_WIDTH_ROUTE
+        : EXPLORER_PANEL_WIDTH;
   const featureEditorActive = useAppSelector((state) => state.featureEditor.activeLayerId);
   const selectedBundleId = useAppSelector((state) => state.layers.selectedBundleId);
   const featureEditorActiveFeature = useAppSelector((state) => state.featureEditor.activeFeatureId);
@@ -309,7 +330,26 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
     return widths.reduce((a, b) => a + b, 0) + GAP_SIZE * (widths.length - 1);
   }, [measureVisible, showFeatureEditPanel, activeRight]);
 
-  return (
+  const layerTree = (
+    <ProjectLayerTree
+      projectId={projectId}
+      projectLayers={projectLayers || []}
+      projectLayerGroups={projectLayerGroups || []}
+      isLoading={false}
+      onTreeUpdate={handleTreeUpdate}
+      onLayerDuplicate={handleLayerDuplicate}
+      onCreateGroup={handleCreateGroup}
+      onUpdateGroup={handleUpdateGroup}
+      onDeleteGroup={handleDeleteGroup}
+      viewMode={isProjectEditor ? "edit" : "view"}
+      projectOwnerId={project.owned_by?.id}
+    />
+  );
+  // The right-hand panels belong to the data view, not the Explorer.
+  const rightComponent = explorerActive ? undefined : activeRightComponent;
+  const showFeaturePanel = !explorerActive && showFeatureEditPanel;
+
+  const layout = (
     <>
       <Box
         {...{ [DATA_PANEL_HEIGHT_CONSUMER_ATTR]: "" }}
@@ -332,21 +372,19 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
             columnGap: 2,
             overflow: "hidden",
           }}>
-          <FloatingPanel width={panelWidth} maxHeight="100%">
-            <ProjectLayerTree
-              projectId={projectId}
-              projectLayers={projectLayers || []}
-              projectLayerGroups={projectLayerGroups || []}
-              isLoading={false}
-              onTreeUpdate={handleTreeUpdate}
-              onLayerDuplicate={handleLayerDuplicate}
-              onCreateGroup={handleCreateGroup}
-              onUpdateGroup={handleUpdateGroup}
-              onDeleteGroup={handleDeleteGroup}
-              viewMode={isProjectEditor ? "edit" : "view"}
-              projectOwnerId={project.owned_by?.id}
+          {explorerActive ? (
+            <ExplorerLeftPanel
+              layersTab={
+                <FloatingPanel width={leftWidth} maxHeight="100%">
+                  {layerTree}
+                </FloatingPanel>
+              }
             />
-          </FloatingPanel>
+          ) : (
+            <FloatingPanel width={panelWidth} maxHeight="100%">
+              {layerTree}
+            </FloatingPanel>
+          )}
           <Box sx={{ marginTop: "auto" }}>
             <Scalebar />
           </Box>
@@ -354,7 +392,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
         <Box
           sx={{
             position: "absolute",
-            left: `${panelWidth + GAP_SIZE}px`,
+            left: `${leftWidth + GAP_SIZE}px`,
             top: 0,
           }}>
           <SearchControl
@@ -368,7 +406,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
               buttons below it step aside while it is open. */}
           {!searchPanelOpen && (
             <>
-              {isProjectEditor && (
+              {isProjectEditor && !explorerActive && (
                 <ToolboxCtrl onToggle={handleToolboxToggle} open={activeRight === MapSidebarItemID.TOOLBOX} />
               )}
               <MeasureButton {...measureTool} />
@@ -401,14 +439,14 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
               overflow: "hidden",
             }}>
             <MeasureResultsPanel {...measureTool} />
-            {showFeatureEditPanel && (
+            {showFeaturePanel && (
               <FloatingPanel width={320} maxHeight="100%" fillHeight>
                 <FeatureEditPanel />
               </FloatingPanel>
             )}
-            {activeRightComponent && (
+            {rightComponent && (
               <FloatingPanel width={panelWidth} maxHeight="100%" fillHeight>
-                {activeRightComponent}
+                {rightComponent}
               </FloatingPanel>
             )}
           </Stack>
@@ -473,14 +511,14 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
             spacing={2}
             sx={{ alignItems: "flex-start", height: "100%", overflow: "hidden" }}>
             <MeasureResultsPanel {...measureTool} />
-            {showFeatureEditPanel && (
+            {showFeaturePanel && (
               <FloatingPanel width={320} maxHeight="100%" fillHeight>
                 <FeatureEditPanel />
               </FloatingPanel>
             )}
-            {activeRightComponent && (
+            {rightComponent && (
               <FloatingPanel width={panelWidth} maxHeight="100%" fillHeight>
-                {activeRightComponent}
+                {rightComponent}
               </FloatingPanel>
             )}
           </Stack>
@@ -499,7 +537,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
         sx={{
           position: "absolute",
           top: toolbarHeight + 10,
-          left: panelWidth + GAP_SIZE + 10,
+          left: leftWidth + GAP_SIZE + 10,
           right: (rightStackWidth ? rightStackWidth + GAP_SIZE : 0) + 10,
           bottom: `calc(10px + var(${DATA_PANEL_HEIGHT_VAR}, 0px))`,
           pointerEvents: "none",
@@ -510,6 +548,17 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
         }}>
         <MapFixedPopupSlot layers={projectLayers} />
       </Box>
+      {explorerActive && (
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: 10,
+            left: leftWidth + GAP_SIZE + 10,
+            zIndex: (theme) => theme.zIndex.drawer + 1,
+          }}>
+          <ExplorerBottomBar />
+        </Box>
+      )}
       <CustomBasemapDialog
         open={dialogOpen}
         initial={editing}
@@ -537,6 +586,12 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
         }
       />
     </>
+  );
+
+  return explorerActive && explorerBundleId ? (
+    <ExplorerProvider bundleId={explorerBundleId}>{layout}</ExplorerProvider>
+  ) : (
+    layout
   );
 };
 

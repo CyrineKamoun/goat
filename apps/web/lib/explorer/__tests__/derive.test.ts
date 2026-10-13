@@ -192,3 +192,20 @@ describe("cost", () => {
     expect(defaultRate(null).per_hour).toBeNull();
   });
 });
+
+describe("network cost", () => {
+  it("adds every route type at its rate", async () => {
+    const { networkAnnualFigures } = await import("@/lib/explorer/derive/cost");
+    const window: [string, string] = ["2026-01-05", "2026-12-31"];
+    const network = await networkAnnualFigures(db, window);
+    let expected = 0;
+    for (const id of ["R1", "R2", "R3", "R4"]) {
+      const r = route(id);
+      const type = (
+        await db.all<{ t: number }>(`SELECT route_type AS t FROM routes WHERE route_id = '${id}'`)
+      )[0].t;
+      expected += (await annualFigures(db, r, window, defaultRate(type))).cost;
+    }
+    expect(network.cost).toBeCloseTo(expected, 6);
+  });
+});

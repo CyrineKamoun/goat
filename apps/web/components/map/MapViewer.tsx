@@ -6,7 +6,14 @@ import centroid from "@turf/centroid";
 import maplibregl from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Map, type MapGeoJSONFeature, type MapLayerMouseEvent, type MapLayerTouchEvent, type MapRef, type ViewState } from "react-map-gl/maplibre";
+import {
+  Map,
+  type MapGeoJSONFeature,
+  type MapLayerMouseEvent,
+  type MapLayerTouchEvent,
+  type MapRef,
+  type ViewState,
+} from "react-map-gl/maplibre";
 import type { ViewStateChangeEvent } from "react-map-gl/maplibre";
 import { v4 } from "uuid";
 
@@ -19,8 +26,6 @@ import {
   setPopupPreview,
 } from "@/lib/store/map/slice";
 import { addOrUpdateMarkerImages, addPatternImages } from "@/lib/transformers/map-image";
-import { applyMapLanguage } from "@/hooks/map/MapHooks";
-import createPulsingDot from "@/lib/utils/map/pulsing-dot-image";
 import {
   buildPopupFieldConfig,
   getEffectivePopupTrigger,
@@ -28,23 +33,21 @@ import {
   selectPopupProperties,
   splitPopupProperties,
 } from "@/lib/utils/map/popupProperties";
-import {
-  type FeatureLayerPointProperties,
-  type Layer,
-  type PopupProperties,
-} from "@/lib/validations/layer";
+import createPulsingDot from "@/lib/utils/map/pulsing-dot-image";
+import { type FeatureLayerPointProperties, type Layer, type PopupProperties } from "@/lib/validations/layer";
 import type { ProjectLayer } from "@/lib/validations/project";
 
+import { applyMapLanguage } from "@/hooks/map/MapHooks";
+import { useFeatureEditor } from "@/hooks/map/useFeatureEditor";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
-import { useFeatureEditor } from "@/hooks/map/useFeatureEditor";
+import { ExplorerMapLayers } from "@/components/explorer/ExplorerMapLayers";
 import GeocoderLayer from "@/components/map/GeocoderLayer";
 import Layers from "@/components/map/Layers";
 import ToolboxLayers from "@/components/map/ToolboxLayers";
 import UserLocationLayer from "@/components/map/UserLocationLayer";
 import DrawControl from "@/components/map/controls/Draw";
 import FeatureEditToolbar from "@/components/map/controls/FeatureEditToolbar";
-import ConfirmModal from "@/components/modals/Confirm";
 import MapPopoverEditor from "@/components/map/controls/PopoverEditor";
 import { MeasureLabels } from "@/components/map/controls/measure";
 import { buildLayerIcon } from "@/components/map/panels/layer/legend/LayerIcon";
@@ -58,6 +61,7 @@ import {
   shouldClosePopupForHiddenLayer,
   shouldHighlightActivePopupFeature,
 } from "@/components/map/popover/popupVisibility";
+import ConfirmModal from "@/components/modals/Confirm";
 
 maplibregl.addProtocol("cog", cogProtocol);
 
@@ -187,9 +191,8 @@ const MapViewer: React.FC<MapProps> = ({
   const clickedPopupLayer = useMemo(
     // Explicit type argument: `layers` is a union of arrays
     // (ProjectLayer[] | Layer[]), which generic inference can't unify.
-    () =>
-      findPopupLayer<ProjectLayer | Layer>(popupInfo?.layerId, layers, popupInfo?.projectLayerId),
-    [popupInfo?.layerId, popupInfo?.projectLayerId, layers],
+    () => findPopupLayer<ProjectLayer | Layer>(popupInfo?.layerId, layers, popupInfo?.projectLayerId),
+    [popupInfo?.layerId, popupInfo?.projectLayerId, layers]
   );
 
   // `popup` only exists on feature-layer property variants; non-feature layers
@@ -213,11 +216,7 @@ const MapViewer: React.FC<MapProps> = ({
   const previewLayer = useMemo(() => {
     if (!popupPreview?.layerId || !layers) return undefined;
     const target = popupPreview.layerId;
-    return layers.find(
-      (l) =>
-        (l as { layer_id?: string }).layer_id === target ||
-        l.id.toString() === target,
-    );
+    return layers.find((l) => (l as { layer_id?: string }).layer_id === target || l.id.toString() === target);
   }, [popupPreview?.layerId, layers]);
 
   const previewPopupConfig = useMemo<PopupProperties | undefined>(() => {
@@ -238,11 +237,11 @@ const MapViewer: React.FC<MapProps> = ({
     popupInfo?.properties) as Record<string, unknown> | undefined;
   const clickedPopupLayerIcon = useMemo(
     () => buildLayerIcon(clickedPopupLayer, clickedFeatureProperties),
-    [clickedPopupLayer, clickedFeatureProperties],
+    [clickedPopupLayer, clickedFeatureProperties]
   );
   const previewLayerIcon = useMemo(
     () => buildLayerIcon(previewLayer, popupPreview?.feature?.properties ?? undefined),
-    [previewLayer, popupPreview?.feature?.properties],
+    [previewLayer, popupPreview?.feature?.properties]
   );
 
   // Centroid of the preview feature, used both for the popover anchor and the
@@ -285,12 +284,17 @@ const MapViewer: React.FC<MapProps> = ({
           `${l.id}-cluster-bubble`,
           `${l.id}-cluster-count`,
           `${l.id}-cluster-icon`,
-          `${l.id}-cluster-badge`,
+          `${l.id}-cluster-badge`
         );
       }
     });
     if (pendingFeaturesExist) {
-      ids.push("pending-features-fill", "pending-features-line", "pending-features-circle", "pending-features-symbol");
+      ids.push(
+        "pending-features-fill",
+        "pending-features-line",
+        "pending-features-circle",
+        "pending-features-symbol"
+      );
     }
     return ids;
   }, [layers, pendingFeaturesExist]);
@@ -309,10 +313,7 @@ const MapViewer: React.FC<MapProps> = ({
   // pinned popup rendered by MapFixedPopupSlot, and the mobile bottom sheet),
   // which all read the same popupInfo.
   useEffect(() => {
-    if (
-      popupInfo &&
-      shouldClosePopupForHiddenLayer(popupInfo.layerId, layers, popupInfo.projectLayerId)
-    ) {
+    if (popupInfo && shouldClosePopupForHiddenLayer(popupInfo.layerId, layers, popupInfo.projectLayerId)) {
       popupInfo.onClose();
     }
   }, [popupInfo, layers]);
@@ -373,9 +374,7 @@ const MapViewer: React.FC<MapProps> = ({
     // (bubble / count / icon / badge).
     const clusterFeature = features?.find(
       (f) =>
-        typeof f.layer.id === "string" &&
-        f.layer.id.includes("-cluster-") &&
-        f.properties?.cluster_id != null,
+        typeof f.layer.id === "string" && f.layer.id.includes("-cluster-") && f.properties?.cluster_id != null
     );
     if (clusterFeature && mapRef?.current) {
       const map = mapRef.current.getMap();
@@ -414,9 +413,7 @@ const MapViewer: React.FC<MapProps> = ({
       // Accepts `click` or `click_and_hover` in the new schema, plus the
       // legacy `interaction.type === "click"`. Hover-only layers are
       // skipped here and handled in `handleMapOverImmediate`.
-      const isClickable = (
-        layer: Layer | ProjectLayer | undefined,
-      ): boolean => {
+      const isClickable = (layer: Layer | ProjectLayer | undefined): boolean => {
         const t = getEffectivePopupTrigger(layer);
         return t === "click" || t === "click_and_hover";
       };
@@ -426,13 +423,9 @@ const MapViewer: React.FC<MapProps> = ({
       // clicking a different feature in the same layer).
       const activeLayerId = popupInfo?.layerId;
       for (const feature of features) {
-        const layer = layers?.find(
-          (l) => l.id.toString() === feature.layer.id && isClickable(l),
-        );
+        const layer = layers?.find((l) => l.id.toString() === feature.layer.id && isClickable(l));
         if (!layer) continue;
-        const layerDatasetId = (
-          (layer as { layer_id?: string }).layer_id ?? layer.id
-        )?.toString();
+        const layerDatasetId = ((layer as { layer_id?: string }).layer_id ?? layer.id)?.toString();
         if (activeLayerId && layerDatasetId !== activeLayerId) continue;
         interactiveFeature = feature;
         interactiveLayer = layer;
@@ -474,8 +467,7 @@ const MapViewer: React.FC<MapProps> = ({
             // which lives on `.layer_id` for ProjectLayers and on `.id`
             // for plain Layers. Prefer `layer_id` when present.
             layerId: (
-              (interactiveLayer as { layer_id?: string }).layer_id ??
-              interactiveLayer.id
+              (interactiveLayer as { layer_id?: string }).layer_id ?? interactiveLayer.id
             )?.toString(),
             projectLayerId: interactiveLayer.id?.toString(),
             ...popupFieldInfo(fieldConfig),
@@ -591,22 +583,16 @@ const MapViewer: React.FC<MapProps> = ({
     // is open for one layer, hover triggers on OTHER layers are ignored
     // until that popup closes.
     const activeLayerId = popupInfo?.layerId;
-    const isHoverable = (
-      layer: Layer | ProjectLayer | undefined,
-    ): boolean => {
+    const isHoverable = (layer: Layer | ProjectLayer | undefined): boolean => {
       const t = getEffectivePopupTrigger(layer);
       return t === "hover" || t === "click_and_hover";
     };
     let hoverFeature: MapGeoJSONFeature | undefined;
     let hoverLayer: Layer | ProjectLayer | undefined;
     for (const feature of features ?? []) {
-      const layer = layers?.find(
-        (l) => l.id.toString() === feature.layer.id && isHoverable(l),
-      );
+      const layer = layers?.find((l) => l.id.toString() === feature.layer.id && isHoverable(l));
       if (!layer) continue;
-      const layerDatasetId = (
-        (layer as { layer_id?: string }).layer_id ?? layer.id
-      )?.toString();
+      const layerDatasetId = ((layer as { layer_id?: string }).layer_id ?? layer.id)?.toString();
       // Block cross-layer hover when another popup is active.
       if (activeLayerId && layerDatasetId !== activeLayerId) continue;
       hoverFeature = feature;
@@ -636,9 +622,7 @@ const MapViewer: React.FC<MapProps> = ({
         setPopupInfo({
           lngLat: featureLngLat,
           title: hoverLayer.name ?? "",
-          layerId: (
-            (hoverLayer as { layer_id?: string }).layer_id ?? hoverLayer.id
-          )?.toString(),
+          layerId: ((hoverLayer as { layer_id?: string }).layer_id ?? hoverLayer.id)?.toString(),
           projectLayerId: hoverLayer.id?.toString(),
           // The new MapFeaturePopover uses featureProperties for token
           // substitution. `properties` is kept (same payload) so the
@@ -647,7 +631,7 @@ const MapViewer: React.FC<MapProps> = ({
           properties: hoverFeature.properties as Record<string, string>,
           triggeredBy: "hover",
           onClose: handlePopoverClose,
-        }),
+        })
       );
     } else if (hoverPopupKeyRef.current !== undefined) {
       // Cursor left all hover-trigger features — close the hover popup.
@@ -696,7 +680,7 @@ const MapViewer: React.FC<MapProps> = ({
           duration: 1800, // slower expansion
           idleTime: 400, // a touch more breathing room between rings
         }),
-        { pixelRatio: 2 },
+        { pixelRatio: 2 }
       );
 
       // Static (non-pulsing) variant of the popup-active dot. Used for
@@ -712,7 +696,7 @@ const MapViewer: React.FC<MapProps> = ({
           innerRatio: 0.18,
           staticOnly: true,
         }),
-        { pixelRatio: 2 },
+        { pixelRatio: 2 }
       );
 
       // set current zoom (rounded to 1 decimal place for consistency)
@@ -871,7 +855,7 @@ const MapViewer: React.FC<MapProps> = ({
             highlightFeature={
               shouldHighlightActivePopupFeature(
                 Boolean(popupInfo && activePopupConfig),
-                activePopupConfig?.highlight_active_feature,
+                activePopupConfig?.highlight_active_feature
               )
                 ? highlightedFeature
                 : undefined
@@ -880,6 +864,7 @@ const MapViewer: React.FC<MapProps> = ({
           <GeocoderLayer />
           <UserLocationLayer />
           <ToolboxLayers />
+          <ExplorerMapLayers />
           <MeasureLabels />
           {popupInfo && activePopupConfig && (
             <>

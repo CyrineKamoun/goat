@@ -77,6 +77,8 @@ export default function MapPage(props: { params: Promise<{ projectId: string }> 
   // Read ?loc= once on mount; it wins over the project's saved initial view.
   const urlLoc = useMemo(() => getLocFromUrl(), []);
   const mapMode = useAppSelector((state) => state.map.mapMode);
+  // The Explorer has its own bottom bar and is not a feature-editing session.
+  const explorerActive = useAppSelector((state) => state.explorer.active);
   const dispatch = useAppDispatch();
 
   // A template result (T7) can land here as `?mode=workflows&workflow=<id>` /
@@ -587,11 +589,15 @@ export default function MapPage(props: { params: Promise<{ projectId: string }> 
                               isEditor={isProjectEditor}
                             />
                           </ThemeProvider>
-                          <DataPanel
-                            projectLayers={allProjectLayersIncludingTables}
-                            isEditor={isProjectEditor}
-                          />
-                          <EditModeHalo />
+                          {!explorerActive && (
+                            <>
+                              <DataPanel
+                                projectLayers={allProjectLayersIncludingTables}
+                                isEditor={isProjectEditor}
+                              />
+                              <EditModeHalo />
+                            </>
+                          )}
                         </Box>
                         {mapMode === "builder" && (
                           <Box
