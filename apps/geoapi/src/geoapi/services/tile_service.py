@@ -1367,6 +1367,9 @@ class TileService:
             # Check unsigned integers FIRST (before substring match)
             if type_lower in unsigned_int_types:
                 return "BIGINT"
+            # "interval" contains "int": without this it would pass as an integer
+            if "interval" in type_lower:
+                return "VARCHAR"
             # Check if it's a supported type (no cast needed)
             if any(t in type_lower for t in mvt_supported_types):
                 return None
