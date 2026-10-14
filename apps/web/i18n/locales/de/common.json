@@ -3462,5 +3462,8 @@
   "explorer_mode_trolleybus": "Oberleitungsbus",
   "explorer_mode_monorail": "Einschienenbahn",
   "explorer_mode_other": "Sonstige",
-  "explorer_more_routes": "{{count}} weitere: Suche eingrenzen"
+  "explorer_more_routes": "{{count}} weitere: Suche eingrenzen",
+  "explorer_no_changes": "keine Änderungen",
+  "explorer_fold": "Einklappen",
+  "explorer_unfold": "Ausklappen"
 }

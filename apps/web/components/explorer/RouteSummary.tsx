@@ -20,6 +20,7 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { RouteBadge } from "@/components/explorer/RouteBadge";
 import { VehiclesCurve } from "@/components/explorer/VehiclesCurve";
+import { modeIcon } from "@/components/explorer/modeIcon";
 
 function SectionTitle({ title, aside }: { title: string; aside?: string }) {
   return (
@@ -204,7 +205,7 @@ export function RouteSummary({ route }: { route: RouteRow }) {
 
   return (
     <Stack sx={{ height: "100%", minHeight: 0 }}>
-      <Box sx={{ px: 2, pt: 1.5 }}>
+      <Box sx={{ px: 2.5, pt: 1.5, pb: 0.5 }}>
         <ButtonBase
           onClick={() => dispatch(selectExplorerRoute(null))}
           sx={{ gap: 0.75, color: "text.secondary", borderRadius: 1, px: 0.5 }}>
@@ -213,13 +214,20 @@ export function RouteSummary({ route }: { route: RouteRow }) {
         </ButtonBase>
         <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mt: 1 }}>
           <RouteBadge route={route} />
-          <Typography variant="body1" fontWeight="bold" noWrap>
+          <Typography variant="h6" fontWeight="bold" noWrap sx={{ fontSize: 17 }}>
             {route.long_name || route.short_name}
           </Typography>
         </Stack>
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-          {meta}
-        </Typography>
+        <Stack
+          direction="row"
+          spacing={0.75}
+          alignItems="flex-start"
+          sx={{ mt: 0.75, color: "text.secondary" }}>
+          <Box sx={{ display: "flex", pt: "2px" }}>
+            <Icon iconName={modeIcon(mode)} style={{ fontSize: 12 }} htmlColor="inherit" />
+          </Box>
+          <Typography variant="caption">{meta}</Typography>
+        </Stack>
       </Box>
       <Tabs value={0} variant="fullWidth" sx={{ minHeight: 40 }}>
         <Tab label={t("overview")} sx={{ minHeight: 40, minWidth: 0, px: 0.5, textTransform: "none" }} />
@@ -241,7 +249,7 @@ export function RouteSummary({ route }: { route: RouteRow }) {
           />
         ))}
       </Tabs>
-      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: 2, borderTop: 1, borderColor: "divider" }}>
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: 2.5, borderTop: 1, borderColor: "divider" }}>
         {summary.error && (
           <Typography variant="body2" color="error" sx={{ mt: 2 }}>
             {summary.error}
