@@ -13,7 +13,7 @@ import { GEOAPI_BASE_URL } from "@/lib/constants";
 
 import { useAppSelector } from "@/hooks/store/ContextHooks";
 
-import { EXPLORER_PANEL_WIDTH_ROUTE } from "@/components/explorer/ExplorerLeftPanel";
+import { EXPLORER_PANEL_WIDTH } from "@/components/explorer/ExplorerLeftPanel";
 
 export function ExplorerMapLayers() {
   const drawing = useAppSelector((s) => (s.explorer.active ? s.explorer.drawing : null));
@@ -54,7 +54,7 @@ export function ExplorerMapLayers() {
         [Math.min(...lons), Math.min(...lats)],
         [Math.max(...lons), Math.max(...lats)],
       ],
-      { padding: { top: 80, bottom: 120, left: EXPLORER_PANEL_WIDTH_ROUTE + 60, right: 80 }, maxZoom: 15 }
+      { padding: { top: 80, bottom: 120, left: EXPLORER_PANEL_WIDTH + 60, right: 80 }, maxZoom: 15 }
     );
     // Only when another route is chosen, not on every update of the same one.
     // eslint-disable-next-line react-hooks/exhaustive-deps

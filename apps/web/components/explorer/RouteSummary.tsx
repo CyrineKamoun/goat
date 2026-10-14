@@ -65,7 +65,7 @@ function ServiceTable({ data }: { data: RouteSummaryData }) {
             color="text.secondary"
             noWrap
             title={c.direction.label}
-            sx={{ width: 76, textAlign: "right" }}>
+            sx={{ width: 64, flexShrink: 0, textAlign: "right" }}>
             {c.direction.label}
           </Typography>
         ))}
@@ -87,7 +87,7 @@ function ServiceTable({ data }: { data: RouteSummaryData }) {
                 key={c.direction.key}
                 variant="caption"
                 fontWeight="bold"
-                sx={{ width: 76, textAlign: "right" }}>
+                sx={{ width: 64, flexShrink: 0, textAlign: "right" }}>
                 {text}
               </Typography>
             );
@@ -136,7 +136,7 @@ function Overview({ route, data }: { route: RouteRow; data: RouteSummaryData }) 
           </Box>
         </Tooltip>
       </Stack>
-      <Stack direction="row" justifyContent="space-between" sx={{ mt: 1.5 }}>
+      <Stack direction="row" justifyContent="space-between" flexWrap="wrap" columnGap={1} sx={{ mt: 1.5 }}>
         <Typography variant="caption" color="text.secondary">
           {t("explorer_vehicles_in_service", { date: shortDate(date, lang) })}
         </Typography>
@@ -221,8 +221,8 @@ export function RouteSummary({ route }: { route: RouteRow }) {
           {meta}
         </Typography>
       </Box>
-      <Tabs value={0} variant="scrollable" sx={{ px: 1, minHeight: 40 }}>
-        <Tab label={t("overview")} sx={{ minHeight: 40, textTransform: "none" }} />
+      <Tabs value={0} variant="fullWidth" sx={{ minHeight: 40 }}>
+        <Tab label={t("overview")} sx={{ minHeight: 40, minWidth: 0, px: 0.5, textTransform: "none" }} />
         {/* Shown where they will be, disabled until their phase. Direct
             children of Tabs: it hands its own props to each. */}
         {[t("explorer_tab_stops"), t("explorer_tab_service"), t("calendar")].map((label) => (
@@ -231,7 +231,13 @@ export function RouteSummary({ route }: { route: RouteRow }) {
             label={label}
             disabled
             title={t("explorer_coming_later")}
-            sx={{ minHeight: 40, textTransform: "none", "&.Mui-disabled": { pointerEvents: "auto" } }}
+            sx={{
+              minHeight: 40,
+              minWidth: 0,
+              px: 0.5,
+              textTransform: "none",
+              "&.Mui-disabled": { pointerEvents: "auto" },
+            }}
           />
         ))}
       </Tabs>

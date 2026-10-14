@@ -32,11 +32,7 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import { FloatingPanel } from "@/components/common/FloatingPanel";
 import { ExplorerBottomBar } from "@/components/explorer/ExplorerBottomBar";
 import { ExplorerProvider } from "@/components/explorer/ExplorerContext";
-import {
-  EXPLORER_PANEL_WIDTH,
-  EXPLORER_PANEL_WIDTH_ROUTE,
-  ExplorerLeftPanel,
-} from "@/components/explorer/ExplorerLeftPanel";
+import { EXPLORER_PANEL_WIDTH, ExplorerLeftPanel } from "@/components/explorer/ExplorerLeftPanel";
 import AttributionControl from "@/components/map/controls/Attribution";
 import { BasemapSelector } from "@/components/map/controls/BasemapSelector";
 import { CustomBasemapDialog } from "@/components/map/controls/CustomBasemapDialog";
@@ -111,14 +107,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
   // The PT network Explorer takes over the panels (docs/pt-network-editor).
   const explorerActive = useAppSelector((state) => state.explorer.active);
   const explorerBundleId = useAppSelector((state) => state.explorer.bundleId);
-  const explorerWide = useAppSelector(
-    (state) => state.explorer.leftTab === "explorer" && !!state.explorer.selectedRouteId
-  );
-  const leftWidth = !explorerActive
-    ? panelWidth
-    : explorerWide
-      ? EXPLORER_PANEL_WIDTH_ROUTE
-      : EXPLORER_PANEL_WIDTH;
+  const leftWidth = explorerActive ? EXPLORER_PANEL_WIDTH : panelWidth;
   const featureEditorActive = useAppSelector((state) => state.featureEditor.activeLayerId);
   const selectedBundleId = useAppSelector((state) => state.layers.selectedBundleId);
   const featureEditorActiveFeature = useAppSelector((state) => state.featureEditor.activeFeatureId);

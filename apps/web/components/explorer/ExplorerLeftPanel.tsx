@@ -18,8 +18,9 @@ import { FloatingPanel } from "@/components/common/FloatingPanel";
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { ExplorerTab } from "@/components/explorer/ExplorerTab";
 
-export const EXPLORER_PANEL_WIDTH = 312;
-export const EXPLORER_PANEL_WIDTH_ROUTE = 380;
+/** The data view's left panel width: entering the Explorer or opening a route
+ * never resizes the panel under the user. */
+export const EXPLORER_PANEL_WIDTH = 300;
 
 function Status() {
   const { t } = useTranslation("common");
@@ -61,15 +62,14 @@ export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const tab = useAppSelector((s) => s.explorer.leftTab);
-  const routeOpen = useAppSelector((s) => !!s.explorer.selectedRouteId);
   const { db, state } = useExplorer();
-  const width = tab === "explorer" && routeOpen ? EXPLORER_PANEL_WIDTH_ROUTE : EXPLORER_PANEL_WIDTH;
 
   // One panel: the tab bar is its header, the active tab fills the rest. Both
   // tabs stay mounted, so switching is a tab change, never a reload — the
   // route search and scroll position survive a look at the layers.
   return (
-    <FloatingPanel width={width} maxHeight="100%" fillHeight={tab === "explorer"}>
+    // The full map height on both tabs, so switching does not resize it.
+    <FloatingPanel width={EXPLORER_PANEL_WIDTH} maxHeight="100%" fillHeight>
       {/* Flush with the panel: plain tabs under its own corners, the active
           one underlined, rather than a control set inside it. */}
       <Tabs
