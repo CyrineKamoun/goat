@@ -18,7 +18,7 @@ import { selectExplorerStop } from "@/lib/store/explorer/slice";
 import type { RouteRow } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
-import { RouteBadge } from "@/components/explorer/RouteBadge";
+import { RouteBadge, distinctLines } from "@/components/explorer/RouteBadge";
 import { PX } from "@/components/explorer/SectionHeader";
 import { StopMarker } from "@/components/explorer/StopMarker";
 
@@ -135,20 +135,7 @@ export function StationsList({
   const [open, setOpen] = useState<Set<number>>(new Set());
   const nested = listed.some((l) => l.platforms.length > 0);
 
-  // One badge per number and colour: a feed may run several routes as "S3"
-  // (per operator, per variant), and the row means the line, not the route.
-  const routes = (idxs: number[]) => {
-    const seen = new Set<string>();
-    return idxs
-      .map((i) => routeByIdx.get(i))
-      .filter((r): r is RouteRow => {
-        if (!r) return false;
-        const key = `${r.short_name || r.long_name || r.route_id}|${r.color}|${r.route_type}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-  };
+  const routes = (idxs: number[]) => distinctLines(idxs.map((i) => routeByIdx.get(i)));
   const toggle = (idx: number) =>
     setOpen((s) => {
       const next = new Set(s);
@@ -171,7 +158,9 @@ export function StationsList({
       )
     );
   const platformLabel = (place: PlaceRow, p: PlatformRow) => {
-    const code = p.platform_code ? t("explorer_platform", { code: p.platform_code }) : null;
+    const code = p.platform_code
+      ? t("explorer_platform", { code: p.platform_code, interpolation: { escapeValue: false } })
+      : null;
     // The station's name again says nothing, nor does an id: a platform with
     // neither code nor name of its own is "Platform", told apart by its routes.
     const own = p.name && p.name !== place.name ? p.name : null;

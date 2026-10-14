@@ -9,6 +9,8 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
+import { shortDate } from "@/lib/explorer/format";
+
 /** Side padding of the panel's rows (board 3). */
 export const PX = 2.5;
 
@@ -17,6 +19,7 @@ export function SectionHeader({
   label,
   amount,
   note,
+  aside,
   folded,
   onFold,
   px = PX,
@@ -26,8 +29,10 @@ export function SectionHeader({
   label: string;
   /** A count, shown as a pill. */
   amount?: ReactNode;
-  /** Plain text at the right, e.g. the day the figures are for. */
+  /** Plain text at the right. */
   note?: string;
+  /** Anything else at the right, e.g. the date the figures are for. */
+  aside?: ReactNode;
   folded?: boolean;
   onFold?: () => void;
   /** Side padding; 0 inside a section that is padded already. */
@@ -49,6 +54,7 @@ export function SectionHeader({
           {note}
         </Typography>
       )}
+      {aside}
       {amount !== undefined && (
         <Box
           component="span"
@@ -74,6 +80,31 @@ export function SectionHeader({
           <Icon iconName={folded ? ICON_NAME.CHEVRON_DOWN : ICON_NAME.CHEVRON_UP} style={{ fontSize: 11 }} />
         </IconButton>
       )}
+    </Stack>
+  );
+}
+
+/** The Explorer's date, set in the bottom bar, as a pill on each section its
+ * figures depend on: every figure names its period (05-viewers-and-cost.md). */
+export function DateChip({ date }: { date: string }) {
+  const { i18n } = useTranslation("common");
+  return (
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={0.75}
+      sx={{
+        px: 1,
+        py: 0.25,
+        borderRadius: 1,
+        bgcolor: "action.hover",
+        color: "text.primary",
+        flexShrink: 0,
+      }}>
+      <Icon iconName={ICON_NAME.CALENDAR} style={{ fontSize: 11 }} htmlColor="inherit" />
+      <Typography variant="caption" fontWeight={700} noWrap>
+        {shortDate(date, i18n.language)}
+      </Typography>
     </Stack>
   );
 }

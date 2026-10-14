@@ -20,6 +20,14 @@ export interface ExplorerFilters {
   agencies: number[];
 }
 
+export type ExplorerRouteTab = "overview" | "stops" | "calendar";
+
+/** The destination picker's choice: a direction, and one of its patterns. */
+export interface ExplorerPatternChoice {
+  direction: number;
+  pattern_idx: number;
+}
+
 export const NO_FILTERS: ExplorerFilters = { types: [], modes: [], agencies: [] };
 
 export interface ExplorerRouteDrawing {
@@ -56,6 +64,10 @@ export interface ExplorerState {
   filters: ExplorerFilters;
   /** The stop (or station) picked in a list, highlighted on the map. */
   selectedStop: ExplorerPickedStop | null;
+  routeTab: ExplorerRouteTab;
+  /** One picker for the Stops tab now, and the strip and stop timetable
+   * later (02-panel-behaviour-spec › Directions). */
+  pattern: ExplorerPatternChoice | null;
 }
 
 const initialState: ExplorerState = {
@@ -68,6 +80,8 @@ const initialState: ExplorerState = {
   drawing: null,
   filters: NO_FILTERS,
   selectedStop: null,
+  routeTab: "overview",
+  pattern: null,
 };
 
 const explorerSlice = createSlice({
@@ -92,8 +106,19 @@ const explorerSlice = createSlice({
       state.leftTab = action.payload;
     },
     selectExplorerRoute: (state, action: PayloadAction<string | null>) => {
+      // Another route starts on its Overview, in its own first direction.
+      if (action.payload !== state.selectedRouteId) {
+        state.routeTab = "overview";
+        state.pattern = null;
+      }
       state.selectedRouteId = action.payload;
       if (action.payload === null) state.drawing = null;
+    },
+    setExplorerRouteTab: (state, action: PayloadAction<ExplorerRouteTab>) => {
+      state.routeTab = action.payload;
+    },
+    pickExplorerPattern: (state, action: PayloadAction<ExplorerPatternChoice | null>) => {
+      state.pattern = action.payload;
     },
     setExplorerDate: (state, action: PayloadAction<string>) => {
       state.date = action.payload;
@@ -125,6 +150,8 @@ export const {
   setExplorerDrawing,
   setExplorerFilters,
   selectExplorerStop,
+  setExplorerRouteTab,
+  pickExplorerPattern,
 } = explorerSlice.actions;
 
 export const explorerReducer = explorerSlice.reducer;

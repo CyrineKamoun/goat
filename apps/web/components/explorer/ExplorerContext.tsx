@@ -26,6 +26,8 @@ interface ExplorerData {
   progress: number | null;
   /** Start a failed open over. */
   retry: () => void;
+  /** The feed's `shape_dist_traveled` unit, as the snapshot found it. */
+  shapeDistUnit: string | null;
 }
 
 const Context = createContext<ExplorerData | null>(null);
@@ -69,8 +71,9 @@ export function ExplorerProvider({ bundleId, children }: { bundleId: string; chi
             ? state.progress.received / state.progress.total
             : null,
       retry,
+      shapeDistUnit: manifest?.shape_dist_unit ?? null,
     };
-  }, [state, window, members, retry]);
+  }, [state, window, members, retry, manifest]);
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

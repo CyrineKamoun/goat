@@ -5,35 +5,27 @@
  * the Explorer straight away.
  */
 import LogoutIcon from "@mui/icons-material/Logout";
-import { Button, Stack, TextField } from "@mui/material";
+import { Box, Button, Stack } from "@mui/material";
 import { useTranslation } from "react-i18next";
 
-import { closeExplorer, setExplorerDate } from "@/lib/store/explorer/slice";
+import { closeExplorer } from "@/lib/store/explorer/slice";
 
-import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
+import { useAppDispatch } from "@/hooks/store/ContextHooks";
 
 import { FloatingPanel } from "@/components/common/FloatingPanel";
-import { useExplorer } from "@/components/explorer/ExplorerContext";
+import { AnalysisDate } from "@/components/explorer/AnalysisDate";
 
 export function ExplorerBottomBar() {
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
-  const date = useAppSelector((s) => s.explorer.date);
-  const { window } = useExplorer();
 
   return (
     <FloatingPanel width={360} minHeight={0}>
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ px: 1.5, py: 1 }}>
-        {date && window && (
-          <TextField
-            type="date"
-            size="small"
-            value={date}
-            inputProps={{ min: window[0], max: window[1], "aria-label": t("calendar") }}
-            onChange={(e) => e.target.value && dispatch(setExplorerDate(e.target.value))}
-            sx={{ width: 160 }}
-          />
-        )}
+        {/* The Explorer's one date: the panels show it, this sets it. */}
+        <Box sx={{ width: 170 }}>
+          <AnalysisDate />
+        </Box>
         <Button
           variant="contained"
           color="primary"

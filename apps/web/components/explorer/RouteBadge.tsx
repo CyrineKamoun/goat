@@ -49,3 +49,16 @@ export function routeName(route: RouteRow, t: TFunction): string {
 export function namedByMode(route: RouteRow): boolean {
   return !route.long_name || route.long_name === route.short_name;
 }
+
+/** One route per number, colour and type: a feed may run several routes as
+ * "S3" (per operator, per variant), and a stop's badges mean the lines. */
+export function distinctLines(routes: (RouteRow | undefined)[]): RouteRow[] {
+  const seen = new Set<string>();
+  return routes.filter((r): r is RouteRow => {
+    if (!r) return false;
+    const key = `${r.short_name || r.long_name || r.route_id}|${r.color}|${r.route_type}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}

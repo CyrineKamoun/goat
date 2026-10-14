@@ -22,6 +22,7 @@ import {
 } from "@/lib/explorer/derive/operations";
 import { routeRuns } from "@/lib/explorer/derive/runs";
 import { places } from "@/lib/explorer/derive/stops";
+import { stopsLine } from "@/lib/explorer/derive/stopsLine";
 import type { ExplorerRouteDrawing } from "@/lib/store/explorer/slice";
 
 export interface RouteRow {
@@ -190,5 +191,21 @@ export function useRouteSummary(
 export function useNetworkCost(db: SqlRunner | undefined, window: [string, string] | null) {
   return useQuery(window ? db : undefined, `network-cost:${window?.[0]}:${window?.[1]}`, (d) =>
     networkAnnualFigures(d, window as [string, string])
+  );
+}
+
+/** A pattern's line diagram for the Stops tab, on the Explorer's date. */
+export function useStopsLine(
+  db: SqlRunner | undefined,
+  route: RouteRow,
+  direction: Direction | undefined,
+  pattern_idx: number | undefined,
+  date: string | null,
+  shapeDistUnit: string | null
+) {
+  return useQuery(
+    direction && pattern_idx !== undefined && date ? db : undefined,
+    `line:${route.route_idx}:${pattern_idx}:${date}`,
+    (d) => stopsLine(d, route, direction as Direction, pattern_idx as number, date as string, shapeDistUnit)
   );
 }

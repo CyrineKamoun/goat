@@ -4,11 +4,13 @@ import {
   closeExplorer,
   explorerReducer,
   openExplorer,
+  pickExplorerPattern,
   selectExplorerRoute,
   selectExplorerStop,
   setExplorerDrawing,
   setExplorerFilters,
   setExplorerLeftTab,
+  setExplorerRouteTab,
 } from "@/lib/store/explorer/slice";
 import { setMapMode } from "@/lib/store/map/slice";
 
@@ -59,6 +61,18 @@ describe("explorer slice", () => {
     state = open(explorerReducer(state, closeExplorer()));
     expect(state.filters).toEqual({ types: [], modes: [], agencies: [] });
     expect(state.selectedStop).toBeNull();
+  });
+
+  it("opens another route on its Overview, in its first direction", () => {
+    let state = explorerReducer(open(), selectExplorerRoute("R1"));
+    state = explorerReducer(state, setExplorerRouteTab("stops"));
+    state = explorerReducer(state, pickExplorerPattern({ direction: 3, pattern_idx: 4 }));
+    // Back to the list and into the same route: where the user was.
+    state = explorerReducer(state, selectExplorerRoute("R1"));
+    expect(state.routeTab).toBe("stops");
+    state = explorerReducer(state, selectExplorerRoute("R2"));
+    expect(state.routeTab).toBe("overview");
+    expect(state.pattern).toBeNull();
   });
 
   it("ends when the map leaves the data view", () => {

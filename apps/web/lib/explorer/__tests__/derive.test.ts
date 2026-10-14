@@ -21,10 +21,11 @@ import { openFixtureDb } from "@/lib/explorer/__tests__/fixtureDb";
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import { activeServicesSql, serviceDayCounts } from "@/lib/explorer/derive/calendar";
 import { annualFigures, defaultRate } from "@/lib/explorer/derive/cost";
-import { routeDirections } from "@/lib/explorer/derive/directions";
+import { type Direction, routeDirections } from "@/lib/explorer/derive/directions";
 import { headways, operations, vehiclesInService } from "@/lib/explorer/derive/operations";
 import { type TripRange, routeRuns } from "@/lib/explorer/derive/runs";
 import { type PlaceRow, places } from "@/lib/explorer/derive/stops";
+import { stopsLine } from "@/lib/explorer/derive/stopsLine";
 import {
   filterCount,
   listPlaces,
@@ -274,5 +275,53 @@ describe("filters", () => {
       ["tram", 1],
     ]);
     expect(filterCount({ types: ["routes"], modes: ["bus"], agencies: [0, 1] })).toBe(4);
+  });
+});
+
+describe("stops line", () => {
+  // R1 towards Fifth: T1 and T2 run S1→S5, 2 min and 0.68 km a hop (the
+  // feed's shape_dist is in km); T4 turns at S3.
+  const line = async (date: string) => {
+    const r = route("R1");
+    const { directions } = await routeDirections(db, r);
+    const toFifth = directions.find((d) => d.label === "To Fifth") as Direction;
+    return { toFifth, result: await stopsLine(db, r, toFifth, toFifth.key, date, "km") };
+  };
+
+  it("times and measures every hop of the main pattern", async () => {
+    const { result } = await line("2026-10-14");
+    expect(result.stops.map((s) => s.minutes)).toEqual([0, 2, 4, 6, 8]);
+    expect(result.stops.slice(0, -1).map((s) => Math.round(s.next_m ?? 0))).toEqual([680, 680, 680, 680]);
+    expect(result.stops.slice(0, -1).map((s) => s.next_min)).toEqual([2, 2, 2, 2]);
+    expect(result.stops[4].next_m).toBeNull();
+    // A platform is known by its station's name.
+    expect(result.stops[0].name).toBe("Main Station");
+    expect(result.of_date).toBe(true);
+    // Both trips leave at 08:00 and 08:10: AM peak, nothing at Midday.
+    expect(result.peak_min).toBe(8);
+    expect(result.offpeak_min).toBeNull();
+  });
+
+  it("marks where the short turn ends and the other routes at each stop", async () => {
+    const { result } = await line("2026-10-14");
+    expect(result.stops[2].short_turns).toEqual([{ destination: "Third", trips: 1 }]);
+    expect(result.stops.filter((s) => s.short_turns.length)).toHaveLength(1);
+    const ids = new Map([...routes.values()].map((r) => [r.route_idx, r.route_id]));
+    const others = result.stops.map((s) => s.transfers.map((i) => ids.get(i)).sort());
+    expect(others).toEqual([["R3"], ["R2", "R3"], ["R3"], ["R4"], ["R4"]]);
+  });
+
+  it("falls back to all the pattern's trips on a day it does not run", async () => {
+    const { result } = await line("2026-10-17");
+    expect(result.of_date).toBe(false);
+    expect(result.stops.map((s) => s.minutes)).toEqual([0, 2, 4, 6, 8]);
+  });
+
+  it("measures as the crow flies where the feed gives no distance", async () => {
+    const r = route("R1");
+    const { directions } = await routeDirections(db, r);
+    const back = directions.find((d) => d.label !== "To Fifth") as Direction;
+    const result = await stopsLine(db, r, back, back.key, "2026-10-14", "km");
+    expect(Math.round(result.stops[0].next_m ?? 0)).toBe(677);
   });
 });
