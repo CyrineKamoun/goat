@@ -3410,7 +3410,7 @@
   "support_following": "Following",
   "explorer": "Explorer",
   "explorer_menu_hint": "View and edit the public transport network",
-  "explorer_search": "Search routes…",
+  "explorer_search": "Search routes and stops…",
   "explorer_routes": "Routes",
   "explorer_no_routes": "No routes match",
   "explorer_stops_stations": "Stops & stations",
@@ -3484,5 +3484,17 @@
   "explorer_error_other_title": "The network could not be opened",
   "explorer_error_other_hint": "Try again. If it keeps failing, send the details to your administrator.",
   "explorer_error_details": "Details",
-  "explorer_vehicles_in_service_title": "Vehicles in service"
+  "explorer_vehicles_in_service_title": "Vehicles in service",
+  "explorer_n_of_m": "{{n}} of {{m}}",
+  "explorer_more_stops": "{{count}} more: narrow the search",
+  "explorer_no_stops": "No stops match",
+  "explorer_filter": "Filter",
+  "explorer_filter_type": "Type",
+  "explorer_filter_route_type": "Route type",
+  "explorer_filter_route_type_note": "Only route types in this feed are listed.",
+  "explorer_filter_agency": "Agency",
+  "explorer_platform": "Platform {{code}}",
+  "explorer_platforms_one": "{{count}} platform",
+  "explorer_platforms_other": "{{count}} platforms",
+  "explorer_platform_unnamed": "Platform"
 }

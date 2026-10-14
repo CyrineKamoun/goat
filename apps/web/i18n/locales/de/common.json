@@ -3410,7 +3410,7 @@
   "support_following": "Folgt dem Ticket",
   "explorer": "Explorer",
   "explorer_menu_hint": "ÖPNV-Netz ansehen und bearbeiten",
-  "explorer_search": "Linien suchen…",
+  "explorer_search": "Linien und Haltestellen suchen…",
   "explorer_routes": "Linien",
   "explorer_no_routes": "Keine passenden Linien",
   "explorer_stops_stations": "Haltestellen & Stationen",
@@ -3484,5 +3484,17 @@
   "explorer_error_other_title": "Das Netz konnte nicht geöffnet werden",
   "explorer_error_other_hint": "Versuchen Sie es erneut. Wenn es weiter fehlschlägt, senden Sie die Details an Ihre Administration.",
   "explorer_error_details": "Details",
-  "explorer_vehicles_in_service_title": "Fahrzeuge im Einsatz"
+  "explorer_vehicles_in_service_title": "Fahrzeuge im Einsatz",
+  "explorer_n_of_m": "{{n}} von {{m}}",
+  "explorer_more_stops": "{{count}} weitere: Suche eingrenzen",
+  "explorer_no_stops": "Keine passenden Haltestellen",
+  "explorer_filter": "Filter",
+  "explorer_filter_type": "Art",
+  "explorer_filter_route_type": "Verkehrsmittel",
+  "explorer_filter_route_type_note": "Nur Verkehrsmittel dieses Feeds werden aufgeführt.",
+  "explorer_filter_agency": "Verkehrsunternehmen",
+  "explorer_platform": "Steig {{code}}",
+  "explorer_platforms_one": "{{count}} Steig",
+  "explorer_platforms_other": "{{count}} Steige",
+  "explorer_platform_unnamed": "Steig"
 }

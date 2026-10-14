@@ -4,7 +4,7 @@
  * and, for a section that lists things, a fold toggle.
  */
 import { Box, IconButton, Stack, Typography } from "@mui/material";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
@@ -21,7 +21,8 @@ export function SectionHeader({
   onFold,
   px = PX,
 }: {
-  icon: ICON_NAME;
+  /** A font icon, or a drawn marker such as the map's stop. */
+  icon: ICON_NAME | ReactElement;
   label: string;
   /** A count, shown as a pill. */
   amount?: ReactNode;
@@ -35,7 +36,11 @@ export function SectionHeader({
   const { t } = useTranslation("common");
   return (
     <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px, minHeight: 40 }}>
-      <Icon iconName={icon} style={{ fontSize: 14 }} htmlColor="inherit" />
+      {typeof icon === "string" ? (
+        <Icon iconName={icon} style={{ fontSize: 14 }} htmlColor="inherit" />
+      ) : (
+        icon
+      )}
       <Typography variant="body2" fontWeight="bold" noWrap sx={{ flex: 1 }}>
         {label}
       </Typography>

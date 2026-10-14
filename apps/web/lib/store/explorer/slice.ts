@@ -1,15 +1,26 @@
 /**
  * The PT network Explorer's view state: which bundle is open, which tab, which
- * route, which date. The data itself is in DuckDB-WASM (useExplorerDb), not
+ * route or stop, which date, what the list is filtered by. The data itself is in DuckDB-WASM (useExplorerDb), not
  * here; the selected route's drawing — a handful of shape ids and stops — is,
  * because the map draws it from inside <Map>, away from the panels that hold
  * the database.
  */
 import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
 
+import type { ModeKey } from "@/lib/explorer/modes";
 import { setMapMode } from "@/lib/store/map/slice";
 
 export type ExplorerLeftTab = "layers" | "explorer";
+
+/** What the Explorer tab lists; an empty choice means everything. */
+export interface ExplorerFilters {
+  types: ("routes" | "stops")[];
+  modes: ModeKey[];
+  /** agency_idx values. */
+  agencies: number[];
+}
+
+export const NO_FILTERS: ExplorerFilters = { types: [], modes: [], agencies: [] };
 
 export interface ExplorerRouteDrawing {
   routeId: string;
@@ -24,6 +35,14 @@ export interface ExplorerRouteDrawing {
   stopChains: [number, number][][];
 }
 
+/** Where the map shows a picked stop; it draws from outside the panels. */
+export interface ExplorerPickedStop {
+  stop_idx: number;
+  name: string;
+  lon: number;
+  lat: number;
+}
+
 export interface ExplorerState {
   active: boolean;
   bundleId: string | null;
@@ -34,6 +53,9 @@ export interface ExplorerState {
    * window is known. */
   date: string | null;
   drawing: ExplorerRouteDrawing | null;
+  filters: ExplorerFilters;
+  /** The stop (or station) picked in a list, highlighted on the map. */
+  selectedStop: ExplorerPickedStop | null;
 }
 
 const initialState: ExplorerState = {
@@ -44,6 +66,8 @@ const initialState: ExplorerState = {
   selectedRouteId: null,
   date: null,
   drawing: null,
+  filters: NO_FILTERS,
+  selectedStop: null,
 };
 
 const explorerSlice = createSlice({
@@ -77,6 +101,12 @@ const explorerSlice = createSlice({
     setExplorerDrawing: (state, action: PayloadAction<ExplorerRouteDrawing | null>) => {
       state.drawing = action.payload;
     },
+    setExplorerFilters: (state, action: PayloadAction<ExplorerFilters>) => {
+      state.filters = action.payload;
+    },
+    selectExplorerStop: (state, action: PayloadAction<ExplorerPickedStop | null>) => {
+      state.selectedStop = action.payload;
+    },
   },
   extraReducers: (builder) => {
     // The Explorer lives in the data view; leaving it ends the session.
@@ -93,6 +123,8 @@ export const {
   selectExplorerRoute,
   setExplorerDate,
   setExplorerDrawing,
+  setExplorerFilters,
+  selectExplorerStop,
 } = explorerSlice.actions;
 
 export const explorerReducer = explorerSlice.reducer;

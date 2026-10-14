@@ -24,6 +24,15 @@ import { annualFigures, defaultRate } from "@/lib/explorer/derive/cost";
 import { routeDirections } from "@/lib/explorer/derive/directions";
 import { headways, operations, vehiclesInService } from "@/lib/explorer/derive/operations";
 import { type TripRange, routeRuns } from "@/lib/explorer/derive/runs";
+import { type PlaceRow, places } from "@/lib/explorer/derive/stops";
+import {
+  filterCount,
+  listPlaces,
+  matchingRouteIdxs,
+  modeCounts,
+  routeMatches,
+  shows,
+} from "@/lib/explorer/filters";
 
 type Route = TripRange & { route_idx: number; route_id: string };
 
@@ -207,5 +216,63 @@ describe("network cost", () => {
       expected += (await annualFigures(db, r, window, defaultRate(type))).cost;
     }
     expect(network.cost).toBeCloseTo(expected, 6);
+  });
+});
+
+describe("stations and platforms", () => {
+  const ids = (route_idxs: number[]) => {
+    const byIdx = new Map([...routes.values()].map((r) => [r.route_idx, r.route_id]));
+    return route_idxs.map((i) => byIdx.get(i)).sort();
+  };
+
+  it("puts platforms under their station and lists the routes calling there", async () => {
+    const byId = new Map((await places(db)).map((p) => [p.stop_id, p]));
+    // S1 is a platform of P: it is listed under the station, not on its own.
+    expect([...byId.keys()].sort()).toEqual(["P", "S2", "S3", "S4", "S5", "S6", "X"]);
+    const station = byId.get("P") as PlaceRow;
+    expect(station.is_station).toBe(true);
+    expect(station.platforms.map((p) => p.stop_id)).toEqual(["S1"]);
+    expect(ids(station.route_idxs)).toEqual(["R1", "R3"]);
+    expect(ids(station.platforms[0].route_idxs)).toEqual(["R1", "R3"]);
+    expect(ids((byId.get("S2") as PlaceRow).route_idxs)).toEqual(["R1", "R2", "R3"]);
+    expect(ids((byId.get("S6") as PlaceRow).route_idxs)).toEqual(["R2", "R4"]);
+    expect(byId.get("X")?.route_idxs).toEqual([]);
+    expect(byId.get("S2")?.platforms).toEqual([]);
+  });
+
+  it("finds a platform by its name and opens its station", async () => {
+    const all = await places(db);
+    const found = listPlaces(all, "platform 1", null);
+    expect(found.map((f) => [f.place.stop_id, f.opened, f.platforms.map((p) => p.stop_id)])).toEqual([
+      ["P", true, ["S1"]],
+    ]);
+    // A station found by its own name stays folded.
+    expect(listPlaces(all, "main station", null)[0].opened).toBe(false);
+  });
+});
+
+describe("filters", () => {
+  const all = [
+    { route_idx: 0, route_type: 3, agency_idx: 0 },
+    { route_idx: 1, route_type: 0, agency_idx: 0 },
+    { route_idx: 2, route_type: 3, agency_idx: 1 },
+  ];
+  const none = { types: [], modes: [], agencies: [] };
+
+  it("narrows routes by route type and agency, and stops through them", () => {
+    const f = { ...none, modes: ["bus" as const], agencies: [1] };
+    expect(all.filter((r) => routeMatches(r, f)).map((r) => r.route_idx)).toEqual([2]);
+    expect(matchingRouteIdxs(all, f)).toEqual(new Set([2]));
+    expect(matchingRouteIdxs(all, { ...none, types: ["stops" as const] })).toBeNull();
+  });
+
+  it("shows both lists until one is picked, and counts what the feed has", () => {
+    expect(shows(none, "stops")).toBe(true);
+    expect(shows({ ...none, types: ["routes"] }, "stops")).toBe(false);
+    expect(modeCounts(all)).toEqual([
+      ["bus", 2],
+      ["tram", 1],
+    ]);
+    expect(filterCount({ types: ["routes"], modes: ["bus"], agencies: [0, 1] })).toBe(4);
   });
 });

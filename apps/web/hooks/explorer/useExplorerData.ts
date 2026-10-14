@@ -21,6 +21,7 @@ import {
   vehiclesInService,
 } from "@/lib/explorer/derive/operations";
 import { routeRuns } from "@/lib/explorer/derive/runs";
+import { places } from "@/lib/explorer/derive/stops";
 import type { ExplorerRouteDrawing } from "@/lib/store/explorer/slice";
 
 export interface RouteRow {
@@ -33,6 +34,7 @@ export interface RouteRow {
   text_color: string | null;
   trip_lo: number | null;
   trip_hi: number | null;
+  agency_idx: number | null;
   agency: string | null;
 }
 
@@ -80,18 +82,26 @@ export function useRoutes(db: SqlRunner | undefined) {
   return useQuery(db, "routes", (d) =>
     d.all<RouteRow>(`
         SELECT r.route_idx, r.route_id, r.short_name, r.long_name, r.route_type, r.color,
-               r.text_color, r.trip_lo, r.trip_hi, a.name AS agency
+               r.text_color, r.trip_lo, r.trip_hi, r.agency_idx, a.name AS agency
         FROM routes r LEFT JOIN agencies a USING (agency_idx)
         WHERE r.trip_lo IS NOT NULL
         ORDER BY r.route_idx`)
   );
 }
 
-export function useStopCount(db: SqlRunner | undefined) {
-  return useQuery(
-    db,
-    "stop-count",
-    async (d) => (await d.all<{ n: number }>("SELECT CAST(count(*) AS INTEGER) AS n FROM stops"))[0]?.n ?? 0
+/** Stations and stops on their own, with the routes calling there. */
+export function useStops(db: SqlRunner | undefined) {
+  return useQuery(db, "places", places);
+}
+
+export interface AgencyRow {
+  agency_idx: number;
+  name: string | null;
+}
+
+export function useAgencies(db: SqlRunner | undefined) {
+  return useQuery(db, "agencies", (d) =>
+    d.all<AgencyRow>("SELECT agency_idx, name FROM agencies ORDER BY name, agency_idx")
   );
 }
 

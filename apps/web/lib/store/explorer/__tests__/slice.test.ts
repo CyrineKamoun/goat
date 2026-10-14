@@ -5,7 +5,9 @@ import {
   explorerReducer,
   openExplorer,
   selectExplorerRoute,
+  selectExplorerStop,
   setExplorerDrawing,
+  setExplorerFilters,
   setExplorerLeftTab,
 } from "@/lib/store/explorer/slice";
 import { setMapMode } from "@/lib/store/map/slice";
@@ -42,6 +44,21 @@ describe("explorer slice", () => {
     );
     state = explorerReducer(state, selectExplorerRoute(null));
     expect(state.drawing).toBeNull();
+  });
+
+  it("starts every bundle unfiltered with no stop picked", () => {
+    let state = explorerReducer(
+      open(),
+      setExplorerFilters({ types: ["stops"], modes: ["bus"], agencies: [0] })
+    );
+    state = explorerReducer(
+      state,
+      selectExplorerStop({ stop_idx: 4, name: "Fourth", lon: 13.43, lat: 52.5 })
+    );
+    expect(state.filters.modes).toEqual(["bus"]);
+    state = open(explorerReducer(state, closeExplorer()));
+    expect(state.filters).toEqual({ types: [], modes: [], agencies: [] });
+    expect(state.selectedStop).toBeNull();
   });
 
   it("ends when the map leaves the data view", () => {

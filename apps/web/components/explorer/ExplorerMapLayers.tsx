@@ -1,10 +1,11 @@
 /**
  * The selected route on the map: its lines from the bundle's shape_lines
  * tiles, straight lines between stops where a pattern has no shape, and its
- * stops. Rendered inside <Map>; reads the drawing the route summary puts in
- * the store. Layer ids start with `explorer-`, which the layer restack keeps
+ * stops; and the stop picked in a list, ringed. Rendered inside <Map>; reads
+ * what the panels put in the store. Layer ids start with `explorer-`, which the layer restack keeps
  * above the data (Layers.tsx).
  */
+import { useTheme } from "@mui/material/styles";
 import type { FeatureCollection } from "geojson";
 import { useEffect, useMemo } from "react";
 import { Layer, Source, useMap } from "react-map-gl/maplibre";
@@ -17,7 +18,36 @@ import { EXPLORER_PANEL_WIDTH } from "@/components/explorer/ExplorerLeftPanel";
 
 export function ExplorerMapLayers() {
   const drawing = useAppSelector((s) => (s.explorer.active ? s.explorer.drawing : null));
+  const picked = useAppSelector((s) => (s.explorer.active ? s.explorer.selectedStop : null));
   const { current: map } = useMap();
+  const theme = useTheme();
+
+  const pickedPoint = useMemo<FeatureCollection>(
+    () => ({
+      type: "FeatureCollection",
+      features: picked
+        ? [
+            {
+              type: "Feature",
+              geometry: { type: "Point", coordinates: [picked.lon, picked.lat] },
+              properties: { name: picked.name },
+            },
+          ]
+        : [],
+    }),
+    [picked]
+  );
+
+  // Fly to a picked stop, clear of the left panel; zoom in only as far as a
+  // stop needs, never out from a closer look.
+  useEffect(() => {
+    if (!map || !picked) return;
+    map.flyTo({
+      center: [picked.lon, picked.lat],
+      zoom: Math.max(map.getZoom(), 15),
+      padding: { top: 0, bottom: 0, left: EXPLORER_PANEL_WIDTH, right: 0 },
+    });
+  }, [map, picked]);
 
   const stops = useMemo<FeatureCollection>(
     () => ({
@@ -60,12 +90,35 @@ export function ExplorerMapLayers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, drawing?.routeId]);
 
-  if (!drawing) return null;
+  const pickedLayers = (
+    <Source key="explorer-picked-stop" id="explorer-picked-stop" type="geojson" data={pickedPoint}>
+      <Layer
+        id="explorer-picked-stop-halo"
+        type="circle"
+        paint={{ "circle-radius": 14, "circle-color": theme.palette.primary.main, "circle-opacity": 0.2 }}
+      />
+      <Layer
+        id="explorer-picked-stop-dot"
+        type="circle"
+        paint={{
+          "circle-radius": 6,
+          "circle-color": "#FFFFFF",
+          "circle-stroke-color": theme.palette.primary.main,
+          "circle-stroke-width": 3,
+        }}
+      />
+    </Source>
+  );
+
+  // Keyed sources: with or without a route drawn, each keeps its own place,
+  // because react-map-gl refuses a source whose id changes under it.
+  if (!drawing) return pickedLayers;
   const color = drawing.color ?? "#2E7D32";
   return (
     <>
       {drawing.shapeLinesLayerId && drawing.shapeIds.length > 0 && (
         <Source
+          key="explorer-route-shapes"
           id="explorer-route-shapes"
           type="vector"
           tiles={[
@@ -90,14 +143,14 @@ export function ExplorerMapLayers() {
           />
         </Source>
       )}
-      <Source id="explorer-route-chains" type="geojson" data={chains}>
+      <Source key="explorer-route-chains" id="explorer-route-chains" type="geojson" data={chains}>
         <Layer
           id="explorer-route-chain-line"
           type="line"
           paint={{ "line-color": color, "line-width": 3, "line-dasharray": [2, 1.5] }}
         />
       </Source>
-      <Source id="explorer-route-stops" type="geojson" data={stops}>
+      <Source key="explorer-route-stops" id="explorer-route-stops" type="geojson" data={stops}>
         <Layer
           id="explorer-route-stop"
           type="circle"
@@ -109,6 +162,7 @@ export function ExplorerMapLayers() {
           }}
         />
       </Source>
+      {pickedLayers}
     </>
   );
 }
