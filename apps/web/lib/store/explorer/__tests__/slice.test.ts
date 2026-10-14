@@ -6,7 +6,6 @@ import {
   openExplorer,
   selectExplorerRoute,
   setExplorerDrawing,
-  setExplorerLeftCollapsed,
   setExplorerLeftTab,
 } from "@/lib/store/explorer/slice";
 import { setMapMode } from "@/lib/store/map/slice";
@@ -20,14 +19,12 @@ describe("explorer slice", () => {
     expect(state).toMatchObject({ active: true, bundleId: "b1", bundleName: "Feed", selectedRouteId: null });
   });
 
-  it("keeps the tab and collapse the user chose for the session", () => {
+  it("keeps the tab the user chose for the session", () => {
     let state = open();
     state = explorerReducer(state, setExplorerLeftTab("layers"));
-    state = explorerReducer(state, setExplorerLeftCollapsed(true));
     state = explorerReducer(state, closeExplorer());
     state = open(state);
     expect(state.leftTab).toBe("layers");
-    expect(state.leftCollapsed).toBe(true);
   });
 
   it("drops the drawing when the route is deselected", () => {

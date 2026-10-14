@@ -29,7 +29,6 @@ export interface ExplorerState {
   bundleId: string | null;
   bundleName: string | null;
   leftTab: ExplorerLeftTab;
-  leftCollapsed: boolean;
   selectedRouteId: string | null;
   /** The one date every view shows, `YYYY-MM-DD`; null until the feed's
    * window is known. */
@@ -42,7 +41,6 @@ const initialState: ExplorerState = {
   bundleId: null,
   bundleName: null,
   leftTab: "explorer",
-  leftCollapsed: false,
   selectedRouteId: null,
   date: null,
   drawing: null,
@@ -53,11 +51,10 @@ const explorerSlice = createSlice({
   initialState,
   reducers: {
     openExplorer: (state, action: PayloadAction<{ bundleId: string; bundleName: string }>) => {
-      // The tab and collapse the user chose stay for the session.
+      // The tab the user chose stays for the session.
       return {
         ...initialState,
         leftTab: state.leftTab,
-        leftCollapsed: state.leftCollapsed,
         active: true,
         bundleId: action.payload.bundleId,
         bundleName: action.payload.bundleName,
@@ -66,13 +63,9 @@ const explorerSlice = createSlice({
     closeExplorer: (state) => ({
       ...initialState,
       leftTab: state.leftTab,
-      leftCollapsed: state.leftCollapsed,
     }),
     setExplorerLeftTab: (state, action: PayloadAction<ExplorerLeftTab>) => {
       state.leftTab = action.payload;
-    },
-    setExplorerLeftCollapsed: (state, action: PayloadAction<boolean>) => {
-      state.leftCollapsed = action.payload;
     },
     selectExplorerRoute: (state, action: PayloadAction<string | null>) => {
       state.selectedRouteId = action.payload;
@@ -97,7 +90,6 @@ export const {
   openExplorer,
   closeExplorer,
   setExplorerLeftTab,
-  setExplorerLeftCollapsed,
   selectExplorerRoute,
   setExplorerDate,
   setExplorerDrawing,

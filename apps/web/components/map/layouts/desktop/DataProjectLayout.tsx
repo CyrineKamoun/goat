@@ -111,17 +111,14 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
   // The PT network Explorer takes over the panels (docs/pt-network-editor).
   const explorerActive = useAppSelector((state) => state.explorer.active);
   const explorerBundleId = useAppSelector((state) => state.explorer.bundleId);
-  const explorerCollapsed = useAppSelector((state) => state.explorer.leftCollapsed);
   const explorerWide = useAppSelector(
     (state) => state.explorer.leftTab === "explorer" && !!state.explorer.selectedRouteId
   );
   const leftWidth = !explorerActive
     ? panelWidth
-    : explorerCollapsed
-      ? 48
-      : explorerWide
-        ? EXPLORER_PANEL_WIDTH_ROUTE
-        : EXPLORER_PANEL_WIDTH;
+    : explorerWide
+      ? EXPLORER_PANEL_WIDTH_ROUTE
+      : EXPLORER_PANEL_WIDTH;
   const featureEditorActive = useAppSelector((state) => state.featureEditor.activeLayerId);
   const selectedBundleId = useAppSelector((state) => state.layers.selectedBundleId);
   const featureEditorActiveFeature = useAppSelector((state) => state.featureEditor.activeFeatureId);

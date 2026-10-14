@@ -3451,8 +3451,6 @@
   "explorer_directions_other": "{{count}} Richtungen",
   "explorer_stops_one": "{{count}} Haltestelle",
   "explorer_stops_other": "{{count}} Haltestellen",
-  "explorer_collapse_panel": "Panel einklappen",
-  "explorer_show_panel": "Panel anzeigen",
   "explorer_mode_tram": "Straßenbahn",
   "explorer_mode_metro": "U-Bahn",
   "explorer_mode_rail": "Eisenbahn",
