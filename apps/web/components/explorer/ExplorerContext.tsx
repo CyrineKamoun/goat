@@ -22,6 +22,10 @@ interface ExplorerData {
   window: [string, string] | null;
   /** The bundle's shape_lines layer, which the map draws routes from. */
   shapeLinesLayerId: string | null;
+  /** Share of the snapshot's bytes in the browser, 0–1; null before the download. */
+  progress: number | null;
+  /** Start a failed open over. */
+  retry: () => void;
 }
 
 const Context = createContext<ExplorerData | null>(null);
@@ -37,7 +41,7 @@ export function defaultDate(window: [string, string], today = new Date()): strin
 export function ExplorerProvider({ bundleId, children }: { bundleId: string; children: ReactNode }) {
   const dispatch = useAppDispatch();
   const date = useAppSelector((s) => s.explorer.date);
-  const state = useExplorerDb(bundleId);
+  const { state, retry } = useExplorerDb(bundleId);
   const { members } = useBundleLayers(bundleId);
 
   const manifest = state.status === "loading" || state.status === "ready" ? state.manifest : undefined;
@@ -58,8 +62,15 @@ export function ExplorerProvider({ bundleId, children }: { bundleId: string; chi
       complete: state.status === "ready",
       window,
       shapeLinesLayerId: members?.find((m) => m.role === "shape_lines")?.layer_id ?? null,
+      progress:
+        state.status === "ready"
+          ? 1
+          : state.status === "loading" && state.progress.total
+            ? state.progress.received / state.progress.total
+            : null,
+      retry,
     };
-  }, [state, window, members]);
+  }, [state, window, members, retry]);
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

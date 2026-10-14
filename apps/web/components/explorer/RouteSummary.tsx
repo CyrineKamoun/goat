@@ -3,14 +3,14 @@
  * Explorer's date. Overview only for now; Stops, Service and Calendar come
  * with later phases and are shown, disabled, where they will be.
  */
-import { Box, ButtonBase, Stack, Tab, Tabs, Tooltip, Typography } from "@mui/material";
+import { Box, ButtonBase, Skeleton, Stack, Tab, Tabs, Tooltip, Typography } from "@mui/material";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { DEFAULT_PERIODS } from "@/lib/explorer/derive/operations";
-import { clock, count, euros, rate as formatRate, shortDate } from "@/lib/explorer/format";
+import { clock, count, shortDate } from "@/lib/explorer/format";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
 import { selectExplorerRoute, setExplorerDrawing } from "@/lib/store/explorer/slice";
 
@@ -18,32 +18,20 @@ import { type RouteRow, type RouteSummaryData, useRouteSummary } from "@/hooks/e
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
-import { RouteBadge } from "@/components/explorer/RouteBadge";
+import { useTimetablesPending } from "@/components/explorer/ExplorerLoading";
+import { RouteBadge, namedByMode, routeName } from "@/components/explorer/RouteBadge";
+import { SectionHeader } from "@/components/explorer/SectionHeader";
 import { VehiclesCurve } from "@/components/explorer/VehiclesCurve";
 import { modeIcon } from "@/components/explorer/modeIcon";
 
-function SectionTitle({ title, aside }: { title: string; aside?: string }) {
-  return (
-    <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mt: 2, mb: 1 }}>
-      <Typography variant="caption" fontWeight="bold" sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}>
-        {title}
-      </Typography>
-      {aside && (
-        <Typography variant="caption" color="text.secondary">
-          {aside}
-        </Typography>
-      )}
-    </Stack>
-  );
-}
-
+/** A figure on the panel's tinted ground, as in the cost section. */
 function Tile({ value, label }: { value: string; label: string }) {
   return (
-    <Box sx={{ flex: 1, border: 1, borderColor: "divider", borderRadius: 1, px: 1.25, py: 1 }}>
-      <Typography variant="body1" fontWeight="bold">
+    <Box sx={{ flex: 1, minWidth: 0, bgcolor: "action.hover", borderRadius: 1.5, px: 1.25, py: 1 }}>
+      <Typography variant="body1" fontWeight="bold" noWrap>
         {value}
       </Typography>
-      <Typography variant="caption" color="text.secondary">
+      <Typography variant="caption" color="text.secondary" display="block" sx={{ lineHeight: 1.3 }}>
         {label}
       </Typography>
     </Box>
@@ -54,8 +42,9 @@ function ServiceTable({ data }: { data: RouteSummaryData }) {
   const { t } = useTranslation("common");
   const cols = data.directions;
   return (
-    <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1, overflow: "hidden" }}>
-      <Stack direction="row" sx={{ px: 1.25, py: 0.75, bgcolor: "action.hover" }}>
+    // Tinted like the cost section; rows split by hairlines, the head by none.
+    <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, overflow: "hidden", px: 1.25, py: 0.5 }}>
+      <Stack direction="row" columnGap={1} sx={{ py: 0.75 }}>
         <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
           {t("explorer_every_min")}
         </Typography>
@@ -72,7 +61,11 @@ function ServiceTable({ data }: { data: RouteSummaryData }) {
         ))}
       </Stack>
       {DEFAULT_PERIODS.map((p) => (
-        <Stack key={p.key} direction="row" sx={{ px: 1.25, py: 0.6, borderTop: 1, borderColor: "divider" }}>
+        <Stack
+          key={p.key}
+          direction="row"
+          columnGap={1}
+          sx={{ py: 0.6, borderTop: 1, borderColor: "divider" }}>
           <Typography variant="caption" sx={{ flex: 1 }}>
             <b>{t(`explorer_period_${p.key}`)}</b>{" "}
             <Box component="span" sx={{ color: "text.secondary" }}>
@@ -114,10 +107,14 @@ function Overview({ route, data }: { route: RouteRow; data: RouteSummaryData }) 
   const peakIndex = ops.peak_at_s !== null ? Math.floor(ops.peak_at_s / 300) : null;
   return (
     <>
-      <SectionTitle
-        title={t("explorer_service")}
-        aside={t("explorer_timetable_of", { date: shortDate(date, lang) })}
-      />
+      <Box sx={{ mt: 1 }}>
+        <SectionHeader
+          px={0}
+          icon={ICON_NAME.CLOCK}
+          label={t("explorer_service")}
+          note={shortDate(date, lang)}
+        />
+      </Box>
       <ServiceTable data={data} />
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
         {t("explorer_first_last_trips", {
@@ -127,7 +124,14 @@ function Overview({ route, data }: { route: RouteRow; data: RouteSummaryData }) 
         })}
       </Typography>
 
-      <SectionTitle title={t("explorer_operations")} aside={t("explorer_per_day")} />
+      <Box sx={{ mt: 2 }}>
+        <SectionHeader
+          px={0}
+          icon={ICON_NAME.CHART}
+          label={t("explorer_operations")}
+          note={t("explorer_per_day")}
+        />
+      </Box>
       <Stack direction="row" spacing={1}>
         <Tile value={count(ops.vehicle_hours, lang)} label={t("explorer_vehicle_hours")} />
         <Tile value={count(ops.vehicle_km, lang)} label={t("explorer_vehicle_km")} />
@@ -137,40 +141,43 @@ function Overview({ route, data }: { route: RouteRow; data: RouteSummaryData }) 
           </Box>
         </Tooltip>
       </Stack>
-      <Stack direction="row" justifyContent="space-between" flexWrap="wrap" columnGap={1} sx={{ mt: 1.5 }}>
-        <Typography variant="caption" color="text.secondary">
-          {t("explorer_vehicles_in_service", { date: shortDate(date, lang) })}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {t("explorer_peak_at", { count: ops.peak_vehicles, time: clock(ops.peak_at_s) })}
-        </Typography>
-      </Stack>
+      <Box sx={{ mt: 2 }}>
+        <SectionHeader
+          px={0}
+          icon={ICON_NAME.BUS}
+          label={t("explorer_vehicles_in_service_title")}
+          note={t("explorer_peak_at", { count: ops.peak_vehicles, time: clock(ops.peak_at_s) })}
+        />
+      </Box>
       <VehiclesCurve
         values={data.curve}
         color={routeColor(route.color, modeOf(route.route_type))}
         markIndex={peakIndex}
       />
-
-      <SectionTitle title={t("explorer_operating_cost")} />
-      <Typography variant="h6" fontWeight="bold">
-        ≈ {euros(data.annual.cost, lang)}{" "}
-        <Typography component="span" variant="body2" color="text.secondary">
-          {t("explorer_a_year")}
-        </Typography>
-      </Typography>
-      <Typography variant="body2">
-        {t("explorer_cost_km_line", {
-          km: count(data.annual.vehicle_km, lang),
-          rate: formatRate(data.rate.per_km, lang),
-        })}
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        {t("explorer_cost_hours_line", { hours: count(data.annual.vehicle_hours, lang) })}
-      </Typography>
-      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1, mb: 2 }}>
-        {t("explorer_cost_note")}
-      </Typography>
+      <Box sx={{ mb: 2 }} />
     </>
+  );
+}
+
+/** The Overview's shape while its figures are worked out, so it fills in
+ * rather than jumps in; says so while the timetables are still loading. */
+function OverviewSkeleton() {
+  const { t } = useTranslation("common");
+  const pending = useTimetablesPending();
+  return (
+    <Box aria-busy sx={{ pt: 2, pb: 2 }}>
+      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+        {pending ?? t("explorer_calculating")}
+      </Typography>
+      <Skeleton variant="rounded" height={190} />
+      <Skeleton variant="text" width="60%" sx={{ mt: 1 }} />
+      <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} variant="rounded" height={58} sx={{ flex: 1 }} />
+        ))}
+      </Stack>
+      <Skeleton variant="rounded" height={80} sx={{ mt: 2 }} />
+    </Box>
   );
 }
 
@@ -195,7 +202,8 @@ export function RouteSummary({ route }: { route: RouteRow }) {
   }, [summary.data, route.route_id, route.color, mode, shapeLinesLayerId, dispatch]);
 
   const meta = [
-    t(`explorer_mode_${mode}`),
+    // Named by its mode already, the heading needs no second mention of it.
+    namedByMode(route) ? null : t(`explorer_mode_${mode}`),
     route.agency,
     summary.data ? t("explorer_directions", { count: summary.data.directions.length }) : null,
     summary.data ? t("explorer_stops", { count: summary.data.n_stops }) : null,
@@ -215,7 +223,7 @@ export function RouteSummary({ route }: { route: RouteRow }) {
         <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mt: 1 }}>
           <RouteBadge route={route} />
           <Typography variant="h6" fontWeight="bold" noWrap sx={{ fontSize: 17 }}>
-            {route.long_name || route.short_name}
+            {routeName(route, t)}
           </Typography>
         </Stack>
         <Stack
@@ -255,11 +263,7 @@ export function RouteSummary({ route }: { route: RouteRow }) {
             {summary.error}
           </Typography>
         )}
-        {!summary.data && !summary.error && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            {t("loading")}
-          </Typography>
-        )}
+        {!summary.data && !summary.error && <OverviewSkeleton />}
         {summary.data && <Overview route={route} data={summary.data} />}
       </Box>
     </Stack>

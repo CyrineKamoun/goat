@@ -1,37 +1,25 @@
 /**
- * The Explorer tab: the bundle's routes, searchable, and the network's
- * operating cost. Selecting a route turns the tab into its summary.
+ * The Explorer tab: the bundle's routes, searchable. Selecting a route turns
+ * the tab into its summary; the operating cost sits below, in CostSection.
  */
-import {
-  Box,
-  Divider,
-  IconButton,
-  InputAdornment,
-  List,
-  ListItemButton,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
-import { type ReactNode, useMemo, useState } from "react";
+import { Box, InputAdornment, List, ListItemButton, Stack, TextField, Typography } from "@mui/material";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { count, euros } from "@/lib/explorer/format";
+import { count } from "@/lib/explorer/format";
 import { modeOf } from "@/lib/explorer/modes";
 import { selectExplorerRoute } from "@/lib/store/explorer/slice";
 
-import { type RouteRow, useNetworkCost, useRoutes, useStopCount } from "@/hooks/explorer/useExplorerData";
+import { type RouteRow, useRoutes, useStopCount } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { RouteBadge } from "@/components/explorer/RouteBadge";
 import { RouteSummary } from "@/components/explorer/RouteSummary";
+import { PX, SectionHeader } from "@/components/explorer/SectionHeader";
 import { modeIcon } from "@/components/explorer/modeIcon";
-
-/** Side padding of the tab's rows (board 3). */
-const PX = 2.5;
 
 /** A list longer than this is cut short: narrowing the search finds the rest. */
 const SHOWN = 200;
@@ -44,64 +32,14 @@ function matches(route: RouteRow, query: string): boolean {
   );
 }
 
-/** A section's header: its icon, its name, how many it holds, and — for a
- * section that lists them — a fold toggle. */
-function SectionHeader({
-  icon,
-  label,
-  amount,
-  folded,
-  onFold,
-}: {
-  icon: ICON_NAME;
-  label: string;
-  amount: ReactNode;
-  folded?: boolean;
-  onFold?: () => void;
-}) {
-  const { t } = useTranslation("common");
-  return (
-    <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: PX, minHeight: 40 }}>
-      <Icon iconName={icon} style={{ fontSize: 14 }} htmlColor="inherit" />
-      <Typography variant="body2" fontWeight="bold" sx={{ flex: 1 }}>
-        {label}
-      </Typography>
-      <Box
-        component="span"
-        sx={{
-          px: 1,
-          py: 0.25,
-          borderRadius: 1,
-          bgcolor: "action.hover",
-          color: "text.secondary",
-          fontSize: 12,
-          fontWeight: 600,
-        }}>
-        {amount}
-      </Box>
-      {onFold && (
-        <IconButton
-          size="small"
-          aria-label={folded ? t("explorer_unfold") : t("explorer_fold")}
-          aria-expanded={!folded}
-          onClick={onFold}
-          sx={{ mr: -0.75 }}>
-          <Icon iconName={folded ? ICON_NAME.CHEVRON_DOWN : ICON_NAME.CHEVRON_UP} style={{ fontSize: 11 }} />
-        </IconButton>
-      )}
-    </Stack>
-  );
-}
-
 export function ExplorerTab() {
   const { t, i18n } = useTranslation("common");
   const dispatch = useAppDispatch();
-  const { db, complete, window } = useExplorer();
+  const { db } = useExplorer();
   const bundleName = useAppSelector((s) => s.explorer.bundleName);
   const selectedRouteId = useAppSelector((s) => s.explorer.selectedRouteId);
   const routes = useRoutes(db);
   const stops = useStopCount(db);
-  const network = useNetworkCost(complete ? db : undefined, window);
   const [query, setQuery] = useState("");
   const [routesFolded, setRoutesFolded] = useState(false);
 
@@ -190,21 +128,6 @@ export function ExplorerTab() {
         label={t("explorer_stops_stations")}
         amount={stops.data !== undefined ? count(stops.data, i18n.language) : "…"}
       />
-      <Divider />
-      <Box sx={{ px: PX, py: 1.5 }}>
-        <Typography variant="caption" color="text.secondary" display="block">
-          {t("explorer_network_cost")}
-        </Typography>
-        <Typography variant="body2">
-          <b>{network.data ? `≈ ${euros(network.data.cost, i18n.language)} ${t("explorer_a_year")}` : "…"}</b>
-          {network.data && (
-            <Box component="span" sx={{ color: "text.secondary" }}>
-              {" · "}
-              {t("explorer_no_changes")}
-            </Box>
-          )}
-        </Typography>
-      </Box>
     </Stack>
   );
 }

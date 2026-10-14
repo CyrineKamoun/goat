@@ -1,4 +1,5 @@
 import { Box } from "@mui/material";
+import type { TFunction } from "i18next";
 
 import { modeOf, routeColor, textOn } from "@/lib/explorer/modes";
 
@@ -33,4 +34,18 @@ export function RouteBadge({ route, small }: { route: RouteRow; small?: boolean 
       {route.short_name || route.long_name?.slice(0, 4) || route.route_id}
     </Box>
   );
+}
+
+/** The name to show beside a route's badge once it is selected: its long
+ * name, or — when it has none, or one that only repeats the number on the
+ * badge — its mode. */
+export function routeName(route: RouteRow, t: TFunction): string {
+  return route.long_name && route.long_name !== route.short_name
+    ? route.long_name
+    : t(`explorer_mode_${modeOf(route.route_type)}`);
+}
+
+/** Whether `routeName` fell back to the route's mode. */
+export function namedByMode(route: RouteRow): boolean {
+  return !route.long_name || route.long_name === route.short_name;
 }

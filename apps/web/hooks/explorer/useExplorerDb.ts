@@ -3,17 +3,19 @@
  * and loaded into DuckDB-WASM. One per bundle while the Explorer is open,
  * released when it closes.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { ExplorerDb } from "@/lib/explorer/db/ExplorerDb";
 import type { SnapshotManifest } from "@/lib/explorer/db/types";
+import { type ExplorerFailure, explain } from "@/lib/explorer/errors";
 import { FIRST_TABLES, type LoadProgress, loadSnapshot, waitForManifest } from "@/lib/explorer/snapshot";
 
 export type ExplorerDbState =
-  | { status: "preparing" }
+  /** Waiting for the snapshot; `building` once the server says it is making it. */
+  | { status: "preparing"; building: boolean }
   | { status: "loading"; progress: LoadProgress; db: ExplorerDb; manifest: SnapshotManifest }
   | { status: "ready"; db: ExplorerDb; manifest: SnapshotManifest }
-  | { status: "error"; error: string };
+  | { status: "error"; error: ExplorerFailure };
 
 /** Whether the tables a view needs are loaded. */
 export function hasTables(state: ExplorerDbState, tables: string[]): boolean {
@@ -22,17 +24,27 @@ export function hasTables(state: ExplorerDbState, tables: string[]): boolean {
   return tables.every((t) => state.progress.loaded.includes(t));
 }
 
-export function useExplorerDb(bundleId: string | undefined): ExplorerDbState {
-  const [state, setState] = useState<ExplorerDbState>({ status: "preparing" });
+export function useExplorerDb(bundleId: string | undefined): { state: ExplorerDbState; retry: () => void } {
+  const [state, setState] = useState<ExplorerDbState>({ status: "preparing", building: false });
+  // Bumped by `retry`: a failed open starts over from the manifest.
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   useEffect(() => {
     if (!bundleId) return;
     const abort = new AbortController();
     let db: ExplorerDb | undefined;
-    setState({ status: "preparing" });
+    setState({ status: "preparing", building: false });
 
     (async () => {
-      const manifest = await waitForManifest(bundleId, undefined, abort.signal);
+      const manifest = await waitForManifest(
+        bundleId,
+        () => {
+          if (!abort.signal.aborted) setState({ status: "preparing", building: true });
+        },
+        abort.signal,
+        attempt > 0
+      );
       const { ExplorerDb } = await import("@/lib/explorer/db/ExplorerDb");
       // A cancelled effect (an unmount, React's double mount in development)
       // must not start a worker, nor leave one running that it started.
@@ -54,16 +66,16 @@ export function useExplorerDb(bundleId: string | undefined): ExplorerDbState {
       if (!abort.signal.aborted) setState({ status: "ready", db: opened, manifest });
     })().catch((error: unknown) => {
       if (abort.signal.aborted) return;
-      setState({ status: "error", error: error instanceof Error ? error.message : String(error) });
+      setState({ status: "error", error: explain(error) });
     });
 
     return () => {
       abort.abort();
       void db?.close();
     };
-  }, [bundleId]);
+  }, [bundleId, attempt]);
 
-  return state;
+  return { state, retry };
 }
 
 export { FIRST_TABLES };

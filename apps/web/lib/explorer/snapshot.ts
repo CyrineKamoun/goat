@@ -10,29 +10,38 @@ import { apiRequestAuth } from "@/lib/api/fetcher";
 import { GEOAPI_BASE_URL } from "@/lib/constants";
 import type { ExplorerDb } from "@/lib/explorer/db/ExplorerDb";
 import type { SnapshotFile, SnapshotManifest, SnapshotPending } from "@/lib/explorer/db/types";
+import { ExplorerLoadError, kindOfBuildFailure, kindOfStatus } from "@/lib/explorer/errors";
 
 export type ManifestAnswer = SnapshotManifest | SnapshotPending;
 
-export async function fetchManifest(bundleId: string): Promise<ManifestAnswer> {
-  const res = await apiRequestAuth(`${GEOAPI_BASE_URL}/bundles/${bundleId}/explorer`);
-  if (res.status === 200 || res.status === 202 || res.status === 500) {
-    return (await res.json()) as ManifestAnswer;
+/** The manifest, or word that it is being built or failed. `retry` asks the
+ * server to forget a failed build and build again. */
+export async function fetchManifest(bundleId: string, retry = false): Promise<ManifestAnswer> {
+  const query = retry ? "?retry=true" : "";
+  const res = await apiRequestAuth(`${GEOAPI_BASE_URL}/bundles/${bundleId}/explorer${query}`);
+  if (res.status === 200 || res.status === 202) return (await res.json()) as ManifestAnswer;
+  // A failed build answers 500 with its reason; a 500 without one is the server's.
+  if (res.status === 500) {
+    const answer = (await res.json().catch(() => null)) as ManifestAnswer | null;
+    if (answer?.status === "failed") return answer;
   }
-  throw new Error(`Explorer snapshot: ${res.status} ${res.statusText}`);
+  throw new ExplorerLoadError(kindOfStatus(res.status), `Explorer snapshot: ${res.status} ${res.statusText}`);
 }
 
 /** Poll until the snapshot is built: every second at first, every five later. */
 export async function waitForManifest(
   bundleId: string,
   onPending?: (pending: SnapshotPending) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  retry = false
 ): Promise<SnapshotManifest> {
   let delay = 1000;
-  for (;;) {
-    const answer = await fetchManifest(bundleId);
+  for (let first = true; ; first = false) {
+    const answer = await fetchManifest(bundleId, retry && first);
     if (answer.status === "ready") return answer;
     if (answer.status === "failed") {
-      throw new Error(answer.detail || "The snapshot could not be built");
+      const detail = answer.detail || "The snapshot could not be built";
+      throw new ExplorerLoadError(kindOfBuildFailure(detail), detail);
     }
     onPending?.(answer);
     await new Promise((resolve, reject) => {
@@ -53,7 +62,12 @@ async function download(
   signal?: AbortSignal
 ): Promise<Uint8Array> {
   const res = await apiRequestAuth(`${GEOAPI_BASE_URL}${file.url}`, { signal });
-  if (!res.ok || !res.body) throw new Error(`${file.name}: ${res.status} ${res.statusText}`);
+  if (!res.ok || !res.body) {
+    // A file is named for its revision and never changes: a missing one was
+    // cleaned up under a long load, and a fresh manifest finds its successor.
+    const kind = res.status >= 500 ? "unreachable" : "other";
+    throw new ExplorerLoadError(kind, `${file.name}: ${res.status} ${res.statusText}`);
+  }
   const reader = res.body.getReader();
   const out = new Uint8Array(file.bytes);
   let received = 0;

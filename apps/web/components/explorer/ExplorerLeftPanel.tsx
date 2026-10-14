@@ -4,7 +4,7 @@
  * only way out of the Explorer
  * (docs/pt-network-editor/docs/02-panel-behaviour-spec.md).
  */
-import { Box, LinearProgress, Stack, Tab, Tabs, Typography } from "@mui/material";
+import { Box, Stack, Tab, Tabs } from "@mui/material";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -15,54 +15,20 @@ import { type ExplorerLeftTab, setExplorerLeftTab } from "@/lib/store/explorer/s
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { FloatingPanel } from "@/components/common/FloatingPanel";
+import { CostSection } from "@/components/explorer/CostSection";
 import { useExplorer } from "@/components/explorer/ExplorerContext";
+import { ExplorerLoadingCard, ExplorerLoadingLine } from "@/components/explorer/ExplorerLoading";
 import { ExplorerTab } from "@/components/explorer/ExplorerTab";
 
 /** The data view's left panel width: entering the Explorer or opening a route
  * never resizes the panel under the user. */
 export const EXPLORER_PANEL_WIDTH = 300;
 
-function Status() {
-  const { t } = useTranslation("common");
-  const { state } = useExplorer();
-  if (state.status === "error") {
-    return (
-      <Typography variant="body2" color="error" sx={{ p: 2 }}>
-        {t("explorer_error", { error: state.error })}
-      </Typography>
-    );
-  }
-  if (state.status === "preparing") {
-    return (
-      <Box sx={{ p: 2 }}>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          {t("explorer_preparing")}
-        </Typography>
-        <LinearProgress />
-      </Box>
-    );
-  }
-  if (state.status === "loading") {
-    const percent = state.progress.total
-      ? Math.round((100 * state.progress.received) / state.progress.total)
-      : 0;
-    return (
-      <Box sx={{ px: 2, py: 1 }}>
-        <Typography variant="caption" color="text.secondary">
-          {t("explorer_loading", { percent })}
-        </Typography>
-        <LinearProgress variant="determinate" value={percent} />
-      </Box>
-    );
-  }
-  return null;
-}
-
 export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const tab = useAppSelector((s) => s.explorer.leftTab);
-  const { db, state } = useExplorer();
+  const { db } = useExplorer();
 
   // One panel: the tab bar is its header, the active tab fills the rest. Both
   // tabs stay mounted, so switching is a tab change, never a reload — the
@@ -101,11 +67,19 @@ export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
         }}>
         {layersTab}
       </Box>
-      <Stack sx={{ display: tab === "explorer" ? "flex" : "none", flex: 1, minHeight: 0 }}>
-        {state.status !== "ready" && <Status />}
-        {db && (
-          <Box sx={{ flex: 1, minHeight: 0 }}>
-            <ExplorerTab />
+      <Stack
+        sx={{ display: tab === "explorer" ? "flex" : "none", flex: 1, minHeight: 0, position: "relative" }}>
+        <ExplorerLoadingLine />
+        {db ? (
+          <>
+            <Box sx={{ flex: 1, minHeight: 0 }}>
+              <ExplorerTab />
+            </Box>
+            <CostSection />
+          </>
+        ) : (
+          <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+            <ExplorerLoadingCard />
           </Box>
         )}
       </Stack>

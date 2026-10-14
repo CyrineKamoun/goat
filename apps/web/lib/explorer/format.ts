@@ -14,6 +14,11 @@ export function count(value: number, locale: string, digits = 0): string {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: digits }).format(value);
 }
 
+/** A large figure in a few digits, `54.7M`: totals a year are estimates. */
+export function compact(value: number, locale: string): string {
+  return new Intl.NumberFormat(locale, { notation: "compact", maximumSignificantDigits: 3 }).format(value);
+}
+
 /** An estimate in euros, rounded to what it can claim: `€1.58M`, `€40k`. */
 export function euros(value: number, locale: string): string {
   return new Intl.NumberFormat(locale, {
