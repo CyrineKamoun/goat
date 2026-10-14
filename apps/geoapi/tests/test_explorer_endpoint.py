@@ -153,6 +153,19 @@ def test_a_failed_build_is_reported_not_retried_at_once(client, explorer) -> Non
         assert build.call_count == 1
 
 
+def test_try_again_forgets_a_failed_build(client, explorer) -> None:
+    async def failing(bundle_id: str, revision: int, members: dict) -> None:
+        explorer._failures[(bundle_id, revision)] = (time.time(), "boom")
+
+    with patch.object(explorer, "_build", side_effect=failing) as build:
+        client.get(MANIFEST_URL)
+        time.sleep(0.1)
+        assert client.get(MANIFEST_URL).status_code == 500
+        assert client.get(f"{MANIFEST_URL}?retry=true").status_code == 202
+        time.sleep(0.1)
+        assert build.call_count == 2
+
+
 def test_a_reader_the_layer_rule_refuses_gets_nothing(client, explorer) -> None:
     with patch.object(
         explorer,

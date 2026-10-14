@@ -9,7 +9,7 @@ downloads files.
 - ``GET /bundles/{id}/explorer`` returns the manifest of the bundle's current
   revision: 200 with the files when the snapshot is there, 202 while it is
   being built (poll again; ``Retry-After``), 500 if the build failed (kept
-  for a few minutes, then tried again).
+  for a few minutes, then tried again; ``?retry=true`` tries again at once).
 - ``GET /bundles/{id}/explorer/r{rev}/s{schema}/{name}.parquet`` returns one
   file. The URL names the revision and schema version, so a file never
   changes and is cached for good.
@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from goatlib.bundles.explorer.snapshot import (
     FILES,
@@ -298,6 +298,10 @@ def _start_build(bundle_id: str, revision: int, members: dict[str, str]) -> None
 async def get_explorer_manifest(
     bundle_id: UUID,
     user_id: UUID | None = Depends(get_optional_user_id),
+    retry: bool = Query(
+        False,
+        description="Forget a failed build and build again (the Explorer's Try again).",
+    ),
 ) -> JSONResponse:
     bundle = await _authorize(bundle_id, user_id)
     bid, revision = str(bundle_id), bundle["revision"]
@@ -310,7 +314,7 @@ async def get_explorer_manifest(
             f["url"] = _file_url(bid, revision, f["name"])
         return JSONResponse({"status": "ready", **manifest}, headers=headers)
 
-    failure = _failures.get((bid, revision))
+    failure = None if retry else _failures.get((bid, revision))
     if failure and time.time() - failure[0] < _FAILURE_TTL_SECONDS:
         return JSONResponse(
             {"status": "failed", "layers_revision": revision, "detail": failure[1]},
