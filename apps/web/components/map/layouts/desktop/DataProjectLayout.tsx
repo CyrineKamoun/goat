@@ -337,13 +337,16 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
 
   const layout = (
     <>
+      {/* The 10px margin to the map's edge is padding, not an offset: the
+          column clips what overflows it, and a panel flush with the clip edge
+          has its shadow cut square at the rounded corners. */}
       <Box
         {...{ [DATA_PANEL_HEIGHT_CONSUMER_ATTR]: "" }}
         sx={{
           position: "absolute",
-          top: toolbarHeight + 10,
-          height: `calc(100% - ${toolbarHeight + 20}px - var(${DATA_PANEL_HEIGHT_VAR}, 0px))`,
-          left: 10,
+          top: toolbarHeight,
+          height: `calc(100% - ${toolbarHeight}px - var(${DATA_PANEL_HEIGHT_VAR}, 0px))`,
+          left: 0,
           zIndex: (theme) => theme.zIndex.drawer + 1,
           pointerEvents: "none",
         }}>
@@ -351,6 +354,8 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
           direction="column"
           sx={{
             height: "100%",
+            boxSizing: "border-box",
+            p: "10px",
             alignItems: "flex-start",
             flexWrap: "wrap",
             alignContent: "flex-start",
@@ -372,8 +377,8 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
         <Box
           sx={{
             position: "absolute",
-            left: `${leftWidth + GAP_SIZE}px`,
-            top: 0,
+            left: `${leftWidth + GAP_SIZE + 10}px`,
+            top: 10,
           }}>
           <SearchControl
             source={searchSource}
