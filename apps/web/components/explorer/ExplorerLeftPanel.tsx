@@ -6,16 +6,7 @@
  */
 import KeyboardDoubleArrowLeftIcon from "@mui/icons-material/KeyboardDoubleArrowLeft";
 import KeyboardDoubleArrowRightIcon from "@mui/icons-material/KeyboardDoubleArrowRight";
-import {
-  Box,
-  IconButton,
-  LinearProgress,
-  Stack,
-  ToggleButton,
-  ToggleButtonGroup,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Box, IconButton, LinearProgress, Stack, Tab, Tabs, Tooltip, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -101,31 +92,38 @@ export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
   // route search and scroll position survive a look at the layers.
   return (
     <FloatingPanel width={width} maxHeight="100%" fillHeight={tab === "explorer"}>
+      {/* Flush with the panel: plain tabs under its own corners, the active
+          one underlined, rather than a control set inside it. */}
       <Stack
         direction="row"
         alignItems="center"
-        sx={{ p: 0.5, borderBottom: 1, borderColor: "divider", flexShrink: 0 }}>
-        <ToggleButtonGroup
-          exclusive
-          fullWidth
-          size="small"
+        sx={{ borderBottom: 1, borderColor: "divider", flexShrink: 0 }}>
+        <Tabs
           value={tab}
-          onChange={(_e, value: ExplorerLeftTab | null) => value && dispatch(setExplorerLeftTab(value))}
-          sx={{ flex: 1, "& .MuiToggleButton-root": { border: 0, textTransform: "none", gap: 1 } }}>
-          <ToggleButton value="layers">
-            <Icon iconName={ICON_NAME.LAYERS} style={{ fontSize: 14 }} />
-            {t("layers")}
-          </ToggleButton>
-          <ToggleButton value="explorer">
-            <Icon iconName={ICON_NAME.BUS} style={{ fontSize: 14 }} />
-            {t("explorer")}
-          </ToggleButton>
-        </ToggleButtonGroup>
+          variant="fullWidth"
+          onChange={(_e, value: ExplorerLeftTab) => dispatch(setExplorerLeftTab(value))}
+          sx={{ flex: 1, minHeight: 44 }}>
+          <Tab
+            value="layers"
+            iconPosition="start"
+            icon={<Icon iconName={ICON_NAME.LAYERS} style={{ fontSize: 14 }} />}
+            label={t("layers")}
+            sx={{ minHeight: 44, textTransform: "none", gap: 0.5 }}
+          />
+          <Tab
+            value="explorer"
+            iconPosition="start"
+            icon={<Icon iconName={ICON_NAME.BUS} style={{ fontSize: 14 }} />}
+            label={t("explorer")}
+            sx={{ minHeight: 44, textTransform: "none", gap: 0.5 }}
+          />
+        </Tabs>
         <Tooltip title={t("explorer_collapse_panel")}>
           <IconButton
             aria-label={t("explorer_collapse_panel")}
             aria-expanded
-            onClick={() => dispatch(setExplorerLeftCollapsed(true))}>
+            onClick={() => dispatch(setExplorerLeftCollapsed(true))}
+            sx={{ mx: 0.5 }}>
             <KeyboardDoubleArrowLeftIcon fontSize="small" />
           </IconButton>
         </Tooltip>
