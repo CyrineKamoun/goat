@@ -59,11 +59,9 @@ export function ExplorerTab() {
 
   return (
     <Stack sx={{ height: "100%", minHeight: 0 }}>
-      <Box sx={{ px: 2, pt: 2, pb: 1 }}>
-        <Typography variant="body1" fontWeight="bold">
-          {t("explorer")}
-        </Typography>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1.5, color: "text.secondary" }}>
+      {/* No title of its own: the tab bar above already says Explorer. */}
+      <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ color: "text.secondary" }}>
           <Icon iconName={ICON_NAME.CUBE} style={{ fontSize: 13 }} />
           <Typography variant="body2" fontWeight="bold" color="text.primary" noWrap>
             {bundleName}

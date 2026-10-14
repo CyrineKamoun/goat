@@ -373,13 +373,7 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
             overflow: "hidden",
           }}>
           {explorerActive ? (
-            <ExplorerLeftPanel
-              layersTab={
-                <FloatingPanel width={leftWidth} maxHeight="100%">
-                  {layerTree}
-                </FloatingPanel>
-              }
-            />
+            <ExplorerLeftPanel layersTab={layerTree} />
           ) : (
             <FloatingPanel width={panelWidth} maxHeight="100%">
               {layerTree}

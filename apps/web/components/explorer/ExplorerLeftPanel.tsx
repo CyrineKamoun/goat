@@ -96,50 +96,57 @@ export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
     );
   }
 
+  // One panel: the tab bar is its header, the active tab fills the rest. Both
+  // tabs stay mounted, so switching is a tab change, never a reload — the
+  // route search and scroll position survive a look at the layers.
   return (
-    <Stack spacing={1} sx={{ height: "100%", minHeight: 0, width }}>
-      <FloatingPanel width={width} minHeight={0}>
-        <Stack direction="row" alignItems="center" sx={{ p: 0.5 }}>
-          <ToggleButtonGroup
-            exclusive
-            fullWidth
-            size="small"
-            value={tab}
-            onChange={(_e, value: ExplorerLeftTab | null) => value && dispatch(setExplorerLeftTab(value))}
-            sx={{ flex: 1, "& .MuiToggleButton-root": { border: 0, textTransform: "none", gap: 1 } }}>
-            <ToggleButton value="layers">
-              <Icon iconName={ICON_NAME.LAYERS} style={{ fontSize: 14 }} />
-              {t("layers")}
-            </ToggleButton>
-            <ToggleButton value="explorer">
-              <Icon iconName={ICON_NAME.BUS} style={{ fontSize: 14 }} />
-              {t("explorer")}
-            </ToggleButton>
-          </ToggleButtonGroup>
-          <Tooltip title={t("explorer_collapse_panel")}>
-            <IconButton
-              aria-label={t("explorer_collapse_panel")}
-              aria-expanded
-              onClick={() => dispatch(setExplorerLeftCollapsed(true))}>
-              <KeyboardDoubleArrowLeftIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </FloatingPanel>
-      {/* Both tabs stay mounted: switching is a tab change, never a reload. */}
-      <Box sx={{ display: tab === "layers" ? "contents" : "none" }}>{layersTab}</Box>
-      {tab === "explorer" && (
-        <FloatingPanel width={width} maxHeight="100%" fillHeight>
-          <Stack sx={{ height: "100%", minHeight: 0 }}>
-            {state.status !== "ready" && <Status />}
-            {db && (
-              <Box sx={{ flex: 1, minHeight: 0 }}>
-                <ExplorerTab />
-              </Box>
-            )}
-          </Stack>
-        </FloatingPanel>
-      )}
-    </Stack>
+    <FloatingPanel width={width} maxHeight="100%" fillHeight={tab === "explorer"}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        sx={{ p: 0.5, borderBottom: 1, borderColor: "divider", flexShrink: 0 }}>
+        <ToggleButtonGroup
+          exclusive
+          fullWidth
+          size="small"
+          value={tab}
+          onChange={(_e, value: ExplorerLeftTab | null) => value && dispatch(setExplorerLeftTab(value))}
+          sx={{ flex: 1, "& .MuiToggleButton-root": { border: 0, textTransform: "none", gap: 1 } }}>
+          <ToggleButton value="layers">
+            <Icon iconName={ICON_NAME.LAYERS} style={{ fontSize: 14 }} />
+            {t("layers")}
+          </ToggleButton>
+          <ToggleButton value="explorer">
+            <Icon iconName={ICON_NAME.BUS} style={{ fontSize: 14 }} />
+            {t("explorer")}
+          </ToggleButton>
+        </ToggleButtonGroup>
+        <Tooltip title={t("explorer_collapse_panel")}>
+          <IconButton
+            aria-label={t("explorer_collapse_panel")}
+            aria-expanded
+            onClick={() => dispatch(setExplorerLeftCollapsed(true))}>
+            <KeyboardDoubleArrowLeftIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+      <Box
+        sx={{
+          display: tab === "layers" ? "flex" : "none",
+          flexDirection: "column",
+          minHeight: 0,
+          overflow: "auto",
+        }}>
+        {layersTab}
+      </Box>
+      <Stack sx={{ display: tab === "explorer" ? "flex" : "none", flex: 1, minHeight: 0 }}>
+        {state.status !== "ready" && <Status />}
+        {db && (
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+            <ExplorerTab />
+          </Box>
+        )}
+      </Stack>
+    </FloatingPanel>
   );
 }
