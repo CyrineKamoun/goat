@@ -2,11 +2,12 @@
  * The open bundle's Explorer data, for every panel of the Explorer: its
  * DuckDB-WASM database and the member layers the map draws from.
  */
-import { createContext, useContext, useEffect, useMemo } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { useBundleLayers } from "@/lib/api/bundles";
 import type { SqlRunner } from "@/lib/explorer/db/types";
+import { DEFAULT_SETTINGS, type ExplorerSettings, loadSettings, saveSettings } from "@/lib/explorer/settings";
 import { setExplorerDate } from "@/lib/store/explorer/slice";
 
 import { type ExplorerDbState, FIRST_TABLES, hasTables, useExplorerDb } from "@/hooks/explorer/useExplorerDb";
@@ -28,6 +29,10 @@ interface ExplorerData {
   retry: () => void;
   /** The feed's `shape_dist_traveled` unit, as the snapshot found it. */
   shapeDistUnit: string | null;
+  /** The assumptions figures rest on (settings.ts), and how to change them:
+   * false when this browser could not keep them. */
+  settings: ExplorerSettings;
+  setSettings: (next: ExplorerSettings) => boolean;
 }
 
 const Context = createContext<ExplorerData | null>(null);
@@ -44,6 +49,15 @@ export function ExplorerProvider({ bundleId, children }: { bundleId: string; chi
   const dispatch = useAppDispatch();
   const date = useAppSelector((s) => s.explorer.date);
   const { state, retry } = useExplorerDb(bundleId);
+  const [settings, setSettingsState] = useState<ExplorerSettings>(DEFAULT_SETTINGS);
+  useEffect(() => setSettingsState(loadSettings(bundleId)), [bundleId]);
+  const setSettings = useCallback(
+    (next: ExplorerSettings) => {
+      setSettingsState(next);
+      return saveSettings(bundleId, next);
+    },
+    [bundleId]
+  );
   const { members } = useBundleLayers(bundleId);
 
   const manifest = state.status === "loading" || state.status === "ready" ? state.manifest : undefined;
@@ -72,8 +86,10 @@ export function ExplorerProvider({ bundleId, children }: { bundleId: string; chi
             : null,
       retry,
       shapeDistUnit: manifest?.shape_dist_unit ?? null,
+      settings,
+      setSettings,
     };
-  }, [state, window, members, retry, manifest]);
+  }, [state, window, members, retry, manifest, settings, setSettings]);
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

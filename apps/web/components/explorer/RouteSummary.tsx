@@ -1,7 +1,7 @@
 /**
- * A route's summary in the left panel (board 6): its name and, on the
- * Explorer's date, its Overview and its Stops (board 10). Service and
- * Calendar come with later steps and are shown, disabled, where they will be.
+ * A route's summary in the left panel (board 6): its name and its tabs —
+ * Overview, Stops (board 10), Service (board 22, read-only until editing)
+ * and Calendar (board 11).
  */
 import { Box, ButtonBase, Skeleton, Stack, Tab, Tabs, Tooltip, Typography } from "@mui/material";
 import { useEffect } from "react";
@@ -9,7 +9,6 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { DEFAULT_PERIODS } from "@/lib/explorer/derive/operations";
 import { clock, count, shortDate } from "@/lib/explorer/format";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
 import {
@@ -24,10 +23,14 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { useTimetablesPending } from "@/components/explorer/ExplorerLoading";
+import { EditPeriodsButton } from "@/components/explorer/ExplorerSettingsDialog";
 import { RouteBadge, namedByMode, routeName } from "@/components/explorer/RouteBadge";
+import { RouteCalendar } from "@/components/explorer/RouteCalendar";
+import { RouteService } from "@/components/explorer/RouteService";
 import { RouteStops } from "@/components/explorer/RouteStops";
 import { DateChip, SectionHeader } from "@/components/explorer/SectionHeader";
 import { VehiclesCurve } from "@/components/explorer/VehiclesCurve";
+import { directionLabel, directionPlace } from "@/components/explorer/directionWords";
 import { modeIcon } from "@/components/explorer/modeIcon";
 
 /** A figure on the panel's tinted ground, as in the cost section. */
@@ -49,13 +52,16 @@ const DIRECTION_COL = 76;
 
 function ServiceTable({ data }: { data: RouteSummaryData }) {
   const { t } = useTranslation("common");
+  const { periods } = useExplorer().settings;
   const cols = data.directions;
   return (
     // Tinted like the cost section; rows split by hairlines, the head by none.
     <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, overflow: "hidden", px: 1.5, py: 0.5 }}>
       {/* The directions, each in its own column; the unit is in the values. */}
       <Stack direction="row" columnGap={1.5} alignItems="flex-end" sx={{ py: 1 }}>
-        <Box sx={{ flex: 1 }} />
+        <Box sx={{ flex: 1 }}>
+          <EditPeriodsButton />
+        </Box>
         {cols.map((c) => (
           // "To" goes without saying in a column of headways: more of the
           // destination fits; the whole of it is in the tooltip.
@@ -65,13 +71,13 @@ function ServiceTable({ data }: { data: RouteSummaryData }) {
             color="text.secondary"
             fontWeight={600}
             noWrap
-            title={c.direction.label}
+            title={directionLabel(c.direction.name, t)}
             sx={{ width: DIRECTION_COL, flexShrink: 0, textAlign: "right" }}>
-            {c.direction.label.replace(/^To /, "")}
+            {directionPlace(c.direction.name, t)}
           </Typography>
         ))}
       </Stack>
-      {DEFAULT_PERIODS.map((p) => (
+      {periods.map((p) => (
         <Stack
           key={p.key}
           direction="row"
@@ -219,10 +225,10 @@ const TAB_SX = {
 export function RouteSummary({ route }: { route: RouteRow }) {
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
-  const { db, complete, window, shapeLinesLayerId } = useExplorer();
+  const { db, complete, window, shapeLinesLayerId, settings } = useExplorer();
   const date = useAppSelector((s) => s.explorer.date);
   const tab = useAppSelector((s) => s.explorer.routeTab);
-  const summary = useRouteSummary(complete ? db : undefined, route, date, window);
+  const summary = useRouteSummary(complete ? db : undefined, route, date, window, settings);
   const mode = modeOf(route.route_type);
 
   useEffect(() => {
@@ -284,17 +290,8 @@ export function RouteSummary({ route }: { route: RouteRow }) {
           sx={{ minHeight: 36 }}>
           <Tab value="overview" label={t("overview")} sx={TAB_SX} />
           <Tab value="stops" label={t("explorer_tab_stops")} sx={TAB_SX} />
-          {/* Shown where they will be, disabled until their phase. Direct
-            children of Tabs: it hands its own props to each. */}
-          {[t("explorer_tab_service"), t("calendar")].map((label) => (
-            <Tab
-              key={label}
-              label={label}
-              disabled
-              title={t("explorer_coming_later")}
-              sx={{ ...TAB_SX, "&.Mui-disabled": { pointerEvents: "auto" } }}
-            />
-          ))}
+          <Tab value="service" label={t("explorer_tab_service")} sx={TAB_SX} />
+          <Tab value="calendar" label={t("calendar")} sx={TAB_SX} />
         </Tabs>
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: 2.5 }}>
@@ -303,8 +300,10 @@ export function RouteSummary({ route }: { route: RouteRow }) {
             {summary.error}
           </Typography>
         )}
-        {!summary.data && !summary.error && <OverviewSkeleton />}
+        {!summary.data && !summary.error && tab !== "calendar" && <OverviewSkeleton />}
         {summary.data && tab === "overview" && <Overview route={route} data={summary.data} />}
+        {tab === "calendar" && <RouteCalendar route={route} />}
+        {summary.data && tab === "service" && <RouteService data={summary.data} />}
         {summary.data && tab === "stops" && (
           <RouteStops route={route} directions={summary.data.directions.map((d) => d.direction)} />
         )}

@@ -7,28 +7,7 @@
  * every time it runs.
  */
 import type { Run } from "@/lib/explorer/derive/runs";
-
-export interface Period {
-  key: string;
-  /** Seconds since the start of the service day; `end_s` exclusive. */
-  start_s: number;
-  end_s: number;
-}
-
-/** The bundle's time periods. They cover the service day without gaps
- * (goat_time_periods_gap_or_overlap); defining them per bundle comes later. */
-export const DEFAULT_PERIODS: Period[] = [
-  { key: "early", start_s: 0, end_s: 7 * 3600 },
-  { key: "am_peak", start_s: 7 * 3600, end_s: 9 * 3600 },
-  { key: "midday", start_s: 9 * 3600, end_s: 15 * 3600 },
-  { key: "pm_peak", start_s: 15 * 3600, end_s: 18 * 3600 },
-  { key: "evening", start_s: 18 * 3600, end_s: 22 * 3600 },
-  { key: "night", start_s: 22 * 3600, end_s: 48 * 3600 },
-];
-
-/** Where no `block_id` says which trips one vehicle runs, each run is taken
- * to keep its vehicle this long after arriving. */
-export const LAYOVER_S = 6 * 60;
+import { DEFAULT_SETTINGS, type Period } from "@/lib/explorer/settings";
 
 export interface Headway {
   /** Median minutes between departures; null with fewer than two. */
@@ -56,7 +35,7 @@ function median(values: number[]): number {
 }
 
 /** Headway in each period, for the runs of one direction. */
-export function headways(runs: Run[], periods: Period[] = DEFAULT_PERIODS): Map<string, Headway> {
+export function headways(runs: Run[], periods: Period[] = DEFAULT_SETTINGS.periods): Map<string, Headway> {
   const out = new Map<string, Headway>();
   for (const p of periods) {
     const deps = runs
@@ -72,11 +51,34 @@ export function headways(runs: Run[], periods: Period[] = DEFAULT_PERIODS): Map<
   return out;
 }
 
+/** End-to-end running time in each period: the median minutes of the runs
+ * leaving in it on the pattern most of them use — a short turn or branch does
+ * not shorten the main line's time, yet a period served only by a branch
+ * still has one. Null where nothing leaves. */
+export function runningTimes(
+  runs: Run[],
+  periods: Period[] = DEFAULT_SETTINGS.periods
+): Map<string, number | null> {
+  return new Map(
+    periods.map((p) => {
+      const inPeriod = runs.filter((r) => r.dep_s >= p.start_s && r.dep_s < p.end_s);
+      const byPattern = new Map<number, number[]>();
+      for (const r of inPeriod)
+        byPattern.set(r.pattern_idx, [...(byPattern.get(r.pattern_idx) ?? []), r.arr_s - r.dep_s]);
+      const busiest = [...byPattern.values()].sort((a, b) => b.length - a.length)[0];
+      return [p.key, busiest ? Math.round(median(busiest) / 60) : null];
+    })
+  );
+}
+
 /** The intervals during which vehicles are tied up: one per block where every
- * run has a block, else one per run with a layover after it. */
-function vehicleIntervals(runs: Run[]): { intervals: [number, number][]; fromBlocks: boolean } {
+ * run has a block, else one per run with its layover after it. */
+function vehicleIntervals(
+  runs: Run[],
+  layover_s: number
+): { intervals: [number, number][]; fromBlocks: boolean } {
   const fromBlocks = runs.length > 0 && runs.every((r) => r.block_idx !== null);
-  if (!fromBlocks) return { intervals: runs.map((r) => [r.dep_s, r.arr_s + LAYOVER_S]), fromBlocks };
+  if (!fromBlocks) return { intervals: runs.map((r) => [r.dep_s, r.arr_s + layover_s]), fromBlocks };
   const blocks = new Map<number, [number, number]>();
   for (const r of runs) {
     const b = blocks.get(r.block_idx as number);
@@ -111,8 +113,10 @@ function peak(intervals: [number, number][]): { n: number; at: number | null } {
   return { n: best, at };
 }
 
-export function operations(runs: Run[]): Operations {
-  const { intervals, fromBlocks } = vehicleIntervals(runs);
+/** `layover_s`: how long a run keeps its vehicle after arriving, where no
+ * `block_id` says which trips one vehicle runs. */
+export function operations(runs: Run[], layover_s = DEFAULT_SETTINGS.layover_s): Operations {
+  const { intervals, fromBlocks } = vehicleIntervals(runs, layover_s);
   const p = peak(intervals);
   const deps = runs.map((r) => r.dep_s);
   return {

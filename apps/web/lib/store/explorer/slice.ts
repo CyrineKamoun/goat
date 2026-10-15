@@ -20,13 +20,16 @@ export interface ExplorerFilters {
   agencies: number[];
 }
 
-export type ExplorerRouteTab = "overview" | "stops" | "calendar";
+export type ExplorerRouteTab = "overview" | "stops" | "service" | "calendar";
 
 /** The destination picker's choice: a direction, and one of its patterns. */
 export interface ExplorerPatternChoice {
   direction: number;
   pattern_idx: number;
 }
+
+/** The settings dialog's tabs (settings.ts). */
+export type ExplorerSettingsTab = "rates" | "periods" | "vehicles";
 
 export const NO_FILTERS: ExplorerFilters = { types: [], modes: [], agencies: [] };
 
@@ -68,6 +71,8 @@ export interface ExplorerState {
   /** One picker for the Stops tab now, and the strip and stop timetable
    * later (02-panel-behaviour-spec › Directions). */
   pattern: ExplorerPatternChoice | null;
+  /** The settings dialog, open on a tab, or closed. */
+  settingsTab: ExplorerSettingsTab | null;
 }
 
 const initialState: ExplorerState = {
@@ -82,6 +87,7 @@ const initialState: ExplorerState = {
   selectedStop: null,
   routeTab: "overview",
   pattern: null,
+  settingsTab: null,
 };
 
 const explorerSlice = createSlice({
@@ -120,6 +126,9 @@ const explorerSlice = createSlice({
     pickExplorerPattern: (state, action: PayloadAction<ExplorerPatternChoice | null>) => {
       state.pattern = action.payload;
     },
+    openExplorerSettings: (state, action: PayloadAction<ExplorerSettingsTab | null>) => {
+      state.settingsTab = action.payload;
+    },
     setExplorerDate: (state, action: PayloadAction<string>) => {
       state.date = action.payload;
     },
@@ -152,6 +161,7 @@ export const {
   selectExplorerStop,
   setExplorerRouteTab,
   pickExplorerPattern,
+  openExplorerSettings,
 } = explorerSlice.actions;
 
 export const explorerReducer = explorerSlice.reducer;

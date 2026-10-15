@@ -9,9 +9,11 @@
  * 3. A direction's main pattern is the one with the most trips; the others
  *    are variants: a short turn runs a stretch of it, an express skips some of
  *    its stops, a branch leaves it.
- * 4. A direction is called "To" the headsign most of its trips share, else
- *    its last stop; a loop (ending where it starts) "Loop via" its stop
- *    farthest from the start. Never inbound/outbound or 0/1.
+ * 4. A direction is named by the headsign most of its trips share, else its
+ *    last stop; a loop (ending where it starts) by its stop farthest from the
+ *    start. Never inbound/outbound or 0/1. The name is data — kind, place,
+ *    and a stop to tell two same-named directions apart; the UI words it in
+ *    the reader's language (`directionLabel`).
  */
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import type { TripRange } from "@/lib/explorer/derive/runs";
@@ -32,11 +34,18 @@ export interface DirectionPattern {
   n_trips: number;
 }
 
+/** How a direction is named, for the UI to word: "to" a place, or a "loop"
+ * via one; `via` tells apart two directions that would share a name. */
+export interface DirectionName {
+  kind: "to" | "loop";
+  place: string;
+  via: string | null;
+}
+
 export interface Direction {
   /** Stable within the route: the main pattern's index. */
   key: number;
-  /** "To SE 60th & Hawthorne", or "Loop via Third". */
-  label: string;
+  name: DirectionName;
   /** The feed's direction_id for these trips, when it gives one. */
   direction_id: number | null;
   patterns: DirectionPattern[];
@@ -197,13 +206,13 @@ export function deriveDirections(
     const main = group[0];
     const groupTrips = group.flatMap((p) => byPattern.get(p.pattern_idx) ?? []);
     const ids = new Set(groupTrips.map((t) => t.direction_id));
-    let label: string;
-    if (isLoop(main.stops, stops)) {
-      label = `Loop via ${loopVia(main.stops, stops)}`;
-    } else {
-      const headsign = sharedHeadsign(groupTrips);
-      label = `To ${headsign ?? stopName(stops, main.stops[main.stops.length - 1])}`;
-    }
+    const name: DirectionName = isLoop(main.stops, stops)
+      ? { kind: "loop", place: loopVia(main.stops, stops), via: null }
+      : {
+          kind: "to",
+          place: sharedHeadsign(groupTrips) ?? stopName(stops, main.stops[main.stops.length - 1]),
+          via: null,
+        };
     const patternsOut = group.map((p): DirectionPattern => {
       let kind: VariantKind = "main";
       if (p !== main) {
@@ -217,7 +226,7 @@ export function deriveDirections(
     });
     return {
       key: main.pattern_idx,
-      label,
+      name,
       direction_id: ids.size === 1 ? ([...ids][0] as number | null) : null,
       patterns: patternsOut,
       n_trips: group.reduce((n, p) => n + p.n_trips, 0),
@@ -225,12 +234,13 @@ export function deriveDirections(
   });
 
   // Two directions with one name are told apart by where they first differ.
+  const same = (d: Direction) => `${d.name.kind}|${d.name.place}`;
   const seen = new Map<string, number>();
-  directions.forEach((d) => seen.set(d.label, (seen.get(d.label) ?? 0) + 1));
+  directions.forEach((d) => seen.set(same(d), (seen.get(same(d)) ?? 0) + 1));
   for (const d of directions) {
-    if ((seen.get(d.label) ?? 0) < 2) continue;
+    if ((seen.get(same(d)) ?? 0) < 2) continue;
     const main = patterns.find((p) => p.pattern_idx === d.key);
-    if (main && main.stops.length > 1) d.label = `${d.label} via ${stopName(stops, main.stops[1])}`;
+    if (main && main.stops.length > 1) d.name.via = stopName(stops, main.stops[1]);
   }
   return directions;
 }

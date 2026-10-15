@@ -67,3 +67,36 @@ async function countServiceDays(db: SqlRunner, start: string, end: string): Prom
   `);
   return new Map(rows.map((r) => [r.service_idx, r.days]));
 }
+
+export interface ServiceDays {
+  weekdays: number;
+  saturdays: number;
+  sundays: number;
+  /** The days counted over. */
+  window_days: number;
+}
+
+/** The days between `start` and `end` on which the network runs any service,
+ * by kind of day: what a year's cost is counted from. */
+export async function networkServiceDays(db: SqlRunner, start: string, end: string): Promise<ServiceDays> {
+  const [row] = await db.all<{ weekdays: number; saturdays: number; sundays: number; window_days: number }>(`
+    WITH dates AS (
+      SELECT CAST(d AS DATE) AS date
+      FROM range(${sqlDate(start)}, ${sqlDate(end)} + INTERVAL 1 DAY, INTERVAL 1 DAY) r(d)
+    ),
+    served AS (
+      SELECT DISTINCT d.date FROM dates d
+      WHERE EXISTS (SELECT 1 FROM services s WHERE s.days IS NOT NULL
+                      AND d.date BETWEEN s.start_date AND s.end_date
+                      AND (CAST(s.days AS INTEGER) >> (isodow(d.date) - 1)) & 1 = 1
+                      AND NOT EXISTS (SELECT 1 FROM calendar_dates c WHERE c.service_idx = s.service_idx
+                                        AND c.date = d.date AND c.exception_type = 2))
+         OR EXISTS (SELECT 1 FROM calendar_dates c WHERE c.date = d.date AND c.exception_type = 1)
+    )
+    SELECT CAST(count(*) FILTER (WHERE isodow(date) <= 5) AS INTEGER) AS weekdays,
+           CAST(count(*) FILTER (WHERE isodow(date) = 6) AS INTEGER) AS saturdays,
+           CAST(count(*) FILTER (WHERE isodow(date) = 7) AS INTEGER) AS sundays,
+           CAST((SELECT count(*) FROM dates) AS INTEGER) AS window_days
+    FROM served`);
+  return row;
+}

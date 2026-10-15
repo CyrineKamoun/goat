@@ -9,11 +9,12 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { compact, euros } from "@/lib/explorer/format";
+import { compact, money } from "@/lib/explorer/format";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
+import { openExplorerSettings } from "@/lib/store/explorer/slice";
 
 import { type RouteRow, useNetworkCost, useRouteSummary, useRoutes } from "@/hooks/explorer/useExplorerData";
-import { useAppSelector } from "@/hooks/store/ContextHooks";
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { useTimetablesPending } from "@/components/explorer/ExplorerLoading";
@@ -75,16 +76,17 @@ function Figure({ value, label }: { value: string | undefined; label: string }) 
 
 export function CostSection() {
   const { t, i18n } = useTranslation("common");
+  const dispatch = useAppDispatch();
   const lang = i18n.language;
-  const { db, complete, window } = useExplorer();
+  const { db, complete, window, settings } = useExplorer();
   const selectedRouteId = useAppSelector((s) => s.explorer.selectedRouteId);
   const date = useAppSelector((s) => s.explorer.date);
   const routes = useRoutes(db);
   const route = routes.data?.find((r) => r.route_id === selectedRouteId);
   // Both answers are remembered per database: the route summary above asks
   // for the same ones, so nothing is computed twice.
-  const network = useNetworkCost(complete && !route ? db : undefined, window);
-  const summary = useRouteSummary(complete && route ? db : undefined, route, date, window);
+  const network = useNetworkCost(complete && !route ? db : undefined, window, settings);
+  const summary = useRouteSummary(complete && route ? db : undefined, route, date, window, settings);
   const annual = route ? summary.data?.annual : network.data;
   const pending = useTimetablesPending();
 
@@ -109,14 +111,14 @@ export function CostSection() {
         <Typography variant="body2" fontWeight="bold" sx={{ flex: 1 }} noWrap>
           {t("explorer_operating_cost")}
         </Typography>
-        {/* The rates dialog comes next; the button already sits where it
-            will open it. */}
-        <Tooltip title={`${t("explorer_cost_rates")} · ${t("explorer_coming_later")}`}>
-          <span>
-            <IconButton size="small" disabled aria-label={t("explorer_cost_rates")} sx={{ mr: -0.75 }}>
-              <Icon iconName={ICON_NAME.SLIDERS} style={{ fontSize: 13 }} />
-            </IconButton>
-          </span>
+        <Tooltip title={t("explorer_cost_rates")}>
+          <IconButton
+            size="small"
+            aria-label={t("explorer_cost_rates")}
+            onClick={() => dispatch(openExplorerSettings("rates"))}
+            sx={{ mr: -0.75 }}>
+            <Icon iconName={ICON_NAME.SLIDERS} style={{ fontSize: 13 }} />
+          </IconButton>
         </Tooltip>
       </Stack>
       <Scope route={route} />
@@ -125,7 +127,7 @@ export function CostSection() {
         <Stack direction="row" alignItems={annual ? "baseline" : "center"} spacing={1} sx={{ minHeight: 31 }}>
           {annual ? (
             <Typography fontWeight="bold" noWrap sx={{ fontSize: 26, lineHeight: 1.2 }}>
-              ≈ {euros(annual.cost, lang)}
+              ≈ {money(annual.cost, lang, settings.currency)}
             </Typography>
           ) : (
             <Skeleton variant="rounded" width={84} height={26} sx={{ my: "2.5px" }} />

@@ -7,26 +7,15 @@
  * A year's vehicle-km come from the timetable and the calendar: each service's
  * daily km times the days it runs within the feed's window, scaled to 365 days
  * when the window is shorter. Rates are per operator and route type and set by
- * the user; until the rates dialog exists, the defaults below apply.
+ * the user (settings.ts); a type without one is priced at its default.
  */
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import { serviceDayCounts } from "@/lib/explorer/derive/calendar";
 import type { TripRange } from "@/lib/explorer/derive/runs";
-import { modeOf } from "@/lib/explorer/modes";
+import { type Rate, defaultRate } from "@/lib/explorer/settings";
 
-export interface Rate {
-  per_km: number;
-  /** Empty means the km rate is all-in. */
-  per_hour: number | null;
-}
-
-/** Default rate by GTFS route type (basic or extended), until rates are set. */
-export function defaultRate(routeType: number | null): Rate {
-  const mode = modeOf(routeType ?? 3);
-  if (mode === "tram" || mode === "cable_tram" || mode === "trolleybus") return { per_km: 7, per_hour: null };
-  if (mode === "metro" || mode === "rail" || mode === "monorail") return { per_km: 12, per_hour: null };
-  return { per_km: 4.5, per_hour: null };
-}
+export type { Rate };
+export { defaultRate };
 
 export interface AnnualFigures {
   vehicle_km: number;
@@ -84,7 +73,7 @@ async function annualFor(
 }
 
 /** A year at most, from the window's start: a feed covering more counts once. */
-function yearOf(window: [string, string]): [string, string] {
+export function yearOf(window: [string, string]): [string, string] {
   const startMs = Date.parse(`${window[0]}T00:00:00Z`);
   const yearEnd = new Date(startMs + 364 * 86_400_000).toISOString().slice(0, 10);
   return window[1] > yearEnd ? [window[0], yearEnd] : window;
@@ -100,22 +89,28 @@ export function annualFigures(
   return annualFor(db, `trip_idx BETWEEN ${route.trip_lo ?? -1} AND ${route.trip_hi ?? -2}`, window, rate);
 }
 
-/** The whole network's figures for a year, each route type at its rate. */
+/** The whole network's figures for a year, each operator's route types at
+ * their rate. */
 export async function networkAnnualFigures(
   db: SqlRunner,
   window: [string, string],
-  rateFor: (routeType: number | null) => Rate = defaultRate
+  rateFor: (agencyId: string | null, routeType: number | null) => Rate = (_a, type) => defaultRate(type)
 ): Promise<AnnualFigures> {
   const year = yearOf(window);
   const days = await serviceDayCounts(db, year[0], year[1]);
-  const types = await db.all<{ route_type: number | null }>("SELECT DISTINCT route_type FROM routes");
+  const groups = await db.all<{
+    agency_idx: number | null;
+    agency_id: string | null;
+    route_type: number | null;
+  }>(`
+    SELECT DISTINCT r.agency_idx, a.agency_id, r.route_type
+    FROM routes r LEFT JOIN agencies a USING (agency_idx)`);
   const total: AnnualFigures = { vehicle_km: 0, vehicle_hours: 0, cost: 0, window_days: 0 };
-  for (const { route_type } of types) {
-    const where =
-      route_type === null
-        ? "route_idx IN (SELECT route_idx FROM routes WHERE route_type IS NULL)"
-        : `route_idx IN (SELECT route_idx FROM routes WHERE route_type = ${route_type})`;
-    const f = await annualFor(db, where, year, rateFor(route_type), days);
+  const is = (col: string, v: number | null) => (v === null ? `${col} IS NULL` : `${col} = ${v}`);
+  for (const g of groups) {
+    const where = `route_idx IN (SELECT route_idx FROM routes WHERE ${is("agency_idx", g.agency_idx)}
+                   AND ${is("route_type", g.route_type)})`;
+    const f = await annualFor(db, where, year, rateFor(g.agency_id, g.route_type), days);
     total.vehicle_km += f.vehicle_km;
     total.vehicle_hours += f.vehicle_hours;
     total.cost += f.cost;

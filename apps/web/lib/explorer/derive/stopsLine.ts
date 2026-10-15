@@ -12,8 +12,8 @@
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import { activeServicesSql } from "@/lib/explorer/derive/calendar";
 import type { Direction } from "@/lib/explorer/derive/directions";
-import { DEFAULT_PERIODS } from "@/lib/explorer/derive/operations";
 import type { TripRange } from "@/lib/explorer/derive/runs";
+import { DEFAULT_SETTINGS, type Period } from "@/lib/explorer/settings";
 
 /** Metres per `shape_dist_traveled` unit, by the manifest's unit. */
 export const METRES_PER_UNIT: Record<string, number> = { m: 1, km: 1000, ft: 0.3048, mi: 1609.344 };
@@ -63,7 +63,8 @@ export async function stopsLine(
   direction: Direction,
   pattern_idx: number,
   date: string,
-  shapeDistUnit: string | null
+  shapeDistUnit: string | null,
+  periods: Period[] = DEFAULT_SETTINGS.periods
 ): Promise<StopsLine> {
   const range = `trip_idx BETWEEN ${route.trip_lo ?? -1} AND ${route.trip_hi ?? -2}`;
   const onDate = `${range} AND service_idx IN ${activeServicesSql(date)}`;
@@ -185,7 +186,7 @@ export async function stopsLine(
     return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
   };
   const inPeriod = (key: string) => {
-    const p = DEFAULT_PERIODS.find((q) => q.key === key);
+    const p = periods.find((q) => q.key === key);
     return p ? ends.filter((e) => e.t0 >= p.start_s && e.t0 < p.end_s).map((e) => e.run_s) : [];
   };
   const am = median(inPeriod("am_peak"));

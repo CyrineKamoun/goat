@@ -6,23 +6,22 @@
 import { useEffect, useState } from "react";
 
 import type { SqlRunner } from "@/lib/explorer/db/types";
-import {
-  type AnnualFigures,
-  annualFigures,
-  defaultRate,
-  networkAnnualFigures,
-} from "@/lib/explorer/derive/cost";
+import { networkServiceDays } from "@/lib/explorer/derive/calendar";
+import { type AnnualFigures, annualFigures, networkAnnualFigures, yearOf } from "@/lib/explorer/derive/cost";
 import { type Direction, routeDirections } from "@/lib/explorer/derive/directions";
 import {
   type Headway,
   type Operations,
   headways,
   operations,
+  runningTimes,
   vehiclesInService,
 } from "@/lib/explorer/derive/operations";
 import { routeRuns } from "@/lib/explorer/derive/runs";
+import { routeCalendar } from "@/lib/explorer/derive/serviceCalendar";
 import { places } from "@/lib/explorer/derive/stops";
 import { stopsLine } from "@/lib/explorer/derive/stopsLine";
+import { type ExplorerSettings, type Period, type Rate, rateFor, settingsKey } from "@/lib/explorer/settings";
 import type { ExplorerRouteDrawing } from "@/lib/store/explorer/slice";
 
 export interface RouteRow {
@@ -36,6 +35,8 @@ export interface RouteRow {
   trip_lo: number | null;
   trip_hi: number | null;
   agency_idx: number | null;
+  /** The operator's GTFS id: what cost rates are set by. */
+  agency_id: string | null;
   agency: string | null;
 }
 
@@ -83,7 +84,7 @@ export function useRoutes(db: SqlRunner | undefined) {
   return useQuery(db, "routes", (d) =>
     d.all<RouteRow>(`
         SELECT r.route_idx, r.route_id, r.short_name, r.long_name, r.route_type, r.color,
-               r.text_color, r.trip_lo, r.trip_hi, r.agency_idx, a.name AS agency
+               r.text_color, r.trip_lo, r.trip_hi, r.agency_idx, a.agency_id, a.name AS agency
         FROM routes r LEFT JOIN agencies a USING (agency_idx)
         WHERE r.trip_lo IS NOT NULL
         ORDER BY r.route_idx`)
@@ -109,6 +110,8 @@ export function useAgencies(db: SqlRunner | undefined) {
 export interface DirectionSummary {
   direction: Direction;
   headways: Map<string, Headway>;
+  /** Minutes end to end on each period's busiest pattern. */
+  running: Map<string, number | null>;
   operations: Operations;
 }
 
@@ -120,7 +123,7 @@ export interface RouteSummaryData {
   curve: number[];
   n_stops: number;
   annual: AnnualFigures;
-  rate: ReturnType<typeof defaultRate>;
+  rate: Rate;
   drawing: Omit<ExplorerRouteDrawing, "routeId" | "color" | "shapeLinesLayerId">;
 }
 
@@ -128,7 +131,8 @@ async function summarize(
   db: SqlRunner,
   route: RouteRow,
   date: string,
-  window: [string, string]
+  window: [string, string],
+  settings: ExplorerSettings
 ): Promise<RouteSummaryData> {
   const [{ directions, stops, patterns }, runs] = await Promise.all([
     routeDirections(db, route),
@@ -138,10 +142,15 @@ async function summarize(
   for (const d of directions) for (const p of d.patterns) directionOfPattern.set(p.pattern_idx, d);
   const perDirection = directions.map((direction) => {
     const own = runs.filter((r) => directionOfPattern.get(r.pattern_idx) === direction);
-    return { direction, headways: headways(own), operations: operations(own) };
+    return {
+      direction,
+      headways: headways(own, settings.periods),
+      running: runningTimes(own, settings.periods),
+      operations: operations(own, settings.layover_s),
+    };
   });
 
-  const rate = defaultRate(route.route_type);
+  const rate = rateFor(settings, route.agency_id, route.route_type);
   const annual = await annualFigures(db, route, window, rate);
 
   // The map: the route's shapes, and straight lines for patterns without one.
@@ -156,7 +165,7 @@ async function summarize(
   const stopIds = new Set(patterns.flatMap((p) => p.stops));
   return {
     directions: perDirection,
-    operations: operations(runs),
+    operations: operations(runs, settings.layover_s),
     curve: vehiclesInService(runs, 300),
     n_stops: stopIds.size,
     annual,
@@ -178,19 +187,26 @@ export function useRouteSummary(
   db: SqlRunner | undefined,
   route: RouteRow | undefined,
   date: string | null,
-  window: [string, string] | null
+  window: [string, string] | null,
+  settings: ExplorerSettings
 ) {
   return useQuery(
     route && date && window ? db : undefined,
-    `route:${route?.route_idx}:${date}:${window?.[0]}:${window?.[1]}`,
-    (d) => summarize(d, route as RouteRow, date as string, window as [string, string])
+    `route:${route?.route_idx}:${date}:${window?.[0]}:${window?.[1]}:${settingsKey(settings)}`,
+    (d) => summarize(d, route as RouteRow, date as string, window as [string, string], settings)
   );
 }
 
 /** The network's annual operating cost; needs the whole snapshot loaded. */
-export function useNetworkCost(db: SqlRunner | undefined, window: [string, string] | null) {
-  return useQuery(window ? db : undefined, `network-cost:${window?.[0]}:${window?.[1]}`, (d) =>
-    networkAnnualFigures(d, window as [string, string])
+export function useNetworkCost(
+  db: SqlRunner | undefined,
+  window: [string, string] | null,
+  settings: ExplorerSettings
+) {
+  return useQuery(
+    window ? db : undefined,
+    `network-cost:${window?.[0]}:${window?.[1]}:${JSON.stringify(settings.rates)}`,
+    (d) => networkAnnualFigures(d, window as [string, string], (a, type) => rateFor(settings, a, type))
   );
 }
 
@@ -201,11 +217,40 @@ export function useStopsLine(
   direction: Direction | undefined,
   pattern_idx: number | undefined,
   date: string | null,
-  shapeDistUnit: string | null
+  shapeDistUnit: string | null,
+  periods: Period[]
 ) {
   return useQuery(
     direction && pattern_idx !== undefined && date ? db : undefined,
-    `line:${route.route_idx}:${pattern_idx}:${date}`,
-    (d) => stopsLine(d, route, direction as Direction, pattern_idx as number, date as string, shapeDistUnit)
+    `line:${route.route_idx}:${pattern_idx}:${date}:${periods.map((p) => p.start_s).join(",")}`,
+    (d) =>
+      stopsLine(
+        d,
+        route,
+        direction as Direction,
+        pattern_idx as number,
+        date as string,
+        shapeDistUnit,
+        periods
+      )
+  );
+}
+
+/** Which service a route runs on which day, over the feed's window. */
+export function useRouteCalendar(
+  db: SqlRunner | undefined,
+  route: RouteRow,
+  window: [string, string] | null
+) {
+  return useQuery(window ? db : undefined, `calendar:${route.route_idx}:${window?.[0]}:${window?.[1]}`, (d) =>
+    routeCalendar(d, route, window as [string, string])
+  );
+}
+
+/** Days with any service in the year the cost is counted over, by kind of day. */
+export function useServiceDays(db: SqlRunner | undefined, window: [string, string] | null) {
+  const year = window ? yearOf(window) : null;
+  return useQuery(year ? db : undefined, `service-days:${year?.[0]}:${year?.[1]}`, (d) =>
+    networkServiceDays(d, (year as [string, string])[0], (year as [string, string])[1])
   );
 }

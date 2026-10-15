@@ -18,6 +18,7 @@ import { FloatingPanel } from "@/components/common/FloatingPanel";
 import { CostSection } from "@/components/explorer/CostSection";
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { ExplorerLoadingCard, ExplorerLoadingLine } from "@/components/explorer/ExplorerLoading";
+import { ExplorerSettingsDialog } from "@/components/explorer/ExplorerSettingsDialog";
 import { ExplorerTab } from "@/components/explorer/ExplorerTab";
 
 /** The data view's left panel width: entering the Explorer or opening a route
@@ -76,6 +77,7 @@ export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
               <ExplorerTab />
             </Box>
             <CostSection />
+            <ExplorerSettingsDialog />
           </>
         ) : (
           <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>

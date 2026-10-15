@@ -22,8 +22,9 @@ import type { SqlRunner } from "@/lib/explorer/db/types";
 import { activeServicesSql, serviceDayCounts } from "@/lib/explorer/derive/calendar";
 import { annualFigures, defaultRate } from "@/lib/explorer/derive/cost";
 import { type Direction, routeDirections } from "@/lib/explorer/derive/directions";
-import { headways, operations, vehiclesInService } from "@/lib/explorer/derive/operations";
+import { headways, operations, runningTimes, vehiclesInService } from "@/lib/explorer/derive/operations";
 import { type TripRange, routeRuns } from "@/lib/explorer/derive/runs";
+import { isoWeekday, routeCalendar } from "@/lib/explorer/derive/serviceCalendar";
 import { type PlaceRow, places } from "@/lib/explorer/derive/stops";
 import { stopsLine } from "@/lib/explorer/derive/stopsLine";
 import {
@@ -47,6 +48,9 @@ beforeAll(async () => {
 });
 
 const route = (id: string) => routes.get(id) as Route;
+/** A direction's name as the English UI words it. */
+const label = (d: Direction) =>
+  `${d.name.kind === "loop" ? "Loop via" : "To"} ${d.name.place}${d.name.via ? ` via ${d.name.via}` : ""}`;
 const hm = (s: number) =>
   `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}`;
 
@@ -114,7 +118,7 @@ describe("runs", () => {
 describe("directions", () => {
   const summary = async (id: string) =>
     (await routeDirections(db, route(id))).directions.map((d) => ({
-      label: d.label,
+      label: label(d),
       patterns: d.patterns.map((p) => `${p.kind} to ${p.destination}`),
     }));
 
@@ -284,7 +288,7 @@ describe("stops line", () => {
   const line = async (date: string) => {
     const r = route("R1");
     const { directions } = await routeDirections(db, r);
-    const toFifth = directions.find((d) => d.label === "To Fifth") as Direction;
+    const toFifth = directions.find((d) => label(d) === "To Fifth") as Direction;
     return { toFifth, result: await stopsLine(db, r, toFifth, toFifth.key, date, "km") };
   };
 
@@ -320,8 +324,80 @@ describe("stops line", () => {
   it("measures as the crow flies where the feed gives no distance", async () => {
     const r = route("R1");
     const { directions } = await routeDirections(db, r);
-    const back = directions.find((d) => d.label !== "To Fifth") as Direction;
+    const back = directions.find((d) => label(d) !== "To Fifth") as Direction;
     const result = await stopsLine(db, r, back, back.key, "2026-10-14", "km");
     expect(Math.round(result.stops[0].next_m ?? 0)).toBe(677);
+  });
+});
+
+describe("route calendar", () => {
+  // The feed runs 5 Jan – 31 Dec 2026. WK runs Mon–Fri but not on Easter
+  // Monday (6 Apr); XMAS runs on 25 December only, beside WK.
+  const window: [string, string] = ["2026-01-05", "2026-12-31"];
+
+  it("names a route's weekday service and the holiday it skips", async () => {
+    const cal = await routeCalendar(db, route("R1"), window);
+    expect(cal.types).toHaveLength(1);
+    const [weekdays] = cal.types;
+    expect(weekdays.weekdays).toEqual([1, 2, 3, 4, 5]);
+    expect(weekdays.except).toEqual(["2026-04-06"]);
+    expect(weekdays.adds).toEqual([]);
+    expect(weekdays.trips).toBe(4);
+    expect(cal.days.find((d) => d.date === "2026-04-06")).toMatchObject({ services: [], exception: true });
+    expect(cal.days.find((d) => d.date === "2026-10-17")?.trips).toBe(0);
+    expect(cal).toMatchObject({ from_calendar: 1, exceptions: 1 });
+  });
+
+  it("gives a day with an extra service its own day type", async () => {
+    const cal = await routeCalendar(db, route("R4"), window);
+    // 259 weekdays from 5 Jan to 31 Dec, less Easter Monday and Christmas.
+    expect(cal.types.map((t) => t.days.length)).toEqual([257, 1]);
+    const [weekdays, christmas] = cal.types;
+    expect(weekdays.except).toEqual(["2026-04-06", "2026-12-25"]);
+    expect(christmas.days).toEqual(["2026-12-25"]);
+    expect(christmas.weekdays).toEqual([5]);
+  });
+
+  it("names a Saturday service by its weekday", async () => {
+    const cal = await routeCalendar(db, route("R3"), window);
+    expect(cal.types.map((t) => t.weekdays)).toEqual([[6]]);
+  });
+
+  it("finds the weekday of a date", () => {
+    expect(isoWeekday("2026-10-14")).toBe(3);
+    expect(isoWeekday("2026-10-18")).toBe(7);
+  });
+});
+
+describe("running times", () => {
+  it("takes the busiest pattern's median per period, leaving short turns out", async () => {
+    const r = route("R1");
+    const { directions } = await routeDirections(db, r);
+    const toFifth = directions.find((d) => label(d) === "To Fifth") as Direction;
+    const own = new Set(toFifth.patterns.map((p) => p.pattern_idx));
+    const runs = (await routeRuns(db, r, "2026-10-14")).filter((x) => own.has(x.pattern_idx));
+    const times = runningTimes(runs);
+    // T1 and T2 leave at 08:00 and 08:10 and take 8 min; T4, the short turn, 4.
+    expect(times.get("am_peak")).toBe(8);
+    expect(times.get("midday")).toBeNull();
+  });
+});
+
+describe("route calendar with frequencies", () => {
+  it("counts every run of a frequency-based trip", async () => {
+    // F1 runs every 10 min from 06:00 to 09:00: 18 trips, as the Overview counts them.
+    const cal = await routeCalendar(db, route("R4"), ["2026-01-05", "2026-12-31"]);
+    const wednesday = cal.days.find((d) => d.date === "2026-10-14");
+    expect(wednesday?.trips).toBe(18);
+    expect(wednesday?.trips).toBe((await routeRuns(db, route("R4"), "2026-10-14")).length);
+  });
+});
+
+describe("settings in the figures", () => {
+  it("counts peak vehicles with the layover set", async () => {
+    // R1's weekday runs, 08:00–08:34, 2 minutes apart at the ends: with no
+    // layover one vehicle can follow another sooner.
+    const runs = await routeRuns(db, route("R1"), "2026-10-14");
+    expect(operations(runs, 0).peak_vehicles).toBeLessThanOrEqual(operations(runs, 6 * 60).peak_vehicles);
   });
 });

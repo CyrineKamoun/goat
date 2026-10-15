@@ -22,6 +22,7 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { RouteBadge, distinctLines } from "@/components/explorer/RouteBadge";
+import { directionLabel } from "@/components/explorer/directionWords";
 import Selector from "@/components/map/panels/common/Selector";
 
 /** Badges a stop shows before "+n". */
@@ -192,7 +193,7 @@ function optionValue(direction: number, pattern: number) {
 export function RouteStops({ route, directions }: { route: RouteRow; directions: Direction[] }) {
   const { t, i18n } = useTranslation("common");
   const dispatch = useAppDispatch();
-  const { db, complete, shapeDistUnit } = useExplorer();
+  const { db, complete, shapeDistUnit, settings } = useExplorer();
   const date = useAppSelector((s) => s.explorer.date);
   const choice = useAppSelector((s) => s.explorer.pattern);
   const picked = useAppSelector((s) => s.explorer.selectedStop);
@@ -206,7 +207,15 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
     choice && direction?.patterns.some((p) => p.pattern_idx === choice.pattern_idx)
       ? choice.pattern_idx
       : direction?.key;
-  const line = useStopsLine(complete ? db : undefined, route, direction, pattern_idx, date, shapeDistUnit);
+  const line = useStopsLine(
+    complete ? db : undefined,
+    route,
+    direction,
+    pattern_idx,
+    date,
+    shapeDistUnit,
+    settings.periods
+  );
 
   if (!direction) {
     return (
@@ -224,7 +233,7 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
   const items: SelectorItem[] = directions.flatMap((d) => [
     {
       value: optionValue(d.key, d.key),
-      label: d.label,
+      label: directionLabel(d.name, t),
       iconNode: <RouteBadge route={route} small />,
     },
     ...d.patterns
