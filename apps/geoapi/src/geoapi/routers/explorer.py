@@ -12,7 +12,7 @@ downloads files.
   for a few minutes, then tried again; ``?retry=true`` tries again at once).
 - ``GET /bundles/{id}/explorer/r{rev}/s{schema}/{name}.parquet`` returns one
   file. The URL names the revision and schema version, so a file never
-  changes and is cached for good.
+  changes; browsers keep it for a month (``FILE_MAX_AGE_SECONDS``).
 
 A build reads the revision and the DuckLake snapshot id together, under the
 bundle's advisory lock taken shared (``goatlib.bundles.locks``), and then
@@ -63,6 +63,10 @@ router = APIRouter(prefix="/bundles", tags=["Explorer"])
 #: Derived from DATA_DIR like the catalog's directories, not a setting of its
 #: own. On the data volume every geoapi pod mounts.
 EXPLORER_DIR = Path(os.getenv("DATA_DIR", "/app/data")) / "explorer"
+
+#: How long a browser keeps a snapshot file: it never changes under its URL,
+#: but a month bounds what a device holds for a bundle it no longer opens.
+FILE_MAX_AGE_SECONDS = 30 * 24 * 3600
 
 _GTFS = "pt_network_gtfs"
 #: How long a failed build is reported before a request tries again.
@@ -355,7 +359,9 @@ async def get_explorer_file(
     return FileResponse(
         path,
         media_type="application/vnd.apache.parquet",
-        headers={"Cache-Control": "private, max-age=31536000, immutable"},
+        headers={
+            "Cache-Control": f"private, max-age={FILE_MAX_AGE_SECONDS}, immutable"
+        },
     )
 
 

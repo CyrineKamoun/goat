@@ -3,7 +3,7 @@
 The build itself (DuckLake → Parquet) is goatlib's and tested there; here it
 is replaced by a stand-in, so what is tested is the endpoint's own protocol:
 202 while building, one build however often it is asked, 200 with the files,
-files served for good and uncompressed, failures remembered, old revisions
+files cached for a month and served uncompressed, failures remembered, old revisions
 pruned.
 """
 
@@ -121,7 +121,7 @@ def test_files_are_cached_for_good_and_never_gzipped(client, builds) -> None:
         headers={"Accept-Encoding": "gzip"},
     )
     assert response.status_code == 200
-    assert response.headers["cache-control"] == "private, max-age=31536000, immutable"
+    assert response.headers["cache-control"] == "private, max-age=2592000, immutable"
     assert "content-encoding" not in response.headers
     assert response.headers["content-length"] == str(len(response.content))
     assert response.content.startswith(b"PAR1")

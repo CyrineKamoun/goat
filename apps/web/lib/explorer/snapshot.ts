@@ -3,7 +3,7 @@
  *
  * geoapi builds the snapshot on the first request for a bundle revision and
  * answers 202 meanwhile; after that the manifest lists the files, whose URLs
- * name the revision and are cached for good. Files load smallest first, so
+ * name the revision and are cached for a month. Files load smallest first, so
  * the route list is there while the stop times are still on their way.
  */
 import { apiRequestAuth } from "@/lib/api/fetcher";
