@@ -5,13 +5,13 @@
  * has no blocks. Edited as a draft; Save keeps them for this bundle in this
  * browser and every figure follows.
  */
-import { Box, ButtonBase, MenuItem, Select, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
+import { Box, ButtonBase, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { clock, count, rate as formatRate } from "@/lib/explorer/format";
+import { clock, count, currencySymbol } from "@/lib/explorer/format";
 import { modeOf } from "@/lib/explorer/modes";
 import {
   CURRENCIES,
@@ -96,6 +96,7 @@ function RatesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => v
   const routes = useRoutes(db);
   const days = useServiceDays(db, window);
   const lang = i18n.language;
+  const symbol = currencySymbol(draft.currency, lang);
 
   // The operators, each with the route types it runs and how many routes.
   const agencies = useMemo(() => {
@@ -132,34 +133,46 @@ function RatesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => v
 
   return (
     <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        {t("explorer_rates_intro")}
-      </Typography>
       {/* A feed may have one operator or fifty: a searchable list, as the
-          toolbox picks from many. Operators with rates set say so. */}
-      {agencies.length > 1 && (
-        <Selector
-          label={t("explorer_filter_agency")}
-          enableSearch={agencies.length > 8}
-          items={agencies.map((a) => ({
-            value: a.id ?? "",
-            label: `${a.name} · ${t("explorer_n_routes", { count: a.n })}${
-              hasRates(a.id) ? ` · ${t("explorer_rates_set")}` : ""
-            }`,
-          }))}
-          selectedItems={
-            agency
-              ? {
-                  value: agency.id ?? "",
-                  label: `${agency.name} · ${t("explorer_n_routes", { count: agency.n })}`,
-                }
-              : undefined
-          }
-          setSelectedItems={(item) => {
-            if (item && !Array.isArray(item)) setAgencyKey(String(item.value));
-          }}
-        />
-      )}
+          toolbox picks from many. Operators with rates set say so. Beside
+          it, the currency every rate is in. */}
+      <Stack direction="row" spacing={1.5} alignItems="flex-end">
+        {agencies.length > 1 && (
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Selector
+              label={t("explorer_filter_agency")}
+              enableSearch={agencies.length > 8}
+              items={agencies.map((a) => ({
+                value: a.id ?? "",
+                label: `${a.name} · ${t("explorer_n_routes", { count: a.n })}${
+                  hasRates(a.id) ? ` · ${t("explorer_rates_set")}` : ""
+                }`,
+              }))}
+              selectedItems={
+                agency
+                  ? {
+                      value: agency.id ?? "",
+                      label: `${agency.name} · ${t("explorer_n_routes", { count: agency.n })}`,
+                    }
+                  : undefined
+              }
+              setSelectedItems={(item) => {
+                if (item && !Array.isArray(item)) setAgencyKey(String(item.value));
+              }}
+            />
+          </Box>
+        )}
+        <Box sx={{ width: agencies.length > 1 ? 112 : 160, flexShrink: 0 }}>
+          <Selector
+            label={t("explorer_currency")}
+            items={CURRENCIES.map((c) => ({ value: c, label: c }))}
+            selectedItems={{ value: draft.currency, label: draft.currency }}
+            setSelectedItems={(item) => {
+              if (item && !Array.isArray(item)) setDraft({ ...draft, currency: String(item.value) });
+            }}
+          />
+        </Box>
+      </Stack>
       {agency && (
         <Box component="table" sx={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
@@ -170,10 +183,10 @@ function RatesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => v
                 {t("explorer_filter_route_type")}
               </Box>
               <Box component="th" sx={{ textAlign: "right" }}>
-                {t("explorer_rate_per_km", { currency: draft.currency })}
+                {t("explorer_rate_km_head", { currency: symbol })}
               </Box>
               <Box component="th" sx={{ textAlign: "right", pl: 1.5 }}>
-                {t("explorer_rate_per_hour", { currency: draft.currency })}
+                {t("explorer_rate_hour_head", { currency: symbol })}
               </Box>
             </Box>
           </thead>
@@ -229,38 +242,13 @@ function RatesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => v
           </tbody>
         </Box>
       )}
-      <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, px: 1.5, py: 1.25 }}>
-        <Typography variant="body2">{t("explorer_rates_formula")}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          {days.data
-            ? t("explorer_rates_days", {
-                weekdays: count(days.data.weekdays, lang),
-                saturdays: count(days.data.saturdays, lang),
-                sundays: count(days.data.sundays, lang),
-                window: count(days.data.window_days, lang),
-              })
-            : t("explorer_calculating")}
-        </Typography>
-      </Box>
-      <Stack direction="row" spacing={1.5} alignItems="center">
-        <Typography variant="body2" color="text.secondary">
-          {t("explorer_currency")}
-        </Typography>
-        <Select
-          size="small"
-          value={draft.currency}
-          onChange={(e) => setDraft({ ...draft, currency: e.target.value })}
-          sx={{ minWidth: 96, "& .MuiSelect-select": { py: 0.75, fontSize: "0.8125rem" } }}>
-          {CURRENCIES.map((c) => (
-            <MenuItem key={c} value={c}>
-              {c}
-            </MenuItem>
-          ))}
-        </Select>
-        <Typography variant="caption" color="text.secondary">
-          {t("explorer_rate_example", { rate: formatRate(4.5, lang, draft.currency) })}
-        </Typography>
-      </Stack>
+      <Typography variant="caption" color="text.secondary">
+        {t("explorer_rates_note")}
+        {days.data &&
+          ` ${t("explorer_rates_days_counted", {
+            days: count(days.data.weekdays + days.data.saturdays + days.data.sundays, lang),
+          })}`}
+      </Typography>
     </Stack>
   );
 }
@@ -269,10 +257,7 @@ function PeriodsTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) =>
   const { t } = useTranslation("common");
   const starts = ["00:00", ...draft.starts];
   return (
-    <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        {t("explorer_periods_intro")}
-      </Typography>
+    <Stack spacing={1.5}>
       <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, px: 1.5, py: 0.5 }}>
         {PERIOD_KEYS.map((key, i) => {
           const end = i < PERIOD_KEYS.length - 1 ? starts[i + 1] : clock(SERVICE_DAY_END_S);
@@ -326,10 +311,7 @@ function PeriodsTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) =>
 function VehiclesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
   const { t } = useTranslation("common");
   return (
-    <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        {t("explorer_layover_intro")}
-      </Typography>
+    <Stack spacing={1.5}>
       <Stack direction="row" spacing={1.5} alignItems="center">
         <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
           {t("explorer_layover")}
@@ -346,6 +328,9 @@ function VehiclesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) =
           {t("explorer_minutes_short")}
         </Typography>
       </Stack>
+      <Typography variant="caption" color="text.secondary">
+        {t("explorer_layover_note")}
+      </Typography>
     </Stack>
   );
 }
@@ -377,7 +362,6 @@ export function ExplorerSettingsDialog() {
       onClose={close}
       icon={ICON_NAME.SLIDERS}
       title={t("explorer_settings")}
-      subtitle={t("explorer_settings_subtitle")}
       maxWidth={600}
       notice={
         problems.length || saveFailed ? (

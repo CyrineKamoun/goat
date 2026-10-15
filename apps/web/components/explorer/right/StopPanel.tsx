@@ -143,7 +143,14 @@ export function StopPanel({ stop }: { stop: ExplorerPickedStop }) {
     }
     return [...byKey.values()];
   }, [departures, routes.data]);
-  const line = lines.find((l) => lineKey(l.route) === picked) ?? lines[0];
+  // The line shown first: the route the stop was opened from — its Stops
+  // tab, or its stop on the map — or the route selected, where it leaves
+  // from here; else the first.
+  const preferred = useAppSelector((s) => s.explorer.panel.fromRoute ?? s.explorer.selectedRouteId);
+  const line =
+    lines.find((l) => lineKey(l.route) === picked) ??
+    lines.find((l) => [...l.idxs].some((i) => routeByIdx.get(i)?.route_id === preferred)) ??
+    lines[0];
   // Its directions, those of its routes with the same name taken as one.
   const directions = useMemo(() => {
     if (!line || !data.data) return [];

@@ -1362,12 +1362,26 @@ export const ProjectLayerTree = ({
           ...(!!node.bundle_id &&
             node.bundle_id === exploredBundleId && {
               contentOverride: (
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, flex: 1 }}>
-                  <Icon
-                    iconName={ICON_NAME.CUBE}
-                    style={{ fontSize: "1rem", color: theme.palette.action.active }}
-                  />
-                  <Typography variant="body2" noWrap title={node.name} sx={{ minWidth: 0 }}>
+                <Stack direction="row" alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
+                  {/* The icon in the tree's own slot (24 px, then a gap), so the
+                      name lines up with every other row's. */}
+                  <Box
+                    sx={{
+                      width: 24,
+                      height: 24,
+                      mr: 1,
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}>
+                    <Icon
+                      iconName={ICON_NAME.CUBE}
+                      style={{ fontSize: "1rem", color: theme.palette.action.active }}
+                    />
+                  </Box>
+                  {/* The name takes the room, the chip keeps to the right edge. */}
+                  <Typography variant="body2" noWrap title={node.name} sx={{ minWidth: 0, flex: 1, mr: 1 }}>
                     {node.name}
                   </Typography>
                   <InExplorerChip />

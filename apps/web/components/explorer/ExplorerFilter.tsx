@@ -239,11 +239,11 @@ export function ExplorerFilterChips({ agencies }: { agencies: AgencyRow[] }) {
   return (
     <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.75} sx={{ mt: 1.25 }}>
       {chips.map((c) => (
+        // Quiet pills on the panel's tinted ground, as the date pill: what
+        // the list is narrowed to, each with a small × to undo it.
         <Chip
           key={c.key}
           size="small"
-          variant="outlined"
-          color="primary"
           icon={
             typeof c.icon === "string" ? (
               <Icon iconName={c.icon} style={{ fontSize: 11 }} htmlColor="inherit" />
@@ -253,7 +253,28 @@ export function ExplorerFilterChips({ agencies }: { agencies: AgencyRow[] }) {
           }
           label={c.label}
           onDelete={c.remove}
-          sx={{ fontWeight: 600, fontStyle: "normal", maxWidth: "100%", "& .MuiChip-icon": { ml: 1 } }}
+          deleteIcon={<Icon iconName={ICON_NAME.XCLOSE} htmlColor="inherit" />}
+          sx={{
+            height: 26,
+            maxWidth: "100%",
+            borderRadius: "13px",
+            bgcolor: "action.hover",
+            color: "text.primary",
+            fontSize: 12,
+            fontWeight: 600,
+            fontStyle: "normal",
+            "& .MuiChip-icon": { ml: 1, mr: "2px", color: "text.secondary" },
+            "& .MuiChip-label": { pl: 0.75, pr: 0.5 },
+            "& .MuiChip-deleteIcon": {
+              fontSize: "9px",
+              width: 9,
+              height: 9,
+              ml: 0.25,
+              mr: 1.25,
+              color: "text.secondary",
+              "&:hover": { color: "text.primary" },
+            },
+          }}
         />
       ))}
     </Stack>

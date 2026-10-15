@@ -29,6 +29,20 @@ export function money(value: number, locale: string, currency = "EUR"): string {
   }).format(value);
 }
 
+/** A currency as it is written before or after an amount: €, $, CHF. */
+export function currencySymbol(currency: string, locale: string): string {
+  try {
+    const parts = new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+    }).formatToParts(0);
+    return parts.find((p) => p.type === "currency")?.value ?? currency;
+  } catch {
+    return currency;
+  }
+}
+
 export function rate(value: number, locale: string, currency = "EUR"): string {
   return new Intl.NumberFormat(locale, {
     style: "currency",

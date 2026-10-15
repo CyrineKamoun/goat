@@ -90,8 +90,9 @@ export function ExplorerTab() {
   const agencies = useAgencies(db);
   const [query, setQuery] = useState("");
   // One section open at a time, filling the room the other's header leaves:
-  // neither list is squeezed on a small screen.
-  const [open, setOpen] = useState<"routes" | "stops">("routes");
+  // neither list is squeezed on a small screen. Its header folds it again,
+  // leaving both folded.
+  const [open, setOpen] = useState<"routes" | "stops" | null>("routes");
 
   const q = query.trim();
   const narrowed = !!q || filterCount(filters) > 0;
@@ -120,10 +121,17 @@ export function ExplorerTab() {
       : q && filteredStops.length === 0 && filteredRoutes.length > 0
         ? "routes"
         : null;
-  const shown = !showStops ? "routes" : !showRoutes ? "stops" : (searchOpens ?? open);
+  // Both folded, a search still shows what it finds.
+  const shown =
+    open === null && !q
+      ? null
+      : !showStops
+        ? "routes"
+        : !showRoutes
+          ? "stops"
+          : (searchOpens ?? open ?? "routes");
   const routesOpen = shown === "routes";
   const stopsOpen = shown === "stops";
-  const both = showRoutes && showStops;
 
   return (
     <Stack sx={{ height: "100%", minHeight: 0 }}>
@@ -170,7 +178,7 @@ export function ExplorerTab() {
             label={t("explorer_routes")}
             amount={routesAmount}
             folded={!routesOpen}
-            onFold={both ? () => setOpen("routes") : undefined}
+            onFold={() => setOpen(routesOpen ? null : "routes")}
           />
           <SectionList hidden={!routesOpen}>
             {filteredRoutes.slice(0, SHOWN).map((route) => (
@@ -206,7 +214,7 @@ export function ExplorerTab() {
             label={t("explorer_stops_stations")}
             amount={stopsAmount}
             folded={!stopsOpen}
-            onFold={both ? () => setOpen("stops") : undefined}
+            onFold={() => setOpen(stopsOpen ? null : "stops")}
           />
           <SectionList hidden={!stopsOpen}>
             <StationsList listed={filteredStops.slice(0, SHOWN)} routeByIdx={routeByIdx} />
