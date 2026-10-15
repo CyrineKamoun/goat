@@ -66,6 +66,9 @@ const LINE_CHOICE_SX = {
   [`.${LINE_CHOICE} .maplibregl-popup-tip`]: { display: "none" },
 };
 
+/** How far (px) from the pointer a line is looked for, nearest first. */
+const HIT_RADII = [2, 5, 9];
+
 /** The shape_lines tiles name their layer this. */
 const TILE_LAYER = "default";
 
@@ -206,14 +209,32 @@ export function ExplorerMapLayers() {
   }, [map, active, network, selectedRouteId, filters]);
 
   // A click on a line selects its route; where several routes share the
-  // shapes under the pointer, they are offered to choose from.
+  // shapes under the pointer, they are offered to choose from. The lines are
+  // a few pixels wide, so the pointer need only come near one: the nearest
+  // lines are taken, looking further out only while none is found, so a
+  // click in a dense part of the network still finds one line, not all
+  // around it.
   useEffect(() => {
     if (!map || !active) return;
     const layer = "explorer-network-line";
+    const linesNear = (point: { x: number; y: number }) => {
+      if (!map.getLayer(layer)) return [];
+      for (const r of HIT_RADII) {
+        const found = map.queryRenderedFeatures(
+          [
+            [point.x - r, point.y - r],
+            [point.x + r, point.y + r],
+          ],
+          { layers: [layer] }
+        );
+        if (found.length) return found;
+      }
+      return [];
+    };
     const onClick = (e: MapLayerMouseEvent) => {
       const routeIds = [
         ...new Set(
-          (e.features ?? []).flatMap(
+          linesNear(e.point).flatMap(
             (f) => network.shapes.get(String(f.properties?.shape_id ?? f.id))?.route_ids ?? []
           )
         ),
@@ -221,15 +242,18 @@ export function ExplorerMapLayers() {
       if (routeIds.length === 1) dispatch(selectExplorerRoute(routeIds[0]));
       else if (routeIds.length > 1) setChoice({ lon: e.lngLat.lng, lat: e.lngLat.lat, routeIds });
     };
-    const enter = () => (map.getCanvas().style.cursor = "pointer");
-    const leave = () => (map.getCanvas().style.cursor = "");
-    map.on("click", layer, onClick);
-    map.on("mouseenter", layer, enter);
-    map.on("mouseleave", layer, leave);
+    // Registered after the map viewer's own handler, which sets the cursor
+    // for GOAT's layers on every move: over a line, this one has the last
+    // word, unless a tool (measuring) holds the cursor.
+    const onMove = (e: MapLayerMouseEvent) => {
+      const canvas = map.getCanvas();
+      if (canvas.style.cursor === "" && linesNear(e.point).length) canvas.style.cursor = "pointer";
+    };
+    map.on("click", onClick);
+    map.on("mousemove", onMove);
     return () => {
-      map.off("click", layer, onClick);
-      map.off("mouseenter", layer, enter);
-      map.off("mouseleave", layer, leave);
+      map.off("click", onClick);
+      map.off("mousemove", onMove);
     };
   }, [map, active, network, dispatch]);
 
