@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { setColorFunction } from "@geomatico/maplibre-cog-protocol";
-import type { FilterSpecification } from "maplibre-gl";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import type { FilterSpecification } from "maplibre-gl";
 import type { LayerProps, MapGeoJSONFeature } from "react-map-gl/maplibre";
 import { Layer as MapLayer, Source, useMap } from "react-map-gl/maplibre";
 
@@ -21,8 +21,8 @@ import {
   getSymbolStyleSpec,
   transformToMapboxLayerStyleSpec,
 } from "@/lib/transformers/layer";
-import { transformToLineDecorationLayers } from "@/lib/transformers/lineStyle";
 import { addOrUpdateMarkerImages, loadImage } from "@/lib/transformers/map-image";
+import { transformToLineDecorationLayers } from "@/lib/transformers/lineStyle";
 import { computeStackOrder, resolveTarget } from "@/lib/utils/map/basemapLayers";
 import { generateCOGColorFunction } from "@/lib/utils/map/cog-styling";
 import { getLayerKey, selectDataLayers } from "@/lib/utils/map/layer";
@@ -63,7 +63,11 @@ const Layers = (props: LayersProps) => {
     if (basemapLayerConfigOverride !== undefined) {
       return basemapLayerConfigOverride;
     }
-    if (activeBasemap && activeBasemap.source === "custom" && activeBasemap.type === "vector") {
+    if (
+      activeBasemap &&
+      activeBasemap.source === "custom" &&
+      activeBasemap.type === "vector"
+    ) {
       return (activeBasemap.layer_config as BasemapLayerConfig | undefined) ?? {};
     }
     return {};
@@ -146,7 +150,7 @@ const Layers = (props: LayersProps) => {
   const getFeatureTileUrl = (
     layer: ProjectLayer | Layer,
     label = false,
-    decoration: "start" | "end" | "start_and_end" | "center" | null = null
+    decoration: "start" | "end" | "start_and_end" | "center" | null = null,
   ) => {
     const extendedQuery = getLayerQueryFilter(layer);
     const parts: string[] = [];
@@ -184,7 +188,9 @@ const Layers = (props: LayersProps) => {
     const layerId = String(layer["layer_id"] || layer["id"]);
     const extendedQuery = getLayerQueryFilter(layer);
     const filterStr =
-      extendedQuery && Object.keys(extendedQuery).length > 0 ? JSON.stringify(extendedQuery) : undefined;
+      extendedQuery && Object.keys(extendedQuery).length > 0
+        ? JSON.stringify(extendedQuery)
+        : undefined;
     return getClusterGeoJsonUrl(GEOAPI_BASE_URL ?? "", layerId, filterStr);
   };
 
@@ -232,7 +238,10 @@ const Layers = (props: LayersProps) => {
         layer.properties?.["custom_marker"]
       ) {
         const pointProps = layer.properties as FeatureLayerPointProperties;
-        const allMarkers = [pointProps.marker, ...(pointProps.marker_mapping ?? []).map((m) => m[1])];
+        const allMarkers = [
+          pointProps.marker,
+          ...(pointProps.marker_mapping ?? []).map((m) => m[1]),
+        ];
         allMarkers.forEach((marker) => {
           if (marker?.url && marker?.name) {
             map[`${layer.id}-${marker.name}`] = {
@@ -445,7 +454,9 @@ const Layers = (props: LayersProps) => {
       // Basemap layers = everything that isn't a user data layer or an overlay.
       // Capture their pristine order once per basemap style (keyed by the basemap
       // layer-id set, which is stable when user layers are added/removed).
-      const basemapIds = allIdsBottomToTop.filter((id) => !userSubIds.has(id) && !isOverlayId(id));
+      const basemapIds = allIdsBottomToTop.filter(
+        (id) => !userSubIds.has(id) && !isOverlayId(id)
+      );
       const styleKey = [...basemapIds].sort().join("|");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cache = map as any;
@@ -545,10 +556,15 @@ const Layers = (props: LayersProps) => {
         ? reversedDataLayers.map((layer: ProjectLayer | Layer) =>
             (() => {
               if (layer.type === "feature") {
-                if (layer.feature_layer_geometry_type === "point" && isClusteringEnabled(layer)) {
+                if (
+                  layer.feature_layer_geometry_type === "point" &&
+                  isClusteringEnabled(layer)
+                ) {
                   // Defer the full-dataset GeoJSON download until the layer has
                   // been visible at least once (see revealedLayerIds above).
-                  const isVisible = !!(layer.properties as { visibility?: boolean } | undefined)?.visibility;
+                  const isVisible = !!(
+                    layer.properties as { visibility?: boolean } | undefined
+                  )?.visibility;
                   if (!isVisible && !revealedLayerIds.has(String(layer.id))) {
                     return null;
                   }
@@ -573,32 +589,33 @@ const Layers = (props: LayersProps) => {
                   // Build edit-exclusion + atlas filter helpers (mirroring the vector branch)
                   const isEditingThisLayer = editLayerId === (layer as ProjectLayer).layer_id;
                   const mergeEditExclusion = (
-                    baseFilter: FilterSpecification | undefined
+                    baseFilter: FilterSpecification | undefined,
                   ): FilterSpecification | undefined => {
                     if (!isEditingThisLayer || editExcludeIds.length === 0) return baseFilter;
                     const numericIds = editExcludeIds.map(Number);
-                    const excludeFilter: FilterSpecification = ["!", ["in", ["id"], ["literal", numericIds]]];
-                    return baseFilter
-                      ? (["all", baseFilter, excludeFilter] as FilterSpecification)
-                      : excludeFilter;
+                    const excludeFilter: FilterSpecification = [
+                      "!",
+                      ["in", ["id"], ["literal", numericIds]],
+                    ];
+                    return baseFilter ? (["all", baseFilter, excludeFilter] as FilterSpecification) : excludeFilter;
                   };
                   const isAtlasCoverageLayer =
                     props.atlasFilter !== undefined && props.atlasFilter.layerId === layer.id;
                   const mergeAtlasFilter = (
-                    baseFilter: FilterSpecification | undefined
+                    baseFilter: FilterSpecification | undefined,
                   ): FilterSpecification | undefined => {
                     if (!isAtlasCoverageLayer) return baseFilter;
                     const featureId = Number(props.atlasFilter!.featureId);
                     const atlasFilter: FilterSpecification = ["==", ["id"], featureId];
-                    return baseFilter
-                      ? (["all", baseFilter, atlasFilter] as FilterSpecification)
-                      : atlasFilter;
+                    return baseFilter ? (["all", baseFilter, atlasFilter] as FilterSpecification) : atlasFilter;
                   };
                   const composeFilters = (
-                    baseFilter: FilterSpecification | undefined
+                    baseFilter: FilterSpecification | undefined,
                   ): FilterSpecification | undefined => mergeAtlasFilter(mergeEditExclusion(baseFilter));
 
-                  const andUnclustered = (base: FilterSpecification | undefined): FilterSpecification =>
+                  const andUnclustered = (
+                    base: FilterSpecification | undefined,
+                  ): FilterSpecification =>
                     base ? (["all", base, unclusteredFilter] as FilterSpecification) : unclusteredFilter;
 
                   // GeoJSON source props (clusterRadius, clusterMaxZoom, clusterMinPoints,
@@ -619,7 +636,8 @@ const Layers = (props: LayersProps) => {
                       key={`${layer.id}-cluster-${layer.updated_at || ""}-${clusterKeySalt}`}
                       type="geojson"
                       data={dataUrl}
-                      {...clusterSourceProps}>
+                      {...clusterSourceProps}
+                    >
                       {/* Unclustered features: existing paint, plus the !has(point_count) filter */}
                       {!isCustomMarker && (
                         <MapLayer
@@ -738,7 +756,8 @@ const Layers = (props: LayersProps) => {
                       ...layer.properties,
                       opacity: 1,
                       visibility:
-                        layer.properties?.visibility && (layer.properties as FeatureLayerProperties)?.stroked,
+                        layer.properties?.visibility &&
+                        (layer.properties as FeatureLayerProperties)?.stroked,
                     },
                   }) as any
                 );
@@ -755,13 +774,14 @@ const Layers = (props: LayersProps) => {
 
                 // Build exclusion filter for features being edited on this layer
                 const isEditingThisLayer = editLayerId === (layer as ProjectLayer).layer_id;
-                const mergeEditExclusion = (
-                  baseFilter: FilterSpecification | undefined
-                ): FilterSpecification | undefined => {
+                const mergeEditExclusion = (baseFilter: FilterSpecification | undefined): FilterSpecification | undefined => {
                   if (!isEditingThisLayer || editExcludeIds.length === 0) return baseFilter;
                   // Exclude by MVT feature ID (rowid+1). IDs are always numeric.
                   const numericIds = editExcludeIds.map(Number);
-                  const excludeFilter: FilterSpecification = ["!", ["in", ["id"], ["literal", numericIds]]];
+                  const excludeFilter: FilterSpecification = [
+                    "!",
+                    ["in", ["id"], ["literal", numericIds]],
+                  ];
                   if (baseFilter) {
                     return ["all", baseFilter, excludeFilter] as FilterSpecification;
                   }
@@ -775,7 +795,7 @@ const Layers = (props: LayersProps) => {
                 const isAtlasCoverageLayer =
                   props.atlasFilter !== undefined && props.atlasFilter.layerId === layer.id;
                 const mergeAtlasFilter = (
-                  baseFilter: FilterSpecification | undefined
+                  baseFilter: FilterSpecification | undefined,
                 ): FilterSpecification | undefined => {
                   if (!isAtlasCoverageLayer) return baseFilter;
                   const featureId = Number(props.atlasFilter!.featureId);
@@ -787,8 +807,9 @@ const Layers = (props: LayersProps) => {
                 };
 
                 const composeFilters = (
-                  baseFilter: FilterSpecification | undefined
-                ): FilterSpecification | undefined => mergeAtlasFilter(mergeEditExclusion(baseFilter));
+                  baseFilter: FilterSpecification | undefined,
+                ): FilterSpecification | undefined =>
+                  mergeAtlasFilter(mergeEditExclusion(baseFilter));
 
                 // Only send ?decoration=... when decoration is actually enabled
                 // for the layer — sending it when type === "none" forces dynamic
@@ -820,9 +841,7 @@ const Layers = (props: LayersProps) => {
                         maxzoom={layer.properties.max_zoom || 24}
                         id={layer.id.toString()}
                         {...(layerStyleSpec as any)}
-                        {...(composeFilters(mapLayerFilter)
-                          ? { filter: composeFilters(mapLayerFilter) }
-                          : {})}
+                        {...(composeFilters(mapLayerFilter) ? { filter: composeFilters(mapLayerFilter) } : {})}
                         source-layer="default"
                       />
                     )}
@@ -836,9 +855,7 @@ const Layers = (props: LayersProps) => {
                           type="symbol"
                           layout={decoSpec.layout as any}
                           paint={decoSpec.paint as any}
-                          {...(composeFilters(mapLayerFilter)
-                            ? { filter: composeFilters(mapLayerFilter) }
-                            : {})}
+                          {...(composeFilters(mapLayerFilter) ? { filter: composeFilters(mapLayerFilter) } : {})}
                           source-layer={decoSpec.sourceLayer}
                         />
                       ))}
@@ -849,9 +866,7 @@ const Layers = (props: LayersProps) => {
                         minzoom={layer.properties.min_zoom || 0}
                         maxzoom={layer.properties.max_zoom || 24}
                         {...(strokeStyleSpec as any)}
-                        {...(composeFilters(mapStrokeFilter)
-                          ? { filter: composeFilters(mapStrokeFilter) }
-                          : {})}
+                        {...(composeFilters(mapStrokeFilter) ? { filter: composeFilters(mapStrokeFilter) } : {})}
                         source-layer="default"
                       />
                     )}
@@ -872,25 +887,22 @@ const Layers = (props: LayersProps) => {
                         minzoom={layer.properties.min_zoom || 0}
                         maxzoom={layer.properties.max_zoom || 24}
                         {...(labelStyleSpec as any)}
-                        {...(layer.properties?.["custom_marker"] ||
-                        layer.feature_layer_geometry_type === "polygon"
-                          ? composeFilters(mapLabelFilter)
-                            ? { filter: composeFilters(mapLabelFilter) }
-                            : {}
-                          : mapLabelFilter
-                            ? { filter: mapLabelFilter }
-                            : {})}
+                        {...(layer.properties?.["custom_marker"] || layer.feature_layer_geometry_type === "polygon"
+                          ? (composeFilters(mapLabelFilter) ? { filter: composeFilters(mapLabelFilter) } : {})
+                          : (mapLabelFilter ? { filter: mapLabelFilter } : {})
+                        )}
                       />
                     )}
 
                     {/* HighlightLayer */}
-                    {props.highlightFeature && props.highlightFeature.layer.id === layer.id.toString() && (
-                      <MapLayer
-                        id={`highlight-${layer.id}`}
-                        source-layer="default"
-                        {...(getHightlightStyleSpec(props.highlightFeature) as any)}
-                      />
-                    )}
+                    {props.highlightFeature &&
+                      props.highlightFeature.layer.id === layer.id.toString() && (
+                        <MapLayer
+                          id={`highlight-${layer.id}`}
+                          source-layer="default"
+                          {...(getHightlightStyleSpec(props.highlightFeature) as any)}
+                        />
+                      )}
                   </Source>
                 );
               } else if (layer.type === "raster" && layer.url) {
@@ -942,111 +954,90 @@ const Layers = (props: LayersProps) => {
           )
         : null}
       {/* Pending features overlay — uses editing layer's original style */}
-      {editLayerId &&
-        editingLayer &&
-        pendingGeoJSON.features.length > 0 &&
-        (() => {
-          const layerStyle = transformToMapboxLayerStyleSpec(editingLayer) as any & {
-            paint?: Record<string, unknown>;
-          };
-          const geomType = editingLayer.feature_layer_geometry_type;
-          const isCustomMarker = !!editingLayer.properties?.["custom_marker"];
-          const symbolStyle = isCustomMarker
-            ? (getSymbolStyleSpec(undefined, editingLayer) as any & {
-                layout?: Record<string, unknown>;
-                paint?: Record<string, unknown>;
-              })
-            : null;
+      {editLayerId && editingLayer && pendingGeoJSON.features.length > 0 && (() => {
+        const layerStyle = transformToMapboxLayerStyleSpec(editingLayer) as any & { paint?: Record<string, unknown> };
+        const geomType = editingLayer.feature_layer_geometry_type;
+        const isCustomMarker = !!editingLayer.properties?.["custom_marker"];
+        const symbolStyle = isCustomMarker
+          ? getSymbolStyleSpec(undefined, editingLayer) as any & { layout?: Record<string, unknown>; paint?: Record<string, unknown> }
+          : null;
 
-          return (
-            <Source id="src-pending-features" key="pending-features" type="geojson" data={pendingGeoJSON}>
-              {geomType === "polygon" && layerStyle.type === "fill" && (
-                <MapLayer
-                  id="pending-features-fill"
-                  type="fill"
-                  paint={layerStyle.paint as Record<string, unknown>}
-                  filter={["==", "$type", "Polygon"]}
-                />
-              )}
-              {(geomType === "line" || geomType === "polygon") && (
-                <MapLayer
-                  id="pending-features-line"
-                  type="line"
-                  paint={{
-                    "line-color": "#ef4444",
-                    "line-dasharray": [3, 2],
-                    "line-width": 2,
-                  }}
-                  filter={["any", ["==", "$type", "LineString"], ["==", "$type", "Polygon"]]}
-                />
-              )}
-              {geomType === "point" && isCustomMarker && symbolStyle && (
-                <MapLayer
-                  id="pending-features-ring"
-                  type="circle"
-                  paint={{
-                    "circle-radius": Math.max(
-                      12,
-                      Math.round(
-                        ((((editingLayer.properties as Record<string, unknown>)?.marker_size as number) ??
-                          100) /
-                          200) *
-                          16
-                      ) + 4
-                    ),
-                    "circle-color": "transparent",
-                    "circle-stroke-color": "#ef4444",
-                    "circle-stroke-width": 2,
-                  }}
-                  filter={["==", "$type", "Point"]}
-                />
-              )}
-              {geomType === "point" && isCustomMarker && symbolStyle && (
-                <MapLayer
-                  id="pending-features-symbol"
-                  type="symbol"
-                  layout={{
-                    ...symbolStyle.layout,
-                    visibility: "visible",
-                    "icon-allow-overlap": true,
-                  }}
-                  paint={symbolStyle.paint as Record<string, unknown>}
-                  filter={["==", "$type", "Point"]}
-                />
-              )}
-              {geomType === "point" && !isCustomMarker && layerStyle.type === "circle" && (
-                <MapLayer
-                  id="pending-features-circle"
-                  type="circle"
-                  paint={layerStyle.paint as Record<string, unknown>}
-                  filter={["==", "$type", "Point"]}
-                />
-              )}
-              {/* Fallbacks if style type doesn't match */}
-              {geomType === "polygon" && layerStyle.type !== "fill" && (
-                <MapLayer
-                  id="pending-features-fill"
-                  type="fill"
-                  paint={{ "fill-color": "#ef4444", "fill-opacity": 0.15 }}
-                  filter={["==", "$type", "Polygon"]}
-                />
-              )}
-              {geomType === "point" && !isCustomMarker && layerStyle.type !== "circle" && (
-                <MapLayer
-                  id="pending-features-circle"
-                  type="circle"
-                  paint={{
-                    "circle-radius": 6,
-                    "circle-color": "#ef4444",
-                    "circle-stroke-width": 2,
-                    "circle-stroke-color": "#fff",
-                  }}
-                  filter={["==", "$type", "Point"]}
-                />
-              )}
-            </Source>
-          );
-        })()}
+        return (
+          <Source id="src-pending-features" key="pending-features" type="geojson" data={pendingGeoJSON}>
+            {geomType === "polygon" && layerStyle.type === "fill" && (
+              <MapLayer
+                id="pending-features-fill"
+                type="fill"
+                paint={layerStyle.paint as Record<string, unknown>}
+                filter={["==", "$type", "Polygon"]}
+              />
+            )}
+            {(geomType === "line" || geomType === "polygon") && (
+              <MapLayer
+                id="pending-features-line"
+                type="line"
+                paint={{
+                  "line-color": "#ef4444",
+                  "line-dasharray": [3, 2],
+                  "line-width": 2,
+                }}
+                filter={["any", ["==", "$type", "LineString"], ["==", "$type", "Polygon"]]}
+              />
+            )}
+            {geomType === "point" && isCustomMarker && symbolStyle && (
+              <MapLayer
+                id="pending-features-ring"
+                type="circle"
+                paint={{
+                  "circle-radius": Math.max(12, Math.round(((editingLayer.properties as Record<string, unknown>)?.marker_size as number ?? 100) / 200 * 16) + 4),
+                  "circle-color": "transparent",
+                  "circle-stroke-color": "#ef4444",
+                  "circle-stroke-width": 2,
+                }}
+                filter={["==", "$type", "Point"]}
+              />
+            )}
+            {geomType === "point" && isCustomMarker && symbolStyle && (
+              <MapLayer
+                id="pending-features-symbol"
+                type="symbol"
+                layout={{
+                  ...symbolStyle.layout,
+                  visibility: "visible",
+                  "icon-allow-overlap": true,
+                }}
+                paint={symbolStyle.paint as Record<string, unknown>}
+                filter={["==", "$type", "Point"]}
+              />
+            )}
+            {geomType === "point" && !isCustomMarker && layerStyle.type === "circle" && (
+              <MapLayer
+                id="pending-features-circle"
+                type="circle"
+                paint={layerStyle.paint as Record<string, unknown>}
+                filter={["==", "$type", "Point"]}
+              />
+            )}
+            {/* Fallbacks if style type doesn't match */}
+            {geomType === "polygon" && layerStyle.type !== "fill" && (
+              <MapLayer
+                id="pending-features-fill"
+                type="fill"
+                paint={{ "fill-color": "#ef4444", "fill-opacity": 0.15 }}
+                filter={["==", "$type", "Polygon"]}
+              />
+            )}
+            {geomType === "point" && !isCustomMarker && layerStyle.type !== "circle" && (
+              <MapLayer
+                id="pending-features-circle"
+                type="circle"
+                paint={{ "circle-radius": 6, "circle-color": "#ef4444", "circle-stroke-width": 2, "circle-stroke-color": "#fff" }}
+                filter={["==", "$type", "Point"]}
+              />
+            )}
+          </Source>
+        );
+      })()}
     </>
   );
 };
