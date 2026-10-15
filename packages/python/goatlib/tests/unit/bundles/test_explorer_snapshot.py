@@ -257,3 +257,75 @@ def test_a_trip_whose_end_has_no_time_has_no_schedule(tmp_path: Path) -> None:
         "WHERE trip_id = 'FLEX'"
     ).fetchall()
     assert row == [(21 * 3600 + 20 * 60, None)]
+
+
+def test_shapes_are_simplified_with_the_distance_along_them(
+    snapshot: Dict[str, Any],
+) -> None:
+    # SH1 leaves S1 north-east to 52.505° N, comes back down at S2 and runs
+    # due east to S5. Its point at 13.42 lies on the straight run: simplified
+    # away. Each leg of the detour is 650.9 m; 0.01° of longitude 676.9 m.
+    points = _rows(snapshot, "SELECT i, lon, lat, d FROM {shape_points} ORDER BY i")
+    assert [round(p[1], 3) for p in points] == [13.4, 13.405, 13.41, 13.44]
+    assert [round(p[3]) for p in points] == [0, 651, 1302, 3332]
+
+
+def test_stops_are_placed_along_their_trips_shape(snapshot: Dict[str, Any]) -> None:
+    # The main pattern S1 → S5 on SH1: S2 after the detour, then 676.9 m a stop.
+    along = _rows(
+        snapshot,
+        """SELECT p.d FROM {pattern_shape_stops} p JOIN {patterns} USING (pattern_idx)
+           WHERE n_stops = 5 AND stops[1] < stops[5] ORDER BY i""",
+    )
+    assert [round(a[0]) for a in along] == [0, 1302, 1979, 2656, 3332]
+    # Patterns whose trips have no shape (R1's return, R2, R3, R4) have none.
+    assert _rows(
+        snapshot, "SELECT count(DISTINCT pattern_idx) FROM {pattern_shape_stops}"
+    ) == [(2,)]
+    assert _rows(snapshot, "SELECT * FROM {shape_route}") == [(0, 0)]
+
+
+@pytest.mark.parametrize("layout", ["points", "lines_as_shapes"])
+def test_shapes_read_alike_however_the_bundle_keeps_them(
+    snapshot: Dict[str, Any], tmp_path: Path, layout: str
+) -> None:
+    # Newer imports keep the GTFS points and a shape_lines member (the module
+    # snapshot); a bundle may have the points alone, or, imported earlier, one
+    # line per shape as its shapes member.
+    root = tmp_path / "in"
+    root.mkdir()
+    archive = root / "mini_gtfs.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        for f in sorted(FIXTURE.iterdir()):
+            zf.write(f, f.name)
+    work = root / "work"
+    work.mkdir()
+    paths = {
+        layer.role: layer.file_path
+        for layer in GtfsImporter().extract_layers(str(archive), str(work))
+    }
+    if layout == "points":
+        del paths["shape_lines"]
+    else:
+        paths["shapes"] = paths.pop("shape_lines")
+    out = tmp_path / "snapshot"
+    out.mkdir()
+    con = bound_duckdb(duckdb.connect(), str(work))
+    manifest = build_snapshot(
+        con,
+        lambda role: f"read_parquet('{paths[role]}')" if role in paths else None,
+        str(out),
+    )
+    expected = {None if layout == "points" else "shapes"}
+    assert {manifest["shape_lines_role"]} == expected
+    for name in ("shape_points", "pattern_shape_stops"):
+        rows = con.execute(
+            f"SELECT * FROM read_parquet('{out}/{name}.parquet') ORDER BY ALL"
+        ).fetchall()
+        assert rows == _rows(snapshot, f"SELECT * FROM {{{name}}} ORDER BY ALL"), name
+    # A shape's length: from its points where there are any, else from the
+    # simplified line — within a metre of each other.
+    (length,) = con.execute(
+        f"SELECT length_m FROM read_parquet('{out}/shapes_meta.parquet')"
+    ).fetchone()
+    assert length == pytest.approx(3332.5, abs=1)

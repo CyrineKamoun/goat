@@ -539,6 +539,8 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
             position: "absolute",
             bottom: 10,
             left: leftWidth + GAP_SIZE + 10,
+            // To the map controls' column: the bar spans the map (board 3).
+            right: 90,
             zIndex: (theme) => theme.zIndex.drawer + 1,
           }}>
           <ExplorerBottomBar />

@@ -225,7 +225,9 @@ def _build_sync(
 
 
 def _prune(bundle_id: str, current: int) -> None:
-    """Remove superseded revisions; the one before stays for an hour."""
+    """Remove superseded snapshots: older revisions, and any revision's of an
+    older schema. The one just superseded stays for an hour, for downloads in
+    flight."""
     bundle_dir = EXPLORER_DIR / bundle_id
     now = time.time()
     for entry in bundle_dir.iterdir():
@@ -233,12 +235,14 @@ def _prune(bundle_id: str, current: int) -> None:
         if not name.startswith("r") or not entry.is_dir():
             continue
         try:
-            rev = int(name[1:].split(".", 1)[0])
+            rev_text, schema_text = name[1:].split(".s", 1)
+            rev, schema = int(rev_text), int(schema_text)
         except ValueError:
             continue
-        if rev >= current:
+        if rev >= current and schema == SCHEMA_VERSION:
             continue
-        if rev < current - 1 or now - entry.stat().st_mtime > _KEEP_PREVIOUS_SECONDS:
+        recent = now - entry.stat().st_mtime <= _KEEP_PREVIOUS_SECONDS
+        if rev < current - 1 or not recent:
             shutil.rmtree(entry, ignore_errors=True)
 
 

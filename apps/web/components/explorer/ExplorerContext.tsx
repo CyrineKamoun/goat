@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 
 import { useBundleLayers } from "@/lib/api/bundles";
 import type { SqlRunner } from "@/lib/explorer/db/types";
+import { networkShapes, networkStore } from "@/lib/explorer/network";
 import { DEFAULT_SETTINGS, type ExplorerSettings, loadSettings, saveSettings } from "@/lib/explorer/settings";
 import { setExplorerDate } from "@/lib/store/explorer/slice";
 
@@ -70,6 +71,23 @@ export function ExplorerProvider({ bundleId, children }: { bundleId: string; chi
     if (window && !date) dispatch(setExplorerDate(defaultDate(window)));
   }, [window, date, dispatch]);
 
+  // The member the map draws shapes from: whichever the snapshot found the
+  // lines in (an older import keeps them as its shapes).
+  const linesRole = manifest ? (manifest.shape_lines_role ?? null) : undefined;
+  const shapeLinesLayerId = linesRole ? (members?.find((m) => m.role === linesRole)?.layer_id ?? null) : null;
+
+  // The network the map draws by itself, once the snapshot is in.
+  const db = state.status === "ready" ? state.db : undefined;
+  useEffect(() => {
+    if (!db) return;
+    let current = true;
+    networkShapes(db, shapeLinesLayerId).then((n) => current && networkStore.set(n));
+    return () => {
+      current = false;
+      networkStore.reset();
+    };
+  }, [db, shapeLinesLayerId]);
+
   const value = useMemo<ExplorerData>(() => {
     const ready = state.status === "loading" || state.status === "ready";
     return {
@@ -77,7 +95,7 @@ export function ExplorerProvider({ bundleId, children }: { bundleId: string; chi
       db: ready && hasTables(state, FIRST_TABLES) ? state.db : undefined,
       complete: state.status === "ready",
       window,
-      shapeLinesLayerId: members?.find((m) => m.role === "shape_lines")?.layer_id ?? null,
+      shapeLinesLayerId,
       progress:
         state.status === "ready"
           ? 1
@@ -89,7 +107,7 @@ export function ExplorerProvider({ bundleId, children }: { bundleId: string; chi
       settings,
       setSettings,
     };
-  }, [state, window, members, retry, manifest, settings, setSettings]);
+  }, [state, window, retry, manifest, settings, setSettings, shapeLinesLayerId]);
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

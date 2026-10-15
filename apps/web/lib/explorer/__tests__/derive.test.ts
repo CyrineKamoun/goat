@@ -28,6 +28,14 @@ import { isoWeekday, routeCalendar } from "@/lib/explorer/derive/serviceCalendar
 import { type PlaceRow, places } from "@/lib/explorer/derive/stops";
 import { stopsLine } from "@/lib/explorer/derive/stopsLine";
 import {
+  alongShape,
+  positionsAt,
+  prepareDay,
+  runningAt,
+  serviceSpan,
+  vehicleWindow,
+} from "@/lib/explorer/derive/vehicles";
+import {
   filterCount,
   listPlaces,
   matchingRouteIdxs,
@@ -399,5 +407,110 @@ describe("settings in the figures", () => {
     // layover one vehicle can follow another sooner.
     const runs = await routeRuns(db, route("R1"), "2026-10-14");
     expect(operations(runs, 0).peak_vehicles).toBeLessThanOrEqual(operations(runs, 6 * 60).peak_vehicles);
+  });
+});
+
+describe("vehicles", () => {
+  // Stops lie 0.01° of longitude apart along 52.5° N: S1 13.40 … S6 13.45.
+  const at = async (date: string, t: number) => {
+    await prepareDay(db, date);
+    return positionsAt(await vehicleWindow(db, date, t - 600, t + 600), t);
+  };
+  const hm = (h: number, m: number) => h * 3600 + m * 60;
+
+  it("places a vehicle between the stops it runs between", async () => {
+    // T1 leaves S2 at 08:02 and reaches S3 at 08:04: at 08:03 it is halfway.
+    const r1 = route("R1");
+    const vehicles = (await at("2026-10-14", hm(8, 3))).filter((v) => v.route_idx === r1.route_idx);
+    expect(vehicles).toHaveLength(1);
+    expect(vehicles[0].lon).toBeCloseTo(13.415, 6);
+    expect(vehicles[0].lat).toBeCloseTo(52.5, 6);
+  });
+
+  it("follows the trip's shape, not the straight line between stops", async () => {
+    // SH1 leaves S1 for 52.505° N and comes back down at S2: T1, halfway
+    // from S1 (08:00) to S2 (08:02), is at the top of the detour.
+    const r1 = route("R1");
+    const [t1] = (await at("2026-10-14", hm(8, 1))).filter((v) => v.route_idx === r1.route_idx);
+    expect(t1.lon).toBeCloseTo(13.405, 4);
+    expect(t1.lat).toBeCloseTo(52.505, 4);
+  });
+
+  it("goes in a straight line where a trip has no shape", async () => {
+    // T3 (no shape) runs S5 → S1 from 08:20; at 08:21 it is halfway to S4.
+    const r1 = route("R1");
+    const vehicles = (await at("2026-10-14", hm(8, 21))).filter((v) => v.route_idx === r1.route_idx);
+    expect(vehicles).toHaveLength(1);
+    expect(vehicles[0].lon).toBeCloseTo(13.435, 6);
+    expect(vehicles[0].lat).toBeCloseTo(52.5, 6);
+  });
+
+  it("walks a shape by distance", () => {
+    const shape = {
+      d: Float32Array.from([0, 100, 300]),
+      lon: Float32Array.from([0, 1, 1]),
+      lat: Float32Array.from([0, 0, 2]),
+    };
+    expect(alongShape(shape, 50)).toEqual([0.5, 0]);
+    expect(alongShape(shape, 200)).toEqual([1, 1]);
+    expect(alongShape(shape, 999)).toEqual([1, 2]);
+  });
+
+  it("runs every run of a frequency-based trip", async () => {
+    // F1 leaves every 10 min from 06:00 and takes 8 (S4 → S5 in 4, S5 → S6
+    // in 4): at 06:15 only the 06:10 run is out, a quarter of the way from
+    // S5 (06:14) to S6 (06:18).
+    const r4 = route("R4");
+    const at0615 = (await at("2026-10-14", hm(6, 15))).filter((v) => v.route_idx === r4.route_idx);
+    expect(at0615).toHaveLength(1);
+    expect(at0615[0].lon).toBeCloseTo(13.44 + 0.01 * (1 / 4), 6);
+    const at0607 = (await at("2026-10-14", hm(6, 7))).filter((v) => v.route_idx === r4.route_idx);
+    expect(at0607).toHaveLength(1);
+  });
+
+  it("follows service past midnight", async () => {
+    // U2 runs 24:20–24:50; its middle stop has no position, so it goes
+    // straight from S6 to S2 between 24:20 and 24:50.
+    await prepareDay(db, "2026-10-14");
+    const span = await serviceSpan(db);
+    expect(span?.last_s).toBe(hm(24, 50));
+    expect(await runningAt(db, hm(24, 30))).toBe(1);
+    const r2 = route("R2");
+    const [u2] = (await at("2026-10-14", hm(24, 35))).filter((v) => v.route_idx === r2.route_idx);
+    expect(u2.lon).toBeCloseTo(13.45 - 0.04 * 0.5, 6);
+  });
+
+  it("holds a vehicle at its stop while it waits there", () => {
+    const window = {
+      date: "2026-10-14",
+      from_s: 0,
+      to_s: 100,
+      runs: new Map([
+        [
+          1,
+          [
+            {
+              run: 1,
+              route_idx: 0,
+              t0: 10,
+              t1: 20,
+              a: [1, 1] as [number, number],
+              b: [1, 1] as [number, number],
+            },
+            {
+              run: 1,
+              route_idx: 0,
+              t0: 20,
+              t1: 30,
+              a: [1, 1] as [number, number],
+              b: [2, 1] as [number, number],
+            },
+          ],
+        ],
+      ]),
+    };
+    expect(positionsAt(window, 15)).toEqual([{ run: 1, route_idx: 0, lon: 1, lat: 1 }]);
+    expect(positionsAt(window, 25)[0].lon).toBe(1.5);
+    expect(positionsAt(window, 40)).toEqual([]);
   });
 });

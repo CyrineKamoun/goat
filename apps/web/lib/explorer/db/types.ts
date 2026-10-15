@@ -29,6 +29,9 @@ export interface SnapshotManifest {
   files: SnapshotFile[];
   warnings: Record<string, number>;
   shape_dist_unit: string | null;
+  /** The member whose features are the shapes as lines: `shape_lines`, an
+   * older import's `shapes`, or none. */
+  shape_lines_role?: string | null;
   service_window: [string | null, string | null];
 }
 

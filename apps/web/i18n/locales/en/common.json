@@ -3561,5 +3561,14 @@
   "explorer_settings_invalid": "Some values are not numbers or times (HH:MM).",
   "explorer_settings_not_kept": "This browser could not keep the settings. Check that it allows this site to store data.",
   "explorer_edit_time_periods": "Edit time periods",
-  "explorer_rates_set": "rates set"
+  "explorer_rates_set": "rates set",
+  "explorer_play": "Play",
+  "explorer_pause": "Pause",
+  "explorer_speed": "Playback speed",
+  "explorer_playback_time": "Time of day",
+  "explorer_vehicles_running_one": "{{n}} vehicle",
+  "explorer_vehicles_running_other": "{{n}} vehicles",
+  "explorer_playback_memory_database": "Playback is off: the network already takes most of the memory this browser allows the Explorer. Everything else still works.",
+  "explorer_playback_memory_page": "Playback is off: this page is using most of the memory the browser allows it. Close other tabs, or reload, to free memory.",
+  "explorer_playback_memory_device": "Playback is off: this device has too little memory to play the network beside the rest of the Explorer."
 }

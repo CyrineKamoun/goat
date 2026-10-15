@@ -33,7 +33,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 #: Bumped when a file's columns or meaning change; part of the files' URLs,
 #: so a browser never mixes files of two versions.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 #: GTFS ``shape_dist_traveled`` has no fixed unit. The feed's unit is the one
 #: of these (metres per unit) nearest to what its stops' straight-line
@@ -56,9 +56,21 @@ FILES = (
     "trips",
     "frequencies",
     "shapes_meta",
+    "shape_points",
+    "pattern_shape_stops",
+    "shape_route",
     "stop_time_extras",
     "stop_times",
 )
+
+#: Shapes are simplified to this tolerance, in metres: finer than a vehicle
+#: marker at any zoom, and less than half the points of a typical feed.
+SHAPE_TOLERANCE_M = 2.0
+#: Metres per degree of latitude, for the shapes' local planar frame.
+_M_PER_DEG = 111_195.0
+#: Shapes simplified per statement: a whole feed's at once overruns the build's
+#: memory (an ordered list per shape); a thousand at a time stays small.
+_SHAPE_BATCH = 1000
 
 #: The roles the snapshot reads.
 ROLES = (
@@ -71,6 +83,7 @@ ROLES = (
     "calendar_dates",
     "frequencies",
     "shapes",
+    "shape_lines",
 )
 
 _WEEKDAYS = (
@@ -95,6 +108,9 @@ _TEMP_TABLES = (
     "x_patterns0",
     "x_trips",
     "x_shapes_meta",
+    "x_shape_lines",
+    "x_shape_points",
+    "x_pattern_shape_stops",
 )
 
 
@@ -166,7 +182,9 @@ def build_snapshot(
         _trip_stops(con, warnings)
         scale, unit = _distance_scale(con)
         _shapes(con, rel, present)
+        lines_role = _shape_lines(con, rel, present)
         _patterns_and_trips(con, scale)
+        _pattern_shape_stops(con)
 
         files = []
         for name in FILES:
@@ -190,6 +208,9 @@ def build_snapshot(
         "files": files,
         "warnings": warnings,
         "shape_dist_unit": unit,
+        # The member whose features are the shapes as lines, for the map to
+        # draw the network from: shape_lines, or an older import's shapes.
+        "shape_lines_role": lines_role,
         "service_window": [d.isoformat() if d else None for d in window],
     }
 
@@ -579,6 +600,197 @@ def _patterns_and_trips(con: Any, scale: Optional[float]) -> None:
     )
 
 
+def _geometry_column(con: Any, relation: str) -> Optional[str]:
+    """The relation's geometry column, if it has one."""
+    for name, kind, *_ in con.execute(f"DESCRIBE SELECT * FROM {relation}").fetchall():
+        if str(kind).upper().startswith("GEOMETRY"):
+            return str(name)
+    return None
+
+
+def _shape_lines(con: Any, rel: Rel, present: Present) -> Optional[str]:
+    """``x_shape_lines`` (each shape trips use, simplified, in a local planar
+    frame) and ``x_shape_points`` (its vertices, with the distance along it);
+    returns the role the map can draw the shapes as lines from.
+
+    Bundles keep shapes as lines (a ``shape_lines`` member, or an older
+    import's ``shapes`` of one line per shape) or as GTFS points (``shapes``
+    with ``shape_pt_*``); whichever there is is read, a thousand shapes at a
+    time so the build stays within its memory. A shape is drawn in a frame of
+    its own — longitude scaled by the cosine of its mean latitude, both in
+    degrees of latitude — so simplification, distances and where a stop
+    falls on the line all use one measure.
+    """
+    con.execute(
+        """
+        CREATE OR REPLACE TEMP TABLE x_shape_lines (
+            shape_idx INTEGER, k DOUBLE, g GEOMETRY)
+        """
+    )
+    con.execute(
+        """
+        CREATE OR REPLACE TEMP TABLE x_shape_points (
+            shape_idx INTEGER, i INTEGER, lon FLOAT, lat FLOAT, d FLOAT)
+        """
+    )
+    # Where the vertices come from: (relation, how to read them, role drawn).
+    source: Optional[Tuple[str, str, Optional[str]]] = None
+    for role in ("shape_lines", "shapes"):
+        r = rel.get(role)
+        if r is None or "shape_id" not in present.get(role, []):
+            continue
+        geom = _geometry_column(con, r)
+        if geom and not {"shape_pt_lat", "shape_pt_lon"} <= set(present[role]):
+            source = (r, f'"{geom}"', role)
+            break
+    if (
+        source is None
+        and rel["shapes"] is not None
+        and {
+            "shape_id",
+            "shape_pt_lat",
+            "shape_pt_lon",
+            "shape_pt_sequence",
+        }
+        <= set(present["shapes"])
+    ):
+        source = (rel["shapes"], "", None)
+    if source is None:
+        return None
+    relation, geom, lines_role = source
+    con.execute("LOAD spatial")
+    n = con.execute("SELECT count(*) FROM x_shapes_meta").fetchone()[0]
+    tol = SHAPE_TOLERANCE_M / _M_PER_DEG
+    for lo in range(0, n, _SHAPE_BATCH):
+        hi = lo + _SHAPE_BATCH
+        batch = f"m.shape_idx >= {lo} AND m.shape_idx < {hi}"
+        if geom:
+            # A line's vertices, in order (a multi-line merged into one
+            # first); one line per shape, should a shape appear twice.
+            pts = f"""
+                SELECT shape_idx, struct_extract(d, 'path')[1] AS seq,
+                       ST_X(struct_extract(d, 'geom')) AS lon,
+                       ST_Y(struct_extract(d, 'geom')) AS lat
+                FROM (
+                    SELECT shape_idx, UNNEST(ST_Dump(ST_Points(ST_LineMerge(g)))) AS d
+                    FROM (
+                        SELECT m.shape_idx, any_value(s.{geom}) AS g
+                        FROM {relation} s JOIN x_shapes_meta m ON m.shape_id = s."shape_id"
+                        WHERE {batch} AND s.{geom} IS NOT NULL
+                        GROUP BY m.shape_idx
+                    )
+                )
+            """
+        else:
+            pts = f"""
+                SELECT m.shape_idx, CAST(s."shape_pt_sequence" AS INTEGER) AS seq,
+                       CAST(s."shape_pt_lon" AS DOUBLE) AS lon,
+                       CAST(s."shape_pt_lat" AS DOUBLE) AS lat
+                FROM {relation} s JOIN x_shapes_meta m ON m.shape_id = s."shape_id"
+                WHERE {batch}
+                  AND s."shape_pt_lat" IS NOT NULL AND s."shape_pt_lon" IS NOT NULL
+            """
+        con.execute(
+            f"""
+            INSERT INTO x_shape_lines
+            WITH pts AS ({pts}),
+            frame AS (SELECT shape_idx, cos(radians(avg(lat))) AS k FROM pts GROUP BY shape_idx)
+            SELECT p.shape_idx, f.k,
+                   ST_Simplify(ST_MakeLine(list(ST_Point(p.lon * f.k, p.lat)
+                                                ORDER BY p.seq)), {tol})
+            FROM pts p JOIN frame f USING (shape_idx)
+            GROUP BY p.shape_idx, f.k
+            HAVING count(*) >= 2
+            """
+        )
+    con.execute(
+        f"""
+        INSERT INTO x_shape_points
+        WITH v AS (
+            SELECT shape_idx, k, UNNEST(ST_Dump(ST_Points(g)), recursive := true)
+            FROM x_shape_lines
+        ),
+        xy AS (
+            SELECT shape_idx, k, ST_X(geom) AS x, ST_Y(geom) AS y, path[1] - 1 AS i FROM v
+        )
+        SELECT shape_idx, CAST(i AS INTEGER), CAST(x / k AS FLOAT), CAST(y AS FLOAT),
+               CAST({_M_PER_DEG} * coalesce(sum(hop) OVER (
+                   PARTITION BY shape_idx ORDER BY i
+                   ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS FLOAT)
+        FROM (
+            SELECT *, sqrt(pow(x - lag(x) OVER w, 2) + pow(y - lag(y) OVER w, 2)) AS hop
+            FROM xy WINDOW w AS (PARTITION BY shape_idx ORDER BY i)
+        )
+        """
+    )
+    # A shape's length where its points gave none: the line's.
+    con.execute(
+        """
+        UPDATE x_shapes_meta m SET length_m = l.length_m
+        FROM (SELECT shape_idx, CAST(max(d) AS REAL) AS length_m
+              FROM x_shape_points GROUP BY shape_idx) l
+        WHERE l.shape_idx = m.shape_idx AND m.length_m IS NULL
+        """
+    )
+    return lines_role
+
+
+def _pattern_shape_stops(con: Any) -> None:
+    """``x_pattern_shape_stops``: how far along its shape each stop of a
+    pattern lies, for every pattern and shape trips use together.
+
+    A stop is placed where it projects onto the line, never before the stop
+    ahead of it: a loop or a stop beside the line must not send a vehicle
+    backwards; a loop's last stop, which projects to where it began, is the
+    line's end."""
+    con.execute(
+        """
+        CREATE OR REPLACE TEMP TABLE x_pattern_shape_stops (
+            pattern_idx INTEGER, shape_idx INTEGER, i INTEGER, d FLOAT)
+        """
+    )
+    n = con.execute("SELECT count(*) FROM x_shapes_meta").fetchone()[0]
+    for lo in range(0, n, _SHAPE_BATCH):
+        hi = lo + _SHAPE_BATCH
+        con.execute(
+            f"""
+            INSERT INTO x_pattern_shape_stops
+            WITH pairs AS (
+                SELECT DISTINCT pattern_idx, shape_idx FROM x_trips
+                WHERE shape_idx >= {lo} AND shape_idx < {hi}
+            ),
+            calls AS (
+                SELECT pr.pattern_idx, pr.shape_idx,
+                       UNNEST(p.stops) AS stop_idx,
+                       UNNEST(range(len(p.stops))) AS i
+                FROM pairs pr JOIN x_patterns0 p USING (pattern_idx)
+            ),
+            placed AS (
+                -- A stop without a position takes its station's.
+                SELECT c.pattern_idx, c.shape_idx, c.i,
+                       ST_LineLocatePoint(l.g, ST_Point(coalesce(s.lon, ps.lon) * l.k,
+                                                        coalesce(s.lat, ps.lat)))
+                         * ST_Length(l.g) * {_M_PER_DEG} AS d,
+                       ST_Length(l.g) * {_M_PER_DEG} AS length_m
+                FROM calls c JOIN x_shape_lines l USING (shape_idx)
+                JOIN x_stops s ON s.stop_idx = c.stop_idx
+                LEFT JOIN x_stops ps ON ps.stop_idx = s.parent_idx
+                WHERE coalesce(s.lon, ps.lon) IS NOT NULL
+            )
+            SELECT pattern_idx, shape_idx, CAST(i AS INTEGER),
+                   CAST(CASE
+                       WHEN i = max(i) OVER pat AND d < max(d) OVER prior
+                            AND d < 0.05 * length_m THEN length_m
+                       ELSE greatest(d, coalesce(max(d) OVER prior, 0))
+                   END AS FLOAT)
+            FROM placed
+            WINDOW pat AS (PARTITION BY pattern_idx, shape_idx),
+                   prior AS (PARTITION BY pattern_idx, shape_idx ORDER BY i
+                             ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING)
+            """
+        )
+
+
 _QUERIES: Dict[str, str] = {
     "agencies": "SELECT * FROM x_agencies ORDER BY agency_idx",
     "routes": """
@@ -600,6 +812,14 @@ _QUERIES: Dict[str, str] = {
     "shapes_meta": (
         "SELECT shape_idx, shape_id, length_m FROM x_shapes_meta ORDER BY shape_idx"
     ),
+    "shape_points": "SELECT * FROM x_shape_points ORDER BY shape_idx, i",
+    "pattern_shape_stops": (
+        "SELECT * FROM x_pattern_shape_stops ORDER BY pattern_idx, shape_idx, i"
+    ),
+    "shape_route": """
+        SELECT DISTINCT shape_idx, route_idx FROM x_trips
+        WHERE shape_idx IS NOT NULL ORDER BY shape_idx, route_idx
+    """,
     "stop_times": """
         SELECT t.trip_idx, st.stop_sequence, st.stop_idx, st.arrival_s,
                st.departure_s, CAST(st.shape_dist AS REAL) AS shape_dist

@@ -3561,5 +3561,14 @@
   "explorer_settings_invalid": "Einige Werte sind keine Zahlen oder Zeiten (HH:MM).",
   "explorer_settings_not_kept": "Dieser Browser konnte die Einstellungen nicht speichern. Prüfen Sie, ob er dieser Seite das Speichern erlaubt.",
   "explorer_edit_time_periods": "Zeiträume bearbeiten",
-  "explorer_rates_set": "Sätze gesetzt"
+  "explorer_rates_set": "Sätze gesetzt",
+  "explorer_play": "Abspielen",
+  "explorer_pause": "Pause",
+  "explorer_speed": "Abspielgeschwindigkeit",
+  "explorer_playback_time": "Uhrzeit",
+  "explorer_vehicles_running_one": "{{n}} Fahrzeug",
+  "explorer_vehicles_running_other": "{{n}} Fahrzeuge",
+  "explorer_playback_memory_database": "Abspielen ist aus: Das Netz belegt bereits den Großteil des Speichers, den dieser Browser dem Explorer erlaubt. Alles andere funktioniert weiter.",
+  "explorer_playback_memory_page": "Abspielen ist aus: Diese Seite nutzt den Großteil des Speichers, den der Browser ihr erlaubt. Schließen Sie andere Tabs oder laden Sie neu.",
+  "explorer_playback_memory_device": "Abspielen ist aus: Dieses Gerät hat zu wenig Speicher, um das Netz neben dem übrigen Explorer abzuspielen."
 }

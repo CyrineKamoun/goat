@@ -31,6 +31,10 @@ export interface ExplorerPatternChoice {
 /** The settings dialog's tabs (settings.ts). */
 export type ExplorerSettingsTab = "rates" | "periods" | "vehicles";
 
+/** Playback speeds: how many seconds of the day pass in one second. */
+export const PLAYBACK_SPEEDS = [1, 10, 60] as const;
+export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
+
 export const NO_FILTERS: ExplorerFilters = { types: [], modes: [], agencies: [] };
 
 export interface ExplorerRouteDrawing {
@@ -73,6 +77,13 @@ export interface ExplorerState {
   pattern: ExplorerPatternChoice | null;
   /** The settings dialog, open on a tab, or closed. */
   settingsTab: ExplorerSettingsTab | null;
+  /** Playback: whether it runs, how fast, and the time of the day it shows,
+   * in service-day seconds — null until the day's service is known. While it
+   * runs the live time is the playback clock's (lib/explorer/playback.ts);
+   * this is where it starts and stops. */
+  playing: boolean;
+  speed: PlaybackSpeed;
+  time_s: number | null;
 }
 
 const initialState: ExplorerState = {
@@ -88,6 +99,9 @@ const initialState: ExplorerState = {
   routeTab: "overview",
   pattern: null,
   settingsTab: null,
+  playing: false,
+  speed: 60,
+  time_s: null,
 };
 
 const explorerSlice = createSlice({
@@ -129,7 +143,22 @@ const explorerSlice = createSlice({
     openExplorerSettings: (state, action: PayloadAction<ExplorerSettingsTab | null>) => {
       state.settingsTab = action.payload;
     },
+    setPlaying: (state, action: PayloadAction<boolean>) => {
+      state.playing = action.payload;
+    },
+    setPlaybackSpeed: (state, action: PayloadAction<PlaybackSpeed>) => {
+      state.speed = action.payload;
+    },
+    /** Where playback stands: set by the scrubber, and by the clock when it stops. */
+    setPlaybackTime: (state, action: PayloadAction<number | null>) => {
+      state.time_s = action.payload;
+    },
     setExplorerDate: (state, action: PayloadAction<string>) => {
+      // Another day's service has another span: playback starts it afresh.
+      if (action.payload !== state.date) {
+        state.playing = false;
+        state.time_s = null;
+      }
       state.date = action.payload;
     },
     setExplorerDrawing: (state, action: PayloadAction<ExplorerRouteDrawing | null>) => {
@@ -162,6 +191,9 @@ export const {
   setExplorerRouteTab,
   pickExplorerPattern,
   openExplorerSettings,
+  setPlaying,
+  setPlaybackSpeed,
+  setPlaybackTime,
 } = explorerSlice.actions;
 
 export const explorerReducer = explorerSlice.reducer;

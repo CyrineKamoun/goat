@@ -18,6 +18,7 @@ from uuid import UUID
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from goatlib.bundles.explorer.snapshot import SCHEMA_VERSION as S
 
 BUNDLE = "22222222-2222-2222-2222-222222222222"
 STOPS = "3fa85f64-5717-4562-b3fc-2c963f66afa6"
@@ -109,14 +110,14 @@ def test_first_request_builds_and_later_ones_get_the_files(client, builds) -> No
     body = ready["body"]
     assert body["status"] == "ready"
     assert body["files"][0]["url"] == (
-        f"/bundles/{BUNDLE}/explorer/r3/s1/stop_times.parquet"
+        f"/bundles/{BUNDLE}/explorer/r3/s{S}/stop_times.parquet"
     )
 
 
 def test_files_are_cached_for_good_and_never_gzipped(client, builds) -> None:
     _until_ready(client)
     response = client.get(
-        f"/bundles/{BUNDLE}/explorer/r3/s1/stop_times.parquet",
+        f"/bundles/{BUNDLE}/explorer/r3/s{S}/stop_times.parquet",
         headers={"Accept-Encoding": "gzip"},
     )
     assert response.status_code == 200
@@ -129,9 +130,9 @@ def test_files_are_cached_for_good_and_never_gzipped(client, builds) -> None:
 @pytest.mark.parametrize(
     "path",
     [
-        "r3/s1/manifest.parquet",  # not a snapshot file
+        f"r3/s{S}/manifest.parquet",  # not a snapshot file
         "r3/s9/stop_times.parquet",  # another schema version
-        "r2/s1/stop_times.parquet",  # a revision that is not there
+        f"r2/s{S}/stop_times.parquet",  # a revision that is not there
     ],
 )
 def test_anything_else_is_not_found(client, builds, path: str) -> None:
@@ -173,7 +174,7 @@ def test_a_reader_the_layer_rule_refuses_gets_nothing(client, explorer) -> None:
         AsyncMock(side_effect=HTTPException(status_code=403, detail="no")),
     ):
         assert client.get(MANIFEST_URL).status_code == 403
-        url = f"/bundles/{BUNDLE}/explorer/r3/s1/stop_times.parquet"
+        url = f"/bundles/{BUNDLE}/explorer/r3/s{S}/stop_times.parquet"
         assert client.get(url).status_code == 403
 
 
@@ -181,31 +182,37 @@ def test_superseded_revisions_are_pruned_the_previous_after_an_hour(
     explorer, tmp_path: Path
 ) -> None:
     for rev in (1, 2, 3, 4):
-        (tmp_path / BUNDLE / f"r{rev}.s1").mkdir(parents=True)
+        (tmp_path / BUNDLE / f"r{rev}.s{S}").mkdir(parents=True)
     old = time.time() - 2 * 3600
-    os.utime(tmp_path / BUNDLE / "r2.s1", (old, old))
+    os.utime(tmp_path / BUNDLE / f"r2.s{S}", (old, old))
 
     explorer._prune(BUNDLE, 4)
     # r3, the one before, stays while downloads of it may be in flight; r2
     # was superseded long ago and r1 is two behind.
-    assert sorted(p.name for p in (tmp_path / BUNDLE).iterdir()) == ["r3.s1", "r4.s1"]
+    assert sorted(p.name for p in (tmp_path / BUNDLE).iterdir()) == [
+        f"r3.s{S}",
+        f"r4.s{S}",
+    ]
 
-    (tmp_path / BUNDLE / "r5.s1").mkdir()
+    (tmp_path / BUNDLE / f"r5.s{S}").mkdir()
     explorer._prune(BUNDLE, 5)
-    assert sorted(p.name for p in (tmp_path / BUNDLE).iterdir()) == ["r4.s1", "r5.s1"]
+    assert sorted(p.name for p in (tmp_path / BUNDLE).iterdir()) == [
+        f"r4.s{S}",
+        f"r5.s{S}",
+    ]
 
 
 def test_cleanup_removes_what_no_build_will_finish(explorer, tmp_path: Path) -> None:
     bundle = tmp_path / BUNDLE
     (bundle / ".tmp-r3-abc").mkdir(parents=True)
     (bundle / ".building-r3").write_text("pod")
-    (bundle / "r3.s1").mkdir()
+    (bundle / f"r3.s{S}").mkdir()
     old = time.time() - 2 * 3600
     for name in (".tmp-r3-abc", ".building-r3"):
         os.utime(bundle / name, (old, old))
 
     assert explorer.cleanup_explorer_dir() == 2
-    assert [p.name for p in bundle.iterdir()] == ["r3.s1"]
+    assert [p.name for p in bundle.iterdir()] == [f"r3.s{S}"]
 
 
 def test_bundle_lookup_rejects_what_is_not_a_public_transport_bundle() -> None:
@@ -223,3 +230,14 @@ def test_bundle_lookup_rejects_what_is_not_a_public_transport_bundle() -> None:
         with pytest.raises(HTTPException) as refused:
             asyncio.run(explorer._bundle(UUID(BUNDLE)))
     assert refused.value.status_code == 404
+
+
+def test_an_older_schemas_snapshot_goes_once_superseded(
+    explorer, tmp_path: Path
+) -> None:
+    (tmp_path / BUNDLE / f"r3.s{S - 1}").mkdir(parents=True)
+    (tmp_path / BUNDLE / f"r3.s{S}").mkdir()
+    old = time.time() - 2 * 3600
+    os.utime(tmp_path / BUNDLE / f"r3.s{S - 1}", (old, old))
+    explorer._prune(BUNDLE, 3)
+    assert [p.name for p in (tmp_path / BUNDLE).iterdir()] == [f"r3.s{S}"]

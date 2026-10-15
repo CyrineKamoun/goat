@@ -7,10 +7,13 @@ import {
   pickExplorerPattern,
   selectExplorerRoute,
   selectExplorerStop,
+  setExplorerDate,
   setExplorerDrawing,
   setExplorerFilters,
   setExplorerLeftTab,
   setExplorerRouteTab,
+  setPlaybackTime,
+  setPlaying,
 } from "@/lib/store/explorer/slice";
 import { setMapMode } from "@/lib/store/map/slice";
 
@@ -73,6 +76,16 @@ describe("explorer slice", () => {
     state = explorerReducer(state, selectExplorerRoute("R2"));
     expect(state.routeTab).toBe("overview");
     expect(state.pattern).toBeNull();
+  });
+
+  it("stops playback and forgets its time when the date changes", () => {
+    let state = explorerReducer(open(), setExplorerDate("2026-10-14"));
+    state = explorerReducer(state, setPlaybackTime(8 * 3600));
+    state = explorerReducer(state, setPlaying(true));
+    state = explorerReducer(state, setExplorerDate("2026-10-14"));
+    expect(state).toMatchObject({ playing: true, time_s: 8 * 3600 });
+    state = explorerReducer(state, setExplorerDate("2026-10-15"));
+    expect(state).toMatchObject({ playing: false, time_s: null });
   });
 
   it("ends when the map leaves the data view", () => {
