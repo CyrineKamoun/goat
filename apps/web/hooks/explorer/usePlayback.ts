@@ -158,7 +158,7 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
         features: vehicles.flatMap((v) => {
           const r = props.get(v.route_idx);
           if (!r) return [];
-          const p: VehicleProps = { run: v.run, ...r };
+          const p: VehicleProps = { run: v.run, trip_idx: v.trip_idx, run_dep_s: v.run_dep_s, ...r };
           return [
             {
               type: "Feature" as const,

@@ -45,6 +45,31 @@ export interface StopsLine {
   of_date: boolean;
 }
 
+/** The routes calling at each of `stopIdxs` or at its station — the
+ * transfers there — by route_idx, leaving out `except`. */
+export async function routesAt(
+  db: SqlRunner,
+  stopIdxs: number[],
+  except: number | null = null
+): Promise<Map<number, number[]>> {
+  if (!stopIdxs.length) return new Map();
+  const rows = await db.all<{ stop_idx: number; routes: ArrayLike<number> | null }>(`
+    WITH calls AS (SELECT route_idx, UNNEST(stops) AS stop_idx FROM patterns),
+    placed AS (
+      SELECT COALESCE(s.parent_idx, s.stop_idx) AS place, c.route_idx
+      FROM calls c JOIN stops s USING (stop_idx)
+    ),
+    mine AS (
+      SELECT stop_idx, COALESCE(parent_idx, stop_idx) AS place FROM stops
+      WHERE stop_idx IN (${[...new Set(stopIdxs)].join(",")})
+    )
+    SELECT m.stop_idx,
+           list_sort(list_distinct(list(p.route_idx) FILTER (WHERE p.route_idx <> ${except ?? -1})))
+             AS routes
+    FROM mine m LEFT JOIN placed p USING (place) GROUP BY m.stop_idx`);
+  return new Map(rows.map((r) => [r.stop_idx, r.routes ? Array.from(r.routes) : []]));
+}
+
 /** Haversine, in metres. */
 function crowFlies(a: LineStop, b: LineStop): number | null {
   if (a.lat === null || a.lon === null || b.lat === null || b.lon === null) return null;
@@ -92,7 +117,7 @@ export async function stopsLine(
       FROM stop_times st JOIN (${tripsSql}) USING (trip_idx)
     ),
     t0 AS (SELECT trip_idx, dep AS t0, shape_dist AS d0 FROM st WHERE i = 0)`;
-  const [offsets, ends, served, info] = await Promise.all([
+  const [offsets, ends, transfers, info] = await Promise.all([
     db.all<{ i: number; off_s: number | null; dist: number | null }>(`
       ${timing}
       SELECT i, median(arr - t0) AS off_s, median(shape_dist - d0) AS dist
@@ -101,22 +126,7 @@ export async function stopsLine(
       ${timing}
       SELECT any_value(t0.t0) AS t0, max(st.arr) - any_value(t0.t0) AS run_s
       FROM st JOIN t0 USING (trip_idx) GROUP BY trip_idx`),
-    chain.length
-      ? db.all<{ stop_idx: number; routes: ArrayLike<number> | null }>(`
-          WITH calls AS (SELECT route_idx, UNNEST(stops) AS stop_idx FROM patterns),
-          placed AS (
-            SELECT COALESCE(s.parent_idx, s.stop_idx) AS place, c.route_idx
-            FROM calls c JOIN stops s USING (stop_idx)
-          ),
-          mine AS (
-            SELECT stop_idx, COALESCE(parent_idx, stop_idx) AS place FROM stops
-            WHERE stop_idx IN (${chain.join(",")})
-          )
-          SELECT m.stop_idx,
-                 list_sort(list_distinct(list(p.route_idx) FILTER (WHERE p.route_idx <> ${route.route_idx})))
-                   AS routes
-          FROM mine m LEFT JOIN placed p USING (place) GROUP BY m.stop_idx`)
-      : Promise.resolve([]),
+    routesAt(db, chain, route.route_idx),
     chain.length
       ? db.all<{
           stop_idx: number;
@@ -133,7 +143,6 @@ export async function stopsLine(
 
   const scale = shapeDistUnit ? (METRES_PER_UNIT[shapeDistUnit] ?? null) : null;
   const byPos = new Map(offsets.map((o) => [o.i, o]));
-  const transfers = new Map(served.map((s) => [s.stop_idx, s.routes ? Array.from(s.routes) : []]));
   const stopInfo = new Map(info.map((s) => [s.stop_idx, s]));
 
   // The direction's short turns, by the stop their trips end at.

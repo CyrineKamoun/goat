@@ -6,6 +6,7 @@
  */
 import { Box, IconButton, ListItemButton, Stack, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import type { TFunction } from "i18next";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -13,7 +14,7 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import type { PlaceRow, PlatformRow } from "@/lib/explorer/derive/stops";
 import type { ListedPlace } from "@/lib/explorer/filters";
-import { selectExplorerStop } from "@/lib/store/explorer/slice";
+import { closeExplorerPanel, openExplorerPanel, pickedStop } from "@/lib/store/explorer/slice";
 
 import type { RouteRow } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
@@ -122,6 +123,22 @@ function Row({
   );
 }
 
+/** How a platform is named under its station: its code, else its own name
+ * where it differs from the station's. The station's name again says
+ * nothing, nor does an id: a platform with neither is "Platform", told apart
+ * by its routes. */
+export function platformLabel(
+  place: Pick<PlaceRow, "name">,
+  p: Pick<PlatformRow, "name" | "platform_code">,
+  t: TFunction
+): { label: string; note?: string } {
+  const code = p.platform_code
+    ? t("explorer_platform", { code: p.platform_code, interpolation: { escapeValue: false } })
+    : null;
+  const own = p.name && p.name !== place.name ? p.name : null;
+  return { label: code ?? own ?? t("explorer_platform_unnamed"), note: code && own ? own : undefined };
+}
+
 export function StationsList({
   listed,
   routeByIdx,
@@ -131,7 +148,7 @@ export function StationsList({
 }) {
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
-  const selected = useAppSelector((s) => s.explorer.selectedStop);
+  const selected = useAppSelector((s) => pickedStop(s.explorer));
   const [open, setOpen] = useState<Set<number>>(new Set());
   const nested = listed.some((l) => l.platforms.length > 0);
 
@@ -142,7 +159,8 @@ export function StationsList({
       if (!next.delete(idx)) next.add(idx);
       return next;
     });
-  // Picking what is picked already lets go of it.
+  // A stop or station opens its timetable in the right panel; picking what
+  // is picked already closes it.
   const pick = (stop: {
     stop_idx: number;
     stop_id: string;
@@ -151,21 +169,20 @@ export function StationsList({
     lon: number | null;
   }) =>
     dispatch(
-      selectExplorerStop(
-        selected?.stop_idx === stop.stop_idx || stop.lat === null || stop.lon === null
-          ? null
-          : { stop_idx: stop.stop_idx, name: stop.name ?? stop.stop_id, lon: stop.lon, lat: stop.lat }
-      )
+      selected?.stop_idx === stop.stop_idx
+        ? closeExplorerPanel()
+        : openExplorerPanel({
+            item: {
+              kind: "stop",
+              stop: {
+                stop_idx: stop.stop_idx,
+                name: stop.name ?? stop.stop_id,
+                lon: stop.lon,
+                lat: stop.lat,
+              },
+            },
+          })
     );
-  const platformLabel = (place: PlaceRow, p: PlatformRow) => {
-    const code = p.platform_code
-      ? t("explorer_platform", { code: p.platform_code, interpolation: { escapeValue: false } })
-      : null;
-    // The station's name again says nothing, nor does an id: a platform with
-    // neither code nor name of its own is "Platform", told apart by its routes.
-    const own = p.name && p.name !== place.name ? p.name : null;
-    return { label: code ?? own ?? t("explorer_platform_unnamed"), note: code && own ? own : undefined };
-  };
 
   return (
     <>
@@ -210,7 +227,7 @@ export function StationsList({
             />
             {isOpen &&
               platforms.map((p) => {
-                const { label, note } = platformLabel(place, p);
+                const { label, note } = platformLabel(place, p, t);
                 return (
                   <Row
                     key={p.stop_idx}

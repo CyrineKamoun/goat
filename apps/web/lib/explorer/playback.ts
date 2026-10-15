@@ -9,6 +9,9 @@ import type { FeatureCollection, Point } from "geojson";
 
 export interface VehicleProps {
   run: number;
+  /** The run's trip, and when it left its first stop: which Trip it opens. */
+  trip_idx: number;
+  run_dep_s: number;
   route_id: string;
   /** `#RRGGBB`, the route's or its mode's. */
   color: string;

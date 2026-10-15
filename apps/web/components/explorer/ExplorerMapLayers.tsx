@@ -2,8 +2,9 @@
  * The Explorer on the map, drawn by itself whatever GOAT's layers beneath
  * show: the bundle's whole network in its routes' colours (shape_lines
  * tiles, each shape styled from the snapshot), the selected route over it
- * with its stops, the others faded; playback's vehicles; the picked stop.
- * Clicking a line selects its route.
+ * with its stops, the others faded; the network's stops from street level;
+ * playback's vehicles; the stop and the trip the right panel shows.
+ * Clicking a vehicle opens its trip, a stop its timetable, a line its route.
  *
  * Rendered inside <Map>, outside the Explorer's provider: it reads what the
  * panels put in the store, and the network and playback stores. Sources are
@@ -12,7 +13,7 @@
  */
 import { Box, GlobalStyles, ListItemButton, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import type { FeatureCollection } from "geojson";
+import type { FeatureCollection, Point, Polygon } from "geojson";
 import type {
   ExpressionSpecification,
   FilterSpecification,
@@ -27,20 +28,25 @@ import { GEOAPI_BASE_URL } from "@/lib/constants";
 import { routeMatches } from "@/lib/explorer/filters";
 import { networkStore } from "@/lib/explorer/network";
 import { playbackClock } from "@/lib/explorer/playback";
-import { selectExplorerRoute } from "@/lib/store/explorer/slice";
+import { openExplorerPanel, panelItem, pickedStop, selectExplorerRoute } from "@/lib/store/explorer/slice";
 
 import type { RouteRow } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { EXPLORER_PANEL_WIDTH } from "@/components/explorer/ExplorerLeftPanel";
 import { RouteBadge } from "@/components/explorer/RouteBadge";
+import { STOP_FILL } from "@/components/explorer/StopMarker";
+import { EXPLORER_RIGHT_PANEL_WIDTH } from "@/components/explorer/right/panelSize";
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const NETWORK = "explorer-network";
 const FADED = "#9E9E9E";
 /** The Explorer's layers, bottom to top. */
 const DRAW_ORDER = [
+  "explorer-station-area",
+  "explorer-station-edge",
   "explorer-network-line",
+  "explorer-stop-dot",
   "explorer-route-casing",
   "explorer-route-line",
   "explorer-route-chain-line",
@@ -50,6 +56,7 @@ const DRAW_ORDER = [
   "explorer-route-stop",
   "explorer-vehicle-dot",
   "explorer-vehicle-mine",
+  "explorer-vehicle-open",
   "explorer-picked-stop-halo",
   "explorer-picked-stop-dot",
 ];
@@ -66,7 +73,14 @@ const LINE_CHOICE_SX = {
   [`.${LINE_CHOICE} .maplibregl-popup-tip`]: { display: "none" },
 };
 
-/** How far (px) from the pointer a line is looked for, nearest first. */
+/** What a click opens, first found first: a vehicle, a stop, a line under
+ * the pointer, the station it is in, a line near it. */
+const VEHICLE_LAYERS = ["explorer-vehicle-mine", "explorer-vehicle-dot"];
+const STOP_LAYERS = ["explorer-route-stop", "explorer-stop-dot"];
+const LINE_LAYERS = ["explorer-network-line"];
+const STATION_LAYERS = ["explorer-station-area"];
+
+/** How far (px) from the pointer a feature is looked for, nearest first. */
 const HIT_RADII = [2, 5, 9];
 
 /** The shape_lines tiles name their layer this. */
@@ -111,7 +125,14 @@ export function ExplorerMapLayers() {
   const dispatch = useAppDispatch();
   const active = useAppSelector((s) => s.explorer.active);
   const drawing = useAppSelector((s) => (s.explorer.active ? s.explorer.drawing : null));
-  const picked = useAppSelector((s) => (s.explorer.active ? s.explorer.selectedStop : null));
+  const picked = useAppSelector((s) => (s.explorer.active ? pickedStop(s.explorer) : null));
+  const openTrip = useAppSelector((s) => {
+    const item = s.explorer.active ? panelItem(s.explorer) : null;
+    return item?.kind === "trip" ? item : null;
+  });
+  const panelOpen = useAppSelector(
+    (s) => s.explorer.active && s.explorer.panel.stack.length > 0 && !s.explorer.panel.collapsed
+  );
   const selectedRouteId = useAppSelector((s) => (s.explorer.active ? s.explorer.selectedRouteId : null));
   const filters = useAppSelector((s) => s.explorer.filters);
   const playing = useAppSelector((s) => s.explorer.playing);
@@ -208,46 +229,95 @@ export function ExplorerMapLayers() {
     };
   }, [map, active, network, selectedRouteId, filters]);
 
-  // A click on a line selects its route; where several routes share the
-  // shapes under the pointer, they are offered to choose from. The lines are
-  // a few pixels wide, so the pointer need only come near one: the nearest
-  // lines are taken, looking further out only while none is found, so a
-  // click in a dense part of the network still finds one line, not all
-  // around it.
+  // A click opens what it lands on: a vehicle its trip, a stop its
+  // timetable, a line its route — where several routes share the shapes
+  // under the pointer, they are offered to choose from. Lines, dots and
+  // vehicles are a few pixels across, so the pointer need only come near
+  // one: the nearest are taken, looking further out only while none is
+  // found, so a click in a dense part of the network still finds one thing,
+  // not all around it.
   useEffect(() => {
     if (!map || !active) return;
-    const layer = "explorer-network-line";
-    const linesNear = (point: { x: number; y: number }) => {
-      if (!map.getLayer(layer)) return [];
-      for (const r of HIT_RADII) {
+    const near = (point: { x: number; y: number }, layers: string[], radii = HIT_RADII) => {
+      const present = layers.filter((l) => map.getLayer(l));
+      if (!present.length) return [];
+      for (const r of radii) {
         const found = map.queryRenderedFeatures(
           [
             [point.x - r, point.y - r],
             [point.x + r, point.y + r],
           ],
-          { layers: [layer] }
+          { layers: present }
         );
         if (found.length) return found;
       }
       return [];
     };
     const onClick = (e: MapLayerMouseEvent) => {
-      const routeIds = [
+      const [vehicle] = near(e.point, VEHICLE_LAYERS);
+      if (vehicle) {
+        const p = vehicle.properties ?? {};
+        dispatch(
+          openExplorerPanel({
+            item: { kind: "trip", trip_idx: Number(p.trip_idx), run_dep_s: Number(p.run_dep_s) },
+          })
+        );
+        return;
+      }
+      const [stop] = near(e.point, STOP_LAYERS);
+      if (stop) {
+        const [lon, lat] = (stop.geometry as Point).coordinates;
+        const p = stop.properties ?? {};
+        dispatch(
+          openExplorerPanel({
+            item: {
+              kind: "stop",
+              stop: { stop_idx: Number(p.stop_idx), name: String(p.name ?? ""), lon, lat },
+            },
+            // A stop of the selected route goes when the route does.
+            fromRoute: stop.layer.id === "explorer-route-stop" ? selectedRouteId : null,
+          })
+        );
+        return;
+      }
+      // A station's area covers the lines through it: a line right under
+      // the pointer wins, the station takes the rest of its area.
+      const routesOf = (radii: number[]) => [
         ...new Set(
-          linesNear(e.point).flatMap(
+          near(e.point, LINE_LAYERS, radii).flatMap(
             (f) => network.shapes.get(String(f.properties?.shape_id ?? f.id))?.route_ids ?? []
           )
         ),
       ];
+      let routeIds = routesOf(HIT_RADII.slice(0, 1));
+      if (!routeIds.length) {
+        const [station] = near(e.point, STATION_LAYERS, [0]);
+        if (station) {
+          const p = station.properties ?? {};
+          const ring = (station.geometry as Polygon).coordinates[0] ?? [];
+          const mid = (k: 0 | 1) => ring.reduce((sum, c) => sum + c[k], 0) / Math.max(ring.length, 1);
+          dispatch(
+            openExplorerPanel({
+              item: {
+                kind: "stop",
+                stop: { stop_idx: Number(p.stop_idx), name: String(p.name ?? ""), lon: mid(0), lat: mid(1) },
+              },
+            })
+          );
+          return;
+        }
+        routeIds = routesOf(HIT_RADII);
+      }
       if (routeIds.length === 1) dispatch(selectExplorerRoute(routeIds[0]));
       else if (routeIds.length > 1) setChoice({ lon: e.lngLat.lng, lat: e.lngLat.lat, routeIds });
     };
     // Registered after the map viewer's own handler, which sets the cursor
-    // for GOAT's layers on every move: over a line, this one has the last
-    // word, unless a tool (measuring) holds the cursor.
+    // for GOAT's layers on every move: over anything that opens, this one
+    // has the last word, unless a tool (measuring) holds the cursor.
+    const all = [...VEHICLE_LAYERS, ...STOP_LAYERS, ...STATION_LAYERS, ...LINE_LAYERS];
     const onMove = (e: MapLayerMouseEvent) => {
       const canvas = map.getCanvas();
-      if (canvas.style.cursor === "" && linesNear(e.point).length) canvas.style.cursor = "pointer";
+      if (canvas.style.cursor === "" && near(e.point, all).length) canvas.style.cursor = "pointer";
     };
     map.on("click", onClick);
     map.on("mousemove", onMove);
@@ -255,11 +325,11 @@ export function ExplorerMapLayers() {
       map.off("click", onClick);
       map.off("mousemove", onMove);
     };
-  }, [map, active, network, dispatch]);
+  }, [map, active, network, selectedRouteId, dispatch]);
 
   const pickedPoint = useMemo<FeatureCollection>(
     () =>
-      picked
+      picked && picked.lon !== null && picked.lat !== null
         ? {
             type: "FeatureCollection",
             features: [
@@ -274,15 +344,23 @@ export function ExplorerMapLayers() {
     [picked]
   );
 
-  // Fly to a picked stop, clear of the left panel; zoom in only as far as a
-  // stop needs, never out from a closer look.
+  // Fly to a picked stop, clear of the panels; zoom in only as far as a
+  // stop needs, never out from a closer look. A stop already in plain view
+  // at street level (clicked on the map) is left where it is.
   useEffect(() => {
-    if (!map || !picked) return;
+    if (!map || !picked || picked.lon === null || picked.lat === null) return;
+    const right = panelOpen ? EXPLORER_RIGHT_PANEL_WIDTH : 0;
+    const { x, y } = map.project([picked.lon, picked.lat]);
+    const { clientWidth: w, clientHeight: h } = map.getCanvas();
+    const inView = x > EXPLORER_PANEL_WIDTH + 40 && x < w - right - 40 && y > 60 && y < h - 120;
+    if (inView && map.getZoom() >= 14) return;
     map.flyTo({
       center: [picked.lon, picked.lat],
       zoom: Math.max(map.getZoom(), 15),
-      padding: { top: 0, bottom: 0, left: EXPLORER_PANEL_WIDTH, right: 0 },
+      padding: { top: 0, bottom: 0, left: EXPLORER_PANEL_WIDTH, right },
     });
+    // Only when another stop is picked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, picked]);
 
   const stops = useMemo<FeatureCollection>(
@@ -291,7 +369,7 @@ export function ExplorerMapLayers() {
       features: (drawing?.stops ?? []).map((s) => ({
         type: "Feature",
         geometry: { type: "Point", coordinates: [s.lon, s.lat] },
-        properties: { name: s.name },
+        properties: { stop_idx: s.stop_idx, name: s.name },
       })),
     }),
     [drawing?.stops]
@@ -358,6 +436,13 @@ export function ExplorerMapLayers() {
   const routeOpacity = highlighting ? 0.15 : 1;
   const isMine: FilterSpecification = ["==", ["get", "route_id"], selectedRouteId ?? ""];
   const none: FilterSpecification = ["boolean", false];
+  const isOpenTrip: FilterSpecification = openTrip
+    ? [
+        "all",
+        ["==", ["get", "trip_idx"], openTrip.trip_idx],
+        ["==", ["get", "run_dep_s"], openTrip.run_dep_s],
+      ]
+    : none;
   const faded: ExpressionSpecification = ["boolean", ["feature-state", "faded"], false];
 
   return (
@@ -426,6 +511,46 @@ export function ExplorerMapLayers() {
           />
         </Source>
       )}
+      {/* Each station as a faint area round its stops, under the lines:
+          clicked, the timetable of all its stops. */}
+      <Source key="explorer-stations" id="explorer-stations" type="geojson" data={network.stations}>
+        <Layer
+          id="explorer-station-area"
+          type="fill"
+          minzoom={14}
+          paint={{
+            "fill-color": STOP_FILL,
+            "fill-opacity": ["interpolate", ["linear"], ["zoom"], 14, 0, 15, selectedRouteId ? 0.1 : 0.16],
+          }}
+        />
+        <Layer
+          id="explorer-station-edge"
+          type="line"
+          minzoom={14}
+          paint={{
+            "line-color": STOP_FILL,
+            "line-width": 1,
+            "line-opacity": ["interpolate", ["linear"], ["zoom"], 14, 0, 15, selectedRouteId ? 0.3 : 0.55],
+          }}
+        />
+      </Source>
+      {/* The network's stops from street level, to click for a timetable:
+          the stops layer's grey dot in a white ring (StopMarker). */}
+      <Source key="explorer-stops" id="explorer-stops" type="geojson" data={network.stops}>
+        <Layer
+          id="explorer-stop-dot"
+          type="circle"
+          minzoom={13}
+          paint={{
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 2, 16, 4],
+            "circle-color": STOP_FILL,
+            "circle-stroke-color": "#FFFFFF",
+            "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 13, 1, 16, 2],
+            "circle-opacity": selectedRouteId ? 0.6 : 1,
+            "circle-stroke-opacity": selectedRouteId ? 0.6 : 1,
+          }}
+        />
+      </Source>
       <Source key="explorer-route-chains" id="explorer-route-chains" type="geojson" data={chains}>
         <Layer
           id="explorer-route-chain-line"
@@ -487,6 +612,19 @@ export function ExplorerMapLayers() {
             "text-ignore-placement": true,
           }}
           paint={{ "text-color": ["get", "text_color"] }}
+        />
+        {/* The vehicle of the trip the right panel shows. */}
+        <Layer
+          id="explorer-vehicle-open"
+          type="circle"
+          filter={isOpenTrip}
+          paint={{
+            "circle-radius": 15,
+            "circle-color": theme.palette.primary.main,
+            "circle-opacity": 0.15,
+            "circle-stroke-color": theme.palette.primary.main,
+            "circle-stroke-width": 2.5,
+          }}
         />
       </Source>
       <Source key="explorer-picked-stop" id="explorer-picked-stop" type="geojson" data={pickedPoint}>

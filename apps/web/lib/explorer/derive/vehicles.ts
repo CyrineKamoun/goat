@@ -31,6 +31,9 @@ export interface ShapeLine {
 export interface Segment {
   run: number;
   route_idx: number;
+  trip_idx: number;
+  /** When the run left its first stop: with trip_idx, which run it is. */
+  run_dep_s: number;
   t0: number;
   t1: number;
   a: [number, number];
@@ -51,6 +54,8 @@ export interface VehicleWindow {
 export interface Vehicle {
   run: number;
   route_idx: number;
+  trip_idx: number;
+  run_dep_s: number;
   lon: number;
   lat: number;
 }
@@ -98,6 +103,8 @@ export async function vehicleWindow(
   const rows = await db.all<{
     run: number;
     route_idx: number;
+    trip_idx: number;
+    run_dep_s: number;
     shape_idx: number | null;
     lon: number;
     lat: number;
@@ -122,7 +129,7 @@ export async function vehicleWindow(
       WHERE st.trip_idx IN (SELECT DISTINCT trip_idx FROM r)
     ),
     placed AS (
-      SELECT st.*, r.run, r.route_idx, r.shape_idx, r.off, ps.d
+      SELECT st.*, r.run, r.route_idx, r.shape_idx, r.off, r.dep_s AS run_dep_s, ps.d
       FROM st JOIN r USING (trip_idx)
       LEFT JOIN pattern_shape_stops ps
         ON ps.pattern_idx = r.pattern_idx AND ps.shape_idx = r.shape_idx AND ps.i = st.i
@@ -133,7 +140,7 @@ export async function vehicleWindow(
              lead(d) OVER w AS next_d
       FROM placed WINDOW w AS (PARTITION BY run ORDER BY i)
     )
-    SELECT run, route_idx, shape_idx, lon, lat, nlon, nlat, d, next_d,
+    SELECT run, route_idx, trip_idx, run_dep_s, shape_idx, lon, lat, nlon, nlat, d, next_d,
            arr + off AS arr, dep + off AS dep, next_arr + off AS next_arr
     FROM hops
     WHERE arr + off <= ${to} AND COALESCE(next_arr, dep) + off >= ${from}
@@ -152,12 +159,12 @@ export async function vehicleWindow(
   for (const h of rows) {
     const at: [number, number] = [h.lon, h.lat];
     // Waiting at the stop, then (unless it is the last) on the way to the next.
-    if (h.dep > h.arr) add({ run: h.run, route_idx: h.route_idx, t0: h.arr, t1: h.dep, a: at, b: at });
+    const who = { run: h.run, route_idx: h.route_idx, trip_idx: h.trip_idx, run_dep_s: h.run_dep_s };
+    if (h.dep > h.arr) add({ ...who, t0: h.arr, t1: h.dep, a: at, b: at });
     if (h.next_arr === null || h.nlon === null || h.nlat === null) continue;
     const shape = h.shape_idx !== null ? lines.get(h.shape_idx) : undefined;
     add({
-      run: h.run,
-      route_idx: h.route_idx,
+      ...who,
       t0: h.dep,
       t1: h.next_arr,
       a: at,
@@ -230,7 +237,7 @@ export function positionsAt(window: VehicleWindow, t: number): Vehicle[] {
       s.shape && s.d0 !== undefined && s.d1 !== undefined
         ? alongShape(s.shape, s.d0 + (s.d1 - s.d0) * f)
         : [s.a[0] + (s.b[0] - s.a[0]) * f, s.a[1] + (s.b[1] - s.a[1]) * f];
-    out.push({ run: s.run, route_idx: s.route_idx, lon, lat });
+    out.push({ run: s.run, route_idx: s.route_idx, trip_idx: s.trip_idx, run_dep_s: s.run_dep_s, lon, lat });
   }
   return out;
 }

@@ -3,15 +3,20 @@ import { describe, expect, it } from "vitest";
 import {
   clearRestoreGroup,
   closeExplorer,
+  closeExplorerPanel,
+  explorerPanelBack,
   explorerReducer,
   openExplorer,
+  openExplorerPanel,
+  panelItem,
   pickExplorerPattern,
+  pickedStop,
   selectExplorerRoute,
-  selectExplorerStop,
   setExplorerDate,
   setExplorerDrawing,
   setExplorerFilters,
   setExplorerLeftTab,
+  setExplorerPanelCollapsed,
   setExplorerRouteTab,
   setPlaybackTime,
   setPlaying,
@@ -20,6 +25,8 @@ import { setMapMode } from "@/lib/store/map/slice";
 
 const open = (state = explorerReducer(undefined, { type: "init" })) =>
   explorerReducer(state, openExplorer({ bundleId: "b1", bundleName: "Feed" }));
+
+const FOURTH = { stop_idx: 4, name: "Fourth", lon: 13.43, lat: 52.5 };
 
 describe("explorer slice", () => {
   it("opens on a bundle with nothing selected", () => {
@@ -59,14 +66,11 @@ describe("explorer slice", () => {
       open(),
       setExplorerFilters({ types: ["stops"], modes: ["bus"], agencies: [0] })
     );
-    state = explorerReducer(
-      state,
-      selectExplorerStop({ stop_idx: 4, name: "Fourth", lon: 13.43, lat: 52.5 })
-    );
+    state = explorerReducer(state, openExplorerPanel({ item: { kind: "stop", stop: FOURTH } }));
     expect(state.filters.modes).toEqual(["bus"]);
     state = open(explorerReducer(state, closeExplorer()));
     expect(state.filters).toEqual({ types: [], modes: [], agencies: [] });
-    expect(state.selectedStop).toBeNull();
+    expect(pickedStop(state)).toBeNull();
   });
 
   it("opens another route on its Overview, in its first direction", () => {
@@ -85,10 +89,37 @@ describe("explorer slice", () => {
     let state = explorerReducer(open(), selectExplorerRoute("R1"));
     state = explorerReducer(
       state,
-      selectExplorerStop({ stop_idx: 4, name: "Fourth", lon: 13.43, lat: 52.5 })
+      openExplorerPanel({ item: { kind: "stop", stop: FOURTH }, fromRoute: "R1" })
     );
     state = explorerReducer(state, selectExplorerRoute(null));
-    expect(state.selectedStop).toBeNull();
+    expect(pickedStop(state)).toBeNull();
+    // A stop opened from the stops list stays as routes come and go.
+    state = explorerReducer(state, openExplorerPanel({ item: { kind: "stop", stop: FOURTH } }));
+    state = explorerReducer(state, selectExplorerRoute("R2"));
+    expect(pickedStop(state)?.stop_idx).toBe(4);
+  });
+
+  it("goes back from a trip to the stop it was opened from, and closes", () => {
+    let state = explorerReducer(open(), openExplorerPanel({ item: { kind: "stop", stop: FOURTH } }));
+    state = explorerReducer(
+      state,
+      openExplorerPanel({ item: { kind: "trip", trip_idx: 2, run_dep_s: 29400 }, push: true })
+    );
+    expect(panelItem(state)?.kind).toBe("trip");
+    expect(pickedStop(state)).toBeNull();
+    state = explorerReducer(state, explorerPanelBack());
+    expect(pickedStop(state)?.stop_idx).toBe(4);
+    state = explorerReducer(state, closeExplorerPanel());
+    expect(panelItem(state)).toBeNull();
+  });
+
+  it("keeps the panel folded, as the user left it, across items and sessions", () => {
+    let state = explorerReducer(open(), setExplorerPanelCollapsed(true));
+    state = explorerReducer(state, openExplorerPanel({ item: { kind: "stop", stop: FOURTH } }));
+    expect(state.panel.collapsed).toBe(true);
+    state = open(explorerReducer(state, closeExplorer()));
+    expect(state.panel.collapsed).toBe(true);
+    expect(state.panel.stack).toEqual([]);
   });
 
   it("stops playback and forgets its time when the date changes", () => {

@@ -28,7 +28,9 @@ function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function AnalysisDate() {
+/** `compact`: without the day before and after, for a squeezed bar; the
+ * picker still sets any day. */
+export function AnalysisDate({ compact = false }: { compact?: boolean }) {
   const { t, i18n } = useTranslation("common");
   const dispatch = useAppDispatch();
   const locale = useDayjsLocale();
@@ -46,14 +48,16 @@ export function AnalysisDate() {
       direction="row"
       alignItems="center"
       sx={{ height: 32, px: 0.25, borderRadius: "16px", bgcolor: "action.hover", flexShrink: 0 }}>
-      <IconButton
-        size="small"
-        aria-label={t("explorer_day_before")}
-        disabled={date <= window[0]}
-        onClick={() => step(-1)}
-        sx={stepSx}>
-        <Icon iconName={ICON_NAME.CHEVRON_LEFT} style={{ fontSize: 10 }} />
-      </IconButton>
+      {!compact && (
+        <IconButton
+          size="small"
+          aria-label={t("explorer_day_before")}
+          disabled={date <= window[0]}
+          onClick={() => step(-1)}
+          sx={stepSx}>
+          <Icon iconName={ICON_NAME.CHEVRON_LEFT} style={{ fontSize: 10 }} />
+        </IconButton>
+      )}
       <ButtonBase
         onClick={(e) => setAnchor(e.currentTarget)}
         aria-label={t("explorer_pick_date")}
@@ -69,14 +73,16 @@ export function AnalysisDate() {
           {shortDate(date, i18n.language)}
         </Typography>
       </ButtonBase>
-      <IconButton
-        size="small"
-        aria-label={t("explorer_day_after")}
-        disabled={date >= window[1]}
-        onClick={() => step(1)}
-        sx={stepSx}>
-        <Icon iconName={ICON_NAME.CHEVRON_RIGHT} style={{ fontSize: 10 }} />
-      </IconButton>
+      {!compact && (
+        <IconButton
+          size="small"
+          aria-label={t("explorer_day_after")}
+          disabled={date >= window[1]}
+          onClick={() => step(1)}
+          sx={stepSx}>
+          <Icon iconName={ICON_NAME.CHEVRON_RIGHT} style={{ fontSize: 10 }} />
+        </IconButton>
+      )}
       <Popover
         open={!!anchor}
         anchorEl={anchor}

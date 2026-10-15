@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 
 import { useBundleLayers } from "@/lib/api/bundles";
 import type { SqlRunner } from "@/lib/explorer/db/types";
-import { networkShapes, networkStore } from "@/lib/explorer/network";
+import { networkShapes, networkStations, networkStops, networkStore } from "@/lib/explorer/network";
 import { DEFAULT_SETTINGS, type ExplorerSettings, loadSettings, saveSettings } from "@/lib/explorer/settings";
 import { setExplorerBounds, setExplorerDate } from "@/lib/store/explorer/slice";
 
@@ -106,7 +106,9 @@ export function ExplorerProvider({ bundleId, children }: { bundleId: string; chi
   useEffect(() => {
     if (!db) return;
     let current = true;
-    networkShapes(db, shapeLinesLayerId).then((n) => current && networkStore.set(n));
+    Promise.all([networkShapes(db, shapeLinesLayerId), networkStops(db), networkStations(db)]).then(
+      ([n, stops, stations]) => current && networkStore.set({ ...n, stops, stations })
+    );
     return () => {
       current = false;
       networkStore.reset();

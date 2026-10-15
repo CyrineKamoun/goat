@@ -28,8 +28,9 @@ export interface Run {
   length_m: number;
 }
 
-/** SQL for the runs of `range` on `date`. */
-export function runsSql(range: TripRange, date: string): string {
+/** SQL for the runs of `range` on `date`; `tripsIn`, a query of trip_idx,
+ * narrows them to those trips (the trips calling at a stop). */
+export function runsSql(range: TripRange, date: string, tripsIn?: string): string {
   const lo = range.trip_lo ?? -1;
   const hi = range.trip_hi ?? -2;
   return `
@@ -37,6 +38,7 @@ export function runsSql(range: TripRange, date: string): string {
       SELECT * FROM trips
       WHERE trip_idx BETWEEN ${lo} AND ${hi}
         AND service_idx IN ${activeServicesSql(date)}
+        ${tripsIn ? `AND trip_idx IN (${tripsIn})` : ""}
     )
     SELECT trip_idx, pattern_idx, direction_id, headsign, block_idx, service_idx,
            first_dep_s AS dep_s, last_arr_s AS arr_s, length_m
@@ -52,6 +54,9 @@ export function runsSql(range: TripRange, date: string): string {
     )
   `;
 }
+
+/** Every trip of the bundle: `runsSql` over the whole network. */
+export const ALL_TRIPS: TripRange = { trip_lo: 0, trip_hi: 2147483647 };
 
 export async function routeRuns(db: SqlRunner, range: TripRange, date: string): Promise<Run[]> {
   return db.all<Run>(`SELECT * FROM (${runsSql(range, date)}) ORDER BY dep_s, trip_idx`);

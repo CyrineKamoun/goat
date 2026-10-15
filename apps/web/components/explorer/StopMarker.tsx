@@ -6,7 +6,7 @@
 import { Box } from "@mui/material";
 
 /** The stops layer's default colours, rgb(113, 113, 113) on white. */
-const FILL = "#717171";
+export const STOP_FILL = "#717171";
 const RING = "#FFFFFF";
 
 export function StopMarker({ station = false, size = 12 }: { station?: boolean; size?: number }) {
@@ -23,7 +23,7 @@ export function StopMarker({ station = false, size = 12 }: { station?: boolean; 
         height: d,
         flexShrink: 0,
         borderRadius: "50%",
-        bgcolor: FILL,
+        bgcolor: STOP_FILL,
         border: `2px solid ${RING}`,
         // The white ring needs an edge of its own on a white panel.
         boxShadow: (theme) => `0 0 0 1px ${theme.palette.divider}`,

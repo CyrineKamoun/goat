@@ -1,0 +1,421 @@
+/**
+ * A stop's timetable in the right panel (board 13) — a station's, when a
+ * station is picked in the list, is that of all its stops together. The
+ * stop, the Explorer's date, its lines to pick one from, and either that
+ * line's hour × minute timetable per direction — short turns marked, the
+ * next departure after the playback time highlighted — or the next
+ * departures of every line. A departure opens its trip, which goes back here.
+ */
+import AccessibleIcon from "@mui/icons-material/Accessible";
+import { Box, ButtonBase, Skeleton, Stack, Typography } from "@mui/material";
+import { type ReactNode, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+
+import type { Direction } from "@/lib/explorer/derive/directions";
+import {
+  type Departure,
+  type TimetableDirection,
+  type TimetableEntry,
+  byDirection,
+  byHour,
+} from "@/lib/explorer/derive/stopTimetable";
+import { clock } from "@/lib/explorer/format";
+import { type ExplorerPickedStop, openExplorerPanel } from "@/lib/store/explorer/slice";
+
+import { type RouteRow, useRoutes, useStopTimetable } from "@/hooks/explorer/useExplorerData";
+import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
+
+import { useExplorer } from "@/components/explorer/ExplorerContext";
+import { RouteBadge, distinctLines, lineKey } from "@/components/explorer/RouteBadge";
+import { DateChip, PX, SectionHeader } from "@/components/explorer/SectionHeader";
+import { platformLabel } from "@/components/explorer/StationsList";
+import { StopMarker } from "@/components/explorer/StopMarker";
+import { directionLabel } from "@/components/explorer/directionWords";
+import { usePlaybackMinute } from "@/components/explorer/right/usePlaybackMinute";
+
+type View = "timetable" | "next";
+
+/** How many departures the Next view lists. */
+const NEXT_COUNT = 12;
+/** One text line of the meta row, as the route summary's. */
+const META_LINE = "18px";
+
+/** An hour of the service day as a timetable heads it: 24 is 00 again. */
+const hourLabel = (hour: number) => String(hour % 24).padStart(2, "0");
+
+/** A segmented switch on the panel's tinted ground, as the bottom bar's speed. */
+function ViewSwitch({ value, onChange }: { value: View; onChange: (v: View) => void }) {
+  const { t } = useTranslation("common");
+  return (
+    <Stack direction="row" role="radiogroup" sx={{ p: 0.25, borderRadius: "16px", bgcolor: "action.hover" }}>
+      {(["timetable", "next"] as const).map((v) => (
+        <ButtonBase
+          key={v}
+          role="radio"
+          aria-checked={v === value}
+          onClick={() => onChange(v)}
+          sx={{
+            height: 28,
+            px: 2,
+            borderRadius: "14px",
+            fontSize: 12,
+            fontWeight: 700,
+            color: v === value ? "text.primary" : "text.secondary",
+            bgcolor: v === value ? "background.paper" : "transparent",
+            boxShadow: v === value ? "0 1px 2px rgba(0, 0, 0, 0.12)" : "none",
+          }}>
+          {t(`explorer_stop_view_${v}`)}
+        </ButtonBase>
+      ))}
+    </Stack>
+  );
+}
+
+/** A row of choices beside a quiet label. */
+function ChipRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <Stack direction="row" alignItems="flex-start" spacing={1} sx={{ mt: 1.25 }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        fontWeight={600}
+        sx={{ width: 40, flexShrink: 0, lineHeight: "24px" }}>
+        {label}
+      </Typography>
+      <Stack
+        direction="row"
+        useFlexGap
+        flexWrap="wrap"
+        alignItems="center"
+        columnGap={1.75}
+        rowGap={1.25}
+        sx={{ flex: 1, minWidth: 0, pt: "3px", px: "4px" }}>
+        {children}
+      </Stack>
+    </Stack>
+  );
+}
+
+/** A line to pick: its badge as it is everywhere, the chosen one haloed in
+ * the theme's colour. */
+function LineChoice({ route, chosen, onClick }: { route: RouteRow; chosen: boolean; onClick: () => void }) {
+  return (
+    <ButtonBase
+      onClick={onClick}
+      aria-pressed={chosen}
+      sx={(theme) => ({
+        // The badge's own corners; the halo a little clear of them, the gap
+        // showing the panel's own ground.
+        borderRadius: 0.75,
+        outline: chosen ? `2px solid ${theme.palette.primary.main}` : "none",
+        outlineOffset: "2px",
+        "&:hover": { opacity: chosen ? 1 : 0.8 },
+      })}>
+      <RouteBadge route={route} small />
+    </ButtonBase>
+  );
+}
+
+export function StopPanel({ stop }: { stop: ExplorerPickedStop }) {
+  const { t } = useTranslation("common");
+  const dispatch = useAppDispatch();
+  const { db, complete } = useExplorer();
+  const date = useAppSelector((s) => s.explorer.date);
+  const now = usePlaybackMinute();
+  const routes = useRoutes(db);
+  const data = useStopTimetable(complete ? db : undefined, stop.stop_idx, date);
+  const [view, setView] = useState<View>("timetable");
+  const [picked, setPicked] = useState<string | null>(null);
+
+  const routeByIdx = useMemo(() => new Map((routes.data ?? []).map((r) => [r.route_idx, r])), [routes.data]);
+  const departures = useMemo(() => data.data?.departures ?? [], [data.data]);
+  // The lines leaving here on the date, in the route list's order. A feed
+  // may run one line as several routes (per operator, per variant): riders
+  // know one line, so its routes' departures go together.
+  const lines = useMemo(() => {
+    const idxs = new Set(departures.map((d) => d.route_idx));
+    const byKey = new Map<string, { route: RouteRow; idxs: Set<number> }>();
+    for (const r of routes.data ?? []) {
+      if (!idxs.has(r.route_idx)) continue;
+      const line = byKey.get(lineKey(r));
+      if (line) line.idxs.add(r.route_idx);
+      else byKey.set(lineKey(r), { route: r, idxs: new Set([r.route_idx]) });
+    }
+    return [...byKey.values()];
+  }, [departures, routes.data]);
+  const line = lines.find((l) => lineKey(l.route) === picked) ?? lines[0];
+  // Its directions, those of its routes with the same name taken as one.
+  const directions = useMemo(() => {
+    if (!line || !data.data) return [];
+    const merged = new Map<string, TimetableDirection>();
+    for (const idx of line.idxs)
+      for (const d of byDirection(
+        departures.filter((x) => x.route_idx === idx),
+        data.data.directions.get(idx) ?? []
+      )) {
+        const key = `${d.name.kind}|${d.name.place}|${d.name.via ?? ""}`;
+        const into = merged.get(key);
+        if (into) into.departures.push(...d.departures);
+        else merged.set(key, { ...d, key, departures: [...d.departures] });
+      }
+    for (const d of merged.values()) d.departures.sort((x, y) => x.dep_s - y.dep_s);
+    return [...merged.values()];
+  }, [line, departures, data.data]);
+
+  const openTrip = (e: { trip_idx: number; run_dep_s: number }) =>
+    dispatch(
+      openExplorerPanel({ item: { kind: "trip", trip_idx: e.trip_idx, run_dep_s: e.run_dep_s }, push: true })
+    );
+  // Named as riders know it: by its station, the stop told apart by its
+  // platform where the feed names one.
+  const detail = data.data?.stop;
+  const station = detail?.is_station ?? false;
+  const title = detail?.station ?? detail?.name ?? stop.name;
+  const own = detail?.station ? platformLabel({ name: detail.station }, detail, t).label : null;
+  const meta = [
+    station ? t("explorer_place_station") : (own ?? t("explorer_place_stop")),
+    station && detail ? t("explorer_stops", { count: detail.n_stops }) : null,
+    detail
+      ? t("explorer_lines_count", {
+          count: distinctLines(detail.routes.map((i) => routeByIdx.get(i))).length,
+        })
+      : null,
+  ].filter(Boolean);
+
+  return (
+    <Stack sx={{ flex: 1, minHeight: 0 }}>
+      <Box sx={{ px: PX, pt: 0.5, pb: 1.5 }}>
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <StopMarker station={station} />
+          <Typography variant="h6" fontWeight="bold" noWrap sx={{ fontSize: 17 }} title={title}>
+            {title}
+          </Typography>
+        </Stack>
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.75, color: "text.secondary" }}>
+          <Typography variant="caption" sx={{ lineHeight: META_LINE }}>
+            {meta.join(" · ")}
+          </Typography>
+          {detail?.wheelchair === 1 && (
+            <AccessibleIcon sx={{ fontSize: 15 }} titleAccess={t("explorer_wheelchair_boarding")} />
+          )}
+        </Stack>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1.5 }}>
+          {date && <DateChip date={date} />}
+          <Box sx={{ flex: 1 }} />
+          <ViewSwitch value={view} onChange={setView} />
+        </Stack>
+        {view === "timetable" && lines.length > 1 && (
+          <ChipRow label={t("explorer_lines")}>
+            {lines.map(({ route: r }) => (
+              <LineChoice
+                key={r.route_idx}
+                route={r}
+                chosen={r.route_idx === line?.route.route_idx}
+                onClick={() => setPicked(lineKey(r))}
+              />
+            ))}
+          </ChipRow>
+        )}
+      </Box>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          px: PX,
+          pb: 2,
+          borderTop: 1,
+          borderColor: "divider",
+        }}>
+        {!data.data && !data.error && <Skeleton variant="rounded" height={240} sx={{ mt: 1.5 }} />}
+        {data.error && (
+          <Typography variant="body2" color="error" sx={{ mt: 2 }}>
+            {data.error}
+          </Typography>
+        )}
+        {data.data && !departures.length && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            {t("explorer_no_departures")}
+          </Typography>
+        )}
+        {data.data && view === "timetable" && line && (
+          <Timetable route={line.route} directions={directions} now={now} onOpen={openTrip} />
+        )}
+        {data.data && view === "next" && departures.length > 0 && (
+          <NextDepartures
+            departures={departures}
+            directions={data.data.directions}
+            routeByIdx={routeByIdx}
+            now={now}
+            onOpen={openTrip}
+          />
+        )}
+      </Box>
+    </Stack>
+  );
+}
+
+/** A line's departures per direction: hour rows of minutes on the panel's
+ * tinted ground, as the Overview's headways table. */
+function Timetable({
+  route,
+  directions,
+  now,
+  onOpen,
+}: {
+  route: RouteRow;
+  directions: TimetableDirection[];
+  now: number | null;
+  onOpen: (e: TimetableEntry) => void;
+}) {
+  const { t } = useTranslation("common");
+  const anyShort = directions.some((d) => d.departures.some((e) => e.short));
+  return (
+    <>
+      {directions.map((d) => {
+        // The next departure after the playback time, marked in the grid.
+        const next = now === null ? null : d.departures.find((e) => e.dep_s >= now);
+        const hours = byHour(d.departures);
+        return (
+          <Box key={d.key} sx={{ mt: 1 }}>
+            <SectionHeader
+              px={0}
+              icon={<RouteBadge route={route} small />}
+              label={directionLabel(d.name, t)}
+              amount={d.departures.length}
+            />
+            <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, px: 1.5, py: 0.5 }}>
+              {hours.map(({ hour, entries }, i) => (
+                <Stack
+                  key={hour}
+                  direction="row"
+                  alignItems="flex-start"
+                  sx={{
+                    py: 0.5,
+                    borderBottom: i < hours.length - 1 ? 1 : 0,
+                    borderColor: "divider",
+                  }}>
+                  <Typography
+                    variant="body2"
+                    fontWeight="bold"
+                    sx={{ width: 30, flexShrink: 0, lineHeight: "24px", fontVariantNumeric: "tabular-nums" }}>
+                    {hourLabel(hour)}
+                  </Typography>
+                  <Stack direction="row" flexWrap="wrap" sx={{ flex: 1 }}>
+                    {entries.map((e) => {
+                      const isNext = e === next;
+                      return (
+                        <ButtonBase
+                          key={`${e.trip_idx}:${e.run_dep_s}`}
+                          onClick={() => onOpen(e)}
+                          title={clock(e.dep_s)}
+                          sx={{
+                            minWidth: 32,
+                            height: 24,
+                            px: 0.5,
+                            borderRadius: "12px",
+                            fontSize: 13,
+                            fontVariantNumeric: "tabular-nums",
+                            fontWeight: isNext ? 700 : 500,
+                            color: isNext
+                              ? "primary.contrastText"
+                              : e.short
+                                ? "warning.dark"
+                                : "text.primary",
+                            bgcolor: isNext ? "primary.main" : "transparent",
+                            "&:hover": { bgcolor: isNext ? "primary.dark" : "action.selected" },
+                          }}>
+                          {String(Math.floor((e.dep_s % 3600) / 60)).padStart(2, "0")}
+                          {e.short && (
+                            <Box component="sup" sx={{ fontSize: 9, ml: 0.125 }}>
+                              {t("explorer_short_turn_mark")}
+                            </Box>
+                          )}
+                        </ButtonBase>
+                      );
+                    })}
+                  </Stack>
+                </Stack>
+              ))}
+            </Box>
+          </Box>
+        );
+      })}
+      {anyShort && (
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5 }}>
+          {t("explorer_short_turn_note")}
+        </Typography>
+      )}
+    </>
+  );
+}
+
+/** The next departures of every line from the playback time on. */
+function NextDepartures({
+  departures,
+  directions,
+  routeByIdx,
+  now,
+  onOpen,
+}: {
+  departures: Departure[];
+  directions: Map<number, Direction[]>;
+  routeByIdx: Map<number, RouteRow>;
+  now: number | null;
+  onOpen: (e: { trip_idx: number; run_dep_s: number }) => void;
+}) {
+  const { t } = useTranslation("common");
+  const from = now ?? 0;
+  const upcoming = departures.filter((d) => d.dep_s >= from).slice(0, NEXT_COUNT);
+  if (!upcoming.length)
+    return (
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+        {t("explorer_no_more_departures")}
+      </Typography>
+    );
+  return (
+    <Box sx={{ mt: 1.5, bgcolor: "action.hover", borderRadius: 1.5, py: 0.5 }}>
+      {upcoming.map((d, i) => {
+        const route = routeByIdx.get(d.route_idx);
+        const pattern = (directions.get(d.route_idx) ?? [])
+          .flatMap((x) => x.patterns)
+          .find((p) => p.pattern_idx === d.pattern_idx);
+        const wait = Math.floor((d.dep_s - from) / 60);
+        return (
+          <ButtonBase
+            key={`${d.trip_idx}:${d.run_dep_s}`}
+            onClick={() => onOpen(d)}
+            sx={{
+              width: "100%",
+              justifyContent: "flex-start",
+              gap: 1.25,
+              minHeight: 36,
+              px: 1.5,
+              borderBottom: i < upcoming.length - 1 ? 1 : 0,
+              borderColor: "divider",
+              "&:hover": { bgcolor: "action.selected" },
+            }}>
+            <Typography
+              variant="body2"
+              fontWeight="bold"
+              sx={{ width: 42, textAlign: "left", fontVariantNumeric: "tabular-nums" }}>
+              {clock(d.dep_s)}
+            </Typography>
+            {route && <RouteBadge route={route} small />}
+            <Typography variant="body2" noWrap sx={{ flex: 1, textAlign: "left" }}>
+              {pattern
+                ? t("explorer_direction_to", {
+                    place: pattern.destination,
+                    interpolation: { escapeValue: false },
+                  })
+                : (d.headsign ?? "")}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {wait <= 0 ? t("explorer_now") : t("explorer_in_minutes", { count: wait })}
+            </Typography>
+          </ButtonBase>
+        );
+      })}
+    </Box>
+  );
+}

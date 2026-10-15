@@ -14,7 +14,12 @@ import type { Direction, VariantKind } from "@/lib/explorer/derive/directions";
 import type { LineStop } from "@/lib/explorer/derive/stopsLine";
 import { count } from "@/lib/explorer/format";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
-import { pickExplorerPattern, selectExplorerStop } from "@/lib/store/explorer/slice";
+import {
+  closeExplorerPanel,
+  openExplorerPanel,
+  pickExplorerPattern,
+  pickedStop,
+} from "@/lib/store/explorer/slice";
 
 import type { SelectorItem } from "@/types/map/common";
 
@@ -22,14 +27,10 @@ import { type RouteRow, useRoutes, useStopsLine } from "@/hooks/explorer/useExpl
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
+import { BADGES, RAIL, Rail, StopDot } from "@/components/explorer/LineDiagram";
 import { RouteBadge, distinctLines } from "@/components/explorer/RouteBadge";
 import { directionLabel } from "@/components/explorer/directionWords";
 import Selector from "@/components/map/panels/common/Selector";
-
-/** Badges a stop shows before "+n". */
-const BADGES = 3;
-/** The rail's column, and its markers. */
-const RAIL = 24;
 
 const KIND_KEY: Record<Exclude<VariantKind, "main">, string> = {
   short_turn: "explorer_variant_short_turn",
@@ -42,24 +43,6 @@ function km(m: number | null, locale: string): string | null {
   return m < 1000
     ? `${count(Math.round(m / 10) * 10, locale)} m`
     : `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(m / 1000)} km`;
-}
-
-/** The rail through a row: a line above and below the marker, as it runs. */
-function Rail({ color, top, bottom }: { color: string; top: boolean; bottom: boolean }) {
-  return (
-    <>
-      {top && (
-        <Box
-          sx={{ position: "absolute", left: RAIL / 2 - 2, top: 0, height: "50%", width: 4, bgcolor: color }}
-        />
-      )}
-      {bottom && (
-        <Box
-          sx={{ position: "absolute", left: RAIL / 2 - 2, top: "50%", bottom: 0, width: 4, bgcolor: color }}
-        />
-      )}
-    </>
-  );
 }
 
 function StopRow({
@@ -81,7 +64,6 @@ function StopRow({
 }) {
   const end = first || last;
   const lines = distinctLines(stop.transfers.map((i) => routeByIdx.get(i)));
-  const size = end ? 16 : 12;
   return (
     <ButtonBase
       onClick={onPick}
@@ -98,19 +80,7 @@ function StopRow({
       }}>
       <Box sx={{ position: "relative", width: RAIL, alignSelf: "stretch", flexShrink: 0 }}>
         <Rail color={color} top={!first} bottom={!last} />
-        {/* Ends ringed heavier, as the board draws them. */}
-        <Box
-          sx={{
-            position: "absolute",
-            left: (RAIL - size) / 2,
-            top: `calc(50% - ${size / 2}px)`,
-            width: size,
-            height: size,
-            borderRadius: "50%",
-            bgcolor: "background.paper",
-            border: `${end ? 4 : 3}px solid ${color}`,
-          }}
-        />
+        <StopDot color={color} end={end} />
       </Box>
       <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flex: 1, minWidth: 0, py: 0.5 }}>
         <Typography variant="body2" fontWeight={end ? 700 : 500} noWrap title={stop.name}>
@@ -198,7 +168,7 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
   const { db, complete, shapeDistUnit, settings } = useExplorer();
   const date = useAppSelector((s) => s.explorer.date);
   const choice = useAppSelector((s) => s.explorer.pattern);
-  const picked = useAppSelector((s) => s.explorer.selectedStop);
+  const picked = useAppSelector((s) => pickedStop(s.explorer));
   const routes = useRoutes(db);
   const routeByIdx = new Map((routes.data ?? []).map((r) => [r.route_idx, r]));
   const lang = i18n.language;
@@ -315,13 +285,18 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
                   last={last}
                   routeByIdx={routeByIdx}
                   selected={picked?.stop_idx === s.stop_idx}
+                  // Its timetable in the right panel; picked again, closed.
                   onPick={() =>
                     dispatch(
-                      selectExplorerStop(
-                        picked?.stop_idx === s.stop_idx || s.lat === null || s.lon === null
-                          ? null
-                          : { stop_idx: s.stop_idx, name: s.name, lat: s.lat, lon: s.lon }
-                      )
+                      picked?.stop_idx === s.stop_idx
+                        ? closeExplorerPanel()
+                        : openExplorerPanel({
+                            item: {
+                              kind: "stop",
+                              stop: { stop_idx: s.stop_idx, name: s.name, lat: s.lat, lon: s.lon },
+                            },
+                            fromRoute: route.route_id,
+                          })
                     )
                   }
                 />

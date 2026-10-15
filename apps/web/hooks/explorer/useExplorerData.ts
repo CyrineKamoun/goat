@@ -19,8 +19,15 @@ import {
 } from "@/lib/explorer/derive/operations";
 import { routeRuns } from "@/lib/explorer/derive/runs";
 import { routeCalendar } from "@/lib/explorer/derive/serviceCalendar";
+import {
+  type Departure,
+  type StopDetail,
+  stopDepartures,
+  stopDetail,
+} from "@/lib/explorer/derive/stopTimetable";
 import { places } from "@/lib/explorer/derive/stops";
 import { stopsLine } from "@/lib/explorer/derive/stopsLine";
+import { tripDetail } from "@/lib/explorer/derive/trip";
 import { type ExplorerSettings, type Period, type Rate, rateFor, settingsKey } from "@/lib/explorer/settings";
 import type { ExplorerRouteDrawing } from "@/lib/store/explorer/slice";
 
@@ -174,7 +181,16 @@ async function summarize(
       shapeIds: [...new Set(shapes.map((s) => s.shape_id))],
       stops: [...stopIds].flatMap((idx) => {
         const c = coord(idx);
-        return c ? [{ lon: c[0], lat: c[1], name: stops.get(idx)?.name ?? "" }] : [];
+        return c
+          ? [
+              {
+                stop_idx: idx,
+                lon: c[0],
+                lat: c[1],
+                name: stops.get(idx)?.station ?? stops.get(idx)?.name ?? "",
+              },
+            ]
+          : [];
       }),
       stopChains: patterns
         .filter((p) => !shaped.has(p.pattern_idx))
@@ -261,5 +277,52 @@ export function useServiceDays(db: SqlRunner | undefined, window: [string, strin
   const year = window ? yearOf(window) : null;
   return useQuery(year ? db : undefined, `service-days:${year?.[0]}:${year?.[1]}`, (d) =>
     networkServiceDays(d, (year as [string, string])[0], (year as [string, string])[1])
+  );
+}
+
+export interface StopTimetableData {
+  stop: StopDetail | null;
+  departures: Departure[];
+  /** The directions of each route leaving the stop, by route_idx. */
+  directions: Map<number, Direction[]>;
+}
+
+/** A stop's (or station's) departures on the date, with its routes' directions. */
+export function useStopTimetable(db: SqlRunner | undefined, stop_idx: number, date: string | null) {
+  return useQuery(date ? db : undefined, `stop-timetable:${stop_idx}:${date}`, async (d) => {
+    const [stop, departures] = await Promise.all([
+      stopDetail(d, stop_idx),
+      stopDepartures(d, stop_idx, date as string),
+    ]);
+    const idxs = [...new Set(departures.map((x) => x.route_idx))];
+    const ranges = idxs.length
+      ? await d.all<{ route_idx: number; trip_lo: number | null; trip_hi: number | null }>(
+          `SELECT route_idx, trip_lo, trip_hi FROM routes WHERE route_idx IN (${idxs.join(",")})`
+        )
+      : [];
+    const directions = new Map(
+      await Promise.all(
+        ranges.map(
+          async (r) =>
+            [
+              r.route_idx,
+              (await remembered(d, `directions:${r.route_idx}`, (x) => routeDirections(x, r))).directions,
+            ] as const
+        )
+      )
+    );
+    return { stop, departures, directions } satisfies StopTimetableData;
+  });
+}
+
+/** One run of a trip on the date: its stops and times, and its neighbours. */
+export function useTripDetail(
+  db: SqlRunner | undefined,
+  trip_idx: number,
+  run_dep_s: number,
+  date: string | null
+) {
+  return useQuery(date ? db : undefined, `trip:${trip_idx}:${run_dep_s}:${date}`, (d) =>
+    tripDetail(d, trip_idx, run_dep_s, date as string)
   );
 }

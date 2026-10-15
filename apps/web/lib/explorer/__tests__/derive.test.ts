@@ -25,8 +25,10 @@ import { type Direction, routeDirections } from "@/lib/explorer/derive/direction
 import { headways, operations, runningTimes, vehiclesInService } from "@/lib/explorer/derive/operations";
 import { type TripRange, routeRuns } from "@/lib/explorer/derive/runs";
 import { isoWeekday, routeCalendar } from "@/lib/explorer/derive/serviceCalendar";
+import { byDirection, byHour, stopDepartures, stopDetail } from "@/lib/explorer/derive/stopTimetable";
 import { type PlaceRow, places } from "@/lib/explorer/derive/stops";
 import { stopsLine } from "@/lib/explorer/derive/stopsLine";
+import { tripDetail } from "@/lib/explorer/derive/trip";
 import {
   alongShape,
   positionsAt,
@@ -43,6 +45,7 @@ import {
   routeMatches,
   shows,
 } from "@/lib/explorer/filters";
+import { convexHull, networkStations, networkStops, stationArea } from "@/lib/explorer/network";
 
 type Route = TripRange & { route_idx: number; route_id: string };
 
@@ -492,6 +495,8 @@ describe("vehicles", () => {
             {
               run: 1,
               route_idx: 0,
+              trip_idx: 0,
+              run_dep_s: 10,
               t0: 10,
               t1: 20,
               a: [1, 1] as [number, number],
@@ -500,6 +505,8 @@ describe("vehicles", () => {
             {
               run: 1,
               route_idx: 0,
+              trip_idx: 0,
+              run_dep_s: 10,
               t0: 20,
               t1: 30,
               a: [1, 1] as [number, number],
@@ -509,8 +516,127 @@ describe("vehicles", () => {
         ],
       ]),
     };
-    expect(positionsAt(window, 15)).toEqual([{ run: 1, route_idx: 0, lon: 1, lat: 1 }]);
+    expect(positionsAt(window, 15)).toEqual([
+      { run: 1, route_idx: 0, trip_idx: 0, run_dep_s: 10, lon: 1, lat: 1 },
+    ]);
     expect(positionsAt(window, 25)[0].lon).toBe(1.5);
     expect(positionsAt(window, 40)).toEqual([]);
+  });
+});
+
+describe("stop timetable", () => {
+  // Stop indexes: 0 Main Station (a station), 1 its platform S1, 2 S2 … 5 S5.
+  const departures = async (stop_idx: number, date = "2026-10-14") =>
+    (await stopDepartures(db, stop_idx, date)).map((d) => hm(d.dep_s));
+
+  it("lists each run leaving the stop, but not trips ending there", async () => {
+    // T1, T2 towards Fifth and T3 towards Main Station; T4 turns at S3.
+    expect(await departures(3)).toEqual(["08:04", "08:14", "08:24"]);
+  });
+
+  it("runs every run of a frequency-based trip", async () => {
+    // R4 every 10 min 06:00–08:50 leaves S4 as it starts; R1 passes three times.
+    const times = await departures(4);
+    expect(times).toHaveLength(18 + 3);
+    expect(times.slice(0, 2)).toEqual(["06:00", "06:10"]);
+  });
+
+  it("covers a station's platforms, and lets a loop leave where it ends", async () => {
+    expect(await departures(0)).toEqual(["08:00", "08:10", "08:30"]);
+    // Each from the platform it leaves: S1.
+    expect(new Set((await stopDepartures(db, 0, "2026-10-14")).map((d) => d.stop_idx))).toEqual(new Set([1]));
+    // Saturday: the loop leaves S1 at 10:00 and ends back there.
+    expect(await departures(1, "2026-10-17")).toEqual(["10:00"]);
+  });
+
+  it("groups by direction and marks short turns", async () => {
+    const r1 = route("R1");
+    const { directions } = await routeDirections(db, r1);
+    const deps = (await stopDepartures(db, 1, "2026-10-14")).filter((d) => d.route_idx === r1.route_idx);
+    const groups = byDirection(deps, directions);
+    expect(
+      groups.map((g) => [label({ name: g.name } as Direction), g.departures.map((e) => e.short)])
+    ).toEqual([["To Fifth", [false, false, true]]]);
+    expect(byHour(groups[0].departures).map((h) => [h.hour, h.entries.length])).toEqual([[8, 3]]);
+  });
+
+  it("describes the stop and the routes calling there", async () => {
+    const ids = new Map([...routes.values()].map((r) => [r.route_idx, r.route_id]));
+    const station = await stopDetail(db, 0);
+    expect(station?.is_station).toBe(true);
+    expect(station?.routes.map((i) => ids.get(i)).sort()).toEqual(["R1", "R3"]);
+    expect(station?.n_stops).toBe(1);
+    const platform = await stopDetail(db, 1);
+    expect(platform?.station).toBe("Main Station");
+    // A stop's own lines: S4 is R1's and R4's, not its neighbours'.
+    expect((await stopDetail(db, 4))?.routes.map((i) => ids.get(i)).sort()).toEqual(["R1", "R4"]);
+  });
+});
+
+describe("trip", () => {
+  it("times a run's stops, with its neighbours and the transfers at each stop", async () => {
+    const t2 = (await db.all<{ trip_idx: number }>("SELECT trip_idx FROM trips WHERE trip_id = 'T2'"))[0];
+    const trip = await tripDetail(db, t2.trip_idx, 8 * 3600 + 600, "2026-10-14");
+    expect(trip?.stops.map((s) => hm(s.dep_s ?? 0))).toEqual(["08:10", "08:12", "08:14", "08:16", "08:18"]);
+    expect(trip?.stops[0].name).toBe("Main Station");
+    expect(trip?.destination).toBe("Fifth");
+    const ids = new Map([...routes.values()].map((r) => [r.route_idx, r.route_id]));
+    expect(trip?.stops.map((s) => s.transfers.map((i) => ids.get(i)).sort())).toEqual([
+      ["R3"],
+      ["R2", "R3"],
+      ["R3"],
+      ["R4"],
+      ["R4"],
+    ]);
+    // Towards Fifth: T1 at 08:00 before, the short turn T4 at 08:30 after.
+    expect(trip?.prev && hm(trip.prev.run_dep_s)).toBe("08:00");
+    expect(trip?.next && hm(trip.next.run_dep_s)).toBe("08:30");
+  });
+
+  it("moves a frequency run's times by its start", async () => {
+    const f1 = (await db.all<{ trip_idx: number }>("SELECT trip_idx FROM trips WHERE trip_id = 'F1'"))[0];
+    const trip = await tripDetail(db, f1.trip_idx, 6 * 3600 + 600, "2026-10-14");
+    expect(trip?.stops.map((s) => hm(s.dep_s ?? 0))).toEqual(["06:10", "06:14", "06:18"]);
+    expect(trip?.prev && hm(trip.prev.run_dep_s)).toBe("06:00");
+    expect(trip?.next && hm(trip.next.run_dep_s)).toBe("06:20");
+  });
+});
+
+describe("network stops", () => {
+  it("draws every stop vehicles call at, by its station's name, and no others", async () => {
+    const names = (await networkStops(db)).features.map((f) => f.properties.name);
+    expect(names.sort()).toEqual(["Fifth", "Fourth", "Main Station", "Second", "Sixth", "Third"]);
+  });
+});
+
+describe("station areas", () => {
+  it("takes the outermost points, counter-clockwise", () => {
+    const hull = convexHull([
+      [0, 0],
+      [2, 0],
+      [1, 1],
+      [2, 2],
+      [0, 2],
+    ]);
+    expect(hull).toEqual([
+      [0, 0],
+      [2, 0],
+      [2, 2],
+      [0, 2],
+    ]);
+  });
+
+  it("rounds one stop into a circle the margin wide", () => {
+    const ring = stationArea([[13.4, 52.5]], 12);
+    expect(ring[0]).toEqual(ring[ring.length - 1]);
+    // Every corner point 12 m from the stop, give or take the rounding.
+    const kx = 111320 * Math.cos((52.5 * Math.PI) / 180);
+    for (const [lon, lat] of ring.slice(0, -1))
+      expect(Math.hypot((lon - 13.4) * kx, (lat - 52.5) * 110540)).toBeCloseTo(12, 0);
+  });
+
+  it("draws a station round the stops some route calls at", async () => {
+    const stations = (await networkStations(db)).features;
+    expect(stations.map((f) => f.properties.name)).toEqual(["Main Station"]);
   });
 });

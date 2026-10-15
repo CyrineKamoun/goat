@@ -20,10 +20,13 @@ import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { ExplorerLoadingCard, ExplorerLoadingLine } from "@/components/explorer/ExplorerLoading";
 import { ExplorerSettingsDialog } from "@/components/explorer/ExplorerSettingsDialog";
 import { ExplorerTab } from "@/components/explorer/ExplorerTab";
+import { EXPLORER_RIGHT_PANEL_WIDTH } from "@/components/explorer/right/panelSize";
 
-/** The data view's left panel width: entering the Explorer or opening a route
- * never resizes the panel under the user. */
-export const EXPLORER_PANEL_WIDTH = 300;
+/** The left panel's width while the Explorer is open: the right panel's, so
+ * the two sides match and the route summary has room. It holds for the
+ * whole session — opening a route never resizes it — and the data view's
+ * own width comes back on exit (DataProjectLayout). */
+export const EXPLORER_PANEL_WIDTH = EXPLORER_RIGHT_PANEL_WIDTH;
 
 export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
   const { t } = useTranslation("common");

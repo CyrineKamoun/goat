@@ -38,7 +38,11 @@ const SETTLE_MS = 2000;
 /** Extra room (px) beside the round buttons at the bar's two ends. */
 const END_ROOM = 8;
 
-export function ExplorerBottomBar() {
+/** `compact`: squeezed between the side panels, the bar keeps one row with
+ * less of each (02-panel-behaviour-spec › Viewers): one speed button that
+ * cycles, the date without its day steps, no vehicle count, and Exit as its
+ * icon alone. */
+export function ExplorerBottomBar({ compact = false }: { compact?: boolean }) {
   const { t, i18n } = useTranslation("common");
   const dispatch = useAppDispatch();
   const { db, complete } = useExplorer();
@@ -105,36 +109,64 @@ export function ExplorerBottomBar() {
             </IconButton>
           </span>
         </Tooltip>
-        {/* Speed: every choice in view, the one in use raised (board 3). */}
-        <Stack
-          direction="row"
-          role="radiogroup"
-          aria-label={t("explorer_speed")}
-          sx={{ p: 0.25, borderRadius: "16px", bgcolor: "action.hover", flexShrink: 0 }}>
-          {PLAYBACK_SPEEDS.map((s) => (
+        {/* Speed: every choice in view, the one in use raised (board 3);
+            compact, one button stepping through them. */}
+        {compact ? (
+          <Tooltip title={t("explorer_speed")}>
             <ButtonBase
-              key={s}
-              role="radio"
-              aria-checked={s === speed}
-              onClick={() => dispatch(setPlaybackSpeed(s))}
+              aria-label={t("explorer_speed")}
+              onClick={() =>
+                dispatch(
+                  setPlaybackSpeed(
+                    PLAYBACK_SPEEDS[(PLAYBACK_SPEEDS.indexOf(speed) + 1) % PLAYBACK_SPEEDS.length]
+                  )
+                )
+              }
               sx={{
-                height: 28,
-                minWidth: 44,
+                height: 32,
+                minWidth: 48,
                 px: 1,
-                borderRadius: "14px",
+                borderRadius: "16px",
+                bgcolor: "action.hover",
                 fontSize: 12,
                 fontWeight: 700,
                 fontVariantNumeric: "tabular-nums",
-                color: s === speed ? "text.primary" : "text.secondary",
-                bgcolor: s === speed ? "background.paper" : "transparent",
-                boxShadow: s === speed ? "0 1px 2px rgba(0, 0, 0, 0.12)" : "none",
+                flexShrink: 0,
               }}>
-              {s}×
+              {speed}×
             </ButtonBase>
-          ))}
-        </Stack>
+          </Tooltip>
+        ) : (
+          <Stack
+            direction="row"
+            role="radiogroup"
+            aria-label={t("explorer_speed")}
+            sx={{ p: 0.25, borderRadius: "16px", bgcolor: "action.hover", flexShrink: 0 }}>
+            {PLAYBACK_SPEEDS.map((s) => (
+              <ButtonBase
+                key={s}
+                role="radio"
+                aria-checked={s === speed}
+                onClick={() => dispatch(setPlaybackSpeed(s))}
+                sx={{
+                  height: 28,
+                  minWidth: 44,
+                  px: 1,
+                  borderRadius: "14px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  fontVariantNumeric: "tabular-nums",
+                  color: s === speed ? "text.primary" : "text.secondary",
+                  bgcolor: s === speed ? "background.paper" : "transparent",
+                  boxShadow: s === speed ? "0 1px 2px rgba(0, 0, 0, 0.12)" : "none",
+                }}>
+                {s}×
+              </ButtonBase>
+            ))}
+          </Stack>
+        )}
         <Divider orientation="vertical" flexItem sx={{ my: 1.5 }} />
-        <AnalysisDate />
+        <AnalysisDate compact={compact} />
         {/* The time the scrubber beside it stands at; past midnight the clock
             counts on, as a timetable does (24:48). */}
         <Typography
@@ -170,7 +202,7 @@ export function ExplorerBottomBar() {
           }}
           sx={{
             flex: 1,
-            minWidth: 120,
+            minWidth: compact ? 48 : 120,
             mx: 1,
             "& .MuiSlider-rail": { opacity: 1, bgcolor: "action.selected" },
             "& .MuiSlider-mark": { width: 2, height: 2, borderRadius: "50%", bgcolor: "text.disabled" },
@@ -179,43 +211,65 @@ export function ExplorerBottomBar() {
             ...(drag && { "& .MuiSlider-thumb, & .MuiSlider-track": { transition: "none" } }),
           }}
         />
-        <Divider orientation="vertical" flexItem sx={{ my: 1.5 }} />
+        {!compact && <Divider orientation="vertical" flexItem sx={{ my: 1.5 }} />}
         {/* Vehicles out at the time: the figure bold, its unit quiet, as the
             left panel's figures are; the figure's width fixed so it does not
             jostle the bar as it plays. */}
-        <Stack
-          direction="row"
-          alignItems="baseline"
-          spacing={0.5}
-          // Inline, as the play button's: the row's spacing resets margins set in sx.
-          style={{ marginRight: END_ROOM }}
-          sx={{ flexShrink: 0, visibility: ready ? "visible" : "hidden" }}>
-          <Typography
-            variant="body2"
-            fontWeight={700}
-            sx={{ fontVariantNumeric: "tabular-nums", minWidth: "5ch", textAlign: "right" }}>
-            {count(frame.vehicles.features.length, i18n.language)}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {t("explorer_vehicles_out", { count: frame.vehicles.features.length })}
-          </Typography>
-        </Stack>
-        <Button
-          variant="contained"
-          color="primary"
-          size="small"
-          startIcon={<LogoutIcon fontSize="small" />}
-          onClick={() => dispatch(closeExplorer())}
-          sx={{
-            textTransform: "none",
-            whiteSpace: "nowrap",
-            flexShrink: 0,
-            borderRadius: "18px",
-            height: 36,
-            px: 2,
-          }}>
-          {t("explorer_exit")}
-        </Button>
+        {!compact && (
+          <Stack
+            direction="row"
+            alignItems="baseline"
+            spacing={0.5}
+            // Inline, as the play button's: the row's spacing resets margins set in sx.
+            style={{ marginRight: END_ROOM }}
+            sx={{ flexShrink: 0, visibility: ready ? "visible" : "hidden" }}>
+            <Typography
+              variant="body2"
+              fontWeight={700}
+              sx={{ fontVariantNumeric: "tabular-nums", minWidth: "5ch", textAlign: "right" }}>
+              {count(frame.vehicles.features.length, i18n.language)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t("explorer_vehicles_out", { count: frame.vehicles.features.length })}
+            </Typography>
+          </Stack>
+        )}
+        {compact ? (
+          <Tooltip title={t("explorer_exit")}>
+            <IconButton
+              aria-label={t("explorer_exit")}
+              onClick={() => dispatch(closeExplorer())}
+              // Inline, as the play button's: the row's spacing resets margins set in sx.
+              style={{ marginLeft: END_ROOM }}
+              sx={{
+                width: 36,
+                height: 36,
+                flexShrink: 0,
+                bgcolor: "primary.main",
+                color: "primary.contrastText",
+                "&:hover": { bgcolor: "primary.dark" },
+              }}>
+              <LogoutIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        ) : (
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            startIcon={<LogoutIcon fontSize="small" />}
+            onClick={() => dispatch(closeExplorer())}
+            sx={{
+              textTransform: "none",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+              borderRadius: "18px",
+              height: 36,
+              px: 2,
+            }}>
+            {t("explorer_exit")}
+          </Button>
+        )}
       </Stack>
     </FloatingPanel>
   );

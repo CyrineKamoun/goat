@@ -1,6 +1,6 @@
 /**
  * The PT network Explorer's view state: which bundle is open, which tab, which
- * route or stop, which date, what the list is filtered by. The data itself is in DuckDB-WASM (useExplorerDb), not
+ * route, what the right panel shows, which date, what the list is filtered by. The data itself is in DuckDB-WASM (useExplorerDb), not
  * here; the selected route's drawing — a handful of shape ids and stops — is,
  * because the map draws it from inside <Map>, away from the panels that hold
  * the database.
@@ -45,7 +45,7 @@ export interface ExplorerRouteDrawing {
   shapeLinesLayerId: string | null;
   shapeIds: string[];
   /** Its stops, for the map and for fitting the view. */
-  stops: { lon: number; lat: number; name: string }[];
+  stops: { stop_idx: number; lon: number; lat: number; name: string }[];
   /** Straight lines between stops, for trips without a shape. */
   stopChains: [number, number][][];
   /** Each pattern's shapes, and its stop chain where it has none: what the
@@ -54,12 +54,32 @@ export interface ExplorerRouteDrawing {
   patternChains: Record<number, [number, number][]>;
 }
 
-/** Where the map shows a picked stop; it draws from outside the panels. */
+/** A stop the right panel shows, and where the map marks it (a station
+ * may have no position of its own). */
 export interface ExplorerPickedStop {
   stop_idx: number;
   name: string;
-  lon: number;
-  lat: number;
+  lon: number | null;
+  lat: number | null;
+}
+
+/** What the right panel shows (02-panel-behaviour-spec › Viewers): a stop's
+ * timetable, or one run of a trip — a trip and when the run left its first
+ * stop, as a frequency-based trip runs many times. */
+export type ExplorerPanelItem =
+  | { kind: "stop"; stop: ExplorerPickedStop }
+  | { kind: "trip"; trip_idx: number; run_dep_s: number };
+
+export interface ExplorerPanel {
+  /** The item shown is the last; "‹" goes back to the one before (a trip
+   * opened from a stop's timetable goes back to the stop). */
+  stack: ExplorerPanelItem[];
+  /** Folded to its rail. The user's choice: opening another item does not
+   * unfold it (02-panel-behaviour-spec › Sticky preferences). */
+  collapsed: boolean;
+  /** The route the item was opened from, if any: leaving that route lets
+   * the item go. */
+  fromRoute: string | null;
 }
 
 export interface ExplorerState {
@@ -78,8 +98,7 @@ export interface ExplorerState {
   date: string | null;
   drawing: ExplorerRouteDrawing | null;
   filters: ExplorerFilters;
-  /** The stop (or station) picked in a list, highlighted on the map. */
-  selectedStop: ExplorerPickedStop | null;
+  panel: ExplorerPanel;
   routeTab: ExplorerRouteTab;
   /** One picker for the Stops tab now, and the strip and stop timetable
    * later (02-panel-behaviour-spec › Directions). */
@@ -109,7 +128,7 @@ const initialState: ExplorerState = {
   date: null,
   drawing: null,
   filters: NO_FILTERS,
-  selectedStop: null,
+  panel: { stack: [], collapsed: false, fromRoute: null },
   routeTab: "overview",
   pattern: null,
   settingsTab: null,
@@ -131,6 +150,7 @@ const explorerSlice = createSlice({
       return {
         ...initialState,
         leftTab: state.leftTab,
+        panel: { ...initialState.panel, collapsed: state.panel.collapsed },
         active: true,
         bundleId: action.payload.bundleId,
         bundleName: action.payload.bundleName,
@@ -140,6 +160,7 @@ const explorerSlice = createSlice({
     closeExplorer: (state) => ({
       ...initialState,
       leftTab: state.leftTab,
+      panel: { ...initialState.panel, collapsed: state.panel.collapsed },
       restoreGroupId: state.hiddenGroupId,
     }),
     /** The layer tree has shown the group again. */
@@ -150,12 +171,13 @@ const explorerSlice = createSlice({
       state.leftTab = action.payload;
     },
     selectExplorerRoute: (state, action: PayloadAction<string | null>) => {
-      // Another route starts on its Overview, in its own first direction,
-      // with no stop picked: a stop picked along a route belongs to it.
+      // Another route starts on its Overview, in its own first direction;
+      // what the right panel opened from the route it leaves goes with it.
       if (action.payload !== state.selectedRouteId) {
         state.routeTab = "overview";
         state.pattern = null;
-        state.selectedStop = null;
+        if (state.panel.fromRoute !== null && state.panel.fromRoute === state.selectedRouteId)
+          state.panel = { ...state.panel, stack: [], fromRoute: null };
       }
       state.selectedRouteId = action.payload;
       if (action.payload === null) state.drawing = null;
@@ -196,8 +218,37 @@ const explorerSlice = createSlice({
     setExplorerFilters: (state, action: PayloadAction<ExplorerFilters>) => {
       state.filters = action.payload;
     },
-    selectExplorerStop: (state, action: PayloadAction<ExplorerPickedStop | null>) => {
-      state.selectedStop = action.payload;
+    /** Show an item in the right panel: in place of everything it shows;
+     * with `push`, over it, to go back to; with `step`, in place of the item
+     * shown only (the trip before or after it). */
+    openExplorerPanel: (
+      state,
+      action: PayloadAction<{
+        item: ExplorerPanelItem;
+        push?: boolean;
+        step?: boolean;
+        fromRoute?: string | null;
+      }>
+    ) => {
+      const { item, push, step, fromRoute } = action.payload;
+      if (push) state.panel.stack = [...state.panel.stack, item];
+      else if (step && state.panel.stack.length)
+        state.panel.stack = [...state.panel.stack.slice(0, -1), item];
+      else {
+        state.panel.stack = [item];
+        state.panel.fromRoute = fromRoute ?? null;
+      }
+    },
+    explorerPanelBack: (state) => {
+      state.panel.stack = state.panel.stack.slice(0, -1);
+      if (!state.panel.stack.length) state.panel.fromRoute = null;
+    },
+    closeExplorerPanel: (state) => {
+      state.panel.stack = [];
+      state.panel.fromRoute = null;
+    },
+    setExplorerPanelCollapsed: (state, action: PayloadAction<boolean>) => {
+      state.panel.collapsed = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -205,7 +256,12 @@ const explorerSlice = createSlice({
     builder.addCase(setMapMode, (state, action) =>
       action.payload === "data"
         ? state
-        : { ...initialState, leftTab: state.leftTab, restoreGroupId: state.hiddenGroupId }
+        : {
+            ...initialState,
+            leftTab: state.leftTab,
+            panel: { ...initialState.panel, collapsed: state.panel.collapsed },
+            restoreGroupId: state.hiddenGroupId,
+          }
     );
   },
 });
@@ -219,7 +275,10 @@ export const {
   setExplorerDate,
   setExplorerDrawing,
   setExplorerFilters,
-  selectExplorerStop,
+  openExplorerPanel,
+  explorerPanelBack,
+  closeExplorerPanel,
+  setExplorerPanelCollapsed,
   setExplorerRouteTab,
   pickExplorerPattern,
   openExplorerSettings,
@@ -230,3 +289,14 @@ export const {
 } = explorerSlice.actions;
 
 export const explorerReducer = explorerSlice.reducer;
+
+/** The item the right panel shows, if any. */
+export function panelItem(state: ExplorerState): ExplorerPanelItem | null {
+  return state.panel.stack[state.panel.stack.length - 1] ?? null;
+}
+
+/** The stop the right panel shows, highlighted on the map. */
+export function pickedStop(state: ExplorerState): ExplorerPickedStop | null {
+  const item = panelItem(state);
+  return item?.kind === "stop" ? item.stop : null;
+}
