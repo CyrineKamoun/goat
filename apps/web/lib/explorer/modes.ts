@@ -64,3 +64,9 @@ export function textOn(background: string): string {
   });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? "#000000" : "#FFFFFF";
 }
+
+/** The colour of a route's number on its badge: the feed's text colour, else
+ * whichever of black and white reads on the route's colour. */
+export function routeTextColor(textColor: string | null, background: string): string {
+  return textColor && /^[0-9A-Fa-f]{6}$/.test(textColor) ? `#${textColor}` : textOn(background);
+}

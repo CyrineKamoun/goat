@@ -12,6 +12,8 @@ export interface VehicleProps {
   route_id: string;
   /** `#RRGGBB`, the route's or its mode's. */
   color: string;
+  /** `#RRGGBB`: the route's number on its colour, as its badge has it. */
+  text_color: string;
   /** What the vehicle's badge reads: the route's number. */
   label: string;
 }

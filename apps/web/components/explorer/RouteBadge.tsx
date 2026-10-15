@@ -1,17 +1,14 @@
 import { Box } from "@mui/material";
 import type { TFunction } from "i18next";
 
-import { modeOf, routeColor, textOn } from "@/lib/explorer/modes";
+import { modeOf, routeColor, routeTextColor } from "@/lib/explorer/modes";
 
 import type { RouteRow } from "@/hooks/explorer/useExplorerData";
 
 /** A route's number on its colour, as riders see it on the vehicle. */
 export function RouteBadge({ route, small }: { route: RouteRow; small?: boolean }) {
   const background = routeColor(route.color, modeOf(route.route_type));
-  const color =
-    route.text_color && /^[0-9A-Fa-f]{6}$/.test(route.text_color)
-      ? `#${route.text_color}`
-      : textOn(background);
+  const color = routeTextColor(route.text_color, background);
   return (
     <Box
       component="span"

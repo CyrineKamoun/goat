@@ -10,7 +10,7 @@
  * always mounted, in drawing order; layer ids start with `explorer-`, which
  * the layer restack keeps above the data (Layers.tsx).
  */
-import { Box, ButtonBase, Stack, Typography } from "@mui/material";
+import { Box, GlobalStyles, ListItemButton, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { FeatureCollection } from "geojson";
 import type {
@@ -20,6 +20,7 @@ import type {
   MapLayerMouseEvent,
 } from "maplibre-gl";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useTranslation } from "react-i18next";
 import { Layer, Popup, Source, useMap } from "react-map-gl/maplibre";
 
 import { GEOAPI_BASE_URL } from "@/lib/constants";
@@ -28,23 +29,93 @@ import { networkStore } from "@/lib/explorer/network";
 import { playbackClock } from "@/lib/explorer/playback";
 import { selectExplorerRoute } from "@/lib/store/explorer/slice";
 
+import type { RouteRow } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { EXPLORER_PANEL_WIDTH } from "@/components/explorer/ExplorerLeftPanel";
+import { RouteBadge } from "@/components/explorer/RouteBadge";
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const NETWORK = "explorer-network";
 const FADED = "#9E9E9E";
+/** The Explorer's layers, bottom to top. */
+const DRAW_ORDER = [
+  "explorer-network-line",
+  "explorer-route-casing",
+  "explorer-route-line",
+  "explorer-route-chain-line",
+  "explorer-pattern-casing",
+  "explorer-pattern-line",
+  "explorer-pattern-chain-line",
+  "explorer-route-stop",
+  "explorer-vehicle-dot",
+  "explorer-vehicle-mine",
+  "explorer-picked-stop-halo",
+  "explorer-picked-stop-dot",
+];
+
+/** The line chooser's class, and its look: the panels' card. */
+const LINE_CHOICE = "explorer-line-choice";
+const LINE_CHOICE_SX = {
+  [`.${LINE_CHOICE} .maplibregl-popup-content`]: {
+    padding: 0,
+    borderRadius: "12px",
+    boxShadow: "rgba(0, 0, 0, 0.2) 0px 0px 10px",
+    overflow: "hidden",
+  },
+  [`.${LINE_CHOICE} .maplibregl-popup-tip`]: { display: "none" },
+};
+
 /** The shape_lines tiles name their layer this. */
 const TILE_LAYER = "default";
 
+/** A vehicle of the selected route is a badge with its number, as the
+ * panels' RouteBadge: a rounded rectangle in the route's colour, edged in
+ * white, that stretches to the number. One image per colour, drawn when the
+ * map first asks for it. */
+const BADGE = "explorer-badge-";
+function drawBadge(color: string) {
+  // CSS pixels, drawn at twice the resolution: the corners and the edge stay
+  // put as the badge stretches between them.
+  const R = 2;
+  const [w, h, radius, edge] = [24 * R, 18 * R, 5 * R, 1.5 * R];
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, radius);
+  ctx.fill();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(edge, edge, w - 2 * edge, h - 2 * edge, radius - edge);
+  ctx.fill();
+  return {
+    image: ctx.getImageData(0, 0, w, h),
+    options: {
+      pixelRatio: R,
+      stretchX: [[6 * R, 18 * R]] as [number, number][],
+      stretchY: [[6 * R, 12 * R]] as [number, number][],
+      content: [4 * R, 3 * R, 20 * R, 15 * R] as [number, number, number, number],
+    },
+  };
+}
+
 export function ExplorerMapLayers() {
+  const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const active = useAppSelector((s) => s.explorer.active);
   const drawing = useAppSelector((s) => (s.explorer.active ? s.explorer.drawing : null));
   const picked = useAppSelector((s) => (s.explorer.active ? s.explorer.selectedStop : null));
   const selectedRouteId = useAppSelector((s) => (s.explorer.active ? s.explorer.selectedRouteId : null));
   const filters = useAppSelector((s) => s.explorer.filters);
+  const playing = useAppSelector((s) => s.explorer.playing);
+  // The Stops tab's pattern, highlighted over the rest of its route.
+  const patternIdx = useAppSelector((s) =>
+    s.explorer.routeTab === "stops" ? (s.explorer.pattern?.pattern_idx ?? null) : null
+  );
   const network = useSyncExternalStore(
     networkStore.subscribe,
     networkStore.getSnapshot,
@@ -62,12 +133,46 @@ export function ExplorerMapLayers() {
 
   // Playback's frames go to the map directly, not through React: many a
   // second, and nothing else on the map changes with them.
+  // Paused, the map shows the network, not vehicles standing still on it.
   const pushVehicles = () => {
     const source = map?.getSource("explorer-vehicles") as GeoJSONSource | undefined;
-    source?.setData(playbackClock.getSnapshot().vehicles);
+    source?.setData(playing ? playbackClock.getSnapshot().vehicles : EMPTY);
   };
   useEffect(() => playbackClock.subscribe(pushVehicles));
   useEffect(pushVehicles);
+
+  // Badges for the vehicles of the selected route, in its colour, drawn the
+  // first time the map needs one (and again after the basemap changes).
+  useEffect(() => {
+    if (!map) return;
+    const missing = (e: { id: string }) => {
+      if (!e.id.startsWith(BADGE) || map.hasImage(e.id)) return;
+      const badge = drawBadge(e.id.slice(BADGE.length));
+      if (badge) map.addImage(e.id, badge.image, badge.options);
+    };
+    map.on("styleimagemissing", missing);
+    return () => {
+      map.off("styleimagemissing", missing);
+    };
+  }, [map]);
+
+  // The Explorer's layers in drawing order, bottom to top. Sources mount as
+  // their data arrives — the network after the route's stops — and a layer
+  // added later lands on top; this puts each back in its place.
+  useEffect(() => {
+    if (!map || !active) return;
+    const order = () => {
+      const ids = (map.getStyle()?.layers ?? []).map((l) => l.id).filter((id) => DRAW_ORDER.includes(id));
+      const want = DRAW_ORDER.filter((id) => ids.includes(id));
+      if (ids.every((id, i) => id === want[i])) return;
+      for (const id of want) map.moveLayer(id);
+    };
+    order();
+    map.on("styledata", order);
+    return () => {
+      map.off("styledata", order);
+    };
+  }, [map, active]);
 
   // Each shape's colour, and whether it is faded: by the selected route, and
   // by the Explorer tab's filter. Set as feature-state, which the map keeps
@@ -170,16 +275,30 @@ export function ExplorerMapLayers() {
   const chains = useMemo<FeatureCollection>(
     () => ({
       type: "FeatureCollection",
-      features: (drawing?.stopChains ?? [])
-        .filter((c) => c.length > 1)
-        .map((coordinates) => ({
+      features: Object.entries(drawing?.patternChains ?? {})
+        .filter(([, c]) => c.length > 1)
+        .map(([pattern_idx, coordinates]) => ({
           type: "Feature",
           geometry: { type: "LineString", coordinates },
-          properties: {},
+          properties: { pattern_idx: Number(pattern_idx) },
         })),
     }),
-    [drawing?.stopChains]
+    [drawing?.patternChains]
   );
+
+  // Fit the view to the network on opening, clear of the left panel and the
+  // bottom bar.
+  const bounds = useAppSelector((s) => (s.explorer.active ? s.explorer.bounds : null));
+  useEffect(() => {
+    if (!map || !bounds) return;
+    map.fitBounds(
+      [
+        [bounds[0], bounds[1]],
+        [bounds[2], bounds[3]],
+      ],
+      { padding: { top: 60, bottom: 100, left: EXPLORER_PANEL_WIDTH + 40, right: 80 }, maxZoom: 14 }
+    );
+  }, [map, bounds]);
 
   // Fit the view to a route when it is selected, clear of the left panel.
   useEffect(() => {
@@ -204,12 +323,22 @@ export function ExplorerMapLayers() {
     ["get", "shape_id"],
     ["literal", drawing?.shapeIds ?? []],
   ];
+  // With a pattern picked, the rest of the route steps back for it.
+  const highlighting = patternIdx !== null && !!drawing;
+  const patternShapes: FilterSpecification = [
+    "in",
+    ["get", "shape_id"],
+    ["literal", (patternIdx !== null && drawing?.patternShapes[patternIdx]) || []],
+  ];
+  const isPatternChain: FilterSpecification = ["==", ["get", "pattern_idx"], patternIdx ?? -1];
+  const routeOpacity = highlighting ? 0.15 : 1;
   const isMine: FilterSpecification = ["==", ["get", "route_id"], selectedRouteId ?? ""];
   const none: FilterSpecification = ["boolean", false];
   const faded: ExpressionSpecification = ["boolean", ["feature-state", "faded"], false];
 
   return (
     <>
+      <GlobalStyles styles={LINE_CHOICE_SX} />
       {network.shapeLinesLayerId && (
         <Source
           key={NETWORK}
@@ -253,7 +382,23 @@ export function ExplorerMapLayers() {
             source-layer={TILE_LAYER}
             filter={selectedShapes}
             layout={{ "line-cap": "round", "line-join": "round" }}
-            paint={{ "line-color": color, "line-width": 4.5 }}
+            paint={{ "line-color": color, "line-width": 4.5, "line-opacity": routeOpacity }}
+          />
+          <Layer
+            id="explorer-pattern-casing"
+            type="line"
+            source-layer={TILE_LAYER}
+            filter={highlighting ? patternShapes : none}
+            layout={{ "line-cap": "round", "line-join": "round" }}
+            paint={{ "line-color": "#FFFFFF", "line-width": 12 }}
+          />
+          <Layer
+            id="explorer-pattern-line"
+            type="line"
+            source-layer={TILE_LAYER}
+            filter={highlighting ? patternShapes : none}
+            layout={{ "line-cap": "round", "line-join": "round" }}
+            paint={{ "line-color": color, "line-width": 7 }}
           />
         </Source>
       )}
@@ -261,7 +406,18 @@ export function ExplorerMapLayers() {
         <Layer
           id="explorer-route-chain-line"
           type="line"
-          paint={{ "line-color": color, "line-width": 3, "line-dasharray": [2, 1.5] }}
+          paint={{
+            "line-color": color,
+            "line-width": 3,
+            "line-dasharray": [2, 1.5],
+            "line-opacity": routeOpacity,
+          }}
+        />
+        <Layer
+          id="explorer-pattern-chain-line"
+          type="line"
+          filter={highlighting ? isPatternChain : none}
+          paint={{ "line-color": color, "line-width": 5, "line-dasharray": [2, 1.5] }}
         />
       </Source>
       <Source key="explorer-route-stops" id="explorer-route-stops" type="geojson" data={stops}>
@@ -277,7 +433,7 @@ export function ExplorerMapLayers() {
         />
       </Source>
       {/* Playback's vehicles: dots in their route's colour; with a route
-          chosen, the others go grey and its own carry its number. */}
+          chosen, the others go grey and its own are badges with its number. */}
       <Source key="explorer-vehicles" id="explorer-vehicles" type="geojson" data={EMPTY}>
         <Layer
           id="explorer-vehicle-dot"
@@ -292,27 +448,21 @@ export function ExplorerMapLayers() {
         />
         <Layer
           id="explorer-vehicle-mine"
-          type="circle"
-          filter={selectedRouteId ? isMine : none}
-          paint={{
-            "circle-radius": 11,
-            "circle-color": ["get", "color"],
-            "circle-stroke-color": "#FFFFFF",
-            "circle-stroke-width": 2,
-          }}
-        />
-        <Layer
-          id="explorer-vehicle-mine-label"
           type="symbol"
           filter={selectedRouteId ? isMine : none}
           layout={{
+            "icon-image": ["concat", BADGE, ["get", "color"]],
+            "icon-text-fit": "both",
+            "icon-text-fit-padding": [1, 3, 1, 3],
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
             "text-field": ["get", "label"],
             "text-size": 10,
             "text-font": ["Roboto Bold", "Roboto Regular"],
             "text-allow-overlap": true,
             "text-ignore-placement": true,
           }}
-          paint={{ "text-color": "#FFFFFF" }}
+          paint={{ "text-color": ["get", "text_color"] }}
         />
       </Source>
       <Source key="explorer-picked-stop" id="explorer-picked-stop" type="geojson" data={pickedPoint}>
@@ -333,45 +483,45 @@ export function ExplorerMapLayers() {
         />
       </Source>
       {choice && (
+        // The panels' card, not MapLibre's bubble (styles in LINE_CHOICE_SX).
         <Popup
           longitude={choice.lon}
           latitude={choice.lat}
           closeOnClick
+          closeButton={false}
+          offset={10}
+          className={LINE_CHOICE}
           onClose={() => setChoice(null)}
-          maxWidth="260px">
-          <Stack sx={{ py: 0.5 }}>
+          maxWidth="280px">
+          <Box sx={{ py: 1, minWidth: 220 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              fontWeight={600}
+              display="block"
+              sx={{ px: 1.5, pb: 0.5 }}>
+              {t("explorer_lines_here", { count: choice.routeIds.length })}
+            </Typography>
             {choice.routeIds.map((id) => {
               const r = network.routes.get(id);
               if (!r) return null;
               return (
-                <ButtonBase
+                <ListItemButton
                   key={id}
+                  dense
                   onClick={() => {
                     dispatch(selectExplorerRoute(id));
                     setChoice(null);
                   }}
-                  sx={{ justifyContent: "flex-start", gap: 1, px: 1, py: 0.5, borderRadius: 1 }}>
-                  <Box
-                    component="span"
-                    sx={{
-                      px: 0.75,
-                      minWidth: 28,
-                      borderRadius: 0.75,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#FFFFFF",
-                      bgcolor: r.color,
-                      textAlign: "center",
-                    }}>
-                    {r.label}
-                  </Box>
+                  sx={{ px: 1.5, gap: 1.25, minHeight: 34 }}>
+                  <RouteBadge route={r as unknown as RouteRow} small />
                   <Typography variant="body2" noWrap>
-                    {r.name ?? r.label}
+                    {r.long_name || r.short_name || r.route_id}
                   </Typography>
-                </ButtonBase>
+                </ListItemButton>
               );
             })}
-          </Stack>
+          </Box>
         </Popup>
       )}
     </>

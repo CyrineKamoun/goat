@@ -1,6 +1,6 @@
 /**
  * The Explorer's left panel (board 3): one panel headed by a tab bar —
- * Layers | Explorer. It neither closes nor collapses: Finish editing is the
+ * Layers | Explorer. It neither closes nor collapses: Exit Explorer is the
  * only way out of the Explorer
  * (docs/pt-network-editor/docs/02-panel-behaviour-spec.md).
  */

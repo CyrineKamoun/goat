@@ -1,9 +1,9 @@
 /**
  * A section's header across the Explorer's left panel: its icon, its name,
  * and at the right what it holds — a count, a note such as the day it shows —
- * and, for a section that lists things, a fold toggle.
+ * and, for a section that lists things, a fold: the whole header opens it.
  */
-import { Box, IconButton, Stack, Typography } from "@mui/material";
+import { Box, ButtonBase, Stack, Typography } from "@mui/material";
 import type { ReactElement, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -39,14 +39,14 @@ export function SectionHeader({
   px?: number;
 }) {
   const { t } = useTranslation("common");
-  return (
-    <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px, minHeight: 40 }}>
+  const row = (
+    <>
       {typeof icon === "string" ? (
         <Icon iconName={icon} style={{ fontSize: 14 }} htmlColor="inherit" />
       ) : (
         icon
       )}
-      <Typography variant="body2" fontWeight="bold" noWrap sx={{ flex: 1 }}>
+      <Typography variant="body2" fontWeight="bold" noWrap sx={{ flex: 1, textAlign: "left" }}>
         {label}
       </Typography>
       {note && (
@@ -71,15 +71,37 @@ export function SectionHeader({
         </Box>
       )}
       {onFold && (
-        <IconButton
-          size="small"
-          aria-label={folded ? t("explorer_unfold") : t("explorer_fold")}
-          aria-expanded={!folded}
-          onClick={onFold}
-          sx={{ mr: -0.75 }}>
-          <Icon iconName={folded ? ICON_NAME.CHEVRON_DOWN : ICON_NAME.CHEVRON_UP} style={{ fontSize: 11 }} />
-        </IconButton>
+        <Box sx={{ display: "flex", width: 16, justifyContent: "center", color: "text.secondary" }}>
+          <Icon
+            iconName={folded ? ICON_NAME.CHEVRON_RIGHT : ICON_NAME.CHEVRON_DOWN}
+            style={{ fontSize: 11 }}
+          />
+        </Box>
       )}
+    </>
+  );
+  // A section that folds is opened by its whole header, not a small button.
+  if (onFold)
+    return (
+      <ButtonBase
+        onClick={onFold}
+        aria-expanded={!folded}
+        aria-label={folded ? t("explorer_unfold") : t("explorer_fold")}
+        sx={{
+          px,
+          minHeight: 40,
+          width: "100%",
+          gap: 1.25,
+          justifyContent: "flex-start",
+          flexShrink: 0,
+          "&:hover": { bgcolor: "action.hover" },
+        }}>
+        {row}
+      </ButtonBase>
+    );
+  return (
+    <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px, minHeight: 40 }}>
+      {row}
     </Stack>
   );
 }

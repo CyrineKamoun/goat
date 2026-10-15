@@ -30,8 +30,7 @@ import { modeIcon } from "@/components/explorer/modeIcon";
 /** A list longer than this is cut short: narrowing the search finds the rest. */
 const SHOWN = 200;
 
-/** Rows a list keeps when the two share the panel, and a row's height. */
-const MIN_ROWS = 6;
+/** A row's height, routes and stops alike. */
 const ROW_HEIGHT = 36;
 
 function matches(route: RouteRow, query: string): boolean {
@@ -52,19 +51,19 @@ function useAmount(shown: number, total: number | undefined, narrowed: boolean):
   return t("explorer_n_of_m", { n: count(shown, i18n.language), m });
 }
 
-/** A section's rows, scrolling within the room the section gets. */
-function SectionList({ hidden, rows, children }: { hidden: boolean; rows: number; children: ReactNode }) {
+/** The open section's rows: all the room below the headers, scrolling. */
+function SectionList({ hidden, children }: { hidden: boolean; children: ReactNode }) {
   return (
     <List
       dense
       disablePadding
-      // As tall as its rows, shrinking to share the room when both are long;
-      // a short list keeps all its rows, a long one at least a few.
       sx={{
-        flex: "0 1 auto",
-        minHeight: Math.min(Math.max(rows, 1), MIN_ROWS) * ROW_HEIGHT,
+        flex: 1,
+        minHeight: 0,
         overflowY: "auto",
         display: hidden ? "none" : "block",
+        borderTop: 1,
+        borderColor: "divider",
       }}>
       {children}
     </List>
@@ -90,9 +89,9 @@ export function ExplorerTab() {
   const stops = useStops(db);
   const agencies = useAgencies(db);
   const [query, setQuery] = useState("");
-  const [routesFolded, setRoutesFolded] = useState(false);
-  // Board 15: the stops are there to be found, the routes to be browsed.
-  const [stopsFolded, setStopsFolded] = useState(true);
+  // One section open at a time, filling the room the other's header leaves:
+  // neither list is squeezed on a small screen.
+  const [open, setOpen] = useState<"routes" | "stops">("routes");
 
   const q = query.trim();
   const narrowed = !!q || filterCount(filters) > 0;
@@ -113,8 +112,18 @@ export function ExplorerTab() {
 
   const showRoutes = shows(filters, "routes");
   const showStops = shows(filters, "stops");
-  // A search that finds stops opens their section: the match is the point.
-  const stopsOpen = !stopsFolded || (!!q && filteredStops.length > 0);
+  // A search that finds only one kind opens its section: the match is the
+  // point. A filter showing one kind shows it open.
+  const searchOpens =
+    q && filteredRoutes.length === 0 && filteredStops.length > 0
+      ? "stops"
+      : q && filteredStops.length === 0 && filteredRoutes.length > 0
+        ? "routes"
+        : null;
+  const shown = !showStops ? "routes" : !showRoutes ? "stops" : (searchOpens ?? open);
+  const routesOpen = shown === "routes";
+  const stopsOpen = shown === "stops";
+  const both = showRoutes && showStops;
 
   return (
     <Stack sx={{ height: "100%", minHeight: 0 }}>
@@ -160,10 +169,10 @@ export function ExplorerTab() {
             icon={ICON_NAME.ROUTE}
             label={t("explorer_routes")}
             amount={routesAmount}
-            folded={routesFolded}
-            onFold={() => setRoutesFolded((f) => !f)}
+            folded={!routesOpen}
+            onFold={both ? () => setOpen("routes") : undefined}
           />
-          <SectionList hidden={routesFolded} rows={Math.min(filteredRoutes.length, SHOWN)}>
+          <SectionList hidden={!routesOpen}>
             {filteredRoutes.slice(0, SHOWN).map((route) => (
               <ListItemButton
                 key={route.route_idx}
@@ -197,9 +206,9 @@ export function ExplorerTab() {
             label={t("explorer_stops_stations")}
             amount={stopsAmount}
             folded={!stopsOpen}
-            onFold={() => setStopsFolded(stopsOpen)}
+            onFold={both ? () => setOpen("stops") : undefined}
           />
-          <SectionList hidden={!stopsOpen} rows={Math.min(filteredStops.length, SHOWN)}>
+          <SectionList hidden={!stopsOpen}>
             <StationsList listed={filteredStops.slice(0, SHOWN)} routeByIdx={routeByIdx} />
             {filteredStops.length > SHOWN && (
               <Note>{t("explorer_more_stops", { count: filteredStops.length - SHOWN })}</Note>
@@ -208,8 +217,6 @@ export function ExplorerTab() {
           </SectionList>
         </>
       )}
-      {/* Sections sit at the top; what room is left stays below them. */}
-      <Box sx={{ flex: 1 }} />
     </Stack>
   );
 }

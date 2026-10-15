@@ -19,11 +19,14 @@ export interface NetworkShape {
  * and to name it where a click finds several. */
 export interface NetworkRoute {
   route_idx: number;
+  route_id: string;
   route_type: number | null;
   agency_idx: number | null;
-  label: string;
-  name: string | null;
-  color: string;
+  short_name: string | null;
+  long_name: string | null;
+  /** The feed's colours, as RouteBadge draws them. */
+  color: string | null;
+  text_color: string | null;
 }
 
 export interface NetworkDrawing {
@@ -77,10 +80,11 @@ export async function networkShapes(
     short_name: string | null;
     long_name: string | null;
     color: string | null;
+    text_color: string | null;
     route_type: number | null;
   }>(`
     SELECT m.shape_id, r.route_id, r.route_idx, r.agency_idx, r.short_name, r.long_name,
-           r.color, r.route_type
+           r.color, r.text_color, r.route_type
     FROM shape_route sr JOIN shapes_meta m USING (shape_idx) JOIN routes r USING (route_idx)
     ORDER BY m.shape_id, r.route_idx`);
   const shapes = new Map<string, NetworkShape>();
@@ -97,11 +101,13 @@ export async function networkShapes(
     if (!routes.has(r.route_id))
       routes.set(r.route_id, {
         route_idx: r.route_idx,
+        route_id: r.route_id,
         route_type: r.route_type,
         agency_idx: r.agency_idx,
-        label: r.short_name || r.long_name?.slice(0, 4) || r.route_id,
-        name: r.long_name,
-        color,
+        short_name: r.short_name,
+        long_name: r.long_name,
+        color: r.color,
+        text_color: r.text_color,
       });
   }
   return { shapeLinesLayerId, shapes, byRoute, routes };

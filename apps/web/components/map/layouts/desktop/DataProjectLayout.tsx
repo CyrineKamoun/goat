@@ -54,6 +54,11 @@ import { MapFixedPopupSlot } from "@/components/map/popover/MapFixedPopupSlot";
 const toolbarHeight = 52;
 const panelWidth = 300;
 const GAP_SIZE = 16;
+/** The room the Explorer leaves under its left panel and bottom bar, whose
+ * bottoms line up: the scale bar sits in it under the panel (EXPLORER_FOOT_GAP
+ * below it) and the map credits under the bar, neither covered. */
+const EXPLORER_FOOT = 30;
+const EXPLORER_FOOT_GAP = 8;
 
 interface DataProjectLayoutProps {
   project: Project;
@@ -359,12 +364,14 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
             alignItems: "flex-start",
             flexWrap: "wrap",
             alignContent: "flex-start",
-            rowGap: 4,
+            rowGap: explorerActive ? `${EXPLORER_FOOT_GAP}px` : 4,
             columnGap: 2,
             overflow: "hidden",
           }}>
           {explorerActive ? (
-            <ExplorerLeftPanel layersTab={layerTree} />
+            <Box sx={{ height: `calc(100% - ${EXPLORER_FOOT}px)`, flexShrink: 0 }}>
+              <ExplorerLeftPanel layersTab={layerTree} />
+            </Box>
           ) : (
             <FloatingPanel width={panelWidth} maxHeight="100%">
               {layerTree}
@@ -537,7 +544,8 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
         <Box
           sx={{
             position: "absolute",
-            bottom: 10,
+            // On one line with the left panel's foot: the credits run below it.
+            bottom: 10 + EXPLORER_FOOT,
             left: leftWidth + GAP_SIZE + 10,
             // To the map controls' column: the bar spans the map (board 3).
             right: 90,

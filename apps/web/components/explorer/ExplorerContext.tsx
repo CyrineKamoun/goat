@@ -9,7 +9,7 @@ import { useBundleLayers } from "@/lib/api/bundles";
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import { networkShapes, networkStore } from "@/lib/explorer/network";
 import { DEFAULT_SETTINGS, type ExplorerSettings, loadSettings, saveSettings } from "@/lib/explorer/settings";
-import { setExplorerDate } from "@/lib/store/explorer/slice";
+import { setExplorerBounds, setExplorerDate } from "@/lib/store/explorer/slice";
 
 import { type ExplorerDbState, FIRST_TABLES, hasTables, useExplorerDb } from "@/hooks/explorer/useExplorerDb";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
@@ -70,6 +70,31 @@ export function ExplorerProvider({ bundleId, children }: { bundleId: string; chi
   useEffect(() => {
     if (window && !date) dispatch(setExplorerDate(defaultDate(window)));
   }, [window, date, dispatch]);
+
+  // The network's extent, from its stops as soon as they are in: the map
+  // fits it once, on opening.
+  const firstDb = state.status === "loading" || state.status === "ready" ? state.db : undefined;
+  const listed = state.status === "ready" || (state.status === "loading" && hasTables(state, FIRST_TABLES));
+  useEffect(() => {
+    if (!firstDb || !listed) return;
+    let current = true;
+    firstDb
+      .all<{ w: number | null; s: number | null; e: number | null; n: number | null }>(
+        // Where most stops are: a regional feed's few far-off stops would
+        // otherwise zoom the map out to half a country.
+        `SELECT quantile_cont(lon, 0.01) AS w, quantile_cont(lat, 0.01) AS s,
+                quantile_cont(lon, 0.99) AS e, quantile_cont(lat, 0.99) AS n
+         FROM stops WHERE lon IS NOT NULL AND lat IS NOT NULL`
+      )
+      .then(([b]) => {
+        if (current && b && b.w !== null && b.s !== null && b.e !== null && b.n !== null)
+          dispatch(setExplorerBounds([b.w, b.s, b.e, b.n]));
+      })
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [firstDb, listed, dispatch]);
 
   // The member the map draws shapes from: whichever the snapshot found the
   // lines in (an older import keeps them as its shapes).

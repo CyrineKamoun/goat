@@ -9,6 +9,7 @@
  * whether it plays, how fast, and where it stopped.
  */
 import { useEffect, useRef, useState } from "react";
+import { useStore } from "react-redux";
 
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import {
@@ -20,8 +21,9 @@ import {
   vehicleWindow,
 } from "@/lib/explorer/derive/vehicles";
 import { type MemoryVerdict, checkMemory } from "@/lib/explorer/memory";
-import { modeOf, routeColor } from "@/lib/explorer/modes";
+import { modeOf, routeColor, routeTextColor } from "@/lib/explorer/modes";
 import { type PlaybackFrame, type VehicleProps, playbackClock } from "@/lib/explorer/playback";
+import type { RootState } from "@/lib/store";
 import { setPlaybackTime, setPlaying } from "@/lib/store/explorer/slice";
 
 import type { RouteRow } from "@/hooks/explorer/useExplorerData";
@@ -42,6 +44,7 @@ const MEMORY_CHECK_MS = 5000;
  * may, and why not. */
 export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | undefined): MemoryVerdict {
   const dispatch = useAppDispatch();
+  const store = useStore<RootState>();
   const date = useAppSelector((s) => s.explorer.date);
   const playing = useAppSelector((s) => s.explorer.playing);
   const speed = useAppSelector((s) => s.explorer.speed);
@@ -51,7 +54,9 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
   const day = useRef<{ date: string; ready: Promise<PlaybackFrame["span"]> } | null>(null);
   const windows = useRef<Map<number, Promise<VehicleWindow>>>(new Map());
   const live = useRef<number | null>(time_s);
-  const byRoute = useRef(new Map<number, { route_id: string; color: string; label: string }>());
+  const byRoute = useRef(
+    new Map<number, { route_id: string; color: string; text_color: string; label: string }>()
+  );
   const [memory, setMemory] = useState<MemoryVerdict>({ ok: true });
 
   // Playback is a nice-to-have: it starts only with memory to spare, and
@@ -80,14 +85,18 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
 
   useEffect(() => {
     byRoute.current = new Map(
-      (routes ?? []).map((r) => [
-        r.route_idx,
-        {
-          route_id: r.route_id,
-          color: routeColor(r.color, modeOf(r.route_type)),
-          label: r.short_name || r.long_name?.slice(0, 4) || r.route_id,
-        },
-      ])
+      (routes ?? []).map((r) => {
+        const color = routeColor(r.color, modeOf(r.route_type));
+        return [
+          r.route_idx,
+          {
+            route_id: r.route_id,
+            color,
+            text_color: routeTextColor(r.text_color, color),
+            label: r.short_name || r.long_name?.slice(0, 4) || r.route_id,
+          },
+        ];
+      })
     );
   }, [routes]);
 
@@ -176,7 +185,10 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
     let raf = 0;
     let last = performance.now();
     let sent = 0;
-    let t = live.current ?? time_s;
+    // From the time the store holds now: where it paused (a speed change
+    // stores it on the way), or where the scrubber was let go.
+    let t = store.getState().explorer.time_s ?? time_s;
+    live.current = t;
     const tick = (now: number) => {
       t += ((now - last) / 1000) * speed;
       last = now;

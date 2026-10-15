@@ -179,6 +179,15 @@ async function summarize(
       stopChains: patterns
         .filter((p) => !shaped.has(p.pattern_idx))
         .map((p) => p.stops.map(coord).filter((c): c is [number, number] => c !== null)),
+      patternShapes: shapes.reduce<Record<number, string[]>>((acc, s) => {
+        (acc[s.pattern_idx] ??= []).push(s.shape_id);
+        return acc;
+      }, {}),
+      patternChains: Object.fromEntries(
+        patterns
+          .filter((p) => !shaped.has(p.pattern_idx))
+          .map((p) => [p.pattern_idx, p.stops.map(coord).filter((c): c is [number, number] => c !== null)])
+      ),
     },
   };
 }

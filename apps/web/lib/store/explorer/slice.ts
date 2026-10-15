@@ -48,6 +48,10 @@ export interface ExplorerRouteDrawing {
   stops: { lon: number; lat: number; name: string }[];
   /** Straight lines between stops, for trips without a shape. */
   stopChains: [number, number][][];
+  /** Each pattern's shapes, and its stop chain where it has none: what the
+   * map highlights when the Stops tab shows that pattern. */
+  patternShapes: Record<number, string[]>;
+  patternChains: Record<number, [number, number][]>;
 }
 
 /** Where the map shows a picked stop; it draws from outside the panels. */
@@ -62,6 +66,11 @@ export interface ExplorerState {
   active: boolean;
   bundleId: string | null;
   bundleName: string | null;
+  /** The layer-tree group the Explorer hid on opening (its bundle's own
+   * layers, drawn by the Explorer itself), and, once it closes, the one to
+   * show again — the layer tree does both. */
+  hiddenGroupId: number | null;
+  restoreGroupId: number | null;
   leftTab: ExplorerLeftTab;
   selectedRouteId: string | null;
   /** The one date every view shows, `YYYY-MM-DD`; null until the feed's
@@ -77,6 +86,9 @@ export interface ExplorerState {
   pattern: ExplorerPatternChoice | null;
   /** The settings dialog, open on a tab, or closed. */
   settingsTab: ExplorerSettingsTab | null;
+  /** The network's extent, `[west, south, east, north]`: the map fits it
+   * once on opening. */
+  bounds: [number, number, number, number] | null;
   /** Playback: whether it runs, how fast, and the time of the day it shows,
    * in service-day seconds — null until the day's service is known. While it
    * runs the live time is the playback clock's (lib/explorer/playback.ts);
@@ -90,6 +102,8 @@ const initialState: ExplorerState = {
   active: false,
   bundleId: null,
   bundleName: null,
+  hiddenGroupId: null,
+  restoreGroupId: null,
   leftTab: "explorer",
   selectedRouteId: null,
   date: null,
@@ -99,8 +113,9 @@ const initialState: ExplorerState = {
   routeTab: "overview",
   pattern: null,
   settingsTab: null,
+  bounds: null,
   playing: false,
-  speed: 60,
+  speed: 10,
   time_s: null,
 };
 
@@ -108,7 +123,10 @@ const explorerSlice = createSlice({
   name: "explorer",
   initialState,
   reducers: {
-    openExplorer: (state, action: PayloadAction<{ bundleId: string; bundleName: string }>) => {
+    openExplorer: (
+      state,
+      action: PayloadAction<{ bundleId: string; bundleName: string; hiddenGroupId?: number | null }>
+    ) => {
       // The tab the user chose stays for the session.
       return {
         ...initialState,
@@ -116,20 +134,28 @@ const explorerSlice = createSlice({
         active: true,
         bundleId: action.payload.bundleId,
         bundleName: action.payload.bundleName,
+        hiddenGroupId: action.payload.hiddenGroupId ?? null,
       };
     },
     closeExplorer: (state) => ({
       ...initialState,
       leftTab: state.leftTab,
+      restoreGroupId: state.hiddenGroupId,
     }),
+    /** The layer tree has shown the group again. */
+    clearRestoreGroup: (state) => {
+      state.restoreGroupId = null;
+    },
     setExplorerLeftTab: (state, action: PayloadAction<ExplorerLeftTab>) => {
       state.leftTab = action.payload;
     },
     selectExplorerRoute: (state, action: PayloadAction<string | null>) => {
-      // Another route starts on its Overview, in its own first direction.
+      // Another route starts on its Overview, in its own first direction,
+      // with no stop picked: a stop picked along a route belongs to it.
       if (action.payload !== state.selectedRouteId) {
         state.routeTab = "overview";
         state.pattern = null;
+        state.selectedStop = null;
       }
       state.selectedRouteId = action.payload;
       if (action.payload === null) state.drawing = null;
@@ -142,6 +168,9 @@ const explorerSlice = createSlice({
     },
     openExplorerSettings: (state, action: PayloadAction<ExplorerSettingsTab | null>) => {
       state.settingsTab = action.payload;
+    },
+    setExplorerBounds: (state, action: PayloadAction<[number, number, number, number] | null>) => {
+      state.bounds = action.payload;
     },
     setPlaying: (state, action: PayloadAction<boolean>) => {
       state.playing = action.payload;
@@ -174,7 +203,9 @@ const explorerSlice = createSlice({
   extraReducers: (builder) => {
     // The Explorer lives in the data view; leaving it ends the session.
     builder.addCase(setMapMode, (state, action) =>
-      action.payload === "data" ? state : { ...initialState, leftTab: state.leftTab }
+      action.payload === "data"
+        ? state
+        : { ...initialState, leftTab: state.leftTab, restoreGroupId: state.hiddenGroupId }
     );
   },
 });
@@ -182,6 +213,7 @@ const explorerSlice = createSlice({
 export const {
   openExplorer,
   closeExplorer,
+  clearRestoreGroup,
   setExplorerLeftTab,
   selectExplorerRoute,
   setExplorerDate,
@@ -191,6 +223,7 @@ export const {
   setExplorerRouteTab,
   pickExplorerPattern,
   openExplorerSettings,
+  setExplorerBounds,
   setPlaying,
   setPlaybackSpeed,
   setPlaybackTime,

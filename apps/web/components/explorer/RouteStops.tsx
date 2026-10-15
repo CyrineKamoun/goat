@@ -7,6 +7,7 @@
  */
 import { Box, ButtonBase, Stack, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Direction, VariantKind } from "@/lib/explorer/derive/directions";
@@ -147,9 +148,10 @@ function HopRow({ stop, color, last }: { stop: LineStop; color: string; last: bo
     .join(" · ");
   return (
     <>
-      {stop.short_turns.map((s) => (
+      {stop.short_turns.map((s, k) => (
         <Stack
-          key={s.destination}
+          // Two short turns may end here for one destination.
+          key={k}
           direction="row"
           alignItems="center"
           spacing={1.5}
@@ -207,6 +209,13 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
     choice && direction?.patterns.some((p) => p.pattern_idx === choice.pattern_idx)
       ? choice.pattern_idx
       : direction?.key;
+  // The picker's choice is the store's, which the map highlights: the first
+  // direction's main pattern until another is picked.
+  useEffect(() => {
+    if (!choice && direction)
+      dispatch(pickExplorerPattern({ direction: direction.key, pattern_idx: direction.key }));
+  }, [choice, direction, dispatch]);
+
   const line = useStopsLine(
     complete ? db : undefined,
     route,
@@ -240,7 +249,8 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
       .filter((p) => p.kind !== "main")
       .map((p) => ({
         value: optionValue(d.key, p.pattern_idx),
-        label: variantLabel(p),
+        // A busy route has many variants to one place: its trips tell them apart.
+        label: `${variantLabel(p)} · ${t("explorer_trips", { count: p.n_trips })}`,
         // A variant sits under its direction, where the badge would be.
         iconNode: (
           <Box component="span" sx={{ width: 28, textAlign: "center", color: "text.secondary" }}>
