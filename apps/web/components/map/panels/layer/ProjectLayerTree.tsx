@@ -30,7 +30,7 @@ import { projectLayersKey } from "@/lib/api/projects";
 // Redux
 import { useUserProfile } from "@/lib/api/users";
 import { MAX_EDITABLE_LAYER_SIZE } from "@/lib/constants";
-import { clearRestoreGroup, openExplorer } from "@/lib/store/explorer/slice";
+import { clearRestoreGroup, closeExplorer, openExplorer } from "@/lib/store/explorer/slice";
 import { emitInteractionEvent } from "@/lib/store/interaction/slice";
 import { setSelectedBundle, setSelectedLayers } from "@/lib/store/layer/slice";
 import { setActiveRightPanel, setDataPanelLayerId, setIsDataPanelOpen } from "@/lib/store/map/slice";
@@ -965,13 +965,20 @@ export const ProjectLayerTree = ({
         menuOptions = [
           ...(item.isBundleGroup && ptBundleGroupIds.has(node.id) && mapMode === "data"
             ? [
-                {
-                  id: MapLayerActions.OPEN_EXPLORER,
-                  label: t("explorer"),
-                  icon: ICON_NAME.BUS,
-                  // The menu's leading entry, its icon on a tile (board 2).
-                  featured: true,
-                },
+                // The bundle open in the Explorer offers the way out instead.
+                node.bundle_id && node.bundle_id === exploredBundleId
+                  ? {
+                      id: MapLayerActions.EXIT_EXPLORER,
+                      label: t("explorer_exit"),
+                      icon: ICON_NAME.SIGNOUT,
+                    }
+                  : {
+                      id: MapLayerActions.OPEN_EXPLORER,
+                      label: t("explorer"),
+                      icon: ICON_NAME.BUS,
+                      // The menu's leading entry, its icon on a tile (board 2).
+                      featured: true,
+                    },
               ]
             : []),
           ...(node.extent
@@ -1212,7 +1219,9 @@ export const ProjectLayerTree = ({
                       openMoreMenu(menuItem, target);
                     }
                   } else {
-                    if (menuItem.id === MapLayerActions.OPEN_EXPLORER && node.bundle_id) {
+                    if (menuItem.id === MapLayerActions.EXIT_EXPLORER) {
+                      dispatch(closeExplorer());
+                    } else if (menuItem.id === MapLayerActions.OPEN_EXPLORER && node.bundle_id) {
                       dispatch(setIsDataPanelOpen(false));
                       dispatch(setActiveRightPanel(undefined));
                       // The Explorer draws the bundle itself: its own layers

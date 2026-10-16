@@ -3572,7 +3572,6 @@
   "explorer_trip_at": "Trip {{time}}",
   "explorer_trip_previous": "Previous trip",
   "explorer_trip_next": "Next trip",
-  "explorer_vehicle_now": "Vehicle now · {{time}}",
   "explorer_panel_fold": "Fold the panel to the edge",
   "explorer_panel_unfold": "Show the panel",
   "explorer_panel_close": "Close",
@@ -3598,5 +3597,5 @@
   "explorer_rates_note": "Cost a year ≈ vehicle-km × km rate + vehicle-hours × hour rate. A blank km rate uses the default shown; with no hour rate, the km rate covers everything.",
   "explorer_rates_days_counted": "Counted over {{days}} service days.",
   "explorer_periods_note": "Times past 24:00 are the next morning, as in the feed.",
-  "explorer_layover_note": "Sets the peak vehicles where the feed doesn't say which trips one vehicle runs."
+  "explorer_layover_note": "How long a vehicle waits after each trip before starting the next. Used to estimate peak vehicles when the feed has no vehicle schedules (block_id)."
 }

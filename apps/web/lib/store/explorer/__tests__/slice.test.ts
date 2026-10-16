@@ -55,6 +55,7 @@ describe("explorer slice", () => {
         stopChains: [],
         patternShapes: {},
         patternChains: {},
+        patternBounds: {},
       })
     );
     state = explorerReducer(state, selectExplorerRoute(null));

@@ -1,16 +1,16 @@
 /**
  * The Explorer's left panel (board 3): one panel headed by a tab bar —
- * Layers | Explorer. It neither closes nor collapses: Exit Explorer is the
- * only way out of the Explorer
+ * Layers | Explorer. It neither closes nor collapses; the Explorer is left
+ * by the × on its tab, Exit Explorer in the bottom bar, or the bundle's menu
  * (docs/pt-network-editor/docs/02-panel-behaviour-spec.md).
  */
-import { Box, Stack, Tab, Tabs } from "@mui/material";
+import { Box, Stack, Tab, Tabs, Tooltip, alpha } from "@mui/material";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { type ExplorerLeftTab, setExplorerLeftTab } from "@/lib/store/explorer/slice";
+import { type ExplorerLeftTab, closeExplorer, setExplorerLeftTab } from "@/lib/store/explorer/slice";
 
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
@@ -58,7 +58,51 @@ export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
           value="explorer"
           iconPosition="start"
           icon={<Icon iconName={ICON_NAME.BUS} style={{ fontSize: 14 }} />}
-          label={t("explorer")}
+          label={
+            <>
+              {t("explorer")}
+              {/* The way out, at the tab's far edge, centred on its height: a
+                  control inside the tab, so its own click does not select it. */}
+              <Tooltip title={t("explorer_exit")}>
+                <Box
+                  component="span"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t("explorer_exit")}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dispatch(closeExplorer());
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      dispatch(closeExplorer());
+                    }
+                  }}
+                  sx={{
+                    position: "absolute",
+                    right: 10,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    color: "primary.main",
+                    "&:hover": {
+                      bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+                      color: "primary.dark",
+                    },
+                  }}>
+                  <Icon iconName={ICON_NAME.XCLOSE} style={{ fontSize: 14 }} htmlColor="inherit" />
+                </Box>
+              </Tooltip>
+            </>
+          }
           sx={{ minHeight: 44, textTransform: "none", gap: 0.5 }}
         />
       </Tabs>

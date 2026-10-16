@@ -6,7 +6,7 @@
 import { useAppSelector } from "@/hooks/store/ContextHooks";
 
 /** The panel's width (02-panel-behaviour-spec), and its rail's when folded. */
-export const EXPLORER_RIGHT_PANEL_WIDTH = 380;
+export const EXPLORER_RIGHT_PANEL_WIDTH = 340;
 export const EXPLORER_RAIL_WIDTH = 48;
 
 /** The width the panel takes, folded or not; 0 when closed. */

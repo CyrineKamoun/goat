@@ -52,6 +52,9 @@ export interface ExplorerRouteDrawing {
    * map highlights when the Stops tab shows that pattern. */
   patternShapes: Record<number, string[]>;
   patternChains: Record<number, [number, number][]>;
+  /** Each pattern's extent from its stops, `[west, south, east, north]`: the
+   * map fits it when the Stops tab switches to it. */
+  patternBounds: Record<number, [number, number, number, number]>;
 }
 
 /** A stop the right panel shows, and where the map marks it (a station

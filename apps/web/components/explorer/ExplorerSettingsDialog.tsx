@@ -5,8 +5,8 @@
  * has no blocks. Edited as a draft; Save keeps them for this bundle in this
  * browser and every figure follows.
  */
-import { Box, ButtonBase, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
+import { Box, ButtonBase, InputAdornment, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
@@ -44,10 +44,127 @@ interface Draft {
   layover_min: string;
 }
 
-const numberSx = {
-  width: 96,
-  "& .MuiInputBase-input": { px: 1, py: 0.75, textAlign: "right", fontSize: "0.8125rem" },
-};
+/** Every field's width: one right edge down a card. */
+const FIELD_WIDTH = 112;
+
+/** A card on the dialog's tinted ground, rows split by hairlines: as the
+ * route summary's headways table. */
+function Card({ children }: { children: ReactNode }) {
+  return <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, px: 1.5 }}>{children}</Box>;
+}
+
+function Row({ first, children }: { first: boolean; children: ReactNode }) {
+  return (
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={1.5}
+      sx={{ minHeight: 52, py: 1.25, borderTop: first ? 0 : 1, borderColor: "divider" }}>
+      {children}
+    </Stack>
+  );
+}
+
+/** A row's name, with a quiet line under it. */
+function RowLabel({ icon, label, note }: { icon?: ReactNode; label: string; note?: string }) {
+  return (
+    <Stack direction="row" spacing={1.25} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
+      {icon && <Box sx={{ display: "flex", color: "text.secondary", flexShrink: 0 }}>{icon}</Box>}
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="body2" fontWeight={600} noWrap>
+          {label}
+        </Typography>
+        {note && (
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ lineHeight: 1.4 }}>
+            {note}
+          </Typography>
+        )}
+      </Box>
+    </Stack>
+  );
+}
+
+/** A compact number field on white, its unit inside it at the right. */
+function UnitField({
+  value,
+  onChange,
+  unit,
+  label,
+  placeholder,
+  error,
+  disabled,
+  numeric = "decimal",
+}: {
+  value: string;
+  onChange?: (value: string) => void;
+  unit?: string;
+  label: string;
+  placeholder?: string;
+  error?: boolean;
+  disabled?: boolean;
+  numeric?: "decimal" | "numeric" | "text";
+}) {
+  // A value that is not the user's to set: plain text, on the fields' line.
+  if (disabled)
+    return (
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        aria-label={label}
+        sx={{
+          width: FIELD_WIDTH,
+          flexShrink: 0,
+          textAlign: "right",
+          pr: "11px",
+          fontSize: "0.8125rem",
+          fontVariantNumeric: "tabular-nums",
+        }}>
+        {value}
+      </Typography>
+    );
+  return (
+    <TextField
+      size="small"
+      value={value}
+      placeholder={placeholder}
+      error={error}
+      disabled={disabled}
+      onChange={(e) => onChange?.(e.target.value)}
+      inputProps={{ "aria-label": label, inputMode: numeric }}
+      InputProps={
+        unit
+          ? {
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Typography variant="caption" color="text.secondary">
+                    {unit}
+                  </Typography>
+                </InputAdornment>
+              ),
+            }
+          : undefined
+      }
+      sx={{
+        width: FIELD_WIDTH,
+        flexShrink: 0,
+        "& .MuiOutlinedInput-root": {
+          height: 32,
+          pr: unit ? 1.25 : 0,
+          borderRadius: 1,
+          bgcolor: "background.paper",
+          fontSize: "0.8125rem",
+        },
+        "& .MuiInputBase-input": {
+          px: 1.25,
+          py: 0,
+          textAlign: "right",
+          fontVariantNumeric: "tabular-nums",
+        },
+        "& .MuiInputAdornment-root": { ml: 0.5 },
+      }}
+    />
+  );
+}
 
 /** `HH:MM` as seconds; hours may pass 24, as a feed's times do. */
 function parseClock(text: string): number | null {
@@ -174,73 +291,39 @@ function RatesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => v
         </Box>
       </Stack>
       {agency && (
-        <Box component="table" sx={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <Box
-              component="tr"
-              sx={{ "& th": { fontSize: 12, fontWeight: 600, color: "text.secondary", pb: 1 } }}>
-              <Box component="th" sx={{ textAlign: "left" }}>
-                {t("explorer_filter_route_type")}
-              </Box>
-              <Box component="th" sx={{ textAlign: "right" }}>
-                {t("explorer_rate_km_head", { currency: symbol })}
-              </Box>
-              <Box component="th" sx={{ textAlign: "right", pl: 1.5 }}>
-                {t("explorer_rate_hour_head", { currency: symbol })}
-              </Box>
-            </Box>
-          </thead>
-          <tbody>
-            {[...agency.types.keys()]
-              .sort((a, b) => (a ?? 0) - (b ?? 0))
-              .map((type) => {
-                const key = rateKey(agency.id, type);
-                const mode = modeOf(type);
-                const fallback = defaultRate(type);
-                const value = draft.rates[key] ?? { km: "", hour: "" };
-                return (
-                  <Box component="tr" key={key} sx={{ borderTop: 1, borderColor: "divider" }}>
-                    <Box component="td" sx={{ py: 1 }}>
-                      <Stack direction="row" spacing={1} alignItems="center">
-                        <Icon iconName={modeIcon(mode)} style={{ fontSize: 13 }} htmlColor="inherit" />
-                        <Typography variant="body2" fontWeight={600}>
-                          {t(`explorer_mode_${mode}`)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {t("explorer_n_routes", { count: agency.types.get(type) ?? 0 })}
-                        </Typography>
-                      </Stack>
-                    </Box>
-                    <Box component="td" sx={{ textAlign: "right" }}>
-                      <TextField
-                        size="small"
-                        inputMode="decimal"
-                        value={value.km}
-                        // The default shows where none is set: what applies now.
-                        placeholder={String(fallback.per_km)}
-                        onChange={(e) => setRate(key, "km", e.target.value)}
-                        inputProps={{ "aria-label": t("explorer_rate_per_km", { currency: draft.currency }) }}
-                        sx={numberSx}
-                      />
-                    </Box>
-                    <Box component="td" sx={{ textAlign: "right", pl: 1.5 }}>
-                      <TextField
-                        size="small"
-                        inputMode="decimal"
-                        value={value.hour}
-                        placeholder="—"
-                        onChange={(e) => setRate(key, "hour", e.target.value)}
-                        inputProps={{
-                          "aria-label": t("explorer_rate_per_hour", { currency: draft.currency }),
-                        }}
-                        sx={numberSx}
-                      />
-                    </Box>
-                  </Box>
-                );
-              })}
-          </tbody>
-        </Box>
+        <Card>
+          {[...agency.types.keys()]
+            .sort((x, y) => (x ?? 0) - (y ?? 0))
+            .map((type, i) => {
+              const key = rateKey(agency.id, type);
+              const mode = modeOf(type);
+              const value = draft.rates[key] ?? { km: "", hour: "" };
+              return (
+                <Row key={key} first={i === 0}>
+                  <RowLabel
+                    icon={<Icon iconName={modeIcon(mode)} style={{ fontSize: 14 }} htmlColor="inherit" />}
+                    label={t(`explorer_mode_${mode}`)}
+                    note={t("explorer_n_routes", { count: agency.types.get(type) ?? 0 })}
+                  />
+                  <UnitField
+                    value={value.km}
+                    // The default shows where none is set: what applies now.
+                    placeholder={String(defaultRate(type).per_km)}
+                    unit={t("explorer_rate_km_head", { currency: symbol })}
+                    label={t("explorer_rate_km_head", { currency: symbol })}
+                    onChange={(v) => setRate(key, "km", v)}
+                  />
+                  <UnitField
+                    value={value.hour}
+                    placeholder="—"
+                    unit={t("explorer_rate_hour_head", { currency: symbol })}
+                    label={t("explorer_rate_hour_head", { currency: symbol })}
+                    onChange={(v) => setRate(key, "hour", v)}
+                  />
+                </Row>
+              );
+            })}
+        </Card>
       )}
       <Typography variant="caption" color="text.secondary">
         {t("explorer_rates_note")}
@@ -258,49 +341,36 @@ function PeriodsTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) =>
   const starts = ["00:00", ...draft.starts];
   return (
     <Stack spacing={1.5}>
-      <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, px: 1.5, py: 0.5 }}>
+      <Card>
         {PERIOD_KEYS.map((key, i) => {
           const end = i < PERIOD_KEYS.length - 1 ? starts[i + 1] : clock(SERVICE_DAY_END_S);
           return (
-            <Stack
-              key={key}
-              direction="row"
-              alignItems="center"
-              spacing={1.5}
-              sx={{ py: 0.75, borderTop: i ? 1 : 0, borderColor: "divider" }}>
-              <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
-                {t(`explorer_period_${key}`)}
-              </Typography>
+            <Row key={key} first={i === 0}>
+              <RowLabel label={t(`explorer_period_${key}`)} />
               {/* The first period starts with the service day; each other
                   starts where it is set, and ends where the next starts. */}
-              {i === 0 ? (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ width: 96, textAlign: "right", pr: 1 }}>
-                  00:00
-                </Typography>
-              ) : (
-                <TextField
-                  size="small"
-                  value={draft.starts[i - 1]}
-                  onChange={(e) => {
-                    const next = [...draft.starts];
-                    next[i - 1] = e.target.value;
-                    setDraft({ ...draft, starts: next });
-                  }}
-                  error={parseClock(draft.starts[i - 1]) === null}
-                  inputProps={{ "aria-label": t(`explorer_period_${key}`) }}
-                  sx={numberSx}
-                />
-              )}
-              <Typography variant="body2" color="text.secondary" sx={{ width: 64 }}>
+              <UnitField
+                value={i === 0 ? "00:00" : draft.starts[i - 1]}
+                disabled={i === 0}
+                numeric="text"
+                label={t(`explorer_period_${key}`)}
+                error={i > 0 && parseClock(draft.starts[i - 1]) === null}
+                onChange={(v) => {
+                  const next = [...draft.starts];
+                  next[i - 1] = v;
+                  setDraft({ ...draft, starts: next });
+                }}
+              />
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ width: 56, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
                 – {end}
               </Typography>
-            </Stack>
+            </Row>
           );
         })}
-      </Box>
+      </Card>
       <Typography variant="caption" color="text.secondary">
         {t("explorer_periods_note")}
       </Typography>
@@ -311,27 +381,18 @@ function PeriodsTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) =>
 function VehiclesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
   const { t } = useTranslation("common");
   return (
-    <Stack spacing={1.5}>
-      <Stack direction="row" spacing={1.5} alignItems="center">
-        <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
-          {t("explorer_layover")}
-        </Typography>
-        <TextField
-          size="small"
-          inputMode="numeric"
+    <Card>
+      <Row first>
+        <RowLabel label={t("explorer_layover")} note={t("explorer_layover_note")} />
+        <UnitField
           value={draft.layover_min}
-          onChange={(e) => setDraft({ ...draft, layover_min: e.target.value })}
-          inputProps={{ "aria-label": t("explorer_layover") }}
-          sx={numberSx}
+          numeric="numeric"
+          unit={t("explorer_minutes_short")}
+          label={t("explorer_layover")}
+          onChange={(v) => setDraft({ ...draft, layover_min: v })}
         />
-        <Typography variant="body2" color="text.secondary" sx={{ width: 40 }}>
-          {t("explorer_minutes_short")}
-        </Typography>
-      </Stack>
-      <Typography variant="caption" color="text.secondary">
-        {t("explorer_layover_note")}
-      </Typography>
-    </Stack>
+      </Row>
+    </Card>
   );
 }
 

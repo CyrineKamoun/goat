@@ -19,8 +19,9 @@ import type {
   FilterSpecification,
   GeoJSONSource,
   MapLayerMouseEvent,
+  SymbolLayerSpecification,
 } from "maplibre-gl";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Layer, Popup, Source, useMap } from "react-map-gl/maplibre";
 
@@ -28,7 +29,13 @@ import { GEOAPI_BASE_URL } from "@/lib/constants";
 import { routeMatches } from "@/lib/explorer/filters";
 import { networkStore } from "@/lib/explorer/network";
 import { playbackClock } from "@/lib/explorer/playback";
-import { openExplorerPanel, panelItem, pickedStop, selectExplorerRoute } from "@/lib/store/explorer/slice";
+import {
+  closeExplorerPanel,
+  openExplorerPanel,
+  panelItem,
+  pickedStop,
+  selectExplorerRoute,
+} from "@/lib/store/explorer/slice";
 
 import type { RouteRow } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
@@ -55,6 +62,7 @@ const DRAW_ORDER = [
   "explorer-pattern-chain-line",
   "explorer-route-stop",
   "explorer-vehicle-dot",
+  "explorer-vehicle-badge",
   "explorer-vehicle-mine",
   "explorer-vehicle-open",
   "explorer-picked-stop-halo",
@@ -75,7 +83,10 @@ const LINE_CHOICE_SX = {
 
 /** What a click opens, first found first: a vehicle, a stop, a line under
  * the pointer, the station it is in, a line near it. */
-const VEHICLE_LAYERS = ["explorer-vehicle-mine", "explorer-vehicle-dot"];
+const VEHICLE_LAYERS = ["explorer-vehicle-mine", "explorer-vehicle-badge", "explorer-vehicle-dot"];
+/** From this zoom every vehicle carries its route's badge; further out, a
+ * network's thousands of badges would cover each other, and they are dots. */
+const BADGES_FROM_ZOOM = 12;
 const STOP_LAYERS = ["explorer-route-stop", "explorer-stop-dot"];
 const LINE_LAYERS = ["explorer-network-line"];
 const STATION_LAYERS = ["explorer-station-area"];
@@ -154,6 +165,10 @@ export function ExplorerMapLayers() {
     [network.shapeLinesLayerId]
   );
   const [choice, setChoice] = useState<{ lon: number; lat: number; routeIds: string[] } | null>(null);
+  // What a click on nothing lets go of, as it is when the click lands.
+  const panelShown = useAppSelector((s) => s.explorer.active && s.explorer.panel.stack.length > 0);
+  const open = useRef({ choice: false, panel: false, route: false });
+  open.current = { choice: choice !== null, panel: panelShown, route: selectedRouteId !== null };
 
   // Playback's frames go to the map directly, not through React: many a
   // second, and nothing else on the map changes with them.
@@ -310,6 +325,17 @@ export function ExplorerMapLayers() {
       }
       if (routeIds.length === 1) dispatch(selectExplorerRoute(routeIds[0]));
       else if (routeIds.length > 1) setChoice({ lon: e.lngLat.lng, lat: e.lngLat.lat, routeIds });
+      else dismiss();
+    };
+    // A click on nothing lets go of what is open, the latest first: the line
+    // chooser, then the right panel's stop or trip, then the selected route.
+    // A tool holding the cursor (measuring) owns its clicks.
+    const dismiss = () => {
+      const cursor = map.getCanvas().style.cursor;
+      if (cursor !== "" && cursor !== "pointer") return;
+      if (open.current.choice) return; // the popup closes itself
+      if (open.current.panel) dispatch(closeExplorerPanel());
+      else if (open.current.route) dispatch(selectExplorerRoute(null));
     };
     // Registered after the map viewer's own handler, which sets the cursor
     // for GOAT's layers on every move: over anything that opens, this one
@@ -402,6 +428,30 @@ export function ExplorerMapLayers() {
     );
   }, [map, bounds]);
 
+  // Fit the view to the Stops tab's pattern when it switches to another,
+  // clear of the panels and the bottom bar.
+  useEffect(() => {
+    const b = patternIdx !== null ? drawing?.patternBounds?.[patternIdx] : undefined;
+    if (!map || !b) return;
+    map.fitBounds(
+      [
+        [b[0], b[1]],
+        [b[2], b[3]],
+      ],
+      {
+        padding: {
+          top: 80,
+          bottom: 120,
+          left: EXPLORER_PANEL_WIDTH + 60,
+          right: (panelOpen ? EXPLORER_RIGHT_PANEL_WIDTH : 0) + 80,
+        },
+        maxZoom: 15,
+      }
+    );
+    // Only when another pattern is chosen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, patternIdx, drawing?.routeId]);
+
   // Fit the view to a route when it is selected, clear of the left panel.
   useEffect(() => {
     if (!map || !drawing?.stops.length) return;
@@ -436,6 +486,20 @@ export function ExplorerMapLayers() {
   const routeOpacity = highlighting ? 0.15 : 1;
   const isMine: FilterSpecification = ["==", ["get", "route_id"], selectedRouteId ?? ""];
   const none: FilterSpecification = ["boolean", false];
+  // A vehicle as its route's badge: the number on the route's colour, the
+  // badge stretched to fit it (drawBadge).
+  const badgeLayout = {
+    "icon-image": ["concat", BADGE, ["get", "color"]],
+    "icon-text-fit": "both",
+    "icon-text-fit-padding": [1, 3, 1, 3],
+    "icon-allow-overlap": true,
+    "icon-ignore-placement": true,
+    "text-field": ["get", "label"],
+    "text-size": 10,
+    "text-font": ["Roboto Bold", "Roboto Regular"],
+    "text-allow-overlap": true,
+    "text-ignore-placement": true,
+  } satisfies SymbolLayerSpecification["layout"];
   const isOpenTrip: FilterSpecification = openTrip
     ? [
         "all",
@@ -581,13 +645,15 @@ export function ExplorerMapLayers() {
           }}
         />
       </Source>
-      {/* Playback's vehicles: dots in their route's colour; with a route
-          chosen, the others go grey and its own are badges with its number. */}
+      {/* Playback's vehicles: each a badge with its route's number, in its
+          colour — dots when zoomed out too far for badges to be read. With a
+          route chosen, its own stay badges and the others go grey dots. */}
       <Source key="explorer-vehicles" id="explorer-vehicles" type="geojson" data={EMPTY}>
         <Layer
           id="explorer-vehicle-dot"
           type="circle"
           filter={selectedRouteId ? ["!", isMine] : ["all"]}
+          maxzoom={selectedRouteId ? 24 : BADGES_FROM_ZOOM}
           paint={{
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 2, 13, 4, 16, 6],
             "circle-color": selectedRouteId ? FADED : ["get", "color"],
@@ -596,21 +662,18 @@ export function ExplorerMapLayers() {
           }}
         />
         <Layer
+          id="explorer-vehicle-badge"
+          type="symbol"
+          filter={selectedRouteId ? none : ["all"]}
+          minzoom={BADGES_FROM_ZOOM}
+          layout={badgeLayout}
+          paint={{ "text-color": ["get", "text_color"] }}
+        />
+        <Layer
           id="explorer-vehicle-mine"
           type="symbol"
           filter={selectedRouteId ? isMine : none}
-          layout={{
-            "icon-image": ["concat", BADGE, ["get", "color"]],
-            "icon-text-fit": "both",
-            "icon-text-fit-padding": [1, 3, 1, 3],
-            "icon-allow-overlap": true,
-            "icon-ignore-placement": true,
-            "text-field": ["get", "label"],
-            "text-size": 10,
-            "text-font": ["Roboto Bold", "Roboto Regular"],
-            "text-allow-overlap": true,
-            "text-ignore-placement": true,
-          }}
+          layout={badgeLayout}
           paint={{ "text-color": ["get", "text_color"] }}
         />
         {/* The vehicle of the trip the right panel shows. */}

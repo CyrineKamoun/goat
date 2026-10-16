@@ -43,11 +43,11 @@ export function TripPanel({ trip_idx, run_dep_s }: { trip_idx: number; run_dep_s
   const timed = data?.stops.filter((s) => (s.dep_s ?? s.arr_s) !== null) ?? [];
   const first = timed[0]?.dep_s ?? timed[0]?.arr_s ?? null;
   const last = timed[timed.length - 1]?.arr_s ?? timed[timed.length - 1]?.dep_s ?? null;
-  // Where the vehicle is: after the last stop it has left by now.
+  // While playback is within the run: the stop the vehicle is at, or heading
+  // to — the first it has not yet left.
   const running = playing && now !== null && first !== null && last !== null && now >= first && now <= last;
-  const nowAfter = running
-    ? (data?.stops.reduce((at, s, i) => ((s.dep_s ?? s.arr_s ?? Infinity) <= (now as number) ? i : at), -1) ??
-      -1)
+  const current = running
+    ? (data?.stops.findIndex((s) => (s.dep_s ?? s.arr_s ?? -Infinity) >= (now as number)) ?? -1)
     : -1;
 
   const step = (to: { trip_idx: number; run_dep_s: number } | null) =>
@@ -162,13 +162,11 @@ export function TripPanel({ trip_idx, run_dep_s }: { trip_idx: number; run_dep_s
               color={color as string}
               first={i === 0}
               last={i === data.stops.length - 1}
-              passed={running && i <= nowAfter}
+              passed={running && i < current}
+              current={i === current}
               routeByIdx={routeByIdx}
               onOpen={() => openStop(s)}
             />
-            {running && i === nowAfter && i < data.stops.length - 1 && (
-              <VehicleNow route={route} color={color as string} now={now as number} />
-            )}
           </Box>
         ))}
       </Box>
@@ -184,6 +182,7 @@ function StopLine({
   first,
   last,
   passed,
+  current,
   routeByIdx,
   onOpen,
 }: {
@@ -192,6 +191,8 @@ function StopLine({
   first: boolean;
   last: boolean;
   passed: boolean;
+  /** Where the vehicle is now, or heading: shaded. */
+  current: boolean;
   routeByIdx: Map<number, RouteRow>;
   onOpen: () => void;
 }) {
@@ -209,7 +210,8 @@ function StopLine({
         gap: 1.5,
         minHeight: 32,
         borderRadius: 1,
-        "&:hover": { bgcolor: "action.hover" },
+        bgcolor: current ? "action.selected" : "transparent",
+        "&:hover": { bgcolor: current ? "action.selected" : "action.hover" },
       }}>
       <Box sx={{ position: "relative", width: RAIL, alignSelf: "stretch", flexShrink: 0 }}>
         <Rail color={color} top={!first} bottom={!last} />
@@ -239,36 +241,5 @@ function StopLine({
         {clock(time)}
       </Typography>
     </ButtonBase>
-  );
-}
-
-/** Where the vehicle is now, between two stops on the rail. */
-function VehicleNow({ route, color, now }: { route: RouteRow; color: string; now: number }) {
-  const { t } = useTranslation("common");
-  return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      spacing={1.5}
-      sx={{ minHeight: 28, borderRadius: 1, bgcolor: "action.selected" }}>
-      <Box
-        sx={{
-          position: "relative",
-          width: RAIL,
-          alignSelf: "stretch",
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}>
-        <Rail color={color} top bottom />
-        <Box sx={{ position: "relative" }}>
-          <RouteBadge route={route} small />
-        </Box>
-      </Box>
-      <Typography variant="caption" fontWeight={700} color="primary.main">
-        {t("explorer_vehicle_now", { time: clock(now) })}
-      </Typography>
-    </Stack>
   );
 }

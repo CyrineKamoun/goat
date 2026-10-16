@@ -54,16 +54,21 @@ function ViewSwitch({ value, onChange }: { value: View; onChange: (v: View) => v
           role="radio"
           aria-checked={v === value}
           onClick={() => onChange(v)}
-          sx={{
+          sx={(theme) => ({
             height: 28,
             px: 2,
             borderRadius: "14px",
             fontSize: 12,
             fontWeight: 700,
-            color: v === value ? "text.primary" : "text.secondary",
+            color: v === value ? "primary.main" : "text.secondary",
             bgcolor: v === value ? "background.paper" : "transparent",
-            boxShadow: v === value ? "0 1px 2px rgba(0, 0, 0, 0.12)" : "none",
-          }}>
+            // The chosen one raised, edged in the theme's colour as the chosen
+            // line is (2 px), drawn inside so the button keeps its size.
+            boxShadow:
+              v === value
+                ? `inset 0 0 0 2px ${theme.palette.primary.main}, 0 1px 2px rgba(0, 0, 0, 0.12)`
+                : "none",
+          })}>
           {t(`explorer_stop_view_${v}`)}
         </ButtonBase>
       ))}

@@ -204,6 +204,15 @@ async function summarize(
           .filter((p) => !shaped.has(p.pattern_idx))
           .map((p) => [p.pattern_idx, p.stops.map(coord).filter((c): c is [number, number] => c !== null)])
       ),
+      patternBounds: Object.fromEntries(
+        patterns.flatMap((p) => {
+          const cs = p.stops.map(coord).filter((c): c is [number, number] => c !== null);
+          if (!cs.length) return [];
+          const xs = cs.map((c) => c[0]);
+          const ys = cs.map((c) => c[1]);
+          return [[p.pattern_idx, [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]]];
+        })
+      ),
     },
   };
 }

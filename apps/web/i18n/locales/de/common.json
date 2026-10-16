@@ -3572,7 +3572,6 @@
   "explorer_trip_at": "Fahrt {{time}}",
   "explorer_trip_previous": "Vorherige Fahrt",
   "explorer_trip_next": "Nächste Fahrt",
-  "explorer_vehicle_now": "Fahrzeug jetzt · {{time}}",
   "explorer_panel_fold": "Bereich an den Rand einklappen",
   "explorer_panel_unfold": "Bereich einblenden",
   "explorer_panel_close": "Schließen",
@@ -3598,5 +3597,5 @@
   "explorer_rates_note": "Kosten pro Jahr ≈ Fahrzeug-km × km-Satz + Fahrzeugstunden × Stundensatz. Ein leerer km-Satz nimmt den angezeigten Standard; ohne Stundensatz deckt der km-Satz alles ab.",
   "explorer_rates_days_counted": "Gezählt über {{days}} Betriebstage.",
   "explorer_periods_note": "Zeiten nach 24:00 sind der nächste Morgen, wie im Feed.",
-  "explorer_layover_note": "Bestimmt die Fahrzeuge in der Spitze, wo der Feed nicht sagt, welche Fahrten ein Fahrzeug fährt."
+  "explorer_layover_note": "Wie lange ein Fahrzeug nach jeder Fahrt wartet, bevor es die nächste beginnt. Damit werden die Fahrzeuge in der Spitze geschätzt, wenn der Feed keine Umläufe (block_id) enthält."
 }
