@@ -5,13 +5,10 @@
  * do not re-render many times a second. The map reads it from outside the
  * Explorer's provider, as it reads the route drawing from the store.
  */
-import type { FeatureCollection, Point } from "geojson";
+import type { Vehicle } from "@/lib/explorer/derive/vehicles";
 
-export interface VehicleProps {
-  run: number;
-  /** The run's trip, and when it left its first stop: which Trip it opens. */
-  trip_idx: number;
-  run_dep_s: number;
+/** How a route's vehicles are drawn: set once per bundle, not per frame. */
+export interface VehicleStyle {
   route_id: string;
   /** `#RRGGBB`, the route's or its mode's. */
   color: string;
@@ -24,14 +21,18 @@ export interface VehicleProps {
 export interface PlaybackFrame {
   /** Service-day seconds; null before the day's service is known. */
   time_s: number | null;
-  vehicles: FeatureCollection<Point, VehicleProps>;
+  /** Each running vehicle where it is at `time_s`. */
+  vehicles: Vehicle[];
+  /** Each route's look, by route_idx. */
+  styles: Map<number, VehicleStyle>;
   /** The day's first departure and last arrival, which bound the scrubber. */
   span: { first_s: number; last_s: number } | null;
 }
 
 const EMPTY: PlaybackFrame = {
   time_s: null,
-  vehicles: { type: "FeatureCollection", features: [] },
+  vehicles: [],
+  styles: new Map(),
   span: null,
 };
 

@@ -3,7 +3,8 @@
  * show: the bundle's whole network in its routes' colours (shape_lines
  * tiles, each shape styled from the snapshot), the selected route over it
  * with its stops, the others faded; the network's stops from street level;
- * playback's vehicles; the stop and the trip the right panel shows.
+ * playback's vehicles (a WebGL layer of their own, vehicleLayer.ts); the
+ * stop and the trip the right panel shows.
  * Clicking a vehicle opens its trip, a stop its timetable, a line its route.
  *
  * Rendered inside <Map>, outside the Explorer's provider: it reads what the
@@ -14,13 +15,7 @@
 import { Box, GlobalStyles, ListItemButton, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { FeatureCollection, Point, Polygon } from "geojson";
-import type {
-  ExpressionSpecification,
-  FilterSpecification,
-  GeoJSONSource,
-  MapLayerMouseEvent,
-  SymbolLayerSpecification,
-} from "maplibre-gl";
+import type { ExpressionSpecification, FilterSpecification, MapLayerMouseEvent } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Layer, Popup, Source, useMap } from "react-map-gl/maplibre";
@@ -44,6 +39,7 @@ import { EXPLORER_PANEL_WIDTH } from "@/components/explorer/ExplorerLeftPanel";
 import { RouteBadge } from "@/components/explorer/RouteBadge";
 import { STOP_FILL } from "@/components/explorer/StopMarker";
 import { EXPLORER_RIGHT_PANEL_WIDTH } from "@/components/explorer/right/panelSize";
+import { VEHICLE_LAYER_ID, VehicleLayer } from "@/components/explorer/vehicleLayer";
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const NETWORK = "explorer-network";
@@ -61,10 +57,7 @@ const DRAW_ORDER = [
   "explorer-pattern-line",
   "explorer-pattern-chain-line",
   "explorer-route-stop",
-  "explorer-vehicle-dot",
-  "explorer-vehicle-badge",
-  "explorer-vehicle-mine",
-  "explorer-vehicle-open",
+  VEHICLE_LAYER_ID,
   "explorer-picked-stop-halo",
   "explorer-picked-stop-dot",
 ];
@@ -83,10 +76,6 @@ const LINE_CHOICE_SX = {
 
 /** What a click opens, first found first: a vehicle, a stop, a line under
  * the pointer, the station it is in, a line near it. */
-const VEHICLE_LAYERS = ["explorer-vehicle-mine", "explorer-vehicle-badge", "explorer-vehicle-dot"];
-/** From this zoom every vehicle carries its route's badge; further out, a
- * network's thousands of badges would cover each other, and they are dots. */
-const BADGES_FROM_ZOOM = 12;
 const STOP_LAYERS = ["explorer-route-stop", "explorer-stop-dot"];
 const LINE_LAYERS = ["explorer-network-line"];
 const STATION_LAYERS = ["explorer-station-area"];
@@ -96,40 +85,6 @@ const HIT_RADII = [2, 5, 9];
 
 /** The shape_lines tiles name their layer this. */
 const TILE_LAYER = "default";
-
-/** A vehicle of the selected route is a badge with its number, as the
- * panels' RouteBadge: a rounded rectangle in the route's colour, edged in
- * white, that stretches to the number. One image per colour, drawn when the
- * map first asks for it. */
-const BADGE = "explorer-badge-";
-function drawBadge(color: string) {
-  // CSS pixels, drawn at twice the resolution: the corners and the edge stay
-  // put as the badge stretches between them.
-  const R = 2;
-  const [w, h, radius, edge] = [24 * R, 18 * R, 5 * R, 1.5 * R];
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.beginPath();
-  ctx.roundRect(0, 0, w, h, radius);
-  ctx.fill();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.roundRect(edge, edge, w - 2 * edge, h - 2 * edge, radius - edge);
-  ctx.fill();
-  return {
-    image: ctx.getImageData(0, 0, w, h),
-    options: {
-      pixelRatio: R,
-      stretchX: [[6 * R, 18 * R]] as [number, number][],
-      stretchY: [[6 * R, 12 * R]] as [number, number][],
-      content: [4 * R, 3 * R, 20 * R, 15 * R] as [number, number, number, number],
-    },
-  };
-}
 
 export function ExplorerMapLayers() {
   const { t } = useTranslation("common");
@@ -170,48 +125,54 @@ export function ExplorerMapLayers() {
   const open = useRef({ choice: false, panel: false, route: false });
   open.current = { choice: choice !== null, panel: panelShown, route: selectedRouteId !== null };
 
-  // Playback's frames go to the map directly, not through React: many a
-  // second, and nothing else on the map changes with them.
-  // Paused, the map shows the network, not vehicles standing still on it.
+  // Playback's vehicles, drawn by a layer of their own (vehicleLayer.ts).
+  // Frames reach it directly, not through React: many a second, and nothing
+  // else on the map changes with them. Paused, the map shows the network,
+  // not vehicles standing still on it.
+  const vehicles = useMemo(() => new VehicleLayer(), []);
   const pushVehicles = () => {
-    const source = map?.getSource("explorer-vehicles") as GeoJSONSource | undefined;
-    source?.setData(playing ? playbackClock.getSnapshot().vehicles : EMPTY);
+    const frame = playbackClock.getSnapshot();
+    vehicles.setFrame(playing ? frame.vehicles : [], frame.styles);
   };
   useEffect(() => playbackClock.subscribe(pushVehicles));
   useEffect(pushVehicles);
-
-  // Badges for the vehicles of the selected route, in its colour, drawn the
-  // first time the map needs one (and again after the basemap changes).
   useEffect(() => {
-    if (!map) return;
-    const missing = (e: { id: string }) => {
-      if (!e.id.startsWith(BADGE) || map.hasImage(e.id)) return;
-      const badge = drawBadge(e.id.slice(BADGE.length));
-      if (badge) map.addImage(e.id, badge.image, badge.options);
-    };
-    map.on("styleimagemissing", missing);
-    return () => {
-      map.off("styleimagemissing", missing);
-    };
-  }, [map]);
+    vehicles.setLook({
+      selectedRouteId,
+      openTrip: openTrip ? { trip_idx: openTrip.trip_idx, run_dep_s: openTrip.run_dep_s } : null,
+      ring: theme.palette.primary.main,
+      faded: FADED,
+    });
+  }, [vehicles, selectedRouteId, openTrip, theme.palette.primary.main]);
 
   // The Explorer's layers in drawing order, bottom to top. Sources mount as
   // their data arrives — the network after the route's stops — and a layer
-  // added later lands on top; this puts each back in its place.
+  // added later lands on top; this puts each back in its place. The
+  // vehicles' layer is added here, and again whenever a new basemap style
+  // drops it.
   useEffect(() => {
     if (!map || !active) return;
+    const raw = map.getMap();
     const order = () => {
-      const ids = (map.getStyle()?.layers ?? []).map((l) => l.id).filter((id) => DRAW_ORDER.includes(id));
+      if (!raw.getLayer(VEHICLE_LAYER_ID)) {
+        try {
+          raw.addLayer(vehicles);
+        } catch {
+          return; // the style is still loading: the next styledata adds it
+        }
+      }
+      const ids = raw.getLayersOrder().filter((id) => DRAW_ORDER.includes(id));
       const want = DRAW_ORDER.filter((id) => ids.includes(id));
       if (ids.every((id, i) => id === want[i])) return;
-      for (const id of want) map.moveLayer(id);
+      for (const id of want) raw.moveLayer(id);
     };
     order();
-    map.on("styledata", order);
+    raw.on("styledata", order);
     return () => {
-      map.off("styledata", order);
+      raw.off("styledata", order);
+      if (raw.getLayer(VEHICLE_LAYER_ID)) raw.removeLayer(VEHICLE_LAYER_ID);
     };
-  }, [map, active]);
+  }, [map, active, vehicles]);
 
   // Each shape's colour, and whether it is faded: by the selected route, and
   // by the Explorer tab's filter. Set as feature-state, which the map keeps
@@ -268,13 +229,19 @@ export function ExplorerMapLayers() {
       }
       return [];
     };
+    const vehicleAt = (point: { x: number; y: number }) => {
+      for (const r of HIT_RADII) {
+        const found = vehicles.hit(point, r);
+        if (found) return found;
+      }
+      return null;
+    };
     const onClick = (e: MapLayerMouseEvent) => {
-      const [vehicle] = near(e.point, VEHICLE_LAYERS);
+      const vehicle = vehicleAt(e.point);
       if (vehicle) {
-        const p = vehicle.properties ?? {};
         dispatch(
           openExplorerPanel({
-            item: { kind: "trip", trip_idx: Number(p.trip_idx), run_dep_s: Number(p.run_dep_s) },
+            item: { kind: "trip", trip_idx: vehicle.trip_idx, run_dep_s: vehicle.run_dep_s },
           })
         );
         return;
@@ -340,10 +307,11 @@ export function ExplorerMapLayers() {
     // Registered after the map viewer's own handler, which sets the cursor
     // for GOAT's layers on every move: over anything that opens, this one
     // has the last word, unless a tool (measuring) holds the cursor.
-    const all = [...VEHICLE_LAYERS, ...STOP_LAYERS, ...STATION_LAYERS, ...LINE_LAYERS];
+    const all = [...STOP_LAYERS, ...STATION_LAYERS, ...LINE_LAYERS];
     const onMove = (e: MapLayerMouseEvent) => {
       const canvas = map.getCanvas();
-      if (canvas.style.cursor === "" && near(e.point, all).length) canvas.style.cursor = "pointer";
+      if (canvas.style.cursor === "" && (vehicleAt(e.point) || near(e.point, all).length))
+        canvas.style.cursor = "pointer";
     };
     map.on("click", onClick);
     map.on("mousemove", onMove);
@@ -351,7 +319,7 @@ export function ExplorerMapLayers() {
       map.off("click", onClick);
       map.off("mousemove", onMove);
     };
-  }, [map, active, network, selectedRouteId, dispatch]);
+  }, [map, active, network, selectedRouteId, dispatch, vehicles]);
 
   const pickedPoint = useMemo<FeatureCollection>(
     () =>
@@ -484,29 +452,7 @@ export function ExplorerMapLayers() {
   ];
   const isPatternChain: FilterSpecification = ["==", ["get", "pattern_idx"], patternIdx ?? -1];
   const routeOpacity = highlighting ? 0.15 : 1;
-  const isMine: FilterSpecification = ["==", ["get", "route_id"], selectedRouteId ?? ""];
   const none: FilterSpecification = ["boolean", false];
-  // A vehicle as its route's badge: the number on the route's colour, the
-  // badge stretched to fit it (drawBadge).
-  const badgeLayout = {
-    "icon-image": ["concat", BADGE, ["get", "color"]],
-    "icon-text-fit": "both",
-    "icon-text-fit-padding": [1, 3, 1, 3],
-    "icon-allow-overlap": true,
-    "icon-ignore-placement": true,
-    "text-field": ["get", "label"],
-    "text-size": 10,
-    "text-font": ["Roboto Bold", "Roboto Regular"],
-    "text-allow-overlap": true,
-    "text-ignore-placement": true,
-  } satisfies SymbolLayerSpecification["layout"];
-  const isOpenTrip: FilterSpecification = openTrip
-    ? [
-        "all",
-        ["==", ["get", "trip_idx"], openTrip.trip_idx],
-        ["==", ["get", "run_dep_s"], openTrip.run_dep_s],
-      ]
-    : none;
   const faded: ExpressionSpecification = ["boolean", ["feature-state", "faded"], false];
 
   return (
@@ -641,51 +587,6 @@ export function ExplorerMapLayers() {
             "circle-radius": 5,
             "circle-color": "#FFFFFF",
             "circle-stroke-color": color,
-            "circle-stroke-width": 2.5,
-          }}
-        />
-      </Source>
-      {/* Playback's vehicles: each a badge with its route's number, in its
-          colour — dots when zoomed out too far for badges to be read. With a
-          route chosen, its own stay badges and the others go grey dots. */}
-      <Source key="explorer-vehicles" id="explorer-vehicles" type="geojson" data={EMPTY}>
-        <Layer
-          id="explorer-vehicle-dot"
-          type="circle"
-          filter={selectedRouteId ? ["!", isMine] : ["all"]}
-          maxzoom={selectedRouteId ? 24 : BADGES_FROM_ZOOM}
-          paint={{
-            "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 2, 13, 4, 16, 6],
-            "circle-color": selectedRouteId ? FADED : ["get", "color"],
-            "circle-stroke-color": "#FFFFFF",
-            "circle-stroke-width": 1,
-          }}
-        />
-        <Layer
-          id="explorer-vehicle-badge"
-          type="symbol"
-          filter={selectedRouteId ? none : ["all"]}
-          minzoom={BADGES_FROM_ZOOM}
-          layout={badgeLayout}
-          paint={{ "text-color": ["get", "text_color"] }}
-        />
-        <Layer
-          id="explorer-vehicle-mine"
-          type="symbol"
-          filter={selectedRouteId ? isMine : none}
-          layout={badgeLayout}
-          paint={{ "text-color": ["get", "text_color"] }}
-        />
-        {/* The vehicle of the trip the right panel shows. */}
-        <Layer
-          id="explorer-vehicle-open"
-          type="circle"
-          filter={isOpenTrip}
-          paint={{
-            "circle-radius": 15,
-            "circle-color": theme.palette.primary.main,
-            "circle-opacity": 0.15,
-            "circle-stroke-color": theme.palette.primary.main,
             "circle-stroke-width": 2.5,
           }}
         />

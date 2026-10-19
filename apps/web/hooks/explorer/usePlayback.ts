@@ -22,7 +22,7 @@ import {
 } from "@/lib/explorer/derive/vehicles";
 import { type MemoryVerdict, checkMemory } from "@/lib/explorer/memory";
 import { modeOf, routeColor, routeTextColor } from "@/lib/explorer/modes";
-import { type PlaybackFrame, type VehicleProps, playbackClock } from "@/lib/explorer/playback";
+import { type PlaybackFrame, type VehicleStyle, playbackClock } from "@/lib/explorer/playback";
 import type { RootState } from "@/lib/store";
 import { setPlaybackTime, setPlaying } from "@/lib/store/explorer/slice";
 
@@ -54,9 +54,6 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
   const day = useRef<{ date: string; ready: Promise<PlaybackFrame["span"]> } | null>(null);
   const windows = useRef<Map<number, Promise<VehicleWindow>>>(new Map());
   const live = useRef<number | null>(time_s);
-  const byRoute = useRef(
-    new Map<number, { route_id: string; color: string; text_color: string; label: string }>()
-  );
   const [memory, setMemory] = useState<MemoryVerdict>({ ok: true });
 
   // Playback is a nice-to-have: it starts only with memory to spare, and
@@ -83,21 +80,24 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db, playing]);
 
+  // Each route's look, for the map to draw its vehicles with.
   useEffect(() => {
-    byRoute.current = new Map(
-      (routes ?? []).map((r) => {
-        const color = routeColor(r.color, modeOf(r.route_type));
-        return [
-          r.route_idx,
-          {
-            route_id: r.route_id,
-            color,
-            text_color: routeTextColor(r.text_color, color),
-            label: r.short_name || r.long_name?.slice(0, 4) || r.route_id,
-          },
-        ];
-      })
-    );
+    playbackClock.publish({
+      styles: new Map(
+        (routes ?? []).map((r): [number, VehicleStyle] => {
+          const color = routeColor(r.color, modeOf(r.route_type));
+          return [
+            r.route_idx,
+            {
+              route_id: r.route_id,
+              color,
+              text_color: routeTextColor(r.text_color, color),
+              label: r.short_name || r.long_name?.slice(0, 4) || r.route_id,
+            },
+          ];
+        })
+      ),
+    });
   }, [routes]);
 
   // A day's runs, once per date; playback starts at 08:00 or the day's first departure.
@@ -150,25 +150,7 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
     if (!w) return;
     const vehicles = positionsAt(await w, t);
     if (live.current !== t) return; // a later frame is on its way
-    const props = byRoute.current;
-    playbackClock.publish({
-      time_s: t,
-      vehicles: {
-        type: "FeatureCollection",
-        features: vehicles.flatMap((v) => {
-          const r = props.get(v.route_idx);
-          if (!r) return [];
-          const p: VehicleProps = { run: v.run, trip_idx: v.trip_idx, run_dep_s: v.run_dep_s, ...r };
-          return [
-            {
-              type: "Feature" as const,
-              geometry: { type: "Point" as const, coordinates: [v.lon, v.lat] },
-              properties: p,
-            },
-          ];
-        }),
-      },
-    });
+    playbackClock.publish({ time_s: t, vehicles });
   };
 
   // Paused: show the time the store holds.

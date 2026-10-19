@@ -227,10 +227,10 @@ export function ExplorerBottomBar({ compact = false }: { compact?: boolean }) {
               variant="body2"
               fontWeight={700}
               sx={{ fontVariantNumeric: "tabular-nums", minWidth: "5ch", textAlign: "right" }}>
-              {count(frame.vehicles.features.length, i18n.language)}
+              {count(frame.vehicles.length, i18n.language)}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {t("explorer_vehicles_out", { count: frame.vehicles.features.length })}
+              {t("explorer_vehicles_out", { count: frame.vehicles.length })}
             </Typography>
           </Stack>
         )}
