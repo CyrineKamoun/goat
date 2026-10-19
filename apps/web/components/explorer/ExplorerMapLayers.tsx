@@ -21,6 +21,7 @@ import { useTranslation } from "react-i18next";
 import { Layer, Popup, Source, useMap } from "react-map-gl/maplibre";
 
 import { GEOAPI_BASE_URL } from "@/lib/constants";
+import { vehicleFrame } from "@/lib/explorer/derive/vehicles";
 import { routeMatches } from "@/lib/explorer/filters";
 import { networkStore } from "@/lib/explorer/network";
 import { playbackClock } from "@/lib/explorer/playback";
@@ -42,6 +43,7 @@ import { EXPLORER_RIGHT_PANEL_WIDTH } from "@/components/explorer/right/panelSiz
 import { VEHICLE_LAYER_ID, VehicleLayer } from "@/components/explorer/vehicleLayer";
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
+const NO_VEHICLES = vehicleFrame();
 const NETWORK = "explorer-network";
 const FADED = "#9E9E9E";
 /** The Explorer's layers, bottom to top. */
@@ -130,7 +132,7 @@ export function ExplorerMapLayers() {
   const vehicles = useMemo(() => new VehicleLayer(), []);
   const pushVehicles = () => {
     const frame = playbackClock.getSnapshot();
-    vehicles.setFrame(playing ? frame.vehicles : [], frame.styles);
+    vehicles.setFrame(playing ? frame.vehicles : NO_VEHICLES, frame.styles);
   };
   useEffect(() => playbackClock.subscribe(pushVehicles));
   useEffect(pushVehicles);

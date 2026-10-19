@@ -44,6 +44,12 @@ export async function openFixtureDb(): Promise<SqlRunner> {
         .toArray()
         .map((row) => row.toJSON() as T);
     },
+    async columns<K extends string>(sql: string): Promise<Record<K, ArrayLike<number>>> {
+      const table = conn.query(sql);
+      return Object.fromEntries(
+        table.schema.fields.map((f) => [f.name, table.getChild(f.name)?.toArray() ?? []])
+      ) as Record<K, ArrayLike<number>>;
+    },
     async exec(sql: string): Promise<void> {
       conn.query(sql);
     },

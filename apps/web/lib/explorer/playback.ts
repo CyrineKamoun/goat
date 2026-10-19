@@ -5,7 +5,7 @@
  * do not re-render many times a second. The map reads it from outside the
  * Explorer's provider, as it reads the route drawing from the store.
  */
-import type { Vehicle } from "@/lib/explorer/derive/vehicles";
+import { type VehicleFrame, vehicleFrame } from "@/lib/explorer/derive/vehicles";
 
 /** How a route's vehicles are drawn: set once per bundle, not per frame. */
 export interface VehicleStyle {
@@ -21,8 +21,9 @@ export interface VehicleStyle {
 export interface PlaybackFrame {
   /** Service-day seconds; null before the day's service is known. */
   time_s: number | null;
-  /** Each running vehicle where it is at `time_s`. */
-  vehicles: Vehicle[];
+  /** Each running vehicle where it is at `time_s`: columns filled in place
+   * frame after frame, so a reader takes what it needs when it is told. */
+  vehicles: VehicleFrame;
   /** Each route's look, by route_idx. */
   styles: Map<number, VehicleStyle>;
   /** The day's first departure and last arrival, which bound the scrubber. */
@@ -31,7 +32,7 @@ export interface PlaybackFrame {
 
 const EMPTY: PlaybackFrame = {
   time_s: null,
-  vehicles: [],
+  vehicles: vehicleFrame(),
   styles: new Map(),
   span: null,
 };

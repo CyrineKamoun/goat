@@ -9,6 +9,10 @@
 export interface SqlRunner {
   /** Rows of a query, as plain objects. BIGINTs arrive as numbers. */
   all<T = Record<string, unknown>>(sql: string): Promise<T[]>;
+  /** A query's numeric columns as arrays, without an object per row: for
+   * results too large to read row by row (playback's windows). A NULL reads
+   * as 0, so the query states what stands in for one. */
+  columns<K extends string>(sql: string): Promise<Record<K, ArrayLike<number>>>;
   /** A statement whose result is not needed. */
   exec(sql: string): Promise<void>;
 }

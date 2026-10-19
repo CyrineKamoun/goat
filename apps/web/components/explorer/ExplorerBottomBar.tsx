@@ -9,11 +9,10 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import { Button, ButtonBase, Divider, IconButton, Slider, Stack, Tooltip, Typography } from "@mui/material";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { clock, count } from "@/lib/explorer/format";
-import { playbackClock } from "@/lib/explorer/playback";
 import {
   PLAYBACK_SPEEDS,
   closeExplorer,
@@ -24,6 +23,7 @@ import {
 
 import { useRoutes } from "@/hooks/explorer/useExplorerData";
 import { usePlayback } from "@/hooks/explorer/usePlayback";
+import { usePlaybackValue } from "@/hooks/explorer/usePlaybackValue";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { FloatingPanel } from "@/components/common/FloatingPanel";
@@ -43,19 +43,18 @@ const END_ROOM = 8;
  * cycles, the date without its day steps, no vehicle count, and Exit as its
  * icon alone. */
 export function ExplorerBottomBar({ compact = false }: { compact?: boolean }) {
-  const { t, i18n } = useTranslation("common");
+  const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const { db, complete } = useExplorer();
   const routes = useRoutes(db);
   const playing = useAppSelector((s) => s.explorer.playing);
   const speed = useAppSelector((s) => s.explorer.speed);
   const memory = usePlayback(complete ? db : undefined, routes.data);
-  const frame = useSyncExternalStore(
-    playbackClock.subscribe,
-    playbackClock.getSnapshot,
-    playbackClock.getSnapshot
-  );
-  const span = frame.span;
+  // Not every frame: the span, and the minute the clock and the scrubber
+  // show (a scrubber step is a minute). What changes every frame, the
+  // vehicle count, renders on its own (VehicleCount).
+  const span = usePlaybackValue((f) => f.span);
+  const minute = usePlaybackValue((f) => (f.time_s === null ? null : Math.floor(f.time_s / 60) * 60));
   // While the scrubber is dragged only the clock follows it; the map is
   // drawn for the time it is let go at, and playback, if it ran, goes on
   // from there. Let go, the thumb stays where it was left until the map has
@@ -64,15 +63,15 @@ export function ExplorerBottomBar({ compact = false }: { compact?: boolean }) {
   const resume = useRef(false);
   useEffect(() => {
     if (!drag?.let_go) return;
-    if (frame.time_s !== null && Math.abs(frame.time_s - drag.t) <= SETTLED_S) {
+    if (minute !== null && Math.abs(minute - drag.t) <= SETTLED_S) {
       setDrag(null);
       return;
     }
     // A frame that never comes (a window that failed to read) does not hold the thumb.
     const timer = window.setTimeout(() => setDrag(null), SETTLE_MS);
     return () => window.clearTimeout(timer);
-  }, [drag, frame.time_s]);
-  const time = drag?.t ?? frame.time_s;
+  }, [drag, minute]);
+  const time = drag?.t ?? minute;
   const ready = complete && span !== null && time !== null;
 
   const ticks: { value: number }[] = [];
@@ -212,28 +211,7 @@ export function ExplorerBottomBar({ compact = false }: { compact?: boolean }) {
           }}
         />
         {!compact && <Divider orientation="vertical" flexItem sx={{ my: 1.5 }} />}
-        {/* Vehicles out at the time: the figure bold, its unit quiet, as the
-            left panel's figures are; the figure's width fixed so it does not
-            jostle the bar as it plays. */}
-        {!compact && (
-          <Stack
-            direction="row"
-            alignItems="baseline"
-            spacing={0.5}
-            // Inline, as the play button's: the row's spacing resets margins set in sx.
-            style={{ marginRight: END_ROOM }}
-            sx={{ flexShrink: 0, visibility: ready ? "visible" : "hidden" }}>
-            <Typography
-              variant="body2"
-              fontWeight={700}
-              sx={{ fontVariantNumeric: "tabular-nums", minWidth: "5ch", textAlign: "right" }}>
-              {count(frame.vehicles.length, i18n.language)}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {t("explorer_vehicles_out", { count: frame.vehicles.length })}
-            </Typography>
-          </Stack>
-        )}
+        {!compact && <VehicleCount ready={ready} />}
         {compact ? (
           <Tooltip title={t("explorer_exit")}>
             <IconButton
@@ -272,5 +250,32 @@ export function ExplorerBottomBar({ compact = false }: { compact?: boolean }) {
         )}
       </Stack>
     </FloatingPanel>
+  );
+}
+
+/** Vehicles out at the time: the figure bold, its unit quiet, as the left
+ * panel's figures are; the figure's width fixed so it does not jostle the bar
+ * as it plays. Apart from the bar, as it changes with every frame. */
+function VehicleCount({ ready }: { ready: boolean }) {
+  const { t, i18n } = useTranslation("common");
+  const n = usePlaybackValue((f) => f.vehicles.n);
+  return (
+    <Stack
+      direction="row"
+      alignItems="baseline"
+      spacing={0.5}
+      // Inline, as the play button's: the row's spacing resets margins set in sx.
+      style={{ marginRight: END_ROOM }}
+      sx={{ flexShrink: 0, visibility: ready ? "visible" : "hidden" }}>
+      <Typography
+        variant="body2"
+        fontWeight={700}
+        sx={{ fontVariantNumeric: "tabular-nums", minWidth: "5ch", textAlign: "right" }}>
+        {count(n, i18n.language)}
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        {t("explorer_vehicles_out", { count: n })}
+      </Typography>
+    </Stack>
   );
 }

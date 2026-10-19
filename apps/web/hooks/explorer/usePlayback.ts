@@ -18,6 +18,7 @@ import {
   positionsAt,
   prepareDay,
   serviceSpan,
+  vehicleFrame,
   vehicleWindow,
 } from "@/lib/explorer/derive/vehicles";
 import { type MemoryVerdict, checkMemory } from "@/lib/explorer/memory";
@@ -54,6 +55,8 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
   const day = useRef<{ date: string; ready: Promise<PlaybackFrame["span"]> } | null>(null);
   const windows = useRef<Map<number, Promise<VehicleWindow>>>(new Map());
   const live = useRef<number | null>(time_s);
+  // The frame's columns, filled in place for every frame drawn.
+  const frame = useRef(vehicleFrame());
   const [memory, setMemory] = useState<MemoryVerdict>({ ok: true });
 
   // Playback is a nice-to-have: it starts only with memory to spare, and
@@ -148,9 +151,9 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
   const draw = async (t: number) => {
     const w = windowFor(t);
     if (!w) return;
-    const vehicles = positionsAt(await w, t);
+    const window = await w;
     if (live.current !== t) return; // a later frame is on its way
-    playbackClock.publish({ time_s: t, vehicles });
+    playbackClock.publish({ time_s: t, vehicles: positionsAt(window, t, frame.current) });
   };
 
   // Paused: show the time the store holds.

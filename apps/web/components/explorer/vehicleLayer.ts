@@ -19,7 +19,7 @@
  */
 import type { CustomLayerInterface, CustomRenderMethodInput, Map as MaplibreMap } from "maplibre-gl";
 
-import type { Vehicle } from "@/lib/explorer/derive/vehicles";
+import { type Vehicle, type VehicleFrame, vehicleAt, vehicleFrame } from "@/lib/explorer/derive/vehicles";
 import type { VehicleStyle } from "@/lib/explorer/playback";
 
 export const VEHICLE_LAYER_ID = "explorer-vehicles";
@@ -164,7 +164,19 @@ class BadgeAtlas {
   }
 
   /** The badge of `style`, drawn if it is new; null where the atlas is full. */
+  /** Each route's badge, by its style: found without building a key on
+   * every frame. Styles are kept for as long as the routes are. */
+  private byStyle = new WeakMap<VehicleStyle, AtlasEntry | null>();
+
   get(style: VehicleStyle): AtlasEntry | null {
+    const cached = this.byStyle.get(style);
+    if (cached !== undefined) return cached;
+    const entry = this.byKey(style);
+    this.byStyle.set(style, entry);
+    return entry;
+  }
+
+  private byKey(style: VehicleStyle): AtlasEntry | null {
     const key = `${style.label}|${style.color}|${style.text_color}`;
     const known = this.entries.get(key);
     if (known !== undefined) return known;
@@ -244,7 +256,10 @@ export class VehicleLayer implements CustomLayerInterface {
   private uniforms: Record<string, WebGLUniformLocation | null> = {};
   private data = new Float32Array(0);
 
-  private vehicles: Vehicle[] = [];
+  /** The frame's columns, read up to `count`: the frame is filled in place,
+   * frame after frame, by playback. */
+  private vehicles: VehicleFrame = vehicleFrame();
+  private count = 0;
   private styles = new Map<number, VehicleStyle>();
   private look: VehicleLook = { selectedRouteId: null, openTrip: null, ring: "#2BB381", faded: "#9E9E9E" };
   /** Mercator positions of the frame's vehicles, x then y, in double
@@ -280,20 +295,20 @@ export class VehicleLayer implements CustomLayerInterface {
   private drawnRound = new Uint8Array(0);
 
   /** The vehicles to show now, and their routes' looks. */
-  setFrame(vehicles: Vehicle[], styles: Map<number, VehicleStyle>): void {
+  setFrame(vehicles: VehicleFrame, styles: Map<number, VehicleStyle>): void {
     const now = performance.now();
     const gap = now - this.frameAt;
     // Frames that follow each other closely are glided between; a frame after
     // a pause, or the first, is shown as it is.
-    const smooth = this.vehicles.length > 0 && gap < MAX_GLIDE_MS;
+    const smooth = this.count > 0 && gap < MAX_GLIDE_MS;
     const f = this.progress(now);
-    const n = vehicles.length;
+    const n = vehicles.n;
     if (this.nextFrom.length < n * 2) {
       this.nextFrom = new Float64Array(n * 4);
       this.nextTo = new Float64Array(n * 4);
     }
     let maxRun = 0;
-    for (const v of vehicles) maxRun = Math.max(maxRun, v.run);
+    for (let i = 0; i < n; i++) maxRun = Math.max(maxRun, vehicles.run[i]);
     if (this.runIndex.length <= maxRun) {
       const index = new Int32Array((maxRun + 1) * 2);
       const stamps = new Uint32Array((maxRun + 1) * 2);
@@ -305,7 +320,7 @@ export class VehicleLayer implements CustomLayerInterface {
     const { from, to, nextFrom, nextTo, runIndex, runStamp } = this;
     const last = this.stamp;
     for (let i = 0; i < n; i++) {
-      const { lon, lat, run } = vehicles[i];
+      const [lon, lat, run] = [vehicles.lon[i], vehicles.lat[i], vehicles.run[i]];
       const x = (180 + lon) / 360;
       const y = (180 - (180 / Math.PI) * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360))) / 360;
       nextTo[2 * i] = x;
@@ -318,12 +333,13 @@ export class VehicleLayer implements CustomLayerInterface {
     }
     this.stamp = last + 1;
     for (let i = 0; i < n; i++) {
-      runIndex[vehicles[i].run] = i;
-      runStamp[vehicles[i].run] = this.stamp;
+      runIndex[vehicles.run[i]] = i;
+      runStamp[vehicles.run[i]] = this.stamp;
     }
     [this.from, this.nextFrom] = [nextFrom, from];
     [this.to, this.nextTo] = [nextTo, to];
     this.vehicles = vehicles;
+    this.count = n;
     this.styles = styles;
     this.frameAt = now;
     this.glide = smooth ? gap : 0;
@@ -356,7 +372,7 @@ export class VehicleLayer implements CustomLayerInterface {
         bestDistance = distance;
       }
     }
-    return best >= 0 ? (this.vehicles[best] ?? null) : null;
+    return best >= 0 && best < this.count ? vehicleAt(this.vehicles, best) : null;
   }
 
   onAdd(map: MaplibreMap, gl: WebGLRenderingContext | WebGL2RenderingContext): void {
@@ -396,7 +412,7 @@ export class VehicleLayer implements CustomLayerInterface {
     const map = this.map;
     const atlas = this.atlas;
     if (!map || !atlas || !this.program || !this.buffer || !this.texture) return;
-    const n = this.vehicles.length;
+    const n = this.count;
     this.drawnCount = 0;
     if (n === 0) return;
 
@@ -435,8 +451,8 @@ export class VehicleLayer implements CustomLayerInterface {
       const x = ((m[0] * mx + m[4] * my + m[12]) / w + 1) * 0.5 * width;
       const y = (1 - (m[1] * mx + m[5] * my + m[13]) / w) * 0.5 * height;
       if (x < -60 || y < -30 || x > width + 60 || y > height + 30) continue;
-      const v = this.vehicles[i];
-      const style = this.styles.get(v.route_idx);
+      const v = this.vehicles;
+      const style = this.styles.get(v.route_idx[i]);
       if (!style) continue;
       screen[2 * i] = x;
       screen[2 * i + 1] = y;
@@ -448,7 +464,7 @@ export class VehicleLayer implements CustomLayerInterface {
           ? PASS.badge
           : PASS.dot;
       quads++;
-      if (openTrip && v.trip_idx === openTrip.trip_idx && v.run_dep_s === openTrip.run_dep_s) open = i;
+      if (openTrip && v.trip_idx[i] === openTrip.trip_idx && v.run_dep_s[i] === openTrip.run_dep_s) open = i;
     }
 
     const need = (quads + 1) * 6 * STRIDE;
@@ -523,7 +539,7 @@ export class VehicleLayer implements CustomLayerInterface {
     for (const p of [PASS.dot, PASS.badge, PASS.mine]) {
       for (let i = 0; i < n; i++) {
         if (pass[i] !== p) continue;
-        const style = this.styles.get(this.vehicles[i].route_idx) as VehicleStyle;
+        const style = this.styles.get(this.vehicles.route_idx[i]) as VehicleStyle;
         if (p === PASS.dot) {
           dot(i, selectedRouteId ? faded : rgb(style.color));
           continue;

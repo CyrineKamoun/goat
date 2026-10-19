@@ -30,11 +30,13 @@ import { type PlaceRow, places } from "@/lib/explorer/derive/stops";
 import { stopsLine } from "@/lib/explorer/derive/stopsLine";
 import { tripDetail } from "@/lib/explorer/derive/trip";
 import {
+  type VehicleWindow,
   alongShape,
   positionsAt,
   prepareDay,
   runningAt,
   serviceSpan,
+  vehicleAt,
   vehicleWindow,
 } from "@/lib/explorer/derive/vehicles";
 import {
@@ -423,7 +425,8 @@ describe("vehicles", () => {
   // Stops lie 0.01° of longitude apart along 52.5° N: S1 13.40 … S6 13.45.
   const at = async (date: string, t: number) => {
     await prepareDay(db, date);
-    return positionsAt(await vehicleWindow(db, date, t - 600, t + 600), t);
+    const frame = positionsAt(await vehicleWindow(db, date, t - 600, t + 600), t);
+    return Array.from({ length: frame.n }, (_, i) => vehicleAt(frame, i));
   };
   const hm = (h: number, m: number) => h * 3600 + m * 60;
 
@@ -490,43 +493,34 @@ describe("vehicles", () => {
   });
 
   it("holds a vehicle at its stop while it waits there", () => {
-    const window = {
+    // One run: waiting at (1, 1) from 10 to 20, then on to (2, 1) by 30.
+    const window: VehicleWindow = {
       date: "2026-10-14",
       from_s: 0,
       to_s: 100,
-      runs: new Map([
-        [
-          1,
-          [
-            {
-              run: 1,
-              route_idx: 0,
-              trip_idx: 0,
-              run_dep_s: 10,
-              t0: 10,
-              t1: 20,
-              a: [1, 1] as [number, number],
-              b: [1, 1] as [number, number],
-            },
-            {
-              run: 1,
-              route_idx: 0,
-              trip_idx: 0,
-              run_dep_s: 10,
-              t0: 20,
-              t1: 30,
-              a: [1, 1] as [number, number],
-              b: [2, 1] as [number, number],
-            },
-          ],
-        ],
-      ]),
+      runs: 1,
+      first: Int32Array.from([0, 2]),
+      run: Int32Array.from([1, 1]),
+      route_idx: Int32Array.from([0, 0]),
+      trip_idx: Int32Array.from([0, 0]),
+      run_dep_s: Float64Array.from([10, 10]),
+      t0: Float64Array.from([10, 20]),
+      t1: Float64Array.from([20, 30]),
+      ax: Float64Array.from([1, 1]),
+      ay: Float64Array.from([1, 1]),
+      bx: Float64Array.from([1, 2]),
+      by: Float64Array.from([1, 1]),
+      shape: Int32Array.from([-1, -1]),
+      d0: new Float64Array(2),
+      d1: new Float64Array(2),
+      shapes: new Map(),
     };
-    expect(positionsAt(window, 15)).toEqual([
-      { run: 1, route_idx: 0, trip_idx: 0, run_dep_s: 10, lon: 1, lat: 1 },
-    ]);
-    expect(positionsAt(window, 25)[0].lon).toBe(1.5);
-    expect(positionsAt(window, 40)).toEqual([]);
+    const frame = positionsAt(window, 15);
+    expect(frame.n).toBe(1);
+    expect(vehicleAt(frame, 0)).toEqual({ run: 1, route_idx: 0, trip_idx: 0, run_dep_s: 10, lon: 1, lat: 1 });
+    // The same frame, filled again in place.
+    expect(positionsAt(window, 25, frame).lon[0]).toBe(1.5);
+    expect(positionsAt(window, 40, frame).n).toBe(0);
   });
 });
 
