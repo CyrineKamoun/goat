@@ -13,6 +13,7 @@ import {
   faStackOverflow,
   faXTwitter,
 } from "@fortawesome/free-brands-svg-icons";
+import { faCircleXmark as faCircleXmarkOutline } from "@fortawesome/free-regular-svg-icons";
 import {
   faAlignCenter,
   faAlignJustify,
@@ -257,6 +258,7 @@ export enum ICON_NAME {
   TRASH = "trash",
   EDIT = "edit",
   XCLOSE = "xclose",
+  CIRCLE_XCLOSE = "circle-xclose",
   EDITPEN = "editpen",
   SAVE = "save",
   DATABASE = "database",
@@ -453,6 +455,7 @@ const nameToIcon: { [k in ICON_NAME]: IconDefinition } = {
   [ICON_NAME.TRASH]: faTrash,
   [ICON_NAME.EDIT]: faEdit,
   [ICON_NAME.XCLOSE]: faXmark,
+  [ICON_NAME.CIRCLE_XCLOSE]: faCircleXmarkOutline,
   [ICON_NAME.EDITPEN]: faPen,
   [ICON_NAME.SAVE]: faFloppyDisk,
   [ICON_NAME.DATABASE]: faDatabase,

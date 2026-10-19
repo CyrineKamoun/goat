@@ -4,7 +4,7 @@
  * by the × on its tab, Exit Explorer in the bottom bar, or the bundle's menu
  * (docs/pt-network-editor/docs/02-panel-behaviour-spec.md).
  */
-import { Box, Stack, Tab, Tabs, Tooltip, alpha } from "@mui/material";
+import { Box, Stack, Tab, Tabs, Tooltip } from "@mui/material";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -92,13 +92,11 @@ export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
                     width: 24,
                     height: 24,
                     borderRadius: "50%",
-                    color: "primary.main",
-                    "&:hover": {
-                      bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
-                      color: "primary.dark",
-                    },
+                    // The tab's own text colour: grey, or green while selected.
+                    color: "inherit",
+                    "&:hover": { bgcolor: "action.hover" },
                   }}>
-                  <Icon iconName={ICON_NAME.XCLOSE} style={{ fontSize: 14 }} htmlColor="inherit" />
+                  <Icon iconName={ICON_NAME.CIRCLE_XCLOSE} style={{ fontSize: 16 }} htmlColor="inherit" />
                 </Box>
               </Tooltip>
             </>
