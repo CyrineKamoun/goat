@@ -97,23 +97,43 @@ export function ExplorerProvider({ bundleId, children }: { bundleId: string; chi
   }, [firstDb, listed, dispatch]);
 
   // The member the map draws shapes from: whichever the snapshot found the
-  // lines in (an older import keeps them as its shapes).
-  const linesRole = manifest ? (manifest.shape_lines_role ?? null) : undefined;
+  // lines in (an older import keeps them as its shapes); before its manifest
+  // is in — a first opening, while the snapshot is still built — the
+  // bundle's shape_lines member, so the network shows from the start.
+  const linesRole = manifest ? (manifest.shape_lines_role ?? null) : "shape_lines";
   const shapeLinesLayerId = linesRole ? (members?.find((m) => m.role === linesRole)?.layer_id ?? null) : null;
 
-  // The network the map draws by itself, once the snapshot is in.
-  const db = state.status === "ready" ? state.db : undefined;
+  // The network the map draws by itself, each part as soon as what it comes
+  // from is in, not once the whole timetable is: the lines from their
+  // prebuilt tiles at once (grey until coloured); their routes' colours with
+  // the few small tables that say which route draws each line; the stops and
+  // stations with theirs.
+  useEffect(() => () => networkStore.reset(), [bundleId]);
+  useEffect(() => networkStore.update({ shapeLinesLayerId }), [shapeLinesLayerId]);
+  const has = (tables: string[]) =>
+    state.status === "ready" || (state.status === "loading" && hasTables(state, tables));
+  const shapesIn = has(["shapes_meta", "shape_route", "routes"]);
+  const stopsIn = has(["stops", "patterns"]);
   useEffect(() => {
-    if (!db) return;
+    if (!firstDb || !shapesIn) return;
     let current = true;
-    Promise.all([networkShapes(db, shapeLinesLayerId), networkStops(db), networkStations(db)]).then(
-      ([n, stops, stations]) => current && networkStore.set({ ...n, stops, stations })
-    );
+    networkShapes(firstDb)
+      .then((part) => current && networkStore.update(part))
+      .catch(() => undefined);
     return () => {
       current = false;
-      networkStore.reset();
     };
-  }, [db, shapeLinesLayerId]);
+  }, [firstDb, shapesIn]);
+  useEffect(() => {
+    if (!firstDb || !stopsIn) return;
+    let current = true;
+    Promise.all([networkStops(firstDb), networkStations(firstDb)])
+      .then(([stops, stations]) => current && networkStore.update({ stops, stations }))
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [firstDb, stopsIn]);
 
   const value = useMemo<ExplorerData>(() => {
     const ready = state.status === "loading" || state.status === "ready";

@@ -604,7 +604,7 @@ describe("trip", () => {
 
 describe("network shapes", () => {
   it("draws every route, through its stops where the feed has no shape", async () => {
-    const { shapes, routes } = await networkShapes(db, "layer");
+    const { shapes, routes } = await networkShapes(db);
     // R1 has SH1 and a line through the stops for its return; R2, R3 and R4
     // have no shape in the feed. RX runs no trip that could be drawn.
     const drawn = new Set([...shapes.values()].flatMap((s) => s.route_ids));

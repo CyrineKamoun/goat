@@ -74,8 +74,10 @@ export const networkStore = {
   getSnapshot(): NetworkDrawing {
     return drawing;
   },
-  set(next: NetworkDrawing): void {
-    drawing = next;
+  /** Some of the drawing, the rest kept: the lines, their colours and the
+   * stops each arrive as soon as what they come from is in. */
+  update(part: Partial<NetworkDrawing>): void {
+    drawing = { ...drawing, ...part };
     listeners.forEach((l) => l());
   },
   reset(): void {
@@ -88,9 +90,8 @@ export const networkStore = {
  * feed's, and the lines through the stops of trips without one. And every
  * route, for the filter and the line chooser, whatever it is drawn with. */
 export async function networkShapes(
-  db: SqlRunner,
-  shapeLinesLayerId: string | null
-): Promise<NetworkDrawing> {
+  db: SqlRunner
+): Promise<Pick<NetworkDrawing, "shapes" | "byRoute" | "routes">> {
   const [rows, all] = await Promise.all([
     db.all<{ shape_id: string; route_id: string; color: string | null; route_type: number | null }>(`
       SELECT m.shape_id, r.route_id, r.color, r.route_type
@@ -112,7 +113,7 @@ export async function networkShapes(
     else byRoute.set(r.route_id, [r.shape_id]);
   }
   const routes = new Map(all.map((r) => [r.route_id, r]));
-  return { shapeLinesLayerId, shapes, byRoute, routes, stops: NO_STOPS, stations: NO_STATIONS };
+  return { shapes, byRoute, routes };
 }
 
 /** Every stop vehicles call at, as points: platforms and stops on their own
