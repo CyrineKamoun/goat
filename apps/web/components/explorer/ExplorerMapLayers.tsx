@@ -52,10 +52,8 @@ const DRAW_ORDER = [
   "explorer-stop-dot",
   "explorer-route-casing",
   "explorer-route-line",
-  "explorer-route-chain-line",
   "explorer-pattern-casing",
   "explorer-pattern-line",
-  "explorer-pattern-chain-line",
   "explorer-route-stop",
   VEHICLE_LAYER_ID,
   "explorer-picked-stop-halo",
@@ -368,20 +366,6 @@ export function ExplorerMapLayers() {
     }),
     [drawing?.stops]
   );
-  const chains = useMemo<FeatureCollection>(
-    () => ({
-      type: "FeatureCollection",
-      features: Object.entries(drawing?.patternChains ?? {})
-        .filter(([, c]) => c.length > 1)
-        .map(([pattern_idx, coordinates]) => ({
-          type: "Feature",
-          geometry: { type: "LineString", coordinates },
-          properties: { pattern_idx: Number(pattern_idx) },
-        })),
-    }),
-    [drawing?.patternChains]
-  );
-
   // Fit the view to the network on opening, clear of the left panel and the
   // bottom bar.
   const bounds = useAppSelector((s) => (s.explorer.active ? s.explorer.bounds : null));
@@ -450,7 +434,6 @@ export function ExplorerMapLayers() {
     ["get", "shape_id"],
     ["literal", (patternIdx !== null && drawing?.patternShapes[patternIdx]) || []],
   ];
-  const isPatternChain: FilterSpecification = ["==", ["get", "pattern_idx"], patternIdx ?? -1];
   const routeOpacity = highlighting ? 0.15 : 1;
   const none: FilterSpecification = ["boolean", false];
   const faded: ExpressionSpecification = ["boolean", ["feature-state", "faded"], false];
@@ -559,24 +542,6 @@ export function ExplorerMapLayers() {
             "circle-opacity": selectedRouteId ? 0.6 : 1,
             "circle-stroke-opacity": selectedRouteId ? 0.6 : 1,
           }}
-        />
-      </Source>
-      <Source key="explorer-route-chains" id="explorer-route-chains" type="geojson" data={chains}>
-        <Layer
-          id="explorer-route-chain-line"
-          type="line"
-          paint={{
-            "line-color": color,
-            "line-width": 3,
-            "line-dasharray": [2, 1.5],
-            "line-opacity": routeOpacity,
-          }}
-        />
-        <Layer
-          id="explorer-pattern-chain-line"
-          type="line"
-          filter={highlighting ? isPatternChain : none}
-          paint={{ "line-color": color, "line-width": 5, "line-dasharray": [2, 1.5] }}
         />
       </Source>
       <Source key="explorer-route-stops" id="explorer-route-stops" type="geojson" data={stops}>

@@ -45,7 +45,13 @@ import {
   routeMatches,
   shows,
 } from "@/lib/explorer/filters";
-import { convexHull, networkStations, networkStops, stationArea } from "@/lib/explorer/network";
+import {
+  convexHull,
+  networkShapes,
+  networkStations,
+  networkStops,
+  stationArea,
+} from "@/lib/explorer/network";
 
 type Route = TripRange & { route_idx: number; route_id: string };
 
@@ -599,6 +605,22 @@ describe("trip", () => {
     expect(trip?.stops.map((s) => hm(s.dep_s ?? 0))).toEqual(["06:10", "06:14", "06:18"]);
     expect(trip?.prev && hm(trip.prev.run_dep_s)).toBe("06:00");
     expect(trip?.next && hm(trip.next.run_dep_s)).toBe("06:20");
+  });
+});
+
+describe("network shapes", () => {
+  it("draws every route, through its stops where the feed has no shape", async () => {
+    const { shapes, routes } = await networkShapes(db, "layer");
+    // R1 has SH1 and a line through the stops for its return; R2, R3 and R4
+    // have no shape in the feed. RX runs no trip that could be drawn.
+    const drawn = new Set([...shapes.values()].flatMap((s) => s.route_ids));
+    expect([...drawn].sort()).toEqual(["R1", "R2", "R3", "R4"]);
+    expect(shapes.get("SH1")?.route_ids).toEqual(["R1"]);
+    const chains = [...shapes.keys()].filter((id) => id.startsWith("stops-"));
+    expect(chains.length).toBeGreaterThanOrEqual(4);
+    for (const id of chains) expect(shapes.get(id)?.color).toMatch(/^#[0-9A-F]{6}$/i);
+    // Every route is known, for the filter and the line chooser.
+    expect([...routes.keys()].sort()).toEqual(["R1", "R2", "R3", "R4"]);
   });
 });
 

@@ -160,11 +160,11 @@ async function summarize(
   const rate = rateFor(settings, route.agency_id, route.route_type);
   const annual = await annualFigures(db, route, window, rate);
 
-  // The map: the route's shapes, and straight lines for patterns without one.
+  // The map: the route's shapes — the feed's, or the line through the stops
+  // of trips without one (the snapshot's stop chains).
   const shapes = await db.all<{ shape_id: string; pattern_idx: number }>(`
     SELECT DISTINCT s.shape_id, t.pattern_idx FROM trips t JOIN shapes_meta s USING (shape_idx)
     WHERE t.trip_idx BETWEEN ${route.trip_lo} AND ${route.trip_hi}`);
-  const shaped = new Set(shapes.map((s) => s.pattern_idx));
   const coord = (idx: number): [number, number] | null => {
     const s = stops.get(idx);
     return s && s.lon != null && s.lat != null ? [s.lon, s.lat] : null;
@@ -192,18 +192,10 @@ async function summarize(
             ]
           : [];
       }),
-      stopChains: patterns
-        .filter((p) => !shaped.has(p.pattern_idx))
-        .map((p) => p.stops.map(coord).filter((c): c is [number, number] => c !== null)),
       patternShapes: shapes.reduce<Record<number, string[]>>((acc, s) => {
         (acc[s.pattern_idx] ??= []).push(s.shape_id);
         return acc;
       }, {}),
-      patternChains: Object.fromEntries(
-        patterns
-          .filter((p) => !shaped.has(p.pattern_idx))
-          .map((p) => [p.pattern_idx, p.stops.map(coord).filter((c): c is [number, number] => c !== null)])
-      ),
       patternBounds: Object.fromEntries(
         patterns.flatMap((p) => {
           const cs = p.stops.map(coord).filter((c): c is [number, number] => c !== null);

@@ -84,29 +84,24 @@ export const networkStore = {
   },
 };
 
-/** Every shape trips use, with its routes, read from the snapshot. */
+/** Every shape trips use, with its routes, read from the snapshot: the
+ * feed's, and the lines through the stops of trips without one. And every
+ * route, for the filter and the line chooser, whatever it is drawn with. */
 export async function networkShapes(
   db: SqlRunner,
   shapeLinesLayerId: string | null
 ): Promise<NetworkDrawing> {
-  const rows = await db.all<{
-    shape_id: string;
-    route_id: string;
-    route_idx: number;
-    agency_idx: number | null;
-    short_name: string | null;
-    long_name: string | null;
-    color: string | null;
-    text_color: string | null;
-    route_type: number | null;
-  }>(`
-    SELECT m.shape_id, r.route_id, r.route_idx, r.agency_idx, r.short_name, r.long_name,
-           r.color, r.text_color, r.route_type
-    FROM shape_route sr JOIN shapes_meta m USING (shape_idx) JOIN routes r USING (route_idx)
-    ORDER BY m.shape_id, r.route_idx`);
+  const [rows, all] = await Promise.all([
+    db.all<{ shape_id: string; route_id: string; color: string | null; route_type: number | null }>(`
+      SELECT m.shape_id, r.route_id, r.color, r.route_type
+      FROM shape_route sr JOIN shapes_meta m USING (shape_idx) JOIN routes r USING (route_idx)
+      ORDER BY m.shape_id, r.route_idx`),
+    db.all<NetworkRoute>(`
+      SELECT route_idx, route_id, route_type, agency_idx, short_name, long_name, color, text_color
+      FROM routes ORDER BY route_idx`),
+  ]);
   const shapes = new Map<string, NetworkShape>();
   const byRoute = new Map<string, string[]>();
-  const routes = new Map<string, NetworkRoute>();
   for (const r of rows) {
     const color = routeColor(r.color, modeOf(r.route_type));
     const s = shapes.get(r.shape_id);
@@ -115,18 +110,8 @@ export async function networkShapes(
     const list = byRoute.get(r.route_id);
     if (list) list.push(r.shape_id);
     else byRoute.set(r.route_id, [r.shape_id]);
-    if (!routes.has(r.route_id))
-      routes.set(r.route_id, {
-        route_idx: r.route_idx,
-        route_id: r.route_id,
-        route_type: r.route_type,
-        agency_idx: r.agency_idx,
-        short_name: r.short_name,
-        long_name: r.long_name,
-        color: r.color,
-        text_color: r.text_color,
-      });
   }
+  const routes = new Map(all.map((r) => [r.route_id, r]));
   return { shapeLinesLayerId, shapes, byRoute, routes, stops: NO_STOPS, stations: NO_STATIONS };
 }
 

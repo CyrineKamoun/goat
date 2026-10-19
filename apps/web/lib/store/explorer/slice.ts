@@ -46,12 +46,9 @@ export interface ExplorerRouteDrawing {
   shapeIds: string[];
   /** Its stops, for the map and for fitting the view. */
   stops: { stop_idx: number; lon: number; lat: number; name: string }[];
-  /** Straight lines between stops, for trips without a shape. */
-  stopChains: [number, number][][];
-  /** Each pattern's shapes, and its stop chain where it has none: what the
-   * map highlights when the Stops tab shows that pattern. */
+  /** Each pattern's shapes — the feed's, or the line through its stops —:
+   * what the map highlights when the Stops tab shows that pattern. */
   patternShapes: Record<number, string[]>;
-  patternChains: Record<number, [number, number][]>;
   /** Each pattern's extent from its stops, `[west, south, east, north]`: the
    * map fits it when the Stops tab switches to it. */
   patternBounds: Record<number, [number, number, number, number]>;

@@ -52,9 +52,7 @@ describe("explorer slice", () => {
         shapeLinesLayerId: null,
         shapeIds: [],
         stops: [],
-        stopChains: [],
         patternShapes: {},
-        patternChains: {},
         patternBounds: {},
       })
     );
