@@ -265,7 +265,11 @@ def test_shapes_are_simplified_with_the_distance_along_them(
     # SH1 leaves S1 north-east to 52.505° N, comes back down at S2 and runs
     # due east to S5. Its point at 13.42 lies on the straight run: simplified
     # away. Each leg of the detour is 650.9 m; 0.01° of longitude 676.9 m.
-    points = _rows(snapshot, "SELECT i, lon, lat, d FROM {shape_points} ORDER BY i")
+    points = _rows(
+        snapshot,
+        """SELECT i, lon, lat, d FROM {shape_points} JOIN {shapes_meta} USING (shape_idx)
+           WHERE shape_id = 'SH1' ORDER BY i""",
+    )
     assert [round(p[1], 3) for p in points] == [13.4, 13.405, 13.41, 13.44]
     assert [round(p[3]) for p in points] == [0, 651, 1302, 3332]
 
@@ -278,11 +282,116 @@ def test_stops_are_placed_along_their_trips_shape(snapshot: Dict[str, Any]) -> N
            WHERE n_stops = 5 AND stops[1] < stops[5] ORDER BY i""",
     )
     assert [round(a[0]) for a in along] == [0, 1302, 1979, 2656, 3332]
-    # Patterns whose trips have no shape (R1's return, R2, R3, R4) have none.
+    # Patterns whose trips have no shape (R1's return, R2, R3, R4) are placed
+    # along the line through their stops: every pattern is.
     assert _rows(
-        snapshot, "SELECT count(DISTINCT pattern_idx) FROM {pattern_shape_stops}"
-    ) == [(2,)]
-    assert _rows(snapshot, "SELECT * FROM {shape_route}") == [(0, 0)]
+        snapshot,
+        "SELECT count(DISTINCT pattern_idx) = (SELECT count(*) FROM {patterns}) "
+        "FROM {pattern_shape_stops}",
+    ) == [(True,)]
+    assert _rows(
+        snapshot, "SELECT DISTINCT route_idx FROM {shape_route} ORDER BY 1"
+    ) == [
+        (0,),
+        (1,),
+        (2,),
+        (3,),
+    ]
+
+
+def test_trips_without_a_shape_take_the_line_through_their_stops(
+    snapshot: Dict[str, Any], tmp_path: Path
+) -> None:
+    # Every trip has a shape: its own, or the line through its stops.
+    assert _rows(snapshot, "SELECT count(*) FROM {trips} WHERE shape_idx IS NULL") == [
+        (0,)
+    ]
+    # R1's return T3 runs S5 → S1 straight along the stops, 676.9 m a stop,
+    # and keeps its length from them.
+    shape = _rows(
+        snapshot,
+        """SELECT m.shape_id, m.length_m, t.length_src FROM {trips} t
+           JOIN {shapes_meta} m USING (shape_idx) WHERE t.trip_id = 'T3'""",
+    )
+    [(shape_id, length_m, length_src)] = shape
+    assert shape_id.startswith("stops-")
+    assert length_m == pytest.approx(4 * 676.9, rel=0.01)
+    assert length_src == 3
+    points = _rows(
+        snapshot,
+        """SELECT round(lon, 3), round(d) FROM {shape_points} JOIN {shapes_meta}
+           USING (shape_idx) WHERE shape_id = '%s' ORDER BY i"""
+        % shape_id,
+    )
+    assert [p[0] for p in points] == pytest.approx([13.44, 13.43, 13.42, 13.41, 13.4])
+    # Each stop lies on it where the stops put it, never projected.
+    along = _rows(
+        snapshot,
+        """SELECT round(p.d) FROM {pattern_shape_stops} p JOIN {trips} t
+           USING (pattern_idx, shape_idx) WHERE t.trip_id = 'T3' ORDER BY p.i""",
+    )
+    assert [a[0] for a in along] == [round(p[1]) for p in points]
+    # The same id the importer gives the line in the bundle's shape_lines, so
+    # the map's tiles draw it.
+    archive = tmp_path / "mini_gtfs.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        for f in sorted(FIXTURE.iterdir()):
+            zf.write(f, f.name)
+    work = tmp_path / "work"
+    work.mkdir()
+    lines = next(
+        layer.file_path
+        for layer in GtfsImporter().extract_layers(str(archive), str(work))
+        if layer.role == "shape_lines"
+    )
+    member = {
+        r[0]
+        for r in duckdb.connect()
+        .execute(f"SELECT shape_id FROM read_parquet('{lines}')")
+        .fetchall()
+    }
+    assert {
+        r[0] for r in _rows(snapshot, "SELECT shape_id FROM {shapes_meta}")
+    } <= member
+
+
+def test_an_empty_or_unknown_shape_id_counts_as_none(tmp_path: Path) -> None:
+    # T1 names no shape ("") and T2 one the feed does not have: both are
+    # drawn through their stops, the same line, and no phantom shape appears.
+    root = tmp_path / "in"
+    root.mkdir()
+    archive = root / "mini_gtfs.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        for f in sorted(FIXTURE.iterdir()):
+            text = f.read_text()
+            if f.name == "trips.txt":
+                text = text.replace("R1,WK,T1,Fifth,0,,SH1", "R1,WK,T1,Fifth,0,,")
+                text = text.replace("R1,WK,T2,Fifth,0,,SH1", "R1,WK,T2,Fifth,0,,GONE")
+            zf.writestr(f.name, text)
+    work = tmp_path / "work"
+    work.mkdir()
+    paths = {
+        layer.role: layer.file_path
+        for layer in GtfsImporter().extract_layers(str(archive), str(work))
+    }
+    out = tmp_path / "snapshot"
+    out.mkdir()
+    con = bound_duckdb(duckdb.connect(), str(work))
+    build_snapshot(
+        con,
+        lambda role: f"read_parquet('{paths[role]}')" if role in paths else None,
+        str(out),
+    )
+    rows = con.execute(
+        f"""SELECT t.trip_id, m.shape_id FROM read_parquet('{out}/trips.parquet') t
+            JOIN read_parquet('{out}/shapes_meta.parquet') m USING (shape_idx)
+            WHERE t.trip_id IN ('T1', 'T2', 'T4') ORDER BY t.trip_id"""
+    ).fetchall()
+    assert rows[0][1] == rows[1][1] and rows[0][1].startswith("stops-")
+    assert rows[2] == ("T4", "SH1")
+    assert con.execute(
+        f"SELECT count(*) FROM read_parquet('{out}/shapes_meta.parquet') WHERE shape_id = ''"
+    ).fetchone() == (0,)
 
 
 @pytest.mark.parametrize("layout", ["points", "lines_as_shapes"])
@@ -291,7 +400,8 @@ def test_shapes_read_alike_however_the_bundle_keeps_them(
 ) -> None:
     # Newer imports keep the GTFS points and a shape_lines member (the module
     # snapshot); a bundle may have the points alone, or, imported earlier, one
-    # line per shape as its shapes member.
+    # line per shape as its shapes member. The lines through the stops come
+    # out alike too: the snapshot draws them from the stops, member or not.
     root = tmp_path / "in"
     root.mkdir()
     archive = root / "mini_gtfs.zip"

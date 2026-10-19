@@ -509,8 +509,13 @@ SPECS: Dict[BundleTypeName, BundleTypeSpec] = {
                 key="shape_lines",
                 label="Shape lines",
                 geometry="line",
+                # Also drawn from the stops, for trips without a shape: never
+                # written back either way.
                 derived_from="shapes",
-                description="The shape points joined into one line per shape.",
+                description=(
+                    "The shape points joined into one line per shape, and a line "
+                    "through the stops for each trip without a shape."
+                ),
             ),
             RoleSpec(key="frequencies", label="Frequencies", geometry="none"),
             RoleSpec(key="transfers", label="Transfers", geometry="none"),

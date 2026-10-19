@@ -98,6 +98,13 @@ should not assume either storage until every bundle has been converted;
 `analysis/accessibility/base.py` compares dates and enums as text for that
 reason.
 
+Shapes are optional in GTFS, and many feeds have none or have them for some
+trips only. The derived `shape_lines` member draws the feed's shapes and, for
+every trip without a usable one, a line through its stops
+(`bundles/importers/pt_network/stop_chains.py`), named after the stops so the
+Explorer's snapshot gives those trips the same line as their shape. Like any
+derived member it is never written back to the feed.
+
 ## Copies behind a project entry
 
 Two tools replace the layer a `layer_project` entry shows instead of adding a

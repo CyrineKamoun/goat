@@ -31,9 +31,11 @@ import math
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from goatlib.bundles.importers.pt_network.stop_chains import STOP_CHAIN_PREFIX
+
 #: Bumped when a file's columns or meaning change; part of the files' URLs,
 #: so a browser never mixes files of two versions.
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 #: GTFS ``shape_dist_traveled`` has no fixed unit. The feed's unit is the one
 #: of these (metres per unit) nearest to what its stops' straight-line
@@ -110,6 +112,8 @@ _TEMP_TABLES = (
     "x_shapes_meta",
     "x_shape_lines",
     "x_shape_points",
+    "x_chain_patterns",
+    "x_chain_shapes",
     "x_pattern_shape_stops",
 )
 
@@ -184,6 +188,7 @@ def build_snapshot(
         _shapes(con, rel, present)
         lines_role = _shape_lines(con, rel, present)
         _patterns_and_trips(con, scale)
+        _stop_chain_shapes(con)
         _pattern_shape_stops(con)
 
         files = []
@@ -416,7 +421,7 @@ def _trips0(con: Any, rel: Rel, present: Present, warnings: Dict[str, int]) -> N
         f"""
         CREATE OR REPLACE TEMP TABLE x_trips0 AS
         SELECT t."trip_id" AS trip_id, r.route_idx, sv.service_idx,
-               {_col(t, "shape_id", "VARCHAR", alias="t")} AS shape_id,
+               NULLIF({_col(t, "shape_id", "VARCHAR", alias="t")}, '') AS shape_id,
                NULLIF({_col(t, "block_id", "VARCHAR", alias="t")}, '') AS block_id,
                {_col(t, "direction_id", "UTINYINT", alias="t")} AS direction_id,
                {_col(t, "trip_headsign", "VARCHAR", alias="t")} AS headsign,
@@ -735,6 +740,118 @@ def _shape_lines(con: Any, rel: Rel, present: Present) -> Optional[str]:
     return lines_role
 
 
+def _stop_chain_shapes(con: Any) -> None:
+    """A line through the stops as the shape of each trip without one: its
+    ``shape_id`` empty, or naming no line (``x_shape_lines``).
+
+    The rule is ``stop_chains``': the same id the importer gives the line in
+    the bundle's ``shape_lines`` member (so the map's tiles draw it), the same
+    stops and positions. Built here from the stops all the same, so a bundle
+    imported without those lines still plays and measures. Listed per pattern,
+    not per trip: a trip's pattern is its ordered stops (``_trip_stops``).
+
+    Its points are the stops themselves, and the distance along it is the
+    stop-to-stop distance, so each stop's place on it (``x_pattern_shape_stops``)
+    is exact rather than projected. A trip's length is left as it was: from the
+    stop-to-stop distance already (``length_src`` 3)."""
+    con.execute(
+        """
+        CREATE OR REPLACE TEMP TABLE x_pattern_shape_stops (
+            pattern_idx INTEGER, shape_idx INTEGER, i INTEGER, d FLOAT)
+        """
+    )
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP TABLE x_chain_patterns AS
+        WITH shapeless AS (
+            SELECT DISTINCT pattern_idx FROM x_trips
+            WHERE shape_idx IS NULL
+               OR shape_idx NOT IN (SELECT shape_idx FROM x_shape_lines)
+        ),
+        calls AS (
+            SELECT p.pattern_idx, UNNEST(p.stops) AS stop_idx,
+                   UNNEST(range(len(p.stops))) AS i
+            FROM x_patterns0 p JOIN shapeless USING (pattern_idx)
+        )
+        SELECT c.pattern_idx,
+               '{STOP_CHAIN_PREFIX}' || md5(string_agg(s.stop_id, chr(31) ORDER BY c.i))
+                   AS shape_id
+        FROM calls c JOIN x_stops s USING (stop_idx)
+        GROUP BY c.pattern_idx
+        """
+    )
+    # One shape per distinct stop list, indexed after the feed's own.
+    con.execute(
+        """
+        CREATE OR REPLACE TEMP TABLE x_chain_shapes AS
+        SELECT CAST((SELECT coalesce(max(shape_idx) + 1, 0) FROM x_shapes_meta)
+                    + row_number() OVER (ORDER BY shape_id) - 1 AS INTEGER) AS shape_idx,
+               shape_id, min(pattern_idx) AS pattern_idx
+        FROM x_chain_patterns GROUP BY shape_id
+        """
+    )
+    # Each pattern's stops with a position (its station's where it has none),
+    # and how far along the line each lies.
+    placed = """
+        WITH calls AS (
+            SELECT {key}, UNNEST(p.stops) AS stop_idx, UNNEST(range(len(p.stops))) AS i
+            FROM {pairs} JOIN x_patterns0 p USING (pattern_idx)
+        ),
+        pos AS (
+            SELECT c.*, coalesce(s.lon, ps.lon) AS lon, coalesce(s.lat, ps.lat) AS lat
+            FROM calls c JOIN x_stops s USING (stop_idx)
+            LEFT JOIN x_stops ps ON ps.stop_idx = s.parent_idx
+            WHERE coalesce(s.lon, ps.lon) IS NOT NULL
+              AND coalesce(s.lat, ps.lat) IS NOT NULL
+        )
+        SELECT *, coalesce(sum(hop) OVER (PARTITION BY {part} ORDER BY i
+                      ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW), 0) AS d,
+               row_number() OVER (PARTITION BY {part} ORDER BY i) - 1 AS j,
+               count(*) OVER (PARTITION BY {part}) AS n
+        FROM (SELECT *, _hav_m(lag(lat) OVER w, lag(lon) OVER w, lat, lon) AS hop
+              FROM pos WINDOW w AS (PARTITION BY {part} ORDER BY i))
+    """
+    con.execute(
+        f"""
+        INSERT INTO x_shape_points
+        SELECT shape_idx, CAST(j AS INTEGER), CAST(lon AS FLOAT), CAST(lat AS FLOAT),
+               CAST(d AS FLOAT)
+        FROM ({placed.format(key="cs.shape_idx", pairs="x_chain_shapes cs", part="shape_idx")})
+        WHERE n >= 2
+        """
+    )
+    con.execute(
+        """
+        INSERT INTO x_shapes_meta
+        SELECT cs.shape_idx, cs.shape_id, CAST(max(pt.d) AS REAL)
+        FROM x_chain_shapes cs JOIN x_shape_points pt USING (shape_idx)
+        GROUP BY ALL
+        """
+    )
+    # The trips take it, where it could be drawn (two stops with a position).
+    con.execute(
+        """
+        UPDATE x_trips t SET shape_idx = m.shape_idx
+        FROM x_chain_patterns cp JOIN x_shapes_meta m USING (shape_id)
+        WHERE cp.pattern_idx = t.pattern_idx
+          AND (t.shape_idx IS NULL
+               OR t.shape_idx NOT IN (SELECT shape_idx FROM x_shape_lines))
+        """
+    )
+    con.execute(
+        f"""
+        INSERT INTO x_pattern_shape_stops
+        SELECT pattern_idx, shape_idx, CAST(i AS INTEGER), CAST(d AS FLOAT)
+        FROM ({placed.format(
+            key="cp.pattern_idx, m.shape_idx",
+            pairs="x_chain_patterns cp JOIN x_shapes_meta m USING (shape_id)",
+            part="pattern_idx",
+        )})
+        WHERE n >= 2
+        """
+    )
+
+
 def _pattern_shape_stops(con: Any) -> None:
     """``x_pattern_shape_stops``: how far along its shape each stop of a
     pattern lies, for every pattern and shape trips use together.
@@ -743,12 +860,6 @@ def _pattern_shape_stops(con: Any) -> None:
     ahead of it: a loop or a stop beside the line must not send a vehicle
     backwards; a loop's last stop, which projects to where it began, is the
     line's end."""
-    con.execute(
-        """
-        CREATE OR REPLACE TEMP TABLE x_pattern_shape_stops (
-            pattern_idx INTEGER, shape_idx INTEGER, i INTEGER, d FLOAT)
-        """
-    )
     n = con.execute("SELECT count(*) FROM x_shapes_meta").fetchone()[0]
     for lo in range(0, n, _SHAPE_BATCH):
         hi = lo + _SHAPE_BATCH

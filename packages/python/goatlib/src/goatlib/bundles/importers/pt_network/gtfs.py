@@ -4,8 +4,9 @@ Role → file and per-role column requirements are GTFS-specific and live here;
 which roles are *required* comes from the spec. Every file becomes one layer
 holding its rows and columns as published, typed where the GTFS reference
 types a field (``gtfs_schema``) and text otherwise. Stops carry a geometry
-alongside their own columns, and the shape points get a derived line layer for
-the map; neither replaces the data it is drawn from.
+alongside their own columns, and a derived line layer draws the shape points
+for the map, with a line through the stops for each trip without a shape
+(``stop_chains``); neither replaces the data it is drawn from.
 """
 
 import csv
@@ -25,6 +26,7 @@ from goatlib.bundles.importers.base import (
     bound_duckdb,
     register_importer,
 )
+from goatlib.bundles.importers.pt_network.stop_chains import stop_chain_lines_parquet
 from goatlib.models.bundle import BundleTypeName
 
 logger = logging.getLogger(__name__)
@@ -294,6 +296,8 @@ class GtfsImporter(BundleImporter):
         """
         layers: List[ExtractedLayer] = []
         essential = self._essential_roles()
+        # Each role's typed table, for the lines drawn after the loop.
+        converted: Dict[str, str] = {}
         with zipfile.ZipFile(source_path) as zf:
             names = {
                 os.path.basename(n) for n in zf.namelist() if self._is_feed_file(n)
@@ -334,23 +338,11 @@ class GtfsImporter(BundleImporter):
                         file_path=out_path,
                     )
                 )
-                if role == "shapes":
-                    lines_spec = self.spec.role("shape_lines")
-                    lines_path = os.path.join(workdir, "shape_lines.parquet")
-                    try:
-                        self._shape_lines_parquet(out_path, lines_path)
-                    except Exception as e:
-                        logger.warning("Skipping the shape lines: %s", e)
-                    else:
-                        layers.append(
-                            ExtractedLayer(
-                                role="shape_lines",
-                                name=lines_spec.label if lines_spec else "Shape lines",
-                                layer_type="feature",
-                                geometry_type="line",
-                                file_path=lines_path,
-                            )
-                        )
+                converted[role] = out_path
+
+            lines = self._lines_layer(converted, workdir)
+            if lines is not None:
+                layers.append(lines)
 
             known = set(_GTFS_FILE.values())
             for fname in sorted(names - known):
@@ -565,6 +557,83 @@ class GtfsImporter(BundleImporter):
             if os.path.exists(text_path):
                 os.remove(text_path)
         return out_path
+
+    def _lines_layer(
+        self, converted: Dict[str, str], workdir: str
+    ) -> Optional[ExtractedLayer]:
+        """The ``shape_lines`` member: the feed's shapes as lines, and a line
+        through the stops for each trip without one (``stop_chains``), so a
+        feed without shapes is drawn all the same. None where the feed has
+        nothing to draw a line from."""
+        import duckdb
+
+        from goatlib.io.geoparquet import write_optimized_parquet
+
+        parts: List[str] = []
+        drawn: Set[str] = set()
+        if "shapes" in converted:
+            shape_path = os.path.join(workdir, "shape_lines.shapes.parquet")
+            try:
+                self._shape_lines_parquet(converted["shapes"], shape_path)
+            except Exception as e:
+                logger.warning("Skipping the shape lines: %s", e)
+            else:
+                parts.append(shape_path)
+                con = duckdb.connect()
+                try:
+                    drawn = {
+                        row[0]
+                        for row in con.execute(
+                            "SELECT shape_id FROM read_parquet(?)", [shape_path]
+                        ).fetchall()
+                    }
+                finally:
+                    con.close()
+        if {"trips", "stop_times", "stops"} <= converted.keys():
+            chain_path = os.path.join(workdir, "shape_lines.stops.parquet")
+            try:
+                count = stop_chain_lines_parquet(
+                    converted["trips"],
+                    converted["stop_times"],
+                    converted["stops"],
+                    drawn,
+                    chain_path,
+                )
+            except Exception as e:
+                logger.warning("Skipping the lines through the stops: %s", e)
+            else:
+                logger.info(
+                    "%d lines through the stops for trips without a shape", count
+                )
+                parts.append(chain_path)
+        if not parts:
+            return None
+        out_path = os.path.join(workdir, "shape_lines.parquet")
+        # Bounded, spilling next to the output: see bound_duckdb.
+        con = bound_duckdb(duckdb.connect(), workdir)
+        try:
+            con.execute("INSTALL spatial; LOAD spatial")
+            union = " UNION ALL ".join(
+                f"SELECT shape_id, geometry FROM read_parquet('{p.replace(chr(39), chr(39) * 2)}')"
+                if p.endswith(".shapes.parquet")
+                else f"SELECT shape_id, ST_GeomFromWKB(wkb) AS geometry "
+                f"FROM read_parquet('{p.replace(chr(39), chr(39) * 2)}')"
+                for p in parts
+            )
+            write_optimized_parquet(con, union, out_path)
+        finally:
+            con.close()
+            for p in parts:
+                if os.path.exists(p):
+                    os.remove(p)
+        spec = self.spec.role("shape_lines")
+        return ExtractedLayer(
+            role="shape_lines",
+            name=spec.label if spec else "Shape lines",
+            layer_type="feature",
+            geometry_type="line",
+            file_path=out_path,
+        )
 
     @staticmethod
     def _shape_lines_parquet(shapes_path: str, out_path: str) -> str:

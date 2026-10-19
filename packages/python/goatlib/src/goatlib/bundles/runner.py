@@ -269,6 +269,10 @@ class BundleImportRunner(BundleArtifactBuildMixin, BaseToolRunner):
                     info = self._ingest_to_ducklake(
                         user_id=user_id, layer_id=layer_id, parquet_path=parquet_path
                     )
+                    # Read from the data, so an empty layer has none: a feed's
+                    # header-only shapes.txt gives shape lines without a line.
+                    # The importer's own word stands in.
+                    geometry_type = info.get("geometry_type") or extracted.geometry_type
 
                     # The role's contract as per-column metadata: which columns
                     # are computed and by what formula, which the bundle owns,
@@ -333,7 +337,7 @@ class BundleImportRunner(BundleArtifactBuildMixin, BaseToolRunner):
                         feature_layer_type=(
                             "standard" if extracted.layer_type == "feature" else None
                         ),
-                        geometry_type=info.get("geometry_type"),
+                        geometry_type=geometry_type,
                         extent_wkt=info.get("extent_wkt"),
                         feature_count=info.get("feature_count", 0),
                         size=info.get("size", 0),
@@ -344,7 +348,7 @@ class BundleImportRunner(BundleArtifactBuildMixin, BaseToolRunner):
                         properties=get_bundle_style(
                             bundle_type,
                             extracted.role,
-                            normalize_geometry_type(info.get("geometry_type")),
+                            normalize_geometry_type(geometry_type),
                         ),
                     )
                     if field_config:
@@ -363,7 +367,7 @@ class BundleImportRunner(BundleArtifactBuildMixin, BaseToolRunner):
                             layer_id=layer_id,
                             name=layer_name,
                             layer_type=extracted.layer_type,
-                            geometry_type=info.get("geometry_type"),
+                            geometry_type=geometry_type,
                             feature_count=info.get("feature_count", 0),
                         )
                     )
