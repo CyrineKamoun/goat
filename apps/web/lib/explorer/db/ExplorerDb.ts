@@ -16,6 +16,16 @@ import type { SqlRunner } from "@/lib/explorer/db/types";
  * upload limit allows needs about 0.5 GB. */
 const MEMORY_LIMIT = "2560MB";
 
+/** The snapshot's tables live in a compressed in-memory database, not the
+ * default one, which keeps them uncompressed: Berlin's take about 70 MB
+ * instead of 400. A table is compressed when it is checkpointed. */
+const SNAPSHOT_DB = "snapshot";
+
+/** Rows loaded between checkpoints. The module's memory never shrinks, so
+ * it keeps whatever a load once held uncompressed: a chunk of this size, not
+ * a whole table (about 20 MB, where all of Berlin's stop_times would be 150). */
+const LOAD_CHUNK_ROWS = 500_000;
+
 export class ExplorerDb implements SqlRunner {
   private constructor(
     private readonly db: AsyncDuckDB,
@@ -32,6 +42,8 @@ export class ExplorerDb implements SqlRunner {
       await db.open({ query: { castBigIntToDouble: true } });
       const conn = await db.connect();
       await conn.query(`SET memory_limit='${MEMORY_LIMIT}'`);
+      await conn.query(`ATTACH ':memory:' AS ${SNAPSHOT_DB} (COMPRESS)`);
+      await conn.query(`USE ${SNAPSHOT_DB}`);
       return new ExplorerDb(db, conn);
     } catch (error) {
       await db.terminate();
@@ -48,13 +60,24 @@ export class ExplorerDb implements SqlRunner {
     await this.conn.query(sql);
   }
 
-  /** Load one snapshot file as the table of its name. The buffer is released
-   * once the table holds the data. */
+  /** Load one snapshot file as the table of its name, compressed, a chunk
+   * of rows at a time. The buffer is released once the table holds the data. */
   async loadParquet(name: string, bytes: Uint8Array): Promise<void> {
     const file = `${name}.parquet`;
     await this.db.registerFileBuffer(file, bytes);
     try {
-      await this.conn.query(`CREATE OR REPLACE TABLE ${name} AS SELECT * FROM '${file}'`);
+      const [meta] = await this.all<{ rows: number }>(
+        `SELECT num_rows AS rows FROM parquet_file_metadata('${file}')`
+      );
+      const rows = Number(meta?.rows ?? 0);
+      await this.conn.query(`CREATE OR REPLACE TABLE ${name} AS SELECT * FROM '${file}' LIMIT 0`);
+      for (let from = 0; from < rows; from += LOAD_CHUNK_ROWS) {
+        await this.conn.query(`
+          INSERT INTO ${name}
+          SELECT * EXCLUDE (file_row_number) FROM read_parquet('${file}', file_row_number = true)
+          WHERE file_row_number >= ${from} AND file_row_number < ${from + LOAD_CHUNK_ROWS}`);
+        await this.conn.query(`CHECKPOINT ${SNAPSHOT_DB}`);
+      }
     } finally {
       await this.db.dropFile(file);
     }
