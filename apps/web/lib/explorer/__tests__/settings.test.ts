@@ -7,6 +7,7 @@ import {
   periodsFrom,
   rateFor,
   rateKey,
+  ratesByKind,
   settingsKey,
   settingsProblems,
 } from "@/lib/explorer/settings";
@@ -18,6 +19,22 @@ describe("Explorer settings", () => {
     // Another operator's buses, and the same operator's trams, keep the defaults.
     expect(rateFor(settings, "B", 3)).toEqual({ per_km: 4.5, per_hour: null });
     expect(rateFor(settings, "A", 0)).toEqual({ per_km: 7, per_hour: null });
+  });
+
+  it("prices every route type of a kind of vehicle at its one rate", () => {
+    const settings = { ...DEFAULT_SETTINGS, rates: { [rateKey("A", 3)]: { per_km: 5, per_hour: 40 } } };
+    // 700 is a bus too (extended route types): the bus rate.
+    expect(rateKey("A", 700)).toBe(rateKey("A", 3));
+    expect(rateFor(settings, "A", 700)).toEqual({ per_km: 5, per_hour: 40 });
+  });
+
+  it("still reads rates kept per route type, and moves them to their kind", () => {
+    const old = { "A|700": { per_km: 6, per_hour: null }, "A|0": { per_km: 8, per_hour: 50 } };
+    expect(rateFor({ ...DEFAULT_SETTINGS, rates: old }, "A", 700)).toEqual({ per_km: 6, per_hour: null });
+    expect(ratesByKind(old)).toEqual({
+      "A|bus": { per_km: 6, per_hour: null },
+      "A|tram": { per_km: 8, per_hour: 50 },
+    });
   });
 
   it("covers the service day with contiguous periods", () => {

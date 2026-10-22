@@ -7,7 +7,7 @@
  * Kept in this browser for now (Nihar, 14 Oct 2026); keyed by GTFS ids, not a
  * snapshot's indices, so they survive a rebuild of the snapshot.
  */
-import { modeOf } from "@/lib/explorer/modes";
+import { type ModeKey, modeOf } from "@/lib/explorer/modes";
 
 export interface Rate {
   per_km: number;
@@ -52,20 +52,55 @@ export const DEFAULT_SETTINGS: ExplorerSettings = {
   layover_s: 6 * 60,
 };
 
-/** Default rate by GTFS route type (basic or extended), where none is set. */
-export function defaultRate(routeType: number | null): Rate {
-  const mode = modeOf(routeType ?? 3);
+/** Default rate by kind of vehicle, where none is set. */
+export function modeRate(mode: ModeKey): Rate {
   if (mode === "tram" || mode === "cable_tram" || mode === "trolleybus") return { per_km: 7, per_hour: null };
   if (mode === "metro" || mode === "rail" || mode === "monorail") return { per_km: 12, per_hour: null };
   return { per_km: 4.5, per_hour: null };
 }
 
-export function rateKey(agencyId: string | null, routeType: number | null): string {
-  return `${agencyId ?? ""}|${routeType ?? ""}`;
+/** Default rate by GTFS route type (basic or extended), where none is set. */
+export function defaultRate(routeType: number | null): Rate {
+  return modeRate(modeOf(routeType ?? 3));
 }
 
+/** The kind of vehicle a rate key is for. */
+export function rateKeyMode(key: string): ModeKey {
+  return key.slice(key.lastIndexOf("|") + 1) as ModeKey;
+}
+
+/** Rates as kept, each under its kind of vehicle: one kept per route type
+ * (before 21 Oct 2026) moves to its kind's key, unless that has one. */
+export function ratesByKind(rates: Record<string, Rate>): Record<string, Rate> {
+  const out: Record<string, Rate> = {};
+  for (const [key, rate] of Object.entries(rates)) {
+    const bar = key.lastIndexOf("|");
+    const tail = key.slice(bar + 1);
+    if (tail === "" || /^\d+$/.test(tail)) {
+      const kind = rateKey(key.slice(0, bar) || null, tail === "" ? null : Number(tail));
+      out[kind] ??= rate;
+    } else out[key] = rate;
+  }
+  return out;
+}
+
+/** A rate is set per operator and kind of vehicle (bus, tram, …), not per
+ * GTFS route type: a feed often gives one kind several types (3 and 700
+ * both buses, 0 and 900 both trams), all costing the same. */
+export function rateKey(agencyId: string | null, routeType: number | null): string {
+  return `${agencyId ?? ""}|${modeOf(routeType ?? 3)}`;
+}
+
+/** Rates kept before they were per kind of vehicle were per route type
+ * (until 21 Oct 2026): still read, where no rate for the kind is set. */
+const typeKey = (agencyId: string | null, routeType: number | null) => `${agencyId ?? ""}|${routeType ?? ""}`;
+
 export function rateFor(settings: ExplorerSettings, agencyId: string | null, routeType: number | null): Rate {
-  return settings.rates[rateKey(agencyId, routeType)] ?? defaultRate(routeType);
+  return (
+    settings.rates[rateKey(agencyId, routeType)] ??
+    settings.rates[typeKey(agencyId, routeType)] ??
+    defaultRate(routeType)
+  );
 }
 
 /** Whether every rate in use is the default. */

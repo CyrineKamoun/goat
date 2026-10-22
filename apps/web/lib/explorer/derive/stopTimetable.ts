@@ -92,9 +92,12 @@ export async function stopDepartures(db: SqlRunner, stop_idx: number, date: stri
 }
 
 export interface TimetableEntry {
+  /** The platform it leaves from: a run can call at two of a station's. */
+  stop_idx: number;
   dep_s: number;
   trip_idx: number;
   run_dep_s: number;
+  pattern_idx: number;
   /** A short turn of its direction: it ends before the direction does. */
   short: boolean;
 }
@@ -128,9 +131,11 @@ export function byDirection(departures: Departure[], directions: Direction[]): T
       groups.set(key, group);
     }
     group.departures.push({
+      stop_idx: dep.stop_idx,
       dep_s: dep.dep_s,
       trip_idx: dep.trip_idx,
       run_dep_s: dep.run_dep_s,
+      pattern_idx: dep.pattern_idx,
       short: found?.short ?? false,
     });
   }

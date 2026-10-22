@@ -3,7 +3,8 @@
  *
  * A timetabled trip runs once. A frequency-based trip (frequencies.txt) is a
  * template: it runs every `headway_s` from `start_s` up to, not including,
- * `end_s`, each run taking as long as the template does.
+ * `end_s`, each run taking as long as the template does. Windows that
+ * overlap (a validator error, but feeds have them) run each departure once.
  */
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import { activeServicesSql } from "@/lib/explorer/derive/calendar";
@@ -46,7 +47,7 @@ export function runsSql(range: TripRange, date: string, tripsIn?: string): strin
     WHERE trip_idx NOT IN (SELECT trip_idx FROM frequencies)
       AND first_dep_s IS NOT NULL AND last_arr_s IS NOT NULL
     UNION ALL
-    SELECT trip_idx, pattern_idx, direction_id, headsign, block_idx, service_idx, dep_s,
+    SELECT DISTINCT trip_idx, pattern_idx, direction_id, headsign, block_idx, service_idx, dep_s,
            dep_s + (last_arr_s - first_dep_s) AS arr_s, length_m
     FROM (
       SELECT t.*, unnest(range(f.start_s, f.end_s, f.headway_s)) AS dep_s
@@ -57,6 +58,17 @@ export function runsSql(range: TripRange, date: string, tripsIn?: string): strin
 
 /** Every trip of the bundle: `runsSql` over the whole network. */
 export const ALL_TRIPS: TripRange = { trip_lo: 0, trip_hi: 2147483647 };
+
+/** How many runs each route makes on `date`, by route_idx; a route making
+ * none is not in it. For ranking the route list: what runs that day, and
+ * runs most, first. */
+export async function routeDayRuns(db: SqlRunner, date: string): Promise<Map<number, number>> {
+  const rows = await db.all<{ route_idx: number; n: number }>(`
+    SELECT t.route_idx, CAST(count(*) AS INTEGER) AS n
+    FROM (${runsSql(ALL_TRIPS, date)}) r JOIN trips t USING (trip_idx)
+    GROUP BY 1`);
+  return new Map(rows.map((r) => [r.route_idx, r.n]));
+}
 
 export async function routeRuns(db: SqlRunner, range: TripRange, date: string): Promise<Run[]> {
   return db.all<Run>(`SELECT * FROM (${runsSql(range, date)}) ORDER BY dep_s, trip_idx`);

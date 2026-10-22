@@ -61,22 +61,123 @@ export interface ListedPlace {
   opened: boolean;
 }
 
-const has = (v: string | null, q: string) => !!v && v.toLowerCase().includes(q);
+/** Whether `text` has a word starting with `q`: at its start, or after a
+ * space or other separator ("Hbf (Berlin)", "Alt-Moabit"). */
+function wordStarts(text: string, q: string): boolean {
+  return text.startsWith(q) || [" ", "-", "/", "(", "."].some((sep) => text.includes(sep + q));
+}
 
-/** The places a search and a route filter keep, with the platforms they keep. */
+/** Route numbers as people read them: 2, 4, 10, 52, 100 — not as text. */
+const natural = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+export interface SearchableRoute {
+  route_idx: number;
+  short_name: string | null;
+  long_name: string | null;
+  agency: string | null;
+  route_id: string;
+}
+
+/** How well a route matches a search, best first, or null where it does
+ * not: its number exactly, starting with the search, holding it; then its
+ * name, a word of it starting with the search, holding it; last, only its
+ * operator or id (route 25 whose id holds "52" comes after 52 and 520). */
+export function routeRank(route: SearchableRoute, q: string): number | null {
+  const short = (route.short_name ?? "").toLowerCase();
+  const long = (route.long_name ?? "").toLowerCase();
+  if (short === q) return 0;
+  if (short.startsWith(q)) return 1;
+  if (short.includes(q)) return 2;
+  if (wordStarts(long, q)) return 3;
+  if (long.includes(q)) return 4;
+  if ((route.agency ?? "").toLowerCase().includes(q) || route.route_id.toLowerCase().includes(q)) return 5;
+  return null;
+}
+
+/** The routes a search finds, best match first. Among equals, with each
+ * route's runs on the date known (`runs`, by route_idx): those running that
+ * day first, the busiest first; then by number in natural order (52 before
+ * 520), else as listed. No search: all, as listed. */
+export function searchRoutes<R extends SearchableRoute>(
+  routes: R[],
+  query: string,
+  runs?: Map<number, number> | null
+): R[] {
+  const q = query.toLowerCase();
+  if (!q) return routes;
+  const found: [number, number, number, R][] = [];
+  routes.forEach((r, i) => {
+    const rank = routeRank(r, q);
+    if (rank !== null) found.push([rank, runs?.get(r.route_idx) ?? 0, i, r]);
+  });
+  found.sort(
+    (a, b) =>
+      a[0] - b[0] ||
+      (runs ? b[1] - a[1] : 0) ||
+      natural.compare(a[3].short_name ?? "", b[3].short_name ?? "") ||
+      a[2] - b[2]
+  );
+  return found.map(([, , , r]) => r);
+}
+
+/** The text a search looks in, lowercased once per list of places rather
+ * than on every keystroke: a place's name and id, and each platform's name,
+ * code and id. A platform's fields are joined by a character no search
+ * holds, so a search never matches across two of them. */
+const placeKeys = new WeakMap<
+  PlaceRow[],
+  { name: string; id: string; platforms: Map<PlatformRow, string> }[]
+>();
+const key = (...vs: (string | null)[]) =>
+  vs
+    .map((v) => v ?? "")
+    .join("\u0000")
+    .toLowerCase();
+function keysOf(places: PlaceRow[]) {
+  let keys = placeKeys.get(places);
+  if (!keys) {
+    keys = places.map((p) => ({
+      name: (p.name ?? "").toLowerCase(),
+      id: (p.stop_id ?? "").toLowerCase(),
+      platforms: new Map(p.platforms.map((x) => [x, key(x.name, x.platform_code, x.stop_id)])),
+    }));
+    placeKeys.set(places, keys);
+  }
+  return keys;
+}
+
+/** How well a place's own name or id matches, best first: the name exactly,
+ * starting with the search, a word of it starting with it, holding it; then
+ * the id. Null where only a platform, or nothing, matches. */
+function placeRank(k: { name: string; id: string }, q: string): number | null {
+  if (k.name === q) return 0;
+  if (k.name.startsWith(q)) return 1;
+  if (wordStarts(k.name, q)) return 2;
+  if (k.name.includes(q)) return 3;
+  if (k.id.includes(q)) return 4;
+  return null;
+}
+
+/** The places a search and a route filter keep, with the platforms they
+ * keep: best match first, a place found by one of its platforms last, and
+ * equals in name order. */
 export function listPlaces(places: PlaceRow[], query: string, via: Set<number> | null): ListedPlace[] {
   const q = query.toLowerCase();
+  const keys = q ? keysOf(places) : null;
   const calledAt = (routes: number[]) => !via || routes.some((i) => via.has(i));
-  const out: ListedPlace[] = [];
-  for (const place of places) {
-    if (!calledAt(place.route_idxs)) continue;
-    const platforms = place.platforms.filter((p) => calledAt(p.route_idxs));
-    if (!q || has(place.name, q) || has(place.stop_id, q)) {
-      out.push({ place, platforms, opened: false });
-      continue;
+  const out: [number, ListedPlace][] = [];
+  places.forEach((place, i) => {
+    if (!calledAt(place.route_idxs)) return;
+    const platforms = via ? place.platforms.filter((p) => calledAt(p.route_idxs)) : place.platforms;
+    const rank = keys ? placeRank(keys[i], q) : 0;
+    if (rank !== null) {
+      out.push([rank, { place, platforms, opened: false }]);
+      return;
     }
-    const found = platforms.filter((p) => has(p.name, q) || has(p.platform_code, q) || has(p.stop_id, q));
-    if (found.length) out.push({ place, platforms: found, opened: true });
-  }
-  return out;
+    const found = platforms.filter((p) => keys?.[i].platforms.get(p)?.includes(q));
+    if (found.length) out.push([5, { place, platforms: found, opened: true }]);
+  });
+  // A stable sort: equals keep the name order they came in.
+  if (q) out.sort((a, b) => a[0] - b[0]);
+  return out.map(([, listed]) => listed);
 }

@@ -51,9 +51,27 @@ export function rate(value: number, locale: string, currency = "EUR"): string {
   }).format(value);
 }
 
-/** `Tue, 6 Oct`. */
+/** The locale dates are written in: English as written in Europe, the day
+ * before the month ("Wed 21 Oct", not "Wed, Oct 21"), as GOAT's date
+ * pickers write it (en-gb); other languages as they are. */
+export function dateLocale(locale: string): string {
+  return locale === "en" || locale.startsWith("en-") ? "en-GB" : locale;
+}
+
+/** `[from, to]` (`YYYY-MM-DD`) as the locale writes a span of days:
+ * "21 Oct 2026 – 20 Oct 2027", "6 Oct – 12 Dec 2026". */
+export function dateSpan(from: string, to: string, locale: string): string {
+  return new Intl.DateTimeFormat(dateLocale(locale), {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).formatRange(new Date(`${from}T00:00:00Z`), new Date(`${to}T00:00:00Z`));
+}
+
+/** `Tue 6 Oct`. */
 export function shortDate(date: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
+  return new Intl.DateTimeFormat(dateLocale(locale), {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -63,15 +81,17 @@ export function shortDate(date: string, locale: string): string {
 
 /** `26 Nov`. */
 export function dayMonth(date: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", timeZone: "UTC" }).format(
-    new Date(`${date}T00:00:00Z`)
-  );
+  return new Intl.DateTimeFormat(dateLocale(locale), {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T00:00:00Z`));
 }
 
 /** A weekday's short name, ISO numbered (1 = Monday). */
 export function weekdayName(isoDay: number, locale: string, width: "short" | "narrow" = "short"): string {
   // 2024-01-01 was a Monday.
-  return new Intl.DateTimeFormat(locale, { weekday: width, timeZone: "UTC" }).format(
+  return new Intl.DateTimeFormat(dateLocale(locale), { weekday: width, timeZone: "UTC" }).format(
     new Date(Date.UTC(2024, 0, isoDay))
   );
 }

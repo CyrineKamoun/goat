@@ -5,8 +5,8 @@
  *   annual cost = vehicle-km a year × € per km (+ vehicle-hours × € per hour)
  *
  * A year's vehicle-km come from the timetable and the calendar: each service's
- * daily km times the days it runs within the feed's window, scaled to 365 days
- * when the window is shorter. Rates are per operator and route type and set by
+ * daily km times the days it runs in the year counted (yearOf), scaled to 365
+ * days when the feed's window is shorter. Rates are per operator and route type and set by
  * the user (settings.ts); a type without one is priced at its default.
  */
 import type { SqlRunner } from "@/lib/explorer/db/types";
@@ -72,11 +72,40 @@ async function annualFor(
   };
 }
 
-/** A year at most, from the window's start: a feed covering more counts once. */
-export function yearOf(window: [string, string]): [string, string] {
-  const startMs = Date.parse(`${window[0]}T00:00:00Z`);
-  const yearEnd = new Date(startMs + 364 * 86_400_000).toISOString().slice(0, 10);
-  return window[1] > yearEnd ? [window[0], yearEnd] : window;
+const DAY_MS = 86_400_000;
+const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/** The period a cost is counted over, and how it was chosen. */
+export interface CostYear {
+  from: string;
+  to: string;
+  /** "calendar": this calendar year, all of it in the feed; "year": 365
+   * days of the feed, the calendar year not all in it; "scaled": all of a
+   * feed shorter than a year, its figures scaled to 365 days. */
+  kind: "calendar" | "year" | "scaled";
+}
+
+/** The period a cost is counted over: this calendar year, where the feed's
+ * window covers all of it; else 365 days of the window, from today, or its
+ * last 365 days once today is past them; and a window of a year or less,
+ * all of it. Not from the window's first day, where a placeholder service
+ * range (2018–2028) can put it years before the timetable runs. */
+export function costYear(window: [string, string], today: Date = new Date()): CostYear {
+  const start = Date.parse(`${window[0]}T00:00:00Z`);
+  const end = Date.parse(`${window[1]}T00:00:00Z`);
+  if (end - start <= 364 * DAY_MS) return { from: window[0], to: window[1], kind: "scaled" };
+  const year = today.getUTCFullYear();
+  const [jan1, dec31] = [`${year}-01-01`, `${year}-12-31`];
+  if (window[0] <= jan1 && window[1] >= dec31) return { from: jan1, to: dec31, kind: "calendar" };
+  const now = Date.UTC(year, today.getUTCMonth(), today.getUTCDate());
+  const from = Math.min(Math.max(now, start), end - 364 * DAY_MS);
+  return { from: isoDay(from), to: isoDay(from + 364 * DAY_MS), kind: "year" };
+}
+
+/** costYear as `[from, to]`. */
+export function yearOf(window: [string, string], today: Date = new Date()): [string, string] {
+  const { from, to } = costYear(window, today);
+  return [from, to];
 }
 
 /** A route's figures for a year, from every service it runs on. */

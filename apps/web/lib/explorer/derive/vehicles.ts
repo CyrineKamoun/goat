@@ -180,7 +180,12 @@ export async function vehicleWindow(
       FROM st JOIN r USING (trip_idx)
       LEFT JOIN pattern_shape_stops ps
         ON ps.pattern_idx = r.pattern_idx AND ps.shape_idx = r.shape_idx AND ps.i = st.i
-      WHERE st.lon IS NOT NULL AND st.lat IS NOT NULL
+      -- Timed stops only: a feed may time just its timepoints, leaving the
+      -- stops between blank (GTFS allows it). The vehicle then runs from one
+      -- timepoint to the next along its shape, past the untimed stops,
+      -- rather than stopping dead at the first of them. i stays each stop's
+      -- place in the trip, so the shape distances still match.
+      WHERE st.lon IS NOT NULL AND st.lat IS NOT NULL AND st.arr IS NOT NULL
     ),
     hops AS (
       SELECT *, lead(arr) OVER w AS next_arr, lead(lon) OVER w AS nlon, lead(lat) OVER w AS nlat,
