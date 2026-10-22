@@ -46,7 +46,7 @@ Set up your own storage before you start GOAT for the first time. Data already i
   ]
   ```
 
-- **Assets bucket** (`ASSETS_BUCKET_NAME`, default `goat-assets`) for avatars and images. It must be readable without credentials at the address you set as `ASSETS_URL`.
+- **Assets bucket** (`ASSETS_BUCKET_NAME`, default `goat-assets`) for avatars and images. It must be readable without credentials at the address you set as `ASSETS_URL`. If your storage allows no publicly readable bucket, skip it: set `ASSETS_SERVED_BY_CORE=true` and `ASSETS_URL=<GOAT_PUBLIC_URL>/api/v2/asset/file`. GOAT then keeps the images in the uploads bucket under `assets/` and serves them itself.
 
 Both buckets are accessed with the same access key.
 
@@ -65,6 +65,7 @@ Remove `garage` from `COMPOSE_PROFILES`, then set:
 | `ASSETS_S3_ENDPOINT_URL` | Endpoint of the assets bucket; defaults to `S3_ENDPOINT_URL` |
 | `ASSETS_BUCKET_NAME` | The assets bucket |
 | `ASSETS_URL` | Public address of the assets bucket, e.g. `https://assets.example.org` |
+| `ASSETS_SERVED_BY_CORE` | `true` keeps the images in the uploads bucket and lets GOAT serve them, for storage without a public bucket |
 
 `GARAGE_RPC_SECRET` and `GARAGE_ADMIN_TOKEN` are not used without the bundled Garage.
 
@@ -170,7 +171,7 @@ The images in the emails come from GOAT's public URL (`<public URL>/assets`), or
 
 ## Support tickets {#support}
 
-GOAT can hand problem reports and questions from its users to an Odoo Helpdesk, where they appear as tickets with replies. This is optional and **off by default**. Without it, *Report a problem* in the app shows an email address and the *Documentation* link, and the routes under `/api/v2/support` do not exist. The address defaults to `support@plan4better.de`; set your own with `NEXT_PUBLIC_SUPPORT_EMAIL`, see the [configuration reference](./configuration.md#integrations).
+GOAT can hand problem reports and questions from its users to an Odoo Helpdesk, where they appear as tickets with replies. This is optional and **off by default**. Without it, *Report a problem* in the app shows an email address and the *Documentation* link, and the routes under `/api/v2/support` answer 404, except `/api/v2/support/summary`, which tells the app that support is off. The address defaults to `support@plan4better.de`; set your own with `NEXT_PUBLIC_SUPPORT_EMAIL`, see the [configuration reference](./configuration.md#integrations).
 
 | Setting | Meaning |
 |---|---|

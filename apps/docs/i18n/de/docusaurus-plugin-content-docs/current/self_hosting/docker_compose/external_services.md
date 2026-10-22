@@ -46,7 +46,7 @@ Richten Sie Ihren eigenen Speicher ein, bevor Sie GOAT zum ersten Mal starten. D
   ]
   ```
 
-- **Assets-Bucket** (`ASSETS_BUCKET_NAME`, Vorgabe `goat-assets`) für Profilbilder und Bilder. Er muss ohne Zugangsdaten unter der Adresse lesbar sein, die Sie als `ASSETS_URL` eintragen.
+- **Assets-Bucket** (`ASSETS_BUCKET_NAME`, Vorgabe `goat-assets`) für Profilbilder und Bilder. Er muss ohne Zugangsdaten unter der Adresse lesbar sein, die Sie als `ASSETS_URL` eintragen. Erlaubt Ihr Speicher keinen öffentlich lesbaren Bucket, lassen Sie ihn weg: Setzen Sie `ASSETS_SERVED_BY_CORE=true` und `ASSETS_URL=<GOAT_PUBLIC_URL>/api/v2/asset/file`. GOAT legt die Bilder dann im Upload-Bucket unter `assets/` ab und liefert sie selbst aus.
 
 Auf beide Buckets wird mit demselben Zugangsschlüssel zugegriffen.
 
@@ -65,6 +65,7 @@ Entfernen Sie `garage` aus `COMPOSE_PROFILES` und setzen Sie:
 | `ASSETS_S3_ENDPOINT_URL` | Endpunkt des Assets-Buckets; Vorgabe ist `S3_ENDPOINT_URL` |
 | `ASSETS_BUCKET_NAME` | Der Assets-Bucket |
 | `ASSETS_URL` | Öffentliche Adresse des Assets-Buckets, z. B. `https://assets.example.org` |
+| `ASSETS_SERVED_BY_CORE` | `true` legt die Bilder im Upload-Bucket ab und lässt GOAT sie ausliefern, für Speicher ohne öffentlichen Bucket |
 
 `GARAGE_RPC_SECRET` und `GARAGE_ADMIN_TOKEN` werden ohne das mitgelieferte Garage nicht verwendet.
 
@@ -170,7 +171,7 @@ Die Bilder in den E-Mails kommen von GOATs öffentlicher URL (`<öffentliche URL
 
 ## Support-Tickets {#support}
 
-GOAT kann Problemmeldungen und Fragen seiner Benutzer an einen Odoo-Helpdesk weiterreichen, wo sie als Tickets mit Antworten erscheinen. Das ist optional und **standardmäßig aus**. Ohne diese Einstellungen zeigt *Problem melden* in der App eine E-Mail-Adresse und den Link *Dokumentation*, und die Routen unter `/api/v2/support` existieren nicht. Die Adresse ist standardmäßig `support@plan4better.de`; Ihre eigene legen Sie mit `NEXT_PUBLIC_SUPPORT_EMAIL` fest, siehe [Konfigurationsreferenz](./configuration.md#integrations).
+GOAT kann Problemmeldungen und Fragen seiner Benutzer an einen Odoo-Helpdesk weiterreichen, wo sie als Tickets mit Antworten erscheinen. Das ist optional und **standardmäßig aus**. Ohne diese Einstellungen zeigt *Problem melden* in der App eine E-Mail-Adresse und den Link *Dokumentation*, und die Routen unter `/api/v2/support` antworten mit 404, außer `/api/v2/support/summary`, die der App mitteilt, dass der Support aus ist. Die Adresse ist standardmäßig `support@plan4better.de`; Ihre eigene legen Sie mit `NEXT_PUBLIC_SUPPORT_EMAIL` fest, siehe [Konfigurationsreferenz](./configuration.md#integrations).
 
 | Einstellung | Bedeutung |
 |---|---|

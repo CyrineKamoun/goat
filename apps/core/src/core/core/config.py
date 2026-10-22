@@ -1,5 +1,6 @@
 import os
 from typing import Literal
+from urllib.parse import quote
 from uuid import UUID
 
 from goatlib.auth import AuthFlag, require_keycloak_url, require_own_client_allowed
@@ -61,11 +62,17 @@ class Settings(BaseSettings):
     ) -> str:
         if value:
             return value
+        # Percent-encoded, so any character in them survives; SQLAlchemy
+        # decodes them again.
+        user, password = (
+            info.data.get("POSTGRES_USER"),
+            info.data.get("POSTGRES_PASSWORD"),
+        )
         return str(
             PostgresDsn.build(
                 scheme="postgresql+psycopg",
-                username=info.data.get("POSTGRES_USER"),
-                password=info.data.get("POSTGRES_PASSWORD"),
+                username=quote(user, safe="") if user else user,
+                password=quote(password, safe="") if password else password,
                 host=info.data.get("POSTGRES_SERVER"),
                 port=info.data.get("POSTGRES_PORT"),
                 path=f"{info.data.get('POSTGRES_DB') or ''}",
@@ -172,13 +179,19 @@ class Settings(BaseSettings):
     AWS_S3_ASSETS_BUCKET: str | None = "goat-assets"
     ASSETS_S3_ENDPOINT_URL: str | None = None
     ASSETS_S3_FORCE_PATH_STYLE: bool = False
+    # For a store with no publicly readable bucket: assets live in the data
+    # bucket under `assets/`, and core serves them at
+    # {API_V2_STR}/asset/file/<key> by redirecting to a short-lived signed URL.
+    # The AWS_* and ASSETS_S3_* settings above are then unused.
+    ASSETS_SERVED_BY_CORE: bool = False
 
     # ------------------------------------------------------------------
     # Assets / thumbnails
     # ------------------------------------------------------------------
     # Public base URL of the assets bucket: user uploads are served from
     # ``{ASSETS_URL}/{s3_key}``. Unset, a bucket on AWS is served from its own
-    # public URL; a bucket behind ASSETS_S3_ENDPOINT_URL needs it set.
+    # public URL; a bucket behind ASSETS_S3_ENDPOINT_URL needs it set. With
+    # ASSETS_SERVED_BY_CORE it defaults to core's route on CLIENT_URL's host.
     ASSETS_URL: str | None = None
     # Base URL of the product artwork (email images, default thumbnails and
     # avatars), for a mirror or CDN. Unset, the artwork the web app ships is
@@ -249,6 +262,11 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _default_assets_url(self) -> "Settings":
         if self.ASSETS_URL:
+            return self
+        if self.ASSETS_SERVED_BY_CORE:
+            self.ASSETS_URL = (
+                f"{self.CLIENT_URL.rstrip('/')}{self.API_V2_STR}/asset/file"
+            )
             return self
         if self.ASSETS_S3_ENDPOINT_URL:
             raise ValueError(
