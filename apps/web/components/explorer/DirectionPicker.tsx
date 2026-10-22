@@ -27,7 +27,7 @@ import type { RouteRow } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { RouteBadge } from "@/components/explorer/RouteBadge";
-import { directionLabel, directionPlace } from "@/components/explorer/directionWords";
+import { directionPlace } from "@/components/explorer/directionWords";
 
 const KIND_KEY: Record<Exclude<VariantKind, "main">, string> = {
   short_turn: "explorer_variant_short_turn",
@@ -36,12 +36,7 @@ const KIND_KEY: Record<Exclude<VariantKind, "main">, string> = {
 };
 
 /** The picker's options; `all` adds "All directions" where there are several. */
-export function directionItems(
-  directions: Direction[],
-  route: RouteRow,
-  t: TFunction,
-  { all }: { all: boolean }
-): SelectorItem[] {
+export function directionItems(directions: Direction[], route: RouteRow, t: TFunction): SelectorItem[] {
   const trips = (n: number) => t("explorer_trips", { count: n });
   const badge = <RouteBadge route={route} small />;
   // A variant sits under its direction, where the badge would be.
@@ -51,17 +46,9 @@ export function directionItems(
     </Box>
   );
   return [
-    ...(all && directions.length > 1
-      ? [
-          {
-            value: "all",
-            label: `${t("explorer_all_directions")} · ${trips(directions.reduce((n, d) => n + d.n_trips, 0))}`,
-            iconNode: badge,
-          },
-        ]
-      : []),
     ...directions.flatMap((d) => [
-      { value: `${d.key}:`, label: `${directionLabel(d.name, t)} · ${trips(d.n_trips)}`, iconNode: badge },
+      // A direction by its destination alone, no "To".
+      { value: `${d.key}:`, label: `${directionPlace(d.name, t)} · ${trips(d.n_trips)}`, iconNode: badge },
       ...d.patterns
         .filter((p) => p.kind !== "main")
         .map((p) => ({
@@ -104,13 +91,12 @@ export function DirectionPicker({
 }) {
   const { t } = useTranslation("common");
   const { resolved, pick } = useDirectionChoice(directions);
-  const items = directionItems(directions, route, t, { all: true });
+  const items = directionItems(directions, route, t);
   const value = choiceValue(resolved);
   // A variant by its own words ("Short turn to …"); short, its destination.
   const variant = resolved.direction?.patterns.find((p) => p.pattern_idx === resolved.pattern_idx);
-  const shown = resolved.all
-    ? t("explorer_all_directions")
-    : variant && variant.kind !== "main"
+  const shown =
+    variant && variant.kind !== "main"
       ? compact
         ? variant.destination
         : t(KIND_KEY[variant.kind], {
@@ -118,9 +104,7 @@ export function DirectionPicker({
             interpolation: { escapeValue: false },
           })
       : resolved.direction
-        ? compact
-          ? directionPlace(resolved.direction.name, t)
-          : directionLabel(resolved.direction.name, t)
+        ? directionPlace(resolved.direction.name, t)
         : "";
   return (
     <Select

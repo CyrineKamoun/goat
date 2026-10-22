@@ -54,7 +54,6 @@ const HIT_W = 8;
 
 interface Placed {
   direction: Direction;
-  reversed: boolean;
   /** Where each of its stops lies down the strip, 0–1. */
   at: Map<number, number>;
 }
@@ -156,8 +155,8 @@ function Chart(props: StripChartProps) {
 
   // Which directions are drawn, and where each stop lies down the strip.
   const placed = useMemo<Placed[]>(() => {
-    const shown = choice.all ? trips.directions : choice.direction ? [choice.direction] : [];
-    return shown.map((direction, k) => {
+    const shown = choice.direction ? [choice.direction] : [];
+    return shown.map((direction) => {
       const axis = trips.axes.get(direction.key);
       const at = new Map<number, number>();
       if (axis) {
@@ -165,10 +164,10 @@ function Chart(props: StripChartProps) {
         axis.stop_idx.forEach((stop, i) => {
           if (at.has(stop)) return; // a loop's last stop is its first
           const f = (axis.d[i] - d0) / axis.length_m;
-          at.set(stop, choice.all && k % 2 === 1 ? 1 - f : f);
+          at.set(stop, f);
         });
       }
-      return { direction, reversed: choice.all && k % 2 === 1, at };
+      return { direction, at };
     });
   }, [trips, choice]);
   const placedOf = useMemo(() => {

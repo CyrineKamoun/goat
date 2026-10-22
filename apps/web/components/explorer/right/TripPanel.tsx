@@ -6,7 +6,7 @@
  * the map rings the vehicle. A stop opens its timetable, which goes back to
  * the trip.
  */
-import { Box, ButtonBase, IconButton, Skeleton, Stack, Tooltip, Typography } from "@mui/material";
+import { Box, ButtonBase, IconButton, Skeleton, Stack, Tab, Tabs, Tooltip, Typography } from "@mui/material";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -15,15 +15,16 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import type { TripStop } from "@/lib/explorer/derive/trip";
 import { clock, shortDate } from "@/lib/explorer/format";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
-import { openExplorerPanel } from "@/lib/store/explorer/slice";
+import { type ExplorerTripTab, openExplorerPanel, setExplorerTripTab } from "@/lib/store/explorer/slice";
 
-import { type RouteRow, useRoutes, useTripDetail } from "@/hooks/explorer/useExplorerData";
+import { useRoutes, useTripDetail } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
-import { BADGES, RAIL, Rail, StopDot } from "@/components/explorer/LineDiagram";
-import { RouteBadge, distinctLines, routeName } from "@/components/explorer/RouteBadge";
-import { PX } from "@/components/explorer/SectionHeader";
+import { RAIL, Rail, StopDot } from "@/components/explorer/LineDiagram";
+import { RouteBadge } from "@/components/explorer/RouteBadge";
+import { RouteCalendar } from "@/components/explorer/RouteCalendar";
+import { PX, TAB_SX } from "@/components/explorer/SectionHeader";
 import { PanelKind } from "@/components/explorer/right/PanelKind";
 import { usePlaybackMinute } from "@/components/explorer/right/usePlaybackMinute";
 
@@ -33,6 +34,8 @@ export function TripPanel({ trip_idx, run_dep_s }: { trip_idx: number; run_dep_s
   const { db, complete } = useExplorer();
   const date = useAppSelector((s) => s.explorer.date);
   const playing = useAppSelector((s) => s.explorer.playing);
+  const tab = useAppSelector((s) => s.explorer.tripTab);
+  const setTab = (v: ExplorerTripTab) => dispatch(setExplorerTripTab(v));
   const now = usePlaybackMinute();
   const routes = useRoutes(db);
   const trip = useTripDetail(complete ? db : undefined, trip_idx, run_dep_s, date);
@@ -75,19 +78,15 @@ export function TripPanel({ trip_idx, run_dep_s }: { trip_idx: number; run_dep_s
       </Box>
     );
 
-  const destination = data.destination ?? data.headsign;
-  // The line's name, where it adds to where the trip goes: a line is often
-  // named by its two ends ("Pl.Universitat / Sant Joan Despí"), and beside
-  // "To Sant Joan Despí" that would say the destination twice.
-  const lineName = routeName(route, t);
-  const namesDestination = !!destination && lineName.toLowerCase().includes(destination.toLowerCase());
-  const meta = [
-    namesDestination ? null : lineName,
-    destination
-      ? t("explorer_direction_to", { place: destination, interpolation: { escapeValue: false } })
-      : null,
-    date ? shortDate(date, i18n.language) : null,
-  ].filter(Boolean);
+  // Where it runs from and to, its own first and last stop ("Falkenberg –
+  // S Hackescher Markt"), and the date. The line is its badge above: its
+  // name is often its two ends, or only its mode ("Rail"), and wrapped the
+  // subtitle onto two lines.
+  const from = data.stops[0]?.name ?? null;
+  const to = data.stops[data.stops.length - 1]?.name ?? null;
+  const meta = [from && to ? `${from} – ${to}` : null, date ? shortDate(date, i18n.language) : null].filter(
+    Boolean
+  );
   const minutes = first !== null && last !== null ? Math.round((last - first) / 60) : null;
 
   return (
@@ -159,31 +158,42 @@ export function TripPanel({ trip_idx, run_dep_s }: { trip_idx: number; run_dep_s
           </Tooltip>
         </Stack>
       </Box>
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-          px: PX,
-          py: 1,
-          borderTop: 1,
-          borderColor: "divider",
-        }}>
-        {data.stops.map((s, i) => (
-          <Box key={`${s.stop_idx}:${i}`}>
-            <StopLine
-              stop={s}
-              color={color as string}
-              first={i === 0}
-              last={i === data.stops.length - 1}
-              passed={running && i < current}
-              current={i === current}
-              routeByIdx={routeByIdx}
-              onOpen={() => openStop(s)}
-            />
-          </Box>
-        ))}
-      </Box>
+      {/* Stops, as it runs them; Calendar, the days it runs. */}
+      <Tabs
+        value={tab}
+        onChange={(_e, v: ExplorerTripTab) => setTab(v)}
+        sx={{ minHeight: 36, px: PX, flexShrink: 0, borderBottom: 1, borderColor: "divider" }}>
+        <Tab value="stops" label={t("explorer_tab_stops")} sx={TAB_SX} />
+        <Tab value="calendar" label={t("explorer_schedule_tab")} sx={TAB_SX} />
+      </Tabs>
+      {tab === "calendar" ? (
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: PX }}>
+          <RouteCalendar trips={{ trip_lo: trip_idx, trip_hi: trip_idx }} id={`trip:${trip_idx}`} of="trip" />
+        </Box>
+      ) : (
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            px: PX,
+            py: 1,
+          }}>
+          {data.stops.map((s, i) => (
+            <Box key={`${s.stop_idx}:${i}`}>
+              <StopLine
+                stop={s}
+                color={color as string}
+                first={i === 0}
+                last={i === data.stops.length - 1}
+                passed={running && i < current}
+                current={i === current}
+                onOpen={() => openStop(s)}
+              />
+            </Box>
+          ))}
+        </Box>
+      )}
     </Stack>
   );
 }
@@ -197,7 +207,6 @@ function StopLine({
   last,
   passed,
   current,
-  routeByIdx,
   onOpen,
 }: {
   stop: TripStop;
@@ -207,11 +216,9 @@ function StopLine({
   passed: boolean;
   /** Where the vehicle is now, or heading: shaded. */
   current: boolean;
-  routeByIdx: Map<number, RouteRow>;
   onOpen: () => void;
 }) {
   const end = first || last;
-  const others = distinctLines(stop.transfers.map((i) => routeByIdx.get(i)));
   const time = last ? (stop.arr_s ?? stop.dep_s) : (stop.dep_s ?? stop.arr_s);
   return (
     <ButtonBase
@@ -239,14 +246,6 @@ function StopLine({
         <Typography variant="body2" fontWeight={end ? 700 : 500} noWrap title={stop.name}>
           {stop.name}
         </Typography>
-        {others.slice(0, BADGES).map((r) => (
-          <RouteBadge key={r.route_idx} route={r} small />
-        ))}
-        {others.length > BADGES && (
-          <Typography variant="caption" color="text.secondary">
-            +{others.length - BADGES}
-          </Typography>
-        )}
       </Stack>
       <Typography
         variant="body2"

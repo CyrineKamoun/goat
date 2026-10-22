@@ -5,9 +5,8 @@
  */
 import { Box } from "@mui/material";
 
-/** The rail's column, and how many transfer badges a row shows before "+n". */
+/** The rail's column. */
 export const RAIL = 24;
-export const BADGES = 3;
 
 /** The rail through a row: a line above and below the marker, as it runs. */
 export function Rail({ color, top, bottom }: { color: string; top: boolean; bottom: boolean }) {

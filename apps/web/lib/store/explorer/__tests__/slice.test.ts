@@ -17,6 +17,7 @@ import {
   setExplorerFilters,
   setExplorerLeftTab,
   setExplorerRouteTab,
+  setExplorerTripTab,
   setPlaybackTime,
   setPlaying,
   setStripCollapsed,
@@ -78,13 +79,13 @@ describe("explorer slice", () => {
 
   it("opens another route on its Overview, in its first direction", () => {
     let state = explorerReducer(open(), selectExplorerRoute("R1"));
-    state = explorerReducer(state, setExplorerRouteTab("stops"));
+    state = explorerReducer(state, setExplorerRouteTab("calendar"));
     state = explorerReducer(state, pickExplorerPattern({ direction: 3, pattern_idx: 4 }));
     // Back to the list and into the same route: where the user was.
     state = explorerReducer(state, selectExplorerRoute("R1"));
-    expect(state.routeTab).toBe("stops");
+    expect(state.routeTab).toBe("calendar");
     state = explorerReducer(state, selectExplorerRoute("R2"));
-    expect(state.routeTab).toBe("overview");
+    expect(state.routeTab).toBe("service");
     expect(state.pattern).toBeNull();
   });
 
@@ -149,5 +150,15 @@ describe("explorer slice", () => {
     state = explorerReducer(state, setStripHeight(412.4));
     state = open(explorerReducer(state, closeExplorer()));
     expect(state.strip).toMatchObject({ collapsed: true, view: "list", height: 412 });
+  });
+
+  it("opens a trip on its stops, and keeps the tab while stepping", () => {
+    const trip = (trip_idx: number) => ({ kind: "trip" as const, trip_idx, run_dep_s: 0 });
+    let state = explorerReducer(open(), openExplorerPanel({ item: trip(1) }));
+    state = explorerReducer(state, setExplorerTripTab("calendar"));
+    state = explorerReducer(state, openExplorerPanel({ item: trip(2), step: true }));
+    expect(state.tripTab).toBe("calendar");
+    state = explorerReducer(state, openExplorerPanel({ item: trip(3) }));
+    expect(state.tripTab).toBe("stops");
   });
 });

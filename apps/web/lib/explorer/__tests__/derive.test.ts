@@ -21,12 +21,20 @@ import { openFixtureDb } from "@/lib/explorer/__tests__/fixtureDb";
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import { activeServicesSql, serviceDayCounts } from "@/lib/explorer/derive/calendar";
 import { annualFigures, costYear, defaultRate, yearOf } from "@/lib/explorer/derive/cost";
-import { type Direction, routeDirections } from "@/lib/explorer/derive/directions";
+import { type Direction, deriveDirections, routeDirections } from "@/lib/explorer/derive/directions";
 import { headways, operations, runningTimes, vehiclesInService } from "@/lib/explorer/derive/operations";
 import { cut, patternSections } from "@/lib/explorer/derive/patternSections";
 import { axisOf, routeTrips } from "@/lib/explorer/derive/routeTrips";
 import { type TripRange, routeRuns } from "@/lib/explorer/derive/runs";
-import { isoWeekday, routeCalendar } from "@/lib/explorer/derive/serviceCalendar";
+import {
+  type CalendarDay,
+  type DayType,
+  dateRuns,
+  dayTypes,
+  exceptionMarks,
+  isoWeekday,
+  routeCalendar,
+} from "@/lib/explorer/derive/serviceCalendar";
 import { byDirection, byHour, stopDepartures, stopDetail } from "@/lib/explorer/derive/stopTimetable";
 import { type PlaceRow, places } from "@/lib/explorer/derive/stops";
 import { stopsLine } from "@/lib/explorer/derive/stopsLine";
@@ -189,39 +197,35 @@ describe("route trips", () => {
 });
 
 describe("direction choice", () => {
-  it("is all directions until one is picked", async () => {
+  it("is the first direction, whole, until one is picked", async () => {
     // R1: To Fifth (T1, T2, and T4's short turn) and To Main Station (T3).
     const { directions } = await routeDirections(db, route("R1"));
-    const none = resolveChoice(null, directions);
-    expect(none.all).toBe(true);
-    expect(none.patterns.size).toBe(directions.flatMap((d) => d.patterns).length);
-    // A view that draws one line draws the first direction's main pattern.
-    expect(shownLine(none, directions)?.pattern_idx).toBe(directions[0].key);
-    // Picking the first direction is a change: it then shows that alone.
-    const first = resolveChoice({ direction: directions[0].key, pattern_idx: null }, directions);
-    expect(first.all).toBe(false);
+    const first = resolveChoice(null, directions);
+    expect(first.direction?.key).toBe(directions[0].key);
+    expect(first.pattern_idx).toBeNull();
     expect([...first.patterns].sort()).toEqual(directions[0].patterns.map((p) => p.pattern_idx).sort());
+    expect(shownLine(first, directions)?.pattern_idx).toBe(directions[0].key);
   });
 
-  it("takes all directions, or one variant", async () => {
+  it("knows each direction's first and last stop", async () => {
     const { directions } = await routeDirections(db, route("R1"));
-    const all = resolveChoice({ direction: "all", pattern_idx: null }, directions);
-    expect(all.all).toBe(true);
-    expect(all.patterns.size).toBe(directions.flatMap((d) => d.patterns).length);
-    // A view that draws one line draws the first direction's main pattern.
-    expect(shownLine(all, directions)?.pattern_idx).toBe(directions[0].key);
+    const toFifth = directions.find((d) => label(d) === "To Fifth") as Direction;
+    const toMain = directions.find((d) => label(d) === "To Main Station") as Direction;
+    expect(toFifth.ends).toEqual(["Main Station", "Fifth"]);
+    expect(toMain.ends[1]).toBe("Main Station");
+  });
+
+  it("takes one variant", async () => {
+    const { directions } = await routeDirections(db, route("R1"));
     const short = directions[0].patterns.find((p) => p.kind === "short_turn")?.pattern_idx as number;
     const one = resolveChoice({ direction: directions[0].key, pattern_idx: short }, directions);
     expect([...one.patterns]).toEqual([short]);
     expect(shownLine(one, directions)?.pattern_idx).toBe(short);
     expect(choiceFromValue(choiceValue(one))).toEqual({ direction: directions[0].key, pattern_idx: short });
-    expect(choiceFromValue(choiceValue(all))).toEqual({ direction: "all", pattern_idx: null });
   });
 
-  it("has no all directions where there is one", async () => {
+  it("draws the first direction on the map while nothing is picked", async () => {
     const { directions } = await routeDirections(db, route("R4"));
-    expect(resolveChoice({ direction: "all", pattern_idx: null }, directions).all).toBe(false);
-    // The map's highlight, from the drawing's directions, agrees.
     const drawn = directions.map((d) => ({ key: d.key, patterns: d.patterns.map((p) => p.pattern_idx) }));
     expect(shownPattern(null, drawn)).toBe(directions[0].key);
   });
@@ -267,9 +271,8 @@ describe("direction choice", () => {
       { key: 10, patterns: [10, 11] },
       { key: 20, patterns: [20] },
     ];
-    // Nothing picked, or all directions: the route as a whole.
-    expect(highlightedPatterns(null, drawn, false)).toBeNull();
-    expect(highlightedPatterns({ direction: "all", pattern_idx: null }, drawn, false)).toBeNull();
+    // Nothing picked: the first direction, whole.
+    expect(highlightedPatterns(null, drawn, false)).toEqual([10, 11]);
     // A whole direction, with its variants; a variant alone.
     expect(highlightedPatterns({ direction: 10, pattern_idx: null }, drawn, false)).toEqual([10, 11]);
     expect(highlightedPatterns({ direction: 10, pattern_idx: 11 }, drawn, false)).toEqual([11]);
@@ -299,6 +302,29 @@ describe("directions", () => {
 
   it("names a loop by its farthest stop", async () => {
     expect(await summary("R3")).toEqual([{ label: "Loop via Third", patterns: ["main to Loop"] }]);
+  });
+
+  it("names a short turn by where it ends, not by a headsign it keeps from the line", () => {
+    // As TMB's 113: the short turn's trips sign the line's end, Pl. Pius XII.
+    const stop = (stop_idx: number, name: string) => ({ stop_idx, name, lat: 0, lon: 0, station: null });
+    const stops = new Map(
+      [1, 2, 3, 4].map((i) => [i, stop(i, ["", "Mercè", "Mid", "González Tablas", "Pius XII"][i])])
+    );
+    const [direction] = deriveDirections(
+      [
+        { pattern_idx: 0, stops: [1, 2, 3, 4], n_trips: 62 },
+        { pattern_idx: 1, stops: [1, 2, 3], n_trips: 3 },
+      ],
+      [
+        { pattern_idx: 0, direction_id: 1, headsign: "Pl. Pius XII", n: 62 },
+        { pattern_idx: 1, direction_id: 1, headsign: "Pl. Pius XII", n: 3 },
+      ],
+      stops
+    );
+    expect(direction.patterns.map((p) => `${p.kind} to ${p.destination}`)).toEqual([
+      "main to Pl. Pius XII",
+      "short_turn to González Tablas",
+    ]);
   });
 
   it("calls a pattern that skips stops of the main one an express", async () => {
@@ -604,9 +630,8 @@ describe("route calendar", () => {
     expect(weekdays.except).toEqual(["2026-04-06"]);
     expect(weekdays.adds).toEqual([]);
     expect(weekdays.trips).toBe(4);
-    expect(cal.days.find((d) => d.date === "2026-04-06")).toMatchObject({ services: [], exception: true });
+    expect(cal.days.find((d) => d.date === "2026-04-06")).toMatchObject({ services: [], key: null });
     expect(cal.days.find((d) => d.date === "2026-10-17")?.trips).toBe(0);
-    expect(cal).toMatchObject({ from_calendar: 1, exceptions: 1 });
   });
 
   it("gives a day with an extra service its own day type", async () => {
@@ -616,7 +641,8 @@ describe("route calendar", () => {
     const [weekdays, christmas] = cal.types;
     expect(weekdays.except).toEqual(["2026-04-06", "2026-12-25"]);
     expect(christmas.days).toEqual(["2026-12-25"]);
-    expect(christmas.weekdays).toEqual([5]);
+    // One Friday is no weekly rule: it reads as an individual date.
+    expect(christmas.weekdays).toEqual([]);
   });
 
   it("names a Saturday service by its weekday", async () => {
@@ -627,6 +653,63 @@ describe("route calendar", () => {
   it("finds the weekday of a date", () => {
     expect(isoWeekday("2026-10-14")).toBe(3);
     expect(isoWeekday("2026-10-18")).toBe(7);
+  });
+
+  it("joins dates into spans across the days a pattern does not run", () => {
+    // Mon 26 Oct – Fri 6 Nov skipped by a Mon–Fri pattern: one span over the weekend.
+    const fortnight = ["26", "27", "28", "29", "30"].map((d) => `2026-10-${d}`);
+    fortnight.push(...["02", "03", "04", "05", "06"].map((d) => `2026-11-${d}`));
+    expect(dateRuns([...fortnight, "2026-12-25"], [1, 2, 3, 4, 5])).toEqual([
+      ["2026-10-26", "2026-11-06"],
+      ["2026-12-25", "2026-12-25"],
+    ]);
+    // Without weekdays only consecutive days join.
+    expect(dateRuns(["2026-12-24", "2026-12-25", "2026-12-31"])).toEqual([
+      ["2026-12-24", "2026-12-25"],
+      ["2026-12-31", "2026-12-31"],
+    ]);
+    // A weekday the pattern runs on, missing between two dates, splits them.
+    expect(dateRuns(["2026-10-26", "2026-10-28"], [1, 2, 3, 4, 5])).toHaveLength(2);
+  });
+
+  it("names no weekday after a pattern that runs on a single date of it", () => {
+    const day = (date: string, key: string | null): CalendarDay => ({
+      date,
+      services: [],
+      trips: key ? 1 : 0,
+      key,
+    });
+    // Thu 22 Oct alone, then two Saturdays.
+    const days = [day("2026-10-22", "thu"), day("2026-10-24", "sat"), day("2026-10-31", "sat")];
+    const types = dayTypes(days);
+    expect(types.find((ty) => ty.key === "thu")?.weekdays).toEqual([]);
+    expect(types.find((ty) => ty.key === "sat")?.weekdays).toEqual([6]);
+  });
+
+  it("marks service added and removed against the patterns' usual weeks", () => {
+    const weekdays: DayType = {
+      key: "wk",
+      days: ["2026-12-27"],
+      trips: 1,
+      weekdays: [1, 2, 3, 4, 5],
+      except: ["2026-12-24", "2026-12-25"],
+      adds: ["2026-12-27"],
+    };
+    // Thu 24 Dec runs a pattern of its own in the weekdays' place; Fri 25
+    // Dec has no service; Sun 27 Dec the weekdays' pattern runs off its week.
+    const odd = {
+      ...weekdays,
+      key: "xmas",
+      days: ["2026-12-24"],
+      weekdays: [],
+      except: [],
+      adds: ["2026-12-24"],
+    };
+    expect(Object.fromEntries(exceptionMarks([weekdays, odd]))).toEqual({
+      "2026-12-24": "+",
+      "2026-12-25": "-",
+      "2026-12-27": "+",
+    });
   });
 });
 

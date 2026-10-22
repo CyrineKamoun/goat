@@ -22,7 +22,6 @@ import { Layer, Popup, Source, useMap } from "react-map-gl/maplibre";
 
 import { GEOAPI_BASE_URL } from "@/lib/constants";
 import { vehicleFrame } from "@/lib/explorer/derive/vehicles";
-import { highlightedPatterns } from "@/lib/explorer/directionChoice";
 import { routeMatches } from "@/lib/explorer/filters";
 import { highlightStore } from "@/lib/explorer/highlightStore";
 import { tint } from "@/lib/explorer/modes";
@@ -37,6 +36,7 @@ import {
 } from "@/lib/store/explorer/slice";
 
 import type { RouteRow } from "@/hooks/explorer/useExplorerData";
+import { usePatternKey, usePickedTrips } from "@/hooks/explorer/usePickedTrips";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { EXPLORER_PANEL_WIDTH } from "@/components/explorer/ExplorerLeftPanel";
@@ -61,7 +61,7 @@ const ROUTE_ZOOM = 15;
 const ARROW = "explorer-arrow-2";
 function arrowImage(): { image: ImageData; options: object } {
   // At twice the CSS size: a chevron 5 px tall and 2 px thick, inside the
-  // highlighted line's 7 px, so it reads white on the line's colour.
+  // highlighted line's 6 px, so it reads white on the line's colour.
   const size = 20;
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
@@ -202,19 +202,10 @@ export function ExplorerMapLayers() {
   // The patterns highlighted over the rest of the route: the Stops tab's
   // line, else what the direction picker chose (highlightedPatterns). As a
   // string from the store, so it changes only when they do.
-  const patternKey = useAppSelector((s) =>
-    s.explorer.drawing
-      ? (highlightedPatterns(
-          s.explorer.pattern,
-          s.explorer.drawing.directions,
-          s.explorer.routeTab === "stops"
-        )?.join(",") ?? "")
-      : ""
-  );
+  const patternKey = usePatternKey();
   const patternIdxs = useMemo(() => (patternKey ? patternKey.split(",").map(Number) : null), [patternKey]);
-  // Whether a direction or variant was picked (not all directions, not
-  // nothing): the line's vehicles on its other patterns then fade.
-  const picking = useAppSelector((s) => !!s.explorer.pattern && s.explorer.pattern.direction !== "all");
+  // The line's trips shown in full: its vehicles on other patterns fade.
+  const pickedTrips = usePickedTrips();
   // The stretch those patterns run, cut from their shapes; until it is in,
   // the shapes themselves stand in.
   const highlight = useSyncExternalStore(highlightStore.subscribe, highlightStore.getSnapshot, () => null);
@@ -259,11 +250,9 @@ export function ExplorerMapLayers() {
       openTrip: openTrip ? { trip_idx: openTrip.trip_idx, run_dep_s: openTrip.run_dep_s } : null,
       ring: theme.palette.primary.main,
       faded: FADED,
-      // A direction or variant picked (not the Stops tab's line alone, which
-      // follows the tab): the line's vehicles on its other patterns fade.
-      pickedTrips: highlight && highlight.key === patternKey && picking ? highlight.trips : null,
+      pickedTrips,
     });
-  }, [vehicles, selectedRouteId, openTrip, theme.palette.primary.main, highlight, patternKey, picking]);
+  }, [vehicles, selectedRouteId, openTrip, theme.palette.primary.main, pickedTrips]);
 
   // The Explorer's layers in drawing order, bottom to top. Sources mount as
   // their data arrives — the network after the route's stops — and a layer
@@ -756,7 +745,7 @@ export function ExplorerMapLayers() {
             source-layer={TILE_LAYER}
             filter={highlighting && !sections ? patternShapes : none}
             layout={{ "line-cap": "round", "line-join": "round" }}
-            paint={{ "line-color": "#FFFFFF", "line-width": 12 }}
+            paint={{ "line-color": "#FFFFFF", "line-width": 10 }}
           />
           <Layer
             id="explorer-pattern-line"
@@ -764,7 +753,7 @@ export function ExplorerMapLayers() {
             source-layer={TILE_LAYER}
             filter={highlighting && !sections ? patternShapes : none}
             layout={{ "line-cap": "round", "line-join": "round" }}
-            paint={{ "line-color": color, "line-width": 7 }}
+            paint={{ "line-color": color, "line-width": 6 }}
           />
         </Source>
       )}
@@ -778,13 +767,13 @@ export function ExplorerMapLayers() {
           id="explorer-pattern-section-casing"
           type="line"
           layout={{ "line-cap": "round", "line-join": "round" }}
-          paint={{ "line-color": "#FFFFFF", "line-width": 12 }}
+          paint={{ "line-color": "#FFFFFF", "line-width": 10 }}
         />
         <Layer
           id="explorer-pattern-section-line"
           type="line"
           layout={{ "line-cap": "round", "line-join": "round" }}
-          paint={{ "line-color": color, "line-width": 7 }}
+          paint={{ "line-color": color, "line-width": 6 }}
         />
         {/* Which way it runs: each section is cut in the direction its
             trips travel, so arrows along it point that way. Only for one

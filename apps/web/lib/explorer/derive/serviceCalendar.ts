@@ -22,8 +22,6 @@ export interface CalendarDay {
   /** The day's timetable, as a fingerprint of its trips' patterns and
    * departures; days with equal keys run the same timetable. Null without service. */
   key: string | null;
-  /** A calendar_dates exception of one of the route's services falls on it. */
-  exception: boolean;
 }
 
 export interface DayType {
@@ -44,16 +42,55 @@ export interface RouteCalendar {
   days: CalendarDay[];
   /** By days covered, most first. */
   types: DayType[];
-  /** How many of the route's services come from calendar.txt, and how many
-   * calendar_dates.txt exceptions they have. */
-  from_calendar: number;
-  exceptions: number;
 }
 
 /** ISO weekday of a `YYYY-MM-DD` date, 1 = Monday. */
 export function isoWeekday(date: string): number {
   const d = new Date(`${date}T00:00:00Z`).getUTCDay();
   return d === 0 ? 7 : d;
+}
+
+/** The day after a `YYYY-MM-DD` date. */
+function nextDay(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Sorted dates as spans `[first, last]`, so a list reads "26 Oct – 6 Nov"
+ * rather than ten dates. Two dates join when every day between them falls on
+ * none of `weekdays`: for a Mon–Fri pattern, a skipped fortnight is one span
+ * across its weekend. Without weekdays, only consecutive days join.
+ */
+export function dateRuns(dates: string[], weekdays: number[] = []): [string, string][] {
+  const on = new Set(weekdays);
+  const runs: [string, string][] = [];
+  for (const date of dates) {
+    const last = runs[runs.length - 1];
+    let joins = !!last;
+    if (last) {
+      let d = nextDay(last[1]);
+      for (; d < date && joins; d = nextDay(d)) joins = on.size > 0 && !on.has(isoWeekday(d));
+    }
+    if (joins) last[1] = date;
+    else runs.push([date, date]);
+  }
+  return runs;
+}
+
+/** The month grid's exception marks: "+" where a pattern runs off its
+ * weekdays (service added; on a day another pattern skips, it runs in its
+ * place), "-" where a pattern skips one of its weekdays and none runs instead
+ * (service removed). Patterns without weekdays run on added days alone. */
+export function exceptionMarks(types: DayType[]): Map<string, "+" | "-"> {
+  const marks = new Map<string, "+" | "-">();
+  for (const ty of types) {
+    if (ty.weekdays.length) ty.adds.forEach((d) => marks.set(d, "+"));
+    else ty.days.forEach((d) => marks.set(d, "+"));
+  }
+  for (const ty of types) for (const d of ty.except) if (!marks.has(d)) marks.set(d, "-");
+  return marks;
 }
 
 /** Group days into day types. Pure, so it is tested directly. */
@@ -71,11 +108,12 @@ export function dayTypes(days: CalendarDay[]): DayType[] {
     const span = days.filter((d) => d.date >= first && d.date <= last);
     const own = new Set(dates);
     // A weekday is the type's when it runs on most of that weekday's dates
-    // within its span: a holiday it skips does not take the weekday away.
+    // within its span: a holiday it skips does not take the weekday away. One
+    // date is no weekly rule: a type on a single Thursday is not "Thu".
     const weekdays = [1, 2, 3, 4, 5, 6, 7].filter((w) => {
       const all = span.filter((d) => isoWeekday(d.date) === w);
       const on = all.filter((d) => own.has(d.date));
-      return all.length > 0 && on.length * 2 > all.length;
+      return on.length >= 2 && on.length * 2 > all.length;
     });
     const mine = new Set(weekdays);
     types.push({
@@ -98,14 +136,12 @@ export async function routeCalendar(
   const range = `trip_idx BETWEEN ${route.trip_lo ?? -1} AND ${route.trip_hi ?? -2}`;
   const [start, end] = [sqlDate(window[0]), sqlDate(window[1])];
   const mine = `(SELECT service_idx, CAST(count(*) AS INTEGER) AS trips FROM trips WHERE ${range} GROUP BY 1)`;
-  const [rows, counts] = await Promise.all([
-    db.all<{
-      date: string;
-      services: ArrayLike<number> | null;
-      trips: number;
-      key: string | null;
-      exception: boolean;
-    }>(`
+  const rows = await db.all<{
+    date: string;
+    services: ArrayLike<number> | null;
+    trips: number;
+    key: string | null;
+  }>(`
       WITH rs AS ${mine},
       dates AS (SELECT CAST(d AS DATE) AS date FROM range(${start}, ${end} + INTERVAL 1 DAY, INTERVAL 1 DAY) r(d)),
       regular AS (
@@ -122,7 +158,6 @@ export async function routeCalendar(
         WHERE cd.exception_type = 2
       ),
       active AS ((SELECT * FROM regular UNION SELECT * FROM added) EXCEPT SELECT * FROM removed),
-      marked AS (SELECT DISTINCT cd.date FROM calendar_dates cd JOIN rs USING (service_idx)),
       -- A frequency-based trip runs every headway_s from start_s up to end_s,
       -- as derive/runs expands it: that many trips, not one.
       freq AS (
@@ -145,22 +180,14 @@ export async function routeCalendar(
       )
       SELECT strftime(p.date, '%Y-%m-%d') AS date, p.services,
              COALESCE(tt.trips, 0) AS trips,
-             CASE WHEN tt.trips > 0 THEN tt.trips || ':' || tt.sig END AS key,
-             p.date IN (SELECT date FROM marked) AS exception
+             CASE WHEN tt.trips > 0 THEN tt.trips || ':' || tt.sig END AS key
       FROM per_day p LEFT JOIN timetable tt USING (date)
-      ORDER BY p.date`),
-    db.all<{ from_calendar: number; exceptions: number }>(`
-      WITH rs AS ${mine}
-      SELECT CAST(count(*) FILTER (WHERE s.days IS NOT NULL) AS INTEGER) AS from_calendar,
-             CAST((SELECT count(*) FROM calendar_dates cd JOIN rs USING (service_idx)) AS INTEGER) AS exceptions
-      FROM services s JOIN rs USING (service_idx)`),
-  ]);
+      ORDER BY p.date`);
   const days = rows.map((r) => ({
     date: r.date,
     services: r.services ? Array.from(r.services) : [],
     trips: r.trips,
     key: r.key,
-    exception: !!r.exception,
   }));
-  return { days, types: dayTypes(days), ...(counts[0] ?? { from_calendar: 0, exceptions: 0 }) };
+  return { days, types: dayTypes(days) };
 }

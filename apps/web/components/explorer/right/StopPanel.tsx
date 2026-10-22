@@ -2,8 +2,9 @@
  * A stop's timetable in the right panel (board 13) — a station's, when a
  * station is picked in the list, is that of all its stops together. The
  * stop, the Explorer's date, its lines to pick one from, and either that
- * line's hour × minute timetable per direction — short turns marked, the
- * next departure after the playback time highlighted — or the next
+ * line's hour × minute timetable per direction — the next departure after
+ * the playback time highlighted; short turns not set apart (an "s" was
+ * tried and dropped, 22 Oct 2026: unclear, and little use here) — or the next
  * departures of every line. A departure opens its trip, which goes back here.
  */
 import AccessibleIcon from "@mui/icons-material/Accessible";
@@ -172,7 +173,7 @@ export function StopPanel({ stop }: { stop: ExplorerPickedStop }) {
     const all = [...merged.values()];
     if (selectedIdx === undefined || !line.idxs.has(selectedIdx)) return all;
     const picked = resolveChoice(choice, data.data.directions.get(selectedIdx) ?? []);
-    if (picked.all || !picked.direction) return all;
+    if (!picked.direction) return all;
     const source = `${selectedIdx}:${picked.direction.key}`;
     return all
       .filter((d) => d.sources.has(source))
@@ -295,7 +296,6 @@ function Timetable({
   onOpen: (e: TimetableEntry) => void;
 }) {
   const { t } = useTranslation("common");
-  const anyShort = directions.some((d) => d.departures.some((e) => e.short));
   return (
     <>
       {directions.map((d) => {
@@ -307,8 +307,9 @@ function Timetable({
             <SectionHeader
               px={0}
               icon={<RouteBadge route={route} small />}
+              // No count beside it: departures, trips or calls, it read as
+              // any of them (dropped 22 Oct 2026).
               label={directionLabel(d.name, t)}
-              amount={d.departures.length}
             />
             <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, px: 1.5, py: 0.5 }}>
               {hours.map(({ hour, entries }, i) => (
@@ -345,20 +346,11 @@ function Timetable({
                             fontSize: 13,
                             fontVariantNumeric: "tabular-nums",
                             fontWeight: isNext ? 700 : 500,
-                            color: isNext
-                              ? "primary.contrastText"
-                              : e.short
-                                ? "warning.dark"
-                                : "text.primary",
+                            color: isNext ? "primary.contrastText" : "text.primary",
                             bgcolor: isNext ? "primary.main" : "transparent",
                             "&:hover": { bgcolor: isNext ? "primary.dark" : "action.selected" },
                           }}>
                           {String(Math.floor((e.dep_s % 3600) / 60)).padStart(2, "0")}
-                          {e.short && (
-                            <Box component="sup" sx={{ fontSize: 9, ml: 0.125 }}>
-                              {t("explorer_short_turn_mark")}
-                            </Box>
-                          )}
                         </ButtonBase>
                       );
                     })}
@@ -369,11 +361,6 @@ function Timetable({
           </Box>
         );
       })}
-      {anyShort && (
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5 }}>
-          {t("explorer_short_turn_note")}
-        </Typography>
-      )}
     </>
   );
 }

@@ -1,8 +1,9 @@
 /**
- * A route's Service tab (board 22), read-only for now: per direction, how
- * often it runs in each time period, from when to when, and how long a trip
- * takes. In the editing phase these become the fields that change service;
- * the layout is theirs already.
+ * A route's Operations tab (board 22), read-only for now: per direction how
+ * often it runs in each time period, vehicles in service through the day,
+ * how long a trip takes, and its first and last departure. In the editing
+ * phase these become the fields that change service; the layout is theirs
+ * already.
  */
 import { Box, Stack, Typography } from "@mui/material";
 import type { ReactNode } from "react";
@@ -11,18 +12,19 @@ import { useTranslation } from "react-i18next";
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { clock } from "@/lib/explorer/format";
+import { modeOf, routeColor } from "@/lib/explorer/modes";
 
-import type { RouteSummaryData } from "@/hooks/explorer/useExplorerData";
+import type { RouteRow, RouteSummaryData } from "@/hooks/explorer/useExplorerData";
 import { useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
-import { EditPeriodsButton } from "@/components/explorer/ExplorerSettingsDialog";
 import { DateChip, SectionHeader } from "@/components/explorer/SectionHeader";
+import { VehiclesCurve } from "@/components/explorer/VehiclesCurve";
 import { directionLabel, directionPlace } from "@/components/explorer/directionWords";
 
 const COL = 76;
 
-/** A period × direction table on the tinted ground, as the Overview's. */
+/** A period × direction table: titled columns, rows between hairlines. */
 function PeriodTable({
   data,
   cell,
@@ -34,11 +36,11 @@ function PeriodTable({
   const { periods } = useExplorer().settings;
   const cols = data.directions;
   return (
-    <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, overflow: "hidden", px: 1.5, py: 0.5 }}>
+    <Box>
       <Stack direction="row" columnGap={1.5} sx={{ py: 1 }}>
-        <Box sx={{ flex: 1 }}>
-          <EditPeriodsButton />
-        </Box>
+        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ flex: 1 }}>
+          {t("explorer_col_time_period")}
+        </Typography>
         {cols.map((c) => (
           <Typography
             key={c.direction.key}
@@ -101,7 +103,7 @@ function Section({ icon, label, children }: { icon: ICON_NAME; label: string; ch
   );
 }
 
-export function RouteService({ data }: { data: RouteSummaryData }) {
+export function RouteService({ route, data }: { route: RouteRow; data: RouteSummaryData }) {
   const { t } = useTranslation("common");
   if (!data.operations.runs) {
     return (
@@ -112,10 +114,6 @@ export function RouteService({ data }: { data: RouteSummaryData }) {
   }
   return (
     <Box sx={{ pb: 2 }}>
-      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 2 }}>
-        {t("explorer_service_read_only")}
-      </Typography>
-
       <Section icon={ICON_NAME.CLOCK} label={t("explorer_headways")}>
         <PeriodTable
           data={data}
@@ -128,34 +126,8 @@ export function RouteService({ data }: { data: RouteSummaryData }) {
         />
       </Section>
 
-      <Section icon={ICON_NAME.CALENDAR} label={t("explorer_span")}>
-        <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, px: 1.5, py: 0.5 }}>
-          {data.directions.map((d, i) => (
-            <Stack
-              key={d.direction.key}
-              direction="row"
-              columnGap={1.5}
-              alignItems="center"
-              sx={{ py: 0.75, borderTop: i ? 1 : 0, borderColor: "divider" }}>
-              <Typography
-                variant="body2"
-                fontWeight={600}
-                noWrap
-                title={directionLabel(d.direction.name, t)}
-                sx={{ flex: 1, minWidth: 0 }}>
-                {directionLabel(d.direction.name, t)}
-              </Typography>
-              <Typography variant="body2" sx={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-                {d.operations.runs
-                  ? `${clock(d.operations.first_dep_s)} – ${clock(d.operations.last_dep_s)}`
-                  : "–"}
-              </Typography>
-            </Stack>
-          ))}
-        </Box>
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
-          {t("explorer_span_note")}
-        </Typography>
+      <Section icon={ICON_NAME.BUS} label={t("explorer_vehicles_in_service_title")}>
+        <VehiclesCurve values={data.curve} color={routeColor(route.color, modeOf(route.route_type))} />
       </Section>
 
       <Section icon={ICON_NAME.CLOCK} label={t("explorer_running_time")}>
@@ -171,6 +143,45 @@ export function RouteService({ data }: { data: RouteSummaryData }) {
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
           {t("explorer_running_time_note")}
         </Typography>
+      </Section>
+
+      <Section icon={ICON_NAME.CALENDAR} label={t("explorer_span")}>
+        {/* As the period tables below: titled columns, rows between hairlines. */}
+        <Box>
+          <Stack direction="row" columnGap={1.5} sx={{ py: 1 }}>
+            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ flex: 1 }}>
+              {t("explorer_direction")}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ flexShrink: 0 }}>
+              {t("explorer_col_period")}
+            </Typography>
+          </Stack>
+          {data.directions.map((d) => (
+            <Stack
+              key={d.direction.key}
+              direction="row"
+              columnGap={1.5}
+              alignItems="center"
+              sx={{ py: 0.75, borderTop: 1, borderColor: "divider" }}>
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                noWrap
+                title={`${d.direction.ends[0]} – ${d.direction.ends[1]}`}
+                sx={{ flex: 1, minWidth: 0 }}>
+                {directionPlace(d.direction.name, t)}
+              </Typography>
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                sx={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+                {d.operations.runs
+                  ? `${clock(d.operations.first_dep_s)}–${clock(d.operations.last_dep_s)}`
+                  : "–"}
+              </Typography>
+            </Stack>
+          ))}
+        </Box>
       </Section>
     </Box>
   );

@@ -20,13 +20,15 @@ export interface ExplorerFilters {
   agencies: number[];
 }
 
-export type ExplorerRouteTab = "overview" | "stops" | "service" | "calendar";
+export type ExplorerRouteTab = "stops" | "service" | "calendar";
+/** The trip panel's tabs: its stops, or the days it runs. */
+export type ExplorerTripTab = "stops" | "calendar";
 
 /** The destination picker's choice: all directions, or a direction (by its
  * key, its main pattern's index) whole, or one of its patterns
  * (lib/explorer/directionChoice.ts). */
 export interface ExplorerPatternChoice {
-  direction: number | "all";
+  direction: number;
   /** A variant; null for the whole direction. */
   pattern_idx: number | null;
 }
@@ -116,8 +118,10 @@ export interface ExplorerState {
   filters: ExplorerFilters;
   panel: ExplorerPanel;
   routeTab: ExplorerRouteTab;
+  /** Kept as trips are stepped through, each its own panel. */
+  tripTab: ExplorerTripTab;
   /** One picker for the trip strip, the Stops tab and the stop timetable
-   * (02-panel-behaviour-spec › Direction); null is all directions. */
+   * (02-panel-behaviour-spec › Direction); null is the first direction. */
   pattern: ExplorerPatternChoice | null;
   strip: ExplorerStrip;
   /** The settings dialog, open on a tab, or closed. */
@@ -165,7 +169,8 @@ const initialState: ExplorerState = {
   drawing: null,
   filters: NO_FILTERS,
   panel: { stack: [], fromRoute: null },
-  routeTab: "overview",
+  routeTab: "service",
+  tripTab: "stops",
   pattern: null,
   strip: {
     collapsed: false,
@@ -215,10 +220,10 @@ const explorerSlice = createSlice({
       state.leftTab = action.payload;
     },
     selectExplorerRoute: (state, action: PayloadAction<string | null>) => {
-      // Another route starts on its Overview, in its own first direction;
+      // Another route starts on its Operations tab, in its own first direction;
       // what the right panel opened from the route it leaves goes with it.
       if (action.payload !== state.selectedRouteId) {
-        state.routeTab = "overview";
+        state.routeTab = "service";
         state.pattern = null;
         if (state.panel.fromRoute !== null && state.panel.fromRoute === state.selectedRouteId)
           state.panel = { ...state.panel, stack: [], fromRoute: null };
@@ -227,6 +232,9 @@ const explorerSlice = createSlice({
       if (action.payload === null) {
         state.drawing = null;
       }
+    },
+    setExplorerTripTab: (state, action: PayloadAction<ExplorerTripTab>) => {
+      state.tripTab = action.payload;
     },
     setExplorerRouteTab: (state, action: PayloadAction<ExplorerRouteTab>) => {
       state.routeTab = action.payload;
@@ -284,6 +292,9 @@ const explorerSlice = createSlice({
       }>
     ) => {
       const { item, push, step, fromRoute } = action.payload;
+      // A trip opened afresh starts on its stops; stepping to the trip before
+      // or after keeps the tab.
+      if (item.kind === "trip" && !step) state.tripTab = "stops";
       if (push) state.panel.stack = [...state.panel.stack, item];
       else if (step && state.panel.stack.length)
         state.panel.stack = [...state.panel.stack.slice(0, -1), item];
@@ -342,6 +353,7 @@ export const {
   setStripView,
   setStripHeight,
   setExplorerRouteTab,
+  setExplorerTripTab,
   pickExplorerPattern,
   openExplorerSettings,
   setExplorerBounds,

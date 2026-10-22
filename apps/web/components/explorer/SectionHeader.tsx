@@ -106,27 +106,30 @@ export function SectionHeader({
   );
 }
 
-/** The Explorer's date, set in the bottom bar, as a pill on each section its
+/** The Explorer's date, set in the bottom bar, as a quiet label on each section its
  * figures depend on: every figure names its period (05-viewers-and-cost.md). */
 export function DateChip({ date }: { date: string }) {
   const { i18n } = useTranslation("common");
   return (
-    <Stack
-      direction="row"
-      alignItems="center"
-      spacing={0.75}
-      sx={{
-        px: 1,
-        py: 0.25,
-        borderRadius: 1,
-        bgcolor: "action.hover",
-        color: "text.primary",
-        flexShrink: 0,
-      }}>
+    // A label, not a control: grey text with no ground or edge, so it is not
+    // taken for a button (the date is set in the bottom bar).
+    <Stack direction="row" alignItems="center" spacing={0.5} sx={{ color: "text.secondary", flexShrink: 0 }}>
       <Icon iconName={ICON_NAME.CALENDAR} style={{ fontSize: 11 }} htmlColor="inherit" />
-      <Typography variant="caption" fontWeight={700} noWrap>
+      <Typography variant="caption" noWrap>
         {shortDate(date, i18n.language)}
       </Typography>
     </Stack>
   );
 }
+
+/** A panel's tabs (a line's Overview | Stops | Service | Calendar, a trip's
+ * Stops | Calendar): sharing the row, in the panels' type. */
+export const TAB_SX = {
+  minHeight: 36,
+  minWidth: 0,
+  // Equal widths, whatever the labels.
+  flex: "1 1 0",
+  px: 3,
+  textTransform: "none",
+  fontSize: "0.8125rem",
+} as const;

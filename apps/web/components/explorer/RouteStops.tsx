@@ -1,13 +1,13 @@
 /**
  * A route's Stops tab (board 10): the destination picker — directions, each
  * with its variants under it — and the chosen pattern as a line diagram,
- * with distances and minutes between stops, minutes from the start, the
- * other routes at each stop, and where short turns end. Picking a stop
+ * with distances and minutes between stops, minutes from the start, and
+ * where short turns end (no connecting lines at the stops, 22 Oct 2026). Picking a stop
  * shows it on the map.
  */
 import { Box, ButtonBase, Stack, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { memo, useCallback, useMemo, useRef } from "react";
+import { memo, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Direction } from "@/lib/explorer/derive/directions";
@@ -17,13 +17,12 @@ import { count } from "@/lib/explorer/format";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
 import { closeExplorerPanel, openExplorerPanel, pickedStop } from "@/lib/store/explorer/slice";
 
-import { type RouteRow, useRoutes, useStopsLine } from "@/hooks/explorer/useExplorerData";
+import { type RouteRow, useStopsLine } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { directionItems, useDirectionChoice } from "@/components/explorer/DirectionPicker";
 import { useExplorer } from "@/components/explorer/ExplorerContext";
-import { BADGES, RAIL, Rail, StopDot } from "@/components/explorer/LineDiagram";
-import { RouteBadge, distinctLines } from "@/components/explorer/RouteBadge";
+import { RAIL, Rail, StopDot } from "@/components/explorer/LineDiagram";
 import Selector from "@/components/map/panels/common/Selector";
 
 function km(m: number | null, locale: string): string | null {
@@ -40,7 +39,6 @@ const StopRow = memo(function StopRow({
   color,
   first,
   last,
-  routeByIdx,
   selected,
   onPick,
 }: {
@@ -48,12 +46,10 @@ const StopRow = memo(function StopRow({
   color: string;
   first: boolean;
   last: boolean;
-  routeByIdx: Map<number, RouteRow>;
   selected: boolean;
   onPick: (stop: LineStop) => void;
 }) {
   const end = first || last;
-  const lines = distinctLines(stop.transfers.map((i) => routeByIdx.get(i)));
   return (
     <ButtonBase
       onClick={() => onPick(stop)}
@@ -76,14 +72,6 @@ const StopRow = memo(function StopRow({
         <Typography variant="body2" fontWeight={end ? 700 : 500} noWrap title={stop.name}>
           {stop.name}
         </Typography>
-        {lines.slice(0, BADGES).map((r) => (
-          <RouteBadge key={r.route_idx} route={r} small />
-        ))}
-        {lines.length > BADGES && (
-          <Typography variant="caption" color="text.secondary">
-            +{lines.length - BADGES}
-          </Typography>
-        )}
       </Stack>
       <Typography
         variant="body2"
@@ -154,8 +142,6 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
   const { db, complete, shapeDistUnit, settings } = useExplorer();
   const date = useAppSelector((s) => s.explorer.date);
   const picked = useAppSelector((s) => pickedStop(s.explorer));
-  const routes = useRoutes(db);
-  const routeByIdx = useMemo(() => new Map((routes.data ?? []).map((r) => [r.route_idx, r])), [routes.data]);
   // A stop's timetable opens in the right panel; picked again, it closes.
   // One handler for every row, reading the picked stop as it is now.
   const pickedIdx = useRef<number | undefined>(undefined);
@@ -202,7 +188,7 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
     );
   }
 
-  const items = directionItems(directions, route, t, { all: false });
+  const items = directionItems(directions, route, t);
   const variant = direction.patterns.find((p) => p.pattern_idx === pattern_idx);
   const trips = variant && variant.kind !== "main" ? variant.n_trips : direction.n_trips;
   const data = line.data;
@@ -211,12 +197,6 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
         t("explorer_trips", { count: trips }),
         t("explorer_stops", { count: data.stops.length }),
         km(data.length_m, lang),
-        [
-          data.offpeak_min !== null ? t("explorer_min_offpeak", { count: data.offpeak_min }) : null,
-          data.peak_min !== null ? t("explorer_min_peak", { count: data.peak_min }) : null,
-        ]
-          .filter(Boolean)
-          .join(", ") || null,
       ]
         .filter(Boolean)
         .join(" · ")
@@ -229,7 +209,7 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
       <Selector
         label={t("explorer_direction")}
         items={items}
-        selectedItems={items.find((it) => it.value === choiceValue({ ...resolved, all: false, direction }))}
+        selectedItems={items.find((it) => it.value === choiceValue({ ...resolved, direction }))}
         setSelectedItems={(item) => {
           if (!item || Array.isArray(item)) return;
           pick(String(item.value));
@@ -256,7 +236,6 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
                   color={color}
                   first={i === 0}
                   last={last}
-                  routeByIdx={routeByIdx}
                   selected={picked?.stop_idx === s.stop_idx}
                   onPick={pickStop}
                 />

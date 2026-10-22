@@ -1,10 +1,13 @@
 /**
  * Vehicles in service through the day (board 6). The 5-minute counts flicker
  * where short trips start and end; the chart shows each quarter hour's most,
- * the fleet the quarter needs, from the route's first trip to its last.
+ * the fleet the quarter needs, from the route's first trip to its last, the
+ * axis's start and end labelled.
  */
 import { useTheme } from "@mui/material";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
+
+import { clock } from "@/lib/explorer/format";
 
 /** The counts' step, and the chart's. */
 const STEP_S = 300;
@@ -33,8 +36,14 @@ export function VehiclesCurve({ values, color }: { values: number[]; color: stri
   // 2 or 3 hours of a long one, on the clock's own hours.
   const span = (end - start) / HOUR;
   const every = span <= 5 ? 1 : span <= 10 ? 2 : 3;
-  const ticks: number[] = [];
-  for (let h = Math.ceil(start / HOUR / every) * every; h * HOUR <= end; h += every) ticks.push(h * HOUR);
+  // The axis's start and end are always labelled; hours too close to either
+  // give way, so the labels do not run into each other.
+  const room = every * HOUR;
+  const ticks: number[] = [start];
+  for (let h = Math.ceil(start / HOUR / every) * every; h * HOUR <= end; h += every)
+    if (h * HOUR - start >= room && end - h * HOUR >= room) ticks.push(h * HOUR);
+  ticks.push(end);
+  const fill = theme.palette.text.secondary;
   return (
     <ResponsiveContainer width="100%" height={100}>
       <AreaChart data={data} margin={{ top: 6, right: 6, bottom: 0, left: 0 }}>
@@ -44,8 +53,19 @@ export function VehiclesCurve({ values, color }: { values: number[]; color: stri
           type="number"
           domain={[start, end]}
           ticks={ticks}
-          tickFormatter={(s: number) => `${String(Math.floor(s / HOUR) % 24).padStart(2, "0")}:00`}
-          tick={{ fontSize: 10, fill: theme.palette.text.secondary }}
+          interval={0}
+          // Times as the timetable writes them, past midnight too (24:30);
+          // the ends set inside the chart, so neither is cut off.
+          tick={({ x, y, payload }: { x: number; y: number; payload: { value: number } }) => (
+            <text
+              x={x}
+              y={y + 10}
+              fontSize={10}
+              fill={fill}
+              textAnchor={payload.value === start ? "start" : payload.value === end ? "end" : "middle"}>
+              {clock(payload.value)}
+            </text>
+          )}
           axisLine={{ stroke: theme.palette.divider }}
           tickLine={false}
         />

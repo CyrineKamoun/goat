@@ -19,7 +19,7 @@ import {
 } from "@/lib/explorer/derive/operations";
 import { patternSections, patternTrips } from "@/lib/explorer/derive/patternSections";
 import { routeTrips } from "@/lib/explorer/derive/routeTrips";
-import { routeDayRuns, routeRuns } from "@/lib/explorer/derive/runs";
+import { type TripRange, routeDayRuns, routeRuns } from "@/lib/explorer/derive/runs";
 import { routeCalendar } from "@/lib/explorer/derive/serviceCalendar";
 import {
   type Departure,
@@ -271,13 +271,15 @@ export function useStopsLine(
 }
 
 /** Which service a route runs on which day, over the feed's window. */
+/** The calendar of a range of trips — a route's, or one trip's — keyed by `id`. */
 export function useRouteCalendar(
   db: SqlRunner | undefined,
-  route: RouteRow,
+  trips: TripRange,
+  id: string,
   window: [string, string] | null
 ) {
-  return useQuery(window ? db : undefined, `calendar:${route.route_idx}:${window?.[0]}:${window?.[1]}`, (d) =>
-    routeCalendar(d, route, window as [string, string])
+  return useQuery(window ? db : undefined, `calendar:${id}:${window?.[0]}:${window?.[1]}`, (d) =>
+    routeCalendar(d, trips, window as [string, string])
   );
 }
 

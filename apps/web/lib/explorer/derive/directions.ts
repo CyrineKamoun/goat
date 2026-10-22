@@ -11,7 +11,8 @@
  *    its stops, a branch leaves it.
  * 4. A direction is named by the headsign most of its trips share, else its
  *    last stop; a loop (ending where it starts) by its stop farthest from the
- *    start. Never inbound/outbound or 0/1. The name is data — kind, place,
+ *    start. A variant ending elsewhere than the main pattern is named by its
+ *    own last stop, whatever its trips' headsign says. Never inbound/outbound or 0/1. The name is data — kind, place,
  *    and a stop to tell two same-named directions apart; the UI words it in
  *    the reader's language (`directionLabel`).
  */
@@ -50,6 +51,9 @@ export interface Direction {
   direction_id: number | null;
   patterns: DirectionPattern[];
   n_trips: number;
+  /** The main pattern's first and last stop, as riders know them (the
+   * station's name). */
+  ends: [string, string];
 }
 
 export interface StopInfo {
@@ -220,8 +224,15 @@ export function deriveDirections(
         else if (isSubsequence(main.stops, p.stops)) kind = "express";
         else kind = "branch";
       }
+      // Where it goes: its last stop where that is not the main pattern's.
+      // Feeds often keep the line's headsign on a short working (TMB's 113
+      // ends at González Tablas yet signs Pl. Pius XII); the headsign names
+      // only a pattern ending where the main one does.
+      const end = p.stops[p.stops.length - 1];
       const destination =
-        sharedHeadsign(byPattern.get(p.pattern_idx) ?? []) ?? stopName(stops, p.stops[p.stops.length - 1]);
+        end === main.stops[main.stops.length - 1]
+          ? (sharedHeadsign(byPattern.get(p.pattern_idx) ?? []) ?? stopName(stops, end))
+          : stopName(stops, end);
       return { pattern_idx: p.pattern_idx, kind, destination, n_trips: p.n_trips };
     });
     return {
@@ -230,6 +241,7 @@ export function deriveDirections(
       direction_id: ids.size === 1 ? ([...ids][0] as number | null) : null,
       patterns: patternsOut,
       n_trips: group.reduce((n, p) => n + p.n_trips, 0),
+      ends: [stopName(stops, main.stops[0]), stopName(stops, main.stops[main.stops.length - 1])],
     };
   });
 

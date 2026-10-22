@@ -5,11 +5,11 @@
  * playing; here a frame is an array of positions, projected and drawn in
  * place, and nothing is allocated per frame.
  *
- * A vehicle is a small square in its route's colour, edged in white (stops
- * are the map's circles); from BADGES_FROM_ZOOM, or when it is the selected
- * route's, a badge with the route's number, as the panels' RouteBadge.
- * Badges are drawn once per line into a texture (the atlas) and reused. With
- * a route selected, the others are smaller grey squares beneath its badges,
+ * A vehicle is a dot in its route's colour, edged in white; from
+ * BADGES_FROM_ZOOM, or when it is the selected route's, a badge with the
+ * route's number, as the panels' RouteBadge. Badges are drawn once per line
+ * into a texture (the atlas) and reused. With a route selected, the others
+ * are smaller grey dots beneath its badges,
  * and its own on patterns not picked keep their badges, faded; the vehicle
  * of the trip the right panel shows is ringed.
  *
@@ -53,7 +53,7 @@ const DOT_STROKE = 1;
  * with a thinner edge. */
 const FADED_DOT = { share: 0.8, least: 2, stroke: 0.75 };
 /** Shapes the fragment shader tells apart. */
-const KIND = { dot: 0, badge: 1, ring: 2, square: 3 } as const;
+const KIND = { dot: 0, badge: 1, ring: 2 } as const;
 /** Frames further apart than this (ms) are not glided between: playback
  * was paused, or the scrubber jumped. */
 const MAX_GLIDE_MS = 400;
@@ -105,16 +105,6 @@ void main() {
   float d = length(v_local);
   float r = v_size.x;
   float s = v_size.y;
-  if (v_kind > 2.5) {
-    // A square, its corners a little rounded: its colour, edged in white.
-    vec2 q = abs(v_local) - vec2(r - 1.0);
-    float e = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 1.0;
-    float outer = clamp(s - e + 0.5, 0.0, 1.0);
-    float inner = clamp(-e + 0.5, 0.0, 1.0);
-    vec3 rgb = mix(vec3(1.0), v_color.rgb, inner);
-    gl_FragColor = vec4(rgb, 1.0) * outer;
-    return;
-  }
   if (v_kind < 0.5) {
     // A dot: its colour, edged in white.
     float outer = clamp(r + s - d + 0.5, 0.0, 1.0);
@@ -570,16 +560,16 @@ export class VehicleLayer implements CustomLayerInterface {
       box[4 * k + 3] = hh;
       this.drawnRound[k] = round ? 1 : 0;
     };
-    // Vehicles too far out for badges are squares, not dots: stops are the
-    // map's circles, and a vehicle is never mistaken for one.
+    // Vehicles too far out for badges are dots (squares were tried and
+    // dropped, 22 Oct 2026).
     const dot = (i: number, c: Rgb) => {
-      circle(screen[2 * i], screen[2 * i + 1], r, DOT_STROKE, KIND.square, c);
-      remember(i, r + DOT_STROKE, r + DOT_STROKE, false);
+      circle(screen[2 * i], screen[2 * i + 1], r, DOT_STROKE, KIND.dot, c);
+      remember(i, r + DOT_STROKE, r + DOT_STROKE, true);
     };
     const fr = Math.max(FADED_DOT.least, r * FADED_DOT.share);
     const fadedDot = (i: number) => {
-      circle(screen[2 * i], screen[2 * i + 1], fr, FADED_DOT.stroke, KIND.square, faded);
-      remember(i, fr + FADED_DOT.stroke, fr + FADED_DOT.stroke, false);
+      circle(screen[2 * i], screen[2 * i + 1], fr, FADED_DOT.stroke, KIND.dot, faded);
+      remember(i, fr + FADED_DOT.stroke, fr + FADED_DOT.stroke, true);
     };
     const cw = atlas.canvas.width;
 

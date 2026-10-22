@@ -5,7 +5,7 @@
  * has no blocks. Edited as a draft; Save keeps them for this bundle in this
  * browser and every figure follows.
  */
-import { Box, ButtonBase, InputAdornment, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
+import { Box, InputAdornment, Stack, Tab, Tabs, TextField, Typography } from "@mui/material";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -476,23 +476,5 @@ export function ExplorerSettingsDialog() {
       {tab === "periods" && <PeriodsTab draft={draft} setDraft={setDraft} />}
       {tab === "vehicles" && <VehiclesTab draft={draft} setDraft={setDraft} />}
     </AppDialog>
-  );
-}
-
-/** In the corner of a table by time period: what the periods are, and the way
- * to change them. */
-export function EditPeriodsButton() {
-  const { t } = useTranslation("common");
-  const dispatch = useAppDispatch();
-  return (
-    <ButtonBase
-      onClick={() => dispatch(openExplorerSettings("periods"))}
-      title={t("explorer_edit_time_periods")}
-      sx={{ gap: 0.75, px: 0.5, ml: -0.5, borderRadius: 1, color: "text.secondary" }}>
-      <Icon iconName={ICON_NAME.SLIDERS} style={{ fontSize: 11 }} htmlColor="inherit" />
-      <Typography variant="caption" fontWeight={600}>
-        {t("explorer_time_periods")}
-      </Typography>
-    </ButtonBase>
   );
 }

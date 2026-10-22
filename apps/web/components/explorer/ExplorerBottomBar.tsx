@@ -23,7 +23,8 @@ import {
   setStripHeight,
 } from "@/lib/store/explorer/slice";
 
-import { useRoutes } from "@/hooks/explorer/useExplorerData";
+import { type RouteRow, useRoutes } from "@/hooks/explorer/useExplorerData";
+import { usePickedTrips } from "@/hooks/explorer/usePickedTrips";
 import { usePlayback } from "@/hooks/explorer/usePlayback";
 import { usePlaybackValue } from "@/hooks/explorer/usePlaybackValue";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
@@ -31,6 +32,7 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import { FloatingPanel } from "@/components/common/FloatingPanel";
 import { AnalysisDate } from "@/components/explorer/AnalysisDate";
 import { useExplorer } from "@/components/explorer/ExplorerContext";
+import { routeName } from "@/components/explorer/RouteBadge";
 import { RouteChip, StripControls, TripStrip } from "@/components/explorer/strip/TripStrip";
 import { BAR_HEIGHT, STRIP_MIN, clampStripHeight, stripRoom } from "@/components/explorer/strip/stripLayout";
 
@@ -272,7 +274,7 @@ function BottomBar({ compact = false }: { compact?: boolean }) {
         {stripOpen && route && <StripControls route={route} compact={compact} />}
         {!stripOpen && route && <RouteChip route={route} />}
         {!tight && <Divider orientation="vertical" flexItem sx={{ my: 1.5 }} />}
-        {!tight && <VehicleCount ready={ready} />}
+        {!tight && <VehicleCount ready={ready} route={route} />}
       </Stack>
       {stripOpen && route && <TripStrip route={route} height={stripHeight} />}
     </FloatingPanel>
@@ -368,26 +370,47 @@ function ResizeEdge({
 /** Vehicles out at the time: the figure bold, its unit quiet, as the left
  * panel's figures are; the figure's width fixed so it does not jostle the bar
  * as it plays. Apart from the bar, as it changes with every frame. */
-function VehicleCount({ ready }: { ready: boolean }) {
+function VehicleCount({ ready, route }: { ready: boolean; route: RouteRow | undefined }) {
   const { t, i18n } = useTranslation("common");
-  const n = usePlaybackValue((f) => f.vehicles.n);
+  // With a line selected, its vehicles the map shows in full: those of the
+  // direction or variant shown. Else the whole network's.
+  const picked = usePickedTrips();
+  const routeIdx = route?.route_idx ?? null;
+  const n = usePlaybackValue((f) => {
+    const v = f.vehicles;
+    if (routeIdx === null) return v.n;
+    let k = 0;
+    for (let i = 0; i < v.n; i++)
+      if (v.route_idx[i] === routeIdx && (!picked || picked.has(v.trip_idx[i]))) k++;
+    return k;
+  });
   return (
-    <Stack
-      direction="row"
-      alignItems="baseline"
-      spacing={0.5}
-      // Inline, as the play button's: the row's spacing resets margins set in sx.
-      style={{ marginRight: END_ROOM }}
-      sx={{ flexShrink: 0, visibility: ready ? "visible" : "hidden" }}>
-      <Typography
-        variant="body2"
-        fontWeight={700}
-        sx={{ fontVariantNumeric: "tabular-nums", minWidth: "5ch", textAlign: "right" }}>
-        {count(n, i18n.language)}
-      </Typography>
-      <Typography variant="caption" color="text.secondary">
-        {t("explorer_vehicles_out", { count: n })}
-      </Typography>
-    </Stack>
+    <Tooltip
+      title={
+        route
+          ? t("explorer_vehicles_scope_line", {
+              line: routeName(route, t),
+              interpolation: { escapeValue: false },
+            })
+          : t("explorer_vehicles_scope_network")
+      }>
+      <Stack
+        direction="row"
+        alignItems="baseline"
+        spacing={0.5}
+        // Inline, as the play button's: the row's spacing resets margins set in sx.
+        style={{ marginRight: END_ROOM }}
+        sx={{ flexShrink: 0, visibility: ready ? "visible" : "hidden" }}>
+        <Typography
+          variant="body2"
+          fontWeight={700}
+          sx={{ fontVariantNumeric: "tabular-nums", minWidth: "5ch", textAlign: "right" }}>
+          {count(n, i18n.language)}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {t("explorer_vehicles_out", { count: n })}
+        </Typography>
+      </Stack>
+    </Tooltip>
   );
 }

@@ -1,16 +1,15 @@
 /**
  * A route's summary in the left panel (board 6): its name and its tabs —
- * Overview, Stops (board 10), Service (board 22, read-only until editing)
- * and Calendar (board 11).
+ * Operations (board 22, the default; read-only until editing), Stops (board
+ * 10) and Schedule (board 11).
  */
-import { Box, ButtonBase, Skeleton, Stack, Tab, Tabs, Tooltip, Typography } from "@mui/material";
+import { Box, ButtonBase, Skeleton, Stack, Tab, Tabs, Typography } from "@mui/material";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { highlightedPatterns } from "@/lib/explorer/directionChoice";
-import { clock, count, shortDate } from "@/lib/explorer/format";
 import { highlightStore } from "@/lib/explorer/highlightStore";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
 import {
@@ -20,181 +19,21 @@ import {
   setExplorerRouteTab,
 } from "@/lib/store/explorer/slice";
 
-import {
-  type RouteRow,
-  type RouteSummaryData,
-  usePatternSections,
-  useRouteSummary,
-} from "@/hooks/explorer/useExplorerData";
+import { type RouteRow, usePatternSections, useRouteSummary } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { useTimetablesPending } from "@/components/explorer/ExplorerLoading";
-import { EditPeriodsButton } from "@/components/explorer/ExplorerSettingsDialog";
 import { RouteBadge, namedByMode, routeName } from "@/components/explorer/RouteBadge";
 import { RouteCalendar } from "@/components/explorer/RouteCalendar";
 import { RouteService } from "@/components/explorer/RouteService";
 import { RouteStops } from "@/components/explorer/RouteStops";
-import { DateChip, SectionHeader } from "@/components/explorer/SectionHeader";
-import { VehiclesCurve } from "@/components/explorer/VehiclesCurve";
-import { directionLabel, directionPlace } from "@/components/explorer/directionWords";
+import { TAB_SX } from "@/components/explorer/SectionHeader";
 import { modeIcon } from "@/components/explorer/modeIcon";
 
-/** A figure on the panel's tinted ground, as in the cost section. */
-function Tile({ value, label }: { value: string; label: string }) {
-  return (
-    <Box sx={{ flex: 1, minWidth: 0, bgcolor: "action.hover", borderRadius: 1.5, px: 1.25, py: 1 }}>
-      <Typography variant="body1" fontWeight="bold" noWrap>
-        {value}
-      </Typography>
-      <Typography variant="caption" color="text.secondary" display="block" sx={{ lineHeight: 1.3 }}>
-        {label}
-      </Typography>
-    </Box>
-  );
-}
-
-/** Width of a direction's column. */
-const DIRECTION_COL = 76;
-
-function ServiceTable({ data }: { data: RouteSummaryData }) {
-  const { t } = useTranslation("common");
-  const { periods } = useExplorer().settings;
-  const cols = data.directions;
-  return (
-    // Tinted like the cost section; rows split by hairlines, the head by none.
-    <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, overflow: "hidden", px: 1.5, py: 0.5 }}>
-      {/* The directions, each in its own column; the unit is in the values. */}
-      <Stack direction="row" columnGap={1.5} alignItems="flex-end" sx={{ py: 1 }}>
-        <Box sx={{ flex: 1 }}>
-          <EditPeriodsButton />
-        </Box>
-        {cols.map((c) => (
-          // "To" goes without saying in a column of headways: more of the
-          // destination fits; the whole of it is in the tooltip.
-          <Typography
-            key={c.direction.key}
-            variant="caption"
-            color="text.secondary"
-            fontWeight={600}
-            noWrap
-            title={directionLabel(c.direction.name, t)}
-            sx={{ width: DIRECTION_COL, flexShrink: 0, textAlign: "right" }}>
-            {directionPlace(c.direction.name, t)}
-          </Typography>
-        ))}
-      </Stack>
-      {periods.map((p) => (
-        <Stack
-          key={p.key}
-          direction="row"
-          columnGap={1.5}
-          alignItems="center"
-          sx={{ py: 0.75, borderTop: 1, borderColor: "divider" }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="body2" fontWeight={600} noWrap sx={{ lineHeight: 1.3 }}>
-              {t(`explorer_period_${p.key}`)}
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              display="block"
-              noWrap
-              sx={{ lineHeight: 1.3 }}>
-              {p.start_s ? clock(p.start_s) : ""}–{p.end_s < 30 * 3600 ? clock(p.end_s) : ""}
-            </Typography>
-          </Box>
-          {cols.map((c) => {
-            const h = c.headways.get(p.key);
-            const none = !h || h.departures === 0;
-            const single = !none && h.minutes === null;
-            return (
-              <Typography
-                key={c.direction.key}
-                variant="body2"
-                fontWeight={none || single ? 400 : 600}
-                color={none || single ? "text.secondary" : "text.primary"}
-                sx={{
-                  width: DIRECTION_COL,
-                  flexShrink: 0,
-                  textAlign: "right",
-                  fontVariantNumeric: "tabular-nums",
-                }}>
-                {none ? "–" : single ? t("explorer_one_trip") : `${h.minutes}′`}
-              </Typography>
-            );
-          })}
-        </Stack>
-      ))}
-    </Box>
-  );
-}
-
-function Overview({ route, data }: { route: RouteRow; data: RouteSummaryData }) {
-  const { t, i18n } = useTranslation("common");
-  const date = useAppSelector((s) => s.explorer.date) as string;
-  const lang = i18n.language;
-  const ops = data.operations;
-  if (!ops.runs) {
-    return (
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-        {t("explorer_no_service", { date: shortDate(date, lang) })}
-      </Typography>
-    );
-  }
-  return (
-    <>
-      <Box sx={{ mt: 1 }}>
-        <SectionHeader
-          px={0}
-          icon={ICON_NAME.CLOCK}
-          label={t("explorer_headways")}
-          aside={<DateChip date={date} />}
-        />
-      </Box>
-      <ServiceTable data={data} />
-      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-        {t("explorer_first_last_trips", {
-          first: clock(ops.first_dep_s),
-          last: clock(ops.last_dep_s),
-          count: ops.runs,
-        })}
-      </Typography>
-
-      <Box sx={{ mt: 2 }}>
-        <SectionHeader
-          px={0}
-          icon={ICON_NAME.BUS}
-          label={t("explorer_vehicles_in_service_title")}
-          aside={<DateChip date={date} />}
-        />
-      </Box>
-      <VehiclesCurve values={data.curve} color={routeColor(route.color, modeOf(route.route_type))} />
-      <Box sx={{ mt: 2 }}>
-        <SectionHeader
-          px={0}
-          icon={ICON_NAME.CHART}
-          label={t("explorer_operations")}
-          aside={<DateChip date={date} />}
-        />
-      </Box>
-      <Stack direction="row" spacing={1}>
-        <Tile value={count(ops.vehicle_hours, lang)} label={t("explorer_vehicle_hours")} />
-        <Tile value={count(ops.vehicle_km, lang)} label={t("explorer_vehicle_km")} />
-        <Tooltip title={ops.peak_from_blocks ? "" : t("explorer_peak_estimated")}>
-          <Box sx={{ flex: 1, display: "flex" }}>
-            <Tile value={count(ops.peak_vehicles, lang)} label={t("explorer_peak_vehicles")} />
-          </Box>
-        </Tooltip>
-      </Stack>
-      <Box sx={{ mb: 2 }} />
-    </>
-  );
-}
-
-/** The Overview's shape while its figures are worked out, so it fills in
+/** A tab's shape while the route's figures are worked out, so it fills in
  * rather than jumps in; says so while the timetables are still loading. */
-function OverviewSkeleton() {
+function SummarySkeleton() {
   const { t } = useTranslation("common");
   const pending = useTimetablesPending();
   return (
@@ -220,15 +59,6 @@ const META_LINE = "20px";
 /** The route's tabs as GOAT's panels draw theirs (the toolbox's): sentence
  * case, 13 px, on a divider. They fill the bar, each as wide as its label plus
  * padding either side and a share of what is left, so no label meets an edge. */
-const TAB_SX = {
-  minHeight: 36,
-  minWidth: 0,
-  flex: "1 1 auto",
-  px: 3,
-  textTransform: "none",
-  fontSize: "0.8125rem",
-} as const;
-
 export function RouteSummary({ route }: { route: RouteRow }) {
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
@@ -307,10 +137,9 @@ export function RouteSummary({ route }: { route: RouteRow }) {
           value={tab}
           onChange={(_e, value: ExplorerRouteTab) => dispatch(setExplorerRouteTab(value))}
           sx={{ minHeight: 36 }}>
-          <Tab value="overview" label={t("overview")} sx={TAB_SX} />
+          <Tab value="service" label={t("explorer_tab_operations")} sx={TAB_SX} />
           <Tab value="stops" label={t("explorer_tab_stops")} sx={TAB_SX} />
-          <Tab value="service" label={t("explorer_tab_service")} sx={TAB_SX} />
-          <Tab value="calendar" label={t("calendar")} sx={TAB_SX} />
+          <Tab value="calendar" label={t("explorer_schedule_tab")} sx={TAB_SX} />
         </Tabs>
       </Box>
       <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", px: 2.5 }}>
@@ -319,10 +148,9 @@ export function RouteSummary({ route }: { route: RouteRow }) {
             {summary.error}
           </Typography>
         )}
-        {!summary.data && !summary.error && tab !== "calendar" && <OverviewSkeleton />}
-        {summary.data && tab === "overview" && <Overview route={route} data={summary.data} />}
-        {tab === "calendar" && <RouteCalendar route={route} />}
-        {summary.data && tab === "service" && <RouteService data={summary.data} />}
+        {!summary.data && !summary.error && tab !== "calendar" && <SummarySkeleton />}
+        {tab === "calendar" && <RouteCalendar trips={route} id={`route:${route.route_idx}`} of="line" />}
+        {summary.data && tab === "service" && <RouteService route={route} data={summary.data} />}
         {summary.data && tab === "stops" && (
           <RouteStops route={route} directions={summary.data.directions.map((d) => d.direction)} />
         )}

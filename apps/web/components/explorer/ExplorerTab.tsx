@@ -5,7 +5,7 @@
  * platform shows it on the map. The operating cost sits below, in CostSection.
  */
 import { Box, InputAdornment, List, ListItemButton, Stack, TextField, Typography } from "@mui/material";
-import { type ReactNode, memo, useDeferredValue, useMemo, useState } from "react";
+import { type ReactNode, memo, useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
@@ -19,10 +19,11 @@ import {
   shows,
 } from "@/lib/explorer/filters";
 import { compact, count } from "@/lib/explorer/format";
-import { modeOf } from "@/lib/explorer/modes";
-import { selectExplorerRoute } from "@/lib/store/explorer/slice";
+import { type ModeKey, modeOf } from "@/lib/explorer/modes";
+import { selectExplorerRoute, setExplorerFilters } from "@/lib/store/explorer/slice";
 
 import {
+  type AgencyRow,
   type RouteRow,
   useAgencies,
   useRouteDayRuns,
@@ -115,6 +116,62 @@ const RouteRows = memo(function RouteRows({
   );
 });
 
+/** The feed's agencies: each with its lines and their transport modes. A
+ * click shows only its lines and stations (the agency filter); again, all.
+ * (An agency summary, as a line's, is to come.) */
+const AgencyRows = memo(function AgencyRows({
+  agencies,
+  routes,
+  chosen,
+  onChoose,
+}: {
+  agencies: AgencyRow[];
+  routes: RouteRow[];
+  chosen: number[];
+  onChoose: (agency_idx: number) => void;
+}) {
+  const { t } = useTranslation("common");
+  const byAgency = useMemo(() => {
+    const m = new Map<number, { n: number; modes: Set<ModeKey> }>();
+    for (const r of routes) {
+      if (r.agency_idx === null) continue;
+      const a = m.get(r.agency_idx) ?? { n: 0, modes: new Set<ModeKey>() };
+      a.n += 1;
+      a.modes.add(modeOf(r.route_type));
+      m.set(r.agency_idx, a);
+    }
+    return m;
+  }, [routes]);
+  return (
+    <>
+      {agencies.map((a) => {
+        const info = byAgency.get(a.agency_idx);
+        const on = chosen.includes(a.agency_idx);
+        return (
+          <ListItemButton
+            key={a.agency_idx}
+            selected={on}
+            onClick={() => onChoose(a.agency_idx)}
+            title={t(on ? "explorer_agency_show_all" : "explorer_agency_show_only")}
+            sx={{ px: PX, py: 0.75, gap: 1.5, minHeight: ROW_HEIGHT }}>
+            <Typography variant="body2" noWrap sx={{ flex: 1 }} title={a.name ?? undefined}>
+              {a.name || t("explorer_unknown_agency")}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {t("explorer_n_routes", { count: info?.n ?? 0 })}
+            </Typography>
+            <Stack direction="row" spacing={0.5} sx={{ color: "text.disabled" }}>
+              {[...(info?.modes ?? [])].map((m) => (
+                <Icon key={m} iconName={modeIcon(m)} style={{ fontSize: 13 }} htmlColor="inherit" />
+              ))}
+            </Stack>
+          </ListItemButton>
+        );
+      })}
+    </>
+  );
+});
+
 function Note({ children }: { children: ReactNode }) {
   return (
     <Typography variant="caption" color="text.secondary" sx={{ display: "block", px: PX, py: 1 }}>
@@ -141,7 +198,8 @@ export function ExplorerTab() {
   // One section open at a time, filling the room the other's header leaves:
   // neither list is squeezed on a small screen. Its header folds it again,
   // leaving both folded.
-  const [open, setOpen] = useState<"routes" | "stops" | null>("routes");
+  const [open, setOpen] = useState<"routes" | "stops" | "agencies" | null>("routes");
+  const dispatch = useAppDispatch();
 
   // The field shows every keystroke at once; the lists follow when they
   // can, a newer keystroke cutting short the filtering of an older one.
@@ -166,7 +224,22 @@ export function ExplorerTab() {
   // drawn again only when it changes, not as each key is typed.
   const shownRoutes = useMemo(() => filteredRoutes.slice(0, SHOWN), [filteredRoutes]);
   const shownStops = useMemo(() => filteredStops.slice(0, SHOWN), [filteredStops]);
+  const filteredAgencies = useMemo(() => {
+    const ql = q.toLowerCase();
+    return (agencies.data ?? []).filter((a) => !ql || (a.name ?? "").toLowerCase().includes(ql));
+  }, [agencies.data, q]);
   const routesAmount = useAmount(filteredRoutes.length, routes.data?.length, narrowed);
+  const agenciesAmount = useAmount(filteredAgencies.length, agencies.data?.length, !!q);
+  // An agency picked: only its lines and stations, shown in the Lines list;
+  // picked again, all agencies.
+  const chooseAgency = useCallback(
+    (agency_idx: number) => {
+      const only = filters.agencies.length === 1 && filters.agencies[0] === agency_idx;
+      dispatch(setExplorerFilters({ ...filters, agencies: only ? [] : [agency_idx] }));
+      setOpen("routes");
+    },
+    [dispatch, filters]
+  );
   const stopsAmount = useAmount(filteredStops.length, stops.data?.length, narrowed);
 
   const selected = routes.data?.find((r) => r.route_id === selectedRouteId);
@@ -183,6 +256,8 @@ export function ExplorerTab() {
         ? "routes"
         : null;
   // Both folded, a search still shows what it finds.
+  // Agencies show with both lists, not with a filter to one kind.
+  const showAgencies = showRoutes && showStops;
   const shown =
     open === null && !q
       ? null
@@ -193,6 +268,7 @@ export function ExplorerTab() {
           : (searchOpens ?? open ?? "routes");
   const routesOpen = shown === "routes";
   const stopsOpen = shown === "stops";
+  const agenciesOpen = shown === "agencies";
 
   return (
     <Stack sx={{ height: "100%", minHeight: 0 }}>
@@ -266,6 +342,27 @@ export function ExplorerTab() {
               <Note>{t("explorer_more_stops", { count: filteredStops.length - SHOWN })}</Note>
             )}
             {stops.data && filteredStops.length === 0 && <Note>{t("explorer_no_stops")}</Note>}
+          </SectionList>
+        </>
+      )}
+
+      {showAgencies && (
+        <>
+          <SectionHeader
+            icon={ICON_NAME.ORGANIZATION}
+            label={t("explorer_agencies")}
+            amount={agenciesAmount}
+            folded={!agenciesOpen}
+            onFold={() => setOpen(agenciesOpen ? null : "agencies")}
+          />
+          <SectionList hidden={!agenciesOpen}>
+            <AgencyRows
+              agencies={filteredAgencies}
+              routes={routes.data ?? []}
+              chosen={filters.agencies}
+              onChoose={chooseAgency}
+            />
+            {agencies.data && filteredAgencies.length === 0 && <Note>{t("explorer_no_agencies")}</Note>}
           </SectionList>
         </>
       )}
