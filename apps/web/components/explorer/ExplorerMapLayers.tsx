@@ -22,7 +22,10 @@ import { Layer, Popup, Source, useMap } from "react-map-gl/maplibre";
 
 import { GEOAPI_BASE_URL } from "@/lib/constants";
 import { vehicleFrame } from "@/lib/explorer/derive/vehicles";
+import { highlightedPatterns } from "@/lib/explorer/directionChoice";
 import { routeMatches } from "@/lib/explorer/filters";
+import { highlightStore } from "@/lib/explorer/highlightStore";
+import { tint } from "@/lib/explorer/modes";
 import { networkStore } from "@/lib/explorer/network";
 import { playbackClock } from "@/lib/explorer/playback";
 import {
@@ -40,26 +43,119 @@ import { EXPLORER_PANEL_WIDTH } from "@/components/explorer/ExplorerLeftPanel";
 import { RouteBadge } from "@/components/explorer/RouteBadge";
 import { STOP_FILL } from "@/components/explorer/StopMarker";
 import { EXPLORER_RIGHT_PANEL_WIDTH } from "@/components/explorer/right/panelSize";
+import { bottomBarHeight } from "@/components/explorer/strip/stripLayout";
 import { VEHICLE_LAYER_ID, VehicleLayer } from "@/components/explorer/vehicleLayer";
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const NO_VEHICLES = vehicleFrame();
 const NETWORK = "explorer-network";
 const FADED = "#9E9E9E";
+/** How close a picked stop is shown: near enough to tell its platforms and
+ * the streets round it apart. A station is fitted whole, no closer. */
+const STOP_ZOOM = 17;
+/** How close a route or one of its patterns is fitted, at most: a short
+ * route is shown among its streets, not filling the screen. */
+const ROUTE_ZOOM = 15;
+/** The arrow drawn along a highlighted pattern, pointing the way it runs:
+ * a white chevron, its tip to the right (the line's forward direction). */
+const ARROW = "explorer-arrow-2";
+function arrowImage(): { image: ImageData; options: object } {
+  // At twice the CSS size: a chevron 5 px tall and 2 px thick, inside the
+  // highlighted line's 7 px, so it reads white on the line's colour.
+  const size = 20;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
+  ctx.strokeStyle = "#FFFFFF";
+  ctx.lineWidth = 3.5;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(8, 5.5);
+  ctx.lineTo(12.5, 10);
+  ctx.lineTo(8, 14.5);
+  ctx.stroke();
+  return { image: ctx.getImageData(0, 0, size, size), options: { pixelRatio: 2 } };
+}
+
+/** How close a run's vehicle is flown to: among the streets it runs on. */
+const VEHICLE_ZOOM = 15;
+/** Room (px) kept between what a fit shows and the panels round it. */
+const FIT_ROOM = 32;
+/** What the Explorer's panels and controls cover at the map's edges (px):
+ * the left panel and the gap after it, the map controls' column at the right
+ * (and the right panel, when open, beside it), and under the bottom bar its
+ * offset from the map's foot and a gap above it. */
+const COVER = {
+  top: 10,
+  left: EXPLORER_PANEL_WIDTH + 20,
+  right: 60,
+  rightPanel: EXPLORER_RIGHT_PANEL_WIDTH + 20,
+  bar: 50,
+};
+/** However much the panels cover, a fit keeps this much of the map to fit
+ * into: a share of each side, at least so many px. Covering more (a strip
+ * dragged tall), the bar's side gives way first: the fit then runs under
+ * it rather than zooming far out into a sliver above it. */
+const KEEP = { share: 0.3, height: 180, width: 300 };
+
+type Padding = { top: number; bottom: number; left: number; right: number };
+
+/** The map's padding for a fit or a flight: clear of the panels, with `room`
+ * more on every side, giving way where they leave too little (KEEP). */
+function clearOf(
+  map: { getCanvas: () => HTMLCanvasElement },
+  { rightPanel, bar }: { rightPanel: boolean; bar: number },
+  room = 0
+): Padding {
+  const { clientWidth: w, clientHeight: h } = map.getCanvas();
+  const p = {
+    top: COVER.top + room,
+    bottom: bar + COVER.bar + room,
+    left: COVER.left + room,
+    right: (rightPanel ? COVER.rightPanel : 0) + COVER.right + room,
+  };
+  const tallBy = p.top + p.bottom - (h - Math.max(KEEP.height, h * KEEP.share));
+  if (tallBy > 0) p.bottom = Math.max(room, p.bottom - tallBy);
+  const wideBy = p.left + p.right - (w - Math.max(KEEP.width, w * KEEP.share));
+  if (wideBy > 0) {
+    const cut = Math.min(wideBy, p.right - room);
+    p.right -= cut;
+    p.left = Math.max(room, p.left - (wideBy - cut));
+  }
+  return p;
+}
+
+/** Whether a place is in plain view: inside the padding. */
+function inViewOf(
+  map: { getCanvas: () => HTMLCanvasElement; project: (ll: [number, number]) => { x: number; y: number } },
+  p: Padding,
+  [lon, lat]: number[]
+): boolean {
+  const { x, y } = map.project([lon, lat]);
+  const { clientWidth: w, clientHeight: h } = map.getCanvas();
+  return x > p.left && x < w - p.right && y > p.top && y < h - p.bottom;
+}
 /** The Explorer's layers, bottom to top. */
 const DRAW_ORDER = [
   "explorer-station-area",
   "explorer-station-edge",
+  "explorer-picked-station-area",
   "explorer-network-line",
   "explorer-stop-dot",
   "explorer-route-casing",
   "explorer-route-line",
   "explorer-pattern-casing",
   "explorer-pattern-line",
+  "explorer-pattern-section-casing",
+  "explorer-pattern-section-line",
+  "explorer-pattern-section-arrows",
   "explorer-route-stop",
+  "explorer-picked-station-edge",
   VEHICLE_LAYER_ID,
   "explorer-picked-stop-halo",
   "explorer-picked-stop-dot",
+  "explorer-route-ends",
 ];
 
 /** The line chooser's class, and its look: the panels' card. */
@@ -96,22 +192,43 @@ export function ExplorerMapLayers() {
     const item = s.explorer.active ? panelItem(s.explorer) : null;
     return item?.kind === "trip" ? item : null;
   });
-  const panelOpen = useAppSelector(
-    (s) => s.explorer.active && s.explorer.panel.stack.length > 0 && !s.explorer.panel.collapsed
-  );
+  const panelOpen = useAppSelector((s) => s.explorer.active && s.explorer.panel.stack.length > 0);
   const selectedRouteId = useAppSelector((s) => (s.explorer.active ? s.explorer.selectedRouteId : null));
   const filters = useAppSelector((s) => s.explorer.filters);
   const playing = useAppSelector((s) => s.explorer.playing);
-  // The Stops tab's pattern, highlighted over the rest of its route.
-  const patternIdx = useAppSelector((s) =>
-    s.explorer.routeTab === "stops" ? (s.explorer.pattern?.pattern_idx ?? null) : null
+  // Room the bottom bar takes: the trip strip's under a selected route, and
+  // the map's own margin below it.
+  const bar = useAppSelector((s) => bottomBarHeight(s.explorer.strip, s.explorer.selectedRouteId !== null));
+  // The patterns highlighted over the rest of the route: the Stops tab's
+  // line, else what the direction picker chose (highlightedPatterns). As a
+  // string from the store, so it changes only when they do.
+  const patternKey = useAppSelector((s) =>
+    s.explorer.drawing
+      ? (highlightedPatterns(
+          s.explorer.pattern,
+          s.explorer.drawing.directions,
+          s.explorer.routeTab === "stops"
+        )?.join(",") ?? "")
+      : ""
   );
+  const patternIdxs = useMemo(() => (patternKey ? patternKey.split(",").map(Number) : null), [patternKey]);
+  // Whether a direction or variant was picked (not all directions, not
+  // nothing): the line's vehicles on its other patterns then fade.
+  const picking = useAppSelector((s) => !!s.explorer.pattern && s.explorer.pattern.direction !== "all");
+  // The stretch those patterns run, cut from their shapes; until it is in,
+  // the shapes themselves stand in.
+  const highlight = useSyncExternalStore(highlightStore.subscribe, highlightStore.getSnapshot, () => null);
+  const sections = highlight && highlight.key === patternKey ? highlight.sections : null;
   const network = useSyncExternalStore(
     networkStore.subscribe,
     networkStore.getSnapshot,
     networkStore.getSnapshot
   );
   const { current: map } = useMap();
+  // A stop or station just picked on the map itself: the map stays where it
+  // is for it, as it is in view where it was clicked (02-panel-behaviour-spec
+  // › Automatic behaviour). A line is fitted whole however it is picked.
+  const onMap = useRef<{ stop?: number }>({});
   const theme = useTheme();
   // One array for as long as the layer is the same: a new one makes the map
   // replace the source, and with it every shape's styling.
@@ -142,8 +259,11 @@ export function ExplorerMapLayers() {
       openTrip: openTrip ? { trip_idx: openTrip.trip_idx, run_dep_s: openTrip.run_dep_s } : null,
       ring: theme.palette.primary.main,
       faded: FADED,
+      // A direction or variant picked (not the Stops tab's line alone, which
+      // follows the tab): the line's vehicles on its other patterns fade.
+      pickedTrips: highlight && highlight.key === patternKey && picking ? highlight.trips : null,
     });
-  }, [vehicles, selectedRouteId, openTrip, theme.palette.primary.main]);
+  }, [vehicles, selectedRouteId, openTrip, theme.palette.primary.main, highlight, patternKey, picking]);
 
   // The Explorer's layers in drawing order, bottom to top. Sources mount as
   // their data arrives — the network after the route's stops — and a layer
@@ -177,12 +297,19 @@ export function ExplorerMapLayers() {
   // Each shape's colour, and whether it is faded: by the selected route, and
   // by the Explorer tab's filter. Set as feature-state, which the map keeps
   // for shapes whose tiles are not loaded yet.
+  // Only what changed is set again: every feature-state set makes the map
+  // rebuild that shape's paint in every loaded tile, which for a whole
+  // network is a few hundred milliseconds, so selecting one route after
+  // another touches just their shapes. What was set, per shape.
+  const styled = useRef(new Map<string | number, string>());
   useEffect(() => {
     if (!map || !active) return;
     const onlyStops = filters.types.length === 1 && filters.types[0] === "stops";
     const narrowing = filters.modes.length > 0 || filters.agencies.length > 0;
     const apply = () => {
-      if (!map.getSource(NETWORK)) return;
+      const was = styled.current;
+      // No source, no state: whatever was set went with it.
+      if (!map.getSource(NETWORK)) return void was.clear();
       for (const [id, shape] of network.shapes) {
         const shown = shape.route_ids.some((r) => {
           const route = network.routes.get(r);
@@ -190,14 +317,20 @@ export function ExplorerMapLayers() {
         });
         const faded =
           onlyStops || (selectedRouteId ? !shape.route_ids.includes(selectedRouteId) : narrowing && !shown);
+        const key = `${shape.color}|${faded}`;
+        if (was.get(id) === key) continue;
+        was.set(id, key);
         map.setFeatureState({ source: NETWORK, sourceLayer: TILE_LAYER, id }, { color: shape.color, faded });
       }
     };
     apply();
     // Whenever the source is (re)added — after this first runs, or when the
-    // style reloads — its features start without state: style them again.
+    // style reloads — its features start without state: style them all again.
     const onData = (e: { sourceId?: string; sourceDataType?: string }) => {
-      if (e.sourceId === NETWORK && e.sourceDataType === "metadata") apply();
+      if (e.sourceId === NETWORK && e.sourceDataType === "metadata") {
+        styled.current.clear();
+        apply();
+      }
     };
     map.on("sourcedata", onData);
     return () => {
@@ -237,6 +370,7 @@ export function ExplorerMapLayers() {
       return null;
     };
     const onClick = (e: MapLayerMouseEvent) => {
+      onMap.current = {};
       const vehicle = vehicleAt(e.point);
       if (vehicle) {
         dispatch(
@@ -250,6 +384,7 @@ export function ExplorerMapLayers() {
       if (stop) {
         const [lon, lat] = (stop.geometry as Point).coordinates;
         const p = stop.properties ?? {};
+        onMap.current = { stop: Number(p.stop_idx) };
         dispatch(
           openExplorerPanel({
             item: {
@@ -278,6 +413,7 @@ export function ExplorerMapLayers() {
           const p = station.properties ?? {};
           const ring = (station.geometry as Polygon).coordinates[0] ?? [];
           const mid = (k: 0 | 1) => ring.reduce((sum, c) => sum + c[k], 0) / Math.max(ring.length, 1);
+          onMap.current = { stop: Number(p.stop_idx) };
           dispatch(
             openExplorerPanel({
               item: {
@@ -290,8 +426,9 @@ export function ExplorerMapLayers() {
         }
         routeIds = routesOf(HIT_RADII);
       }
-      if (routeIds.length === 1) dispatch(selectExplorerRoute(routeIds[0]));
-      else if (routeIds.length > 1) setChoice({ lon: e.lngLat.lng, lat: e.lngLat.lat, routeIds });
+      if (routeIds.length === 1) {
+        dispatch(selectExplorerRoute(routeIds[0]));
+      } else if (routeIds.length > 1) setChoice({ lon: e.lngLat.lng, lat: e.lngLat.lat, routeIds });
       else dismiss();
     };
     // A click on nothing lets go of what is open, the latest first: the line
@@ -321,9 +458,57 @@ export function ExplorerMapLayers() {
     };
   }, [map, active, network, selectedRouteId, dispatch, vehicles]);
 
+  // A picked station is its whole area, as drawn round its stops, not a
+  // point in it; a stop or platform is its point.
+  // A run picked in the trip strip: its vehicle, if out on the map, flown
+  // to, clear of the panels — the trip opens in the right panel with it. In
+  // plain view already, it is left where it is; a run not running now has
+  // no vehicle to go to.
+  const focus = useAppSelector((s) => (s.explorer.active ? s.explorer.focus : null));
+  useEffect(() => {
+    if (!map || !focus) return;
+    const at = vehicles.find(focus.trip_idx, focus.run_dep_s);
+    if (!at) return;
+    const padding = clearOf(map, { rightPanel: true, bar });
+    if (
+      inViewOf(map, clearOf(map, { rightPanel: true, bar }, FIT_ROOM), [at.lon, at.lat]) &&
+      map.getZoom() >= VEHICLE_ZOOM
+    )
+      return;
+    map.flyTo({
+      center: [at.lon, at.lat],
+      zoom: Math.max(map.getZoom(), VEHICLE_ZOOM),
+      padding,
+      duration: 1000,
+    });
+    // Playing, the vehicle runs on while the map flies: landed, the map
+    // catches up with where it is now.
+    const settle = () => {
+      const now = vehicles.find(focus.trip_idx, focus.run_dep_s);
+      if (now) map.easeTo({ center: [now.lon, now.lat], padding, duration: 300 });
+    };
+    map.once("moveend", settle);
+    return () => {
+      map.off("moveend", settle);
+    };
+    // Only when asked again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, focus]);
+
+  const pickedArea = useMemo(
+    () =>
+      picked
+        ? (network.stations.features.find((f) => f.properties.stop_idx === picked.stop_idx) ?? null)
+        : null,
+    [picked, network.stations]
+  );
+  const pickedAreaData = useMemo<FeatureCollection>(
+    () => (pickedArea ? { type: "FeatureCollection", features: [pickedArea] } : EMPTY),
+    [pickedArea]
+  );
   const pickedPoint = useMemo<FeatureCollection>(
     () =>
-      picked && picked.lon !== null && picked.lat !== null
+      !pickedArea && picked && picked.lon !== null && picked.lat !== null
         ? {
             type: "FeatureCollection",
             features: [
@@ -335,27 +520,85 @@ export function ExplorerMapLayers() {
             ],
           }
         : EMPTY,
-    [picked]
+    [picked, pickedArea]
   );
 
-  // Fly to a picked stop, clear of the panels; zoom in only as far as a
-  // stop needs, never out from a closer look. A stop already in plain view
-  // at street level (clicked on the map) is left where it is.
+  // Fly to a picked stop, clear of the panels, close enough to see it
+  // (STOP_ZOOM), never out from a closer look; a station is fitted whole.
+  // One already in plain view at street level (clicked on the map) is left
+  // where it is.
   useEffect(() => {
-    if (!map || !picked || picked.lon === null || picked.lat === null) return;
-    const right = panelOpen ? EXPLORER_RIGHT_PANEL_WIDTH : 0;
-    const { x, y } = map.project([picked.lon, picked.lat]);
-    const { clientWidth: w, clientHeight: h } = map.getCanvas();
-    const inView = x > EXPLORER_PANEL_WIDTH + 40 && x < w - right - 40 && y > 60 && y < h - 120;
-    if (inView && map.getZoom() >= 14) return;
-    map.flyTo({
-      center: [picked.lon, picked.lat],
-      zoom: Math.max(map.getZoom(), 15),
-      padding: { top: 0, bottom: 0, left: EXPLORER_PANEL_WIDTH, right },
-    });
+    if (!map || !picked) return;
+    if (onMap.current.stop === picked.stop_idx) {
+      onMap.current = {};
+      return;
+    }
+    const cover = { rightPanel: panelOpen, bar };
+    const padding = clearOf(map, cover);
+    const roomy = clearOf(map, cover, FIT_ROOM);
+    const inView = (c: number[]) => inViewOf(map, roomy, c);
+    if (pickedArea) {
+      const ring = pickedArea.geometry.coordinates[0] ?? [];
+      if (!ring.length) return;
+      if (ring.every(inView) && map.getZoom() >= 16) return;
+      const lons = ring.map((c) => c[0]);
+      const lats = ring.map((c) => c[1]);
+      map.fitBounds(
+        [
+          [Math.min(...lons), Math.min(...lats)],
+          [Math.max(...lons), Math.max(...lats)],
+        ],
+        { maxZoom: STOP_ZOOM, padding: roomy }
+      );
+      return;
+    }
+    if (picked.lon === null || picked.lat === null) return;
+    if (inView([picked.lon, picked.lat]) && map.getZoom() >= 16) return;
+    map.flyTo({ center: [picked.lon, picked.lat], zoom: Math.max(map.getZoom(), STOP_ZOOM), padding });
     // Only when another stop is picked.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, picked]);
+  }, [map, picked, pickedArea]);
+
+  // The arrows along a highlighted pattern, drawn when the map asks for
+  // them, so a new style that drops them draws them again.
+  useEffect(() => {
+    if (!map) return;
+    const raw = map.getMap();
+    const onMissing = (e: { id: string }) => {
+      if (raw.hasImage(e.id)) return;
+      if (e.id !== ARROW) return;
+      const { image, options } = arrowImage();
+      raw.addImage(e.id, image, options);
+    };
+    raw.on("styleimagemissing", onMissing);
+    return () => {
+      raw.off("styleimagemissing", onMissing);
+    };
+  }, [map]);
+
+  // The selected line's ends, named on the map: where its directions start
+  // and end, or, with patterns highlighted, where those start and end. A
+  // name shared by two ends (both directions' termini) is named once.
+  const ends = useMemo<FeatureCollection>(() => {
+    if (!drawing) return EMPTY;
+    const ids = new Set<number>();
+    for (const p of patternIdxs ?? drawing.directions.map((d) => d.key)) {
+      const e = drawing.patternEnds?.[p];
+      if (e) e.forEach((i) => ids.add(i));
+    }
+    const named = new Set<string>();
+    const features: FeatureCollection["features"] = [];
+    for (const s of drawing.stops) {
+      if (!ids.has(s.stop_idx) || !s.name || named.has(s.name)) continue;
+      named.add(s.name);
+      features.push({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [s.lon, s.lat] },
+        properties: { name: s.name },
+      });
+    }
+    return { type: "FeatureCollection", features };
+  }, [drawing, patternIdxs]);
 
   const stops = useMemo<FeatureCollection>(
     () => ({
@@ -378,35 +621,41 @@ export function ExplorerMapLayers() {
         [bounds[0], bounds[1]],
         [bounds[2], bounds[3]],
       ],
-      { padding: { top: 60, bottom: 100, left: EXPLORER_PANEL_WIDTH + 40, right: 80 }, maxZoom: 14 }
+      { padding: clearOf(map, { rightPanel: false, bar }, FIT_ROOM), maxZoom: 14 }
     );
+    // Once, on opening: not again when the bottom bar changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, bounds]);
 
-  // Fit the view to the Stops tab's pattern when it switches to another,
-  // clear of the panels and the bottom bar.
+  // Fit the view to the highlighted patterns when they change, clear of the
+  // panels and the bottom bar.
   useEffect(() => {
-    const b = patternIdx !== null ? drawing?.patternBounds?.[patternIdx] : undefined;
-    if (!map || !b) return;
+    const boxes = (patternIdxs ?? []).map((i) => drawing?.patternBounds?.[i]).filter((x) => !!x);
+    if (!map || !boxes.length) return;
+    const b = [
+      Math.min(...boxes.map((x) => x[0])),
+      Math.min(...boxes.map((x) => x[1])),
+      Math.max(...boxes.map((x) => x[2])),
+      Math.max(...boxes.map((x) => x[3])),
+    ];
     map.fitBounds(
       [
         [b[0], b[1]],
         [b[2], b[3]],
       ],
-      {
-        padding: {
-          top: 80,
-          bottom: 120,
-          left: EXPLORER_PANEL_WIDTH + 60,
-          right: (panelOpen ? EXPLORER_RIGHT_PANEL_WIDTH : 0) + 80,
-        },
-        maxZoom: 15,
-      }
+      { padding: clearOf(map, { rightPanel: panelOpen, bar }, FIT_ROOM), maxZoom: ROUTE_ZOOM }
     );
-    // Only when another pattern is chosen.
+    // Only when other patterns are chosen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, patternIdx, drawing?.routeId]);
+  }, [map, patternIdxs, drawing?.routeId]);
 
-  // Fit the view to a route when it is selected, clear of the left panel.
+  // A map pick that moved nothing (the stop already open) is not kept for a
+  // later pick of the same from a panel.
+  useEffect(() => {
+    if (!picked && onMap.current.stop !== undefined) onMap.current = {};
+  }, [picked]);
+
+  // Fit the view to a route when it is selected, clear of the panels.
   useEffect(() => {
     if (!map || !drawing?.stops.length) return;
     const lons = drawing.stops.map((s) => s.lon);
@@ -416,7 +665,7 @@ export function ExplorerMapLayers() {
         [Math.min(...lons), Math.min(...lats)],
         [Math.max(...lons), Math.max(...lats)],
       ],
-      { padding: { top: 80, bottom: 120, left: EXPLORER_PANEL_WIDTH + 60, right: 80 }, maxZoom: 15 }
+      { padding: clearOf(map, { rightPanel: panelOpen, bar }, FIT_ROOM), maxZoom: ROUTE_ZOOM }
     );
     // Only when another route is chosen, not on every update of the same one.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -429,15 +678,19 @@ export function ExplorerMapLayers() {
     ["get", "shape_id"],
     ["literal", drawing?.shapeIds ?? []],
   ];
-  // With a pattern picked, the rest of the route steps back for it.
-  const highlighting = patternIdx !== null && !!drawing;
+  // With patterns picked, the rest of the route steps back for them.
+  const highlighting = patternIdxs !== null && !!drawing;
+  // All of them in one direction: their arrows say which way it runs.
+  const oneWay =
+    highlighting &&
+    !!drawing?.directions.some((d) => (patternIdxs ?? []).every((p) => d.patterns.includes(p)));
   const patternShapes: FilterSpecification = [
     "in",
     ["get", "shape_id"],
-    ["literal", (patternIdx !== null && drawing?.patternShapes[patternIdx]) || []],
+    ["literal", [...new Set((patternIdxs ?? []).flatMap((i) => drawing?.patternShapes[i] ?? []))]],
   ];
-  const routeOpacity = highlighting ? 0.15 : 1;
   const none: FilterSpecification = ["boolean", false];
+  const all: FilterSpecification = ["boolean", true];
   const faded: ExpressionSpecification = ["boolean", ["feature-state", "faded"], false];
 
   return (
@@ -451,11 +704,14 @@ export function ExplorerMapLayers() {
           tiles={networkTiles}
           promoteId="shape_id"
           maxzoom={14}>
-          {/* Every line in its route's colour; faded ones grey and thin. */}
+          {/* Every line in its route's colour; faded ones grey and thin.
+              With patterns highlighted, the selected route's own lines are
+              left to the route's layers above, faded there for them. */}
           <Layer
             id="explorer-network-line"
             type="line"
             source-layer={TILE_LAYER}
+            filter={highlighting ? ["!", selectedShapes] : all}
             layout={{ "line-cap": "round", "line-join": "round" }}
             paint={{
               "line-color": ["case", faded, FADED, ["coalesce", ["feature-state", "color"], FADED]],
@@ -486,13 +742,19 @@ export function ExplorerMapLayers() {
             source-layer={TILE_LAYER}
             filter={selectedShapes}
             layout={{ "line-cap": "round", "line-join": "round" }}
-            paint={{ "line-color": color, "line-width": 4.5, "line-opacity": routeOpacity }}
+            // Faded for highlighted patterns by a paler colour, not by
+            // transparency: a route's many shapes lie over each other, and
+            // see-through lines would add up to solid again.
+            paint={{
+              "line-color": highlighting ? tint(color, 0.3) : color,
+              "line-width": highlighting ? 3.5 : 4.5,
+            }}
           />
           <Layer
             id="explorer-pattern-casing"
             type="line"
             source-layer={TILE_LAYER}
-            filter={highlighting ? patternShapes : none}
+            filter={highlighting && !sections ? patternShapes : none}
             layout={{ "line-cap": "round", "line-join": "round" }}
             paint={{ "line-color": "#FFFFFF", "line-width": 12 }}
           />
@@ -500,12 +762,48 @@ export function ExplorerMapLayers() {
             id="explorer-pattern-line"
             type="line"
             source-layer={TILE_LAYER}
-            filter={highlighting ? patternShapes : none}
+            filter={highlighting && !sections ? patternShapes : none}
             layout={{ "line-cap": "round", "line-join": "round" }}
             paint={{ "line-color": color, "line-width": 7 }}
           />
         </Source>
       )}
+      {/* The highlighted patterns' own stretch of line, over the faded route. */}
+      <Source
+        key="explorer-pattern-sections"
+        id="explorer-pattern-sections"
+        type="geojson"
+        data={highlighting && sections ? sections : EMPTY}>
+        <Layer
+          id="explorer-pattern-section-casing"
+          type="line"
+          layout={{ "line-cap": "round", "line-join": "round" }}
+          paint={{ "line-color": "#FFFFFF", "line-width": 12 }}
+        />
+        <Layer
+          id="explorer-pattern-section-line"
+          type="line"
+          layout={{ "line-cap": "round", "line-join": "round" }}
+          paint={{ "line-color": color, "line-width": 7 }}
+        />
+        {/* Which way it runs: each section is cut in the direction its
+            trips travel, so arrows along it point that way. Only for one
+            direction's patterns: with both, the arrows would point both
+            ways along the same street and say nothing. */}
+        <Layer
+          id="explorer-pattern-section-arrows"
+          type="symbol"
+          filter={oneWay ? all : none}
+          layout={{
+            "symbol-placement": "line",
+            "symbol-spacing": 70,
+            "icon-image": ARROW,
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+            "icon-rotation-alignment": "map",
+          }}
+        />
+      </Source>
       {/* Each station as a faint area round its stops, under the lines:
           clicked, the timetable of all its stops. */}
       <Source key="explorer-stations" id="explorer-stations" type="geojson" data={network.stations}>
@@ -558,6 +856,20 @@ export function ExplorerMapLayers() {
           }}
         />
       </Source>
+      {/* A picked station: its area tinted, under the lines, and edged in
+          the theme's colour above them. */}
+      <Source key="explorer-picked-station" id="explorer-picked-station" type="geojson" data={pickedAreaData}>
+        <Layer
+          id="explorer-picked-station-area"
+          type="fill"
+          paint={{ "fill-color": theme.palette.primary.main, "fill-opacity": 0.16 }}
+        />
+        <Layer
+          id="explorer-picked-station-edge"
+          type="line"
+          paint={{ "line-color": theme.palette.primary.main, "line-width": 2.5 }}
+        />
+      </Source>
       <Source key="explorer-picked-stop" id="explorer-picked-stop" type="geojson" data={pickedPoint}>
         <Layer
           id="explorer-picked-stop-halo"
@@ -572,6 +884,29 @@ export function ExplorerMapLayers() {
             "circle-color": "#FFFFFF",
             "circle-stroke-color": theme.palette.primary.main,
             "circle-stroke-width": 3,
+          }}
+        />
+      </Source>
+      <Source key="explorer-route-ends" id="explorer-route-ends" type="geojson" data={ends}>
+        <Layer
+          id="explorer-route-ends"
+          type="symbol"
+          layout={{
+            "text-field": ["get", "name"],
+            "text-font": ["Roboto Bold"],
+            "text-size": 11.5,
+            // Beside the stop, wherever there is room; always shown: the
+            // ends say which way the line runs.
+            "text-variable-anchor": ["top", "bottom", "left", "right"],
+            "text-radial-offset": 1,
+            "text-justify": "auto",
+            "text-allow-overlap": true,
+            "text-max-width": 12,
+          }}
+          paint={{
+            "text-color": theme.palette.text.primary,
+            "text-halo-color": "#FFFFFF",
+            "text-halo-width": 2,
           }}
         />
       </Source>

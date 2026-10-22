@@ -24,6 +24,7 @@ import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { BADGES, RAIL, Rail, StopDot } from "@/components/explorer/LineDiagram";
 import { RouteBadge, distinctLines, routeName } from "@/components/explorer/RouteBadge";
 import { PX } from "@/components/explorer/SectionHeader";
+import { PanelKind } from "@/components/explorer/right/PanelKind";
 import { usePlaybackMinute } from "@/components/explorer/right/usePlaybackMinute";
 
 export function TripPanel({ trip_idx, run_dep_s }: { trip_idx: number; run_dep_s: number }) {
@@ -75,8 +76,13 @@ export function TripPanel({ trip_idx, run_dep_s }: { trip_idx: number; run_dep_s
     );
 
   const destination = data.destination ?? data.headsign;
+  // The line's name, where it adds to where the trip goes: a line is often
+  // named by its two ends ("Pl.Universitat / Sant Joan Despí"), and beside
+  // "To Sant Joan Despí" that would say the destination twice.
+  const lineName = routeName(route, t);
+  const namesDestination = !!destination && lineName.toLowerCase().includes(destination.toLowerCase());
   const meta = [
-    routeName(route, t),
+    namesDestination ? null : lineName,
     destination
       ? t("explorer_direction_to", { place: destination, interpolation: { escapeValue: false } })
       : null,
@@ -87,13 +93,21 @@ export function TripPanel({ trip_idx, run_dep_s }: { trip_idx: number; run_dep_s
   return (
     <Stack sx={{ flex: 1, minHeight: 0 }}>
       <Box sx={{ px: PX, pt: 0.5, pb: 1.5 }}>
+        <PanelKind kind="trip" />
         <Stack direction="row" spacing={1.25} alignItems="center">
           <RouteBadge route={route} />
+          {/* The trip as its line and its time: "Trip" is said above. */}
           <Typography variant="h6" fontWeight="bold" noWrap sx={{ fontSize: 17 }}>
-            {t("explorer_trip_at", { time: clock(first) })}
+            {clock(first)}
           </Typography>
         </Stack>
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
+        {/* As the stop panel's line under its name: the same height, so the
+            rows below start level in both. */}
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          display="block"
+          sx={{ mt: 0.75, lineHeight: "18px" }}>
           {meta.join(" · ")}
         </Typography>
         {/* The trips before and after, in the same direction on the date: a

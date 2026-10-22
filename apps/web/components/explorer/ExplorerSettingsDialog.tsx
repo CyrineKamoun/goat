@@ -12,15 +12,18 @@ import { useTranslation } from "react-i18next";
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { clock, count, currencySymbol } from "@/lib/explorer/format";
-import { modeOf } from "@/lib/explorer/modes";
+import { type ModeKey, modeOf } from "@/lib/explorer/modes";
 import {
   CURRENCIES,
   type ExplorerSettings,
   PERIOD_KEYS,
   SERVICE_DAY_END_S,
   defaultRate,
+  modeRate,
   periodsFrom,
   rateKey,
+  rateKeyMode,
+  ratesByKind,
   settingsProblems,
 } from "@/lib/explorer/settings";
 import { type ExplorerSettingsTab, openExplorerSettings } from "@/lib/store/explorer/slice";
@@ -174,7 +177,7 @@ function parseClock(text: string): number | null {
 
 function toDraft(settings: ExplorerSettings): Draft {
   const rates: RateDraft = {};
-  for (const [key, r] of Object.entries(settings.rates))
+  for (const [key, r] of Object.entries(ratesByKind(settings.rates)))
     rates[key] = { km: String(r.per_km), hour: r.per_hour === null ? "" : String(r.per_hour) };
   return {
     currency: settings.currency,
@@ -188,9 +191,10 @@ function toDraft(settings: ExplorerSettings): Draft {
 function fromDraft(draft: Draft, base: ExplorerSettings): ExplorerSettings | null {
   const rates: ExplorerSettings["rates"] = {};
   for (const [key, r] of Object.entries(draft.rates)) {
-    // A blank km rate is no rate: the route type keeps its default.
-    if (!r.km.trim()) continue;
-    const per_km = Number(r.km.replace(",", "."));
+    // Both blank is no rate: the kind keeps its default. An hour rate alone
+    // keeps the default km rate beside it, which the km field shows.
+    if (!r.km.trim() && !r.hour.trim()) continue;
+    const per_km = r.km.trim() ? Number(r.km.replace(",", ".")) : modeRate(rateKeyMode(key)).per_km;
     const per_hour = r.hour.trim() ? Number(r.hour.replace(",", ".")) : null;
     if (Number.isNaN(per_km) || (per_hour !== null && Number.isNaN(per_hour))) return null;
     rates[key] = { per_km, per_hour };
@@ -241,8 +245,19 @@ function RatesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => v
 
   const hasRates = (agencyId: string | null) =>
     Object.entries(draft.rates).some(
-      ([key, r]) => key.startsWith(`${agencyId ?? ""}|`) && r.km.trim() !== ""
+      ([key, r]) => key.startsWith(`${agencyId ?? ""}|`) && (r.km.trim() !== "" || r.hour.trim() !== "")
     );
+  // One row per kind of vehicle the operator runs (bus, tram, …), however
+  // many route types the feed gives it: its routes counted together.
+  const kinds = useMemo(() => {
+    const byMode = new Map<ModeKey, { type: number | null; n: number }>();
+    for (const [type, n] of agency?.types ?? []) {
+      const mode = modeOf(type);
+      const k = byMode.get(mode);
+      byMode.set(mode, { type: k && (k.type ?? 0) <= (type ?? 0) ? k.type : type, n: (k?.n ?? 0) + n });
+    }
+    return [...byMode.entries()].sort((a, b) => (a[1].type ?? 0) - (b[1].type ?? 0));
+  }, [agency]);
   const setRate = (key: string, field: "km" | "hour", value: string) => {
     const current = draft.rates[key] ?? { km: "", hour: "" };
     setDraft({ ...draft, rates: { ...draft.rates, [key]: { ...current, [field]: value } } });
@@ -292,37 +307,34 @@ function RatesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => v
       </Stack>
       {agency && (
         <Card>
-          {[...agency.types.keys()]
-            .sort((x, y) => (x ?? 0) - (y ?? 0))
-            .map((type, i) => {
-              const key = rateKey(agency.id, type);
-              const mode = modeOf(type);
-              const value = draft.rates[key] ?? { km: "", hour: "" };
-              return (
-                <Row key={key} first={i === 0}>
-                  <RowLabel
-                    icon={<Icon iconName={modeIcon(mode)} style={{ fontSize: 14 }} htmlColor="inherit" />}
-                    label={t(`explorer_mode_${mode}`)}
-                    note={t("explorer_n_routes", { count: agency.types.get(type) ?? 0 })}
-                  />
-                  <UnitField
-                    value={value.km}
-                    // The default shows where none is set: what applies now.
-                    placeholder={String(defaultRate(type).per_km)}
-                    unit={t("explorer_rate_km_head", { currency: symbol })}
-                    label={t("explorer_rate_km_head", { currency: symbol })}
-                    onChange={(v) => setRate(key, "km", v)}
-                  />
-                  <UnitField
-                    value={value.hour}
-                    placeholder="—"
-                    unit={t("explorer_rate_hour_head", { currency: symbol })}
-                    label={t("explorer_rate_hour_head", { currency: symbol })}
-                    onChange={(v) => setRate(key, "hour", v)}
-                  />
-                </Row>
-              );
-            })}
+          {kinds.map(([mode, { type, n }], i) => {
+            const key = rateKey(agency.id, type);
+            const value = draft.rates[key] ?? { km: "", hour: "" };
+            return (
+              <Row key={key} first={i === 0}>
+                <RowLabel
+                  icon={<Icon iconName={modeIcon(mode)} style={{ fontSize: 14 }} htmlColor="inherit" />}
+                  label={t(`explorer_mode_${mode}`)}
+                  note={t("explorer_n_routes", { count: n })}
+                />
+                <UnitField
+                  value={value.km}
+                  // The default shows where none is set: what applies now.
+                  placeholder={String(defaultRate(type).per_km)}
+                  unit={t("explorer_rate_km_head", { currency: symbol })}
+                  label={t("explorer_rate_km_head", { currency: symbol })}
+                  onChange={(v) => setRate(key, "km", v)}
+                />
+                <UnitField
+                  value={value.hour}
+                  placeholder="—"
+                  unit={t("explorer_rate_hour_head", { currency: symbol })}
+                  label={t("explorer_rate_hour_head", { currency: symbol })}
+                  onChange={(v) => setRate(key, "hour", v)}
+                />
+              </Row>
+            );
+          })}
         </Card>
       )}
       <Typography variant="caption" color="text.secondary">

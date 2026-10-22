@@ -5,12 +5,13 @@
  * playing; here a frame is an array of positions, projected and drawn in
  * place, and nothing is allocated per frame.
  *
- * A vehicle is a dot in its route's colour, edged in white; from
- * BADGES_FROM_ZOOM, or when it is the selected route's, a badge with the
- * route's number, as the panels' RouteBadge. Badges are drawn once per line
- * into a texture (the atlas) and reused. With a route selected, the others
- * are grey dots beneath its badges; the vehicle of the trip the right panel
- * shows is ringed.
+ * A vehicle is a small square in its route's colour, edged in white (stops
+ * are the map's circles); from BADGES_FROM_ZOOM, or when it is the selected
+ * route's, a badge with the route's number, as the panels' RouteBadge.
+ * Badges are drawn once per line into a texture (the atlas) and reused. With
+ * a route selected, the others are smaller grey squares beneath its badges,
+ * and its own on patterns not picked keep their badges, faded; the vehicle
+ * of the trip the right panel shows is ringed.
  *
  * Positions are projected to screen pixels on the CPU, in double precision:
  * no jitter at street level, and the same pixels answer which vehicle the
@@ -37,6 +38,9 @@ export interface VehicleLook {
   ring: string;
   /** `#RRGGBB`: other routes' vehicles while one is selected. */
   faded: string;
+  /** With a direction or variant of the selected route picked, the trips
+   * (trip_idx) it runs: the route's other vehicles fade with the rest. */
+  pickedTrips: Set<number> | null;
 }
 
 /** A badge in CSS pixels: the panels' small RouteBadge, a little tighter. */
@@ -44,13 +48,22 @@ const BADGE = { height: 16, edge: 1.5, padX: 4, radius: 4.5, minWidth: 20, font:
 /** The open trip's ring (CSS px): as the old circle layer drew it. */
 const RING = { radius: 15, stroke: 2.5, fill: 0.15 };
 const DOT_STROKE = 1;
+/** Other lines' vehicles while one is selected: grey, and smaller, so they
+ * step back for it — this share of a dot's size, no less than the least,
+ * with a thinner edge. */
+const FADED_DOT = { share: 0.8, least: 2, stroke: 0.75 };
 /** Shapes the fragment shader tells apart. */
-const KIND = { dot: 0, badge: 1, ring: 2 } as const;
+const KIND = { dot: 0, badge: 1, ring: 2, square: 3 } as const;
 /** Frames further apart than this (ms) are not glided between: playback
  * was paused, or the scrubber jumped. */
 const MAX_GLIDE_MS = 400;
-/** The passes vehicles are drawn in, bottom to top. */
-const PASS = { dot: 1, badge: 2, mine: 3 } as const;
+/** The passes vehicles are drawn in, bottom to top: other lines' dots, all
+ * lines' badges, the selected line's badges for its patterns not picked
+ * (faded), and its own. */
+const PASS = { dot: 1, badge: 2, faded: 4, mine: 3 } as const;
+/** How much of a badge shows for the selected line's vehicles on patterns
+ * not picked: the line's own badge, stepped back. */
+const FADED_BADGE = 0.45;
 /** Floats per vertex: position (2), local (2), kind, size (2), colour (4). */
 const STRIDE = 11;
 const ATLAS_WIDTH = 2048;
@@ -85,12 +98,23 @@ varying vec2 v_size;
 varying vec4 v_color;
 void main() {
   if (v_kind > 0.5 && v_kind < 1.5) {
-    gl_FragColor = texture2D(u_atlas, v_local);
+    // A badge, at the opacity it is drawn with (premultiplied, as blended).
+    gl_FragColor = texture2D(u_atlas, v_local) * v_size.x;
     return;
   }
   float d = length(v_local);
   float r = v_size.x;
   float s = v_size.y;
+  if (v_kind > 2.5) {
+    // A square, its corners a little rounded: its colour, edged in white.
+    vec2 q = abs(v_local) - vec2(r - 1.0);
+    float e = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 1.0;
+    float outer = clamp(s - e + 0.5, 0.0, 1.0);
+    float inner = clamp(-e + 0.5, 0.0, 1.0);
+    vec3 rgb = mix(vec3(1.0), v_color.rgb, inner);
+    gl_FragColor = vec4(rgb, 1.0) * outer;
+    return;
+  }
   if (v_kind < 0.5) {
     // A dot: its colour, edged in white.
     float outer = clamp(r + s - d + 0.5, 0.0, 1.0);
@@ -261,7 +285,13 @@ export class VehicleLayer implements CustomLayerInterface {
   private vehicles: VehicleFrame = vehicleFrame();
   private count = 0;
   private styles = new Map<number, VehicleStyle>();
-  private look: VehicleLook = { selectedRouteId: null, openTrip: null, ring: "#2BB381", faded: "#9E9E9E" };
+  private look: VehicleLook = {
+    selectedRouteId: null,
+    openTrip: null,
+    ring: "#2BB381",
+    faded: "#9E9E9E",
+    pickedTrips: null,
+  };
   /** Mercator positions of the frame's vehicles, x then y, in double
    * precision: where each was shown when the frame came, and where the frame
    * puts it. Between frames (a tenth of a second apart) a vehicle glides from
@@ -356,6 +386,14 @@ export class VehicleLayer implements CustomLayerInterface {
     this.map?.triggerRepaint();
   }
 
+  /** Where a run's vehicle is in the frame shown, or null when it is not out. */
+  find(trip_idx: number, run_dep_s: number): { lon: number; lat: number } | null {
+    const v = this.vehicles;
+    for (let i = 0; i < this.count; i++)
+      if (v.trip_idx[i] === trip_idx && v.run_dep_s[i] === run_dep_s) return { lon: v.lon[i], lat: v.lat[i] };
+    return null;
+  }
+
   /** The vehicle under `point` (CSS px), looking `radius` px around it: the
    * nearest, the topmost on a tie. */
   hit(point: { x: number; y: number }, radius: number): Vehicle | null {
@@ -422,7 +460,7 @@ export class VehicleLayer implements CustomLayerInterface {
     // Mercator coordinates (0–1) to clip space, in double precision.
     const m = options.defaultProjectionData.mainMatrix;
     const zoom = map.getZoom();
-    const { selectedRouteId, openTrip } = this.look;
+    const { selectedRouteId, openTrip, pickedTrips } = this.look;
     const faded = rgb(this.look.faded);
     const r = dotRadius(zoom);
     const badges = zoom >= BADGES_FROM_ZOOM;
@@ -458,7 +496,9 @@ export class VehicleLayer implements CustomLayerInterface {
       screen[2 * i + 1] = y;
       pass[i] = selectedRouteId
         ? style.route_id === selectedRouteId
-          ? PASS.mine
+          ? !pickedTrips || pickedTrips.has(v.trip_idx[i])
+            ? PASS.mine
+            : PASS.faded
           : PASS.dot
         : badges
           ? PASS.badge
@@ -530,18 +570,26 @@ export class VehicleLayer implements CustomLayerInterface {
       box[4 * k + 3] = hh;
       this.drawnRound[k] = round ? 1 : 0;
     };
+    // Vehicles too far out for badges are squares, not dots: stops are the
+    // map's circles, and a vehicle is never mistaken for one.
     const dot = (i: number, c: Rgb) => {
-      circle(screen[2 * i], screen[2 * i + 1], r, DOT_STROKE, KIND.dot, c);
-      remember(i, r + DOT_STROKE, r + DOT_STROKE, true);
+      circle(screen[2 * i], screen[2 * i + 1], r, DOT_STROKE, KIND.square, c);
+      remember(i, r + DOT_STROKE, r + DOT_STROKE, false);
+    };
+    const fr = Math.max(FADED_DOT.least, r * FADED_DOT.share);
+    const fadedDot = (i: number) => {
+      circle(screen[2 * i], screen[2 * i + 1], fr, FADED_DOT.stroke, KIND.square, faded);
+      remember(i, fr + FADED_DOT.stroke, fr + FADED_DOT.stroke, false);
     };
     const cw = atlas.canvas.width;
 
-    for (const p of [PASS.dot, PASS.badge, PASS.mine]) {
+    for (const p of [PASS.dot, PASS.badge, PASS.faded, PASS.mine]) {
       for (let i = 0; i < n; i++) {
         if (pass[i] !== p) continue;
         const style = this.styles.get(this.vehicles.route_idx[i]) as VehicleStyle;
         if (p === PASS.dot) {
-          dot(i, selectedRouteId ? faded : rgb(style.color));
+          if (selectedRouteId) fadedDot(i);
+          else dot(i, rgb(style.color));
           continue;
         }
         const entry = atlas.get(style);
@@ -563,7 +611,9 @@ export class VehicleLayer implements CustomLayerInterface {
           (entry.x + entry.w) / cw,
           (entry.y + entry.h) / ch,
           KIND.badge,
-          0,
+          // Its opacity: the selected line's vehicles on patterns not
+          // picked keep their badge, faded.
+          p === PASS.faded ? FADED_BADGE : 1,
           0,
           WHITE
         );

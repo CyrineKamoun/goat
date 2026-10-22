@@ -22,10 +22,24 @@ export interface ExplorerFilters {
 
 export type ExplorerRouteTab = "overview" | "stops" | "service" | "calendar";
 
-/** The destination picker's choice: a direction, and one of its patterns. */
+/** The destination picker's choice: all directions, or a direction (by its
+ * key, its main pattern's index) whole, or one of its patterns
+ * (lib/explorer/directionChoice.ts). */
 export interface ExplorerPatternChoice {
-  direction: number;
-  pattern_idx: number;
+  direction: number | "all";
+  /** A variant; null for the whole direction. */
+  pattern_idx: number | null;
+}
+
+/** The trip strip, under a selected route (02-panel-behaviour-spec ›
+ * Playback, Viewers): what the user set by hand, which no automatic change
+ * undoes for the session. It shows the route's whole day; the chart zooms. */
+export interface ExplorerStrip {
+  /** Folded to the mini bar by hand. */
+  collapsed: boolean;
+  view: "chart" | "list";
+  /** The whole bottom panel's height (px), as dragged by its top edge. */
+  height: number;
 }
 
 /** The settings dialog's tabs (settings.ts). */
@@ -49,9 +63,14 @@ export interface ExplorerRouteDrawing {
   /** Each pattern's shapes — the feed's, or the line through its stops —:
    * what the map highlights when the Stops tab shows that pattern. */
   patternShapes: Record<number, string[]>;
+  /** The route's directions, each with its patterns (its main one first):
+   * which pattern the map highlights for the picker's choice. */
+  directions: { key: number; patterns: number[] }[];
   /** Each pattern's extent from its stops, `[west, south, east, north]`: the
    * map fits it when the Stops tab switches to it. */
   patternBounds: Record<number, [number, number, number, number]>;
+  /** Each pattern's first and last stop (stop_idx): the ends the map names. */
+  patternEnds: Record<number, [number, number]>;
 }
 
 /** A stop the right panel shows, and where the map marks it (a station
@@ -74,9 +93,6 @@ export interface ExplorerPanel {
   /** The item shown is the last; "‹" goes back to the one before (a trip
    * opened from a stop's timetable goes back to the stop). */
   stack: ExplorerPanelItem[];
-  /** Folded to its rail. The user's choice: opening another item does not
-   * unfold it (02-panel-behaviour-spec › Sticky preferences). */
-  collapsed: boolean;
   /** The route the item was opened from, if any: leaving that route lets
    * the item go. */
   fromRoute: string | null;
@@ -100,9 +116,10 @@ export interface ExplorerState {
   filters: ExplorerFilters;
   panel: ExplorerPanel;
   routeTab: ExplorerRouteTab;
-  /** One picker for the Stops tab now, and the strip and stop timetable
-   * later (02-panel-behaviour-spec › Directions). */
+  /** One picker for the trip strip, the Stops tab and the stop timetable
+   * (02-panel-behaviour-spec › Direction); null is all directions. */
   pattern: ExplorerPatternChoice | null;
+  strip: ExplorerStrip;
   /** The settings dialog, open on a tab, or closed. */
   settingsTab: ExplorerSettingsTab | null;
   /** The network's extent, `[west, south, east, north]`: the map fits it
@@ -115,6 +132,25 @@ export interface ExplorerState {
   playing: boolean;
   speed: PlaybackSpeed;
   time_s: number | null;
+  /** The time the strip's now-line is dragged to: the line and the clock
+   * follow it, and the map is drawn for it once let go. Let go, it holds
+   * until the map has caught up; the bottom bar lets it go then, so it is
+   * let go even when the chart is gone by then (the strip folded). */
+  scrub: { t: number; let_go: boolean } | null;
+  /** A run the map is asked to fly to, if its vehicle is out (a trip picked
+   * in the trip strip); `n` counts the asks, so the same run can be asked
+   * for again. */
+  focus: { trip_idx: number; run_dep_s: number; n: number } | null;
+}
+
+/** What the strip keeps for the session, the Explorer closed or not. */
+function stickyStrip(strip: ExplorerStrip): ExplorerStrip {
+  return {
+    ...initialState.strip,
+    collapsed: strip.collapsed,
+    view: strip.view,
+    height: strip.height,
+  };
 }
 
 const initialState: ExplorerState = {
@@ -128,14 +164,22 @@ const initialState: ExplorerState = {
   date: null,
   drawing: null,
   filters: NO_FILTERS,
-  panel: { stack: [], collapsed: false, fromRoute: null },
+  panel: { stack: [], fromRoute: null },
   routeTab: "overview",
   pattern: null,
+  strip: {
+    collapsed: false,
+    view: "chart",
+    // The strip's opening height (STRIP_HEIGHT in the strip's layout).
+    height: 272,
+  },
   settingsTab: null,
   bounds: null,
   playing: false,
   speed: 10,
   time_s: null,
+  scrub: null,
+  focus: null,
 };
 
 const explorerSlice = createSlice({
@@ -150,7 +194,7 @@ const explorerSlice = createSlice({
       return {
         ...initialState,
         leftTab: state.leftTab,
-        panel: { ...initialState.panel, collapsed: state.panel.collapsed },
+        strip: stickyStrip(state.strip),
         active: true,
         bundleId: action.payload.bundleId,
         bundleName: action.payload.bundleName,
@@ -160,7 +204,7 @@ const explorerSlice = createSlice({
     closeExplorer: (state) => ({
       ...initialState,
       leftTab: state.leftTab,
-      panel: { ...initialState.panel, collapsed: state.panel.collapsed },
+      strip: stickyStrip(state.strip),
       restoreGroupId: state.hiddenGroupId,
     }),
     /** The layer tree has shown the group again. */
@@ -180,7 +224,9 @@ const explorerSlice = createSlice({
           state.panel = { ...state.panel, stack: [], fromRoute: null };
       }
       state.selectedRouteId = action.payload;
-      if (action.payload === null) state.drawing = null;
+      if (action.payload === null) {
+        state.drawing = null;
+      }
     },
     setExplorerRouteTab: (state, action: PayloadAction<ExplorerRouteTab>) => {
       state.routeTab = action.payload;
@@ -204,11 +250,18 @@ const explorerSlice = createSlice({
     setPlaybackTime: (state, action: PayloadAction<number | null>) => {
       state.time_s = action.payload;
     },
+    focusExplorerRun: (state, action: PayloadAction<{ trip_idx: number; run_dep_s: number }>) => {
+      state.focus = { ...action.payload, n: (state.focus?.n ?? 0) + 1 };
+    },
+    setScrub: (state, action: PayloadAction<{ t: number; let_go: boolean } | null>) => {
+      state.scrub = action.payload;
+    },
     setExplorerDate: (state, action: PayloadAction<string>) => {
       // Another day's service has another span: playback starts it afresh.
       if (action.payload !== state.date) {
         state.playing = false;
         state.time_s = null;
+        state.scrub = null;
       }
       state.date = action.payload;
     },
@@ -247,8 +300,16 @@ const explorerSlice = createSlice({
       state.panel.stack = [];
       state.panel.fromRoute = null;
     },
-    setExplorerPanelCollapsed: (state, action: PayloadAction<boolean>) => {
-      state.panel.collapsed = action.payload;
+    setStripCollapsed: (state, action: PayloadAction<boolean>) => {
+      state.strip.collapsed = action.payload;
+    },
+    setStripView: (state, action: PayloadAction<ExplorerStrip["view"]>) => {
+      state.strip.view = action.payload;
+    },
+    /** The height the strip was dragged to; the caller clamps it to the
+     * viewport. */
+    setStripHeight: (state, action: PayloadAction<number>) => {
+      state.strip.height = Math.round(action.payload);
     },
   },
   extraReducers: (builder) => {
@@ -259,7 +320,6 @@ const explorerSlice = createSlice({
         : {
             ...initialState,
             leftTab: state.leftTab,
-            panel: { ...initialState.panel, collapsed: state.panel.collapsed },
             restoreGroupId: state.hiddenGroupId,
           }
     );
@@ -278,7 +338,9 @@ export const {
   openExplorerPanel,
   explorerPanelBack,
   closeExplorerPanel,
-  setExplorerPanelCollapsed,
+  setStripCollapsed,
+  setStripView,
+  setStripHeight,
   setExplorerRouteTab,
   pickExplorerPattern,
   openExplorerSettings,
@@ -286,6 +348,8 @@ export const {
   setPlaying,
   setPlaybackSpeed,
   setPlaybackTime,
+  setScrub,
+  focusExplorerRun,
 } = explorerSlice.actions;
 
 export const explorerReducer = explorerSlice.reducer;

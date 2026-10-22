@@ -7,36 +7,24 @@
  */
 import { Box, ButtonBase, Stack, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { useEffect } from "react";
+import { memo, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { Direction, VariantKind } from "@/lib/explorer/derive/directions";
+import type { Direction } from "@/lib/explorer/derive/directions";
 import type { LineStop } from "@/lib/explorer/derive/stopsLine";
+import { choiceValue, shownLine } from "@/lib/explorer/directionChoice";
 import { count } from "@/lib/explorer/format";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
-import {
-  closeExplorerPanel,
-  openExplorerPanel,
-  pickExplorerPattern,
-  pickedStop,
-} from "@/lib/store/explorer/slice";
-
-import type { SelectorItem } from "@/types/map/common";
+import { closeExplorerPanel, openExplorerPanel, pickedStop } from "@/lib/store/explorer/slice";
 
 import { type RouteRow, useRoutes, useStopsLine } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
+import { directionItems, useDirectionChoice } from "@/components/explorer/DirectionPicker";
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { BADGES, RAIL, Rail, StopDot } from "@/components/explorer/LineDiagram";
 import { RouteBadge, distinctLines } from "@/components/explorer/RouteBadge";
-import { directionLabel } from "@/components/explorer/directionWords";
 import Selector from "@/components/map/panels/common/Selector";
-
-const KIND_KEY: Record<Exclude<VariantKind, "main">, string> = {
-  short_turn: "explorer_variant_short_turn",
-  express: "explorer_variant_express",
-  branch: "explorer_variant_branch",
-};
 
 function km(m: number | null, locale: string): string | null {
   if (m === null) return null;
@@ -45,7 +33,9 @@ function km(m: number | null, locale: string): string | null {
     : `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(m / 1000)} km`;
 }
 
-function StopRow({
+/** Memoised, as the hop under it: picking a stop changes two rows of the
+ * line, not all of them. */
+const StopRow = memo(function StopRow({
   stop,
   color,
   first,
@@ -60,13 +50,13 @@ function StopRow({
   last: boolean;
   routeByIdx: Map<number, RouteRow>;
   selected: boolean;
-  onPick: () => void;
+  onPick: (stop: LineStop) => void;
 }) {
   const end = first || last;
   const lines = distinctLines(stop.transfers.map((i) => routeByIdx.get(i)));
   return (
     <ButtonBase
-      onClick={onPick}
+      onClick={() => onPick(stop)}
       sx={{
         position: "relative",
         width: "100%",
@@ -103,10 +93,10 @@ function StopRow({
       </Typography>
     </ButtonBase>
   );
-}
+});
 
 /** Between two stops: how far, how long; and where short turns end. */
-function HopRow({ stop, color, last }: { stop: LineStop; color: string; last: boolean }) {
+const HopRow = memo(function HopRow({ stop, color, last }: { stop: LineStop; color: string; last: boolean }) {
   const { t, i18n } = useTranslation("common");
   const theme = useTheme();
   const turn = theme.palette.warning.main;
@@ -156,35 +146,43 @@ function HopRow({ stop, color, last }: { stop: LineStop; color: string; last: bo
       )}
     </>
   );
-}
-
-function optionValue(direction: number, pattern: number) {
-  return `${direction}:${pattern}`;
-}
+});
 
 export function RouteStops({ route, directions }: { route: RouteRow; directions: Direction[] }) {
   const { t, i18n } = useTranslation("common");
   const dispatch = useAppDispatch();
   const { db, complete, shapeDistUnit, settings } = useExplorer();
   const date = useAppSelector((s) => s.explorer.date);
-  const choice = useAppSelector((s) => s.explorer.pattern);
   const picked = useAppSelector((s) => pickedStop(s.explorer));
   const routes = useRoutes(db);
-  const routeByIdx = new Map((routes.data ?? []).map((r) => [r.route_idx, r]));
+  const routeByIdx = useMemo(() => new Map((routes.data ?? []).map((r) => [r.route_idx, r])), [routes.data]);
+  // A stop's timetable opens in the right panel; picked again, it closes.
+  // One handler for every row, reading the picked stop as it is now.
+  const pickedIdx = useRef<number | undefined>(undefined);
+  pickedIdx.current = picked?.stop_idx;
+  const routeId = route.route_id;
+  const pickStop = useCallback(
+    (s: LineStop) =>
+      dispatch(
+        pickedIdx.current === s.stop_idx
+          ? closeExplorerPanel()
+          : openExplorerPanel({
+              item: { kind: "stop", stop: { stop_idx: s.stop_idx, name: s.name, lat: s.lat, lon: s.lon } },
+              fromRoute: routeId,
+            })
+      ),
+    [dispatch, routeId]
+  );
   const lang = i18n.language;
   const color = routeColor(route.color, modeOf(route.route_type));
 
-  const direction = directions.find((d) => d.key === choice?.direction) ?? directions[0];
-  const pattern_idx =
-    choice && direction?.patterns.some((p) => p.pattern_idx === choice.pattern_idx)
-      ? choice.pattern_idx
-      : direction?.key;
-  // The picker's choice is the store's, which the map highlights: the first
-  // direction's main pattern until another is picked.
-  useEffect(() => {
-    if (!choice && direction)
-      dispatch(pickExplorerPattern({ direction: direction.key, pattern_idx: direction.key }));
-  }, [choice, direction, dispatch]);
+  // The choice the strip and the stop timetable share; one line drawn here:
+  // the variant chosen, else the direction's main pattern (the first
+  // direction's, when all are chosen).
+  const { resolved, pick } = useDirectionChoice(directions);
+  const shown = shownLine(resolved, directions);
+  const direction = shown?.direction;
+  const pattern_idx = shown?.pattern_idx;
 
   const line = useStopsLine(
     complete ? db : undefined,
@@ -204,31 +202,7 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
     );
   }
 
-  const variantLabel = (p: { kind: VariantKind; destination: string }) =>
-    t(KIND_KEY[p.kind as Exclude<VariantKind, "main">], {
-      destination: p.destination,
-      interpolation: { escapeValue: false },
-    });
-  const items: SelectorItem[] = directions.flatMap((d) => [
-    {
-      value: optionValue(d.key, d.key),
-      label: directionLabel(d.name, t),
-      iconNode: <RouteBadge route={route} small />,
-    },
-    ...d.patterns
-      .filter((p) => p.kind !== "main")
-      .map((p) => ({
-        value: optionValue(d.key, p.pattern_idx),
-        // A busy route has many variants to one place: its trips tell them apart.
-        label: `${variantLabel(p)} · ${t("explorer_trips", { count: p.n_trips })}`,
-        // A variant sits under its direction, where the badge would be.
-        iconNode: (
-          <Box component="span" sx={{ width: 28, textAlign: "center", color: "text.secondary" }}>
-            ↳
-          </Box>
-        ),
-      })),
-  ]);
+  const items = directionItems(directions, route, t, { all: false });
   const variant = direction.patterns.find((p) => p.pattern_idx === pattern_idx);
   const trips = variant && variant.kind !== "main" ? variant.n_trips : direction.n_trips;
   const data = line.data;
@@ -255,11 +229,10 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
       <Selector
         label={t("explorer_direction")}
         items={items}
-        selectedItems={items.find((it) => it.value === optionValue(direction.key, pattern_idx as number))}
+        selectedItems={items.find((it) => it.value === choiceValue({ ...resolved, all: false, direction }))}
         setSelectedItems={(item) => {
           if (!item || Array.isArray(item)) return;
-          const [d, p] = String(item.value).split(":").map(Number);
-          dispatch(pickExplorerPattern({ direction: d, pattern_idx: p }));
+          pick(String(item.value));
         }}
       />
 
@@ -285,20 +258,7 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
                   last={last}
                   routeByIdx={routeByIdx}
                   selected={picked?.stop_idx === s.stop_idx}
-                  // Its timetable in the right panel; picked again, closed.
-                  onPick={() =>
-                    dispatch(
-                      picked?.stop_idx === s.stop_idx
-                        ? closeExplorerPanel()
-                        : openExplorerPanel({
-                            item: {
-                              kind: "stop",
-                              stop: { stop_idx: s.stop_idx, name: s.name, lat: s.lat, lon: s.lon },
-                            },
-                            fromRoute: route.route_id,
-                          })
-                    )
-                  }
+                  onPick={pickStop}
                 />
                 <HopRow stop={s} color={color} last={last} />
               </Box>

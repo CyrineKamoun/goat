@@ -16,10 +16,12 @@ import {
   setExplorerDrawing,
   setExplorerFilters,
   setExplorerLeftTab,
-  setExplorerPanelCollapsed,
   setExplorerRouteTab,
   setPlaybackTime,
   setPlaying,
+  setStripCollapsed,
+  setStripHeight,
+  setStripView,
 } from "@/lib/store/explorer/slice";
 import { setMapMode } from "@/lib/store/map/slice";
 
@@ -53,7 +55,9 @@ describe("explorer slice", () => {
         shapeIds: [],
         stops: [],
         patternShapes: {},
+        directions: [],
         patternBounds: {},
+        patternEnds: {},
       })
     );
     state = explorerReducer(state, selectExplorerRoute(null));
@@ -112,15 +116,6 @@ describe("explorer slice", () => {
     expect(panelItem(state)).toBeNull();
   });
 
-  it("keeps the panel folded, as the user left it, across items and sessions", () => {
-    let state = explorerReducer(open(), setExplorerPanelCollapsed(true));
-    state = explorerReducer(state, openExplorerPanel({ item: { kind: "stop", stop: FOURTH } }));
-    expect(state.panel.collapsed).toBe(true);
-    state = open(explorerReducer(state, closeExplorer()));
-    expect(state.panel.collapsed).toBe(true);
-    expect(state.panel.stack).toEqual([]);
-  });
-
   it("stops playback and forgets its time when the date changes", () => {
     let state = explorerReducer(open(), setExplorerDate("2026-10-14"));
     state = explorerReducer(state, setPlaybackTime(8 * 3600));
@@ -146,5 +141,13 @@ describe("explorer slice", () => {
   it("ends when the map leaves the data view", () => {
     expect(explorerReducer(open(), setMapMode("builder")).active).toBe(false);
     expect(explorerReducer(open(), setMapMode("data")).active).toBe(true);
+  });
+
+  it("keeps the strip as the user left it for the session", () => {
+    let state = explorerReducer(open(), setStripCollapsed(true));
+    state = explorerReducer(state, setStripView("list"));
+    state = explorerReducer(state, setStripHeight(412.4));
+    state = open(explorerReducer(state, closeExplorer()));
+    expect(state.strip).toMatchObject({ collapsed: true, view: "list", height: 412 });
   });
 });

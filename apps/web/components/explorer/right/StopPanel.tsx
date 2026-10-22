@@ -19,6 +19,7 @@ import {
   byDirection,
   byHour,
 } from "@/lib/explorer/derive/stopTimetable";
+import { resolveChoice } from "@/lib/explorer/directionChoice";
 import { clock } from "@/lib/explorer/format";
 import { type ExplorerPickedStop, openExplorerPanel } from "@/lib/store/explorer/slice";
 
@@ -28,9 +29,11 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { RouteBadge, distinctLines, lineKey } from "@/components/explorer/RouteBadge";
 import { DateChip, PX, SectionHeader } from "@/components/explorer/SectionHeader";
+import { SegmentedSwitch } from "@/components/explorer/SegmentedSwitch";
 import { platformLabel } from "@/components/explorer/StationsList";
 import { StopMarker } from "@/components/explorer/StopMarker";
 import { directionLabel } from "@/components/explorer/directionWords";
+import { PanelKind } from "@/components/explorer/right/PanelKind";
 import { usePlaybackMinute } from "@/components/explorer/right/usePlaybackMinute";
 
 type View = "timetable" | "next";
@@ -47,32 +50,14 @@ const hourLabel = (hour: number) => String(hour % 24).padStart(2, "0");
 function ViewSwitch({ value, onChange }: { value: View; onChange: (v: View) => void }) {
   const { t } = useTranslation("common");
   return (
-    <Stack direction="row" role="radiogroup" sx={{ p: 0.25, borderRadius: "16px", bgcolor: "action.hover" }}>
-      {(["timetable", "next"] as const).map((v) => (
-        <ButtonBase
-          key={v}
-          role="radio"
-          aria-checked={v === value}
-          onClick={() => onChange(v)}
-          sx={(theme) => ({
-            height: 28,
-            px: 2,
-            borderRadius: "14px",
-            fontSize: 12,
-            fontWeight: 700,
-            color: v === value ? "primary.main" : "text.secondary",
-            bgcolor: v === value ? "background.paper" : "transparent",
-            // The chosen one raised, edged in the theme's colour as the chosen
-            // line is (2 px), drawn inside so the button keeps its size.
-            boxShadow:
-              v === value
-                ? `inset 0 0 0 2px ${theme.palette.primary.main}, 0 1px 2px rgba(0, 0, 0, 0.12)`
-                : "none",
-          })}>
-          {t(`explorer_stop_view_${v}`)}
-        </ButtonBase>
-      ))}
-    </Stack>
+    <SegmentedSwitch
+      options={(["timetable", "next"] as const).map((v) => ({
+        value: v,
+        label: t(`explorer_stop_view_${v}`),
+      }))}
+      value={value}
+      onChange={onChange}
+    />
   );
 }
 
@@ -157,9 +142,14 @@ export function StopPanel({ stop }: { stop: ExplorerPickedStop }) {
     lines.find((l) => [...l.idxs].some((i) => routeByIdx.get(i)?.route_id === preferred)) ??
     lines[0];
   // Its directions, those of its routes with the same name taken as one.
+  // On the selected route's line, the direction picked for the route (the
+  // strip's and the Stops tab's) is the one shown — all, when all are.
+  const selectedRouteId = useAppSelector((s) => s.explorer.selectedRouteId);
+  const selectedIdx = (routes.data ?? []).find((r) => r.route_id === selectedRouteId)?.route_idx;
+  const choice = useAppSelector((s) => s.explorer.pattern);
   const directions = useMemo(() => {
     if (!line || !data.data) return [];
-    const merged = new Map<string, TimetableDirection>();
+    const merged = new Map<string, TimetableDirection & { sources: Set<string> }>();
     for (const idx of line.idxs)
       for (const d of byDirection(
         departures.filter((x) => x.route_idx === idx),
@@ -167,12 +157,31 @@ export function StopPanel({ stop }: { stop: ExplorerPickedStop }) {
       )) {
         const key = `${d.name.kind}|${d.name.place}|${d.name.via ?? ""}`;
         const into = merged.get(key);
-        if (into) into.departures.push(...d.departures);
-        else merged.set(key, { ...d, key, departures: [...d.departures] });
+        if (into) {
+          into.departures.push(...d.departures);
+          into.sources.add(`${idx}:${d.key}`);
+        } else
+          merged.set(key, {
+            ...d,
+            key,
+            departures: [...d.departures],
+            sources: new Set([`${idx}:${d.key}`]),
+          });
       }
     for (const d of merged.values()) d.departures.sort((x, y) => x.dep_s - y.dep_s);
-    return [...merged.values()];
-  }, [line, departures, data.data]);
+    const all = [...merged.values()];
+    if (selectedIdx === undefined || !line.idxs.has(selectedIdx)) return all;
+    const picked = resolveChoice(choice, data.data.directions.get(selectedIdx) ?? []);
+    if (picked.all || !picked.direction) return all;
+    const source = `${selectedIdx}:${picked.direction.key}`;
+    return all
+      .filter((d) => d.sources.has(source))
+      .map((d) =>
+        picked.pattern_idx === null
+          ? d
+          : { ...d, departures: d.departures.filter((x) => x.pattern_idx === picked.pattern_idx) }
+      );
+  }, [line, departures, data.data, selectedIdx, choice]);
 
   const openTrip = (e: { trip_idx: number; run_dep_s: number }) =>
     dispatch(
@@ -183,10 +192,14 @@ export function StopPanel({ stop }: { stop: ExplorerPickedStop }) {
   const detail = data.data?.stop;
   const station = detail?.is_station ?? false;
   const title = detail?.station ?? detail?.name ?? stop.name;
+  // A station; one of a station's platforms; else a stop of its own.
+  const kind = station ? "station" : detail?.station ? "platform" : "stop";
+  // The platform's own code or name, where it has one: the kind is said above.
   const own = detail?.station ? platformLabel({ name: detail.station }, detail, t).label : null;
   const meta = [
-    station ? t("explorer_place_station") : (own ?? t("explorer_place_stop")),
-    station && detail ? t("explorer_stops", { count: detail.n_stops }) : null,
+    own !== t("explorer_platform_unnamed") ? own : null,
+    // A station counts its platforms: the stops it is made of.
+    station && detail ? t("explorer_platforms", { count: detail.n_stops }) : null,
     detail
       ? t("explorer_lines_count", {
           count: distinctLines(detail.routes.map((i) => routeByIdx.get(i))).length,
@@ -197,6 +210,7 @@ export function StopPanel({ stop }: { stop: ExplorerPickedStop }) {
   return (
     <Stack sx={{ flex: 1, minHeight: 0 }}>
       <Box sx={{ px: PX, pt: 0.5, pb: 1.5 }}>
+        <PanelKind kind={kind} />
         <Stack direction="row" spacing={1.25} alignItems="center">
           <StopMarker station={station} />
           <Typography variant="h6" fontWeight="bold" noWrap sx={{ fontSize: 17 }} title={title}>
@@ -318,7 +332,9 @@ function Timetable({
                       const isNext = e === next;
                       return (
                         <ButtonBase
-                          key={`${e.trip_idx}:${e.run_dep_s}`}
+                          // A run can call twice, at a loop's stop or at two
+                          // of a station's platforms: the call, not the run.
+                          key={`${e.trip_idx}:${e.run_dep_s}:${e.stop_idx}:${e.dep_s}`}
                           onClick={() => onOpen(e)}
                           title={clock(e.dep_s)}
                           sx={{
@@ -395,7 +411,7 @@ function NextDepartures({
         const wait = Math.floor((d.dep_s - from) / 60);
         return (
           <ButtonBase
-            key={`${d.trip_idx}:${d.run_dep_s}`}
+            key={`${d.trip_idx}:${d.run_dep_s}:${d.stop_idx}:${d.dep_s}`}
             onClick={() => onOpen(d)}
             sx={{
               width: "100%",

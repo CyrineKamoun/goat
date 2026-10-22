@@ -20,9 +20,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { openFixtureDb } from "@/lib/explorer/__tests__/fixtureDb";
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import { activeServicesSql, serviceDayCounts } from "@/lib/explorer/derive/calendar";
-import { annualFigures, defaultRate } from "@/lib/explorer/derive/cost";
+import { annualFigures, costYear, defaultRate, yearOf } from "@/lib/explorer/derive/cost";
 import { type Direction, routeDirections } from "@/lib/explorer/derive/directions";
 import { headways, operations, runningTimes, vehiclesInService } from "@/lib/explorer/derive/operations";
+import { cut, patternSections } from "@/lib/explorer/derive/patternSections";
+import { axisOf, routeTrips } from "@/lib/explorer/derive/routeTrips";
 import { type TripRange, routeRuns } from "@/lib/explorer/derive/runs";
 import { isoWeekday, routeCalendar } from "@/lib/explorer/derive/serviceCalendar";
 import { byDirection, byHour, stopDepartures, stopDetail } from "@/lib/explorer/derive/stopTimetable";
@@ -40,11 +42,20 @@ import {
   vehicleWindow,
 } from "@/lib/explorer/derive/vehicles";
 import {
+  choiceFromValue,
+  choiceValue,
+  highlightedPatterns,
+  resolveChoice,
+  shownLine,
+  shownPattern,
+} from "@/lib/explorer/directionChoice";
+import {
   filterCount,
   listPlaces,
   matchingRouteIdxs,
   modeCounts,
   routeMatches,
+  searchRoutes,
   shows,
 } from "@/lib/explorer/filters";
 import {
@@ -134,6 +145,140 @@ describe("runs", () => {
   });
 });
 
+describe("route trips", () => {
+  const times = (t: Awaited<ReturnType<typeof routeTrips>>, r: number) =>
+    Array.from(t.dep.slice(t.first[r], t.first[r + 1])).map(hm);
+
+  it("gives each run its stop times", async () => {
+    // R1 on a Wednesday: T1 08:00, T2 08:10, T3 08:20 (the other way), T4 08:30.
+    const t = await routeTrips(db, route("R1"), "2026-10-14");
+    expect(t.runs.map((r) => hm(r.dep_s))).toEqual(["08:00", "08:10", "08:20", "08:30"]);
+    expect(times(t, 0)).toEqual(["08:00", "08:02", "08:04", "08:06", "08:08"]);
+    // T4, numbered 10/20/30 in the feed, is a short turn to S3.
+    expect(times(t, 3)).toEqual(["08:30", "08:32", "08:34"]);
+  });
+
+  it("runs a frequency-based trip at every headway", async () => {
+    // F1 every 10 min from 06:00 to 09:00, 4 min a stop.
+    const t = await routeTrips(db, route("R4"), "2026-10-14");
+    expect(t.runs).toHaveLength(18);
+    expect(times(t, 1)).toEqual(["06:10", "06:14", "06:18"]);
+  });
+
+  it("lays each direction along its main pattern", async () => {
+    const t = await routeTrips(db, route("R1"), "2026-10-14");
+    const [fifth, back] = t.directions.map((d) => t.axes.get(d.key)!);
+    // Along SH1, which detours between S1 and S2; 676.9 m a stop after.
+    expect(fifth.d.map(Math.round)).toEqual([0, 1302, 1979, 2656, 3332]);
+    // T3 has no shape: along the line through its stops.
+    expect(back.d.map(Math.round)).toEqual([0, 677, 1354, 2031, 2708]);
+  });
+
+  it("fills an axis where a stop has no distance", () => {
+    expect(
+      axisOf(
+        [1, 2, 3],
+        new Map([
+          [0, 0],
+          [2, 100],
+        ])
+      ).d
+    ).toEqual([0, 50, 100]);
+    expect(axisOf([1, 2, 3], new Map()).d).toEqual([0, 1, 2]);
+  });
+});
+
+describe("direction choice", () => {
+  it("is all directions until one is picked", async () => {
+    // R1: To Fifth (T1, T2, and T4's short turn) and To Main Station (T3).
+    const { directions } = await routeDirections(db, route("R1"));
+    const none = resolveChoice(null, directions);
+    expect(none.all).toBe(true);
+    expect(none.patterns.size).toBe(directions.flatMap((d) => d.patterns).length);
+    // A view that draws one line draws the first direction's main pattern.
+    expect(shownLine(none, directions)?.pattern_idx).toBe(directions[0].key);
+    // Picking the first direction is a change: it then shows that alone.
+    const first = resolveChoice({ direction: directions[0].key, pattern_idx: null }, directions);
+    expect(first.all).toBe(false);
+    expect([...first.patterns].sort()).toEqual(directions[0].patterns.map((p) => p.pattern_idx).sort());
+  });
+
+  it("takes all directions, or one variant", async () => {
+    const { directions } = await routeDirections(db, route("R1"));
+    const all = resolveChoice({ direction: "all", pattern_idx: null }, directions);
+    expect(all.all).toBe(true);
+    expect(all.patterns.size).toBe(directions.flatMap((d) => d.patterns).length);
+    // A view that draws one line draws the first direction's main pattern.
+    expect(shownLine(all, directions)?.pattern_idx).toBe(directions[0].key);
+    const short = directions[0].patterns.find((p) => p.kind === "short_turn")?.pattern_idx as number;
+    const one = resolveChoice({ direction: directions[0].key, pattern_idx: short }, directions);
+    expect([...one.patterns]).toEqual([short]);
+    expect(shownLine(one, directions)?.pattern_idx).toBe(short);
+    expect(choiceFromValue(choiceValue(one))).toEqual({ direction: directions[0].key, pattern_idx: short });
+    expect(choiceFromValue(choiceValue(all))).toEqual({ direction: "all", pattern_idx: null });
+  });
+
+  it("has no all directions where there is one", async () => {
+    const { directions } = await routeDirections(db, route("R4"));
+    expect(resolveChoice({ direction: "all", pattern_idx: null }, directions).all).toBe(false);
+    // The map's highlight, from the drawing's directions, agrees.
+    const drawn = directions.map((d) => ({ key: d.key, patterns: d.patterns.map((p) => p.pattern_idx) }));
+    expect(shownPattern(null, drawn)).toBe(directions[0].key);
+  });
+
+  it("cuts a short turn's own stretch from the shape it rides", async () => {
+    const { directions } = await routeDirections(db, route("R1"));
+    const main = directions[0].key;
+    const short = directions[0].patterns.find((p) => p.kind === "short_turn")?.pattern_idx as number;
+    const { features } = await patternSections(db, [main, short]);
+    const length = (idx: number) =>
+      features
+        .filter((f) => f.properties.pattern_idx === idx)
+        .reduce((sum, f) => {
+          const c = f.geometry.coordinates;
+          for (let i = 1; i < c.length; i++) sum += Math.hypot(c[i][0] - c[i - 1][0], c[i][1] - c[i - 1][1]);
+          return sum;
+        }, 0);
+    expect(length(main)).toBeGreaterThan(0);
+    expect(length(short)).toBeGreaterThan(0);
+    expect(length(short)).toBeLessThan(length(main));
+  });
+
+  it("cuts a line between its points, where the stops fall", () => {
+    const pts = [
+      { lon: 0, lat: 0, d: 0 },
+      { lon: 10, lat: 0, d: 100 },
+      { lon: 10, lat: 10, d: 200 },
+    ];
+    expect(cut(pts, 50, 150)).toEqual([
+      [5, 0],
+      [10, 0],
+      [10, 5],
+    ]);
+    // Both ends inside one segment.
+    expect(cut(pts, 20, 40)).toEqual([
+      [2, 0],
+      [4, 0],
+    ]);
+  });
+
+  it("highlights on the map what the picker chose, on any tab", () => {
+    const drawn = [
+      { key: 10, patterns: [10, 11] },
+      { key: 20, patterns: [20] },
+    ];
+    // Nothing picked, or all directions: the route as a whole.
+    expect(highlightedPatterns(null, drawn, false)).toBeNull();
+    expect(highlightedPatterns({ direction: "all", pattern_idx: null }, drawn, false)).toBeNull();
+    // A whole direction, with its variants; a variant alone.
+    expect(highlightedPatterns({ direction: 10, pattern_idx: null }, drawn, false)).toEqual([10, 11]);
+    expect(highlightedPatterns({ direction: 10, pattern_idx: 11 }, drawn, false)).toEqual([11]);
+    // The Stops tab draws one line: the variant, else the main pattern.
+    expect(highlightedPatterns(null, drawn, true)).toEqual([10]);
+    expect(highlightedPatterns({ direction: 10, pattern_idx: null }, drawn, true)).toEqual([10]);
+  });
+});
+
 describe("directions", () => {
   const summary = async (id: string) =>
     (await routeDirections(db, route(id))).directions.map((d) => ({
@@ -217,6 +362,32 @@ describe("cost", () => {
     expect(year.cost).toBeCloseTo(year.vehicle_km * 4.5, 6);
   });
 
+  it("counts this calendar year where the feed covers it, else a year of it", () => {
+    const today = new Date("2026-10-21T12:00:00Z");
+    // All of 2026 in the feed, a placeholder range or not: 2026.
+    expect(costYear(["2018-01-01", "2028-12-31"], today)).toEqual({
+      from: "2026-01-01",
+      to: "2026-12-31",
+      kind: "calendar",
+    });
+    expect(yearOf(["2025-06-01", "2027-03-31"], today)).toEqual(["2026-01-01", "2026-12-31"]);
+    // 2026 not all in it: 365 days from today, kept inside the feed.
+    expect(costYear(["2026-03-01", "2027-12-31"], today)).toEqual({
+      from: "2026-10-21",
+      to: "2027-10-20",
+      kind: "year",
+    });
+    expect(yearOf(["2026-03-01", "2027-06-30"], today)).toEqual(["2026-07-01", "2027-06-30"]);
+    // Before the feed: its first year.
+    expect(yearOf(["2027-01-01", "2028-06-30"], today)).toEqual(["2027-01-01", "2027-12-31"]);
+    // A year or less: all of it, scaled.
+    expect(costYear(["2026-10-06", "2026-12-12"], today)).toEqual({
+      from: "2026-10-06",
+      to: "2026-12-12",
+      kind: "scaled",
+    });
+  });
+
   it("prices by route type until rates are set", () => {
     expect(defaultRate(3).per_km).toBe(4.5);
     expect(defaultRate(0).per_km).toBe(7);
@@ -272,6 +443,77 @@ describe("stations and platforms", () => {
     ]);
     // A station found by its own name stays folded.
     expect(listPlaces(all, "main station", null)[0].opened).toBe(false);
+  });
+});
+
+describe("search ranking", () => {
+  let idx = 0;
+  const route = (short_name: string, route_id: string, long_name = "") => ({
+    route_idx: idx++,
+    short_name,
+    long_name,
+    agency: "BVG",
+    route_id,
+  });
+
+  it("puts the route numbered as typed first, numbers in natural order", () => {
+    const routes = [
+      route("25", "10525_700"), // found only by its id
+      route("152", "152_1"),
+      route("520", "520_1"),
+      route("52", "52_1"),
+      route("X52", "X52_1"),
+      route("M1", "M1_1", "Bus 52 Express"),
+    ];
+    expect(searchRoutes(routes, "52").map((r) => r.short_name)).toEqual([
+      "52",
+      "520",
+      "152",
+      "X52",
+      "M1",
+      "25",
+    ]);
+    // No search: as listed.
+    expect(searchRoutes(routes, "")).toBe(routes);
+  });
+
+  it("puts routes running on the date first, the busiest first, among equal matches", () => {
+    const routes = [route("50", "a"), route("51", "b"), route("52", "c"), route("5", "d")];
+    const runs = new Map([
+      [routes[1].route_idx, 40],
+      [routes[2].route_idx, 120],
+    ]);
+    // The exact number still leads, though it does not run that day.
+    expect(searchRoutes(routes, "5", runs).map((r) => r.short_name)).toEqual(["5", "52", "51", "50"]);
+  });
+
+  it("puts places named as typed first, then a word starting with it", () => {
+    const place = (stop_id: string, name: string) =>
+      ({
+        stop_idx: 0,
+        stop_id,
+        name,
+        lat: 0,
+        lon: 0,
+        is_station: false,
+        route_idxs: [],
+        platforms: [],
+      }) as PlaceRow;
+    const all = [
+      place("a", "Gartenlindenweg"),
+      place("b", "Am Lindenplatz"),
+      place("c", "Lindenstr."),
+      place("d", "Linden"),
+      place("e", "Alt-Linden"),
+    ];
+    // Then names holding it mid-word; equals keep their order.
+    expect(listPlaces(all, "linden", null).map((p) => p.place.name)).toEqual([
+      "Linden",
+      "Lindenstr.",
+      "Am Lindenplatz",
+      "Alt-Linden",
+      "Gartenlindenweg",
+    ]);
   });
 });
 
@@ -437,6 +679,29 @@ describe("vehicles", () => {
     expect(vehicles).toHaveLength(1);
     expect(vehicles[0].lon).toBeCloseTo(13.415, 6);
     expect(vehicles[0].lat).toBeCloseTo(52.5, 6);
+  });
+
+  it("runs a vehicle past stops the feed leaves untimed", async () => {
+    // Only timepoints timed, as GTFS allows: T1 without its time at S2 runs
+    // on from S1 (08:00) to S3 (08:04) rather than vanishing at S1.
+    const where = `trip_idx = (SELECT trip_idx FROM trips WHERE trip_id = 'T1')
+                   AND stop_idx = (SELECT stop_idx FROM stops WHERE stop_id = 'S2')`;
+    const [kept] = await db.all<{ arrival_s: number; departure_s: number }>(
+      `SELECT arrival_s, departure_s FROM stop_times WHERE ${where}`
+    );
+    await db.all(`UPDATE stop_times SET arrival_s = NULL, departure_s = NULL WHERE ${where}`);
+    try {
+      const r1 = route("R1");
+      const [t1] = (await at("2026-10-14", hm(8, 3))).filter((v) => v.route_idx === r1.route_idx);
+      expect(t1).toBeDefined();
+      // Past S2 (13.41), short of S3 (13.42).
+      expect(t1.lon).toBeGreaterThan(13.405);
+      expect(t1.lon).toBeLessThan(13.42);
+    } finally {
+      await db.all(
+        `UPDATE stop_times SET arrival_s = ${kept.arrival_s}, departure_s = ${kept.departure_s} WHERE ${where}`
+      );
+    }
   });
 
   it("follows the trip's shape, not the straight line between stops", async () => {

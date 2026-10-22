@@ -5,17 +5,12 @@
  */
 import { useAppSelector } from "@/hooks/store/ContextHooks";
 
-/** The panel's width (02-panel-behaviour-spec), and its rail's when folded. */
+/** The panel's width (02-panel-behaviour-spec). */
 export const EXPLORER_RIGHT_PANEL_WIDTH = 340;
-export const EXPLORER_RAIL_WIDTH = 48;
 
-/** The width the panel takes, folded or not; 0 when closed. */
+/** The width the panel takes; 0 when closed. */
 export function useRightPanelWidth(): number {
   return useAppSelector((s) =>
-    !s.explorer.active || !s.explorer.panel.stack.length
-      ? 0
-      : s.explorer.panel.collapsed
-        ? EXPLORER_RAIL_WIDTH
-        : EXPLORER_RIGHT_PANEL_WIDTH
+    !s.explorer.active || !s.explorer.panel.stack.length ? 0 : EXPLORER_RIGHT_PANEL_WIDTH
   );
 }

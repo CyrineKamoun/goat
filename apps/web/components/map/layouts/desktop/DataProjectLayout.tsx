@@ -35,6 +35,7 @@ import { ExplorerProvider } from "@/components/explorer/ExplorerContext";
 import { EXPLORER_PANEL_WIDTH, ExplorerLeftPanel } from "@/components/explorer/ExplorerLeftPanel";
 import { ExplorerRightPanel } from "@/components/explorer/right/ExplorerRightPanel";
 import { EXPLORER_RIGHT_PANEL_WIDTH, useRightPanelWidth } from "@/components/explorer/right/panelSize";
+import { STRIP_TOP } from "@/components/explorer/strip/stripLayout";
 import AttributionControl from "@/components/map/controls/Attribution";
 import { BasemapSelector } from "@/components/map/controls/BasemapSelector";
 import { CustomBasemapDialog } from "@/components/map/controls/CustomBasemapDialog";
@@ -393,6 +394,8 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
           </Box>
         </Stack>
         <Box
+          // The Explorer's bottom panel grows up to just under these tools.
+          {...{ [STRIP_TOP]: "" }}
           sx={{
             position: "absolute",
             left: `${leftWidth + GAP_SIZE + 10}px`,

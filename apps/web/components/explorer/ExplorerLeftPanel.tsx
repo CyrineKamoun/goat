@@ -1,11 +1,11 @@
 /**
  * The Explorer's left panel (board 3): one panel headed by a tab bar —
  * Layers | Explorer. It neither closes nor collapses; the Explorer is left
- * by the × on its tab, Exit Explorer in the bottom bar, or the bundle's menu
+ * by the × on its tab or the bundle's menu
  * (docs/pt-network-editor/docs/02-panel-behaviour-spec.md).
  */
 import { Box, Stack, Tab, Tabs, Tooltip } from "@mui/material";
-import type { ReactNode } from "react";
+import { type ReactNode, memo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
@@ -96,7 +96,7 @@ export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
                     color: "inherit",
                     "&:hover": { bgcolor: "action.hover" },
                   }}>
-                  <Icon iconName={ICON_NAME.CIRCLE_XCLOSE} style={{ fontSize: 16 }} htmlColor="inherit" />
+                  <Icon iconName={ICON_NAME.XCLOSE} style={{ fontSize: 13 }} htmlColor="inherit" />
                 </Box>
               </Tooltip>
             </>
@@ -111,25 +111,46 @@ export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
           minHeight: 0,
           overflow: "auto",
         }}>
-        {layersTab}
+        <WhileShown shown={tab === "layers"}>{layersTab}</WhileShown>
       </Box>
       <Stack
         sx={{ display: tab === "explorer" ? "flex" : "none", flex: 1, minHeight: 0, position: "relative" }}>
-        <ExplorerLoadingLine />
-        {db ? (
-          <>
-            <Box sx={{ flex: 1, minHeight: 0 }}>
-              <ExplorerTab />
-            </Box>
-            <CostSection />
-            <ExplorerSettingsDialog />
-          </>
-        ) : (
-          <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-            <ExplorerLoadingCard />
-          </Box>
-        )}
+        <ExplorerContent ready={!!db} />
       </Stack>
     </FloatingPanel>
   );
 }
+
+/** The Explorer tab's content. Apart, and memoised, so the map layout
+ * re-rendering around it — the right panel opening or folding changes its
+ * widths — does not re-render the route list or the route summary with it. */
+const ExplorerContent = memo(function ExplorerContent({ ready }: { ready: boolean }) {
+  return (
+    <>
+      <ExplorerLoadingLine />
+      {ready ? (
+        <>
+          <Box sx={{ flex: 1, minHeight: 0 }}>
+            <ExplorerTab />
+          </Box>
+          <CostSection />
+          <ExplorerSettingsDialog />
+        </>
+      ) : (
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+          <ExplorerLoadingCard />
+        </Box>
+      )}
+    </>
+  );
+});
+
+/** Holds a hidden tab as it was: the layout hands down a new layer tree with
+ * every render of its own, and a tab out of view need not draw it again.
+ * Shown, it takes the latest. */
+const WhileShown = memo(
+  function WhileShown({ children }: { shown: boolean; children: ReactNode }) {
+    return <>{children}</>;
+  },
+  (_prev, next) => !next.shown
+);

@@ -9,7 +9,8 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { compact, money } from "@/lib/explorer/format";
+import { costYear } from "@/lib/explorer/derive/cost";
+import { compact, dateSpan, money } from "@/lib/explorer/format";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
 import { openExplorerSettings } from "@/lib/store/explorer/slice";
 
@@ -22,7 +23,7 @@ import { RouteBadge, routeName } from "@/components/explorer/RouteBadge";
 
 /** Fixed to what its figures need, so the list or summary above never
  * changes height with them. */
-const COST_SECTION_HEIGHT = 160;
+const COST_SECTION_HEIGHT = 180;
 
 /** What the figures below are for: a fixed line whose content follows the
  * selection, so the figures never change without saying what they now cover. */
@@ -89,6 +90,14 @@ export function CostSection() {
   const summary = useRouteSummary(complete && route ? db : undefined, route, date, window, settings);
   const annual = route ? summary.data?.annual : network.data;
   const pending = useTimetablesPending();
+  const year = window ? costYear(window) : null;
+  const period = year && {
+    label: t(`explorer_cost_period_${year.kind}`, {
+      year: year.from.slice(0, 4),
+      span: dateSpan(year.from, year.to, lang),
+    }),
+    hint: t(`explorer_cost_period_${year.kind}_hint`),
+  };
 
   return (
     // Its own tinted ground: the cost is a standing part of the Explorer,
@@ -149,6 +158,15 @@ export function CostSection() {
             label={t("explorer_vehicle_hours_year")}
           />
         </Stack>
+        {/* Which year the figures are for: this calendar year where the feed
+            covers it, else a year of the feed, or all of a shorter one. */}
+        {period && (
+          <Tooltip title={period.hint}>
+            <Typography variant="caption" color="text.secondary" display="block" noWrap sx={{ mt: 1 }}>
+              {period.label}
+            </Typography>
+          </Tooltip>
+        )}
       </Box>
     </Stack>
   );

@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next";
 import { ICON_NAME } from "@p4b/ui/components/Icon";
 
 import { type DayType, isoWeekday } from "@/lib/explorer/derive/serviceCalendar";
-import { count, dayMonth, weekdayList, weekdayName } from "@/lib/explorer/format";
+import { count, dateLocale, dayMonth, weekdayList, weekdayName } from "@/lib/explorer/format";
 import { setExplorerDate } from "@/lib/store/explorer/slice";
 
 import { type RouteRow, useRouteCalendar } from "@/hooks/explorer/useExplorerData";
@@ -123,9 +123,11 @@ function Month({
   const first = new Date(Date.UTC(year, month, 1));
   const length = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const lead = isoWeekday(first.toISOString().slice(0, 10)) - 1;
-  const title = new Intl.DateTimeFormat(lang, { month: "long", year: "numeric", timeZone: "UTC" }).format(
-    first
-  );
+  const title = new Intl.DateTimeFormat(dateLocale(lang), {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(first);
   return (
     <Box ref={monthRef} sx={{ mb: 2 }}>
       <Typography variant="body2" fontWeight={700} sx={{ mb: 0.75 }}>

@@ -7,7 +7,7 @@
 import { Box, IconButton, ListItemButton, Stack, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { TFunction } from "i18next";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
@@ -139,13 +139,10 @@ export function platformLabel(
   return { label: code ?? own ?? t("explorer_platform_unnamed"), note: code && own ? own : undefined };
 }
 
-export function StationsList({
-  listed,
-  routeByIdx,
-}: {
-  listed: ListedPlace[];
-  routeByIdx: Map<number, RouteRow>;
-}) {
+/** Memoised: the search field above re-renders with every key. */
+export const StationsList = memo(Stations);
+
+function Stations({ listed, routeByIdx }: { listed: ListedPlace[]; routeByIdx: Map<number, RouteRow> }) {
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const selected = useAppSelector((s) => pickedStop(s.explorer));

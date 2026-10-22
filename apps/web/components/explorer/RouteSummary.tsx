@@ -9,7 +9,9 @@ import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
+import { highlightedPatterns } from "@/lib/explorer/directionChoice";
 import { clock, count, shortDate } from "@/lib/explorer/format";
+import { highlightStore } from "@/lib/explorer/highlightStore";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
 import {
   type ExplorerRouteTab,
@@ -18,7 +20,12 @@ import {
   setExplorerRouteTab,
 } from "@/lib/store/explorer/slice";
 
-import { type RouteRow, type RouteSummaryData, useRouteSummary } from "@/hooks/explorer/useExplorerData";
+import {
+  type RouteRow,
+  type RouteSummaryData,
+  usePatternSections,
+  useRouteSummary,
+} from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
@@ -230,6 +237,18 @@ export function RouteSummary({ route }: { route: RouteRow }) {
   const tab = useAppSelector((s) => s.explorer.routeTab);
   const summary = useRouteSummary(complete ? db : undefined, route, date, window, settings);
   const mode = modeOf(route.route_type);
+
+  // The stretch of line the map highlights for the picked patterns: a short
+  // turn's own part of the route, not the whole shape it rides.
+  const choice = useAppSelector((s) => s.explorer.pattern);
+  const highlightKey = summary.data
+    ? (highlightedPatterns(choice, summary.data.drawing.directions, tab === "stops")?.join(",") ?? "")
+    : "";
+  const sections = usePatternSections(complete ? db : undefined, highlightKey);
+  useEffect(() => {
+    if (highlightKey && sections.data) highlightStore.set({ key: highlightKey, ...sections.data });
+  }, [highlightKey, sections.data]);
+  useEffect(() => () => highlightStore.set(null), []);
 
   useEffect(() => {
     if (!summary.data) return;

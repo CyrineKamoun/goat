@@ -17,7 +17,9 @@ import {
   runningTimes,
   vehiclesInService,
 } from "@/lib/explorer/derive/operations";
-import { routeRuns } from "@/lib/explorer/derive/runs";
+import { patternSections, patternTrips } from "@/lib/explorer/derive/patternSections";
+import { routeTrips } from "@/lib/explorer/derive/routeTrips";
+import { routeDayRuns, routeRuns } from "@/lib/explorer/derive/runs";
 import { routeCalendar } from "@/lib/explorer/derive/serviceCalendar";
 import {
   type Departure,
@@ -192,10 +194,16 @@ async function summarize(
             ]
           : [];
       }),
+      directions: directions.map((d) => ({ key: d.key, patterns: d.patterns.map((p) => p.pattern_idx) })),
       patternShapes: shapes.reduce<Record<number, string[]>>((acc, s) => {
         (acc[s.pattern_idx] ??= []).push(s.shape_id);
         return acc;
       }, {}),
+      patternEnds: Object.fromEntries(
+        patterns
+          .filter((p) => p.stops.length)
+          .map((p) => [p.pattern_idx, [p.stops[0], p.stops[p.stops.length - 1]]])
+      ),
       patternBounds: Object.fromEntries(
         patterns.flatMap((p) => {
           const cs = p.stops.map(coord).filter((c): c is [number, number] => c !== null);
@@ -325,5 +333,27 @@ export function useTripDetail(
 ) {
   return useQuery(date ? db : undefined, `trip:${trip_idx}:${run_dep_s}:${date}`, (d) =>
     tripDetail(d, trip_idx, run_dep_s, date as string)
+  );
+}
+
+/** The stretch each of `key`'s patterns runs (comma-joined pattern_idx),
+ * for the map's highlight. */
+export function usePatternSections(db: SqlRunner | undefined, key: string) {
+  return useQuery(key ? db : undefined, `pattern-sections:${key}`, async (d) => {
+    const patterns = key.split(",").map(Number);
+    const [sections, trips] = await Promise.all([patternSections(d, patterns), patternTrips(d, patterns)]);
+    return { sections, trips };
+  });
+}
+
+/** Each route's runs on the date, for ranking and dimming the route list. */
+export function useRouteDayRuns(db: SqlRunner | undefined, date: string | null) {
+  return useQuery(date ? db : undefined, `route-day-runs:${date}`, (d) => routeDayRuns(d, date as string));
+}
+
+/** A route's runs on the date with their stop times, for the trip strip. */
+export function useRouteTrips(db: SqlRunner | undefined, route: RouteRow | undefined, date: string | null) {
+  return useQuery(route && date ? db : undefined, `route-trips:${route?.route_idx}:${date}`, (d) =>
+    routeTrips(d, route as RouteRow, date as string)
   );
 }

@@ -5,17 +5,30 @@
  * platform shows it on the map. The operating cost sits below, in CostSection.
  */
 import { Box, InputAdornment, List, ListItemButton, Stack, TextField, Typography } from "@mui/material";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, memo, useDeferredValue, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { filterCount, listPlaces, matchingRouteIdxs, routeMatches, shows } from "@/lib/explorer/filters";
+import {
+  filterCount,
+  listPlaces,
+  matchingRouteIdxs,
+  routeMatches,
+  searchRoutes,
+  shows,
+} from "@/lib/explorer/filters";
 import { compact, count } from "@/lib/explorer/format";
 import { modeOf } from "@/lib/explorer/modes";
 import { selectExplorerRoute } from "@/lib/store/explorer/slice";
 
-import { type RouteRow, useAgencies, useRoutes, useStops } from "@/hooks/explorer/useExplorerData";
+import {
+  type RouteRow,
+  useAgencies,
+  useRouteDayRuns,
+  useRoutes,
+  useStops,
+} from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
@@ -32,14 +45,6 @@ const SHOWN = 200;
 
 /** A row's height, routes and stops alike. */
 const ROW_HEIGHT = 36;
-
-function matches(route: RouteRow, query: string): boolean {
-  if (!query) return true;
-  const q = query.toLowerCase();
-  return [route.short_name, route.long_name, route.agency, route.route_id].some((v) =>
-    v?.toLowerCase().includes(q)
-  );
-}
 
 /** "8 of 89" once something narrows the list, else the plain count. */
 function useAmount(shown: number, total: number | undefined, narrowed: boolean): string {
@@ -70,6 +75,46 @@ function SectionList({ hidden, children }: { hidden: boolean; children: ReactNod
   );
 }
 
+/** The routes listed: a row each, opening the route; one not running on
+ * the date dimmed, and saying so. */
+const RouteRows = memo(function RouteRows({
+  routes,
+  dayRuns,
+}: {
+  routes: RouteRow[];
+  /** Each route's runs on the date, once known: one making none is dimmed. */
+  dayRuns: Map<number, number> | null;
+}) {
+  const { t } = useTranslation("common");
+  const dispatch = useAppDispatch();
+  return (
+    <>
+      {routes.map((route) => {
+        const idle = !!dayRuns && !dayRuns.has(route.route_idx);
+        return (
+          <ListItemButton
+            key={route.route_idx}
+            onClick={() => dispatch(selectExplorerRoute(route.route_id))}
+            title={idle ? t("explorer_route_no_trips_on_date") : undefined}
+            sx={{ px: PX, py: 0.75, gap: 1.5, minHeight: ROW_HEIGHT, opacity: idle ? 0.5 : 1 }}>
+            <RouteBadge route={route} />
+            <Typography variant="body2" noWrap title={route.long_name ?? undefined} sx={{ flex: 1 }}>
+              {route.long_name || route.short_name || route.route_id}
+            </Typography>
+            <Box sx={{ color: "text.disabled", display: "flex" }}>
+              <Icon
+                iconName={modeIcon(modeOf(route.route_type))}
+                style={{ fontSize: 13 }}
+                htmlColor="inherit"
+              />
+            </Box>
+          </ListItemButton>
+        );
+      })}
+    </>
+  );
+});
+
 function Note({ children }: { children: ReactNode }) {
   return (
     <Typography variant="caption" color="text.secondary" sx={{ display: "block", px: PX, py: 1 }}>
@@ -80,12 +125,16 @@ function Note({ children }: { children: ReactNode }) {
 
 export function ExplorerTab() {
   const { t } = useTranslation("common");
-  const dispatch = useAppDispatch();
   const { db } = useExplorer();
   const bundleName = useAppSelector((s) => s.explorer.bundleName);
   const selectedRouteId = useAppSelector((s) => s.explorer.selectedRouteId);
   const filters = useAppSelector((s) => s.explorer.filters);
   const routes = useRoutes(db);
+  // Each route's runs on the date: what runs ranks first in a search, and
+  // what does not run is dimmed. Known once the timetable is in.
+  const date = useAppSelector((s) => s.explorer.date);
+  const { complete } = useExplorer();
+  const dayRuns = useRouteDayRuns(complete ? db : undefined, date).data ?? null;
   const stops = useStops(db);
   const agencies = useAgencies(db);
   const [query, setQuery] = useState("");
@@ -94,17 +143,29 @@ export function ExplorerTab() {
   // leaving both folded.
   const [open, setOpen] = useState<"routes" | "stops" | null>("routes");
 
-  const q = query.trim();
+  // The field shows every keystroke at once; the lists follow when they
+  // can, a newer keystroke cutting short the filtering of an older one.
+  const q = useDeferredValue(query.trim());
   const narrowed = !!q || filterCount(filters) > 0;
   const filteredRoutes = useMemo(
-    () => (routes.data ?? []).filter((r) => routeMatches(r, filters) && matches(r, q)),
-    [routes.data, filters, q]
+    () =>
+      searchRoutes(
+        (routes.data ?? []).filter((r) => routeMatches(r, filters)),
+        q,
+        dayRuns
+      ),
+    [routes.data, filters, q, dayRuns]
   );
+
   const filteredStops = useMemo(
     () => listPlaces(stops.data ?? [], q, matchingRouteIdxs(routes.data ?? [], filters)),
     [stops.data, routes.data, filters, q]
   );
   const routeByIdx = useMemo(() => new Map((routes.data ?? []).map((r) => [r.route_idx, r])), [routes.data]);
+  // What the lists show, kept between renders: the memoised rows below are
+  // drawn again only when it changes, not as each key is typed.
+  const shownRoutes = useMemo(() => filteredRoutes.slice(0, SHOWN), [filteredRoutes]);
+  const shownStops = useMemo(() => filteredStops.slice(0, SHOWN), [filteredStops]);
   const routesAmount = useAmount(filteredRoutes.length, routes.data?.length, narrowed);
   const stopsAmount = useAmount(filteredStops.length, stops.data?.length, narrowed);
 
@@ -181,24 +242,7 @@ export function ExplorerTab() {
             onFold={() => setOpen(routesOpen ? null : "routes")}
           />
           <SectionList hidden={!routesOpen}>
-            {filteredRoutes.slice(0, SHOWN).map((route) => (
-              <ListItemButton
-                key={route.route_idx}
-                onClick={() => dispatch(selectExplorerRoute(route.route_id))}
-                sx={{ px: PX, py: 0.75, gap: 1.5, minHeight: ROW_HEIGHT }}>
-                <RouteBadge route={route} />
-                <Typography variant="body2" noWrap title={route.long_name ?? undefined} sx={{ flex: 1 }}>
-                  {route.long_name || route.short_name || route.route_id}
-                </Typography>
-                <Box sx={{ color: "text.disabled", display: "flex" }}>
-                  <Icon
-                    iconName={modeIcon(modeOf(route.route_type))}
-                    style={{ fontSize: 13 }}
-                    htmlColor="inherit"
-                  />
-                </Box>
-              </ListItemButton>
-            ))}
+            <RouteRows routes={shownRoutes} dayRuns={dayRuns} />
             {filteredRoutes.length > SHOWN && (
               <Note>{t("explorer_more_routes", { count: filteredRoutes.length - SHOWN })}</Note>
             )}
@@ -217,7 +261,7 @@ export function ExplorerTab() {
             onFold={() => setOpen(stopsOpen ? null : "stops")}
           />
           <SectionList hidden={!stopsOpen}>
-            <StationsList listed={filteredStops.slice(0, SHOWN)} routeByIdx={routeByIdx} />
+            <StationsList listed={shownStops} routeByIdx={routeByIdx} />
             {filteredStops.length > SHOWN && (
               <Note>{t("explorer_more_stops", { count: filteredStops.length - SHOWN })}</Note>
             )}
