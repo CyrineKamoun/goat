@@ -12,6 +12,8 @@ import { Box, ButtonBase, Skeleton, Stack, Typography } from "@mui/material";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
 import type { Direction } from "@/lib/explorer/derive/directions";
 import {
   type Departure,
@@ -55,6 +57,7 @@ function ViewSwitch({ value, onChange }: { value: View; onChange: (v: View) => v
       options={(["timetable", "next"] as const).map((v) => ({
         value: v,
         label: t(`explorer_stop_view_${v}`),
+        icon: v === "timetable" ? ICON_NAME.TABLE : ICON_NAME.CLOCK,
       }))}
       value={value}
       onChange={onChange}

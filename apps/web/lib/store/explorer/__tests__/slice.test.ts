@@ -43,6 +43,9 @@ describe("explorer slice", () => {
     state = explorerReducer(state, closeExplorer());
     state = open(state);
     expect(state.leftTab).toBe("layers");
+    // Another bundle opened from the Layers tab: its Explorer shows.
+    state = explorerReducer(state, openExplorer({ bundleId: "b2", bundleName: "Other" }));
+    expect(state.leftTab).toBe("explorer");
   });
 
   it("drops the drawing when the route is deselected", () => {
@@ -117,14 +120,14 @@ describe("explorer slice", () => {
     expect(panelItem(state)).toBeNull();
   });
 
-  it("stops playback and forgets its time when the date changes", () => {
+  it("pauses playback, at the same time of day, when the date changes", () => {
     let state = explorerReducer(open(), setExplorerDate("2026-10-14"));
     state = explorerReducer(state, setPlaybackTime(8 * 3600));
     state = explorerReducer(state, setPlaying(true));
     state = explorerReducer(state, setExplorerDate("2026-10-14"));
     expect(state).toMatchObject({ playing: true, time_s: 8 * 3600 });
     state = explorerReducer(state, setExplorerDate("2026-10-15"));
-    expect(state).toMatchObject({ playing: false, time_s: null });
+    expect(state).toMatchObject({ playing: false, time_s: 8 * 3600 });
   });
 
   it("hands back the group it hid when it closes", () => {
@@ -160,5 +163,26 @@ describe("explorer slice", () => {
     expect(state.tripTab).toBe("calendar");
     state = explorerReducer(state, openExplorerPanel({ item: trip(3) }));
     expect(state.tripTab).toBe("stops");
+  });
+
+  it("shows the last bundle's layers again when another bundle's Explorer opens over it", () => {
+    let state = explorerReducer(
+      undefined,
+      openExplorer({ bundleId: "berlin", bundleName: "Berlin", hiddenGroupId: 7 })
+    );
+    state = explorerReducer(
+      state,
+      openExplorer({ bundleId: "munich", bundleName: "Munich", hiddenGroupId: 9 })
+    );
+    expect(state).toMatchObject({ bundleId: "munich", hiddenGroupId: 9, restoreGroupId: 7 });
+    // The same bundle again: its group, hidden already, stays hidden.
+    state = explorerReducer(state, clearRestoreGroup());
+    state = explorerReducer(
+      state,
+      openExplorer({ bundleId: "munich", bundleName: "Munich", hiddenGroupId: null })
+    );
+    expect(state).toMatchObject({ hiddenGroupId: 9, restoreGroupId: null });
+    // Closed: it is shown again.
+    expect(explorerReducer(state, closeExplorer()).restoreGroupId).toBe(9);
   });
 });

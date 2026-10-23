@@ -39,6 +39,13 @@ export interface ExplorerSettings {
 
 export const CURRENCIES = ["EUR", "CHF", "GBP", "USD"];
 
+/** Every ISO 4217 currency the browser knows, the common ones first; the
+ * short list where it cannot say. */
+export function allCurrencies(): string[] {
+  const all = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("currency") : CURRENCIES;
+  return [...CURRENCIES, ...all.filter((c) => !CURRENCIES.includes(c))];
+}
+
 /** Where nothing is set: common planning hours. */
 export function periodsFrom(boundaries: number[]): Period[] {
   const edges = [0, ...boundaries, SERVICE_DAY_END_S];

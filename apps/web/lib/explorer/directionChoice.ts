@@ -83,3 +83,16 @@ export function choiceFromValue(value: string): ExplorerPatternChoice {
   const [d, p] = value.split(":");
   return { direction: Number(d), pattern_idx: p === "" ? null : Number(p) };
 }
+
+/** The directions whose patterns run on any of `shapeIds` (shapes clicked on
+ * the map), by key, in the route's order. */
+export function directionsOnShapes(
+  shapeIds: string[],
+  directions: { key: number; patterns: number[] }[],
+  patternShapes: Record<number, string[]>
+): number[] {
+  const hit = new Set(shapeIds);
+  return directions
+    .filter((d) => d.patterns.some((p) => (patternShapes[p] ?? []).some((s) => hit.has(s))))
+    .map((d) => d.key);
+}

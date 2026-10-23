@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SETTINGS,
   SERVICE_DAY_END_S,
+  allCurrencies,
   periodsFrom,
   rateFor,
   rateKey,
@@ -58,5 +59,12 @@ describe("Explorer settings", () => {
   it("keys cached figures by what changes them, not by the currency", () => {
     expect(settingsKey({ ...DEFAULT_SETTINGS, currency: "CHF" })).toBe(settingsKey(DEFAULT_SETTINGS));
     expect(settingsKey({ ...DEFAULT_SETTINGS, layover_s: 0 })).not.toBe(settingsKey(DEFAULT_SETTINGS));
+  });
+
+  it("offers every currency, the common ones first", () => {
+    const all = allCurrencies();
+    expect(all.slice(0, 4)).toEqual(["EUR", "CHF", "GBP", "USD"]);
+    expect(all).toContain("INR");
+    expect(new Set(all).size).toBe(all.length);
   });
 });

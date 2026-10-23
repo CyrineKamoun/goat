@@ -59,6 +59,11 @@ function useAmount(shown: number, total: number | undefined, narrowed: boolean):
 
 /** The open section's rows: all the room below the headers, scrolling. */
 function SectionList({ hidden, children }: { hidden: boolean; children: ReactNode }) {
+  // Its rows are drawn once it is first opened, and kept after: a folded
+  // section costs nothing as the Explorer opens (Munich's stations and
+  // agencies are some 300 rows), yet opens again at once.
+  const [opened, setOpened] = useState(!hidden);
+  if (!hidden && !opened) setOpened(true);
   return (
     <List
       dense
@@ -71,7 +76,7 @@ function SectionList({ hidden, children }: { hidden: boolean; children: ReactNod
         borderTop: 1,
         borderColor: "divider",
       }}>
-      {children}
+      {opened && children}
     </List>
   );
 }

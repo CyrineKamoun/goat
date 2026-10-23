@@ -212,7 +212,7 @@ function BottomBar({ compact = false }: { compact?: boolean }) {
                   fontSize: 12,
                   fontWeight: 700,
                   fontVariantNumeric: "tabular-nums",
-                  color: s === speed ? "text.primary" : "text.secondary",
+                  color: "text.secondary",
                   bgcolor: s === speed ? "background.paper" : "transparent",
                   boxShadow: s === speed ? "0 1px 2px rgba(0, 0, 0, 0.12)" : "none",
                 }}>

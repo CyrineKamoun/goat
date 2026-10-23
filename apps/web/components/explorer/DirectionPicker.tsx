@@ -27,7 +27,7 @@ import type { RouteRow } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { RouteBadge } from "@/components/explorer/RouteBadge";
-import { directionPlace } from "@/components/explorer/directionWords";
+import { directionHeading } from "@/components/explorer/directionWords";
 
 const KIND_KEY: Record<Exclude<VariantKind, "main">, string> = {
   short_turn: "explorer_variant_short_turn",
@@ -35,9 +35,27 @@ const KIND_KEY: Record<Exclude<VariantKind, "main">, string> = {
   branch: "explorer_variant_branch",
 };
 
-/** The picker's options; `all` adds "All directions" where there are several. */
-export function directionItems(directions: Direction[], route: RouteRow, t: TFunction): SelectorItem[] {
-  const trips = (n: number) => t("explorer_trips", { count: n });
+/** Trips on the Explorer's date by pattern, from the day's runs: what the
+ * picker counts, as the trip strip does. */
+export function tripsByPattern(runs: { pattern_idx: number }[]): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const r of runs) out.set(r.pattern_idx, (out.get(r.pattern_idx) ?? 0) + 1);
+  return out;
+}
+
+/** The picker's options: each direction, its variants under it, each with
+ * its trips on the Explorer's date (`dayTrips`), as the strip counts them;
+ * no count until they are in. */
+export function directionItems(
+  directions: Direction[],
+  route: RouteRow,
+  t: TFunction,
+  dayTrips: Map<number, number> | null
+): SelectorItem[] {
+  const trips = (patterns: number[]) =>
+    dayTrips
+      ? ` · ${t("explorer_trips", { count: patterns.reduce((n, p) => n + (dayTrips.get(p) ?? 0), 0) })}`
+      : "";
   const badge = <RouteBadge route={route} small />;
   // A variant sits under its direction, where the badge would be.
   const under = (
@@ -47,8 +65,12 @@ export function directionItems(directions: Direction[], route: RouteRow, t: TFun
   );
   return [
     ...directions.flatMap((d) => [
-      // A direction by its destination alone, no "To".
-      { value: `${d.key}:`, label: `${directionPlace(d.name, t)} · ${trips(d.n_trips)}`, iconNode: badge },
+      // A direction by its destination, an arrow before it in place of "To".
+      {
+        value: `${d.key}:`,
+        label: `${directionHeading(d.name, t)}${trips(d.patterns.map((p) => p.pattern_idx))}`,
+        iconNode: badge,
+      },
       ...d.patterns
         .filter((p) => p.kind !== "main")
         .map((p) => ({
@@ -56,7 +78,7 @@ export function directionItems(directions: Direction[], route: RouteRow, t: TFun
           label: `${t(KIND_KEY[p.kind as Exclude<VariantKind, "main">], {
             destination: p.destination,
             interpolation: { escapeValue: false },
-          })} · ${trips(p.n_trips)}`,
+          })}${trips([p.pattern_idx])}`,
           iconNode: under,
         })),
     ]),
@@ -83,15 +105,18 @@ export function useDirectionChoice(directions: Direction[]): {
 export function DirectionPicker({
   route,
   directions,
+  dayTrips,
   compact = false,
 }: {
   route: RouteRow;
   directions: Direction[];
+  /** The day's trips by pattern (`tripsByPattern`). */
+  dayTrips: Map<number, number> | null;
   compact?: boolean;
 }) {
   const { t } = useTranslation("common");
   const { resolved, pick } = useDirectionChoice(directions);
-  const items = directionItems(directions, route, t);
+  const items = directionItems(directions, route, t, dayTrips);
   const value = choiceValue(resolved);
   // A variant by its own words ("Short turn to …"); short, its destination.
   const variant = resolved.direction?.patterns.find((p) => p.pattern_idx === resolved.pattern_idx);
@@ -104,7 +129,7 @@ export function DirectionPicker({
             interpolation: { escapeValue: false },
           })
       : resolved.direction
-        ? directionPlace(resolved.direction.name, t)
+        ? directionHeading(resolved.direction.name, t)
         : "";
   return (
     <Select

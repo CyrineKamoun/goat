@@ -14,10 +14,10 @@ import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 import { clock, count, currencySymbol } from "@/lib/explorer/format";
 import { type ModeKey, modeOf } from "@/lib/explorer/modes";
 import {
-  CURRENCIES,
   type ExplorerSettings,
   PERIOD_KEYS,
   SERVICE_DAY_END_S,
+  allCurrencies,
   defaultRate,
   modeRate,
   periodsFrom,
@@ -175,6 +175,9 @@ function parseClock(text: string): number | null {
   return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 : null;
 }
 
+/** The tabs' shared height: the time periods' six rows and their note. */
+const TAB_HEIGHT = 380;
+
 function toDraft(settings: ExplorerSettings): Draft {
   const rates: RateDraft = {};
   for (const [key, r] of Object.entries(ratesByKind(settings.rates)))
@@ -218,6 +221,11 @@ function RatesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => v
   const days = useServiceDays(db, window);
   const lang = i18n.language;
   const symbol = currencySymbol(draft.currency, lang);
+  // Every currency, by its code and its name in the reader's language.
+  const currencyItems = useMemo(() => {
+    const names = new Intl.DisplayNames([lang], { type: "currency" });
+    return allCurrencies().map((c) => ({ value: c, label: `${c} · ${names.of(c) ?? c}` }));
+  }, [lang]);
 
   // The operators, each with the route types it runs and how many routes.
   const agencies = useMemo(() => {
@@ -297,7 +305,8 @@ function RatesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => v
         <Box sx={{ width: agencies.length > 1 ? 112 : 160, flexShrink: 0 }}>
           <Selector
             label={t("explorer_currency")}
-            items={CURRENCIES.map((c) => ({ value: c, label: c }))}
+            items={currencyItems}
+            enableSearch
             selectedItems={{ value: draft.currency, label: draft.currency }}
             setSelectedItems={(item) => {
               if (item && !Array.isArray(item)) setDraft({ ...draft, currency: String(item.value) });
@@ -350,35 +359,37 @@ function RatesTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => v
 
 function PeriodsTab({ draft, setDraft }: { draft: Draft; setDraft: (d: Draft) => void }) {
   const { t } = useTranslation("common");
-  const starts = ["00:00", ...draft.starts];
+  // Each period is set by when it ends; it starts where the one before ends.
+  // The draft keeps the boundaries between periods, the ends of all but the
+  // last, which ends with the service day.
+  const ends = draft.starts;
   return (
     <Stack spacing={1.5}>
       <Card>
         {PERIOD_KEYS.map((key, i) => {
-          const end = i < PERIOD_KEYS.length - 1 ? starts[i + 1] : clock(SERVICE_DAY_END_S);
+          const start = i === 0 ? "00:00" : ends[i - 1];
+          const last = i === PERIOD_KEYS.length - 1;
           return (
             <Row key={key} first={i === 0}>
               <RowLabel label={t(`explorer_period_${key}`)} />
-              {/* The first period starts with the service day; each other
-                  starts where it is set, and ends where the next starts. */}
-              <UnitField
-                value={i === 0 ? "00:00" : draft.starts[i - 1]}
-                disabled={i === 0}
-                numeric="text"
-                label={t(`explorer_period_${key}`)}
-                error={i > 0 && parseClock(draft.starts[i - 1]) === null}
-                onChange={(v) => {
-                  const next = [...draft.starts];
-                  next[i - 1] = v;
-                  setDraft({ ...draft, starts: next });
-                }}
-              />
               <Typography
                 variant="body2"
                 color="text.secondary"
-                sx={{ width: 56, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
-                – {end}
+                sx={{ width: 56, flexShrink: 0, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                {start} –
               </Typography>
+              <UnitField
+                value={last ? clock(SERVICE_DAY_END_S) : ends[i]}
+                disabled={last}
+                numeric="text"
+                label={t(`explorer_period_${key}`)}
+                error={!last && parseClock(ends[i]) === null}
+                onChange={(v) => {
+                  const next = [...ends];
+                  next[i] = v;
+                  setDraft({ ...draft, starts: next });
+                }}
+              />
             </Row>
           );
         })}
@@ -472,9 +483,14 @@ export function ExplorerSettingsDialog() {
         />
         <Tab value="vehicles" label={t("explorer_vehicles")} sx={{ minHeight: 36, textTransform: "none" }} />
       </Tabs>
-      {tab === "rates" && <RatesTab draft={draft} setDraft={setDraft} />}
-      {tab === "periods" && <PeriodsTab draft={draft} setDraft={setDraft} />}
-      {tab === "vehicles" && <VehiclesTab draft={draft} setDraft={setDraft} />}
+      {/* One height for every tab, scrolling within it: the dialog does not
+          grow or shrink under the pointer as the tabs change, where a click
+          meant for it could land outside and close it. */}
+      <Box sx={{ height: TAB_HEIGHT, overflowY: "auto" }}>
+        {tab === "rates" && <RatesTab draft={draft} setDraft={setDraft} />}
+        {tab === "periods" && <PeriodsTab draft={draft} setDraft={setDraft} />}
+        {tab === "vehicles" && <VehiclesTab draft={draft} setDraft={setDraft} />}
+      </Box>
     </AppDialog>
   );
 }

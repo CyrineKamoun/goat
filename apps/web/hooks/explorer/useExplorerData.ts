@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from "react";
 
+import { remembered } from "@/lib/explorer/answers";
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import { networkServiceDays } from "@/lib/explorer/derive/calendar";
 import { type AnnualFigures, annualFigures, networkAnnualFigures, yearOf } from "@/lib/explorer/derive/cost";
@@ -47,27 +48,6 @@ export interface RouteRow {
   /** The operator's GTFS id: what cost rates are set by. */
   agency_id: string | null;
   agency: string | null;
-}
-
-/**
- * Answers kept per database: going back to the route list, or to a route seen
- * before, must not queue the same work again in the database's one worker —
- * the network's annual cost scans every trip, and a route opened behind it
- * waits for it.
- */
-const answers = new WeakMap<SqlRunner, Map<string, Promise<unknown>>>();
-
-function remembered<T>(db: SqlRunner, key: string, query: (db: SqlRunner) => Promise<T>): Promise<T> {
-  let byKey = answers.get(db);
-  if (!byKey) answers.set(db, (byKey = new Map()));
-  let answer = byKey.get(key) as Promise<T> | undefined;
-  if (!answer) {
-    answer = query(db);
-    // A failure is not kept: the next request tries again.
-    answer.catch(() => byKey?.delete(key));
-    byKey.set(key, answer);
-  }
-  return answer;
 }
 
 /** Run `query` against `db` for `key`; the answer for the latest key wins. */
@@ -194,7 +174,11 @@ async function summarize(
             ]
           : [];
       }),
-      directions: directions.map((d) => ({ key: d.key, patterns: d.patterns.map((p) => p.pattern_idx) })),
+      directions: directions.map((d) => ({
+        key: d.key,
+        patterns: d.patterns.map((p) => p.pattern_idx),
+        name: d.name,
+      })),
       patternShapes: shapes.reduce<Record<number, string[]>>((acc, s) => {
         (acc[s.pattern_idx] ??= []).push(s.shape_id);
         return acc;

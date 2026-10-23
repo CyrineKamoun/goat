@@ -103,7 +103,9 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
     });
   }, [routes]);
 
-  // A day's runs, once per date; playback starts at 08:00 or the day's first departure.
+  // A day's runs, once per date; playback starts at 08:00 or the day's first
+  // departure, or stays at the time it was at on the day before, if the new
+  // day's service runs then.
   useEffect(() => {
     if (!db || !date) return;
     windows.current = new Map();
@@ -113,7 +115,8 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
     ready.then((span) => {
       if (!current) return;
       playbackClock.publish({ span });
-      if (span && time_s === null) {
+      const now = store.getState().explorer.time_s;
+      if (span && (now === null || now < span.first_s || now > span.last_s)) {
         const start = START_S >= span.first_s && START_S <= span.last_s ? START_S : span.first_s;
         dispatch(setPlaybackTime(start));
       }
@@ -121,9 +124,7 @@ export function usePlayback(db: SqlRunner | undefined, routes: RouteRow[] | unde
     return () => {
       current = false;
     };
-    // time_s is read once, when a day is prepared; it does not prepare one.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [db, date, dispatch]);
+  }, [db, date, dispatch, store]);
 
   useEffect(() => () => playbackClock.reset(), []);
 

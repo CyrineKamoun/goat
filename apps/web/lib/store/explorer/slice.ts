@@ -7,6 +7,7 @@
  */
 import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
 
+import type { DirectionName } from "@/lib/explorer/derive/directions";
 import type { ModeKey } from "@/lib/explorer/modes";
 import { setMapMode } from "@/lib/store/map/slice";
 
@@ -65,9 +66,10 @@ export interface ExplorerRouteDrawing {
   /** Each pattern's shapes — the feed's, or the line through its stops —:
    * what the map highlights when the Stops tab shows that pattern. */
   patternShapes: Record<number, string[]>;
-  /** The route's directions, each with its patterns (its main one first):
-   * which pattern the map highlights for the picker's choice. */
-  directions: { key: number; patterns: number[] }[];
+  /** The route's directions, each with its patterns (its main one first)
+   * and its name: which pattern the map highlights for the picker's choice,
+   * and how the map offers a direction to pick. */
+  directions: { key: number; patterns: number[]; name: DirectionName }[];
   /** Each pattern's extent from its stops, `[west, south, east, north]`: the
    * map fits it when the Stops tab switches to it. */
   patternBounds: Record<number, [number, number, number, number]>;
@@ -195,15 +197,25 @@ const explorerSlice = createSlice({
       state,
       action: PayloadAction<{ bundleId: string; bundleName: string; hiddenGroupId?: number | null }>
     ) => {
-      // The tab the user chose stays for the session.
+      // Opened over another bundle's Explorer, that bundle's layers, which
+      // it hid, are shown again; opened again on the same bundle, the group
+      // it hid stays hidden (its eye is off now, so the menu passes none).
+      const hidden = state.active ? state.hiddenGroupId : null;
+      const same = state.active && state.bundleId === action.payload.bundleId;
+      // The tab the user chose stays for the session; switched to another
+      // bundle (from the Layers tab, where its menu is), the new bundle's
+      // Explorer shows, not the layer tree it was opened from.
       return {
         ...initialState,
-        leftTab: state.leftTab,
+        leftTab: state.active && !same ? "explorer" : state.leftTab,
         strip: stickyStrip(state.strip),
         active: true,
         bundleId: action.payload.bundleId,
         bundleName: action.payload.bundleName,
-        hiddenGroupId: action.payload.hiddenGroupId ?? null,
+        hiddenGroupId: same
+          ? (action.payload.hiddenGroupId ?? hidden)
+          : (action.payload.hiddenGroupId ?? null),
+        restoreGroupId: same ? null : hidden,
       };
     },
     closeExplorer: (state) => ({
@@ -220,7 +232,7 @@ const explorerSlice = createSlice({
       state.leftTab = action.payload;
     },
     selectExplorerRoute: (state, action: PayloadAction<string | null>) => {
-      // Another route starts on its Operations tab, in its own first direction;
+      // Another route starts on its Overview tab, in its own first direction;
       // what the right panel opened from the route it leaves goes with it.
       if (action.payload !== state.selectedRouteId) {
         state.routeTab = "service";
@@ -265,10 +277,11 @@ const explorerSlice = createSlice({
       state.scrub = action.payload;
     },
     setExplorerDate: (state, action: PayloadAction<string>) => {
-      // Another day's service has another span: playback starts it afresh.
+      // Another day's service is read afresh: playback pauses, at the same
+      // time of day, so days compare at one time (moved into the new day's
+      // service if it is outside it: usePlayback).
       if (action.payload !== state.date) {
         state.playing = false;
-        state.time_s = null;
         state.scrub = null;
       }
       state.date = action.payload;

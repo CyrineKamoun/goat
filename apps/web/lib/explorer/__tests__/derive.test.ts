@@ -52,6 +52,7 @@ import {
 import {
   choiceFromValue,
   choiceValue,
+  directionsOnShapes,
   highlightedPatterns,
   resolveChoice,
   shownLine,
@@ -71,6 +72,7 @@ import {
   networkShapes,
   networkStations,
   networkStops,
+  shapeColorExpression,
   stationArea,
 } from "@/lib/explorer/network";
 
@@ -264,6 +266,17 @@ describe("direction choice", () => {
       [2, 0],
       [4, 0],
     ]);
+  });
+
+  it("finds the directions running on shapes clicked on the map", () => {
+    const directions = [
+      { key: 10, patterns: [10, 11] },
+      { key: 20, patterns: [20] },
+    ];
+    const shapes = { 10: ["a"], 11: ["b"], 20: ["c", "shared"] };
+    expect(directionsOnShapes(["b"], directions, { ...shapes, 10: ["a", "shared"] })).toEqual([10]);
+    expect(directionsOnShapes(["shared"], directions, { ...shapes, 10: ["a", "shared"] })).toEqual([10, 20]);
+    expect(directionsOnShapes(["elsewhere"], directions, shapes)).toEqual([]);
   });
 
   it("highlights on the map what the picker chose, on any tab", () => {
@@ -1002,5 +1015,25 @@ describe("station areas", () => {
   it("draws a station round the stops some route calls at", async () => {
     const stations = (await networkStations(db)).features;
     expect(stations.map((f) => f.properties.name)).toEqual(["Main Station"]);
+  });
+});
+
+describe("shape colours", () => {
+  it("are one match on shape_id, shapes of a colour sharing a branch", () => {
+    const shapes = new Map([
+      ["a", { color: "#FF0000", route_ids: ["R1"] }],
+      ["b", { color: "#00FF00", route_ids: ["R2"] }],
+      ["c", { color: "#FF0000", route_ids: ["R1"] }],
+    ]);
+    expect(shapeColorExpression(shapes, "#999")).toEqual([
+      "match",
+      ["to-string", ["get", "shape_id"]],
+      ["a", "c"],
+      "#FF0000",
+      ["b"],
+      "#00FF00",
+      "#999",
+    ]);
+    expect(shapeColorExpression(new Map(), "#999")).toBe("#999");
   });
 });

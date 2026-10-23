@@ -1,6 +1,6 @@
 /**
  * A route's summary in the left panel (board 6): its name and its tabs —
- * Operations (board 22, the default; read-only until editing), Stops (board
+ * Overview (board 22, the default; read-only until editing), Stops (board
  * 10) and Schedule (board 11).
  */
 import { Box, ButtonBase, Skeleton, Stack, Tab, Tabs, Typography } from "@mui/material";
@@ -137,7 +137,7 @@ export function RouteSummary({ route }: { route: RouteRow }) {
           value={tab}
           onChange={(_e, value: ExplorerRouteTab) => dispatch(setExplorerRouteTab(value))}
           sx={{ minHeight: 36 }}>
-          <Tab value="service" label={t("explorer_tab_operations")} sx={TAB_SX} />
+          <Tab value="service" label={t("explorer_tab_overview")} sx={TAB_SX} />
           <Tab value="stops" label={t("explorer_tab_stops")} sx={TAB_SX} />
           <Tab value="calendar" label={t("explorer_schedule_tab")} sx={TAB_SX} />
         </Tabs>

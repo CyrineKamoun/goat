@@ -17,10 +17,10 @@ import { count } from "@/lib/explorer/format";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
 import { closeExplorerPanel, openExplorerPanel, pickedStop } from "@/lib/store/explorer/slice";
 
-import { type RouteRow, useStopsLine } from "@/hooks/explorer/useExplorerData";
+import { type RouteRow, useRouteTrips, useStopsLine } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
-import { directionItems, useDirectionChoice } from "@/components/explorer/DirectionPicker";
+import { directionItems, tripsByPattern, useDirectionChoice } from "@/components/explorer/DirectionPicker";
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { RAIL, Rail, StopDot } from "@/components/explorer/LineDiagram";
 import Selector from "@/components/map/panels/common/Selector";
@@ -179,6 +179,9 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
     shapeDistUnit,
     settings.periods
   );
+  // The day's trips, as the trip strip counts them (the same query, kept):
+  // the direction's whole, or the variant's.
+  const dayTrips = useRouteTrips(complete ? db : undefined, route, date);
 
   if (!direction) {
     return (
@@ -188,13 +191,17 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
     );
   }
 
-  const items = directionItems(directions, route, t);
+  const byPattern = dayTrips.data ? tripsByPattern(dayTrips.data.runs) : null;
+  const items = directionItems(directions, route, t, byPattern);
   const variant = direction.patterns.find((p) => p.pattern_idx === pattern_idx);
-  const trips = variant && variant.kind !== "main" ? variant.n_trips : direction.n_trips;
+  const counted = new Set(
+    variant && variant.kind !== "main" ? [variant.pattern_idx] : direction.patterns.map((p) => p.pattern_idx)
+  );
+  const trips = byPattern ? [...counted].reduce((n, p) => n + (byPattern.get(p) ?? 0), 0) : null;
   const data = line.data;
   const summary = data
     ? [
-        t("explorer_trips", { count: trips }),
+        trips === null ? null : t("explorer_trips", { count: trips }),
         t("explorer_stops", { count: data.stops.length }),
         km(data.length_m, lang),
       ]

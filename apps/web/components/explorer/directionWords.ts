@@ -24,3 +24,9 @@ export function directionPlace(name: DirectionName, t: TFunction): string {
       ? `${name.place} (${name.via})`
       : name.place;
 }
+
+/** A direction in a picker: "→ Goerdelersteg", the arrow saying it is where
+ * the line goes; a loop as it is worded ("Loop via Third"). */
+export function directionHeading(name: DirectionName, t: TFunction): string {
+  return name.kind === "loop" ? directionLabel(name, t) : `→ ${directionPlace(name, t)}`;
+}

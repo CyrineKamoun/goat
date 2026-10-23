@@ -200,3 +200,26 @@ export async function networkStations(db: SqlRunner): Promise<FeatureCollection<
     })),
   };
 }
+
+/**
+ * Each shape's colour as one style expression, a `match` on the tiles'
+ * `shape_id`: the map works it out once, as it reads each tile, instead of
+ * keeping a feature-state per shape, which it applies again to every tile
+ * that loads and repaints for every change (the whole network, on the
+ * largest feeds, a second and more of the main thread). Shapes of one colour
+ * share a branch; any other shape is `fallback`.
+ */
+export function shapeColorExpression(
+  shapes: Map<string, NetworkShape>,
+  fallback: string
+): string | ["match", ["to-string", ["get", "shape_id"]], ...unknown[]] {
+  const byColor = new Map<string, string[]>();
+  for (const [id, shape] of shapes) {
+    const ids = byColor.get(shape.color);
+    if (ids) ids.push(id);
+    else byColor.set(shape.color, [id]);
+  }
+  if (!byColor.size) return fallback;
+  const branches = [...byColor].flatMap(([color, ids]) => [ids, color]);
+  return ["match", ["to-string", ["get", "shape_id"]], ...branches, fallback];
+}

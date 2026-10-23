@@ -15,8 +15,9 @@ import { Box, ButtonBase, IconButton, Skeleton, Stack, Tooltip, Typography } fro
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { ICON_NAME } from "@p4b/ui/components/Icon";
+
 import type { Run } from "@/lib/explorer/derive/runs";
-import { clock } from "@/lib/explorer/format";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
 import {
   focusExplorerRun,
@@ -29,7 +30,7 @@ import {
 import { type RouteRow, useRouteSummary, useRouteTrips } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
-import { DirectionPicker, useDirectionChoice } from "@/components/explorer/DirectionPicker";
+import { DirectionPicker, tripsByPattern, useDirectionChoice } from "@/components/explorer/DirectionPicker";
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { RouteBadge } from "@/components/explorer/RouteBadge";
 import { SegmentedSwitch } from "@/components/explorer/SegmentedSwitch";
@@ -75,11 +76,14 @@ export function TripStrip({ route, height: panelHeight }: { route: RouteRow; hei
   const height = panelHeight - BAR_HEIGHT;
   const body = height - STRIP_FOOTER;
 
-  // A zoom holds until set back, or until the route, the direction or the
-  // date changes. Escape sets it back.
+  // A zoom holds until set back, or until the route or the direction
+  // changes; another day keeps it, so the same hours compare. Escape sets
+  // it back.
   const [zoom, setZoom] = useState<Zoom | null>(null);
-  const date = useAppSelector((s) => s.explorer.date);
-  useEffect(() => setZoom(null), [route.route_id, resolved, date]);
+  // The choice as picked, not as resolved: that is worked out again from
+  // each day's trips, and would set the zoom back on every date.
+  const picked = useAppSelector((s) => s.explorer.pattern);
+  useEffect(() => setZoom(null), [route.route_id, picked]);
   useEffect(() => {
     if (!zoom) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setZoom(null);
@@ -155,28 +159,28 @@ export function TripStrip({ route, height: panelHeight }: { route: RouteRow; hei
           />
         )}
       </Box>
-      {/* What is in view; Chart | List. */}
+      {/* Chart | List; what is in view. */}
       <Stack
         direction="row"
         alignItems="center"
         spacing={1}
         sx={{ height: STRIP_FOOTER, px: 1.25, borderTop: 1, borderColor: "divider", flexShrink: 0 }}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ flex: 1, pl: 0.75, fontVariantNumeric: "tabular-nums" }}
-          noWrap>
-          {trips.data && t("explorer_strip_trips", { count: rows.length, from: clock(from), to: clock(to) })}
-        </Typography>
         <SegmentedSwitch
           label={t("explorer_strip_view")}
           options={[
-            { value: "chart", label: t("explorer_strip_chart") },
-            { value: "list", label: t("explorer_strip_list") },
+            { value: "chart", label: t("explorer_strip_chart"), icon: ICON_NAME.LINE_CHART },
+            { value: "list", label: t("explorer_strip_list"), icon: ICON_NAME.LIST },
           ]}
           value={strip.view}
           onChange={(v) => dispatch(setStripView(v))}
         />
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ flex: 1, pr: 0.75, textAlign: "right", fontVariantNumeric: "tabular-nums" }}
+          noWrap>
+          {trips.data && t("explorer_trips", { count: rows.length })}
+        </Typography>
       </Stack>
     </Stack>
   );
@@ -188,9 +192,17 @@ export function StripControls({ route, compact }: { route: RouteRow; compact: bo
   const { t } = useTranslation("common");
   const dispatch = useAppDispatch();
   const { trips } = useStripData(route);
+  const dayTrips = useMemo(() => (trips.data ? tripsByPattern(trips.data.runs) : null), [trips.data]);
   return (
     <>
-      {trips.data && <DirectionPicker route={route} directions={trips.data.directions} compact={compact} />}
+      {trips.data && (
+        <DirectionPicker
+          route={route}
+          directions={trips.data.directions}
+          dayTrips={dayTrips}
+          compact={compact}
+        />
+      )}
       <Tooltip title={t("explorer_strip_collapse")}>
         <IconButton
           aria-label={t("explorer_strip_collapse")}

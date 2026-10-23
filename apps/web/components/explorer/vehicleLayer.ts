@@ -57,6 +57,12 @@ const KIND = { dot: 0, badge: 1, ring: 2 } as const;
 /** Frames further apart than this (ms) are not glided between: playback
  * was paused, or the scrubber jumped. */
 const MAX_GLIDE_MS = 400;
+/** The least time (ms) between the redraws a glide asks for: 30 a second.
+ * Each redraws the whole map, basemap and buildings included, and playback
+ * glides without pause; at the display's 60 a laptop's GPU ran hot and
+ * dropped frames after a minute or two (measured on an Iris Xe, 23 Oct
+ * 2026). Vehicles moving a few pixels a step look as smooth at 30. */
+const GLIDE_FRAME_MS = 1000 / 30;
 /** The passes vehicles are drawn in, bottom to top: other lines' dots, all
  * lines' badges, the selected line's badges for its patterns not picked
  * (faded), and its own. */
@@ -366,6 +372,17 @@ export class VehicleLayer implements CustomLayerInterface {
     this.map?.triggerRepaint();
   }
 
+  private glideTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Ask for the glide's next redraw, GLIDE_FRAME_MS after this one. */
+  private glideOn(map: { triggerRepaint: () => void }): void {
+    if (this.glideTimer !== null) return;
+    this.glideTimer = setTimeout(() => {
+      this.glideTimer = null;
+      map.triggerRepaint();
+    }, GLIDE_FRAME_MS);
+  }
+
   /** How far through the glide to the current frame, 0–1, at `now`. */
   private progress(now: number): number {
     return this.glide > 0 ? Math.min(1, (now - this.frameAt) / this.glide) : 1;
@@ -426,6 +443,8 @@ export class VehicleLayer implements CustomLayerInterface {
   }
 
   onRemove(_map: MaplibreMap, gl: WebGLRenderingContext | WebGL2RenderingContext): void {
+    if (this.glideTimer !== null) clearTimeout(this.glideTimer);
+    this.glideTimer = null;
     if (this.program) gl.deleteProgram(this.program);
     if (this.buffer) gl.deleteBuffer(this.buffer);
     this.bufferFloats = 0;
@@ -455,8 +474,10 @@ export class VehicleLayer implements CustomLayerInterface {
     const r = dotRadius(zoom);
     const badges = zoom >= BADGES_FROM_ZOOM;
     const f = this.progress(performance.now());
-    // Until the vehicles reach the frame's places, every refresh moves them.
-    if (f < 1) map.triggerRepaint();
+    // Until the vehicles reach the frame's places, they move on at most
+    // GLIDE_FRAME_MS apart; anything else that redraws the map in between
+    // (a pan, a zoom) draws them where they are by then.
+    if (f < 1) this.glideOn(map);
 
     // Where each vehicle is on screen, and in which pass it is drawn, bottom
     // to top: dots, badges, the selected route's badges; the ring over all.

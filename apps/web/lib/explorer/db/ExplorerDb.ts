@@ -10,6 +10,7 @@
  */
 import type { AsyncDuckDB, AsyncDuckDBConnection } from "@duckdb/duckdb-wasm";
 
+import { rowsOf } from "@/lib/explorer/db/rows";
 import type { SqlRunner } from "@/lib/explorer/db/types";
 
 /** Well inside the 4 GB a wasm32 module can address; the largest feed the
@@ -52,8 +53,7 @@ export class ExplorerDb implements SqlRunner {
   }
 
   async all<T = Record<string, unknown>>(sql: string): Promise<T[]> {
-    const table = await this.conn.query(sql);
-    return table.toArray().map((row) => row.toJSON() as T);
+    return rowsOf<T>(await this.conn.query(sql));
   }
 
   async columns<K extends string>(sql: string): Promise<Record<K, ArrayLike<number>>> {

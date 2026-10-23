@@ -1,5 +1,5 @@
 /**
- * A route's Operations tab (board 22), read-only for now: per direction how
+ * A route's Overview tab (board 22), read-only for now: per direction how
  * often it runs in each time period, vehicles in service through the day,
  * how long a trip takes, and its first and last departure. In the editing
  * phase these become the fields that change service; the layout is theirs
