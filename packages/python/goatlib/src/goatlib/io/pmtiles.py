@@ -132,10 +132,10 @@ class PMTilesGenerator:
         """Get the path where PMTiles should be stored.
 
         Flat, keyed only by layer id: the id is globally unique, so no
-        directory is needed to disambiguate. Earlier versions nested tiles
-        under the owner's DuckLake schema, which meant the writer had to
-        agree with the reader about where a layer's table lived — see
-        `legacy_pmtiles_paths` for reading those.
+        directory is needed to disambiguate. Every lookup is a single stat()
+        of this path: listing the tiles directory (tens of thousands of
+        files) is slow on network storage and has failed outright on NFS
+        clients that cached it.
 
         Args:
             layer_id: Layer UUID (with or without dashes)
@@ -144,15 +144,6 @@ class PMTilesGenerator:
             Path to the PMTiles file
         """
         return self.tiles_data_dir / f"{layer_id_to_table_name(layer_id)}.pmtiles"
-
-    def legacy_pmtiles_paths(self: Self, layer_id: str) -> list[Path]:
-        """Find PMTiles written before the layout went flat.
-
-        Those live one directory down, under the owner's schema name.
-        """
-        return sorted(
-            self.tiles_data_dir.glob(f"*/{layer_id_to_table_name(layer_id)}.pmtiles")
-        )
 
     def get_anchor_pmtiles_path(self: Self, layer_id: str) -> Path:
         """Get the path for the label anchor PMTiles file (polygon layers only).
@@ -180,11 +171,7 @@ class PMTilesGenerator:
         Returns:
             True if PMTiles file exists
         """
-        if self.get_pmtiles_path(layer_id).exists():
-            return True
-        # Tiles written before the layout went flat still count as present,
-        # so a layer is not needlessly rebuilt while a rollout is partway.
-        return bool(self.legacy_pmtiles_paths(layer_id))
+        return self.get_pmtiles_path(layer_id).exists()
 
     def is_pmtiles_valid(self: Self, pmtiles_path: Path | str) -> bool:
         """Check if a PMTiles file is valid and readable.
@@ -836,9 +823,6 @@ class PMTilesGenerator:
     def delete_pmtiles(self: Self, layer_id: str) -> bool:
         """Delete PMTiles file, anchor file, and metadata for a layer.
 
-        Sweeps the pre-flat locations too, so deleting a layer does not
-        strand tiles written under the old schema-nested layout.
-
         Args:
             layer_id: Layer UUID
 
@@ -864,17 +848,5 @@ class PMTilesGenerator:
         if meta_path.exists():
             meta_path.unlink()
             logger.debug(f"Deleted PMTiles metadata: {meta_path}")
-
-        # Tiles written before the layout went flat sit one directory down.
-        for legacy in self.legacy_pmtiles_paths(layer_id):
-            for path in (
-                legacy,
-                legacy.with_name(legacy.stem + "_anchor.pmtiles"),
-                legacy.with_suffix(".pmtiles.meta.json"),
-            ):
-                if path.exists():
-                    path.unlink()
-                    logger.info(f"Deleted legacy PMTiles: {path}")
-            deleted = True
 
         return deleted
