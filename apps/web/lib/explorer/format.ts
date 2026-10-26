@@ -104,3 +104,12 @@ export function weekdayList(days: number[], locale: string): string | null {
   if (run) return `${weekdayName(days[0], locale)}–${weekdayName(days[days.length - 1], locale)}`;
   return days.map((d) => weekdayName(d, locale)).join(", ");
 }
+
+/** A distance as a reader says it: metres to the nearest 10 under a
+ * kilometre, kilometres to one decimal above. */
+export function distance(m: number | null, locale: string): string | null {
+  if (m === null) return null;
+  return m < 1000
+    ? `${count(Math.round(m / 10) * 10, locale)} m`
+    : `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(m / 1000)} km`;
+}

@@ -164,7 +164,7 @@ export function TripStrip({ route, height: panelHeight }: { route: RouteRow; hei
         direction="row"
         alignItems="center"
         spacing={1}
-        sx={{ height: STRIP_FOOTER, px: 1.25, borderTop: 1, borderColor: "divider", flexShrink: 0 }}>
+        sx={{ height: STRIP_FOOTER, px: 3, borderTop: 1, borderColor: "divider", flexShrink: 0 }}>
         <SegmentedSwitch
           label={t("explorer_strip_view")}
           options={[

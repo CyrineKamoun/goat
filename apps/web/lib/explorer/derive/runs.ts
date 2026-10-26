@@ -27,6 +27,9 @@ export interface Run {
   /** Arrival at the last stop. */
   arr_s: number;
   length_m: number;
+  /** Where the length is from: 1 the feed's shape_dist_traveled, 2 the
+   * shape's geometry, else straight lines between its stops (an estimate). */
+  length_src: number | null;
 }
 
 /** SQL for the runs of `range` on `date`; `tripsIn`, a query of trip_idx,
@@ -42,13 +45,13 @@ export function runsSql(range: TripRange, date: string, tripsIn?: string): strin
         ${tripsIn ? `AND trip_idx IN (${tripsIn})` : ""}
     )
     SELECT trip_idx, pattern_idx, direction_id, headsign, block_idx, service_idx,
-           first_dep_s AS dep_s, last_arr_s AS arr_s, length_m
+           first_dep_s AS dep_s, last_arr_s AS arr_s, length_m, length_src
     FROM t
     WHERE trip_idx NOT IN (SELECT trip_idx FROM frequencies)
       AND first_dep_s IS NOT NULL AND last_arr_s IS NOT NULL
     UNION ALL
     SELECT DISTINCT trip_idx, pattern_idx, direction_id, headsign, block_idx, service_idx, dep_s,
-           dep_s + (last_arr_s - first_dep_s) AS arr_s, length_m
+           dep_s + (last_arr_s - first_dep_s) AS arr_s, length_m, length_src
     FROM (
       SELECT t.*, unnest(range(f.start_s, f.end_s, f.headway_s)) AS dep_s
       FROM t JOIN frequencies f USING (trip_idx)

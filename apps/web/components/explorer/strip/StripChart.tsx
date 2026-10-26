@@ -343,8 +343,10 @@ function Chart(props: StripChartProps) {
             onClick={onUnzoom}
             sx={{
               position: "absolute",
-              top: AXIS_H + 14,
-              right: RIGHT + 8,
+              // Its corner on the plot's: level with the first stop's row
+              // (y0) and flush with where the lines end (x1).
+              top: AXIS_H + 8,
+              right: RIGHT,
               zIndex: 1,
               height: 28,
               borderRadius: "25px",

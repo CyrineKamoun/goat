@@ -1038,6 +1038,24 @@ describe("shape colours", () => {
   });
 });
 
+describe("a run's length", () => {
+  it("says where it is from: a shape, or straight lines between stops", async () => {
+    // 1 the feed's distances, 2 the shape's, 3 straight lines between stops;
+    // a trip without a shape can only have the last, an estimate.
+    const trips = await db.all<{ shape_idx: number | null; length_src: number }>(
+      "SELECT shape_idx, length_src FROM trips"
+    );
+    // The fixture has an estimated one: T3, whose stops are all it has.
+    expect(trips.some((t) => t.length_src === 3)).toBe(true);
+    for (const t of trips) {
+      expect([1, 2, 3]).toContain(t.length_src);
+      if (t.shape_idx === null) expect(t.length_src).toBe(3);
+    }
+    // Runs carry it, for the trip list to mark an estimate.
+    for (const r of await routeRuns(db, route("R1"), "2026-10-14")) expect([1, 2, 3]).toContain(r.length_src);
+  });
+});
+
 describe("a stop the feed leaves untimed", () => {
   it("lists its calls with the window between the timed stops either side", async () => {
     // T1 again as a new trip, its call at Third (S3) left without times:

@@ -20,9 +20,11 @@ import { useAppSelector } from "@/hooks/store/ContextHooks";
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { DateChip, SectionHeader } from "@/components/explorer/SectionHeader";
 import { VehiclesCurve } from "@/components/explorer/VehiclesCurve";
-import { directionLabel, directionPlace } from "@/components/explorer/directionWords";
+import { directionLabel } from "@/components/explorer/directionWords";
 
-const COL = 76;
+/** The time period's column: wide enough for "07:00–09:00"; the directions
+ * share what is left, so their names have the room. */
+const PERIOD_COL = 84;
 
 /** A period × direction table: titled columns, rows between hairlines. */
 function PeriodTable({
@@ -30,15 +32,22 @@ function PeriodTable({
   cell,
 }: {
   data: RouteSummaryData;
-  cell: (d: RouteSummaryData["directions"][number], period: string) => { text: string; muted: boolean };
+  cell: (
+    d: RouteSummaryData["directions"][number],
+    period: string
+  ) => { text: string; muted: boolean; title?: string };
 }) {
   const { t } = useTranslation("common");
   const { periods } = useExplorer().settings;
   const cols = data.directions;
   return (
     <Box>
-      <Stack direction="row" columnGap={1.5} sx={{ py: 1 }}>
-        <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ flex: 1 }}>
+      <Stack direction="row" columnGap={1.5} alignItems="flex-end" sx={{ py: 1 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          fontWeight={600}
+          sx={{ width: PERIOD_COL, flexShrink: 0 }}>
           {t("explorer_col_time_period")}
         </Typography>
         {cols.map((c) => (
@@ -47,10 +56,11 @@ function PeriodTable({
             variant="caption"
             color="text.secondary"
             fontWeight={600}
-            noWrap
             title={directionLabel(c.direction.name, t)}
-            sx={{ width: COL, flexShrink: 0, textAlign: "right" }}>
-            {directionPlace(c.direction.name, t)}
+            // Wrapping, not cut short: the whole name, over two lines where
+            // two directions share a narrow panel.
+            sx={{ flex: 1, minWidth: 0, textAlign: "right", lineHeight: 1.35, overflowWrap: "anywhere" }}>
+            {directionLabel(c.direction.name, t)}
           </Typography>
         ))}
       </Stack>
@@ -61,7 +71,7 @@ function PeriodTable({
           columnGap={1.5}
           alignItems="center"
           sx={{ py: 0.75, borderTop: 1, borderColor: "divider" }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={{ width: PERIOD_COL, flexShrink: 0 }}>
             <Typography variant="body2" fontWeight={600} noWrap sx={{ lineHeight: 1.3 }}>
               {t(`explorer_period_${p.key}`)}
             </Typography>
@@ -75,14 +85,15 @@ function PeriodTable({
             </Typography>
           </Box>
           {cols.map((c) => {
-            const { text, muted } = cell(c, p.key);
+            const { text, muted, title } = cell(c, p.key);
             return (
               <Typography
                 key={c.direction.key}
                 variant="body2"
                 fontWeight={muted ? 400 : 600}
                 color={muted ? "text.secondary" : "text.primary"}
-                sx={{ width: COL, flexShrink: 0, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                title={title}
+                sx={{ flex: 1, minWidth: 0, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                 {text}
               </Typography>
             );
@@ -137,12 +148,11 @@ export function RouteService({ route, data }: { route: RouteRow; data: RouteSumm
             const m = d.running.get(period);
             return m === null || m === undefined
               ? { text: "–", muted: true }
-              : { text: `${m} min`, muted: false };
+              : // The median, marked as not exact (≈), the end-to-end time on the
+                // period's most common pattern.
+                { text: `≈ ${m} min`, muted: false, title: t("explorer_median") };
           }}
         />
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.75 }}>
-          {t("explorer_running_time_note")}
-        </Typography>
       </Section>
 
       <Section icon={ICON_NAME.CALENDAR} label={t("explorer_span")}>
@@ -169,7 +179,7 @@ export function RouteService({ route, data }: { route: RouteRow; data: RouteSumm
                 noWrap
                 title={`${d.direction.ends[0]} – ${d.direction.ends[1]}`}
                 sx={{ flex: 1, minWidth: 0 }}>
-                {directionPlace(d.direction.name, t)}
+                {directionLabel(d.direction.name, t)}
               </Typography>
               <Typography
                 variant="body2"

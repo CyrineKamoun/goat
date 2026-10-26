@@ -35,9 +35,6 @@ export interface RouteTrips {
   dep: Float64Array;
   /** By direction key. */
   axes: Map<number, DirectionAxis>;
-  /** The feed's ids, for the list: trips' and services'. */
-  tripIds: Map<number, string>;
-  serviceIds: Map<number, string>;
 }
 
 export async function routeTrips(
@@ -47,7 +44,7 @@ export async function routeTrips(
 ): Promise<RouteTrips> {
   const lo = route.trip_lo ?? -1;
   const hi = route.trip_hi ?? -2;
-  const [{ directions, stops, patterns }, runs, rows, ids, services] = await Promise.all([
+  const [{ directions, stops, patterns }, runs, rows] = await Promise.all([
     routeDirections(db, route),
     routeRuns(db, route, date),
     db.columns<"trip_idx" | "stop_idx" | "arr" | "dep" | "first_dep">(`
@@ -59,10 +56,6 @@ export async function routeTrips(
       WHERE st.trip_idx BETWEEN ${lo} AND ${hi}
         AND st.trip_idx IN (SELECT DISTINCT trip_idx FROM (${runsSql(route, date)}))
       ORDER BY st.trip_idx, st.stop_sequence`),
-    db.all<{ trip_idx: number; trip_id: string }>(
-      `SELECT trip_idx, trip_id FROM trips WHERE trip_idx BETWEEN ${lo} AND ${hi}`
-    ),
-    db.all<{ service_idx: number; service_id: string }>("SELECT service_idx, service_id FROM services"),
   ]);
 
   // Each template trip's rows.
@@ -87,8 +80,6 @@ export async function routeTrips(
     arr: new Float64Array(total),
     dep: new Float64Array(total),
     axes: new Map(),
-    tripIds: new Map(ids.map((r) => [r.trip_idx, r.trip_id])),
-    serviceIds: new Map(services.map((r) => [r.service_idx, r.service_id])),
   };
   let n = 0;
   runs.forEach((r, i) => {

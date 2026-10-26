@@ -43,6 +43,11 @@ const SETTLED_S = 120;
 const SETTLE_MS = 2000;
 /** Extra room (px) beside the round buttons at the bar's two ends. */
 const END_ROOM = 8;
+/** The vehicle count's slot, and its offset at the end: the row's gap
+ * before it (6 px) against the bar's own padding after it (10 px), so it is
+ * centred between the divider and the bar's edge (measured, 26 Oct 2026). */
+const COUNT_W = 112;
+const COUNT_END = -4;
 /** How far (px) an arrow key moves the strip's top edge. */
 const RESIZE_STEP = 24;
 
@@ -394,17 +399,18 @@ function VehicleCount({ ready, route }: { ready: boolean; route: RouteRow | unde
             })
           : t("explorer_vehicles_scope_network")
       }>
+      {/* Centred between the divider and the bar's end, in a slot of its
+          own width: its digits are all one width (tabular), so it moves only
+          when the count gains a digit. */}
       <Stack
         direction="row"
         alignItems="baseline"
+        justifyContent="center"
         spacing={0.5}
         // Inline, as the play button's: the row's spacing resets margins set in sx.
-        style={{ marginRight: END_ROOM }}
-        sx={{ flexShrink: 0, visibility: ready ? "visible" : "hidden" }}>
-        <Typography
-          variant="body2"
-          fontWeight={700}
-          sx={{ fontVariantNumeric: "tabular-nums", minWidth: "5ch", textAlign: "right" }}>
+        style={{ marginRight: COUNT_END }}
+        sx={{ flexShrink: 0, width: COUNT_W, visibility: ready ? "visible" : "hidden" }}>
+        <Typography variant="body2" fontWeight={700} sx={{ fontVariantNumeric: "tabular-nums" }}>
           {count(n, i18n.language)}
         </Typography>
         <Typography variant="caption" color="text.secondary">

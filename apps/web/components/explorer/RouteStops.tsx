@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import type { Direction } from "@/lib/explorer/derive/directions";
 import type { LineStop } from "@/lib/explorer/derive/stopsLine";
 import { choiceValue, shownLine } from "@/lib/explorer/directionChoice";
-import { count } from "@/lib/explorer/format";
+import { distance } from "@/lib/explorer/format";
 import { modeOf, routeColor } from "@/lib/explorer/modes";
 import { closeExplorerPanel, openExplorerPanel, pickedStop } from "@/lib/store/explorer/slice";
 
@@ -24,13 +24,6 @@ import { directionItems, tripsByPattern, useDirectionChoice } from "@/components
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { RAIL, Rail, StopDot } from "@/components/explorer/LineDiagram";
 import Selector from "@/components/map/panels/common/Selector";
-
-function km(m: number | null, locale: string): string | null {
-  if (m === null) return null;
-  return m < 1000
-    ? `${count(Math.round(m / 10) * 10, locale)} m`
-    : `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(m / 1000)} km`;
-}
 
 /** Memoised, as the hop under it: picking a stop changes two rows of the
  * line, not all of them. */
@@ -89,7 +82,7 @@ const HopRow = memo(function HopRow({ stop, color, last }: { stop: LineStop; col
   const theme = useTheme();
   const turn = theme.palette.warning.main;
   const hop = [
-    km(stop.next_m, i18n.language),
+    distance(stop.next_m, i18n.language),
     stop.next_min !== null ? t("explorer_n_min", { count: stop.next_min }) : null,
   ]
     .filter(Boolean)
@@ -203,7 +196,7 @@ export function RouteStops({ route, directions }: { route: RouteRow; directions:
     ? [
         trips === null ? null : t("explorer_trips", { count: trips }),
         t("explorer_stops", { count: data.stops.length }),
-        km(data.length_m, lang),
+        distance(data.length_m, lang),
       ]
         .filter(Boolean)
         .join(" · ")
