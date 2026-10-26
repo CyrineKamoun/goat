@@ -543,6 +543,9 @@ export type MirrorValuesOutput = {
   estimate?: number | null;
   /** More in the area than one fetch reads: a fetch would be refused. */
   too_large?: boolean;
+  /** With columns_only: what a fetch would write, and its geometry type. */
+  columns?: { name: string; type: string }[];
+  geometry_type?: string;
   values: MirrorValue[];
 };
 
@@ -559,6 +562,21 @@ export async function getMirrorSize(
     size_only: true,
   });
   return { estimate: result.estimate ?? undefined, tooLarge: !!result.too_large };
+}
+
+/** The columns a fetch would write for an area, known before fetching. */
+export async function getMirrorColumns(
+  area: GeoJSON.Polygon | GeoJSON.MultiPolygon,
+  featureType: string,
+  source: string
+): Promise<{ columns: { name: string; type: string }[]; geometryType: string }> {
+  const result = await executeProcess<Record<string, unknown>, MirrorValuesOutput>("mirror-values", {
+    area,
+    source,
+    feature_type: featureType,
+    columns_only: true,
+  });
+  return { columns: result.columns ?? [], geometryType: result.geometry_type ?? "point" };
 }
 
 /** Attributes, or the values of one attribute, in the mirror for an area: OSM tags or Overture columns. */

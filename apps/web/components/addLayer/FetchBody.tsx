@@ -27,7 +27,6 @@ import { Layer as MapLayer, Map as MapLibre, Source } from "react-map-gl/maplibr
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { type MirrorValue, getMirrorValues } from "@/lib/api/processes";
-import { formatBuffer } from "@/lib/catalog/spatial";
 
 import {
   type AreaMode,
@@ -175,14 +174,7 @@ const AreaSection = ({ flow }: { flow: FetchFlow["fetch"] }) => {
     if (mode !== "view" && spatial?.kind !== mode) setEditing(mode);
   };
 
-  const summary =
-    spatial?.kind !== areaMode
-      ? t("fetch_features_area_none")
-      : spatial.kind === "region"
-        ? spatial.nutsIds.map((id) => flow.regionNames[id] ?? id).join(", ")
-        : spatial.kind === "point"
-          ? `${spatial.label ?? t("catalog_spatial_point")} · ${formatBuffer(spatial.km)}`
-          : t("catalog_spatial_area", { count: spatial.ring.length });
+  const summary = flow.areaLabel ?? t("fetch_features_area_none");
 
   return (
     <Box>
@@ -410,7 +402,10 @@ const FilterRow = ({
           loading={keys.loading}
           onOpen={keys.load}
           value={filter.key}
-          onInputChange={(_, next) => flow.updateFilter(filter.id, { key: next, values: [] })}
+          // The list reports the key it opens with as a change; only a new key clears the values.
+          onInputChange={(_, next) =>
+            next !== filter.key && flow.updateFilter(filter.id, { key: next, values: [] })
+          }
           renderOption={({ key, ...props }, option) => (
             <li key={key} {...props}>
               <Typography variant="body2" sx={{ flex: 1 }}>
@@ -710,6 +705,7 @@ const FetchBody = ({ controller }: { controller: FetchFlow }) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
   const { fetch: flow } = controller;
+  const isNetwork = flow.source === "street_network";
 
   return (
     <Stack sx={{ minHeight: 0, flex: 1 }}>
@@ -746,16 +742,32 @@ const FetchBody = ({ controller }: { controller: FetchFlow }) => {
             overflowY: "auto",
             borderRight: { md: `1px solid ${theme.palette.divider}` },
           }}>
-          <LayerList flow={flow} />
-          <Stack spacing={5} sx={{ p: 5, borderTop: `1px solid ${theme.palette.divider}` }}>
+          {!isNetwork && <LayerList flow={flow} />}
+          <Stack
+            spacing={5}
+            sx={{ p: 5, borderTop: isNetwork ? "none" : `1px solid ${theme.palette.divider}` }}>
             {/* Here, not over the map: a line there resized the map, which moved the area. */}
             {flow.tooBig && (
               <Alert severity="warning" sx={{ py: 0.5 }}>
-                {t(flow.tooLarge ? "fetch_features_area_too_large" : "fetch_features_reduce_area")}
+                {t(
+                  isNetwork
+                    ? "fetch_features_street_network_too_large"
+                    : flow.tooLarge
+                      ? "fetch_features_area_too_large"
+                      : "fetch_features_reduce_area"
+                )}
               </Alert>
             )}
-            <GeometrySwitch flow={flow} />
-            <FilterSection flow={flow} />
+            {isNetwork ? (
+              <Typography variant="body2" color="text.secondary">
+                {t("fetch_features_street_network_hint")}
+              </Typography>
+            ) : (
+              <>
+                <GeometrySwitch flow={flow} />
+                <FilterSection flow={flow} />
+              </>
+            )}
           </Stack>
         </Box>
         <Stack spacing={3} sx={{ flex: 1, minWidth: 0, p: 4 }}>
@@ -763,43 +775,45 @@ const FetchBody = ({ controller }: { controller: FetchFlow }) => {
           <AreaPreview flow={flow} />
         </Stack>
       </Box>
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={4}
-        alignItems={{ xs: "stretch", sm: "flex-end" }}
-        sx={{ px: 6, pt: 3.5, pb: 4, borderTop: `1px solid ${theme.palette.divider}` }}>
-        <Box sx={{ width: { xs: "100%", sm: 400 } }}>
-          <Typography
-            variant="body2"
-            fontWeight="bold"
-            component="label"
-            htmlFor="fetch-features-name"
-            sx={{ display: "block", mb: 1.5 }}>
-            {t("layer_name")}
-          </Typography>
-          <TextField
-            id="fetch-features-name"
-            fullWidth
-            size="small"
-            value={flow.name}
-            onChange={(event) => flow.setName(event.target.value)}
-            error={!flow.name.trim()}
-          />
-        </Box>
-        <Box>
-          <Typography variant="body2" fontWeight="bold" sx={{ display: "block", mb: 1.5 }}>
-            {t("connect_service_save_to")}
-          </Typography>
-          <Box sx={{ height: 40, display: "flex", alignItems: "center" }}>
-            <UploadDestinationPill
-              folders={flow.folders}
-              spaces={flow.spaces}
-              selected={flow.selectedFolder}
-              onSelect={flow.setSelectedFolder}
+      {!flow.inWorkflow && (
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={4}
+          alignItems={{ xs: "stretch", sm: "flex-end" }}
+          sx={{ px: 6, pt: 3.5, pb: 4, borderTop: `1px solid ${theme.palette.divider}` }}>
+          <Box sx={{ width: { xs: "100%", sm: 400 } }}>
+            <Typography
+              variant="body2"
+              fontWeight="bold"
+              component="label"
+              htmlFor="fetch-features-name"
+              sx={{ display: "block", mb: 1.5 }}>
+              {t(isNetwork ? "fetch_features_bundle_name" : "layer_name")}
+            </Typography>
+            <TextField
+              id="fetch-features-name"
+              fullWidth
+              size="small"
+              value={flow.name}
+              onChange={(event) => flow.setName(event.target.value)}
+              error={!flow.name.trim()}
             />
           </Box>
-        </Box>
-      </Stack>
+          <Box>
+            <Typography variant="body2" fontWeight="bold" sx={{ display: "block", mb: 1.5 }}>
+              {t("connect_service_save_to")}
+            </Typography>
+            <Box sx={{ height: 40, display: "flex", alignItems: "center" }}>
+              <UploadDestinationPill
+                folders={flow.folders}
+                spaces={flow.spaces}
+                selected={flow.selectedFolder}
+                onSelect={flow.setSelectedFolder}
+              />
+            </Box>
+          </Box>
+        </Stack>
+      )}
     </Stack>
   );
 };

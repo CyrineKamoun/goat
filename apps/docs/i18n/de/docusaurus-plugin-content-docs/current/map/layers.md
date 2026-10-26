@@ -33,7 +33,7 @@ Sie können Layer aus [verschiedenen Quellen](../data/dataset_types) zu Ihrer Ka
 
 - **Datensatz hochladen**: ein Datensatz von Ihrem Gerät (GeoPackage, GeoJSON, Shapefile, KML, CSV, XLSX, Parquet sowie [GTFS](https://www.plan4better.de/de/glossar/gtfs)- und [Overture](https://www.plan4better.de/de/glossar/overture-maps)-Archive)
 - **Layer erstellen**: ein neuer, leerer Layer, in den Sie zeichnen
-- **Dienst verbinden**: ein Layer, der über WFS, WMS, WMTS, XYZ-Kacheln oder COG bereitgestellt wird, per URL eingebunden, oder Features aus OpenStreetMap oder Overture Maps für ein Gebiet
+- **Daten abrufen / verbinden**: ein Layer, der über WFS, WMS, WMTS, XYZ-Kacheln oder COG bereitgestellt wird, per URL eingebunden, Features aus OpenStreetMap oder Overture Maps für ein Gebiet, oder das Straßennetz von GOAT für ein Gebiet als Datenpaket
 
 **Vorhandene Daten**
 
@@ -105,11 +105,11 @@ Sie können Layer aus [verschiedenen Quellen](../data/dataset_types) zu Ihrer Ka
 </div>
 
   </TabItem>
-  <TabItem value="External" label="Dienst verbinden" className="tabItemBox">
+  <TabItem value="External" label="Daten abrufen / verbinden" className="tabItemBox">
 
 <div class="step">
   <div class="step-number">3</div>
-  <div class="content">Wählen Sie links <code>OGC-Dienste</code>, um einen Webdienst über seine Adresse einzubinden, oder <code>OpenStreetMap</code> bzw. <code>Overture Maps</code>, um deren Features für ein Gebiet hinzuzufügen.</div>
+  <div class="content">Wählen Sie links unter <code>Von GOAT bereitgestellt</code> <code>OpenStreetMap</code> bzw. <code>Overture Maps</code>, um deren Features für ein Gebiet hinzuzufügen, <code>Straßennetz</code>, um das Routing-Netz von GOAT auf ein Gebiet zuzuschneiden, oder unter <code>Dienst verbinden</code> <code>OGC-Dienste</code>, um einen Webdienst über seine Adresse einzubinden.</div>
 </div>
 
 <Tabs>
@@ -185,6 +185,11 @@ Ein Layer umfasst bis zu 1.000.000 Features. Liegen im Gebiet mehr, fordert GOAT
 :::
 
 Die Lizenz der Daten steht oben im Bereich: OpenStreetMap steht unter der ODbL, Overture Maps unter der ODbL, Orte unter CDLA-Permissive 2.0. Nennen Sie die Quelle, wenn Sie damit erstellte Karten weitergeben.
+
+  </TabItem>
+  <TabItem value="StreetNetwork" label="Straßennetz" className="tabItemBox">
+
+<code>Straßennetz</code> schneidet das Netz, auf dem GOAT routet, auf ein Gebiet zu und speichert es als Straßennetz-[Datenpaket](../data/dataset_types#datensätze-aus-mehreren-layern) mit Kanten und Knoten. Jede Straße, die das Gebiet berührt, bleibt vollständig und mit ihrer Steigung erhalten, sodass Routing-Werkzeuge das Datenpaket wie jedes andere Straßennetz auswählen und bergauf und bergab wie auf dem GOAT-Netz routen. Wählen Sie das Gebiet wie bei OpenStreetMap, geben Sie unter <code>Name des Datenpakets</code> einen Namen ein und klicken Sie auf <code>Layer hinzufügen</code>. Das Gebiet darf bis etwa 300 km² groß sein; bei einem größeren zeigt der Bereich an, dass es zu groß ist.
 
   </TabItem>
 </Tabs>

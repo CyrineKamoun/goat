@@ -8,7 +8,7 @@ import { useMap } from "react-map-gl/maplibre";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import type { FlowController } from "@/hooks/addLayer/flow";
+import type { FlowController, WorkflowUse } from "@/hooks/addLayer/flow";
 import { useCatalogFlow } from "@/hooks/addLayer/useCatalogFlow";
 import { useConnectFlow } from "@/hooks/addLayer/useConnectFlow";
 import { useCreateFlow } from "@/hooks/addLayer/useCreateFlow";
@@ -41,10 +41,13 @@ const AddLayerFrame = ({
   controller,
   aside,
   instant,
+  titleKey,
   onClose,
   children,
 }: {
   sourceId: AddLayerSourceId;
+  /** In place of the source's own label. */
+  titleKey?: string;
   controller: FlowController;
   /** A rail beside the body that stays while the body changes. */
   aside?: ReactNode;
@@ -66,7 +69,7 @@ const AddLayerFrame = ({
       open
       onClose={close}
       icon={source.icon}
-      title={t(source.labelKey)}
+      title={t(titleKey ?? source.labelKey)}
       // Set outright rather than capped, because each source has a width of its own and
       // MUI's paper rules would otherwise win.
       maxWidth={source.width ?? 860}
@@ -165,6 +168,7 @@ type ConnectPaneProps = {
   defaultFolderId?: string;
   rail: ReactNode;
   instant: boolean;
+  workflow?: WorkflowUse;
   onClose: () => void;
 };
 
@@ -189,14 +193,17 @@ const OpenDataPane = ({
   defaultFolderId,
   rail,
   instant,
+  workflow,
   onClose,
 }: ConnectPaneProps & { source: FetchSource }) => {
   const viewport = useViewport();
   const controller = useFetchFlow({
     projectId,
     defaultFolderId,
-    viewport,
+    // A workflow's area is kept with the node, never the map view of the moment.
+    viewport: workflow ? undefined : viewport,
     initialSource: source,
+    workflow,
     onDone: onClose,
   });
   const { fetch } = controller;
@@ -209,11 +216,15 @@ const OpenDataPane = ({
       controller={controller}
       aside={rail}
       instant={instant}
+      // A workflow only fetches; it connects no web services.
+      titleKey={workflow ? "fetch_data" : undefined}
       onClose={onClose}>
       <FetchBody controller={controller} />
     </AddLayerFrame>
   );
 };
+
+const WORKFLOW_KINDS: ConnectKind[] = ["osm", "overture"];
 
 /**
  * One dialog for everything that is connected rather than uploaded: a web service, or open
@@ -222,25 +233,33 @@ const OpenDataPane = ({
 const ConnectDialog = ({
   projectId,
   defaultFolderId,
+  workflow,
   onClose,
 }: {
   projectId?: string;
   defaultFolderId?: string;
+  workflow?: WorkflowUse;
   onClose: () => void;
 }) => {
-  // Opens on services, as Connect service always has; the rail switches.
-  const [kind, setKind] = useState<ConnectKind>("service");
+  // Opens on services, as Connect service always has; a workflow node on OpenStreetMap or what it saved.
+  const [kind, setKind] = useState<ConnectKind>(() => {
+    const source = workflow?.initial?.params.source;
+    if (!workflow) return "service";
+    return source === "overture" ? "overture" : "osm";
+  });
   // The first frame opens as a dialog does; each one after replaces it in place.
   const opened = useRef(false);
   useEffect(() => {
     opened.current = true;
   });
-  const rail = <ConnectRail kind={kind} onPick={setKind} />;
+  // A workflow takes OpenStreetMap and Overture only.
+  const rail = <ConnectRail kind={kind} onPick={setKind} kinds={workflow ? WORKFLOW_KINDS : undefined} />;
   const pane = {
     projectId,
     defaultFolderId,
     rail,
     instant: opened.current,
+    workflow,
     onClose,
   };
   if (kind === "service") return <ServicePane {...pane} />;
@@ -283,6 +302,7 @@ const AddLayerDialog = ({
   defaultFolderId,
   initialFile,
   autoOpenSetup,
+  workflow,
   onClose,
 }: {
   /** Which source to show; `null` shows nothing. */
@@ -293,6 +313,8 @@ const AddLayerDialog = ({
   initialFile?: File;
   /** Opens the file's own settings as soon as they can be shown. */
   autoOpenSetup?: boolean;
+  /** Connect service only: hands an OpenStreetMap or Overture choice to a workflow node, then closes. */
+  workflow?: WorkflowUse;
   onClose: () => void;
 }) => {
   if (source === "upload")
@@ -308,7 +330,14 @@ const AddLayerDialog = ({
   if (source === "create") return <CreateDialog projectId={projectId} onClose={onClose} />;
   if (source === "catalog") return <CatalogDialog projectId={projectId} onClose={onClose} />;
   if (source === "connect")
-    return <ConnectDialog projectId={projectId} defaultFolderId={defaultFolderId} onClose={onClose} />;
+    return (
+      <ConnectDialog
+        projectId={projectId}
+        defaultFolderId={defaultFolderId}
+        workflow={workflow}
+        onClose={onClose}
+      />
+    );
   if (source === "explorer") return <MyDatasetsDialog projectId={projectId} onClose={onClose} />;
   return null;
 };

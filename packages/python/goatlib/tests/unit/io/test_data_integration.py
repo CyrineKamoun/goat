@@ -211,6 +211,21 @@ def test_the_area_and_the_sql_are_checked(tmp_path) -> None:
     assert module._key_column(con, [str(col)], "highway") and not module._key_column(con, [str(col), str(text)], "highway")
     assert module._column_counts(con, [str(col)], env, "highway", 10) == ([("primary", 3), ("bus_stop", 1)], 4)
 
+    # The columns named before fetching are the ones the SELECT list writes.
+    wrote = tmp_path / "wrote.parquet"
+    for files, storage in (([str(text)], "text"), ([str(mapped)], "map"), ([str(text), str(mapped)], "both")):
+        sel = ", ".join(e for e, _, _ in module.selected_columns(module.mirror_columns(con, files), src, storage))
+        con.execute(f"COPY (SELECT {sel} FROM ({module.candidates_sql(files, src, env, 'TRUE', storage)}) c) TO '{wrote}' (FORMAT PARQUET)")
+        named = module.output_columns(con, files, src, "points")
+        assert [n for n, _ in named] == [str(r[0]) for r in con.execute(f"DESCRIBE SELECT * FROM '{wrote}'").fetchall() if r[0] != "geom"]
+        assert dict(named)["all_tags"] == "VARCHAR" and "geom" not in dict(named) and "_mirror_file" not in dict(named)
+    ov = tmp_path / "ov.parquet"
+    con.execute(f"""COPY (SELECT '1' AS id, {{'primary': 'Rathaus'}} AS names, [{{'dataset': 'osm', 'license': 'ODbL'}}] AS sources,
+        {{'a': 1}} AS extra, 3 AS height, {bbox} AS bbox, ST_Point(11.5, 48.1) AS geometry) TO '{ov}' (FORMAT PARQUET)""")
+    got = dict(module.output_columns(con, [str(ov)], module.SOURCES["overture"], "building"))
+    assert {"name", "source", "source_license", "height"} <= set(got) and got["extra"] == got["names"] == "VARCHAR"
+    assert got["height"] == "INTEGER" and "geometry" not in got and "bbox" not in got
+
 
 def test_a_big_view(tmp_path, monkeypatch) -> None:
     import json
@@ -274,3 +289,102 @@ def test_a_big_view(tmp_path, monkeypatch) -> None:
     with pytest.raises(ValueError, match="too large"):
         module.check_read_size(con, files, [(11.0, 48.0, 11.3, 48.3)], "geom")
     assert module.mirror_values(con, area=square, feature_type="points", source_name="osm", size_only=True)["too_large"]
+
+
+def _merc(lon: float, lat: float) -> list[float]:
+    import math
+
+    r = 6378137.0
+    return [math.radians(lon) * r, math.log(math.tan(math.pi / 4 + math.radians(lat) / 2)) * r]
+
+
+@pytest.fixture
+def network(tmp_path, monkeypatch):
+    """Two partitions: the first with slope columns, the second, older, without."""
+    import duckdb
+    from goatlib.io.data_integration import street_network
+
+    con = duckdb.connect()
+    edges = {
+        1: [(1, 1, 2, (11.40, 47.26), (11.41, 47.26), 0.3), (2, 2, 3, (11.415, 47.265), (11.45, 47.265), 0.1),
+            (4, 6, 7, (11.39, 47.255), (11.395, 47.255), 0.0)],
+        2: [(3, 4, 5, (11.5, 47.3), (11.51, 47.3), None), (4, 6, 7, (11.39, 47.255), (11.395, 47.255), None),
+            (1, 1, 2, (11.40, 47.26), (11.41, 47.26), None)],
+    }
+    for part, rows in edges.items():
+        (tmp_path / "edges" / f"h3_3={part}").mkdir(parents=True)
+        slope = part == 1
+        values = ", ".join(
+            f"({i}::BIGINT, {s}::BIGINT, {t}::BIGINT, 10.0, 'residential', 30::SMALLINT, 30::SMALLINT, "
+            f"[{_merc(*a)}, {_merc(*b)}]::DOUBLE[][]" + (f", {imp}::DOUBLE, {-imp}::DOUBLE, 0.5::FLOAT" if slope else "") + ")"
+            for i, s, t, a, b, imp in rows
+        )
+        cols = "id, source, target, length_m, class_, maxspeed_forward, maxspeed_backward, coordinates_3857"
+        cols += ", impedance_slope, impedance_slope_reverse, impedance_surface" if slope else ""
+        con.execute(f"COPY (SELECT * FROM (VALUES {values}) t({cols})) TO '{tmp_path}/edges/h3_3={part}/a.parquet'")
+    (tmp_path / "nodes" / "h3_3=1").mkdir(parents=True)
+    nodes = {1: (11.40, 47.26), 2: (11.41, 47.26), 3: (11.45, 47.265), 4: (11.5, 47.3), 5: (11.51, 47.3),
+             6: (11.39, 47.255), 7: (11.395, 47.255)}
+    values = ", ".join(f"({i}, {_merc(*p)[0]}, {_merc(*p)[1]})" for i, p in nodes.items())
+    con.execute(f"COPY (SELECT * FROM (VALUES {values}) t(id, x_3857, y_3857)) TO '{tmp_path}/nodes/h3_3=1/a.parquet'")
+    monkeypatch.setattr(street_network, "h3_3_cells_for_bbox", lambda bbox, ring=1: {1, 2})
+    con.execute("INSTALL spatial; LOAD spatial;")
+    area = {"type": "Polygon", "coordinates": [[[11.38, 47.25], [11.42, 47.25], [11.42, 47.28], [11.38, 47.28], [11.38, 47.25]]]}
+    paths = street_network.export_network(
+        con, area=area, edges_base=str(tmp_path / "edges"), nodes_base=str(tmp_path / "nodes"), workdir=str(tmp_path)
+    )
+    return con, paths
+
+
+def test_network_cut(network) -> None:
+    """Touching edges kept whole and once, nodes their ends, slope and surface along."""
+    con, paths = network
+    edges = f"read_parquet('{paths['edges']}')"
+    rows = dict(con.execute(f"SELECT id, ST_XMax(geometry) FROM {edges}").fetchall())
+    # The edge reaching out to 11.45 is kept whole; the one at 11.5 is not kept.
+    assert set(rows) == {"1", "2", "4"} and round(rows["2"], 3) == 11.45
+    assert con.execute(f"SELECT count(*) FROM {edges} WHERE id = '4'").fetchone()[0] == 1
+    nodes = {r[0] for r in con.execute(f"SELECT id FROM read_parquet('{paths['nodes']}')").fetchall()}
+    assert nodes == {"1", "2", "3", "6", "7"}
+    slopes = dict(con.execute(f"SELECT id, (impedance_slope, impedance_slope_reverse) FROM {edges}").fetchall())
+    # Edge 1 is also in the older partition without slope: the copy with it wins.
+    assert slopes["1"] == (0.3, -0.3) and slopes["4"] == (0.0, 0.0)
+    surface = dict(con.execute(f"SELECT id, impedance_surface FROM {edges}").fetchall())
+    assert surface == {"1": 0.5, "2": 0.5, "4": 0.5}
+
+
+def test_network_size(tmp_path, monkeypatch) -> None:
+    """Counted in H3-6 cells, part by part; a continent from its area alone."""
+    import duckdb
+    from goatlib.io.data_integration import street_network
+
+    con = duckdb.connect()
+    con.execute("INSTALL spatial; LOAD spatial;")
+
+    def box(x: float, y: float, d: float) -> list:
+        return [[[x, y], [x + d, y], [x + d, y + d], [x, y + d], [x, y]]]
+
+    small = street_network.area_cells(con, {"type": "Polygon", "coordinates": box(11.40, 47.26, 0.01)})
+    far = street_network.area_cells(con, {"type": "Polygon", "coordinates": box(16.40, 48.20, 0.01)})
+    both = {"type": "MultiPolygon", "coordinates": [box(11.40, 47.26, 0.01), box(16.40, 48.20, 0.01)]}
+    assert 1 <= small <= 2 and street_network.area_cells(con, both) == small + far
+    europe = {"type": "Polygon", "coordinates": box(-10.0, 36.0, 40.0)}
+    assert street_network.area_cells(con, europe) == street_network.MAX_CELLS + 1
+    big = {"type": "Polygon", "coordinates": box(11.0, 47.0, 1.5)}
+    with pytest.raises(ValueError, match="too large for a street network"):
+        street_network.check_area(con, big)
+
+    # The same answer through mirror-values, which has nothing else to say about it.
+    tiny = {"type": "Polygon", "coordinates": box(11.40, 47.26, 0.01)}
+    sized = module.mirror_values(con, area=tiny, feature_type="", source_name="street_network", size_only=True)
+    assert sized["too_large"] is False and sized["cells"] == small
+    assert module.mirror_values(con, area=big, feature_type="", source_name="street_network", size_only=True)["too_large"]
+    with pytest.raises(ValueError, match="only its size"):
+        module.mirror_values(con, area=tiny, feature_type="", source_name="street_network", columns_only=True)
+
+    # Two towns far apart are read as two small boxes, not the one between them.
+    asked = []
+    monkeypatch.setattr(street_network, "h3_3_cells_for_bbox", lambda bbox, ring=1: asked.append(bbox) or set())
+    with pytest.raises(ValueError, match="does not cover"):
+        street_network.export_network(con, area=both, edges_base=str(tmp_path), nodes_base=str(tmp_path), workdir=str(tmp_path))
+    assert len(asked) == 2 and all(b[2] - b[0] < 0.1 for b in asked)

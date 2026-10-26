@@ -89,7 +89,7 @@ Ticket messages can carry attachments of up to 55 MiB in one request. The Ingres
 
 ### OpenStreetMap and Overture Maps {#open-data-mirror}
 
-Optional. The OpenStreetMap and Overture Maps panes under *Add layer › Connect service* read from a mirror of both datasets that a separate pipeline publishes in the catalog bucket, under `mirror/osm` and `mirror/overture`; it is not part of the chart. The chart hands `catalog.s3` to processes and the `tools`, `workflows` and `print` workers, so nothing else needs setting. Without `catalog.s3.bucket`, the two panes find no data; see [OpenStreetMap and Overture Maps](./docker_compose/external_services.md#open-data-mirror).
+Optional. The OpenStreetMap and Overture Maps panes under *Add layer › Fetch / Connect data* read from a mirror of both datasets that a separate pipeline publishes in the catalog bucket, under `mirror/osm` and `mirror/overture`; it is not part of the chart. The chart hands `catalog.s3` to processes and the `tools`, `workflows` and `print` workers, so nothing else needs setting. Without `catalog.s3.bucket`, the two panes find no data; see [OpenStreetMap and Overture Maps](./docker_compose/external_services.md#open-data-mirror).
 
 ### Analysis workers {#workers}
 

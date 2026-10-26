@@ -89,7 +89,7 @@ Nachrichten zu einem Ticket können Anhänge von bis zu 55 MiB in einer Anfrage 
 
 ### OpenStreetMap und Overture Maps {#open-data-mirror}
 
-Optional. Die Bereiche OpenStreetMap und Overture Maps unter *Layer hinzufügen › Dienst verbinden* lesen aus einem Spiegel beider Datensätze, den eine eigene Pipeline im Katalog-Bucket unter `mirror/osm` und `mirror/overture` ablegt; er gehört nicht zum Chart. Das Chart gibt `catalog.s3` an processes und die Worker `tools`, `workflows` und `print` weiter, mehr ist nicht einzustellen. Ohne `catalog.s3.bucket` finden die beiden Bereiche keine Daten; siehe [OpenStreetMap und Overture Maps](./docker_compose/external_services.md#open-data-mirror).
+Optional. Die Bereiche OpenStreetMap und Overture Maps unter *Layer hinzufügen › Daten abrufen / verbinden* lesen aus einem Spiegel beider Datensätze, den eine eigene Pipeline im Katalog-Bucket unter `mirror/osm` und `mirror/overture` ablegt; er gehört nicht zum Chart. Das Chart gibt `catalog.s3` an processes und die Worker `tools`, `workflows` und `print` weiter, mehr ist nicht einzustellen. Ohne `catalog.s3.bucket` finden die beiden Bereiche keine Daten; siehe [OpenStreetMap und Overture Maps](./docker_compose/external_services.md#open-data-mirror).
 
 ### Analyse-Worker {#workers}
 

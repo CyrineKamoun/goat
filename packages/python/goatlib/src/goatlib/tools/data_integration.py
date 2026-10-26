@@ -34,9 +34,10 @@ from goatlib.io.data_integration.mirror import (
     lineage_text,
     mirror_columns,
     pointer,
+    selected_columns,
 )
 from goatlib.io.data_integration.osm import tag_storage
-from goatlib.io.data_integration.overture import OVERTURE_TYPES, overture_plain_columns
+from goatlib.io.data_integration.overture import OVERTURE_TYPES
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner, _get_or_create_event_loop
 from goatlib.tools.schemas import ToolInputBase
@@ -211,40 +212,7 @@ class DataIntegrationRunner(BaseToolRunner[DataIntegrationParams]):
             if src.tagged and "osm_way_id" in columns
             else f'c."{src.id_column}"'
         )
-        if src.tagged and storage == "text":
-            selected = "c.* EXCLUDE (tags, bbox, filename)"
-        elif src.tagged:
-            # Back to one text column, as from the hstore files: the tile writer
-            # drops a map, and the popup would show no tags at all.
-            dropped = "tags, all_tags" if storage == "both" else "tags"
-            selected = (
-                f"c.* EXCLUDE ({dropped}, bbox, filename), "
-                "CAST(to_json(c.tags) AS VARCHAR) AS all_tags"
-            )
-        else:
-            plain = overture_plain_columns(columns)
-
-            def kept(name: str, kind: str) -> str:
-                # Nested records as JSON text: the table and the tiles show
-                # nothing readable for a struct or a list.
-                if kind.upper().startswith(("STRUCT", "MAP", "UNION")) or kind.endswith(
-                    "]"
-                ):
-                    return f'CAST(to_json(c."{name}") AS VARCHAR) AS "{name}"'
-                return f'c."{name}"'
-
-            # Right after the id, so they are the first thing a popup shows.
-            selected = ", ".join(
-                [
-                    f'c."{src.id_column}"',
-                    *plain,
-                    *(
-                        kept(name, kind)
-                        for name, kind in columns.items()
-                        if name not in (src.id_column, "bbox", "filename")
-                    ),
-                ]
-            )
+        selected = ", ".join(e for e, _, _ in selected_columns(columns, src, storage))
         # Two spatial tests, not one: the envelope prunes row groups before
         # anything is read, the area itself is what the user asked for.
         # The area as a constant, so the test streams: joined as a table with a

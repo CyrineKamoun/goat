@@ -215,6 +215,6 @@ Links shown in the app and the source of the product artwork are listed in the [
 
 ### OpenStreetMap and Overture Maps {#open-data-mirror}
 
-The OpenStreetMap and Overture Maps panes under *Add layer › Connect service* copy the features of an area into a GOAT layer. They read from a mirror of both datasets, stored as GeoParquet in the catalog bucket (`CATALOG_S3_*`) under `mirror/osm` and `mirror/overture`. The mirror is not part of a GOAT installation; it is published there by a separate pipeline, next to the catalog. Two parts of GOAT read it: `processes` fills the attribute and value lists in the dialog, and the Windmill `tools` worker runs the copy. Nothing else needs setting: without a catalog bucket, the two panes find no data.
+The OpenStreetMap and Overture Maps panes under *Add layer › Fetch / Connect data* copy the features of an area into a GOAT layer. They read from a mirror of both datasets, stored as GeoParquet in the catalog bucket (`CATALOG_S3_*`) under `mirror/osm` and `mirror/overture`. The mirror is not part of a GOAT installation; it is published there by a separate pipeline, next to the catalog. Two parts of GOAT read it: `processes` fills the attribute and value lists in the dialog, and the Windmill `tools` worker runs the copy. Nothing else needs setting: without a catalog bucket, the two panes find no data.
 
 The licence is recorded on each new layer: ODbL 1.0 for OpenStreetMap, CDLA-Permissive 2.0 for Overture places and ODbL 1.0 for the other Overture types.

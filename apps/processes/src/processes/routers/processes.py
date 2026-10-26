@@ -275,6 +275,7 @@ def _execute_analytics_sync(
                 source=inputs.get("source", "osm"),
                 quick=bool(inputs.get("quick", False)),
                 size_only=bool(inputs.get("size_only", False)),
+                columns_only=bool(inputs.get("columns_only", False)),
             )
         elif process_id == "class-breaks":
             return analytics_service.class_breaks(

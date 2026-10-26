@@ -234,6 +234,20 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         toolbox_hidden=True,
     ),
     ToolDefinition(
+        name="street_network_extract",
+        display_name="Street Network Extract",
+        description=(
+            "Cut GOAT's routing network to an area as a street network bundle "
+            "with its routable artifact"
+        ),
+        module_path="goatlib.tools.street_network_extract",
+        params_class_name="StreetNetworkExtractParams",
+        windmill_path="f/goat/tools/street_network_extract",
+        category="data",
+        keywords=("bundle", "street", "network", "routing", "extract"),
+        toolbox_hidden=True,
+    ),
+    ToolDefinition(
         name="merge",
         display_name="Merge",
         description="Combines multiple vector layers into one output layer",

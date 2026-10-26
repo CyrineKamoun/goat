@@ -36,6 +36,7 @@ from goatlib.io.data_integration.overture import (
     OVERTURE_LICENCES,
     OVERTURE_OSM_LICENCE,
     OVERTURE_TYPES,
+    overture_plain_columns,
 )
 from goatlib.storage.ducklake import load_extensions
 from goatlib.storage.s3_config import apply_duckdb_s3_settings, duckdb_s3_endpoint
@@ -169,6 +170,58 @@ def mirror_columns(con: "Any", files: list[str]) -> dict[str, str]:
     for f in files:
         out.update(known[f])
     return out
+
+
+def selected_columns(
+    columns: dict[str, str], source: Source, storage: str
+) -> list[tuple[str, str, str]]:
+    """What a fetch writes: (SQL expression over `c`, output name, type before DuckDB resolves it)."""
+    nested = ("STRUCT", "MAP", "UNION")
+    out: list[tuple[str, str, str]] = []
+    if source.tagged:
+        for name, kind in columns.items():
+            if name not in ("tags", "all_tags", "bbox", "filename"):
+                out.append((f'c."{name}"', name, kind))
+        # One text column, as from the hstore files: the tile writer drops a map.
+        if storage == "text":
+            if "all_tags" in columns:
+                out.append(('c."all_tags"', "all_tags", columns["all_tags"]))
+        else:
+            out.append(
+                ("CAST(to_json(c.tags) AS VARCHAR) AS all_tags", "all_tags", "VARCHAR")
+            )
+        return out
+    # Right after the id, so they are the first thing a popup shows.
+    out.append(
+        (f'c."{source.id_column}"', source.id_column, columns.get(source.id_column, ""))
+    )
+    for item in overture_plain_columns(columns):
+        out.append((item, item.rsplit(" AS ", 1)[1], "VARCHAR"))
+    for name, kind in columns.items():
+        if name in (source.id_column, "bbox", "filename"):
+            continue
+        # Nested records as JSON text: the table and the tiles show nothing readable.
+        if kind.upper().startswith(nested) or kind.endswith("]"):
+            out.append(
+                (f'CAST(to_json(c."{name}") AS VARCHAR) AS "{name}"', name, "VARCHAR")
+            )
+        else:
+            out.append((f'c."{name}"', name, kind))
+    return out
+
+
+def output_columns(
+    con: "Any", files: list[str], source: Source, type_key: str
+) -> list[tuple[str, str]]:
+    """The (name, DuckDB type) of each attribute a fetch writes, without fetching."""
+    columns = mirror_columns(con, files)
+    storage = tag_storage(columns)
+    select = ", ".join(e for e, _, _ in selected_columns(columns, source, storage))
+    rows = con.execute(
+        f"DESCRIBE SELECT {select} FROM "
+        f"({candidates_sql(files, source, (-180, -90, 180, 90), 'TRUE', storage)}) c"
+    ).fetchall()
+    return [(str(r[0]), str(r[1])) for r in rows if str(r[0]) != source.geom]
 
 
 def ensure_s3(con: "Any") -> None:
@@ -706,6 +759,7 @@ def mirror_values(
     source_name: str = "osm",
     quick: bool = False,
     size_only: bool = False,
+    columns_only: bool = False,
 ) -> dict:
     """Which attributes, or which values of one attribute, the mirror holds here.
 
@@ -718,12 +772,41 @@ def mirror_values(
     """
     import hashlib
 
+    if source_name == "street_network":
+        # No attributes to list, and its size is the area's cells: the network
+        # itself is on the workers' disks, not readable from here.
+        from goatlib.io.data_integration.street_network import MAX_CELLS, area_cells
+
+        if not size_only:
+            raise ValueError(
+                "A street network answers only its size: it has no attributes or columns to list."
+            )
+        cells = area_cells(con, area)
+        return {
+            "key": None,
+            "total": 0,
+            "complete": True,
+            "estimate": None,
+            "cells": cells,
+            "too_large": cells > MAX_CELLS,
+            "values": [],
+        }
     src = SOURCES[source_name]
     table = area_table(con, area)
     envelope = area_envelope(con, table)
     boxes = area_boxes(con, table)
     indexed = _indexed(con, pointer(con, src), src, feature_type, envelope)
     files, parts = _files_of(*indexed)
+    if columns_only:
+        # What a fetch would write here, for the nodes after it to be set up.
+        named = output_columns(con, files, src, feature_type) if files else []
+        return {
+            "key": None,
+            "total": 0,
+            "values": [],
+            "columns": [{"name": n, "type": t} for n, t in named],
+            "geometry_type": src.geometry_of(feature_type),
+        }
     if not files:
         return {"key": key, "total": 0, "values": [], "estimate": 0}
     if size_only:

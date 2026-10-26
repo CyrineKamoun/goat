@@ -63,7 +63,7 @@ class MirrorValuesProcessInput(BaseModel):
 
     area: dict = Field(description="GeoJSON polygon the question is about")
     source: str = Field(
-        "osm", description="Which mirrored source, e.g. osm or overture"
+        "osm", description="Which source: osm, overture, or street_network (size only)"
     )
     feature_type: str = Field(
         "points", description="OSM layer, or Overture type when source is overture"
@@ -78,11 +78,19 @@ class MirrorValuesProcessInput(BaseModel):
     size_only: bool = Field(
         False, description="Only the estimate of features in the area, no list"
     )
+    columns_only: bool = Field(
+        False, description="Only the columns a fetch would write, no list"
+    )
 
 
 class MirrorValue(BaseModel):
     value: str
     count: int
+
+
+class MirrorColumn(BaseModel):
+    name: str
+    type: str
 
 
 class MirrorValuesResult(BaseModel):
@@ -99,6 +107,12 @@ class MirrorValuesResult(BaseModel):
     )
     too_large: bool = Field(
         False, description="More in the area than one fetch reads: a fetch is refused"
+    )
+    columns: list[MirrorColumn] | None = Field(
+        None, description="The columns a fetch would write (columns_only)"
+    )
+    geometry_type: str | None = Field(
+        None, description="point, line or polygon (columns_only)"
     )
     values: list[MirrorValue] = Field(default_factory=list)
 
