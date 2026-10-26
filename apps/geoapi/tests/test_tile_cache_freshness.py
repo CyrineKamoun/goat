@@ -87,16 +87,13 @@ def _service_over(tiles_dir: Path) -> TileService:
 async def test_tiles_regenerated_at_another_path_are_found_again(
     tmp_path: Path,
 ) -> None:
-    """A layer still on the legacy ``<schema>/t_x.pmtiles`` layout has that
-    path cached; an overwrite deletes it and writes the flat ``t_x.pmtiles``.
-    The stale cached path must not lose the fast path for good."""
-    legacy = tmp_path / "user_abc" / "t_abc.pmtiles"
-    legacy.parent.mkdir()
-    legacy.write_bytes(b"pmtiles")
+    """A cached path whose file is gone (deleted for regeneration, or written
+    at another path since) must not lose the fast path for good: the lookup
+    runs again and finds the flat ``t_x.pmtiles``."""
+    stale = tmp_path / "user_abc" / "t_abc.pmtiles"
     service = _service_over(tmp_path)
-    assert service._find_pmtiles_by_layer_id("abc") == legacy
+    service._pmtiles_path_cache["abc"] = stale
 
-    legacy.unlink()
     flat = tmp_path / "t_abc.pmtiles"
     flat.write_bytes(b"pmtiles")
     read_from: list[Path] = []
@@ -146,3 +143,20 @@ async def test_label_tiles_follow_a_regenerated_anchor_file(tmp_path: Path) -> N
 
     assert first == (b"old labels", True, "pmtiles")
     assert regenerated == (b"new labels", True, "pmtiles")
+
+
+def test_lookup_by_layer_id_never_lists_the_tiles_directory(tmp_path: Path) -> None:
+    """The tiles directory holds tens of thousands of files and is only ever
+    probed by path: a schema-nested copy is not searched for, and listing the
+    directory is not attempted at all."""
+    nested = tmp_path / "user_abc" / "t_abc.pmtiles"
+    nested.parent.mkdir()
+    nested.write_bytes(b"pmtiles")
+    service = _service_over(tmp_path)
+
+    with patch.object(Path, "glob", side_effect=AssertionError("tiles dir listed")):
+        assert service._find_pmtiles_by_layer_id("abc") is None
+
+    flat = tmp_path / "t_abc.pmtiles"
+    flat.write_bytes(b"pmtiles")
+    assert service._find_pmtiles_by_layer_id("abc") == flat

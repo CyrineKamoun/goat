@@ -73,6 +73,27 @@ def test_pmtiles_exists_true() -> None:
         assert generator.pmtiles_exists("layer1") is True
 
 
+def test_pmtiles_lookups_never_list_the_tiles_directory() -> None:
+    """The tiles directory holds tens of thousands of files and is only ever
+    probed by path: checking or deleting a layer's tiles does not list it."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        generator = PMTilesGenerator(tiles_data_dir=tmpdir)
+        nested = pathlib.Path(tmpdir) / "user_abc" / "t_layer1.pmtiles"
+        nested.parent.mkdir()
+        nested.touch()
+
+        with (
+            patch.object(
+                pathlib.Path, "glob", side_effect=AssertionError("tiles dir listed")
+            ),
+            patch.object(
+                pathlib.Path, "iterdir", side_effect=AssertionError("tiles dir listed")
+            ),
+        ):
+            assert generator.pmtiles_exists("layer1") is False
+            assert generator.delete_pmtiles("layer1") is False
+
+
 def test_delete_pmtiles_file_exists() -> None:
     """Test delete_pmtiles when file exists."""
     with tempfile.TemporaryDirectory() as tmpdir:
