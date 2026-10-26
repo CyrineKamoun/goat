@@ -27,7 +27,7 @@ import type { RouteRow } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { RouteBadge } from "@/components/explorer/RouteBadge";
-import { directionHeading } from "@/components/explorer/directionWords";
+import { directionLabel } from "@/components/explorer/directionWords";
 
 const KIND_KEY: Record<Exclude<VariantKind, "main">, string> = {
   short_turn: "explorer_variant_short_turn",
@@ -68,7 +68,7 @@ export function directionItems(
       // A direction by its destination, an arrow before it in place of "To".
       {
         value: `${d.key}:`,
-        label: `${directionHeading(d.name, t)}${trips(d.patterns.map((p) => p.pattern_idx))}`,
+        label: `${directionLabel(d.name, t)}${trips(d.patterns.map((p) => p.pattern_idx))}`,
         iconNode: badge,
       },
       ...d.patterns
@@ -129,7 +129,7 @@ export function DirectionPicker({
             interpolation: { escapeValue: false },
           })
       : resolved.direction
-        ? directionHeading(resolved.direction.name, t)
+        ? directionLabel(resolved.direction.name, t)
         : "";
   return (
     <Select

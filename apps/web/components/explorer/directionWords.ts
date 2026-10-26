@@ -10,7 +10,8 @@ import type { DirectionName } from "@/lib/explorer/derive/directions";
 /** Stop names are data, not markup: React escapes them itself. */
 const raw = { interpolation: { escapeValue: false } };
 
-/** "To Goerdelersteg", "Loop via Third", "To Sixth via Second". */
+/** "→ Goerdelersteg", "Loop via Third", "→ Sixth via Second": a direction
+ * goes where its arrow points, wherever it is named. */
 export function directionLabel(name: DirectionName, t: TFunction): string {
   const key = `explorer_direction_${name.kind}${name.via ? "_via" : ""}`;
   return t(key, { place: name.place, via: name.via, ...raw });
@@ -23,10 +24,4 @@ export function directionPlace(name: DirectionName, t: TFunction): string {
     : name.via
       ? `${name.place} (${name.via})`
       : name.place;
-}
-
-/** A direction in a picker: "→ Goerdelersteg", the arrow saying it is where
- * the line goes; a loop as it is worded ("Loop via Third"). */
-export function directionHeading(name: DirectionName, t: TFunction): string {
-  return name.kind === "loop" ? directionLabel(name, t) : `→ ${directionPlace(name, t)}`;
 }

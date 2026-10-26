@@ -12,6 +12,7 @@ import {
   pickExplorerPattern,
   pickedStop,
   selectExplorerRoute,
+  selectExplorerRouteAt,
   setExplorerDate,
   setExplorerDrawing,
   setExplorerFilters,
@@ -184,5 +185,31 @@ describe("explorer slice", () => {
     expect(state).toMatchObject({ hiddenGroupId: 9, restoreGroupId: null });
     // Closed: it is shown again.
     expect(explorerReducer(state, closeExplorer()).restoreGroupId).toBe(9);
+  });
+
+  it("opens a route clicked on the map in the direction of the line clicked", () => {
+    const drawing = (routeId: string) => ({
+      routeId,
+      color: "#123456",
+      shapeLinesLayerId: null,
+      shapeIds: ["out", "back", "both"],
+      stops: [],
+      // Direction 10 runs "out", direction 20 "back"; both run "both".
+      patternShapes: { 10: ["out", "both"], 20: ["back", "both"] },
+      directions: [
+        { key: 10, patterns: [10], name: { kind: "to" as const, place: "A", via: null } },
+        { key: 20, patterns: [20], name: { kind: "to" as const, place: "B", via: null } },
+      ],
+      patternBounds: {},
+      patternEnds: {},
+    });
+    let state = explorerReducer(open(), selectExplorerRouteAt({ routeId: "R1", shapeIds: ["back"] }));
+    state = explorerReducer(state, setExplorerDrawing(drawing("R1")));
+    expect(state.pattern).toEqual({ direction: 20, pattern_idx: null });
+    expect(state.clickedShapes).toBeNull();
+    // A shape both directions run on tells nothing: the first direction.
+    state = explorerReducer(state, selectExplorerRouteAt({ routeId: "R2", shapeIds: ["both"] }));
+    state = explorerReducer(state, setExplorerDrawing(drawing("R2")));
+    expect(state.pattern).toBeNull();
   });
 });

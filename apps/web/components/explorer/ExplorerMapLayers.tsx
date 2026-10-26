@@ -35,6 +35,7 @@ import {
   pickExplorerPattern,
   pickedStop,
   selectExplorerRoute,
+  selectExplorerRouteAt,
 } from "@/lib/store/explorer/slice";
 
 import type { RouteRow } from "@/hooks/explorer/useExplorerData";
@@ -44,7 +45,7 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 import { EXPLORER_PANEL_WIDTH } from "@/components/explorer/ExplorerLeftPanel";
 import { RouteBadge } from "@/components/explorer/RouteBadge";
 import { STOP_FILL } from "@/components/explorer/StopMarker";
-import { directionHeading } from "@/components/explorer/directionWords";
+import { directionLabel } from "@/components/explorer/directionWords";
 import { EXPLORER_RIGHT_PANEL_WIDTH } from "@/components/explorer/right/panelSize";
 import { bottomBarHeight } from "@/components/explorer/strip/stripLayout";
 import { VEHICLE_LAYER_ID, VehicleLayer } from "@/components/explorer/vehicleLayer";
@@ -259,8 +260,8 @@ export function ExplorerMapLayers() {
   // What a click offers to choose from: the lines under it, or the selected
   // line's directions where they share the track.
   const [choice, setChoice] = useState<
-    | { lon: number; lat: number; routeIds: string[]; directions?: undefined }
-    | { lon: number; lat: number; directions: number[]; routeIds?: undefined }
+    | { lon: number; lat: number; routeIds: string[]; shapeIds?: string[]; directions?: undefined }
+    | { lon: number; lat: number; directions: number[]; routeIds?: undefined; shapeIds?: undefined }
     | null
   >(null);
   const pattern = useAppSelector((s) => s.explorer.pattern);
@@ -449,13 +450,13 @@ export function ExplorerMapLayers() {
       }
       // A station's area covers the lines through it: a line right under
       // the pointer wins, the station takes the rest of its area.
-      const routesOf = (radii: number[]) => [
-        ...new Set(
-          near(e.point, LINE_LAYERS, radii).flatMap(
-            (f) => network.shapes.get(String(f.properties?.shape_id ?? f.id))?.route_ids ?? []
-          )
-        ),
-      ];
+      // The shapes under the pointer, kept: a route picked by them opens in
+      // their direction (selectExplorerRouteAt).
+      let clicked: string[] = [];
+      const routesOf = (radii: number[]) => {
+        clicked = near(e.point, LINE_LAYERS, radii).map((f) => String(f.properties?.shape_id ?? f.id));
+        return [...new Set(clicked.flatMap((id) => network.shapes.get(id)?.route_ids ?? []))];
+      };
       let routeIds = routesOf(HIT_RADII.slice(0, 1));
       if (!routeIds.length) {
         const [station] = near(e.point, STATION_LAYERS, [0]);
@@ -477,8 +478,9 @@ export function ExplorerMapLayers() {
         routeIds = routesOf(HIT_RADII);
       }
       if (routeIds.length === 1) {
-        dispatch(selectExplorerRoute(routeIds[0]));
-      } else if (routeIds.length > 1) setChoice({ lon: e.lngLat.lng, lat: e.lngLat.lat, routeIds });
+        dispatch(selectExplorerRouteAt({ routeId: routeIds[0], shapeIds: clicked }));
+      } else if (routeIds.length > 1)
+        setChoice({ lon: e.lngLat.lng, lat: e.lngLat.lat, routeIds, shapeIds: clicked });
       else dismiss();
     };
     // A click on nothing lets go of what is open, the latest first: the line
@@ -1024,7 +1026,7 @@ export function ExplorerMapLayers() {
                   sx={{ px: 1.5, gap: 1.25, minHeight: 34 }}>
                   <RouteBadge route={r as unknown as RouteRow} small />
                   <Typography variant="body2" fontWeight={shown ? 700 : 400} noWrap>
-                    {directionHeading(dir.name, t)}
+                    {directionLabel(dir.name, t)}
                   </Typography>
                 </ListItemButton>
               );
@@ -1060,7 +1062,7 @@ export function ExplorerMapLayers() {
                   key={id}
                   dense
                   onClick={() => {
-                    dispatch(selectExplorerRoute(id));
+                    dispatch(selectExplorerRouteAt({ routeId: id, shapeIds: choice.shapeIds ?? [] }));
                     setChoice(null);
                   }}
                   sx={{ px: 1.5, gap: 1.25, minHeight: 34 }}>

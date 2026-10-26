@@ -8,6 +8,7 @@
 import { type PayloadAction, createSlice } from "@reduxjs/toolkit";
 
 import type { DirectionName } from "@/lib/explorer/derive/directions";
+import { directionsOnShapes } from "@/lib/explorer/directionChoice";
 import type { ModeKey } from "@/lib/explorer/modes";
 import { setMapMode } from "@/lib/store/map/slice";
 
@@ -147,6 +148,24 @@ export interface ExplorerState {
    * in the trip strip); `n` counts the asks, so the same run can be asked
    * for again. */
   focus: { trip_idx: number; run_dep_s: number; n: number } | null;
+  /** The shapes a click on the map found the selected route by: once its
+   * drawing is in, the direction they are of is picked (setExplorerDrawing),
+   * so the route opens the way it was clicked, not in its first direction. */
+  clickedShapes: { routeId: string; shapeIds: string[] } | null;
+}
+
+/** Select a route (or none): another route starts on its Overview tab, in
+ * its own first direction; what the right panel opened from the route it
+ * leaves goes with it. */
+function selectRoute(state: ExplorerState, routeId: string | null): void {
+  if (routeId !== state.selectedRouteId) {
+    state.routeTab = "service";
+    state.pattern = null;
+    if (state.panel.fromRoute !== null && state.panel.fromRoute === state.selectedRouteId)
+      state.panel = { ...state.panel, stack: [], fromRoute: null };
+  }
+  state.selectedRouteId = routeId;
+  if (routeId === null) state.drawing = null;
 }
 
 /** What the strip keeps for the session, the Explorer closed or not. */
@@ -187,6 +206,7 @@ const initialState: ExplorerState = {
   time_s: null,
   scrub: null,
   focus: null,
+  clickedShapes: null,
 };
 
 const explorerSlice = createSlice({
@@ -232,18 +252,14 @@ const explorerSlice = createSlice({
       state.leftTab = action.payload;
     },
     selectExplorerRoute: (state, action: PayloadAction<string | null>) => {
-      // Another route starts on its Overview tab, in its own first direction;
-      // what the right panel opened from the route it leaves goes with it.
-      if (action.payload !== state.selectedRouteId) {
-        state.routeTab = "service";
-        state.pattern = null;
-        if (state.panel.fromRoute !== null && state.panel.fromRoute === state.selectedRouteId)
-          state.panel = { ...state.panel, stack: [], fromRoute: null };
-      }
-      state.selectedRouteId = action.payload;
-      if (action.payload === null) {
-        state.drawing = null;
-      }
+      selectRoute(state, action.payload);
+      state.clickedShapes = null;
+    },
+    /** A route selected by clicking its line on the map: it opens in the
+     * direction of the shapes clicked, where they tell it. */
+    selectExplorerRouteAt: (state, action: PayloadAction<{ routeId: string; shapeIds: string[] }>) => {
+      selectRoute(state, action.payload.routeId);
+      state.clickedShapes = action.payload;
     },
     setExplorerTripTab: (state, action: PayloadAction<ExplorerTripTab>) => {
       state.tripTab = action.payload;
@@ -288,6 +304,17 @@ const explorerSlice = createSlice({
     },
     setExplorerDrawing: (state, action: PayloadAction<ExplorerRouteDrawing | null>) => {
       state.drawing = action.payload;
+      // Clicked on the map: the direction of the shapes clicked, set with the
+      // drawing, so no view shows the first direction in between. Shapes both
+      // directions run on tell nothing: the first stays.
+      const clicked = state.clickedShapes;
+      const drawing = action.payload;
+      if (clicked && drawing && clicked.routeId === drawing.routeId) {
+        const keys = directionsOnShapes(clicked.shapeIds, drawing.directions, drawing.patternShapes);
+        if (keys.length === 1 && state.pattern === null)
+          state.pattern = { direction: keys[0], pattern_idx: null };
+        state.clickedShapes = null;
+      }
     },
     setExplorerFilters: (state, action: PayloadAction<ExplorerFilters>) => {
       state.filters = action.payload;
@@ -375,6 +402,7 @@ export const {
   setPlaybackTime,
   setScrub,
   focusExplorerRun,
+  selectExplorerRouteAt,
 } = explorerSlice.actions;
 
 export const explorerReducer = explorerSlice.reducer;
