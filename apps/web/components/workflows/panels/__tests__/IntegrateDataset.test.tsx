@@ -20,7 +20,9 @@ vi.mock("react-i18next", () => ({
 vi.mock("next/navigation", () => ({ useParams: () => ({ projectId: "p1" }) }));
 
 const dispatch = vi.fn();
-vi.mock("react-redux", () => ({ useDispatch: () => dispatch, useSelector: () => [] }));
+// One array for every selector: a fresh one per render would re-run the panel's effects forever.
+const selected = vi.hoisted(() => [] as unknown[]);
+vi.mock("react-redux", () => ({ useDispatch: () => dispatch, useSelector: () => selected }));
 vi.mock("@/hooks/map/useOgcProcesses", () => ({
   useCategorizedProcesses: () => ({ processes: [], isLoading: false, error: null }),
   useProcessDescription: () => ({
