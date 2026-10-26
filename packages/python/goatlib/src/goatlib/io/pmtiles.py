@@ -45,6 +45,24 @@ from goatlib.utils.layer import layer_id_to_table_name
 logger = logging.getLogger(__name__)
 
 
+def publish_tiles(built: Path, final: Path) -> None:
+    """Move tiles built on local disk into place, atomically.
+
+    tippecanoe builds PMTiles in an SQLite database at its output path and
+    converts it at the end, so it is pointed at local disk: SQLite is unsafe
+    on network file systems. The finished file is copied next to `final`
+    under a pid-tagged temp name (concurrent runs for one layer don't share
+    it) and renamed over `final`, so readers never see a partial file.
+    """
+    final.parent.mkdir(parents=True, exist_ok=True)
+    temp = final.parent / f".tmp_{os.getpid()}_{final.name}"
+    try:
+        shutil.copyfile(built, temp)
+        os.replace(temp, final)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
 @dataclass
 class PMTilesConfig:
     """Configuration for PMTiles generation.
@@ -311,45 +329,37 @@ class PMTilesGenerator:
             duckdb_con, table_name, geometry_column
         )
 
-        # Use a temp file for the PMTiles output, then atomically rename
-        # This prevents corrupted files if the process is interrupted
-        # NOTE: tippecanoe uses file extension to determine output format!
-        # .pmtiles -> PMTiles, anything else -> MBTiles (SQLite)
-        # So we use a .tmp_ prefix instead of .tmp suffix.
-        # The pid keeps the extension intact while making the temp name unique:
-        # two jobs materializing the same layer concurrently must not write the
-        # same temp file and corrupt each other's output before the rename.
-        temp_tag = f".tmp_{os.getpid()}_"
-        temp_pmtiles_path = pmtiles_path.parent / f"{temp_tag}{pmtiles_path.name}"
-
         # Check if this is a polygon layer that needs label anchor points
         geom_upper = geometry_type.upper() if geometry_type else ""
         is_polygon = "POLYGON" in geom_upper
 
         # Anchor PMTiles path (separate file for polygon label points)
         anchor_pmtiles_path = self.get_anchor_pmtiles_path(layer_id)
-        temp_anchor_path = (
-            anchor_pmtiles_path.parent / f"{temp_tag}{anchor_pmtiles_path.name}"
-        )
 
         try:
-            with tempfile.NamedTemporaryFile(
-                suffix=".geojson", delete=True, prefix="pmtiles_"
-            ) as tmp_geojson:
+            # Everything is built on local disk and only the finished files
+            # are published (see publish_tiles). tippecanoe picks the output
+            # format by extension, so the built files keep the final names.
+            with tempfile.TemporaryDirectory(prefix="pmtiles_") as work:
+                work_dir = Path(work)
+                geojson_path = work_dir / "features.geojson"
+                built_path = work_dir / pmtiles_path.name
+                built_anchor_path = work_dir / anchor_pmtiles_path.name
+
                 # Step 1: Export to GeoJSON (preserves attribute types)
                 # Note: FlatGeobuf is faster but tippecanoe converts integers to strings
                 self._export_to_geojson(
                     duckdb_con=duckdb_con,
                     table_name=table_name,
-                    output_path=tmp_geojson.name,
+                    output_path=str(geojson_path),
                     geometry_column=geometry_column,
                     exclude_columns=exclude_columns,
                 )
 
                 # Step 2: Generate main geometry tiles (all layer types)
                 self._run_tippecanoe(
-                    input_path=tmp_geojson.name,
-                    output_path=str(temp_pmtiles_path),
+                    input_path=str(geojson_path),
+                    output_path=str(built_path),
                     geometry_type=geometry_type,
                     snapshot_id=snapshot_id,
                     show_progress=show_progress,
@@ -359,18 +369,17 @@ class PMTilesGenerator:
                 if is_polygon:
                     logger.info("Generating label anchor point tiles...")
                     self._run_tippecanoe(
-                        input_path=tmp_geojson.name,
-                        output_path=str(temp_anchor_path),
+                        input_path=str(geojson_path),
+                        output_path=str(built_anchor_path),
                         geometry_type=geometry_type,
                         snapshot_id=snapshot_id,
                         show_progress=show_progress,
                         label_anchor=True,
                     )
 
-            # Atomically rename temp files to final paths
-            temp_pmtiles_path.rename(pmtiles_path)
-            if is_polygon and temp_anchor_path.exists():
-                temp_anchor_path.rename(anchor_pmtiles_path)
+                publish_tiles(built_path, pmtiles_path)
+                if is_polygon and built_anchor_path.exists():
+                    publish_tiles(built_anchor_path, anchor_pmtiles_path)
 
             size_mb = pmtiles_path.stat().st_size / 1024 / 1024
             logger.info(
@@ -386,11 +395,6 @@ class PMTilesGenerator:
 
         except Exception as e:
             logger.error(f"PMTiles generation failed: {e}")
-            # Clean up temp files if they exist
-            if temp_pmtiles_path.exists():
-                temp_pmtiles_path.unlink()
-            if temp_anchor_path.exists():
-                temp_anchor_path.unlink()
             return None
 
     def generate_anchor_from_table(
@@ -426,12 +430,6 @@ class PMTilesGenerator:
 
         exclude_columns = exclude_columns or ["bbox"]
         anchor_pmtiles_path = self.get_anchor_pmtiles_path(layer_id)
-        anchor_pmtiles_path.parent.mkdir(parents=True, exist_ok=True)
-        # pid-tagged so concurrent runs for one layer don't share a temp file.
-        temp_anchor_path = (
-            anchor_pmtiles_path.parent
-            / f".tmp_{os.getpid()}_{anchor_pmtiles_path.name}"
-        )
 
         logger.info(
             f"Generating anchor PMTiles for {table_name} -> {anchor_pmtiles_path}"
@@ -449,27 +447,30 @@ class PMTilesGenerator:
             return None
 
         try:
-            with tempfile.NamedTemporaryFile(
-                suffix=".geojson", delete=True, prefix="pmtiles_"
-            ) as tmp_geojson:
+            # Built on local disk, then published (see publish_tiles).
+            with tempfile.TemporaryDirectory(prefix="pmtiles_") as work:
+                work_dir = Path(work)
+                geojson_path = work_dir / "features.geojson"
+                built_anchor_path = work_dir / anchor_pmtiles_path.name
+
                 self._export_to_geojson(
                     duckdb_con=duckdb_con,
                     table_name=table_name,
-                    output_path=tmp_geojson.name,
+                    output_path=str(geojson_path),
                     geometry_column=geometry_column,
                     exclude_columns=exclude_columns,
                 )
 
                 self._run_tippecanoe(
-                    input_path=tmp_geojson.name,
-                    output_path=str(temp_anchor_path),
+                    input_path=str(geojson_path),
+                    output_path=str(built_anchor_path),
                     geometry_type=geometry_type,
                     snapshot_id=snapshot_id,
                     show_progress=show_progress,
                     label_anchor=True,
                 )
 
-            temp_anchor_path.rename(anchor_pmtiles_path)
+                publish_tiles(built_anchor_path, anchor_pmtiles_path)
             anchor_mb = anchor_pmtiles_path.stat().st_size / 1024 / 1024
             logger.info(
                 f"Anchor PMTiles generated: {anchor_pmtiles_path} ({anchor_mb:.1f} MB)"
@@ -478,8 +479,6 @@ class PMTilesGenerator:
 
         except Exception as e:
             logger.error(f"Anchor PMTiles generation failed: {e}")
-            if temp_anchor_path.exists():
-                temp_anchor_path.unlink()
             return None
 
     def _detect_geometry_type(
