@@ -20,18 +20,24 @@ vi.mock("react-i18next", () => ({
 vi.mock("next/navigation", () => ({ useParams: () => ({ projectId: "p1" }) }));
 
 const dispatch = vi.fn();
-// One array for every selector: a fresh one per render would re-run the panel's effects forever.
-const selected = vi.hoisted(() => [] as unknown[]);
+// Stable values: fresh ones per render would re-run the panel's effects forever.
+const { selected, described, layers, bundles, edges } = vi.hoisted(() => ({
+  selected: [] as unknown[],
+  described: {
+    process: { id: "data_integration", title: "Data Integration", description: "docstring", inputs: {} },
+    isLoading: false,
+  },
+  layers: { layers: [] },
+  bundles: {},
+  edges: [],
+}));
 vi.mock("react-redux", () => ({ useDispatch: () => dispatch, useSelector: () => selected }));
 vi.mock("@/hooks/map/useOgcProcesses", () => ({
   useCategorizedProcesses: () => ({ processes: [], isLoading: false, error: null }),
-  useProcessDescription: () => ({
-    process: { id: "data_integration", title: "Data Integration", description: "docstring", inputs: {} },
-    isLoading: false,
-  }),
+  useProcessDescription: () => described,
 }));
-vi.mock("@/hooks/map/LayerPanelHooks", () => ({ useFilteredProjectLayers: () => ({ layers: [] }) }));
-vi.mock("@/hooks/map/useProjectBundleKinds", () => ({ useProjectBundleKinds: () => ({}) }));
+vi.mock("@/hooks/map/LayerPanelHooks", () => ({ useFilteredProjectLayers: () => layers }));
+vi.mock("@/hooks/map/useProjectBundleKinds", () => ({ useProjectBundleKinds: () => bundles }));
 vi.mock("@/lib/api/workflows", () => ({
   predictNodeSchema: vi.fn(),
   useTempLayerFeatures: () => ({ data: undefined }),
@@ -40,7 +46,7 @@ vi.mock("@/lib/api/workflows", () => ({
 vi.mock("@/components/workflows/context/WorkflowExecutionContext", () => ({
   useWorkflowExecutionContext: () => ({ nodeStatuses: {}, nodeExecutionInfo: {}, tempLayerIds: {} }),
 }));
-vi.mock("@xyflow/react", () => ({ useEdges: () => [] }));
+vi.mock("@xyflow/react", () => ({ useEdges: () => edges }));
 vi.mock("@/i18n/utils", () => ({ useDateFnsLocale: () => undefined }));
 vi.mock("@/lib/api/processes", () => ({ useJobs: () => ({ jobs: undefined }), dismissJob: vi.fn() }));
 vi.mock("@/components/workflows/panels/WorkflowNodeSettings", () => ({ default: () => null }));
