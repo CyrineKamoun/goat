@@ -1037,3 +1037,36 @@ describe("shape colours", () => {
     expect(shapeColorExpression(new Map(), "#999")).toBe("#999");
   });
 });
+
+describe("a stop the feed leaves untimed", () => {
+  it("lists its calls with the window between the timed stops either side", async () => {
+    // T1 again as a new trip, its call at Third (S3) left without times:
+    // it leaves Second at 08:02 and reaches Fourth at 08:06.
+    const [{ id }] = await db.all<{ id: number }>("SELECT max(trip_idx) + 1 AS id FROM trips");
+    const [{ t1 }] = await db.all<{ t1: number }>("SELECT trip_idx AS t1 FROM trips WHERE trip_id = 'T1'");
+    const [{ s3 }] = await db.all<{ s3: number }>("SELECT stop_idx AS s3 FROM stops WHERE stop_id = 'S3'");
+    await db.exec(`
+      INSERT INTO trips SELECT * REPLACE (${id} AS trip_idx, 'T1-untimed' AS trip_id) FROM trips WHERE trip_idx = ${t1};
+      INSERT INTO stop_times SELECT * REPLACE (
+        ${id} AS trip_idx,
+        CASE WHEN stop_idx = ${s3} THEN NULL ELSE arrival_s END AS arrival_s,
+        CASE WHEN stop_idx = ${s3} THEN NULL ELSE departure_s END AS departure_s
+      ) FROM stop_times WHERE trip_idx = ${t1};`);
+    try {
+      const deps = await stopDepartures(db, s3, "2026-10-14");
+      const untimed = deps.filter((d) => d.trip_idx === id);
+      expect(untimed).toHaveLength(1);
+      expect(untimed[0]).toMatchObject({ untimed: true, from_stop: "Second", until_stop: "Fourth" });
+      expect(hm(untimed[0].dep_s)).toBe("08:02");
+      expect(hm(untimed[0].until_s as number)).toBe("08:06");
+      // A timed call keeps its own time and no window.
+      const timed = deps.find((d) => d.trip_idx === t1);
+      expect(timed).toMatchObject({ untimed: false, until_s: null, from_stop: null });
+      expect(hm((timed as { dep_s: number }).dep_s)).toBe("08:04");
+    } finally {
+      await db.exec(
+        `DELETE FROM stop_times WHERE trip_idx = ${id}; DELETE FROM trips WHERE trip_idx = ${id};`
+      );
+    }
+  });
+});

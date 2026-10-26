@@ -8,6 +8,12 @@
  * the run is from the trip's first departure. A trip's last stop is where
  * it arrives, not where it leaves, and is left out — once, so a loop still
  * leaves from where it starts.
+ *
+ * Feeds may time only some stops (timepoints) and leave the rest blank. A
+ * trip calling at such a stop still calls there: it is listed with the
+ * window the feed does give — from its departure at the timed stop before
+ * to its arrival at the timed stop after — never a time made up between
+ * them (planners act on these figures).
  */
 import type { SqlRunner } from "@/lib/explorer/db/types";
 import type { Direction, DirectionName } from "@/lib/explorer/derive/directions";
@@ -22,8 +28,16 @@ export interface Departure {
   headsign: string | null;
   /** The run's departure from its first stop: with trip_idx, which run. */
   run_dep_s: number;
-  /** Its departure from this stop, seconds from the start of the service day. */
+  /** Its departure from this stop, seconds from the start of the service
+   * day; untimed, the departure from the timed stop before it. */
   dep_s: number;
+  /** Untimed in the feed: its arrival at the timed stop after it (null
+   * when none follows). Null for a timed call. */
+  until_s: number | null;
+  /** Untimed: whether it is, and the timed stops either side, by name. */
+  untimed: boolean;
+  from_stop: string | null;
+  until_stop: string | null;
 }
 
 export interface StopDetail {
@@ -72,7 +86,7 @@ export async function stopDetail(db: SqlRunner, stop_idx: number): Promise<StopD
 }
 
 export async function stopDepartures(db: SqlRunner, stop_idx: number, date: string): Promise<Departure[]> {
-  return db.all<Departure>(`
+  const rows = await db.all<Omit<Departure, "untimed"> & { untimed: boolean | number }>(`
     WITH calls AS (
       SELECT trip_idx, stop_idx, stop_sequence, COALESCE(departure_s, arrival_s) AS at_s
       FROM stop_times WHERE stop_idx IN (${covered(stop_idx)})
@@ -81,14 +95,41 @@ export async function stopDepartures(db: SqlRunner, stop_idx: number, date: stri
       SELECT trip_idx, max(stop_sequence) AS last_seq FROM stop_times
       WHERE trip_idx IN (SELECT trip_idx FROM calls) GROUP BY trip_idx
     ),
+    -- The timed stops of trips with an untimed call here, and for each such
+    -- call, its trip's timed stop before and after it.
+    timed AS (
+      SELECT trip_idx, stop_sequence, stop_idx,
+             COALESCE(departure_s, arrival_s) AS dep_at, COALESCE(arrival_s, departure_s) AS arr_at
+      FROM stop_times
+      WHERE trip_idx IN (SELECT trip_idx FROM calls WHERE at_s IS NULL)
+        AND COALESCE(departure_s, arrival_s) IS NOT NULL
+    ),
+    bounds AS (
+      SELECT c.trip_idx, c.stop_sequence,
+             arg_max(b.dep_at, b.stop_sequence) FILTER (WHERE b.stop_sequence < c.stop_sequence) AS from_s,
+             arg_max(b.stop_idx, b.stop_sequence) FILTER (WHERE b.stop_sequence < c.stop_sequence) AS from_idx,
+             arg_min(b.arr_at, b.stop_sequence) FILTER (WHERE b.stop_sequence > c.stop_sequence) AS until_s,
+             arg_min(b.stop_idx, b.stop_sequence) FILTER (WHERE b.stop_sequence > c.stop_sequence) AS until_idx
+      FROM calls c JOIN timed b USING (trip_idx)
+      WHERE c.at_s IS NULL
+      GROUP BY c.trip_idx, c.stop_sequence
+    ),
     r AS (${runsSql(ALL_TRIPS, date, "SELECT trip_idx FROM calls")})
     SELECT c.stop_idx, t.route_idx, r.trip_idx, r.pattern_idx, r.headsign, r.dep_s AS run_dep_s,
-           c.at_s + (r.dep_s - t.first_dep_s) AS dep_s
+           COALESCE(c.at_s, b.from_s) + (r.dep_s - t.first_dep_s) AS dep_s,
+           CASE WHEN c.at_s IS NULL THEN b.until_s + (r.dep_s - t.first_dep_s) END AS until_s,
+           c.at_s IS NULL AS untimed,
+           CASE WHEN c.at_s IS NULL THEN COALESCE(fp.name, fs.name) END AS from_stop,
+           CASE WHEN c.at_s IS NULL THEN COALESCE(up.name, us.name) END AS until_stop
     FROM r JOIN trips t ON t.trip_idx = r.trip_idx
     JOIN calls c ON c.trip_idx = r.trip_idx
     JOIN last l ON l.trip_idx = r.trip_idx
-    WHERE c.stop_sequence < l.last_seq AND c.at_s IS NOT NULL
+    LEFT JOIN bounds b ON b.trip_idx = c.trip_idx AND b.stop_sequence = c.stop_sequence
+    LEFT JOIN stops fs ON fs.stop_idx = b.from_idx LEFT JOIN stops fp ON fp.stop_idx = fs.parent_idx
+    LEFT JOIN stops us ON us.stop_idx = b.until_idx LEFT JOIN stops up ON up.stop_idx = us.parent_idx
+    WHERE c.stop_sequence < l.last_seq AND COALESCE(c.at_s, b.from_s) IS NOT NULL
     ORDER BY dep_s, t.route_idx, r.trip_idx`);
+  return rows.map((r) => ({ ...r, untimed: !!r.untimed }));
 }
 
 export interface TimetableEntry {
@@ -100,6 +141,12 @@ export interface TimetableEntry {
   pattern_idx: number;
   /** A short turn of its direction: it ends before the direction does. */
   short: boolean;
+  /** Not timed in the feed: `dep_s` to `until_s` is the window between the
+   * timed stops either side (Departure). */
+  untimed: boolean;
+  until_s: number | null;
+  from_stop: string | null;
+  until_stop: string | null;
 }
 
 export interface TimetableDirection {
@@ -137,6 +184,10 @@ export function byDirection(departures: Departure[], directions: Direction[]): T
       run_dep_s: dep.run_dep_s,
       pattern_idx: dep.pattern_idx,
       short: found?.short ?? false,
+      untimed: dep.untimed,
+      until_s: dep.until_s,
+      from_stop: dep.from_stop,
+      until_stop: dep.until_stop,
     });
   }
   return [...groups.values()].sort((a, b) => (order.get(a.key) ?? Infinity) - (order.get(b.key) ?? Infinity));

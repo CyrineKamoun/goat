@@ -24,7 +24,12 @@ import {
 } from "@/lib/explorer/derive/stopTimetable";
 import { resolveChoice } from "@/lib/explorer/directionChoice";
 import { clock } from "@/lib/explorer/format";
-import { type ExplorerPickedStop, openExplorerPanel } from "@/lib/store/explorer/slice";
+import {
+  type ExplorerPickedStop,
+  openExplorerPanel,
+  pickExplorerPattern,
+  selectExplorerRoute,
+} from "@/lib/store/explorer/slice";
 
 import { type RouteRow, useRoutes, useStopTimetable } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
@@ -48,6 +53,22 @@ const META_LINE = "18px";
 
 /** An hour of the service day as a timetable heads it: 24 is 00 again. */
 const hourLabel = (hour: number) => String(hour % 24).padStart(2, "0");
+const minute = (sec: number) => String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
+
+/** What an untimed call's window is, in words: the feed's times at the
+ * timed stops either side, never a time between them. */
+function untimedTitle(
+  e: { dep_s: number; until_s: number | null; from_stop: string | null; until_stop: string | null },
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  return t("explorer_untimed_call", {
+    from: clock(e.dep_s),
+    fromStop: e.from_stop ?? "",
+    until: e.until_s === null ? "–" : clock(e.until_s),
+    untilStop: e.until_stop ?? "",
+    interpolation: { escapeValue: false },
+  });
+}
 
 /** A segmented switch on the panel's tinted ground, as the bottom bar's speed. */
 function ViewSwitch({ value, onChange }: { value: View; onChange: (v: View) => void }) {
@@ -294,11 +315,13 @@ function Timetable({
   onOpen,
 }: {
   route: RouteRow;
-  directions: TimetableDirection[];
+  /** With where each came from, `${route_idx}:${direction key}`. */
+  directions: (TimetableDirection & { sources?: Set<string> })[];
   now: number | null;
   onOpen: (e: TimetableEntry) => void;
 }) {
   const { t } = useTranslation("common");
+  const dispatch = useAppDispatch();
   return (
     <>
       {directions.map((d) => {
@@ -307,13 +330,58 @@ function Timetable({
         const hours = byHour(d.departures);
         return (
           <Box key={d.key} sx={{ mt: 1 }}>
-            <SectionHeader
-              px={0}
-              icon={<RouteBadge route={route} small />}
-              // No count beside it: departures, trips or calls, it read as
-              // any of them (dropped 22 Oct 2026).
-              label={directionLabel(d.name, t)}
-            />
+            {/* The heading is the way from a stop to its line: the line's
+                summary, in the direction whose departures these are. */}
+            <ButtonBase
+              onClick={() => {
+                dispatch(selectExplorerRoute(route.route_id));
+                const from = [...(d.sources ?? [])].find((x) => x.startsWith(`${route.route_idx}:`));
+                const key = Number(from?.split(":")[1]);
+                if (Number.isInteger(key))
+                  dispatch(pickExplorerPattern({ direction: key, pattern_idx: null }));
+              }}
+              title={t("explorer_open_line")}
+              sx={{
+                display: "block",
+                width: "100%",
+                textAlign: "left",
+                borderRadius: 1,
+                "&:hover": { bgcolor: "action.hover" },
+              }}>
+              <SectionHeader
+                px={0}
+                icon={<RouteBadge route={route} small />}
+                // No count beside it: departures, trips or calls, it read as
+                // any of them (dropped 22 Oct 2026).
+                label={directionLabel(d.name, t)}
+              />
+            </ButtonBase>
+            {/* Said under the line's heading where any of its departures here
+                are a window, not a time. */}
+            {d.departures.some((e) => e.untimed) && (
+              // Laid out as the heading above: the pill in the badge's column,
+              // the words where the heading's start.
+              <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ mb: 1.5 }}>
+                {/* A window's pill, as the grid draws one, centred on the
+                    note's first line. */}
+                <Box
+                  aria-hidden
+                  sx={{ width: 28, height: "17.4px", flexShrink: 0, display: "flex", alignItems: "center" }}>
+                  <Box
+                    sx={{
+                      width: 28,
+                      height: 12,
+                      borderRadius: "6px",
+                      border: "1px dotted",
+                      borderColor: "text.disabled",
+                    }}
+                  />
+                </Box>
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.45 }}>
+                  {t("explorer_untimed_line_note")}
+                </Typography>
+              </Stack>
+            )}
             <Box sx={{ bgcolor: "action.hover", borderRadius: 1.5, px: 1.5, py: 0.5 }}>
               {hours.map(({ hour, entries }, i) => (
                 <Stack
@@ -340,20 +408,33 @@ function Timetable({
                           // of a station's platforms: the call, not the run.
                           key={`${e.trip_idx}:${e.run_dep_s}:${e.stop_idx}:${e.dep_s}`}
                           onClick={() => onOpen(e)}
-                          title={clock(e.dep_s)}
+                          title={e.untimed ? untimedTitle(e, t) : clock(e.dep_s)}
                           sx={{
                             minWidth: 32,
                             height: 24,
-                            px: 0.5,
+                            // A window's pill has room inside its outline, and
+                            // apart from its neighbours'.
+                            px: e.untimed ? 1.5 : 0.5,
+                            mx: e.untimed ? 0.25 : 0,
+                            my: e.untimed ? 0.25 : 0,
                             borderRadius: "12px",
                             fontSize: 13,
                             fontVariantNumeric: "tabular-nums",
                             fontWeight: isNext ? 700 : 500,
-                            color: isNext ? "primary.contrastText" : "text.primary",
+                            // Untimed in the feed: its window, in grey, dotted
+                            // round, in the hour it starts.
+                            border: e.untimed && !isNext ? "1px dotted" : "1px solid transparent",
+                            borderColor: e.untimed && !isNext ? "text.disabled" : "transparent",
+                            color: isNext
+                              ? "primary.contrastText"
+                              : e.untimed
+                                ? "text.secondary"
+                                : "text.primary",
                             bgcolor: isNext ? "primary.main" : "transparent",
                             "&:hover": { bgcolor: isNext ? "primary.dark" : "action.selected" },
                           }}>
-                          {String(Math.floor((e.dep_s % 3600) / 60)).padStart(2, "0")}
+                          {minute(e.dep_s)}
+                          {e.untimed && e.until_s !== null && `-${minute(e.until_s)}`}
                         </ButtonBase>
                       );
                     })}
@@ -392,48 +473,63 @@ function NextDepartures({
       </Typography>
     );
   return (
-    <Box sx={{ mt: 1.5, bgcolor: "action.hover", borderRadius: 1.5, py: 0.5 }}>
-      {upcoming.map((d, i) => {
-        const route = routeByIdx.get(d.route_idx);
-        const pattern = (directions.get(d.route_idx) ?? [])
-          .flatMap((x) => x.patterns)
-          .find((p) => p.pattern_idx === d.pattern_idx);
-        const wait = Math.floor((d.dep_s - from) / 60);
-        return (
-          <ButtonBase
-            key={`${d.trip_idx}:${d.run_dep_s}:${d.stop_idx}:${d.dep_s}`}
-            onClick={() => onOpen(d)}
-            sx={{
-              width: "100%",
-              justifyContent: "flex-start",
-              gap: 1.25,
-              minHeight: 36,
-              px: 1.5,
-              borderBottom: i < upcoming.length - 1 ? 1 : 0,
-              borderColor: "divider",
-              "&:hover": { bgcolor: "action.selected" },
-            }}>
-            <Typography
-              variant="body2"
-              fontWeight="bold"
-              sx={{ width: 42, textAlign: "left", fontVariantNumeric: "tabular-nums" }}>
-              {clock(d.dep_s)}
-            </Typography>
-            {route && <RouteBadge route={route} small />}
-            <Typography variant="body2" noWrap sx={{ flex: 1, textAlign: "left" }}>
-              {pattern
-                ? t("explorer_direction_to", {
-                    place: pattern.destination,
-                    interpolation: { escapeValue: false },
-                  })
-                : (d.headsign ?? "")}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {wait <= 0 ? t("explorer_now") : t("explorer_in_minutes", { count: wait })}
-            </Typography>
-          </ButtonBase>
-        );
-      })}
-    </Box>
+    <>
+      <Box sx={{ mt: 1.5, bgcolor: "action.hover", borderRadius: 1.5, py: 0.5 }}>
+        {upcoming.map((d, i) => {
+          const route = routeByIdx.get(d.route_idx);
+          const pattern = (directions.get(d.route_idx) ?? [])
+            .flatMap((x) => x.patterns)
+            .find((p) => p.pattern_idx === d.pattern_idx);
+          const wait = Math.floor((d.dep_s - from) / 60);
+          return (
+            <ButtonBase
+              key={`${d.trip_idx}:${d.run_dep_s}:${d.stop_idx}:${d.dep_s}`}
+              onClick={() => onOpen(d)}
+              sx={{
+                width: "100%",
+                justifyContent: "flex-start",
+                gap: 1.25,
+                minHeight: 36,
+                px: 1.5,
+                borderBottom: i < upcoming.length - 1 ? 1 : 0,
+                borderColor: "divider",
+                "&:hover": { bgcolor: "action.selected" },
+              }}>
+              {/* The time, where the feed gives one; an untimed call keeps the
+                  column, empty, its window where the wait would be. */}
+              <Typography
+                variant="body2"
+                fontWeight="bold"
+                sx={{ width: 42, flexShrink: 0, textAlign: "left", fontVariantNumeric: "tabular-nums" }}>
+                {d.untimed ? "" : clock(d.dep_s)}
+              </Typography>
+              {route && <RouteBadge route={route} small />}
+              <Typography variant="body2" noWrap sx={{ flex: 1, textAlign: "left" }}>
+                {pattern
+                  ? t("explorer_direction_to", {
+                      place: pattern.destination,
+                      interpolation: { escapeValue: false },
+                    })
+                  : (d.headsign ?? "")}
+              </Typography>
+              {d.untimed ? (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  noWrap
+                  title={untimedTitle(d, t)}
+                  sx={{ fontVariantNumeric: "tabular-nums" }}>
+                  {clock(d.dep_s)}-{d.until_s === null ? "" : clock(d.until_s)}
+                </Typography>
+              ) : (
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  {wait <= 0 ? t("explorer_now") : t("explorer_in_minutes", { count: wait })}
+                </Typography>
+              )}
+            </ButtonBase>
+          );
+        })}
+      </Box>
+    </>
   );
 }
