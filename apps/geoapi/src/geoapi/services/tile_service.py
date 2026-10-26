@@ -71,6 +71,8 @@ _LEAF_CACHE_MAX_SIZE = 1000
 # These use LRU eviction to bound memory usage
 _PATH_CACHE_MAX_SIZE = 2000  # ~400KB max
 _EXISTS_CACHE_MAX_SIZE = 5000  # ~250KB max
+# How long "no workflow temp tiles for this layer id" is believed.
+_TEMP_MISS_TTL_S = 30
 
 
 def _tiles_version(pmtiles_path: Path, label: bool) -> str | None:
@@ -372,6 +374,16 @@ class TileService:
         self._pmtiles_path_cache: LRUCache[str, Path | None] = LRUCache(
             maxsize=_PATH_CACHE_MAX_SIZE
         )
+        # Layer ids the workflow temp tree was searched for in vain. That
+        # search walks the whole tree, so a layer without tiles (served
+        # dynamically) would pay it on every tile request. The verdict
+        # expires: a workflow's tiles can arrive after its first request.
+        self._temp_pmtiles_misses: TTLCache[str, bool] = TTLCache(
+            maxsize=_PATH_CACHE_MAX_SIZE, ttl=_TEMP_MISS_TTL_S
+        )
+        # One temp tree search at a time per process: concurrent tile
+        # requests wait for the first verdict instead of each walking the tree.
+        self._temp_search_lock = asyncio.Lock()
 
     def _find_pmtiles_by_layer_id(self, layer_id: str) -> Path | None:
         """Find PMTiles file for a layer by its id alone (no schema lookup needed).
@@ -383,13 +395,44 @@ class TileService:
         that cached it. Temp PMTiles are stored as
         {temp_data_dir}/**/t_{layer_id_no_hyphens}.pmtiles.
 
+        Request handlers use `_find_pmtiles_by_layer_id_async`, which keeps
+        the temp tree search off the event loop.
+
         Args:
             layer_id: Layer UUID (with or without hyphens)
 
         Returns:
             Path to PMTiles file if found, None otherwise
         """
-        # Normalize layer_id (remove hyphens)
+        found = self._find_known_pmtiles(layer_id)
+        if found is not None:
+            return found
+        return self._search_temp_pmtiles(layer_id)
+
+    async def _find_pmtiles_by_layer_id_async(self, layer_id: str) -> Path | None:
+        """`_find_pmtiles_by_layer_id` for request handlers.
+
+        The stat() checks run inline; the temp tree search runs in a worker
+        thread, one at a time, so a slow walk on network storage never blocks
+        the event loop (and with it every other request and the health check).
+        """
+        found = self._find_known_pmtiles(layer_id)
+        if found is not None:
+            return found
+        layer_id_normalized = layer_id.replace("-", "")
+        if layer_id_normalized in self._temp_pmtiles_misses:
+            return None
+        async with self._temp_search_lock:
+            # Another request may have searched while this one waited.
+            if layer_id_normalized in self._temp_pmtiles_misses:
+                return None
+            cached = self._pmtiles_path_cache.get(layer_id_normalized)
+            if cached is not None:
+                return cached
+            return await asyncio.to_thread(self._search_temp_pmtiles, layer_id)
+
+    def _find_known_pmtiles(self, layer_id: str) -> Path | None:
+        """The cached path, else the catalog or flat path when the file exists."""
         layer_id_normalized = layer_id.replace("-", "")
 
         # Check cache first - only return if we found a path (don't cache None)
@@ -409,7 +452,14 @@ class TileService:
             self._pmtiles_path_cache[layer_id_normalized] = flat
             return flat
 
-        # Workflow temp results are nested by user, workflow and node.
+        return None
+
+    def _search_temp_pmtiles(self, layer_id: str) -> Path | None:
+        """Search the workflow temp tree, nested by user, workflow and node."""
+        layer_id_normalized = layer_id.replace("-", "")
+        if layer_id_normalized in self._temp_pmtiles_misses:
+            return None
+
         matches: list[Path] = []
         temp_data_dir = self.tiles_data_dir.parent / "temporary"
         if temp_data_dir.exists():
@@ -419,9 +469,8 @@ class TileService:
             path = matches[0]
             self._pmtiles_path_cache[layer_id_normalized] = path
             return path
-        else:
-            # Don't cache None - PMTiles might be generated later
-            return None
+        self._temp_pmtiles_misses[layer_id_normalized] = True
+        return None
 
     def invalidate_pmtiles_path_cache(self, layer_id: str) -> None:
         """Invalidate the PMTiles path cache for a layer.
@@ -429,6 +478,7 @@ class TileService:
         Call this when PMTiles are regenerated or deleted.
         """
         layer_id_normalized = layer_id.replace("-", "")
+        self._temp_pmtiles_misses.pop(layer_id_normalized, None)
         if layer_id_normalized in self._pmtiles_path_cache:
             del self._pmtiles_path_cache[layer_id_normalized]
             logger.debug("Invalidated PMTiles path cache for layer %s", layer_id)
@@ -598,9 +648,11 @@ class TileService:
         cql_filter: Optional[dict] = None,
         bbox: Optional[list[float]] = None,
     ) -> bool:
-        """Check if PMTiles can serve this request using only layer_id.
+        """Check if this request may be served from PMTiles by layer_id alone.
 
-        Ultra-fast path that avoids DuckDB schema lookup entirely.
+        Only the filters decide here; whether the file exists is answered by
+        `get_tile_from_pmtiles_by_layer_id`, which returns None without one,
+        so the file lookup never runs on the event loop.
 
         Args:
             layer_id: Layer UUID (with or without hyphens)
@@ -611,11 +663,7 @@ class TileService:
             True if PMTiles can serve this request
         """
         # If filters are applied, need dynamic generation
-        if cql_filter or bbox:
-            return False
-
-        # Check if PMTiles exist using glob search
-        return self._find_pmtiles_by_layer_id(layer_id) is not None
+        return not (cql_filter or bbox)
 
     async def get_tile_from_pmtiles_by_layer_id(
         self,
@@ -649,7 +697,7 @@ class TileService:
         # Step 1: Find PMTiles path. Its mtime versions the cached tiles: a
         # workflow re-run or a layer refresh rewrites the file under the same
         # layer id, and must not be answered with tiles of the old one.
-        pmtiles_path = self._find_pmtiles_by_layer_id(layer_id)
+        pmtiles_path = await self._find_pmtiles_by_layer_id_async(layer_id)
         if pmtiles_path is None:
             return None
         version = _tiles_version(pmtiles_path, label)
@@ -657,7 +705,7 @@ class TileService:
             # The cached path is gone: rewritten elsewhere or deleted for
             # regeneration. Look again.
             self._pmtiles_path_cache.pop(layer_id.replace("-", ""), None)
-            pmtiles_path = self._find_pmtiles_by_layer_id(layer_id)
+            pmtiles_path = await self._find_pmtiles_by_layer_id_async(layer_id)
             if pmtiles_path is None:
                 return None
             version = _tiles_version(pmtiles_path, label)
