@@ -6,8 +6,10 @@ user reaches a string literal.
 """
 
 import pytest
-from goatlib.tools import data_integration as module
-from goatlib.tools.data_integration import FEATURE_TYPES, TagFilter, _tag_sql
+from goatlib.io.data_integration import mirror as module
+from goatlib.io.data_integration import osm, overture
+from goatlib.io.data_integration.osm import FEATURE_TYPES, _tag_sql
+from goatlib.tools.data_integration import TagFilter
 
 
 def test_a_key_and_value_match_the_whole_pair() -> None:
@@ -58,12 +60,12 @@ def test_the_cache_key_changes_with_the_snapshot(tmp_path, monkeypatch) -> None:
     a new weekly mirror would answer this week's question from last week's data."""
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     env = (11.5, 48.1, 11.6, 48.2)
-    last = module._tag_cache_path("layer-1", "points", [("germany", "20260921")], env)
-    this = module._tag_cache_path("layer-1", "points", [("germany", "20260928")], env)
+    last = osm._tag_cache_path("layer-1", "points", [("germany", "20260921")], env)
+    this = osm._tag_cache_path("layer-1", "points", [("germany", "20260928")], env)
     assert last != this
     # And a different area, or a different geometry, is a different question.
-    assert last != module._tag_cache_path("layer-2", "points", [("germany", "20260921")], env)
-    assert last != module._tag_cache_path("layer-1", "lines", [("germany", "20260921")], env)
+    assert last != osm._tag_cache_path("layer-2", "points", [("germany", "20260921")], env)
+    assert last != osm._tag_cache_path("layer-1", "lines", [("germany", "20260921")], env)
 
 
 def test_the_join_between_filters_is_chosen() -> None:
@@ -158,7 +160,7 @@ def test_only_indexed_files_touching_the_area(tmp_path) -> None:
         ('b', NULL::STRUCT("primary" VARCHAR), []::{src_type})
         ) t(id, names, sources)) TO '{data}' (FORMAT PARQUET)""")
     cols = {str(r[0]): str(r[1]) for r in con.execute(f"DESCRIBE SELECT * FROM '{data}'").fetchall()}
-    plain = ", ".join(module.overture_plain_columns(cols))
+    plain = ", ".join(overture.overture_plain_columns(cols))
     rows = con.execute(f"SELECT id, {plain} FROM read_parquet('{data}') c ORDER BY id").fetchall()
     assert rows[0][1:4] == ("Rathaus", "OpenStreetMap; Microsoft ML Buildings", "ODbL-1.0")
     assert rows[0][4:] == ("w1494403985@1; m7", "2026-03-30T18:37:29Z")
@@ -194,11 +196,11 @@ def test_the_area_and_the_sql_are_checked(tmp_path) -> None:
         {bbox} AS bbox, ST_Point(11.5, 48.1) AS geom) TO '{mapped}' (FORMAT PARQUET)""")
     f = [TagFilter(key="amenity", values=["school"])]
     for files, storage in (([str(text)], "text"), ([str(mapped)], "map"), ([str(text), str(mapped)], "both")):
-        assert module.tag_storage(module.mirror_columns(con, files)) == storage
+        assert osm.tag_storage(module.mirror_columns(con, files)) == storage
         pre, exact = module.filter_sql(f, src, storage=storage)
         hits = con.execute(f"SELECT osm_id FROM ({module.candidates_sql(files, src, env, pre, storage)}) WHERE {exact}").fetchall()
         assert len(hits) == len(files)
-        keys, _ = module._count_tags(con, module._raw_tags_sql(files, env, "TRUE", storage), None, 10, storage)
+        keys, _ = osm._count_tags(con, osm._raw_tags_sql(files, env, "TRUE", storage), None, 10, storage)
         assert keys[0] == ("amenity", len(files))
         assert not {"name", "check_date"} & {k for k, _ in keys}
 

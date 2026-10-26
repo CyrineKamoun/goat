@@ -218,7 +218,7 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="data_integration",
-        display_name="Extract Features",
+        display_name="Data Integration",
         description=(
             "Extract OpenStreetMap or Overture features for an area, "
             "filtered by tag or attribute"
@@ -231,6 +231,7 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
             "data_management", "osm", "openstreetmap", "overture", "extract",
             "features", "tags", "poi",
         ),
+        toolbox_hidden=True,
     ),
     ToolDefinition(
         name="merge",

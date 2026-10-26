@@ -52,7 +52,7 @@ def mirror_cursor() -> duckdb.DuckDBPyConnection:
     global _mirror_db
     with _mirror_db_lock:
         if _mirror_db is None:
-            from goatlib.tools.data_integration import ensure_s3
+            from goatlib.io.data_integration.mirror import ensure_s3
 
             db = duckdb.connect()
             db.execute("SET memory_limit = '256MB'")

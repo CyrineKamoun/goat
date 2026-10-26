@@ -299,7 +299,7 @@ class AnalyticsService:
         size_only: bool = False,
     ) -> dict[str, Any]:
         """Attributes, or one attribute's values, in the mirror for an area."""
-        from goatlib.tools.data_integration import mirror_values
+        from goatlib.io.data_integration.mirror import mirror_values
 
         with mirror_cursor() as con:
             return mirror_values(
