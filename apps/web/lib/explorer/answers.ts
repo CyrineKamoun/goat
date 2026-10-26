@@ -13,7 +13,8 @@
 import type { SqlRunner } from "@/lib/explorer/db/types";
 
 /** The answers about one line, stop or trip, by their keys' prefix. */
-const PER_ITEM = /^(route|line|calendar|stop-timetable|directions|trip|pattern-sections|route-trips):/;
+const PER_ITEM =
+  /^(route|line|calendar|stop-timetable|directions|trip|trip-cost|pattern-sections|route-trips):/;
 /** How many such answers are kept, the most recently asked for. */
 export const PER_ITEM_KEPT = 40;
 

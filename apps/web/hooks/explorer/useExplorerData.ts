@@ -228,6 +228,28 @@ export function useNetworkCost(
   );
 }
 
+/** One trip's year, priced at its line's rate: its runs on every day its
+ * service runs, as a route's year is counted. */
+export function useTripCost(
+  db: SqlRunner | undefined,
+  trip_idx: number,
+  route: RouteRow | undefined,
+  window: [string, string] | null,
+  settings: ExplorerSettings
+) {
+  return useQuery(
+    window && route ? db : undefined,
+    `trip-cost:${trip_idx}:${window?.[0]}:${window?.[1]}:${JSON.stringify(settings.rates)}`,
+    (d) =>
+      annualFigures(
+        d,
+        { trip_lo: trip_idx, trip_hi: trip_idx },
+        window as [string, string],
+        rateFor(settings, (route as RouteRow).agency_id, (route as RouteRow).route_type)
+      )
+  );
+}
+
 /** A pattern's line diagram for the Stops tab, on the Explorer's date. */
 export function useStopsLine(
   db: SqlRunner | undefined,

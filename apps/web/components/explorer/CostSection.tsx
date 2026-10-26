@@ -1,125 +1,231 @@
 /**
- * The Explorer's operating cost, at the foot of its tab: one fixed place for
- * money, whatever is selected — the network with nothing selected, the route
- * once one is. Its title and the button to the cost rates never move; only
- * the figures below them follow the selection.
+ * The Explorer's operating cost, in its own card below the left panel, as
+ * a stepped hierarchy: the whole network always; under it the selected line (or the
+ * line of the trip the right panel shows); under that the trip. Each step's
+ * ≈ cost a year stands in one column, the deepest step's the largest, so a
+ * line is read against the network and a trip against its line. The
+ * deepest step's vehicle-km and -hours hang off it as branches; a bar at the
+ * foot says they are a year's, and the days of the feed counted.
  */
 import { Box, IconButton, Skeleton, Stack, Tooltip, Typography } from "@mui/material";
+import { type ReactNode, memo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
-import { costYear } from "@/lib/explorer/derive/cost";
-import { compact, dateSpan, money } from "@/lib/explorer/format";
-import { modeOf, routeColor } from "@/lib/explorer/modes";
-import { openExplorerSettings } from "@/lib/store/explorer/slice";
+import { type AnnualFigures, costYear } from "@/lib/explorer/derive/cost";
+import { clock, compact, money } from "@/lib/explorer/format";
+import { openExplorerSettings, panelItem } from "@/lib/store/explorer/slice";
+import { formatDate } from "@/lib/utils/helpers";
 
-import { type RouteRow, useNetworkCost, useRouteSummary, useRoutes } from "@/hooks/explorer/useExplorerData";
+import { useNetworkCost, useRouteSummary, useRoutes, useTripCost } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { useExplorer } from "@/components/explorer/ExplorerContext";
 import { useTimetablesPending } from "@/components/explorer/ExplorerLoading";
 import { RouteBadge, routeName } from "@/components/explorer/RouteBadge";
+import { PX } from "@/components/explorer/SectionHeader";
 
-/** Fixed to what its figures need, so the list or summary above never
- * changes height with them. */
-const COST_SECTION_HEIGHT = 180;
+/** How the cost bar writes a date. */
+const DATE = "DD.MM.YYYY";
 
-/** What the figures below are for: a fixed line whose content follows the
- * selection, so the figures never change without saying what they now cover. */
-function Scope({ route }: { route: RouteRow | undefined }) {
-  const { t } = useTranslation("common");
-  const name = route ? routeName(route, t) : t("explorer_network");
+/** A step's icon size, and the gap after a step's mark, px. */
+const MARK = 13;
+const MARK_GAP = 8;
+
+/** Each step's indent under the one above, px. */
+const STEP = 16;
+
+/** The tree's connector: down from the mark above at `depth - 1`, and
+ * across to this row's centre. `top` is where it starts, above the row. */
+function Elbow({ depth, top, height }: { depth: number; top: number; height: number }) {
   return (
-    // A label, not a control: no box around it, just a bar in the route's
-    // colour (grey for the network) marking what the figures cover.
-    <Stack
-      direction="row"
-      alignItems="center"
-      spacing={1}
+    <Box
+      aria-hidden
       sx={{
-        height: 24,
-        mt: 0.5,
-        pl: 1.25,
-        borderLeft: 3,
-        borderColor: route ? routeColor(route.color, modeOf(route.route_type)) : "text.disabled",
-      }}>
-      {route ? (
-        <RouteBadge route={route} small />
-      ) : (
-        <Box sx={{ display: "flex", color: "text.secondary" }}>
-          <Icon iconName={ICON_NAME.WORKFLOW} style={{ fontSize: 13 }} htmlColor="inherit" />
-        </Box>
-      )}
-      <Typography variant="body2" fontWeight={600} noWrap title={name}>
-        {name}
-      </Typography>
-    </Stack>
+        position: "absolute",
+        left: `${(depth - 1) * STEP + 6}px`,
+        top,
+        width: 8,
+        height,
+        borderLeft: "1.5px solid",
+        borderBottom: "1.5px solid",
+        borderColor: "divider",
+        borderBottomLeftRadius: 4,
+      }}
+    />
   );
 }
 
-function Figure({ value, label }: { value: string | undefined; label: string }) {
+/** One step: what it covers and its year's cost; an elbow joins it to the
+ * step above. */
+function Step({
+  depth,
+  mark,
+  name,
+  annual,
+  deepest,
+}: {
+  depth: number;
+  mark: ReactNode;
+  name: string;
+  annual: AnnualFigures | undefined;
+  deepest: boolean;
+}) {
+  const { i18n } = useTranslation("common");
+  const { settings } = useExplorer();
+  const lang = i18n.language;
   return (
-    <Box sx={{ minWidth: 0 }}>
-      {value ? (
-        <Typography variant="body2" fontWeight="bold" noWrap>
-          {value}
+    <Box sx={{ position: "relative", pl: `${depth * STEP}px`, mt: 0.75 }}>
+      {depth > 0 && <Elbow depth={depth} top={-10} height={22} />}
+      <Stack direction="row" alignItems="center" spacing={`${MARK_GAP}px`} sx={{ minHeight: 24 }}>
+        <Box sx={{ display: "flex", alignItems: "center", color: "text.secondary", flexShrink: 0 }}>
+          {mark}
+        </Box>
+        <Typography
+          variant="body2"
+          fontWeight={deepest ? 700 : 600}
+          noWrap
+          title={name}
+          sx={{ flex: 1, minWidth: 0 }}>
+          {name}
         </Typography>
-      ) : (
-        <Skeleton variant="rounded" width={44} height={14} sx={{ my: "3px" }} />
-      )}
-      <Typography variant="caption" color="text.secondary" display="block" noWrap>
-        {label}
-      </Typography>
+        {annual ? (
+          <Typography
+            fontWeight="bold"
+            noWrap
+            sx={{ fontSize: deepest ? 20 : 14, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>
+            ≈ {money(annual.cost, lang, settings.currency)}
+          </Typography>
+        ) : (
+          <Skeleton variant="rounded" width={deepest ? 72 : 52} height={deepest ? 22 : 16} />
+        )}
+      </Stack>
     </Box>
   );
 }
 
-export function CostSection() {
+/** Row height of a figure, and the gap above it, px. */
+const FIGURE_H = 20;
+const FIGURE_GAP = 2;
+
+/** One of the deepest step's yearly figures, hung off it as a branch, so
+ * it reads as that step's: what it counts, and how many. The first
+ * branch starts under the step's mark; the next carries the line on. */
+function Figure({
+  depth,
+  first,
+  label,
+  value,
+}: {
+  depth: number;
+  first: boolean;
+  label: string;
+  value: string;
+}) {
+  return (
+    <Box sx={{ position: "relative", pl: `${depth * STEP}px`, mt: `${FIGURE_GAP}px` }}>
+      <Elbow
+        depth={depth}
+        top={first ? -6 : -(FIGURE_GAP + FIGURE_H / 2)}
+        height={first ? 6 + FIGURE_H / 2 : FIGURE_GAP + FIGURE_H}
+      />
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ height: FIGURE_H }}>
+        <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1, minWidth: 0 }}>
+          {label}
+        </Typography>
+        <Typography
+          variant="caption"
+          fontWeight={600}
+          noWrap
+          sx={{ fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+          {value}
+        </Typography>
+      </Stack>
+    </Box>
+  );
+}
+
+/** Memoised: the map layout re-renders around the left panel. */
+export const CostSection = memo(Cost);
+
+function Cost() {
   const { t, i18n } = useTranslation("common");
   const dispatch = useAppDispatch();
   const lang = i18n.language;
   const { db, complete, window, settings } = useExplorer();
   const selectedRouteId = useAppSelector((s) => s.explorer.selectedRouteId);
   const date = useAppSelector((s) => s.explorer.date);
+  const trip = useAppSelector((s) => {
+    const item = panelItem(s.explorer);
+    return item?.kind === "trip" ? item : null;
+  });
   const routes = useRoutes(db);
-  const route = routes.data?.find((r) => r.route_id === selectedRouteId);
-  // Both answers are remembered per database: the route summary above asks
+  // The line: the selected one, or the open trip's.
+  const line =
+    routes.data?.find((r) => r.route_id === selectedRouteId) ??
+    (trip
+      ? routes.data?.find(
+          (r) =>
+            r.trip_lo !== null &&
+            r.trip_hi !== null &&
+            r.trip_lo <= trip.trip_idx &&
+            trip.trip_idx <= r.trip_hi
+        )
+      : undefined);
+  // Each answer is remembered per database: the route summary above asks
   // for the same ones, so nothing is computed twice.
-  const network = useNetworkCost(complete && !route ? db : undefined, window, settings);
-  const summary = useRouteSummary(complete && route ? db : undefined, route, date, window, settings);
-  const annual = route ? summary.data?.annual : network.data;
+  const network = useNetworkCost(complete ? db : undefined, window, settings);
+  const summary = useRouteSummary(complete && line ? db : undefined, line, date, window, settings);
+  const tripCost = useTripCost(
+    complete && trip ? db : undefined,
+    trip?.trip_idx ?? -1,
+    line,
+    window,
+    settings
+  );
   const pending = useTimetablesPending();
   const year = window ? costYear(window) : null;
-  const period = year && {
-    label: t(`explorer_cost_period_${year.kind}`, {
-      year: year.from.slice(0, 4),
-      span: dateSpan(year.from, year.to, lang),
-    }),
-    hint: t(`explorer_cost_period_${year.kind}_hint`),
-  };
+
+  const steps: { mark: ReactNode; name: string; annual: AnnualFigures | undefined }[] = [
+    {
+      mark: <Icon iconName={ICON_NAME.WORKFLOW} style={{ fontSize: MARK }} htmlColor="inherit" />,
+      name: t("explorer_network"),
+      annual: network.data,
+    },
+  ];
+  if (line)
+    steps.push({
+      mark: <RouteBadge route={line} small />,
+      name: routeName(line, t),
+      annual: summary.data?.annual,
+    });
+  if (line && trip)
+    steps.push({
+      mark: <Icon iconName={ICON_NAME.CLOCK} style={{ fontSize: MARK }} htmlColor="inherit" />,
+      name: t("explorer_cost_trip", { time: clock(trip.run_dep_s) }),
+      annual: tripCost.data,
+    });
+
+  const deepest = steps[steps.length - 1].annual;
 
   return (
-    // Its own tinted ground: the cost is a standing part of the Explorer,
-    // not a footnote to the list above.
     <Stack
       sx={{
-        height: COST_SECTION_HEIGHT,
-        flexShrink: 0,
-        overflow: "hidden",
-        borderTop: 1,
-        borderColor: "divider",
-        bgcolor: "action.hover",
-        px: 2.5,
-        pt: 1,
-        pb: 2,
+        px: PX,
+        pt: 1.5,
       }}>
       {/* Laid out like the tab's section headers: icon, name, action. */}
-      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minHeight: 36 }}>
+      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minHeight: 32 }}>
         <Icon iconName={ICON_NAME.COINS} style={{ fontSize: 14 }} htmlColor="inherit" />
-        <Typography variant="body2" fontWeight="bold" sx={{ flex: 1 }} noWrap>
+        <Typography variant="body2" fontWeight="bold" noWrap sx={{ flex: 1 }}>
           {t("explorer_operating_cost")}
         </Typography>
+        {!network.data && (
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {pending ?? t("explorer_calculating")}
+          </Typography>
+        )}
         <Tooltip title={t("explorer_cost_rates")}>
           <IconButton
             size="small"
@@ -130,44 +236,60 @@ export function CostSection() {
           </IconButton>
         </Tooltip>
       </Stack>
-      <Scope route={route} />
-
-      <Box sx={{ mt: 1.75 }}>
-        <Stack direction="row" alignItems={annual ? "baseline" : "center"} spacing={1} sx={{ minHeight: 31 }}>
-          {annual ? (
-            <Typography fontWeight="bold" noWrap sx={{ fontSize: 26, lineHeight: 1.2 }}>
-              ≈ {money(annual.cost, lang, settings.currency)}
-            </Typography>
-          ) : (
-            <Skeleton variant="rounded" width={84} height={26} sx={{ my: "2.5px" }} />
-          )}
-          {annual ? (
-            <Typography variant="body2" color="text.secondary" noWrap>
-              {t("explorer_a_year")} · {t("explorer_no_edits")}
-            </Typography>
-          ) : (
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {pending ?? t("explorer_calculating")}
-            </Typography>
-          )}
-        </Stack>
-        <Stack direction="row" spacing={3} sx={{ mt: 1 }}>
-          <Figure value={annual && compact(annual.vehicle_km, lang)} label={t("explorer_vehicle_km_year")} />
+      {steps.map((s, i) => (
+        <Step
+          key={i}
+          depth={i}
+          mark={s.mark}
+          name={s.name}
+          annual={s.annual}
+          deepest={i === steps.length - 1}
+        />
+      ))}
+      {/* The deepest step's vehicle-km and -hours, as its branches. */}
+      <Box sx={{ mt: "4px" }}>
+        {[
+          ["explorer_cost_km", deepest?.vehicle_km],
+          ["explorer_cost_hours", deepest?.vehicle_hours],
+        ].map(([key, value], i) => (
           <Figure
-            value={annual && compact(annual.vehicle_hours, lang)}
-            label={t("explorer_vehicle_hours_year")}
+            key={key}
+            depth={steps.length}
+            first={i === 0}
+            label={t(key as string)}
+            value={value === undefined ? "–" : compact(value as number, lang)}
           />
-        </Stack>
-        {/* Which year the figures are for: this calendar year where the feed
-            covers it, else a year of the feed, or all of a shorter one. */}
-        {period && (
-          <Tooltip title={period.hint}>
-            <Typography variant="caption" color="text.secondary" display="block" noWrap sx={{ mt: 1 }}>
-              {period.label}
-            </Typography>
-          </Tooltip>
-        )}
+        ))}
       </Box>
+      {/* The foot of the card: every figure above is a year's, and the
+          days of the feed it is counted from. */}
+      {year && (
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="center"
+          spacing={1}
+          sx={{
+            mx: -PX,
+            mt: 1.5,
+            px: PX,
+            py: 0.75,
+            borderTop: 1,
+            borderColor: "divider",
+            bgcolor: "action.hover",
+            minWidth: 0,
+          }}>
+          <Typography variant="caption" fontWeight={600} noWrap>
+            {t("explorer_cost_annual")}
+          </Typography>
+          <Box aria-hidden sx={{ width: "1px", height: 12, bgcolor: "divider", flexShrink: 0 }} />
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {t("explorer_cost_based_on", {
+              span: `${formatDate(year.from, DATE)} - ${formatDate(year.to, DATE)}`,
+            })}
+          </Typography>
+        </Stack>
+      )}
     </Stack>
   );
 }
