@@ -71,7 +71,10 @@ implemented yet; the module docstring describes how each would fit.
 
 A serial number is never handed out twice: the writer counts from the larger of
 the table's maximum and the column's high-water mark (core's
-`layer_serial_counter`, read and advanced by geoapi under its per-layer lock).
+`layer_serial_counter`, read and advanced under the per-layer lock in
+`goatlib.utils.layer_lock`: by geoapi's feature writes, and by `finalize_layer`
+when a workflow's "Save as dataset" adds rows to an existing dataset, which
+follows the same field rules as a hand edit (`goatlib.utils.field_config`).
 `layer_create_filtered` copies the source's marks along with its
 `field_config`; a copy made any other way (project export and import) has no
 mark and continues from its own highest number.
@@ -135,6 +138,16 @@ runner's DuckLake connection.
 
 Sessions carry an `application_name` (`goat-geoapi-ducklake`, `goat-tools`,
 …) so operators can tell them apart in `pg_stat_activity`.
+
+No attach puts a password into its connection string:
+`goatlib.utils.credentials.postgres_attach_target` moves it into the DuckDB
+connection's Postgres secret, which every Postgres connection of that DuckDB
+connection uses, and hands back the rest as a libpq string, the only form
+DuckDB merges the secret into. One DuckDB connection therefore holds one
+Postgres password. Error text that processes or a workflow run hands on goes
+through `redact_credentials`. Postgres URIs are built with `postgres_uri`,
+which percent-encodes the user, password and database, and libpq strings quote
+their values, so a password may hold any character.
 
 Behind a connection pooler in transaction mode (`POSTGRES_TRANSACTION_POOLER`)
 each query may run on another server connection, and a pooler with stock
