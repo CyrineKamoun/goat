@@ -253,7 +253,7 @@ services:
     image: ${GOAT_REGISTRY:-ghcr.io/plan4better/goat}/windmill-worker-tools:${GOAT_VERSION:-latest}
     restart: "no"
     logging: *logging
-    entrypoint: ["python", "/init/garage-init.py"]
+    entrypoint: ["python", "-m", "goatlib.storage.garage_init"]
     environment:
       GARAGE_ADMIN_URL: http://garage:3903
       GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN}
@@ -263,8 +263,6 @@ services:
       GOAT_PUBLIC_URL: ${GOAT_PUBLIC_URL}
       UPLOADS_BUCKET: ${S3_BUCKET_NAME:-goat-uploads}
       ASSETS_BUCKET: ${ASSETS_BUCKET_NAME:-goat-assets}
-    volumes:
-      - ./init/garage:/init:ro
     networks: [goat]
     depends_on:
       garage:
@@ -472,6 +470,7 @@ services:
       AWS_ACCESS_KEY_ID: ${ASSETS_S3_ACCESS_KEY_ID:-${S3_ACCESS_KEY_ID}}
       AWS_SECRET_ACCESS_KEY: ${ASSETS_S3_SECRET_ACCESS_KEY:-${S3_SECRET_ACCESS_KEY}}
       AWS_REGION: ${S3_REGION:-garage}
+      ASSETS_SERVED_BY_CORE: ${ASSETS_SERVED_BY_CORE:-false}
       # Product artwork: served by the web app under /assets unless a mirror
       # is set
       STATIC_ASSETS_URL: ${STATIC_ASSETS_URL:-}

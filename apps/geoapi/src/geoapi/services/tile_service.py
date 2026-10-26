@@ -374,11 +374,14 @@ class TileService:
         )
 
     def _find_pmtiles_by_layer_id(self, layer_id: str) -> Path | None:
-        """Find PMTiles file for a layer using glob search (no schema lookup needed).
+        """Find PMTiles file for a layer by its id alone (no schema lookup needed).
 
-        This bypasses the DuckDB schema lookup by searching the filesystem directly.
-        PMTiles are stored as: {tiles_data_dir}/{schema_name}/t_{layer_id_no_hyphens}.pmtiles
-        Temp PMTiles are stored as: {temp_data_dir}/**/t_{layer_id_no_hyphens}.pmtiles
+        PMTiles are stored flat as {tiles_data_dir}/t_{layer_id_no_hyphens}.pmtiles
+        (catalog layers under {catalog_tiles_dir}), so finding them is a stat() of
+        a known path. The tiles directory is never listed: it holds tens of
+        thousands of files, and listing it has failed outright on NFS clients
+        that cached it. Temp PMTiles are stored as
+        {temp_data_dir}/**/t_{layer_id_no_hyphens}.pmtiles.
 
         Args:
             layer_id: Layer UUID (with or without hyphens)
@@ -401,24 +404,16 @@ class TileService:
             self._pmtiles_path_cache[layer_id_normalized] = catalog
             return catalog
 
-        # Tiles are written flat; the glob below only reaches the legacy
-        # schema-nested layout, one directory down.
         flat = self.tiles_data_dir / f"t_{layer_id_normalized}.pmtiles"
         if flat.exists():
             self._pmtiles_path_cache[layer_id_normalized] = flat
             return flat
 
-        # Legacy layout: <schema>/t_{layer_id}.pmtiles
-        pattern = f"*/t_{layer_id_normalized}.pmtiles"
-        matches = list(self.tiles_data_dir.glob(pattern))
-
-        # Also search in temp directory
-        if not matches:
-            temp_data_dir = self.tiles_data_dir.parent / "temporary"
-            if temp_data_dir.exists():
-                matches = list(
-                    temp_data_dir.glob(f"**/t_{layer_id_normalized}.pmtiles")
-                )
+        # Workflow temp results are nested by user, workflow and node.
+        matches: list[Path] = []
+        temp_data_dir = self.tiles_data_dir.parent / "temporary"
+        if temp_data_dir.exists():
+            matches = list(temp_data_dir.glob(f"**/t_{layer_id_normalized}.pmtiles"))
 
         if matches:
             path = matches[0]
@@ -659,8 +654,8 @@ class TileService:
             return None
         version = _tiles_version(pmtiles_path, label)
         if version is None:
-            # The cached path is gone: rewritten elsewhere (legacy nested path
-            # replaced by the flat one) or deleted for regeneration. Look again.
+            # The cached path is gone: rewritten elsewhere or deleted for
+            # regeneration. Look again.
             self._pmtiles_path_cache.pop(layer_id.replace("-", ""), None)
             pmtiles_path = self._find_pmtiles_by_layer_id(layer_id)
             if pmtiles_path is None:
