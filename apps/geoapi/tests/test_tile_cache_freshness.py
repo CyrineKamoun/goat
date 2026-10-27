@@ -7,7 +7,9 @@ same layer id, so every tile someone had already looked at came back old for
 up to an hour, which looked exactly like the overwrite had not happened.
 """
 
+import asyncio
 import os
+import threading
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -60,7 +62,9 @@ async def test_regenerated_tiles_are_not_served_from_the_cache(tmp_path: Path) -
     reads = AsyncMock(side_effect=[(b"old tile", True), (b"new tile", True)])
 
     with (
-        patch.object(service, "_find_pmtiles_by_layer_id", return_value=pmtiles),
+        patch.object(
+            service, "_find_pmtiles_by_layer_id_async", AsyncMock(return_value=pmtiles)
+        ),
         patch.object(service, "_get_tile_from_pmtiles_path", new=reads),
         patch("geoapi.tile_cache.get_redis_client", return_value=_FakeRedis()),
     ):
@@ -160,3 +164,46 @@ def test_lookup_by_layer_id_never_lists_the_tiles_directory(tmp_path: Path) -> N
     flat = tmp_path / "t_abc.pmtiles"
     flat.write_bytes(b"pmtiles")
     assert service._find_pmtiles_by_layer_id("abc") == flat
+
+
+@pytest.mark.asyncio
+async def test_temp_tree_search_runs_once_off_the_event_loop(tmp_path: Path) -> None:
+    """A layer without tiles is served dynamically, so every one of its tile
+    requests asks for its PMTiles. Walking the workflow temp tree each time
+    blocked the event loop on network storage until even the health check
+    timed out: the walk runs in a worker thread, once per layer while its
+    "not found" verdict lasts, however many requests arrive together."""
+    (tmp_path / "temporary").mkdir()
+    service = _service_over(tmp_path / "tiles")
+    walks: list[str] = []
+    real_glob = Path.glob
+
+    def recording_glob(self: Path, pattern: str) -> Any:
+        walks.append(threading.current_thread().name)
+        return real_glob(self, pattern)
+
+    with patch.object(Path, "glob", recording_glob):
+        found = await asyncio.gather(
+            *(service._find_pmtiles_by_layer_id_async("abc") for _ in range(5))
+        )
+        again = await service._find_pmtiles_by_layer_id_async("abc")
+
+    assert found == [None] * 5 and again is None
+    assert len(walks) == 1
+    assert walks[0] != threading.main_thread().name
+
+
+@pytest.mark.asyncio
+async def test_workflow_tiles_written_later_are_found_after_invalidation(
+    tmp_path: Path,
+) -> None:
+    temp = tmp_path / "temporary" / "user_u" / "w_w" / "n_n"
+    temp.mkdir(parents=True)
+    service = _service_over(tmp_path / "tiles")
+    assert await service._find_pmtiles_by_layer_id_async("abc") is None
+
+    tiles = temp / "t_abc.pmtiles"
+    tiles.write_bytes(b"pmtiles")
+    service.invalidate_pmtiles_path_cache("abc")
+
+    assert await service._find_pmtiles_by_layer_id_async("abc") == tiles
