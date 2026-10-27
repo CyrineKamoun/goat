@@ -18,20 +18,20 @@ const manifest = (bytes: number): SnapshotManifest => ({
 });
 const db = { loadParquet: vi.fn(async () => undefined) } as unknown as ExplorerDb;
 
-/** A response that sends `chunks`, then, unless `end`, nothing more until aborted. */
+/** A response that sends `chunks`, then, unless `end`, nothing more until
+ * aborted. Only what `loadSnapshot` reads of a response, not a real stream:
+ * vitest's vmForks pool (CI) gives the jsdom environment no ReadableStream. */
 function respond(chunks: Uint8Array[], end: boolean) {
   request.mockImplementation(async (_url: string, { signal }: { signal: AbortSignal }) => {
     let i = 0;
-    const body = new ReadableStream<Uint8Array>({
-      pull(controller) {
-        if (i < chunks.length) return void controller.enqueue(chunks[i++]);
-        if (end) return void controller.close();
-        return new Promise<void>((_, reject) =>
-          signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")))
-        );
-      },
-    });
-    return new Response(body, { status: 200 });
+    const read = (): Promise<{ done: boolean; value?: Uint8Array }> => {
+      if (i < chunks.length) return Promise.resolve({ done: false, value: chunks[i++] });
+      if (end) return Promise.resolve({ done: true });
+      return new Promise((_, reject) =>
+        signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")))
+      );
+    };
+    return { ok: true, status: 200, statusText: "OK", body: { getReader: () => ({ read }) } };
   });
 }
 
