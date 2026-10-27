@@ -161,26 +161,26 @@ function Cost() {
     return item?.kind === "trip" ? item : null;
   });
   const routes = useRoutes(db);
-  // The line: the selected one, or the open trip's.
-  const line =
-    routes.data?.find((r) => r.route_id === selectedRouteId) ??
-    (trip
-      ? routes.data?.find(
-          (r) =>
-            r.trip_lo !== null &&
-            r.trip_hi !== null &&
-            r.trip_lo <= trip.trip_idx &&
-            trip.trip_idx <= r.trip_hi
-        )
-      : undefined);
+  // The open trip's own line: a route's trips are one range of trip_idx.
+  const tripLine = trip
+    ? routes.data?.find(
+        (r) =>
+          r.trip_lo !== null && r.trip_hi !== null && r.trip_lo <= trip.trip_idx && trip.trip_idx <= r.trip_hi
+      )
+    : undefined;
+  // The line: the selected one, or the open trip's. The trip is a step only
+  // under its own line: a trip left open from another line, when a line is
+  // selected in the panel, is not part of it.
+  const line = routes.data?.find((r) => r.route_id === selectedRouteId) ?? tripLine;
+  const tripShown = !!trip && !!line && line.route_id === tripLine?.route_id;
   // Each answer is remembered per database: the route summary above asks
   // for the same ones, so nothing is computed twice.
   const network = useNetworkCost(complete ? db : undefined, window, settings);
   const summary = useRouteSummary(complete && line ? db : undefined, line, date, window, settings);
   const tripCost = useTripCost(
-    complete && trip ? db : undefined,
+    complete && tripShown ? db : undefined,
     trip?.trip_idx ?? -1,
-    line,
+    tripLine,
     window,
     settings
   );
@@ -200,7 +200,7 @@ function Cost() {
       name: routeName(line, t),
       annual: summary.data?.annual,
     });
-  if (line && trip)
+  if (trip && tripShown)
     steps.push({
       mark: <Icon iconName={ICON_NAME.CLOCK} style={{ fontSize: MARK }} htmlColor="inherit" />,
       name: t("explorer_cost_trip", { time: clock(trip.run_dep_s) }),
