@@ -55,28 +55,35 @@ export function routeColor(color: string | null, mode: ModeKey): string {
   return fallback[mode] ?? "#6A1B9A";
 }
 
-/** `color` (`#RRGGBB`) mixed with white, `share` of it kept: a faded line
- * that stays opaque, so lines drawn over each other do not add up. */
-export function tint(color: string, share: number): string {
-  const hex = color.replace("#", "");
+/** `color` (`#RRGGBB`) mixed with `toward` (white unless said), `share` of
+ * it kept: a faded line that stays opaque, so lines drawn over each other do
+ * not add up. */
+export function tint(color: string, share: number, toward = "#FFFFFF"): string {
+  const [hex, to] = [color, toward].map((c) => c.replace("#", ""));
   return `#${[0, 2, 4]
     .map((i) => {
       const c = parseInt(hex.slice(i, i + 2), 16);
-      return Math.round(255 - (255 - c) * share)
+      const t = parseInt(to.slice(i, i + 2), 16);
+      return Math.round(t - (t - c) * share)
         .toString(16)
         .padStart(2, "0");
     })
     .join("")}`;
 }
 
-/** Text that reads on `background` (WCAG relative luminance). */
-export function textOn(background: string): string {
-  const hex = background.replace("#", "");
+/** The WCAG relative luminance of `color` (`#RRGGBB`), 0 for black to 1. */
+export function luminance(color: string): number {
+  const hex = color.replace("#", "");
   const [r, g, b] = [0, 2, 4].map((i) => {
     const c = parseInt(hex.slice(i, i + 2), 16) / 255;
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? "#000000" : "#FFFFFF";
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Text that reads on `background`. */
+export function textOn(background: string): string {
+  return luminance(background) > 0.4 ? "#000000" : "#FFFFFF";
 }
 
 /** The colour of a route's number on its badge: the feed's text colour, else

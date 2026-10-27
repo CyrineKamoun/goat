@@ -211,13 +211,16 @@ export async function networkStations(db: SqlRunner): Promise<FeatureCollection<
  */
 export function shapeColorExpression(
   shapes: Map<string, NetworkShape>,
-  fallback: string
+  fallback: string,
+  /** How the map draws a colour (lifted on a dark basemap). */
+  paint: (color: string) => string = (color) => color
 ): string | ["match", ["to-string", ["get", "shape_id"]], ...unknown[]] {
   const byColor = new Map<string, string[]>();
   for (const [id, shape] of shapes) {
-    const ids = byColor.get(shape.color);
+    const color = paint(shape.color);
+    const ids = byColor.get(color);
     if (ids) ids.push(id);
-    else byColor.set(shape.color, [id]);
+    else byColor.set(color, [id]);
   }
   if (!byColor.size) return fallback;
   const branches = [...byColor].flatMap(([color, ids]) => [ids, color]);

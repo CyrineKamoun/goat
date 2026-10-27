@@ -25,6 +25,7 @@ import { vehicleFrame } from "@/lib/explorer/derive/vehicles";
 import { directionsOnShapes } from "@/lib/explorer/directionChoice";
 import { routeMatches } from "@/lib/explorer/filters";
 import { highlightStore } from "@/lib/explorer/highlightStore";
+import { mapColor, mapPalette } from "@/lib/explorer/mapPalette";
 import { tint } from "@/lib/explorer/modes";
 import { networkStore, shapeColorExpression } from "@/lib/explorer/network";
 import { playbackClock } from "@/lib/explorer/playback";
@@ -44,7 +45,6 @@ import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
 
 import { EXPLORER_PANEL_WIDTH } from "@/components/explorer/ExplorerLeftPanel";
 import { RouteBadge } from "@/components/explorer/RouteBadge";
-import { STOP_FILL } from "@/components/explorer/StopMarker";
 import { directionLabel } from "@/components/explorer/directionWords";
 import { EXPLORER_RIGHT_PANEL_WIDTH } from "@/components/explorer/right/panelSize";
 import { bottomBarHeight } from "@/components/explorer/strip/stripLayout";
@@ -53,10 +53,6 @@ import { VEHICLE_LAYER_ID, VehicleLayer } from "@/components/explorer/vehicleLay
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 const NO_VEHICLES = vehicleFrame();
 const NETWORK = "explorer-network";
-const FADED = "#9E9E9E";
-/** A line the Explorer tab's filter leaves out: FADED, see-through, as the
- * faded layer draws it (0.35 opacity under the layer's 0.9). */
-const FADED_FILTERED = "rgba(158, 158, 158, 0.4)";
 /** How close a picked stop is shown: near enough to tell its platforms and
  * the streets round it apart. A station is fitted whole, no closer. */
 const STOP_ZOOM = 17;
@@ -251,6 +247,11 @@ export function ExplorerMapLayers() {
   // › Automatic behaviour). A line is fitted whole however it is picked.
   const onMap = useRef<{ stop?: number }>({});
   const theme = useTheme();
+  // Drawn for the basemap under it, light or dark (lib/explorer/mapPalette).
+  // In the Explorer the store always holds this project's basemap: the one
+  // saved with it, or the theme's (useExplorerBasemap).
+  const basemap = useAppSelector((s) => s.map.activeBasemap?.value);
+  const palette = mapPalette(basemap);
   // One array for as long as the layer is the same: a new one makes the map
   // replace the source, and with it every shape's styling.
   const networkTiles = useMemo(
@@ -290,10 +291,10 @@ export function ExplorerMapLayers() {
       selectedRouteId,
       openTrip: openTrip ? { trip_idx: openTrip.trip_idx, run_dep_s: openTrip.run_dep_s } : null,
       ring: theme.palette.primary.main,
-      faded: FADED,
+      faded: palette.faded,
       pickedTrips,
     });
-  }, [vehicles, selectedRouteId, openTrip, theme.palette.primary.main, pickedTrips]);
+  }, [vehicles, selectedRouteId, openTrip, theme.palette.primary.main, palette.faded, pickedTrips]);
 
   // The Explorer's layers in drawing order, bottom to top. Sources mount as
   // their data arrives — the network after the route's stops — and a layer
@@ -369,7 +370,10 @@ export function ExplorerMapLayers() {
       map.off("sourcedata", onData);
     };
   }, [map, active, network, filters]);
-  const shapeColor = useMemo(() => shapeColorExpression(network.shapes, FADED), [network.shapes]);
+  const shapeColor = useMemo(
+    () => shapeColorExpression(network.shapes, palette.faded, (c) => mapColor(c, palette)),
+    [network.shapes, palette]
+  );
 
   // A click opens what it lands on: a vehicle its trip, a stop its
   // timetable, a line its route — where several routes share the shapes
@@ -734,7 +738,7 @@ export function ExplorerMapLayers() {
   }, [map, drawing?.routeId]);
 
   if (!active) return null;
-  const color = drawing?.color ?? theme.palette.primary.main;
+  const color = mapColor(drawing?.color ?? theme.palette.primary.main, palette);
   const selectedShapes: FilterSpecification = [
     "in",
     ["get", "shape_id"],
@@ -785,7 +789,7 @@ export function ExplorerMapLayers() {
             // Berlin's heap past 900 MB zoomed in and out (23 Oct 2026).
             layout={{ visibility: allFaded ? "none" : "visible" }}
             paint={{
-              "line-color": ["case", faded, FADED_FILTERED, shapeColor] as ExpressionSpecification,
+              "line-color": ["case", faded, palette.filtered, shapeColor] as ExpressionSpecification,
               "line-opacity": 0.9,
               "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1.2, 14, 3.5],
             }}
@@ -800,19 +804,20 @@ export function ExplorerMapLayers() {
             filter={highlighting ? ["!", selectedShapes] : all}
             layout={{ visibility: allFaded ? "visible" : "none" }}
             paint={{
-              "line-color": FADED,
+              "line-color": palette.faded,
               "line-opacity": 0.35,
               "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.6, 14, 1.5],
             }}
           />
-          {/* The selected route over the rest, on a white casing. */}
+          {/* The selected route over the rest, on a casing of the map's
+              ground: white on a light basemap, near-black on the dark. */}
           <Layer
             id="explorer-route-casing"
             type="line"
             source-layer={TILE_LAYER}
             filter={selectedShapes}
             layout={{ "line-cap": "round", "line-join": "round" }}
-            paint={{ "line-color": "#FFFFFF", "line-width": 8 }}
+            paint={{ "line-color": palette.ground, "line-width": 8 }}
           />
           <Layer
             id="explorer-route-line"
@@ -824,7 +829,7 @@ export function ExplorerMapLayers() {
             // transparency: a route's many shapes lie over each other, and
             // see-through lines would add up to solid again.
             paint={{
-              "line-color": highlighting ? tint(color, 0.3) : color,
+              "line-color": highlighting ? tint(color, 0.3, palette.ground) : color,
               "line-width": highlighting ? 3.5 : 4.5,
             }}
           />
@@ -834,7 +839,7 @@ export function ExplorerMapLayers() {
             source-layer={TILE_LAYER}
             filter={highlighting && !sections ? patternShapes : none}
             layout={{ "line-cap": "round", "line-join": "round" }}
-            paint={{ "line-color": "#FFFFFF", "line-width": 10 }}
+            paint={{ "line-color": palette.ground, "line-width": 10 }}
           />
           <Layer
             id="explorer-pattern-line"
@@ -856,7 +861,7 @@ export function ExplorerMapLayers() {
           id="explorer-pattern-section-casing"
           type="line"
           layout={{ "line-cap": "round", "line-join": "round" }}
-          paint={{ "line-color": "#FFFFFF", "line-width": 10 }}
+          paint={{ "line-color": palette.ground, "line-width": 10 }}
         />
         <Layer
           id="explorer-pattern-section-line"
@@ -890,7 +895,7 @@ export function ExplorerMapLayers() {
           type="fill"
           minzoom={14}
           paint={{
-            "fill-color": STOP_FILL,
+            "fill-color": palette.stop,
             "fill-opacity": ["interpolate", ["linear"], ["zoom"], 14, 0, 15, selectedRouteId ? 0.1 : 0.16],
           }}
         />
@@ -899,14 +904,14 @@ export function ExplorerMapLayers() {
           type="line"
           minzoom={14}
           paint={{
-            "line-color": STOP_FILL,
+            "line-color": palette.stop,
             "line-width": 1,
             "line-opacity": ["interpolate", ["linear"], ["zoom"], 14, 0, 15, selectedRouteId ? 0.3 : 0.55],
           }}
         />
       </Source>
       {/* The network's stops from street level, to click for a timetable:
-          the stops layer's grey dot in a white ring (StopMarker). */}
+          a grey dot in a ring of the map's ground (StopMarker's, on white). */}
       <Source key="explorer-stops" id="explorer-stops" type="geojson" data={network.stops}>
         <Layer
           id="explorer-stop-dot"
@@ -914,8 +919,8 @@ export function ExplorerMapLayers() {
           minzoom={13}
           paint={{
             "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 2, 16, 4],
-            "circle-color": STOP_FILL,
-            "circle-stroke-color": "#FFFFFF",
+            "circle-color": palette.stop,
+            "circle-stroke-color": palette.stopRing,
             "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 13, 1, 16, 2],
             "circle-opacity": selectedRouteId ? 0.6 : 1,
             "circle-stroke-opacity": selectedRouteId ? 0.6 : 1,
@@ -982,8 +987,8 @@ export function ExplorerMapLayers() {
             "text-max-width": 12,
           }}
           paint={{
-            "text-color": theme.palette.text.primary,
-            "text-halo-color": "#FFFFFF",
+            "text-color": palette.label,
+            "text-halo-color": palette.ground,
             "text-halo-width": 2,
           }}
         />
