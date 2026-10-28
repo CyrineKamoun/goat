@@ -69,6 +69,15 @@ export function dateSpan(from: string, to: string, locale: string): string {
   }).formatRange(new Date(`${from}T00:00:00Z`), new Date(`${to}T00:00:00Z`));
 }
 
+/** `Oct 2026` (`Okt. 2026` in German). */
+export function monthYear(date: string, locale: string): string {
+  return new Intl.DateTimeFormat(dateLocale(locale), {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T00:00:00Z`));
+}
+
 /** `Tue 6 Oct`. */
 export function shortDate(date: string, locale: string): string {
   return new Intl.DateTimeFormat(dateLocale(locale), {

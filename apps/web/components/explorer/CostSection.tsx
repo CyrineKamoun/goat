@@ -14,9 +14,8 @@ import { useTranslation } from "react-i18next";
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
 import { type AnnualFigures, costYear } from "@/lib/explorer/derive/cost";
-import { clock, compact, money } from "@/lib/explorer/format";
+import { clock, compact, money, monthYear } from "@/lib/explorer/format";
 import { openExplorerSettings, panelItem } from "@/lib/store/explorer/slice";
-import { formatDate } from "@/lib/utils/helpers";
 
 import { useNetworkCost, useRouteSummary, useRoutes, useTripCost } from "@/hooks/explorer/useExplorerData";
 import { useAppDispatch, useAppSelector } from "@/hooks/store/ContextHooks";
@@ -26,8 +25,11 @@ import { useTimetablesPending } from "@/components/explorer/ExplorerLoading";
 import { RouteBadge, routeName } from "@/components/explorer/RouteBadge";
 import { PX } from "@/components/explorer/SectionHeader";
 
-/** How the cost bar writes a date. */
-const DATE = "DD.MM.YYYY";
+/** The days counted, by month: `Oct 2026 - Dec 2026`, one month once. */
+function monthSpan(from: string, to: string, lang: string): string {
+  const [a, b] = [monthYear(from, lang), monthYear(to, lang)];
+  return a === b ? a : `${a} - ${b}`;
+}
 
 /** A step's icon size, and the gap after a step's mark, px. */
 const MARK = 13;
@@ -282,10 +284,12 @@ function Cost() {
           <Typography variant="caption" fontWeight={600} noWrap>
             {t("explorer_cost_annual")}
           </Typography>
-          <Box aria-hidden sx={{ width: "1px", height: 12, bgcolor: "divider", flexShrink: 0 }} />
+          {/* Darker than the divider colour, which barely shows on the bar's
+              tint. */}
+          <Box aria-hidden sx={{ width: "1px", height: 14, bgcolor: "text.disabled", flexShrink: 0 }} />
           <Typography variant="caption" color="text.secondary" noWrap>
             {t("explorer_cost_based_on", {
-              span: `${formatDate(year.from, DATE)} - ${formatDate(year.to, DATE)}`,
+              span: monthSpan(year.from, year.to, lang),
             })}
           </Typography>
         </Stack>
