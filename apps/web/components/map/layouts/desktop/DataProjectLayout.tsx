@@ -67,6 +67,9 @@ const EXPLORER_FOOT = 30;
 const MAP_CONTROLS_WIDTH = 40;
 const EXPLORER_CONTROLS_LIFT = 8;
 const EXPLORER_FOOT_GAP = 8;
+/** The Explorer's bottom bar from the left panel: the same 8 px as the cost
+ * card under it. */
+const EXPLORER_BAR_GAP = 8;
 
 interface DataProjectLayoutProps {
   project: Project;
@@ -584,9 +587,9 @@ const DataProjectLayout = ({ project, onProjectUpdate }: DataProjectLayoutProps)
             position: "absolute",
             // On one line with the left panel's foot: the credits run below it.
             bottom: 10 + EXPLORER_FOOT,
-            left: leftWidth + GAP_SIZE + 10,
-            // To the map controls' column, as far from it as from the left
-            // panel: the bar spans the map (board 3).
+            left: leftWidth + EXPLORER_BAR_GAP + 10,
+            // To the map controls' column, the map's usual gap from it: the
+            // bar spans the map (board 3).
             right: 10 + MAP_CONTROLS_WIDTH + GAP_SIZE + explorerRightRoom,
             zIndex: (theme) => theme.zIndex.drawer + 1,
             // Making room for the right panel eases in (spec › Motion).

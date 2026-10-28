@@ -41,7 +41,7 @@ export function ExplorerLeftPanel({ layersTab }: { layersTab: ReactNode }) {
   return (
     // The full map height on both tabs, so switching does not resize it: on
     // the Explorer tab the panel gives up the cost card's height and a gap,
-    // the 16 px the map's other panels keep apart.
+    // 8 px, as the bottom bar keeps from the panel.
     <Stack spacing={2} sx={{ height: "100%", width: EXPLORER_PANEL_WIDTH, pointerEvents: "none" }}>
       <FloatingPanel
         width={EXPLORER_PANEL_WIDTH}
