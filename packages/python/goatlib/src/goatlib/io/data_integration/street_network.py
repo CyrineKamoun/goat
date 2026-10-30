@@ -21,7 +21,13 @@ MAX_CELLS = 20
 #: Above this the extract fails rather than building a graph cut at an arbitrary edge.
 MAX_EDGES = 2_000_000
 
-TOO_LARGE = "This area is too large for a street network (max. about 300 km²)."
+#: Smaller pieces the cut leaves behind (roads leaving the area and returning) are
+#: islands that snapped points cannot route from, so they are dropped.
+MIN_COMPONENT_SHARE = 0.01
+
+# Measured, not 20 x 36 km²: the cells an area only touches at its edge count too,
+# so a compact area reaches 20 cells at 320-400 km² in Germany.
+TOO_LARGE = "This area is too large for a street network (max. about 350 km²)."
 
 
 def _quote(value: str) -> str:
@@ -52,6 +58,43 @@ def check_area(con: Any, area: dict) -> None:
     """Refuse an area over the cell limit, before anything is read."""
     if area_cells(con, area) > MAX_CELLS:
         raise ValueError(TOO_LARGE)
+
+
+def _drop_islands(con: Any) -> None:
+    parent: dict[str, str] = {}
+
+    def find(x: str) -> str:
+        root = x
+        while parent.setdefault(root, root) != root:
+            root = parent[root]
+        while parent[x] != root:
+            parent[x], x = root, parent[x]
+        return root
+
+    pairs = con.execute(
+        "SELECT id, source_node, target_node FROM network_edges"
+    ).fetchall()
+    for _, a, b in pairs:
+        parent[find(a)] = find(b)
+    size: dict[str, int] = {}
+    for _, a, _b in pairs:
+        root = find(a)
+        size[root] = size.get(root, 0) + 1
+    biggest = max(size, key=size.__getitem__)
+    keep = {r for r, n in size.items() if n >= len(pairs) * MIN_COMPONENT_SHARE}
+    keep.add(biggest)
+    dropped = [i for i, a, _b in pairs if find(a) not in keep]
+    if dropped:
+        con.execute(
+            "DELETE FROM network_edges WHERE id IN (SELECT unnest(?::VARCHAR[]))",
+            [dropped],
+        )
+    logger.info(
+        "dropped %d island(s) with %d edge(s) of %d components",
+        len(size) - len(keep),
+        len(dropped),
+        len(size),
+    )
 
 
 def _partition_files(base: str, cells: set[int]) -> list[str]:
@@ -154,6 +197,8 @@ def export_network(
             f"The area holds more than {MAX_EDGES:,} street segments. "
             "Pick a smaller area."
         )
+
+    _drop_islands(con)
 
     con.execute(f"""
         CREATE OR REPLACE TEMP TABLE network_nodes AS

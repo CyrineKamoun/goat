@@ -3444,7 +3444,7 @@
   "fetch_features_source_street_network": "Straßennetz",
   "fetch_features_licence_street_network": "© OpenStreetMap contributors, Overture Maps Foundation · ODbL 1.0",
   "fetch_features_street_network_hint": "Jede Straße, die das Gebiet berührt, wird vollständig und mit ihrer Steigung als routingfähiges Straßennetz-Datenpaket übernommen. Bis etwa 300 km².",
-  "fetch_features_street_network_too_large": "Dieses Gebiet ist für ein Straßennetz zu groß (max. etwa 300 km²).",
+  "fetch_features_street_network_too_large": "Dieses Gebiet ist für ein Straßennetz zu groß (max. etwa 350 km²).",
   "fetch_features_street_network_not_in_workflow": "Ein Straßennetz kann noch nicht in einem Workflow verwendet werden.",
   "fetch_features_bundle_name": "Name des Datenpakets",
   "fetch_features_type": "Feature-Typ",

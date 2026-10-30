@@ -3444,7 +3444,7 @@
   "fetch_features_source_street_network": "Street network",
   "fetch_features_licence_street_network": "© OpenStreetMap contributors, Overture Maps Foundation · ODbL 1.0",
   "fetch_features_street_network_hint": "Every street touching the area is kept whole, with its slope, as a routable street network bundle. Up to about 300 km².",
-  "fetch_features_street_network_too_large": "This area is too large for a street network (max. about 300 km²).",
+  "fetch_features_street_network_too_large": "This area is too large for a street network (max. about 350 km²).",
   "fetch_features_street_network_not_in_workflow": "A street network cannot be used in a workflow yet.",
   "fetch_features_bundle_name": "Bundle name",
   "fetch_features_type": "Feature type",

@@ -388,3 +388,21 @@ def test_network_size(tmp_path, monkeypatch) -> None:
     with pytest.raises(ValueError, match="does not cover"):
         street_network.export_network(con, area=both, edges_base=str(tmp_path), nodes_base=str(tmp_path), workdir=str(tmp_path))
     assert len(asked) == 2 and all(b[2] - b[0] < 0.1 for b in asked)
+
+
+def test_network_islands() -> None:
+    """A 2-edge piece (under 1%) is dropped with its nodes; a 4-edge piece (over 1%) stays."""
+    import duckdb
+    from goatlib.io.data_integration import street_network
+
+    con = duckdb.connect()
+    con.execute("CREATE TEMP TABLE network_edges (id VARCHAR, source_node VARCHAR, target_node VARCHAR)")
+    big = [(f"b{i}", f"n{i}", f"n{i + 1}") for i in range(200)]
+    small = [(f"s{i}", f"m{i}", f"m{i + 1}") for i in range(4)]
+    island = [("i0", "x0", "x1"), ("i1", "x1", "x2")]
+    con.executemany("INSERT INTO network_edges VALUES (?, ?, ?)", big + small + island)
+    street_network._drop_islands(con)
+    ids = {r[0] for r in con.execute("SELECT id FROM network_edges").fetchall()}
+    assert ids == {e[0] for e in big + small}
+    nodes = {r[0] for r in con.execute("SELECT source_node FROM network_edges UNION SELECT target_node FROM network_edges").fetchall()}
+    assert not {"x0", "x1", "x2"} & nodes and {"m0", "m4"} <= nodes
