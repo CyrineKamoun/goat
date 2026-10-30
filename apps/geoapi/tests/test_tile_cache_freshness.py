@@ -184,9 +184,12 @@ async def test_temp_tree_search_runs_once_off_the_event_loop(tmp_path: Path) -> 
 
     with patch.object(Path, "glob", recording_glob):
         found = await asyncio.gather(
-            *(service._find_pmtiles_by_layer_id_async("abc") for _ in range(5))
+            *(
+                service._find_pmtiles_by_layer_id_async("abc", search_temp=True)
+                for _ in range(5)
+            )
         )
-        again = await service._find_pmtiles_by_layer_id_async("abc")
+        again = await service._find_pmtiles_by_layer_id_async("abc", search_temp=True)
 
     assert found == [None] * 5 and again is None
     assert len(walks) == 1
@@ -200,10 +203,28 @@ async def test_workflow_tiles_written_later_are_found_after_invalidation(
     temp = tmp_path / "temporary" / "user_u" / "w_w" / "n_n"
     temp.mkdir(parents=True)
     service = _service_over(tmp_path / "tiles")
-    assert await service._find_pmtiles_by_layer_id_async("abc") is None
+    assert (
+        await service._find_pmtiles_by_layer_id_async("abc", search_temp=True) is None
+    )
 
     tiles = temp / "t_abc.pmtiles"
     tiles.write_bytes(b"pmtiles")
     service.invalidate_pmtiles_path_cache("abc")
 
-    assert await service._find_pmtiles_by_layer_id_async("abc") == tiles
+    assert (
+        await service._find_pmtiles_by_layer_id_async("abc", search_temp=True) == tiles
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_layer_without_tiles_never_walks_the_temp_tree(tmp_path: Path) -> None:
+    """The temp tree holds thousands of directories on NFS. A layer has its
+    tiles at the flat path or none, so a layer lookup is stat() calls only;
+    the tree is searched just for workflow results (`search_temp`)."""
+    temp = tmp_path / "temporary" / "user_u" / "w_w" / "n_n"
+    temp.mkdir(parents=True)
+    (temp / "t_abc.pmtiles").write_bytes(b"pmtiles")
+    service = _service_over(tmp_path / "tiles")
+
+    with patch.object(Path, "glob", side_effect=AssertionError("temp tree walked")):
+        assert await service._find_pmtiles_by_layer_id_async("abc") is None
