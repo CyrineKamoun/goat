@@ -21,7 +21,19 @@ vi.mock("react-i18next", () => ({
 const mapState = vi.hoisted(() => ({ map: undefined as unknown }));
 vi.mock("react-map-gl/maplibre", () => ({
   useMap: () => ({ map: mapState.map }),
-  Map: () => null,
+  Map: ({ onMoveEnd }: { onMoveEnd?: (event: unknown) => void }) => (
+    <button
+      data-testid="pan"
+      onClick={() =>
+        onMoveEnd?.({
+          target: {
+            getContainer: () => ({ clientWidth: 400, clientHeight: 300 }),
+            unproject: ([x, y]: number[]) => ({ lng: x / 100, lat: 50 - y / 100 }),
+          },
+        })
+      }
+    />
+  ),
   Source: () => null,
   Layer: () => null,
 }));
@@ -104,14 +116,12 @@ const SAXONY: GeoJSON.Polygon = {
 const outlines = { geometries: { DE2: BAVARIA, DED: SAXONY }, names: {} };
 vi.mock("@/hooks/catalog/useCatalogNutsGeometries", () => ({ useCatalogNutsGeometries: () => outlines }));
 
-/** The area picker, reduced to one region. */
-vi.mock("@/components/dashboard/catalog/CatalogSpatialDialog", () => ({
-  default: ({ open, onApply }: { open: boolean; onApply: (filter: unknown) => void }) =>
-    open ? (
-      <button onClick={() => onApply({ kind: "region", nutsIds: ["DE2"], names: { DE2: "Bayern" } })}>
-        pick Bayern
-      </button>
-    ) : null,
+/** The region search, answering with Bayern. */
+vi.mock("@/lib/api/catalog", () => ({
+  useCatalogNutsRegions: (query?: string) => ({
+    regions: query && query.length >= 2 ? [{ nuts_id: "DE2", nuts_name: "Bayern", level: 1 }] : [],
+    isLoading: false,
+  }),
 }));
 
 /** jsdom has no matchMedia; the frame full-screens below `sm` and the shelf
@@ -166,9 +176,11 @@ describe("AddLayerDialog — Connect service in a workflow", () => {
     return user;
   };
 
+  // Picked inline: the search sits over the map in the same dialog.
   const pickBayern = async (user: ReturnType<typeof userEvent.setup>) => {
-    await user.click(screen.getByRole("button", { name: "fetch_features_area_choose" }));
-    await user.click(screen.getByRole("button", { name: "pick Bayern" }));
+    await user.click(screen.getByRole("radio", { name: "catalog_mode_region" }));
+    await user.type(screen.getByPlaceholderText("catalog_search_region"), "Bay");
+    await user.click(await screen.findByRole("option", { name: /Bayern/ }));
   };
 
   beforeEach(() => {
@@ -190,6 +202,8 @@ describe("AddLayerDialog — Connect service in a workflow", () => {
     const onUse = vi.fn();
     const user = await openOsm({ onUse });
     await pickBayern(user);
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Bayern" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "fetch_features_add_filter" }));
     await user.type(screen.getByLabelText("fetch_features_tag"), "amenity");
     await user.type(screen.getByLabelText("fetch_features_values"), "school{enter}");
@@ -228,6 +242,23 @@ describe("AddLayerDialog — Connect service in a workflow", () => {
       expect(screen.getAllByLabelText("fetch_features_area_too_large")[0]).toContainElement(useButton())
     );
     expect(useButton().disabled).toBe(true);
+    // Filters cannot help here, so they wait for a smaller area.
+    expect(screen.getByText("fetch_features_filters_paused")).toBeInTheDocument();
+    expect(
+      (screen.getByRole("button", { name: "fetch_features_add_filter" }) as HTMLButtonElement).disabled
+    ).toBe(true);
+  });
+
+  it("keeps filters open when only narrowing helps", async () => {
+    vi.mocked(getMirrorSize).mockResolvedValue({ estimate: 9e9, tooLarge: false } as never);
+    const user = await openOsm({ onUse: vi.fn() });
+    await pickBayern(user);
+
+    await waitFor(() => expect(useButton().disabled).toBe(true));
+    expect(screen.queryByText("fetch_features_filters_paused")).not.toBeInTheDocument();
+    expect(
+      (screen.getByRole("button", { name: "fetch_features_add_filter" }) as HTMLButtonElement).disabled
+    ).toBe(false);
   });
 
   it("reopens with the saved connection", async () => {
@@ -264,7 +295,8 @@ describe("AddLayerDialog — Connect service in a workflow", () => {
     expect((screen.getByLabelText("fetch_features_tag") as HTMLInputElement).value).toBe("highway");
     expect(screen.getByText("primary")).toBeInTheDocument();
     expect(attribute("radio", "catalog_mode_region", "aria-checked")).toBe("true");
-    expect(screen.getByText("Bayern, Sachsen")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Bayern" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sachsen" })).toBeInTheDocument();
 
     await waitFor(() => expect(useButton().disabled).toBe(false));
     await user.click(useButton());
@@ -272,18 +304,21 @@ describe("AddLayerDialog — Connect service in a workflow", () => {
     expect(onUse.mock.calls[0][0]).toMatchObject({ params: { area }, areaChoice });
   });
 
-  it("starts on OpenStreetMap and Region, without OGC services or a map", async () => {
-    mapState.map = {
-      getBounds: () => ({ getWest: () => 0, getSouth: () => 0, getEast: () => 1, getNorth: () => 1 }),
-    };
-    await openOsm({ onUse: vi.fn() });
+  it("starts on OpenStreetMap and Map view, without OGC services, and panning sets the area", async () => {
+    const onUse = vi.fn();
+    const user = await openOsm({ onUse });
 
-    expect(attribute("radio", "catalog_mode_region", "aria-checked")).toBe("true");
-    expect(screen.queryByRole("radio", { name: "fetch_features_area_view" })).not.toBeInTheDocument();
+    expect(attribute("radio", "fetch_features_area_view", "aria-checked")).toBe("true");
     expect(screen.getByText("fetch_data")).toBeInTheDocument();
     expect(screen.queryByText("connect_service")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /connect_data_ogc/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /street_network/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /fetch_features_source_overture/ })).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("pan"));
+    await waitFor(() => expect(useButton().disabled).toBe(false));
+    await user.click(useButton());
+    await waitFor(() => expect(onUse).toHaveBeenCalledTimes(1));
+    expect(onUse.mock.calls[0][0].areaChoice).toEqual({ kind: "view", bbox: [0.28, 47.28, 3.72, 49.72] });
   });
 });

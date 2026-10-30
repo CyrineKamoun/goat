@@ -58,6 +58,9 @@ export const OVERTURE_THEMES: { id: string; types: Partial<Record<Geometry, stri
   },
 ];
 
+/** What the dialog's own map opens on when no project map is behind it: central Europe. */
+const DEFAULT_VIEW_BOX: Bbox = [5, 46, 16, 55];
+
 /**
  * A view's bounds widened to the next 0.01°, so a fit, a resize or a nudge of the map does
  * not count as a new area and restart every question asked about it.
@@ -121,7 +124,6 @@ const seedFrom = (initial: DatasetConnection | undefined) => {
 export type FetchFlowState = {
   areaMode: AreaMode;
   setAreaMode: (mode: AreaMode) => void;
-  hasMapView: boolean;
   viewBox?: Bbox;
   setViewBox: (bbox: Bbox) => void;
   spatial: CatalogSpatialFilter | null;
@@ -196,10 +198,8 @@ export const useFetchFlow = ({
   const [seed] = useState(() => seedFrom(workflow?.initial));
   /** A saved area with no record of how it was chosen: used as it is until another is chosen. */
   const [kept, setKept] = useState(seed?.kept);
-  const [areaMode, setAreaMode] = useState<AreaMode>(
-    seed?.spatial?.kind ?? (kept ? "polygon" : viewport ? "view" : "region")
-  );
-  const [viewBox, setViewBox] = useState<Bbox | undefined>(viewport && roundBox(viewport));
+  const [areaMode, setAreaMode] = useState<AreaMode>(seed?.spatial?.kind ?? (kept ? "polygon" : "view"));
+  const [viewBox, setViewBox] = useState<Bbox | undefined>(roundBox(viewport ?? DEFAULT_VIEW_BOX));
   const [spatial, setSpatial] = useState<CatalogSpatialFilter | null>(seed?.spatial ?? null);
   const [source, setSource] = useState<FetchSource>(initialSource);
   const [osmType, setOsmType] = useState(seed?.params.feature_type ?? "points");
@@ -246,6 +246,8 @@ export const useFetchFlow = ({
       const outlines = spatial.nutsIds.map((id) => geometries[id]);
       return outlines.every(Boolean) ? mergePolygons(outlines) : undefined;
     }
+    // A ring still being drawn is not an area yet.
+    if (spatial.kind === "polygon" && spatial.ring.length < 3) return undefined;
     return spatialGeometry(spatial);
   }, [areaMode, viewBox, spatial, geometries, kept]);
 
@@ -291,8 +293,8 @@ export const useFetchFlow = ({
   const name = customName ?? suggestedName;
 
   const reset = useCallback(() => {
-    setAreaMode(viewport ? "view" : "region");
-    setViewBox(viewport && roundBox(viewport));
+    setAreaMode("view");
+    setViewBox(roundBox(viewport ?? DEFAULT_VIEW_BOX));
     setSpatial(null);
     setKept(undefined);
     setFiltersBySource({ osm: [], overture: [], street_network: [] });
@@ -503,7 +505,6 @@ export const useFetchFlow = ({
         if (mode !== areaMode) setKept(undefined);
         setAreaMode(mode);
       },
-      hasMapView: !!viewport,
       viewBox,
       setViewBox,
       spatial,

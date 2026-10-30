@@ -188,7 +188,7 @@ The licence of the data is shown at the top of the pane: OpenStreetMap is publis
   </TabItem>
   <TabItem value="StreetNetwork" label="Street network" className="tabItemBox">
 
-<code>Street network</code> cuts the network GOAT routes on to an area and saves it as a street network [bundle](../data/dataset_types#datasets-made-of-several-layers) with its edges and nodes. Every street touching the area is kept whole, with its slope, so routing tools pick the bundle like any other street network and route uphill and downhill as on GOAT's own network. Choose the area as for OpenStreetMap, give the bundle a name under <code>Bundle name</code> and click <code>Add layer</code>. The area can be up to about 300 km²; for a larger one the pane says it is too large.
+<code>Street network</code> cuts the network GOAT routes on to an area and saves it as a street network [bundle](../data/dataset_types#datasets-made-of-several-layers) with its edges and nodes. Every street touching the area is kept whole, with its slope, so routing tools pick the bundle like any other street network and route uphill and downhill as on GOAT's own network. Choose the area as for OpenStreetMap, give the bundle a name under <code>Bundle name</code> and click <code>Add layer</code>. The area can be up to about 1,000 km²; for a larger one the pane says it is too large.
 
   </TabItem>
 </Tabs>

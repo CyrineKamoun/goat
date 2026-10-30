@@ -189,7 +189,7 @@ Die Lizenz der Daten steht oben im Bereich: OpenStreetMap steht unter der ODbL, 
   </TabItem>
   <TabItem value="StreetNetwork" label="Straßennetz" className="tabItemBox">
 
-<code>Straßennetz</code> schneidet das Netz, auf dem GOAT routet, auf ein Gebiet zu und speichert es als Straßennetz-[Datenpaket](../data/dataset_types#datensätze-aus-mehreren-layern) mit Kanten und Knoten. Jede Straße, die das Gebiet berührt, bleibt vollständig und mit ihrer Steigung erhalten, sodass Routing-Werkzeuge das Datenpaket wie jedes andere Straßennetz auswählen und bergauf und bergab wie auf dem GOAT-Netz routen. Wählen Sie das Gebiet wie bei OpenStreetMap, geben Sie unter <code>Name des Datenpakets</code> einen Namen ein und klicken Sie auf <code>Layer hinzufügen</code>. Das Gebiet darf bis etwa 300 km² groß sein; bei einem größeren zeigt der Bereich an, dass es zu groß ist.
+<code>Straßennetz</code> schneidet das Netz, auf dem GOAT routet, auf ein Gebiet zu und speichert es als Straßennetz-[Datenpaket](../data/dataset_types#datensätze-aus-mehreren-layern) mit Kanten und Knoten. Jede Straße, die das Gebiet berührt, bleibt vollständig und mit ihrer Steigung erhalten, sodass Routing-Werkzeuge das Datenpaket wie jedes andere Straßennetz auswählen und bergauf und bergab wie auf dem GOAT-Netz routen. Wählen Sie das Gebiet wie bei OpenStreetMap, geben Sie unter <code>Name des Datenpakets</code> einen Namen ein und klicken Sie auf <code>Layer hinzufügen</code>. Das Gebiet darf bis etwa 1.000 km² groß sein; bei einem größeren zeigt der Bereich an, dass es zu groß ist.
 
   </TabItem>
 </Tabs>

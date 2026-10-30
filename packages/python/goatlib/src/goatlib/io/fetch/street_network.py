@@ -15,19 +15,16 @@ from goatlib.tasks.sync_base_data import h3_3_cells_for_bbox
 
 logger = logging.getLogger(__name__)
 
-#: H3-6 cells an area may touch. The densest cell holds 83,660 edges, so 20 can
-#: never reach MAX_EDGES; counted from the area alone, without the network.
-MAX_CELLS = 20
-#: Above this the extract fails rather than building a graph cut at an arbitrary edge.
-MAX_EDGES = 2_000_000
+#: H3-6 cells an area may touch, counted from the area alone, without the network.
+MAX_CELLS = 44
 
 #: Smaller pieces the cut leaves behind (roads leaving the area and returning) are
 #: islands that snapped points cannot route from, so they are dropped.
 MIN_COMPONENT_SHARE = 0.01
 
-# Measured, not 20 x 36 km²: the cells an area only touches at its edge count too,
-# so a compact area reaches 20 cells at 320-400 km² in Germany.
-TOO_LARGE = "This area is too large for a street network (max. about 350 km²)."
+# Measured, not 44 x 36 km²: the cells an area only touches at its edge count too,
+# so a compact area reaches 44 cells at 940-1,120 km² in Germany.
+TOO_LARGE = "This area is too large for a street network (max. about 1,000 km²)."
 
 
 def _quote(value: str) -> str:
@@ -210,11 +207,6 @@ def export_network(
     count = con.execute("SELECT count(*) FROM network_edges").fetchone()[0]
     if not count:
         raise ValueError("The GOAT routing network has no streets in this area.")
-    if count > MAX_EDGES:
-        raise ValueError(
-            f"The area holds more than {MAX_EDGES:,} street segments. "
-            "Pick a smaller area."
-        )
 
     _drop_islands(con)
 

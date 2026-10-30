@@ -17,6 +17,11 @@ const GROUPS: { labelKey: string; options: ConnectOption[] }[] = [
     labelKey: "connect_group_goat",
     options: [
       {
+        kind: "street_network",
+        icon: ICON_NAME.STREET_NETWORK,
+        titleKey: "fetch_features_source_street_network",
+      },
+      {
         kind: "osm",
         icon: ICON_NAME.MAP_LOCATION,
         titleKey: "fetch_features_source_osm",
@@ -25,11 +30,6 @@ const GROUPS: { labelKey: string; options: ConnectOption[] }[] = [
         kind: "overture",
         icon: ICON_NAME.MAP,
         titleKey: "fetch_features_source_overture",
-      },
-      {
-        kind: "street_network",
-        icon: ICON_NAME.STREET_NETWORK,
-        titleKey: "fetch_features_source_street_network",
       },
     ],
   },
