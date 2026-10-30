@@ -6,10 +6,10 @@ user reaches a string literal.
 """
 
 import pytest
-from goatlib.io.data_integration import mirror as module
-from goatlib.io.data_integration import osm, overture
-from goatlib.io.data_integration.osm import FEATURE_TYPES, _tag_sql
-from goatlib.tools.data_integration import TagFilter
+from goatlib.io.fetch import area
+from goatlib.io.fetch.mirror import osm, overture, query, reader, values
+from goatlib.io.fetch.mirror.osm import FEATURE_TYPES, _tag_sql
+from goatlib.tools.fetch_data import TagFilter
 
 
 def test_a_key_and_value_match_the_whole_pair() -> None:
@@ -40,17 +40,17 @@ def test_a_quote_cannot_end_the_literal(value) -> None:
 def test_every_feature_type_names_a_geometry() -> None:
     assert set(FEATURE_TYPES) == {"points", "lines", "multipolygons"}
     # Each layer carries the licence of what it holds, not one for every source.
-    osm, ov = module.SOURCES["osm"], module.SOURCES["overture"]
+    osm, ov = reader.SOURCES["osm"], reader.SOURCES["overture"]
     assert osm.licence_of("points") == ("ODbL-1.0", "© OpenStreetMap contributors")
     assert ov.licence_of("places")[0] == "CDLA-Permissive-2.0"
     assert ov.licence_of("buildings")[0] == ov.licence_of("waterways")[0] == "ODbL-1.0"
     # And the lineage reads as a sentence, not as mirror bookkeeping.
     f = [TagFilter(key="amenity", values=["school", "kindergarten"])]
-    assert module.lineage_text(osm, "points", [("austria", "20261011"), ("germany", "20261010")], f) == (
+    assert query.lineage_text(osm, "points", [("austria", "20261011"), ("germany", "20261010")], f) == (
         "OpenStreetMap data for Austria and Germany, as of 11 Oct 2026. "
         "Only features where amenity is school or kindergarten."
     )
-    assert module.lineage_text(ov, "buildings", [("buildings", "2026-09-23.1")], []) == (
+    assert query.lineage_text(ov, "buildings", [("buildings", "2026-09-23.1")], []) == (
         "Overture Maps buildings, release 2026-09-23.1."
     )
 
@@ -72,16 +72,16 @@ def test_the_join_between_filters_is_chosen() -> None:
     """Two conditions on one key can never both hold, so AND silently returns
     nothing — which is exactly how someone asks for restaurants or cafes."""
     f = [TagFilter(key="amenity", values=["restaurant"]), TagFilter(key="amenity", values=["cafe"])]
-    src = module.SOURCES["osm"]
-    assert " AND " in module.filter_sql(f, src, "all")[1]
-    assert " OR " in module.filter_sql(f, src, "any")[1]
+    src = reader.SOURCES["osm"]
+    assert " AND " in query.filter_sql(f, src, "all")[1]
+    assert " OR " in query.filter_sql(f, src, "any")[1]
 
 
 def test_the_prefilter_uses_the_same_join() -> None:
     """It runs before the parse, so an AND there would drop rows the exact
     test would have kept."""
     f = [TagFilter(key="amenity", values=["restaurant"]), TagFilter(key="shop", values=["bakery"])]
-    pre, exact = module.filter_sql(f, module.SOURCES["osm"], "any")
+    pre, exact = query.filter_sql(f, reader.SOURCES["osm"], "any")
     assert " OR " in pre and " OR " in exact
 
 
@@ -89,7 +89,7 @@ def test_several_values_on_one_key_are_any_of_them() -> None:
     """A feature has one value per key, so AND-ing two of them matches nothing —
     which is exactly how someone asks for restaurants or cafes."""
     f = [TagFilter(key="amenity", values=["restaurant", "cafe"])]
-    pre, exact = module.filter_sql(f, module.SOURCES["osm"])
+    pre, exact = query.filter_sql(f, reader.SOURCES["osm"])
     assert exact == "tags['amenity'] IN ('restaurant', 'cafe')"
     # The prefilter runs first, so it has to admit both or the exact test never sees them.
     assert "(restaurant|cafe)" in pre
@@ -109,24 +109,24 @@ def test_only_indexed_files_touching_the_area(tmp_path) -> None:
         ('points/part-00001.parquet', 'points', 'europe', 30.0, 60.0, 31.0, 61.0, 10, 1),
         ('lines/part-00000.parquet', 'lines', 'europe', 11.0, 48.0, 12.0, 49.0, 10, 1)
         ) t(path, layer, continent, xmin, ymin, xmax, ymax, rows, bytes)) TO '{base}/_index.parquet' (FORMAT PARQUET)""")
-    src = module.Source(str(tmp_path), "geom", "osm_id", True)
+    src = reader.Source(str(tmp_path), "geom", "osm_id", True)
     units = {"europe": {"version": "20261005", "bbox": [-25, 34, 45, 72]},
              "africa": {"version": "20261005", "bbox": [-20, -35, 52, 37]}}
     env = (11.5, 48.1, 11.6, 48.2)
-    files, read = module.covering(con, units, src, "points", env)
+    files, read = reader.covering(con, units, src, "points", env)
     assert files == [f"{base}/points/part-00000.parquet"] and read == [("europe", "20261005")]
     # A unit without an index is left out, not every other unit with it.
     unindexed = {**units, "alps": {"version": "20261005", "bbox": [5, 45, 17, 49]}}
-    assert module.covering(con, unindexed, src, "points", env)[0] == files
+    assert reader.covering(con, unindexed, src, "points", env)[0] == files
     # A version's index is read once: deleted, the same files still come back.
     (base / "_index.parquet").unlink()
-    assert module.covering(con, units, src, "points", env)[0] == files
+    assert reader.covering(con, units, src, "points", env)[0] == files
     # The bbox predicate is what skips row groups; ST_Intersects alone reads them all.
-    sql = module.candidates_sql(files, src, env, "TRUE")
+    sql = query.candidates_sql(files, src, env, "TRUE")
     assert "bbox.xmin <= 11.6" in sql and "bbox.ymax >= 48.1" in sql
 
     # A base type mixes geometries; each option keeps one, so the layer has one type.
-    ov = module.SOURCES["overture"]
+    ov = reader.SOURCES["overture"]
     assert (ov.unit_of("waterways"), ov.layer_of("waterways"), ov.geometry_of("waterways")) == ("base", "water", "line")
     assert "LINESTRING" in ov.geometry_filter("waterways") and "POLYGON" not in ov.geometry_filter("waterways")
     # A split mirror holds the geometry in the layer: no geometry is read then.
@@ -140,12 +140,12 @@ def test_only_indexed_files_touching_the_area(tmp_path) -> None:
     con.execute(f"""COPY (SELECT 'points/germany.parquet' AS path, 'points' AS layer, 'europe' AS continent,
         11.0 AS xmin, 48.0 AS ymin, 12.0 AS xmax, 49.0 AS ymax, 10 AS rows, 1 AS bytes)
         TO '{first}/_index.parquet' (FORMAT PARQUET)""")
-    files, read = module.covering(con, {"europe": {"version": "v2", "path": "v2/europe"}}, src, "points", env)
+    files, read = reader.covering(con, {"europe": {"version": "v2", "path": "v2/europe"}}, src, "points", env)
     assert files == [f"{first}/points/germany.parquet"] and read == [("europe", "v2")]
 
     # No pointer yet means no data here, not a crash.
-    assert module.pointer(con, module.Source(str(tmp_path / "nowhere"), "geom", "osm_id", True)) == {}
-    assert module.pointer(con, module.Source("", "geom", "osm_id", True)) == {}
+    assert reader.pointer(con, reader.Source(str(tmp_path / "nowhere"), "geom", "osm_id", True)) == {}
+    assert reader.pointer(con, reader.Source("", "geom", "osm_id", True)) == {}
 
     # Overture's nested name and sources become plain columns the tiles keep:
     # distinct datasets in order, licences without the missing one, NULL when absent.
@@ -172,18 +172,18 @@ def test_the_area_and_the_sql_are_checked(tmp_path) -> None:
     con = duckdb.connect()
     con.execute("INSTALL spatial; LOAD spatial;")
     box = {"type": "Polygon", "coordinates": [[[11.5, 48.1], [11.6, 48.1], [11.6, 48.2], [11.5, 48.1]]]}
-    assert module.area_envelope(con, module.area_table(con, box)) == (11.5, 48.1, 11.6, 48.2)
+    assert area.area_envelope(con, area.area_table(con, box)) == (11.5, 48.1, 11.6, 48.2)
     with pytest.raises(ValueError, match="polygon"):
-        module.area_table(con, {"type": "Point", "coordinates": [11.5, 48.1]})
+        area.area_table(con, {"type": "Point", "coordinates": [11.5, 48.1]})
 
     data = tmp_path / "p.parquet"
     con.execute(f"COPY (SELECT 1 AS osm_id, '' AS all_tags) TO '{data}' (FORMAT PARQUET)")
-    src = module.SOURCES["osm"]
+    src = reader.SOURCES["osm"]
     ok = "tags['amenity'] IN ('school') AND tags['wheelchair'] IS NOT NULL"
-    assert module.checked_where(con, [str(data)], src, ok) == f"({ok})"
+    assert query.checked_where(con, [str(data)], src, ok) == f"({ok})"
     for bad in ["1=1; DROP TABLE t", "osm_id IN (SELECT 1)", "read_parquet('x') IS NULL"]:
         with pytest.raises(ValueError, match="not allowed"):
-            module.checked_where(con, [str(data)], src, bad)
+            query.checked_where(con, [str(data)], src, bad)
 
     # Tags as hstore text in one country and as a native map in another, as
     # mid-republish: both answer the same filter, and keys list the same way.
@@ -196,9 +196,9 @@ def test_the_area_and_the_sql_are_checked(tmp_path) -> None:
         {bbox} AS bbox, ST_Point(11.5, 48.1) AS geom) TO '{mapped}' (FORMAT PARQUET)""")
     f = [TagFilter(key="amenity", values=["school"])]
     for files, storage in (([str(text)], "text"), ([str(mapped)], "map"), ([str(text), str(mapped)], "both")):
-        assert osm.tag_storage(module.mirror_columns(con, files)) == storage
-        pre, exact = module.filter_sql(f, src, storage=storage)
-        hits = con.execute(f"SELECT osm_id FROM ({module.candidates_sql(files, src, env, pre, storage)}) WHERE {exact}").fetchall()
+        assert osm.tag_storage(reader.mirror_columns(con, files)) == storage
+        pre, exact = query.filter_sql(f, src, storage=storage)
+        hits = con.execute(f"SELECT osm_id FROM ({query.candidates_sql(files, src, env, pre, storage)}) WHERE {exact}").fetchall()
         assert len(hits) == len(files)
         keys, _ = osm._count_tags(con, osm._raw_tags_sql(files, env, "TRUE", storage), None, 10, storage)
         assert keys[0] == ("amenity", len(files))
@@ -208,21 +208,21 @@ def test_the_area_and_the_sql_are_checked(tmp_path) -> None:
     col = tmp_path / "col.parquet"
     con.execute(f"""COPY (SELECT i AS osm_id, CASE WHEN i < 3 THEN 'primary' WHEN i < 4 THEN 'bus_stop' END AS highway,
         {bbox} AS bbox FROM range(6) t(i)) TO '{col}' (FORMAT PARQUET)""")
-    assert module._key_column(con, [str(col)], "highway") and not module._key_column(con, [str(col), str(text)], "highway")
-    assert module._column_counts(con, [str(col)], env, "highway", 10) == ([("primary", 3), ("bus_stop", 1)], 4)
+    assert values._key_column(con, [str(col)], "highway") and not values._key_column(con, [str(col), str(text)], "highway")
+    assert values._column_counts(con, [str(col)], env, "highway", 10) == ([("primary", 3), ("bus_stop", 1)], 4)
 
     # The columns named before fetching are the ones the SELECT list writes.
     wrote = tmp_path / "wrote.parquet"
     for files, storage in (([str(text)], "text"), ([str(mapped)], "map"), ([str(text), str(mapped)], "both")):
-        sel = ", ".join(e for e, _, _ in module.selected_columns(module.mirror_columns(con, files), src, storage))
-        con.execute(f"COPY (SELECT {sel} FROM ({module.candidates_sql(files, src, env, 'TRUE', storage)}) c) TO '{wrote}' (FORMAT PARQUET)")
-        named = module.output_columns(con, files, src, "points")
+        sel = ", ".join(e for e, _, _ in query.selected_columns(reader.mirror_columns(con, files), src, storage))
+        con.execute(f"COPY (SELECT {sel} FROM ({query.candidates_sql(files, src, env, 'TRUE', storage)}) c) TO '{wrote}' (FORMAT PARQUET)")
+        named = query.output_columns(con, files, src, "points")
         assert [n for n, _ in named] == [str(r[0]) for r in con.execute(f"DESCRIBE SELECT * FROM '{wrote}'").fetchall() if r[0] != "geom"]
         assert dict(named)["all_tags"] == "VARCHAR" and "geom" not in dict(named) and "_mirror_file" not in dict(named)
     ov = tmp_path / "ov.parquet"
     con.execute(f"""COPY (SELECT '1' AS id, {{'primary': 'Rathaus'}} AS names, [{{'dataset': 'osm', 'license': 'ODbL'}}] AS sources,
         {{'a': 1}} AS extra, 3 AS height, {bbox} AS bbox, ST_Point(11.5, 48.1) AS geometry) TO '{ov}' (FORMAT PARQUET)""")
-    got = dict(module.output_columns(con, [str(ov)], module.SOURCES["overture"], "building"))
+    got = dict(query.output_columns(con, [str(ov)], reader.SOURCES["overture"], "building"))
     assert {"name", "source", "source_license", "height"} <= set(got) and got["extra"] == got["names"] == "VARCHAR"
     assert got["height"] == "INTEGER" and "geometry" not in got and "bbox" not in got
 
@@ -245,50 +245,50 @@ def test_a_big_view(tmp_path, monkeypatch) -> None:
         ORDER BY y, x) TO '{base}/points.parquet' (FORMAT PARQUET, ROW_GROUP_SIZE 2048)""")
     con.execute(f"""COPY (SELECT 'points.parquet' AS path, 'points' AS layer, 40000 AS rows,
         11.0 AS xmin, 48.0 AS ymin, 11.3 AS xmax, 48.3 AS ymax) TO '{base}/_index.parquet' (FORMAT PARQUET)""")
-    monkeypatch.setitem(module.SOURCES, "osm", module.Source(str(tmp_path), "geom", "osm_id", True))
-    monkeypatch.setattr(module, "SUGGESTION_ROWS", 10_000)
+    monkeypatch.setitem(reader.SOURCES, "osm", reader.Source(str(tmp_path), "geom", "osm_id", True))
+    monkeypatch.setattr(values, "SUGGESTION_ROWS", 10_000)
     square = {"type": "Polygon", "coordinates": [[[11.0, 48.0], [11.3, 48.0], [11.3, 48.3], [11.0, 48.3], [11.0, 48.0]]]}
     files = [str(base / "points.parquet")]
 
     # The size from row-group bounds: the whole square holds all 40,000.
-    assert abs(module._group_rows(module.row_groups(con, files, "geom"), (11.0, 48.0, 11.3, 48.3)) - 40_000) < 2_100
-    sized = module.mirror_values(con, area=square, feature_type="points", source_name="osm", size_only=True)
+    assert abs(area._group_rows(reader.row_groups(con, files, "geom"), (11.0, 48.0, 11.3, 48.3)) - 40_000) < 2_100
+    sized = values.mirror_values(con, area=square, feature_type="points", source_name="osm", size_only=True)
     assert sized["values"] == [] and abs(sized["estimate"] - 40_000) < 2_100
 
     # Over the cap the tag list is the files' tag columns, without counts.
-    keys = module.mirror_values(con, area=square, feature_type="points", source_name="osm", quick=True)
+    keys = values.mirror_values(con, area=square, feature_type="points", source_name="osm", quick=True)
     assert [v["value"] for v in keys["values"]] == ["highway"] and keys["complete"] and keys["estimate"] > 10_000
 
     # With the build's counts the quick ask answers from them; a backfilled file is seen after the recheck.
-    module._no_counts.clear()
+    values._no_counts.clear()
     con.execute(f"""COPY (SELECT * FROM (VALUES
         ('points.parquet', 'points', 'highway', NULL, 10000), ('points.parquet', 'points', 'highway', 'bus_stop', 10000),
         ('points.parquet', 'points', 'surface', NULL, 40000), ('points.parquet', 'points', 'surface', 'asphalt', 20000),
         ('points.parquet', 'points', 'surface', 'gravel', 19000), ('points.parquet', 'points', 'addr:street', NULL, 30000)
         ) t(path, layer, key, value, count)) TO '{base}/_values.parquet' (FORMAT PARQUET)""")
-    keys = module.mirror_values(con, area=square, feature_type="points", source_name="osm", quick=True)
+    keys = values.mirror_values(con, area=square, feature_type="points", source_name="osm", quick=True)
     assert [v["value"] for v in keys["values"]] == ["surface", "highway"] and keys["complete"]
-    surface = module.mirror_values(con, area=square, feature_type="points", key="surface", source_name="osm", quick=True)
+    surface = values.mirror_values(con, area=square, feature_type="points", key="surface", source_name="osm", quick=True)
     assert [v["value"] for v in surface["values"]] == ["asphalt", "gravel"] and surface["complete"]
     corner = {"type": "Polygon", "coordinates": [[[11.0, 48.0], [11.01, 48.0], [11.01, 48.01], [11.0, 48.01], [11.0, 48.0]]]}
-    small = module.mirror_values(con, area=corner, feature_type="points", key="surface", source_name="osm", quick=True)
+    small = values.mirror_values(con, area=corner, feature_type="points", key="surface", source_name="osm", quick=True)
     assert not small["complete"]
 
     # Over the read limit a fetch is refused before reading, whatever its filters.
-    monkeypatch.setattr(module, "MAX_READ_FEATURES", 30_000)
+    monkeypatch.setattr(reader, "MAX_READ_FEATURES", 30_000)
     with pytest.raises(ValueError, match="too large"):
-        module.check_read_size(con, files, [(11.0, 48.0, 11.3, 48.3)], "geom")
-    module.check_read_size(con, files, [(11.0, 48.0, 11.1, 48.1)], "geom")
+        reader.check_read_size(con, files, [(11.0, 48.0, 11.3, 48.3)], "geom")
+    reader.check_read_size(con, files, [(11.0, 48.0, 11.1, 48.1)], "geom")
     # Two small parts far apart count as two small boxes, not the box around both.
     two = {"type": "MultiPolygon", "coordinates": [[[[11.0, 48.0], [11.02, 48.0], [11.02, 48.02], [11.0, 48.02], [11.0, 48.0]]],
                                                    [[[11.28, 48.28], [11.3, 48.28], [11.3, 48.3], [11.28, 48.3], [11.28, 48.28]]]]}
-    module.check_read_size(con, files, module.area_boxes(con, module.area_table(con, two)), "geom")
+    reader.check_read_size(con, files, area.area_boxes(con, area.area_table(con, two)), "geom")
     # Heavy geometry is refused too, before reading: features few, bytes many.
-    monkeypatch.setattr(module, "MAX_READ_FEATURES", 10**9)
-    monkeypatch.setattr(module, "MAX_READ_BYTES", 1_000)
+    monkeypatch.setattr(reader, "MAX_READ_FEATURES", 10**9)
+    monkeypatch.setattr(reader, "MAX_READ_BYTES", 1_000)
     with pytest.raises(ValueError, match="too large"):
-        module.check_read_size(con, files, [(11.0, 48.0, 11.3, 48.3)], "geom")
-    assert module.mirror_values(con, area=square, feature_type="points", source_name="osm", size_only=True)["too_large"]
+        reader.check_read_size(con, files, [(11.0, 48.0, 11.3, 48.3)], "geom")
+    assert values.mirror_values(con, area=square, feature_type="points", source_name="osm", size_only=True)["too_large"]
 
 
 def _merc(lon: float, lat: float) -> list[float]:
@@ -302,7 +302,7 @@ def _merc(lon: float, lat: float) -> list[float]:
 def network(tmp_path, monkeypatch):
     """Two partitions: the first with slope columns, the second, older, without."""
     import duckdb
-    from goatlib.io.data_integration import street_network
+    from goatlib.io.fetch import street_network
 
     con = duckdb.connect()
     edges = {
@@ -356,7 +356,7 @@ def test_network_cut(network) -> None:
 def test_network_size(tmp_path, monkeypatch) -> None:
     """Counted in H3-6 cells, part by part; a continent from its area alone."""
     import duckdb
-    from goatlib.io.data_integration import street_network
+    from goatlib.io.fetch import street_network
 
     con = duckdb.connect()
     con.execute("INSTALL spatial; LOAD spatial;")
@@ -374,13 +374,11 @@ def test_network_size(tmp_path, monkeypatch) -> None:
     with pytest.raises(ValueError, match="too large for a street network"):
         street_network.check_area(con, big)
 
-    # The same answer through mirror-values, which has nothing else to say about it.
+    # The same answer in mirror-values' shape, which has nothing else to say about it.
     tiny = {"type": "Polygon", "coordinates": box(11.40, 47.26, 0.01)}
-    sized = module.mirror_values(con, area=tiny, feature_type="", source_name="street_network", size_only=True)
+    sized = street_network.size(con, tiny)
     assert sized["too_large"] is False and sized["cells"] == small
-    assert module.mirror_values(con, area=big, feature_type="", source_name="street_network", size_only=True)["too_large"]
-    with pytest.raises(ValueError, match="only its size"):
-        module.mirror_values(con, area=tiny, feature_type="", source_name="street_network", columns_only=True)
+    assert street_network.size(con, big)["too_large"]
 
     # Two towns far apart are read as two small boxes, not the one between them.
     asked = []
@@ -393,7 +391,7 @@ def test_network_size(tmp_path, monkeypatch) -> None:
 def test_network_islands() -> None:
     """A 2-edge piece (under 1%) is dropped with its nodes; a 4-edge piece (over 1%) stays."""
     import duckdb
-    from goatlib.io.data_integration import street_network
+    from goatlib.io.fetch import street_network
 
     con = duckdb.connect()
     con.execute("CREATE TEMP TABLE network_edges (id VARCHAR, source_node VARCHAR, target_node VARCHAR)")

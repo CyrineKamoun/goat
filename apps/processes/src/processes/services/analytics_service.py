@@ -300,8 +300,16 @@ class AnalyticsService:
         columns_only: bool = False,
     ) -> dict[str, Any]:
         """Attributes, or one attribute's values, in the mirror for an area."""
-        from goatlib.io.data_integration.mirror import mirror_values
+        from goatlib.io.fetch import street_network
+        from goatlib.io.fetch.mirror.values import mirror_values
 
+        if source == "street_network":
+            if not size_only:
+                raise ValueError(
+                    "A street network answers only its size: it has no attributes or columns to list."
+                )
+            with mirror_cursor() as con:
+                return street_network.size(con, area)
         with mirror_cursor() as con:
             return mirror_values(
                 con,

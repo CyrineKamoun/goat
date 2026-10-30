@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Any
 
-from goatlib.io.data_integration.mirror import area_boxes, area_table
+from goatlib.io.fetch.area import area_boxes, area_table
 from goatlib.io.parquet import write_optimized_parquet
 from goatlib.tasks.sync_base_data import h3_3_cells_for_bbox
 
@@ -52,6 +52,24 @@ def area_cells(con: Any, area: dict) -> int:
             FROM (SELECT unnest(ST_Dump(geom)).geom AS part FROM {table}))
     """).fetchone()
     return int(cells)
+
+
+def size(con: Any, area: dict) -> dict:
+    """The area's size as the fetch form asks it, in the mirror-values shape.
+
+    No attributes to list, and its size is the area's cells: the network
+    itself is on the workers' disks, not readable from here.
+    """
+    cells = area_cells(con, area)
+    return {
+        "key": None,
+        "total": 0,
+        "complete": True,
+        "estimate": None,
+        "cells": cells,
+        "too_large": cells > MAX_CELLS,
+        "values": [],
+    }
 
 
 def check_area(con: Any, area: dict) -> None:

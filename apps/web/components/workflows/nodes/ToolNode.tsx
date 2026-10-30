@@ -404,7 +404,7 @@ const ToolNode: React.FC<ToolNodeProps> = ({ id, data, selected }) => {
 
   // Calculate handle positions for multiple inputs
   const inputHandleCount = effectiveInputHandles.length || 1; // Default to 1 if no process loaded yet
-  // A tool that takes no layer (e.g. data_integration) has nothing to connect into.
+  // A tool that takes no layer (e.g. fetch_data) has nothing to connect into.
   const hasInput = !process || effectiveInputHandles.length > 0;
 
   // Warning message for tooltip - combine missing layers and missing config

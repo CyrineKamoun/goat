@@ -1,6 +1,6 @@
 """Create a street network bundle from GOAT's own routing network, for an area.
 
-The cut itself is in `goatlib.io.data_integration.street_network`; this stores
+The cut itself is in `goatlib.io.fetch.street_network`; this stores
 it as a street_network bundle with its routable artifact, which routes on the
 network's slope.
 """
@@ -22,7 +22,7 @@ from goatlib.analysis.schemas.ui import (
 )
 from goatlib.bundles.importers.base import ExtractedLayer
 from goatlib.bundles.runner import BundleImportRunner, ImportedLayer
-from goatlib.io.data_integration.street_network import export_network
+from goatlib.io.fetch.street_network import export_network
 from goatlib.models.bundle import (
     BundleStatus,
     BundleTypeName,
@@ -36,7 +36,7 @@ from goatlib.tools.schemas import ToolInputBase
 logger = logging.getLogger(__name__)
 
 
-class StreetNetworkExtractParams(ToolInputBase):
+class FetchStreetNetworkParams(ToolInputBase):
     """Where to cut the routing network, and where the bundle goes."""
 
     model_config = ConfigDict(
@@ -65,12 +65,12 @@ class StreetNetworkExtractParams(ToolInputBase):
     )
 
 
-class StreetNetworkExtractRunner(BundleImportRunner):
+class FetchStreetNetworkRunner(BundleImportRunner):
     """Cuts the routing network to an area and stores it as a bundle."""
 
     def process(self, params: Any, temp_dir: Path) -> "tuple[Path, DatasetMetadata]":
         raise NotImplementedError(
-            "StreetNetworkExtractRunner builds a bundle through run_extract()."
+            "FetchStreetNetworkRunner builds a bundle through run_extract()."
         )
 
     async def run_extract(
@@ -200,11 +200,11 @@ class StreetNetworkExtractRunner(BundleImportRunner):
             self.cleanup()
 
 
-def main(params: StreetNetworkExtractParams) -> dict:
+def main(params: FetchStreetNetworkParams) -> dict:
     """Windmill entry point."""
     from goatlib.tools.base import _get_or_create_event_loop
 
-    runner = StreetNetworkExtractRunner()
+    runner = FetchStreetNetworkRunner()
     runner.init_from_env()
     return _get_or_create_event_loop().run_until_complete(
         runner.run_extract(

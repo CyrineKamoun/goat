@@ -4,7 +4,7 @@ import type { ToolNodeData } from "@/lib/validations/workflow";
 
 // Keys match what the workflow runner reads; params never carry user_id, project_id or folder_id.
 export const datasetConnectionSchema = z.object({
-  processId: z.literal("data_integration"),
+  processId: z.literal("fetch_data"),
   params: z.record(z.unknown()),
   summary: z.string(),
   geometryType: z.string(),
@@ -32,7 +32,7 @@ export const datasetConnectionSchema = z.object({
 
 export type DatasetConnection = z.infer<typeof datasetConnectionSchema>;
 
-export const INTEGRATE_PROCESS_ID = "data_integration";
+export const INTEGRATE_PROCESS_ID = "fetch_data";
 
 /** The node's saved choice in the shape the dialog reopens on; none before a first choice. */
 export const connectionFromNode = (data: ToolNodeData): DatasetConnection | undefined =>

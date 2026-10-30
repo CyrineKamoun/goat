@@ -1,7 +1,7 @@
 """Extract features from our mirrored map data for one area, as a layer.
 
 The reading -- which files, which rows, which tags -- is in
-`goatlib.io.data_integration`; this is the job around it.
+`goatlib.io.fetch.mirror`; this is the job around it.
 """
 
 import json
@@ -17,27 +17,31 @@ from goatlib.analysis.schemas.ui import (
     ui_field,
     ui_sections,
 )
-from goatlib.io.data_integration.mirror import (
-    MAX_FEATURES,
-    SOURCES,
-    _files_of,
-    _indexed,
+from goatlib.io.fetch.area import (
     area_boxes,
     area_envelope,
     area_geom_column,
     area_table,
+)
+from goatlib.io.fetch.mirror.osm import tag_storage
+from goatlib.io.fetch.mirror.overture import OVERTURE_TYPES
+from goatlib.io.fetch.mirror.query import (
     candidates_sql,
-    check_read_size,
     checked_where,
-    ensure_s3,
     filter_sql,
     lineage_text,
-    mirror_columns,
-    pointer,
     selected_columns,
 )
-from goatlib.io.data_integration.osm import tag_storage
-from goatlib.io.data_integration.overture import OVERTURE_TYPES
+from goatlib.io.fetch.mirror.reader import (
+    MAX_FEATURES,
+    SOURCES,
+    _files_of,
+    _indexed,
+    check_read_size,
+    ensure_s3,
+    mirror_columns,
+    pointer,
+)
 from goatlib.models.io import DatasetMetadata
 from goatlib.tools.base import BaseToolRunner, _get_or_create_event_loop
 from goatlib.tools.schemas import ToolInputBase
@@ -72,7 +76,7 @@ class TagFilter(BaseModel):
     )
 
 
-class DataIntegrationParams(ToolInputBase):
+class FetchDataParams(ToolInputBase):
     """What to extract, from where, and for which area.
 
     Shown as the panel's own description, so it says what the tool needs rather
@@ -162,18 +166,18 @@ class DataIntegrationParams(ToolInputBase):
     )
 
 
-class DataIntegrationRunner(BaseToolRunner[DataIntegrationParams]):
+class FetchDataRunner(BaseToolRunner[FetchDataParams]):
     """Read the mirror for an area and write one layer."""
 
     default_output_name = "Extracted Features"
     output_geometry_type = "point"
 
-    def get_feature_layer_type(self: Self, params: DataIntegrationParams) -> str:
+    def get_feature_layer_type(self: Self, params: FetchDataParams) -> str:
         """A dataset brought in from a source, like an import -- not a tool's result."""
         return "standard"
 
     def process(
-        self: Self, params: DataIntegrationParams, temp_dir: Path
+        self: Self, params: FetchDataParams, temp_dir: Path
     ) -> tuple[Path, DatasetMetadata]:
         con = self.duckdb_con
         ensure_s3(con)
@@ -316,7 +320,7 @@ class DataIntegrationRunner(BaseToolRunner[DataIntegrationParams]):
 
 
 async def _record_provenance(
-    runner: DataIntegrationRunner, layer_id: str, provenance: dict
+    runner: FetchDataRunner, layer_id: str, provenance: dict
 ) -> None:
     """Write where the data came from onto the layer the tool just made.
 
@@ -347,9 +351,9 @@ async def _record_provenance(
         await pool.close()
 
 
-def main(params: DataIntegrationParams) -> dict:
+def main(params: FetchDataParams) -> dict:
     """Windmill entry point."""
-    runner = DataIntegrationRunner()
+    runner = FetchDataRunner()
     runner.init_from_env()
     try:
         result = runner.run(params)

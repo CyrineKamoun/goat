@@ -203,7 +203,7 @@ describe("AddLayerDialog — Connect service in a workflow", () => {
     await waitFor(() => expect(onUse).toHaveBeenCalledTimes(1));
     const connection = onUse.mock.calls[0][0] as DatasetConnection;
     expect(connection).toMatchObject({
-      processId: "data_integration",
+      processId: "fetch_data",
       params: {
         source: "osm",
         feature_type: "points",
@@ -241,7 +241,7 @@ describe("AddLayerDialog — Connect service in a workflow", () => {
       names: { DE2: "Bayern", DED: "Sachsen" },
     };
     const initial: DatasetConnection = {
-      processId: "data_integration",
+      processId: "fetch_data",
       params: {
         source: "osm",
         feature_type: "lines",

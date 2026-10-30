@@ -217,15 +217,15 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         ),
     ),
     ToolDefinition(
-        name="data_integration",
-        display_name="Data Integration",
+        name="fetch_data",
+        display_name="Fetch data",
         description=(
             "Extract OpenStreetMap or Overture features for an area, "
             "filtered by tag or attribute"
         ),
-        module_path="goatlib.tools.data_integration",
-        params_class_name="DataIntegrationParams",
-        windmill_path="f/goat/tools/data_integration",
+        module_path="goatlib.tools.fetch_data",
+        params_class_name="FetchDataParams",
+        windmill_path="f/goat/tools/fetch_data",
         category="data",
         keywords=(
             "data_management", "osm", "openstreetmap", "overture", "extract",
@@ -234,15 +234,15 @@ TOOL_REGISTRY: tuple[ToolDefinition, ...] = (
         toolbox_hidden=True,
     ),
     ToolDefinition(
-        name="street_network_extract",
-        display_name="Street Network Extract",
+        name="fetch_street_network",
+        display_name="Fetch street network",
         description=(
             "Cut GOAT's routing network to an area as a street network bundle "
             "with its routable artifact"
         ),
-        module_path="goatlib.tools.street_network_extract",
-        params_class_name="StreetNetworkExtractParams",
-        windmill_path="f/goat/tools/street_network_extract",
+        module_path="goatlib.tools.fetch_street_network",
+        params_class_name="FetchStreetNetworkParams",
+        windmill_path="f/goat/tools/fetch_street_network",
         category="data",
         keywords=("bundle", "street", "network", "routing", "extract"),
         toolbox_hidden=True,

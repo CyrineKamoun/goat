@@ -94,7 +94,7 @@ type FetchParams = {
  * connection saved without that keeps its geometry as it is.
  */
 const seedFrom = (initial: DatasetConnection | undefined) => {
-  if (initial?.processId !== "data_integration") return undefined;
+  if (initial?.processId !== "fetch_data") return undefined;
   const params = initial.params as Partial<FetchParams>;
   if (!params.source || !params.area) return undefined;
   const filters = (params.tag_filters ?? []).map((filter, index) => ({ id: index + 1, ...filter }));
@@ -376,14 +376,14 @@ export const useFetchFlow = ({
     try {
       setIsBusy(true);
       const job = isNetwork
-        ? await executeProcessAsync("street_network_extract", {
+        ? await executeProcessAsync("fetch_street_network", {
             user_id: userProfile?.id,
             project_id: projectId,
             folder_id: selectedFolder.id,
             result_bundle_name: name.trim(),
             area,
           })
-        : await executeProcessAsync("data_integration", {
+        : await executeProcessAsync("fetch_data", {
             user_id: userProfile?.id,
             project_id: projectId,
             folder_id: selectedFolder.id,
@@ -433,7 +433,7 @@ export const useFetchFlow = ({
           ? viewBox && { kind: "view" as const, bbox: viewBox }
           : (spatial ?? undefined);
       workflow.onUse({
-        processId: "data_integration",
+        processId: "fetch_data",
         params: fetchParams(area),
         // The node is named as Add layer would name the layer.
         summary: suggestedName,

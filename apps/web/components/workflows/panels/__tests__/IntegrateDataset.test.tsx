@@ -24,7 +24,7 @@ const dispatch = vi.fn();
 const { selected, described, layers, bundles, edges } = vi.hoisted(() => ({
   selected: [] as unknown[],
   described: {
-    process: { id: "data_integration", title: "Data Integration", description: "docstring", inputs: {} },
+    process: { id: "fetch_data", title: "Fetch data", description: "docstring", inputs: {} },
     isLoading: false,
   },
   layers: { layers: [] },
@@ -72,7 +72,7 @@ const area = {
 };
 const empty: ToolNodeData = {
   type: "tool",
-  processId: "data_integration",
+  processId: "fetch_data",
   label: "fetch_data",
   config: {},
   status: "idle",
@@ -92,7 +92,7 @@ const chosen: ToolNodeData = {
 };
 
 describe("Integrate dataset node", () => {
-  it("is dragged from Data I/O as a data_integration tool", () => {
+  it("is dragged from Data I/O as a fetch_data tool", () => {
     const onDragStart = vi.fn();
     render(<WorkflowsNodesPanel config={null} selectedNodeId={null} onDragStart={onDragStart} />);
     const tile = screen.getByText("fetch_data").parentElement!;
@@ -101,7 +101,7 @@ describe("Integrate dataset node", () => {
     expect(container.querySelector("svg")?.innerHTML).toBeTruthy();
     expect(tile.querySelector("svg")?.innerHTML).toBe(container.querySelector("svg")?.innerHTML);
     fireEvent.dragStart(screen.getByText("fetch_data"));
-    expect(onDragStart).toHaveBeenCalledWith(expect.anything(), "tool", "data_integration");
+    expect(onDragStart).toHaveBeenCalledWith(expect.anything(), "tool", "fetch_data");
   });
 
   it("describes itself in the panel, not with the tool docstring", async () => {
@@ -138,7 +138,7 @@ describe("Integrate dataset node", () => {
     expect(workflow.initial).toBeUndefined();
 
     workflow.onUse({
-      processId: "data_integration",
+      processId: "fetch_data",
       params: chosen.config,
       summary: "OSM points",
       geometryType: "point",
