@@ -3429,6 +3429,7 @@
   "fetch_features_area_view": "Kartenausschnitt",
   "fetch_features_area_view_label": "Gebiet: dieser Ausschnitt",
   "fetch_features_area_view_hint": "Verschieben Sie die Karte: Der gestrichelte Rahmen ist das Gebiet.",
+  "fetch_features_area_none": "Noch nichts gewählt",
   "fetch_features_area_preview": "Gebiet",
   "fetch_features_area_needed": "Wählen Sie zuerst ein Gebiet",
   "fetch_data_choose": "Wählen Sie die Daten zum Abrufen",

@@ -3429,6 +3429,7 @@
   "fetch_features_area_view": "Map view",
   "fetch_features_area_view_label": "Area: this view",
   "fetch_features_area_view_hint": "Move the map: the dashed box is the area.",
+  "fetch_features_area_none": "Nothing chosen yet",
   "fetch_features_area_preview": "Area",
   "fetch_features_area_needed": "Choose an area first",
   "fetch_data_choose": "Choose the data to fetch",

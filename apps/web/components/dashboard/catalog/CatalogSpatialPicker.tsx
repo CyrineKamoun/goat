@@ -50,7 +50,7 @@ const LEVEL_LABEL_KEYS: Record<number, string> = {
 };
 
 /** The inline strip keeps one height in every mode, so the map below it never resizes. */
-const STRIP_HEIGHT = 72;
+const STRIP_HEIGHT = 84;
 
 export type Mode = "region" | "point" | "polygon";
 
@@ -149,6 +149,25 @@ const CatalogSpatialPicker = ({
     // `value` is deliberately not a dependency: only a change of regions re-frames.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regionKey, geometries]);
+
+  // Inline, a newly placed point or a polygon's third corner frames the map on the shape;
+  // what is already there when the map opens is framed by the opening view.
+  const fitKey =
+    value?.kind === "point"
+      ? `point ${value.lng},${value.lat}`
+      : value?.kind === "polygon" && value.ring.length >= 3
+        ? "polygon"
+        : "";
+  const framedKey = useRef(fitKey);
+  useEffect(() => {
+    if (!inline || fitKey === framedKey.current) return;
+    framedKey.current = fitKey;
+    if (!fitKey) return;
+    const box = bboxOf(features) as number[];
+    mapRef.current?.fitBounds([box[0], box[1], box[2], box[3]], { padding: 32, maxZoom: 13, duration: 400 });
+    // `features` follows `value`; only a new key re-frames.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey]);
 
   const addRegion = (region: CatalogNutsRegion | null) => {
     if (!region) return;
@@ -380,7 +399,11 @@ const CatalogSpatialPicker = ({
           {mode === "region" ? (
             <>
               {regionSearch}
-              {regionChips}
+              {regionChips || (
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
+                  {hint}
+                </Typography>
+              )}
             </>
           ) : mode === "point" ? (
             <>
@@ -390,6 +413,11 @@ const CatalogSpatialPicker = ({
                 </Typography>
                 {bufferSlider}
                 <Chip size="small" color="primary" label={formatBuffer(buffer)} />
+                {value?.kind === "point" && (
+                  <Button size="small" onClick={() => onChange(null)}>
+                    {t("clear_all")}
+                  </Button>
+                )}
               </Stack>
               <Typography variant="caption" color="text.secondary">
                 {hint}
@@ -410,7 +438,7 @@ const CatalogSpatialPicker = ({
             </Stack>
           )}
         </Box>
-        <Box sx={{ position: "relative", flex: 1, minHeight: 280, cursor }}>
+        <Box sx={{ position: "relative", flex: 1, minHeight: 240, cursor }}>
           {map}
           {overlay}
         </Box>

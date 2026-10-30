@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { forwardRef, useImperativeHandle } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { executeProcessAsync, getMirrorColumns, getMirrorSize, getMirrorValues } from "@/lib/api/processes";
@@ -19,20 +20,24 @@ vi.mock("react-i18next", () => ({
 
 /** The project's map, when a test puts one behind the dialog. */
 const mapState = vi.hoisted(() => ({ map: undefined as unknown }));
-const mapProps = vi.hoisted(() => ({ opened: [] as unknown[] }));
+const mapProps = vi.hoisted(() => ({ opened: [] as unknown[], fitBounds: vi.fn() }));
 vi.mock("react-map-gl/maplibre", () => ({
   useMap: () => ({ map: mapState.map }),
-  Map: ({
-    onMoveEnd,
-    onClick,
-    initialViewState,
-    children,
-  }: {
-    onMoveEnd?: (event: unknown) => void;
-    onClick?: (event: unknown) => void;
-    initialViewState?: unknown;
-    children?: React.ReactNode;
-  }) => {
+  Map: forwardRef(function MapMock(
+    {
+      onMoveEnd,
+      onClick,
+      initialViewState,
+      children,
+    }: {
+      onMoveEnd?: (event: unknown) => void;
+      onClick?: (event: unknown) => void;
+      initialViewState?: unknown;
+      children?: React.ReactNode;
+    },
+    ref
+  ) {
+    useImperativeHandle(ref, () => ({ fitBounds: mapProps.fitBounds }));
     mapProps.opened.push(initialViewState);
     return (
       <>
@@ -52,7 +57,7 @@ vi.mock("react-map-gl/maplibre", () => ({
         {children}
       </>
     );
-  },
+  }),
   Source: ({ id }: { id: string }) => <i data-testid={`source-${id}`} />,
   Layer: () => null,
 }));
@@ -418,5 +423,24 @@ describe("AddLayerDialog — Connect service in a workflow", () => {
 
     expect((screen.getByRole("button", { name: "delete" }) as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByLabelText("fetch_features_tag") as HTMLInputElement).disabled).toBe(false);
+  });
+
+  it("says what is chosen, hints at the region search, and clears and frames a placed point", async () => {
+    const user = await openOsm({ onUse: vi.fn() });
+    await user.click(screen.getByRole("radio", { name: "catalog_mode_region" }));
+    expect(screen.getByText("fetch_features_area_none")).toBeInTheDocument();
+    expect(screen.getByText("catalog_spatial_hint_region")).toBeInTheDocument();
+    await pickBayern(user);
+    expect(screen.queryByText("fetch_features_area_none")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Bayern").length).toBeGreaterThan(1);
+
+    mapProps.fitBounds.mockClear();
+    await user.click(screen.getByRole("radio", { name: "catalog_mode_point" }));
+    await user.click(screen.getByTestId("tap"));
+    expect(mapProps.fitBounds).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/catalog_spatial_point/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "clear_all" }));
+    expect(screen.queryByRole("button", { name: "clear_all" })).not.toBeInTheDocument();
+    expect(screen.getByText("fetch_features_area_none")).toBeInTheDocument();
   });
 });

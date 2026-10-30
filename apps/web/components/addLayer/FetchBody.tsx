@@ -192,6 +192,13 @@ const AreaSection = ({ flow }: { flow: FetchFlow["fetch"] }) => {
       <Box>
         <SectionLabel>{t("fetch_features_area")}</SectionLabel>
         <SpatialModeSwitch modes={modes} value={areaMode} onChange={flow.setAreaMode} />
+        {/* A line is kept in every mode, so the map below never moves. */}
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: "block", mt: 1.5, minHeight: 20 }}>
+          {!isView && (flow.areaLabel ?? t("fetch_features_area_none"))}
+        </Typography>
       </Box>
       <CatalogSpatialPicker
         variant="inline"
