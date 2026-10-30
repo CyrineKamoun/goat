@@ -125,7 +125,8 @@ export type FetchFlowState = {
   areaMode: AreaMode;
   setAreaMode: (mode: AreaMode) => void;
   viewBox?: Bbox;
-  setViewBox: (bbox: Bbox) => void;
+  /** `moved`: a person moved the map, which is what makes the view an area they chose. */
+  setViewBox: (bbox: Bbox, moved?: boolean) => void;
   spatial: CatalogSpatialFilter | null;
   setSpatial: (filter: CatalogSpatialFilter | null) => void;
   regionNames: Record<string, string>;
@@ -200,6 +201,8 @@ export const useFetchFlow = ({
   const [kept, setKept] = useState(seed?.kept);
   const [areaMode, setAreaMode] = useState<AreaMode>(seed?.spatial?.kind ?? (kept ? "polygon" : "view"));
   const [viewBox, setViewBox] = useState<Bbox | undefined>(roundBox(viewport ?? DEFAULT_VIEW_BOX));
+  // Without a project map the view is only a starting point until someone moves it.
+  const [viewChosen, setViewChosen] = useState(!!viewport || !!seed);
   const [spatial, setSpatial] = useState<CatalogSpatialFilter | null>(seed?.spatial ?? null);
   const [source, setSource] = useState<FetchSource>(initialSource);
   const [osmType, setOsmType] = useState(seed?.params.feature_type ?? "points");
@@ -237,19 +240,24 @@ export const useFetchFlow = ({
     [names, spatial]
   );
 
+  // The last complete area, which stays in force while a new polygon is still being drawn.
+  const heldArea = useRef<GeoJSON.Polygon | GeoJSON.MultiPolygon | undefined>(undefined);
   const area = useMemo(() => {
-    if (kept) return kept.area;
-    if (areaMode === "view") return viewBox ? bboxPolygon(viewBox).geometry : undefined;
+    const keep = (next: GeoJSON.Polygon | GeoJSON.MultiPolygon | undefined) => {
+      if (next) heldArea.current = next;
+      return next;
+    };
+    if (kept) return keep(kept.area);
+    if (areaMode === "view") return keep(viewBox && viewChosen ? bboxPolygon(viewBox).geometry : undefined);
     if (!spatial || spatial.kind !== areaMode) return undefined;
     if (spatial.kind === "region") {
       // Every picked region or none: one still loading, or failed, would be left out unseen.
       const outlines = spatial.nutsIds.map((id) => geometries[id]);
-      return outlines.every(Boolean) ? mergePolygons(outlines) : undefined;
+      return keep(outlines.every(Boolean) ? mergePolygons(outlines) : undefined);
     }
-    // A ring still being drawn is not an area yet.
-    if (spatial.kind === "polygon" && spatial.ring.length < 3) return undefined;
-    return spatialGeometry(spatial);
-  }, [areaMode, viewBox, spatial, geometries, kept]);
+    if (spatial.kind === "polygon" && spatial.ring.length < 3) return heldArea.current;
+    return keep(spatialGeometry(spatial));
+  }, [areaMode, viewBox, viewChosen, spatial, geometries, kept]);
 
   const areaLabel = kept
     ? t("catalog_mode_polygon")
@@ -295,6 +303,8 @@ export const useFetchFlow = ({
   const reset = useCallback(() => {
     setAreaMode("view");
     setViewBox(roundBox(viewport ?? DEFAULT_VIEW_BOX));
+    setViewChosen(!!viewport);
+    heldArea.current = undefined;
     setSpatial(null);
     setKept(undefined);
     setFiltersBySource({ osm: [], overture: [], street_network: [] });
@@ -502,14 +512,22 @@ export const useFetchFlow = ({
     fetch: {
       areaMode,
       setAreaMode: (mode: AreaMode) => {
-        if (mode !== areaMode) setKept(undefined);
+        if (mode !== areaMode) {
+          // The map was framed on what was chosen, so the view is no longer just the start.
+          if (spatial || kept) setViewChosen(true);
+          setKept(undefined);
+        }
         setAreaMode(mode);
       },
       viewBox,
-      setViewBox,
+      setViewBox: (box: Bbox, moved?: boolean) => {
+        setViewBox(box);
+        if (moved) setViewChosen(true);
+      },
       spatial,
       setSpatial: (filter: CatalogSpatialFilter | null) => {
-        setKept(undefined);
+        // A polygon with fewer than three corners is not an area: what was in force stays.
+        if (!(filter?.kind === "polygon" && filter.ring.length < 3)) setKept(undefined);
         setSpatial(filter);
       },
       regionNames,

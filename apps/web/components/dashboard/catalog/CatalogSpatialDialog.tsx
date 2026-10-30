@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Button, Stack, Typography, useTheme } from "@mui/material";
+import { Box, Button, Typography } from "@mui/material";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -10,6 +10,7 @@ import type { CatalogSpatialFilter } from "@/lib/catalog/spatial";
 
 import AppDialog, { AppDialogFooter } from "@/components/common/AppDialog";
 import CatalogSpatialPicker, { type Mode, modeOf } from "@/components/dashboard/catalog/CatalogSpatialPicker";
+import SpatialModeSwitch from "@/components/dashboard/catalog/SpatialModeSwitch";
 
 /** The spatial filter tool in a dialog: the picker's edits are a draft until applied. */
 
@@ -25,7 +26,6 @@ const CatalogSpatialDialog = ({
   onApply: (filter: CatalogSpatialFilter | null) => void;
 }) => {
   const { t } = useTranslation("common");
-  const theme = useTheme();
 
   const [mode, setMode] = useState<Mode>(() => modeOf(initial));
   const [draft, setDraft] = useState<CatalogSpatialFilter | null>(initial);
@@ -90,56 +90,15 @@ const CatalogSpatialDialog = ({
             <Typography variant="caption" fontWeight={600} color="text.secondary">
               {t("catalog_selection_type")}
             </Typography>
-            <Stack
-              direction="row"
-              sx={{
-                mt: 1.5,
-                borderRadius: 2.5,
-                overflow: "hidden",
-                border: `1.5px solid ${theme.palette.primary.main}`,
-              }}>
-              {(
-                [
-                  { id: "region" as Mode, label: t("catalog_mode_region"), icon: ICON_NAME.GLOBE },
-                  { id: "point" as Mode, label: t("catalog_mode_point"), icon: ICON_NAME.LOCATION },
-                  {
-                    id: "polygon" as Mode,
-                    label: t("catalog_mode_polygon"),
-                    icon: ICON_NAME.POLYGON_FEATURE,
-                  },
-                ] as const
-              ).map((tool, index) => (
-                <Box
-                  key={tool.id}
-                  component="button"
-                  type="button"
-                  onClick={() => switchMode(tool.id)}
-                  sx={{
-                    flex: 1,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 2.5,
-                    py: 3,
-                    px: 2.5,
-                    cursor: "pointer",
-                    font: "inherit",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    border: "none",
-                    borderLeft: index > 0 ? `1.5px solid ${theme.palette.primary.main}` : undefined,
-                    color: theme.palette.primary.main,
-                    backgroundColor: tool.id === mode ? theme.palette.action.selected : "transparent",
-                  }}>
-                  <Icon
-                    iconName={tool.icon}
-                    style={{ fontSize: 15 }}
-                    htmlColor={theme.palette.primary.main}
-                  />
-                  {tool.label}
-                </Box>
-              ))}
-            </Stack>
+            <SpatialModeSwitch
+              value={mode}
+              onChange={switchMode}
+              modes={[
+                { id: "region", label: t("catalog_mode_region"), icon: ICON_NAME.GLOBE },
+                { id: "point", label: t("catalog_mode_point"), icon: ICON_NAME.LOCATION },
+                { id: "polygon", label: t("catalog_mode_polygon"), icon: ICON_NAME.POLYGON_FEATURE },
+              ]}
+            />
           </Box>
         }
       />

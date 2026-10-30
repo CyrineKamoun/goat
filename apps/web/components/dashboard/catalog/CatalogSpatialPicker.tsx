@@ -69,10 +69,11 @@ const CatalogSpatialPicker = ({
   mapId,
   initialViewState,
   onMoveEnd,
+  onLoad,
+  geometry,
   overlay,
   viewHint,
   shapeColor = SHAPE_COLOR,
-  children,
 }: {
   /** Null is a plain map with nothing to pick. */
   mode: Mode | null;
@@ -88,14 +89,15 @@ const CatalogSpatialPicker = ({
   /** Otherwise it opens on the value, or on Europe. */
   initialViewState?: MapProps["initialViewState"];
   onMoveEnd?: MapProps["onMoveEnd"];
+  onLoad?: MapProps["onLoad"];
+  /** An area with no record of how it was picked: drawn, and framed on open, until a shape is picked. */
+  geometry?: GeoJSON.Geometry | null;
   /** Drawn over the map box. */
   overlay?: ReactNode;
   /** The inline strip's text when there is nothing to pick (mode null). */
   viewHint?: ReactNode;
   /** The drawn area's colour. */
   shapeColor?: string;
-  /** Extra map content. */
-  children?: ReactNode;
 }) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
@@ -110,13 +112,19 @@ const CatalogSpatialPicker = ({
   const regionIds = value?.kind === "region" ? value.nutsIds : [];
   const { geometries, names } = useCatalogNutsGeometries(regionIds);
 
-  const features = useMemo(() => spatialFeatures(value, geometries), [value, geometries]);
+  const shapes = useCallback((): GeoJSON.FeatureCollection => {
+    const picked = spatialFeatures(value, geometries);
+    if (!picked.features.length && geometry)
+      picked.features.push({ type: "Feature", geometry, properties: {} });
+    return picked;
+  }, [value, geometries, geometry]);
+  const features = useMemo(() => shapes(), [shapes]);
 
   const mapRef = useRef<MapRef | null>(null);
   // Only the view the map opens with; later edits move it through `fitBounds`.
   const [openingView] = useState(() => {
     if (initialViewState) return initialViewState;
-    const existing = spatialFeatures(value, geometries);
+    const existing = shapes();
     if (existing.features.length) {
       const box = bboxOf(existing) as number[];
       return {
@@ -292,11 +300,11 @@ const CatalogSpatialPicker = ({
       initialViewState={openingView}
       onClick={handleMapClick}
       onMoveEnd={onMoveEnd}
+      onLoad={onLoad}
       style={{ width: "100%", height: "100%" }}
       mapStyle={basemapStyle}
       // Ours replaces it, at the end of the map's children.
       attributionControl={false}>
-      {children}
       <Source id="spatial-draft" type="geojson" data={features}>
         <MapLayer
           id="spatial-draft-fill"

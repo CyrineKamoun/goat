@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -19,22 +19,41 @@ vi.mock("react-i18next", () => ({
 
 /** The project's map, when a test puts one behind the dialog. */
 const mapState = vi.hoisted(() => ({ map: undefined as unknown }));
+const mapProps = vi.hoisted(() => ({ opened: [] as unknown[] }));
 vi.mock("react-map-gl/maplibre", () => ({
   useMap: () => ({ map: mapState.map }),
-  Map: ({ onMoveEnd }: { onMoveEnd?: (event: unknown) => void }) => (
-    <button
-      data-testid="pan"
-      onClick={() =>
-        onMoveEnd?.({
-          target: {
-            getContainer: () => ({ clientWidth: 400, clientHeight: 300 }),
-            unproject: ([x, y]: number[]) => ({ lng: x / 100, lat: 50 - y / 100 }),
-          },
-        })
-      }
-    />
-  ),
-  Source: () => null,
+  Map: ({
+    onMoveEnd,
+    onClick,
+    initialViewState,
+    children,
+  }: {
+    onMoveEnd?: (event: unknown) => void;
+    onClick?: (event: unknown) => void;
+    initialViewState?: unknown;
+    children?: React.ReactNode;
+  }) => {
+    mapProps.opened.push(initialViewState);
+    return (
+      <>
+        <button
+          data-testid="pan"
+          onClick={() =>
+            onMoveEnd?.({
+              originalEvent: {},
+              target: {
+                getContainer: () => ({ clientWidth: 400, clientHeight: 300 }),
+                unproject: ([x, y]: number[]) => ({ lng: x / 100, lat: 50 - y / 100 }),
+              },
+            })
+          }
+        />
+        <button data-testid="tap" onClick={() => onClick?.({ lngLat: { lng: 11, lat: 48 } })} />
+        {children}
+      </>
+    );
+  },
+  Source: ({ id }: { id: string }) => <i data-testid={`source-${id}`} />,
   Layer: () => null,
 }));
 
@@ -195,6 +214,7 @@ describe("AddLayerDialog — Connect service in a workflow", () => {
 
   afterEach(() => {
     mapState.map = undefined;
+    mapProps.opened.length = 0;
     vi.clearAllMocks();
   });
 
@@ -320,5 +340,83 @@ describe("AddLayerDialog — Connect service in a workflow", () => {
     await user.click(useButton());
     await waitFor(() => expect(onUse).toHaveBeenCalledTimes(1));
     expect(onUse.mock.calls[0][0].areaChoice).toEqual({ kind: "view", bbox: [0.28, 47.28, 3.72, 49.72] });
+  });
+
+  const saved = (areaChoice?: DatasetConnection["areaChoice"], area: GeoJSON.Polygon = BAVARIA) =>
+    ({
+      processId: "fetch_data",
+      params: {
+        source: "osm",
+        feature_type: "points",
+        overture_type: "places",
+        area,
+        match_mode: "all",
+        tag_filters: [{ key: "amenity", values: ["school"] }],
+      },
+      summary: "OSM points",
+      geometryType: "point",
+      fields: [],
+      areaChoice,
+    }) as DatasetConnection;
+
+  const reopen = (initial: DatasetConnection) => {
+    const onUse = vi.fn();
+    render(<AddLayerDialog source="connect" workflow={{ initial, onUse }} onClose={vi.fn()} />);
+    return onUse;
+  };
+
+  it("fetches the box the map shows after another mode moved it", async () => {
+    const onUse = vi.fn();
+    const user = await openOsm({ onUse });
+    await user.click(screen.getByRole("radio", { name: "catalog_mode_region" }));
+    await user.click(screen.getByTestId("pan"));
+    await user.click(screen.getByRole("radio", { name: "fetch_features_area_view" }));
+    await waitFor(() => expect(useButton().disabled).toBe(false));
+    await user.click(useButton());
+    await waitFor(() => expect(onUse).toHaveBeenCalledTimes(1));
+    expect(onUse.mock.calls[0][0].areaChoice).toEqual({ kind: "view", bbox: [0.28, 47.28, 3.72, 49.72] });
+  });
+
+  it("does not take the starting view as an area until the map is moved", async () => {
+    const user = await openOsm({ onUse: vi.fn() });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    expect(getMirrorSize).not.toHaveBeenCalled();
+    expect(useButton().disabled).toBe(true);
+    expect(screen.queryByText("fetch_features_filters_paused")).not.toBeInTheDocument();
+    await user.click(screen.getByTestId("pan"));
+    await waitFor(() => expect(getMirrorSize).toHaveBeenCalled());
+  });
+
+  it("frames the map on a reopened point, and draws the saved area once", async () => {
+    reopen(saved({ kind: "point", lng: 20, lat: 40, km: 5 }));
+    const view = mapProps.opened[0] as { bounds: number[] };
+    expect(view.bounds[0]).toBeLessThanOrEqual(20);
+    expect(view.bounds[2]).toBeGreaterThanOrEqual(20);
+    expect(view.bounds[1]).toBeGreaterThan(39);
+
+    cleanup();
+    reopen(saved());
+    expect(screen.queryByTestId("source-fetch-area")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("source-spatial-draft")).toHaveLength(1);
+  });
+
+  it("keeps a saved area when a polygon is only started", async () => {
+    const onUse = reopen(saved());
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("tap"));
+    await waitFor(() => expect(useButton().disabled).toBe(false));
+    await user.click(useButton());
+    await waitFor(() => expect(onUse).toHaveBeenCalledTimes(1));
+    expect(onUse.mock.calls[0][0].params.area).toEqual(BAVARIA);
+  });
+
+  it("lets filters be deleted while the area is too large", async () => {
+    vi.mocked(getMirrorSize).mockResolvedValue({ estimate: 9e9, tooLarge: true } as never);
+    reopen(saved({ kind: "point", lng: 11, lat: 48, km: 5 }));
+    await waitFor(() => expect(screen.getByText("fetch_features_filters_paused")).toBeInTheDocument());
+
+    expect((screen.getByRole("button", { name: "delete" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByLabelText("fetch_features_tag") as HTMLInputElement).disabled).toBe(false);
   });
 });

@@ -16,11 +16,10 @@ import {
   alpha,
   useTheme,
 } from "@mui/material";
-import bboxOf from "@turf/bbox";
+import type { Map as MaplibreMap } from "maplibre-gl";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Layer as MapLayer, Source } from "react-map-gl/maplibre";
 
 import { ICON_NAME, Icon } from "@p4b/ui/components/Icon";
 
@@ -28,7 +27,6 @@ import { type MirrorValue, getMirrorValues } from "@/lib/api/processes";
 
 import {
   type AreaMode,
-  type Bbox,
   type FetchFlow,
   type Geometry,
   MAX_FEATURES,
@@ -40,6 +38,7 @@ import {
 
 import UploadDestinationPill from "@/components/addLayer/UploadDestinationPill";
 import CatalogSpatialPicker from "@/components/dashboard/catalog/CatalogSpatialPicker";
+import SpatialModeSwitch from "@/components/dashboard/catalog/SpatialModeSwitch";
 
 const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 const SHAPE_COLOR = "#2BB381";
@@ -162,88 +161,50 @@ const AreaSection = ({ flow }: { flow: FetchFlow["fetch"] }) => {
   const shapeColor = flow.tooLarge ? theme.palette.warning.main : SHAPE_COLOR;
   const isView = areaMode === "view";
 
-  const modes: { id: AreaMode; label: string }[] = [
-    { id: "view", label: t("fetch_features_area_view") },
-    { id: "region", label: t("catalog_mode_region") },
-    { id: "point", label: t("catalog_mode_point") },
-    { id: "polygon", label: t("catalog_mode_polygon") },
+  const modes: { id: AreaMode; label: string; icon: ICON_NAME }[] = [
+    { id: "view", label: t("fetch_features_area_view"), icon: ICON_NAME.MAP },
+    { id: "region", label: t("catalog_mode_region"), icon: ICON_NAME.GLOBE },
+    { id: "point", label: t("catalog_mode_point"), icon: ICON_NAME.LOCATION },
+    { id: "polygon", label: t("catalog_mode_polygon"), icon: ICON_NAME.POLYGON_FEATURE },
   ];
 
   // Each mode shows its own last choice; the flow keeps one, so another mode's shows nothing.
   const value = !isView && spatial?.kind === areaMode ? spatial : null;
-  // A saved area with no record of how it was chosen is drawn as it is.
-  const kept = useMemo<GeoJSON.FeatureCollection>(
-    () => ({
-      type: "FeatureCollection",
-      features:
-        !isView && !value && flow.area ? [{ type: "Feature", geometry: flow.area, properties: {} }] : [],
-    }),
-    [isView, value, flow.area]
+  // Another mode opens framed on its own area (the picker does it); only the map view needs the box.
+  const [initialViewState] = useState(() =>
+    isView && flow.viewBox ? { bounds: flow.viewBox, fitBoundsOptions: { padding: VIEW_INSET } } : undefined
   );
-  const [initialViewState] = useState(() => {
-    if (flow.viewBox) return { bounds: flow.viewBox, fitBoundsOptions: { padding: VIEW_INSET } };
-    if (!flow.area) return undefined;
-    const box = bboxOf(flow.area) as number[];
-    return {
-      bounds: [box[0], box[1], box[2], box[3]] as Bbox,
-      fitBoundsOptions: { padding: 32, maxZoom: 13 },
-    };
-  });
+
+  // The box drawn over the map, not the map's own edges: what is fetched is what the box shows.
+  const measure = (event: { target: MaplibreMap; originalEvent?: unknown }) => {
+    const map = event.target;
+    const { clientWidth, clientHeight } = map.getContainer();
+    const sw = map.unproject([VIEW_INSET, clientHeight - VIEW_INSET]);
+    const ne = map.unproject([clientWidth - VIEW_INSET, VIEW_INSET]);
+    const next = roundBox([sw.lng, sw.lat, ne.lng, ne.lat]);
+    // Only a person moving the map chooses the view; a fit to another area does not.
+    if (next.join() !== flow.viewBox?.join() || event.originalEvent)
+      flow.setViewBox(next, !!event.originalEvent);
+  };
 
   return (
     <Stack spacing={3} sx={{ flex: 1, minHeight: 0 }}>
       <Box>
         <SectionLabel>{t("fetch_features_area")}</SectionLabel>
-        <Stack
-          direction="row"
-          role="radiogroup"
-          sx={{ borderRadius: 2.5, overflow: "hidden", border: `1.5px solid ${theme.palette.primary.main}` }}>
-          {modes.map((mode, index) => (
-            <Box
-              key={mode.id}
-              component="button"
-              type="button"
-              role="radio"
-              aria-checked={mode.id === areaMode}
-              onClick={() => flow.setAreaMode(mode.id)}
-              sx={{
-                flex: 1,
-                py: 2.5,
-                px: 1,
-                cursor: "pointer",
-                font: "inherit",
-                fontSize: 13,
-                fontWeight: 600,
-                border: "none",
-                borderLeft: index > 0 ? `1.5px solid ${theme.palette.primary.main}` : undefined,
-                color: theme.palette.primary.main,
-                backgroundColor: mode.id === areaMode ? theme.palette.action.selected : "transparent",
-              }}>
-              {mode.label}
-            </Box>
-          ))}
-        </Stack>
+        <SpatialModeSwitch modes={modes} value={areaMode} onChange={flow.setAreaMode} />
       </Box>
       <CatalogSpatialPicker
         variant="inline"
         mode={isView ? null : areaMode}
         value={value}
+        geometry={isView || value ? undefined : flow.area}
+        shapeColor={shapeColor}
         onChange={flow.setSpatial}
         mapId="fetch-features-preview"
-        shapeColor={shapeColor}
         initialViewState={initialViewState}
         viewHint={t("fetch_features_area_view_hint")}
-        onMoveEnd={(event) => {
-          if (!isView) return;
-          // The box drawn over the map, not the map's own edges: what is fetched is what
-          // the box shows.
-          const map = event.target;
-          const { clientWidth, clientHeight } = map.getContainer();
-          const sw = map.unproject([VIEW_INSET, clientHeight - VIEW_INSET]);
-          const ne = map.unproject([clientWidth - VIEW_INSET, VIEW_INSET]);
-          const next = roundBox([sw.lng, sw.lat, ne.lng, ne.lat]);
-          if (next.join() !== flow.viewBox?.join()) flow.setViewBox(next);
-        }}
+        onMoveEnd={measure}
+        onLoad={measure}
         overlay={
           <>
             {isView && (
@@ -274,16 +235,8 @@ const AreaSection = ({ flow }: { flow: FetchFlow["fetch"] }) => {
               </Typography>
             </Box>
           </>
-        }>
-        <Source id="fetch-area" type="geojson" data={kept}>
-          <MapLayer
-            id="fetch-area-fill"
-            type="fill"
-            paint={{ "fill-color": shapeColor, "fill-opacity": 0.15 }}
-          />
-          <MapLayer id="fetch-area-line" type="line" paint={{ "line-color": shapeColor, "line-width": 2 }} />
-        </Source>
-      </CatalogSpatialPicker>
+        }
+      />
     </Stack>
   );
 };
@@ -397,12 +350,10 @@ const FilterRow = ({
   flow,
   filter,
   keys,
-  disabled,
 }: {
   flow: FetchFlow["fetch"];
   filter: TagFilter;
   keys: ReturnType<typeof useTagOptions>;
-  disabled: boolean;
 }) => {
   const { t } = useTranslation("common");
   const theme = useTheme();
@@ -439,7 +390,6 @@ const FilterRow = ({
         <Autocomplete
           freeSolo
           size="small"
-          disabled={disabled}
           options={keys.options.map((option) => option.value)}
           loading={keys.loading}
           onOpen={keys.load}
@@ -488,7 +438,7 @@ const FilterRow = ({
           freeSolo
           disableCloseOnSelect
           size="small"
-          disabled={disabled || !filter.key.trim()}
+          disabled={!filter.key.trim()}
           options={values.options.map((option) => option.value)}
           loading={values.loading}
           onOpen={values.load}
@@ -524,7 +474,7 @@ const FilterRow = ({
         />
       </Stack>
       <Stack sx={{ mt: 4 }}>
-        <IconButton disabled={disabled} aria-label={t("delete")} onClick={() => flow.removeFilter(filter.id)}>
+        <IconButton aria-label={t("delete")} onClick={() => flow.removeFilter(filter.id)}>
           <Icon iconName={ICON_NAME.TRASH} style={{ fontSize: 14 }} />
         </IconButton>
         {key && (
@@ -549,7 +499,7 @@ const FilterSection = ({ flow }: { flow: FetchFlow["fetch"] }) => {
   const theme = useTheme();
   const keys = useTagOptions(flow, undefined, true);
   const isSql = flow.filterMode === "sql";
-  // Filters cannot make an area this large fit, so they wait for a smaller one.
+  // Filters cannot make an area this large fit: no new ones, while the ones there stay editable.
   const paused = flow.tooLarge;
 
   const insert = (key: string) => {
@@ -591,7 +541,6 @@ const FilterSection = ({ flow }: { flow: FetchFlow["fetch"] }) => {
             minRows={5}
             fullWidth
             value={flow.sql}
-            disabled={paused}
             onChange={(event) => flow.setSql(event.target.value)}
             placeholder={
               flow.source === "osm"
@@ -641,7 +590,7 @@ const FilterSection = ({ flow }: { flow: FetchFlow["fetch"] }) => {
             </Stack>
           )}
           {flow.filters.map((filter) => (
-            <FilterRow key={filter.id} flow={flow} filter={filter} keys={keys} disabled={paused} />
+            <FilterRow key={filter.id} flow={flow} filter={filter} keys={keys} />
           ))}
           {!flow.filters.length && (
             <Typography
