@@ -3498,7 +3498,7 @@
   "fetch_features_theme_land": "Land",
   "fetch_features_theme_water": "Gewässer",
   "fetch_features_theme_infrastructure": "Infrastruktur",
-  "fetch_features_type_land_use_lines": "Landnutzung (Linien)"
+  "fetch_features_type_land_use_lines": "Landnutzung (Linien)",
   "explorer": "Explorer",
   "explorer_search": "Linien und Haltestellen suchen…",
   "explorer_route_no_trips_on_date": "Keine Fahrten am gewählten Tag",

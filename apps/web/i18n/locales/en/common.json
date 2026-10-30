@@ -3498,7 +3498,7 @@
   "fetch_features_theme_land": "Land",
   "fetch_features_theme_water": "Water",
   "fetch_features_theme_infrastructure": "Infrastructure",
-  "fetch_features_type_land_use_lines": "Land use lines"
+  "fetch_features_type_land_use_lines": "Land use lines",
   "explorer": "Explorer",
   "explorer_search": "Search lines and stations…",
   "explorer_route_no_trips_on_date": "No trips on the selected date",
